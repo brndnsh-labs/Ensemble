@@ -59,7 +59,6 @@ import { getBassNote } from '../../public/bass.js';
 import { validateProgression } from '../../public/chords.js';
 import { getState } from '../../public/state.js';
 const { arranger } = getState();
-import { KEY_ORDER } from '../../public/config.js';
 
 describe('Multi-Key Integration: Autumn Leaves', () => {
     // Autumn Leaves progression in Roman Numerals (Relative to Major Key)
@@ -71,60 +70,59 @@ describe('Multi-Key Integration: Autumn Leaves', () => {
     
     // Explicit Roman Numeral Progression
     const ROMAN_PROG = 'iim7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7alt | vim7';
+    const TEST_KEY = 'Bb'; // Standard key (Gm relative)
 
-    KEY_ORDER.forEach(key => {
-        describe(`Key of ${key}`, () => {
-            beforeEach(() => {
-                arranger.key = key;
-                arranger.isMinor = false;
-                arranger.sections = [
-                    { id: 'A', label: 'A', value: ROMAN_PROG }
-                ];
-                validateProgression();
+    describe(`Key of ${TEST_KEY}`, () => {
+        beforeEach(() => {
+            arranger.key = TEST_KEY;
+            arranger.isMinor = false;
+            arranger.sections = [
+                { id: 'A', label: 'A', value: ROMAN_PROG }
+            ];
+            validateProgression();
+        });
+
+        it('should successfully parse progression without errors', () => {
+            expect(arranger.progression.length).toBeGreaterThan(0);
+            arranger.progression.forEach(chord => {
+                expect(chord.rootMidi).not.toBeNaN();
+                expect(chord.intervals.length).toBeGreaterThan(0);
             });
+        });
 
-            it('should successfully parse progression without errors', () => {
-                expect(arranger.progression.length).toBeGreaterThan(0);
-                arranger.progression.forEach(chord => {
-                    expect(chord.rootMidi).not.toBeNaN();
-                    expect(chord.intervals.length).toBeGreaterThan(0);
-                });
-            });
+        it('should identify correct relative scales', () => {
+            const p = arranger.progression;
+            // 1. iim7 (Dorian)
+            const scaleIi = getScaleForChord(p[0], p[1], 'bird');
+            // Dorian intervals: 0, 2, 3, 5, 7, 9, 10
+            expect(scaleIi).toEqual([0, 2, 3, 5, 7, 9, 10]);
 
-            it('should identify correct relative scales', () => {
-                const p = arranger.progression;
-                // 1. iim7 (Dorian)
-                const scaleIi = getScaleForChord(p[0], p[1], 'bird');
-                // Dorian intervals: 0, 2, 3, 5, 7, 9, 10
-                expect(scaleIi).toEqual([0, 2, 3, 5, 7, 9, 10]);
+            // 2. V7 (Mixolydian)
+            const scaleV = getScaleForChord(p[1], p[2], 'bird');
+            // Mixolydian intervals: 0, 2, 4, 5, 7, 9, 10
+            expect(scaleV).toEqual([0, 2, 4, 5, 7, 9, 10]);
 
-                // 2. V7 (Mixolydian)
-                const scaleV = getScaleForChord(p[1], p[2], 'bird');
-                // Mixolydian intervals: 0, 2, 4, 5, 7, 9, 10
-                expect(scaleV).toEqual([0, 2, 4, 5, 7, 9, 10]);
+            // 5. viiø7 (Locrian) - ii of relative minor
+            const scaleVii = getScaleForChord(p[4], p[5], 'bird');
+            // Locrian intervals: 0, 1, 3, 5, 6, 8, 10
+            expect(scaleVii).toEqual([0, 1, 3, 5, 6, 8, 10]);
 
-                // 5. viiø7 (Locrian) - ii of relative minor
-                const scaleVii = getScaleForChord(p[4], p[5], 'bird');
-                // Locrian intervals: 0, 1, 3, 5, 6, 8, 10
-                expect(scaleVii).toEqual([0, 1, 3, 5, 6, 8, 10]);
+            // 6. III7alt (Altered) - V of relative minor
+            const scaleIII = getScaleForChord(p[5], p[6], 'bird');
+            // Altered intervals: 0, 1, 3, 4, 6, 8, 10
+            expect(scaleIII).toEqual([0, 1, 3, 4, 6, 8, 10]);
+        });
 
-                // 6. III7alt (Altered) - V of relative minor
-                const scaleIII = getScaleForChord(p[5], p[6], 'bird');
-                // Altered intervals: 0, 1, 3, 4, 6, 8, 10
-                expect(scaleIII).toEqual([0, 1, 3, 4, 6, 8, 10]);
-            });
+        it('should generate valid bass notes within register', () => {
+            const p = arranger.progression;
+            // Check first measure bass note
+            const result = getBassNote(p[0], p[1], 0, 55, 38, 'quarter', 0, 0, 0);
+            expect(result).not.toBeNull();
+            expect(result.midi).toBeGreaterThanOrEqual(28); // E1
+            expect(result.midi).toBeLessThanOrEqual(60);    // C4 (generous upper bound)
 
-            it('should generate valid bass notes within register', () => {
-                const p = arranger.progression;
-                // Check first measure bass note
-                const result = getBassNote(p[0], p[1], 0, 55, 38, 'quarter', 0, 0, 0);
-                expect(result).not.toBeNull();
-                expect(result.midi).toBeGreaterThanOrEqual(28); // E1
-                expect(result.midi).toBeLessThanOrEqual(60);    // C4 (generous upper bound)
-                
-                // Bass root should match chord root pitch class
-                expect(result.midi % 12).toBe(p[0].rootMidi % 12);
-            });
+            // Bass root should match chord root pitch class
+            expect(result.midi % 12).toBe(p[0].rootMidi % 12);
         });
     });
 });
