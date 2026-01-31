@@ -38,15 +38,11 @@ export function App() {
             <div class="app-container">
                 <Header />
                 <main class="app-main-layout loaded" id="dashboardGrid">
-                    <div class="layout-column main-column" id="col-main">
-                        <ArrangerPanel />
-                        <VisualizerPanel enabled={vizEnabled} />
-                    </div>
-                    <div class="layout-column sidebar-column" id="col-sidebar">
-                        <Sidebar grooveMobileTab={grooveMobileTab} />
-                    </div>
+                    <ArrangerPanel />
+                    <VisualizerPanel enabled={vizEnabled} />
+                    <Sidebar grooveMobileTab={grooveMobileTab} />
+                    <MobileNav activeTab={grooveMobileTab} />
                 </main>
-                <MobileNav activeTab={grooveMobileTab} />
             </div>
 
             <Modals />
@@ -126,13 +122,13 @@ function Sidebar({ grooveMobileTab }) {
     const activeMobileTab = grooveMobileTab === 'mobile' ? 'grooves' : grooveMobileTab;
 
     return (
-        <Fragment>
+        <div class="layout-column sidebar-column" id="col-sidebar">
             <InstrumentPanel id="panel-chords" module="chords" title="Chords" styles={CHORD_STYLES} isActiveMobile={activeMobileTab === 'chords'} />
             <GroovePanel isActiveMobile={activeMobileTab === 'grooves'} />
             <InstrumentPanel id="panel-bass" module="bass" title="Bass" styles={BASS_STYLES} isActiveMobile={activeMobileTab === 'bass'} />
             <InstrumentPanel id="panel-soloist" module="soloist" title="Soloist" styles={SOLOIST_STYLES} isActiveMobile={activeMobileTab === 'soloist'} />
             <InstrumentPanel id="panel-harmonies" module="harmony" title="Harmony" styles={HARMONY_STYLES} isActiveMobile={activeMobileTab === 'harmonies'} />
-        </Fragment>
+        </div>
     );
 }
 
@@ -208,7 +204,7 @@ function MobileNavTab({ tab, activeTab, onSwitch }) {
     const { enabled } = useEnsembleState(s => ({ enabled: s[tab.module].enabled }));
 
     return (
-        <div class="tab-item" onClick={() => onSwitch(tab.id)}>
+        <div class={`tab-item ${isActive ? 'active' : ''} tab-${tab.id}`} onClick={() => onSwitch(tab.id)}>
             <button
                 class={`tab-btn ${isActive ? 'active' : ''}`}
             >{tab.label}</button>
@@ -224,6 +220,9 @@ function MobileNavTab({ tab, activeTab, onSwitch }) {
 
 function MobileNav({ activeTab }) {
     const switchMobileTab = (tab) => {
+        if (tab === 'grooves') {
+            dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'smart' });
+        }
         dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'mobile', target: tab });
         const { groove } = getState();
         groove.mobileTab = tab;

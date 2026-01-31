@@ -23,8 +23,8 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
-            // 1-4: Switch Mobile Tabs
-            if (['1', '2', '3', '4'].includes(e.key) && !isTyping) {
+            // 1-5: Switch Mobile Tabs
+            if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping) {
                 const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
                 const btn = btns[parseInt(e.key) - 1];
                 if (btn) btn.click();

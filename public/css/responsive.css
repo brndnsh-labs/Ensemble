@@ -46,17 +46,28 @@
     .app-main-layout {
         display: grid;
         grid-template-columns: 1fr 28rem; /* Main | Fixed Sidebar */
+        grid-template-areas: 
+            "arranger sidebar"
+            "visualizer sidebar";
         gap: 1rem;
         align-items: start;
         max-width: 1800px;
         padding: 1.5rem;
     }
 
-    .layout-column {
+    #panel-arranger {
+        grid-area: arranger;
+    }
+
+    #panel-visualizer {
+        grid-area: visualizer;
+    }
+
+    #col-sidebar {
+        grid-area: sidebar;
         display: flex;
         flex-direction: column;
         gap: 1rem;
-        min-width: 0; /* Prevent flex overflow */
     }
 
     .dashboard-panel {

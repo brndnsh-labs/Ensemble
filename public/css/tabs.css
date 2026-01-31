@@ -41,8 +41,23 @@
     color: var(--text-color);
 }
 
+.tab-item.active.tab-chords { background: rgba(59, 130, 246, 0.1); border-color: var(--accent-color); }
+.tab-item.active.tab-grooves { background: rgba(181, 137, 0, 0.1); border-color: var(--yellow); }
+.tab-item.active.tab-bass { background: rgba(133, 153, 0, 0.1); border-color: var(--success-color); }
+.tab-item.active.tab-soloist { background: rgba(181, 137, 0, 0.1); border-color: var(--soloist-color); }
+.tab-item.active.tab-harmonies { background: rgba(108, 113, 196, 0.1); border-color: var(--harmony-color); }
 
-/* --- Instrument Panel Tabs (Chords, Bass, Soloist, Grooves) --- */
+.tab-item.active .tab-btn {
+    color: var(--text-color) !important;
+}
+
+@media (max-width: 900px) {
+    .tab-item.active {
+        border-bottom: none !important;
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+}
 .instrument-tabs {
     display: inline-flex;
     gap: 0.25rem;

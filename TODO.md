@@ -13,7 +13,7 @@
 # Bugs
 
 ## Mobile
-- [ ] **Instrument card display**
+- [x] **Instrument card display**
     - Grooves: should default to smart and display smart genre selection
     - Visualizer should appear at the bottom of the screen
     - UI enhancement: visually connect the active card to the tabs (requires moving tabs above active card)

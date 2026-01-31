@@ -205,8 +205,12 @@
     animation: fadeIn 0.2s ease-out;
 }
 
-.instrument-panel.active-mobile {
+main.app-main-layout .dashboard-panel.instrument-panel.active-mobile {
     display: flex;
+    border-top: none !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2); /* Stronger shadow to lift the whole unit */
 }
 
 .desktop-power-btn {

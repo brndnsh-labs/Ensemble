@@ -244,15 +244,57 @@ button {
     min-height: calc(100vh - 80px);
 }
 
-/* Mobile Layout Reordering via display: contents */
-.layout-column {
-    display: contents;
-}
+@media (max-width: 900px) {
+    .app-main-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 0.5rem;
+    }
+    
+    .dashboard-panel {
+        margin-bottom: 0.75rem;
+    }
 
-#panel-arranger { order: 1; }
-.mobile-tabs-nav { order: 2; }
-.instrument-panel { order: 3; }
-#panel-visualizer { order: 4; }
+    /* Arranger panel margin */
+    #panel-arranger {
+        margin-bottom: 1rem;
+        order: 1;
+    }
+
+    /* Connected Tabs and Panel */
+    .mobile-tabs-nav { 
+        order: 2; 
+        margin-bottom: 0;
+        background: var(--panel-color);
+        padding: 0.75rem 0.75rem 0 0.75rem;
+        box-shadow: none;
+        border-bottom: none !important;
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+    
+    #col-sidebar {
+        order: 3;
+        display: contents; /* We want individual panels to be siblings for the tab-connection logic if needed, but actually we can keep it as a div */
+    }
+    
+    /* We actually need the active panel to be visually connected to the nav above it. 
+       If col-sidebar is display: contents, then .instrument-panel.active-mobile is a direct child of app-main-layout.
+    */
+    .instrument-panel {
+        order: 3;
+    }
+    
+    .instrument-panel.active-mobile { 
+        margin-bottom: 1rem;
+    }
+
+    #panel-visualizer { 
+        order: 4; 
+        margin-bottom: 2rem; /* Buffer at bottom */
+    }
+}
 
 /* --- Mobile Navigation --- */
 .mobile-tabs-nav {
@@ -263,7 +305,9 @@ button {
     top: 64px; /* Match mobile header height */
     z-index: var(--z-mobile-nav);
     background: var(--bg-color);
-    padding: 0.5rem 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
     box-shadow: 0 4px 6px -2px rgba(0,0,0,0.1);
 }
 
