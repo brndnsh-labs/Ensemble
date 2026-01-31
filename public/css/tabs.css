@@ -51,13 +51,6 @@
     color: var(--text-color) !important;
 }
 
-@media (max-width: 900px) {
-    .tab-item.active {
-        border-bottom: none !important;
-        border-bottom-left-radius: 0 !important;
-        border-bottom-right-radius: 0 !important;
-    }
-}
 .instrument-tabs {
     display: inline-flex;
     gap: 0.25rem;
