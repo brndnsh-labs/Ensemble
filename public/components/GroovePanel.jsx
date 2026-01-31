@@ -10,7 +10,7 @@ import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { SequencerGrid } from './SequencerGrid.jsx';
 
-export function GroovePanel() {
+export function GroovePanel({ isActiveMobile }) {
     const { activeTab, enabled, measures, fillActive } = useEnsembleState(s => ({
         activeTab: s.groove.activeTab,
         enabled: s.groove.enabled,
@@ -27,7 +27,7 @@ export function GroovePanel() {
     };
 
     return (
-        <div class="panel dashboard-panel instrument-panel" id="panel-grooves" data-id="grooves">
+        <div class={`panel dashboard-panel instrument-panel ${isActiveMobile ? 'active-mobile' : ''}`} id="panel-grooves" data-id="grooves">
             <div class="panel-header groove-panel-header">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <h2 style={{ color: fillActive ? 'var(--soloist-color)' : '' }}>Grooves</h2>
