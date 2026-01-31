@@ -43,7 +43,7 @@ export function App() {
                         <VisualizerPanel enabled={vizEnabled} />
                     </div>
                     <div class="layout-column sidebar-column" id="col-sidebar">
-                        <Sidebar />
+                        <Sidebar grooveMobileTab={grooveMobileTab} />
                     </div>
                 </main>
                 <MobileNav activeTab={grooveMobileTab} />
@@ -122,19 +122,21 @@ function VisualizerPanel({ enabled }) {
     );
 }
 
-function Sidebar() {
+function Sidebar({ grooveMobileTab }) {
+    const activeMobileTab = grooveMobileTab === 'mobile' ? 'grooves' : grooveMobileTab;
+
     return (
         <Fragment>
-            <InstrumentPanel id="panel-chords" module="chords" title="Chords" styles={CHORD_STYLES} />
-            <GroovePanel />
-            <InstrumentPanel id="panel-bass" module="bass" title="Bass" styles={BASS_STYLES} />
-            <InstrumentPanel id="panel-soloist" module="soloist" title="Soloist" styles={SOLOIST_STYLES} />
-            <InstrumentPanel id="panel-harmonies" module="harmony" title="Harmony" styles={HARMONY_STYLES} />
+            <InstrumentPanel id="panel-chords" module="chords" title="Chords" styles={CHORD_STYLES} isActiveMobile={activeMobileTab === 'chords'} />
+            <GroovePanel isActiveMobile={activeMobileTab === 'grooves'} />
+            <InstrumentPanel id="panel-bass" module="bass" title="Bass" styles={BASS_STYLES} isActiveMobile={activeMobileTab === 'bass'} />
+            <InstrumentPanel id="panel-soloist" module="soloist" title="Soloist" styles={SOLOIST_STYLES} isActiveMobile={activeMobileTab === 'soloist'} />
+            <InstrumentPanel id="panel-harmonies" module="harmony" title="Harmony" styles={HARMONY_STYLES} isActiveMobile={activeMobileTab === 'harmonies'} />
         </Fragment>
     );
 }
 
-function InstrumentPanel({ id, module, title, styles }) {
+function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
     const { activeTab, enabled } = useEnsembleState(s => ({
         activeTab: s[module].activeTab,
         enabled: s[module].enabled
@@ -151,7 +153,7 @@ function InstrumentPanel({ id, module, title, styles }) {
     const headerClass = `${module === 'chords' ? 'chord' : (module === 'harmony' ? 'harmony' : module)}-panel-header`;
 
     return (
-        <div class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''}`} id={id} data-id={module}>
+        <div class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''}`} id={id} data-id={module}>
             <div class={`panel-header ${headerClass}`}>
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <h2>{title}</h2>
@@ -201,15 +203,33 @@ function InstrumentPanel({ id, module, title, styles }) {
     );
 }
 
+function MobileNavTab({ tab, activeTab, onSwitch }) {
+    const isActive = (activeTab === tab.id) || (activeTab === 'mobile' && tab.id === 'grooves');
+    const { enabled } = useEnsembleState(s => ({ enabled: s[tab.module].enabled }));
+
+    return (
+        <div class="tab-item" onClick={() => onSwitch(tab.id)}>
+            <button
+                class={`tab-btn ${isActive ? 'active' : ''}`}
+            >{tab.label}</button>
+            <button
+                id={`${tab.module === 'chords' ? 'chord' : tab.module}PowerBtn`}
+                class={`power-btn ${enabled ? 'active' : ''}`}
+                aria-label={`Toggle ${tab.label}`}
+                onClick={(e) => { e.stopPropagation(); togglePower(tab.module); }}
+            >⏻</button>
+        </div>
+    );
+}
+
 function MobileNav({ activeTab }) {
     const switchMobileTab = (tab) => {
         dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'mobile', target: tab });
-        import('./state.js').then(({ groove }) => {
-            groove.mobileTab = tab;
-            dispatch('MOBILE_TAB_SWITCH');
-            syncWorker();
-            saveCurrentState();
-        });
+        const { groove } = getState();
+        groove.mobileTab = tab;
+        dispatch('MOBILE_TAB_SWITCH');
+        syncWorker();
+        saveCurrentState();
     };
 
     return (
@@ -220,26 +240,9 @@ function MobileNav({ activeTab }) {
                 { id: 'bass', label: 'Bass', module: 'bass' },
                 { id: 'soloist', label: 'Soloist', module: 'soloist' },
                 { id: 'harmonies', label: 'Harmony', module: 'harmony' }
-            ].map(tab => {
-                const isActive = (activeTab === tab.id) || (activeTab === 'mobile' && tab.id === 'grooves');
-                const moduleState = useEnsembleState(s => s[tab.module]);
-                const enabled = moduleState?.enabled;
-
-                return (
-                    <div key={tab.id} class="tab-item">
-                        <button 
-                            class={`tab-btn ${isActive ? 'active' : ''}`} 
-                            onClick={() => switchMobileTab(tab.id)}
-                        >{tab.label}</button>
-                        <button 
-                            id={`${tab.module === 'chords' ? 'chord' : tab.module}PowerBtn`} 
-                            class={`power-btn ${enabled ? 'active' : ''}`} 
-                            aria-label={`Toggle ${tab.label}`}
-                            onClick={() => togglePower(tab.module)}
-                        >⏻</button>
-                    </div>
-                );
-            })}
+            ].map(tab => (
+                <MobileNavTab key={tab.id} tab={tab} activeTab={activeTab} onSwitch={switchMobileTab} />
+            ))}
         </div>
     );
 }
