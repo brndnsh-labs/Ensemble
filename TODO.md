@@ -7,5 +7,5 @@
     - Refactor `public/ui.js` and remaining utility files.
     - Deprecate and remove direct exports (`playback`, etc.) from `state.js` once all consumers are updated.
     - Update test suite to strictly use `getState()` without named export fallbacks.
-- [ ] **Unified Test Config:**
+- [x] **Unified Test Config:**
     - Consider moving `eslint.config.js` globals definition to a dedicated `tests/.eslintrc` if the flat config allows, to keep the root config cleaner.

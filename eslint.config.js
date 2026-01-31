@@ -34,7 +34,7 @@ export default [
     files: ["tests/**"],
     languageOptions: {
       globals: {
-        ...globals.jest,
+        ...globals.vitest,
       },
     },
   }
