@@ -293,16 +293,6 @@ export function formatUnicodeSymbols(str) {
         .replace(/b(?=[0-9IVivm\-/])/g, '♭');
 }
 
-/**
- * Ensures a velocity value is within the safe [0, 1] range for MIDI normalization.
- * Prevents overflows when compounding band intensity and conductor modifiers.
- * @param {number} vel 
- * @returns {number}
- */
-export function clampVelocity(vel) {
-    return Math.max(0, Math.min(1.0, vel));
-}
-
 let cachedSoftClipCurve = null;
 
 /**
