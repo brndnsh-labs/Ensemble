@@ -1,5 +1,38 @@
 
 import { describe, it, expect, vi } from 'vitest';
+import { isBassActive, getBassNote } from '../../public/bass.js';
+
+const { mockArranger, stepMap, TOTAL_SECTIONS, STEPS_PER_SECTION } = vi.hoisted(() => {
+    const stepMap = [];
+    const TOTAL_SECTIONS = 1000;
+    const STEPS_PER_SECTION = 4;
+    for (let i = 0; i < TOTAL_SECTIONS; i++) {
+        stepMap.push({
+            start: i * STEPS_PER_SECTION,
+            end: (i + 1) * STEPS_PER_SECTION,
+            chord: {
+                sectionId: `section_${i}`,
+                rootMidi: 48,
+                quality: 'major',
+                beats: 1,
+                intervals: [0, 4, 7]
+            }
+        });
+    }
+    return {
+        stepMap,
+        TOTAL_SECTIONS,
+        STEPS_PER_SECTION,
+        mockArranger: {
+            key: 'C',
+            isMinor: false,
+            progression: [],
+            totalSteps: TOTAL_SECTIONS * STEPS_PER_SECTION,
+            timeSignature: '4/4',
+            stepMap: stepMap
+        }
+    };
+});
 
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
@@ -30,14 +63,7 @@ vi.mock('../../public/state.js', () => {
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.3 },
         chords: { pianoRoots: true },
         harmony: { enabled: false, buffer: new Map() },
-        arranger: {
-            key: 'C',
-            isMinor: false,
-            progression: new Array(16).fill({}),
-            totalSteps: 64,
-            timeSignature: '4/4',
-            stepMap: [{ start: 0, end: 64, chord: { sectionId: 's1', rootMidi: 48, quality: '7', beats: 4 } }]
-        },
+        arranger: mockArranger,
         vizState: {},
         midi: {},
         storage: {},
@@ -56,8 +82,6 @@ vi.mock('../../public/config.js', () => ({
     },
     REGGAE_RIDDIMS: {}
 }));
-
-import { isBassActive } from '../../public/bass.js';
 
 describe('Bass Logic Performance', () => {
     it('measures isBassActive performance for Bossa style', () => {
@@ -85,5 +109,33 @@ describe('Bass Logic Performance', () => {
         // 10,000,000 iterations / 16 steps = 625,000 measures
         // 625,000 * 4 hits = 2,500,000 hits
         expect(activeCount).toBe(2_500_000);
+    });
+
+    // Merged from bass-lookup.bench.test.js
+    const ITERATIONS_LOOKUP = 10_000;
+    const targetStep = (TOTAL_SECTIONS - 1) * STEPS_PER_SECTION + 1;
+    const currentChord = stepMap[stepMap.length - 1].chord;
+    const nextChord = stepMap[0].chord;
+    const context = {
+        sectionStart: stepMap[stepMap.length - 1].start,
+        sectionEnd: stepMap[stepMap.length - 1].end
+    };
+
+    it('Optimized: Direct Access (With Context)', () => {
+        const start = performance.now();
+        for (let i = 0; i < ITERATIONS_LOOKUP; i++) {
+            getBassNote(currentChord, nextChord, 0, 440, 48, 'rock', TOTAL_SECTIONS - 1, targetStep, 1, context);
+        }
+        const duration = performance.now() - start;
+        console.log(`Optimized Access (Run 1): ${duration.toFixed(2)}ms`);
+    });
+
+    it('Legacy: Linear Lookup (No Context)', () => {
+        const start = performance.now();
+        for (let i = 0; i < ITERATIONS_LOOKUP; i++) {
+            getBassNote(currentChord, nextChord, 0, 440, 48, 'rock', TOTAL_SECTIONS - 1, targetStep, 1);
+        }
+        const duration = performance.now() - start;
+        console.log(`Legacy Lookup (Run 2): ${duration.toFixed(2)}ms`);
     });
 });
