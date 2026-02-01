@@ -183,7 +183,16 @@ export function SequencerGrid() {
                         <span 
                             className={`track-symbol ${inst.muted ? 'muted' : ''}`} 
                             title={`Audition ${inst.name}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Audition ${inst.name}`}
                             onClick={() => handleAudition(inst)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleAudition(inst);
+                                }
+                            }}
                         >
                             {inst.symbol || inst.name.charAt(0)}
                         </span>

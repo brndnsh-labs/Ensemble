@@ -42,7 +42,8 @@ vi.mock('../../../public/state.js', () => {
             STEP_TOGGLE: 'STEP_TOGGLE'
         },
         playback: {
-            lastPlayingStep: 0
+            lastPlayingStep: 0,
+            audio: { currentTime: 0 }
         }
     };
     return {
@@ -74,6 +75,11 @@ vi.mock('../../../public/config.js', () => ({
 
 vi.mock('../../../public/instrument-controller.js', () => ({
     clearDrumPresetHighlight: vi.fn()
+}));
+
+vi.mock('../../../public/engine.js', () => ({
+    initAudio: vi.fn(),
+    playDrumSound: vi.fn()
 }));
 
 import { SequencerGrid } from '../../../public/components/SequencerGrid.jsx';
@@ -144,6 +150,32 @@ describe('SequencerGrid Accessibility', () => {
 
         await vi.waitFor(() => {
             expect(mockDispatch).toHaveBeenCalledWith('STEP_TOGGLE');
+        });
+    });
+
+    it('Track symbol should be keyboard accessible for auditioning', async () => {
+        const { initAudio, playDrumSound } = await import('../../../public/engine.js');
+
+        render(<SequencerGrid />, container);
+        const trackSymbol = container.querySelector('.track-symbol');
+
+        expect(trackSymbol).not.toBeNull();
+        expect(trackSymbol.getAttribute('role')).toBe('button');
+        expect(trackSymbol.getAttribute('tabindex')).toBe('0');
+        expect(trackSymbol.getAttribute('aria-label')).toBe('Audition Kick');
+
+        // Simulate Enter key
+        const enterEvent = new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            bubbles: true,
+            cancelable: true
+        });
+        trackSymbol.dispatchEvent(enterEvent);
+
+        await vi.waitFor(() => {
+            expect(initAudio).toHaveBeenCalled();
+            expect(playDrumSound).toHaveBeenCalledWith('Kick', expect.any(Number), 1.0);
         });
     });
 });
