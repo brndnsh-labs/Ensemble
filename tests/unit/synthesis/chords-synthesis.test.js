@@ -72,7 +72,7 @@ vi.mock('../../../public/utils.js', () => ({
     safeDisconnect: vi.fn()
 }));
 
-import { playNote, playChordScratch } from '../../../public/synth-chords.js';
+import { playNote, playChordScratch } from '../../../public/engine/synth-chords.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

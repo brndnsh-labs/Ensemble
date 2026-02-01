@@ -58,7 +58,7 @@ vi.mock('../../../public/worker-client.js', () => ({
 }));
 
 // Mock engine
-vi.mock('../../../public/engine.js', () => ({
+vi.mock('../../../public/engine/engine.js', () => ({
     playDrumSound: vi.fn(),
     initAudio: vi.fn(),
     killAllNotes: vi.fn(),
@@ -92,7 +92,7 @@ vi.mock('../../../public/instrument-controller.js', () => ({
 
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import { scheduler } from '../../../public/scheduler-core.js';
+import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { flushWorker } from '../../../public/worker-client.js';
 
 describe('Harmonic Continuity & Genre Transitions', () => {

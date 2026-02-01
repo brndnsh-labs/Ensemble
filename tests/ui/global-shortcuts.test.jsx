@@ -5,11 +5,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { h, render } from 'preact';
 import React from 'preact/compat';
 import { GlobalShortcuts } from '../../public/components/GlobalShortcuts.jsx';
-import { togglePlay } from '../../public/scheduler-core.js';
+import { togglePlay } from '../../public/engine/scheduler-core.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock scheduler-core
-vi.mock('../../public/scheduler-core.js', () => ({
+vi.mock('../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn()
 }));
 

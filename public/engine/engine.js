@@ -1,7 +1,7 @@
-import { getState } from './state.js';
-import { MIXER_GAIN_MULTIPLIERS } from './config.js';
-import { createReverbImpulse, createSoftClipCurve } from './utils.js';
-import { audioWatchdog } from './audio-recovery.js';
+import { getState } from '../state.js';
+import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
+import { audioWatchdog } from '../audio-recovery.js';
 
 // Facade: Re-export synthesis logic from specialized modules
 import { playNote, playChordScratch, updateSustain, killAllPianoNotes, INSTRUMENT_PRESETS } from './synth-chords.js';
@@ -293,7 +293,7 @@ export async function killAllNotes() {
     killDrumBus();
 
     try {
-        const { panic } = await import('./midi-controller.js');
+        const { panic } = await import('../midi-controller.js');
         panic();
     } catch { /* ignore panic error */ }
 }

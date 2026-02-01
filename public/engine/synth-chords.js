@@ -1,5 +1,5 @@
-import { getState } from './state.js';
-import { safeDisconnect } from './utils.js';
+import { getState } from '../state.js';
+import { safeDisconnect } from '../utils.js';
 
 /**
  * Instrument definitions for the chord engine.

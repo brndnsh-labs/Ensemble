@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { initAudio, getVisualTime, _resetChromiumCheck } from '../../../public/engine.js';
+import { initAudio, getVisualTime, _resetChromiumCheck } from '../../../public/engine/engine.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

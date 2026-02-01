@@ -8,7 +8,7 @@ const { playback, arranger } = getState();
 import { saveCurrentState } from '../persistence.js';
 import { applyTheme } from '../app-controller.js';
 import { initMIDI, panic } from '../midi-controller.js';
-import { restoreGains } from '../engine.js';
+import { restoreGains } from '../engine/engine.js';
 import { MIXER_GAIN_MULTIPLIERS, APP_VERSION } from '../config.js';
 import { triggerInstall } from '../pwa.js';
 

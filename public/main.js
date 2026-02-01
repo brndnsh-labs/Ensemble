@@ -1,10 +1,10 @@
 import { getState, subscribe } from './state.js';
 import { mountComponents } from './ui-root.jsx';
-import { initAudio, playNote } from './engine.js';
+import { initAudio, playNote } from './engine/engine.js';
 import { validateProgression } from './chords.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
 import { setInstrumentControllerRefs, loadDrumPreset } from './instrument-controller.js';
-import { scheduler } from './scheduler-core.js';
+import { scheduler } from './engine/scheduler-core.js';
 import { analyzeFormUI } from './arranger-controller.js';
 import { syncWorker, initWorker } from './worker-client.js';
 import { initPWA } from './pwa.js';

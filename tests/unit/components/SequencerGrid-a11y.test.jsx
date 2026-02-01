@@ -77,7 +77,7 @@ vi.mock('../../../public/instrument-controller.js', () => ({
     clearDrumPresetHighlight: vi.fn()
 }));
 
-vi.mock('../../../public/engine.js', () => ({
+vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     playDrumSound: vi.fn()
 }));
@@ -154,7 +154,7 @@ describe('SequencerGrid Accessibility', () => {
     });
 
     it('Track symbol should be keyboard accessible for auditioning', async () => {
-        const { initAudio, playDrumSound } = await import('../../../public/engine.js');
+        const { initAudio, playDrumSound } = await import('../../../public/engine/engine.js');
 
         render(<SequencerGrid />, container);
         const trackSymbol = container.querySelector('.track-symbol');

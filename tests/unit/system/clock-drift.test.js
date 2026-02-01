@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import { scheduler } from '../../../public/scheduler-core.js';
+import { scheduler } from '../../../public/engine/scheduler-core.js';
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({
@@ -20,7 +20,7 @@ vi.mock('../../../public/ui.js', () => ({
     clearActiveVisuals: vi.fn()
 }));
 
-vi.mock('../../../public/engine.js', () => ({
+vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     playNote: vi.fn(),
     playDrumSound: vi.fn(),
@@ -44,7 +44,7 @@ vi.mock('../../../public/conductor.js', () => ({
     checkSectionTransition: vi.fn()
 }));
 
-vi.mock('../../../public/groove-engine.js', () => ({
+vi.mock('../../../public/engine/groove-engine.js', () => ({
     applyGrooveOverrides: vi.fn(() => ({ shouldPlay: false })),
     calculatePocketOffset: vi.fn(() => 0)
 }));

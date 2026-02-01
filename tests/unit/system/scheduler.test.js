@@ -61,7 +61,7 @@ vi.mock('../../../public/ui.js', () => ({
     }
 }));
 
-import { scheduleGlobalEvent } from '../../../public/scheduler-core.js';
+import { scheduleGlobalEvent } from '../../../public/engine/scheduler-core.js';
 import { getState } from '../../../public/state.js';
 const { arranger, playback } = getState();
 

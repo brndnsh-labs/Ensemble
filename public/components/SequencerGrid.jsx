@@ -164,7 +164,7 @@ export function SequencerGrid() {
     }, [isDragging, dragType, instruments]);
 
     const handleAudition = useCallback((inst) => {
-        import('../engine.js').then(({ initAudio, playDrumSound }) => {
+        import('../engine/engine.js').then(({ initAudio, playDrumSound }) => {
             initAudio();
             playDrumSound(inst.name, playbackState.audio.currentTime, 1.0);
         });

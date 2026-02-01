@@ -44,7 +44,7 @@ vi.mock('../../public/utils.js', () => ({
     getStepInfo: () => ({ isBeatStart: true }),
 }));
 
-vi.mock('../../public/engine.js', () => ({
+vi.mock('../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     triggerFlash: vi.fn(),
     playNote: vi.fn(),
@@ -74,7 +74,7 @@ vi.mock('../../public/conductor.js', () => ({
     checkSectionTransition: vi.fn(),
 }));
 
-vi.mock('../../public/groove-engine.js', () => ({
+vi.mock('../../public/engine/groove-engine.js', () => ({
     applyGrooveOverrides: () => ({ shouldPlay: false }),
     calculatePocketOffset: () => 0,
 }));
@@ -109,7 +109,7 @@ vi.mock('../../public/ui.js', () => ({
     triggerFlash: vi.fn(),
 }));
 
-import { scheduleChordVisuals } from '../../public/scheduler-core.js';
+import { scheduleChordVisuals } from '../../public/engine/scheduler-core.js';
 import { getState } from '../../public/state.js';
 const { playback, vizState } = getState();
 

@@ -67,7 +67,7 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-vi.mock('../../../public/engine.js', () => ({
+vi.mock('../../../public/engine/engine.js', () => ({
     getVisualTime: () => 0,
     playDrumSound: vi.fn(),
     playNote: vi.fn(),
@@ -93,11 +93,11 @@ vi.mock('../../../public/conductor.js', () => ({
     conductorState: { larsBpmOffset: 0 }
 }));
 
-import { scheduler } from '../../../public/scheduler-core.js';
+import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { draw } from '../../../public/animation-loop.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import * as engine from '../../../public/engine.js';
+import * as engine from '../../../public/engine/engine.js';
 
 describe('Long-Session Stress & Endurance', () => {
     beforeEach(() => {

@@ -69,7 +69,7 @@ vi.mock('../../public/state.js', () => {
     };
 });
 
-import { playDrumSound } from '../../public/synth-drums.js';
+import { playDrumSound } from '../../public/engine/synth-drums.js';
 
 describe('Drum Synth Performance', () => {
     it('measures playDrumSound loop performance', () => {

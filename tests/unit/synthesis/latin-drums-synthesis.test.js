@@ -77,7 +77,7 @@ vi.mock('../../../public/utils.js', () => ({
     safeDisconnect: vi.fn()
 }));
 
-import { playDrumSound } from '../../../public/synth-drums.js';
+import { playDrumSound } from '../../../public/engine/synth-drums.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

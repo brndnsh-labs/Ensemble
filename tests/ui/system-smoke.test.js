@@ -168,7 +168,7 @@ vi.mock('../../public/worker-client.js', () => ({
     flushWorker: vi.fn()
 }));
 
-vi.mock('../../public/engine.js', () => ({
+vi.mock('../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     playNote: vi.fn(),
     playDrumSound: vi.fn(),
@@ -197,9 +197,9 @@ vi.mock('../../public/persistence.js', () => ({
 import { dispatch, getState, storage } from '../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 import { addSection, onSectionUpdate } from '../../public/arranger-controller.js';
-import { togglePlay } from '../../public/scheduler-core.js';
+import { togglePlay } from '../../public/engine/scheduler-core.js';
 import { validateProgression } from '../../public/chords.js';
-import { initAudio } from '../../public/engine.js';
+import { initAudio } from '../../public/engine/engine.js';
 
 describe('System Smoke Test (E2E Workflow)', () => {
     beforeEach(() => {

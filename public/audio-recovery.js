@@ -1,5 +1,5 @@
 import { getState } from './state.js';
-import { initAudio, restoreGains, killAllNotes } from './engine.js';
+import { initAudio, restoreGains, killAllNotes } from './engine/engine.js';
 
 /**
  * AudioRecovery.js

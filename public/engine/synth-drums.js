@@ -1,5 +1,5 @@
-import { getState } from './state.js';
-import { safeDisconnect } from './utils.js';
+import { getState } from '../state.js';
+import { safeDisconnect } from '../utils.js';
 
 const RIGHT_PANNED_INSTRUMENTS = new Set(['HiHat', 'Open', 'Crash', 'Shaker', 'Agogo', 'Perc', 'Guiro', 'Clave']);
 

@@ -57,7 +57,7 @@ vi.mock('../../../public/ui.js', () => ({
 
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../../public/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
-vi.mock('../../../public/engine.js', () => ({ restoreGains: vi.fn() }));
+vi.mock('../../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
 vi.mock('../../../public/persistence.js', () => ({ saveCurrentState: vi.fn(), debounceSaveState: vi.fn() }));
 vi.mock('../../../public/history.js', () => ({ pushHistory: vi.fn() }));
 

@@ -197,7 +197,7 @@ export function AnalyzerModal() {
             const arrayBuffer = await file.arrayBuffer();
             import('../state.js').then(async ({ playback }) => {
                 if (!playback.audio) {
-                    const { initAudio } = await import('../engine.js');
+                    const { initAudio } = await import('../engine/engine.js');
                     initAudio();
                 }
                 const decoded = await playback.audio.decodeAudioData(arrayBuffer);

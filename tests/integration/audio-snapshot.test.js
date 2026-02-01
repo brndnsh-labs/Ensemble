@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { dispatch, getState, storage } from '../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import { scheduleGlobalEvent } from '../../public/scheduler-core.js';
-import { initAudio } from '../../public/engine.js';
+import { scheduleGlobalEvent } from '../../public/engine/scheduler-core.js';
+import { initAudio } from '../../public/engine/engine.js';
 import { getTimerWorker, initWorker } from '../../public/worker-client.js';
 
 // Mock Worker to bypass async complexity and control the clock

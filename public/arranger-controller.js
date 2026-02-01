@@ -2,7 +2,7 @@ import { getState } from './state.js';
 import { showToast } from './ui.js';
 import { validateProgression, transformRelativeProgression } from './chords.js';
 import { flushBuffers } from './instrument-controller.js';
-import { restoreGains } from './engine.js';
+import { restoreGains } from './engine/engine.js';
 import { syncWorker } from './worker-client.js';
 import { saveCurrentState } from './persistence.js';
 import { generateId, normalizeKey } from './utils.js';

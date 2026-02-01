@@ -61,7 +61,7 @@ vi.mock('../../public/utils.js', () => ({
     createSoftClipCurve: vi.fn(() => new Float32Array(1024))
 }));
 
-import { initAudio, restoreGains } from '../../public/engine.js';
+import { initAudio, restoreGains } from '../../public/engine/engine.js';
 import { dispatch, getState, storage } from '../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

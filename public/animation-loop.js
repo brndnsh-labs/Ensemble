@@ -1,6 +1,6 @@
 import { ACTIONS } from './types.js';
 import { getState, dispatch } from './state.js';
-import { getVisualTime } from './engine.js';
+import { getVisualTime } from './engine/engine.js';
 import { getStepsPerMeasure } from './utils.js';
 import { switchMeasure } from './instrument-controller.js';
 import { TIME_SIGNATURES } from './config.js';

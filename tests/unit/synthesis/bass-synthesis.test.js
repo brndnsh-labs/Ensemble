@@ -75,7 +75,7 @@ vi.mock('../../../public/utils.js', () => ({
     createSoftClipCurve: vi.fn(() => new Float32Array(1024))
 }));
 
-import { playBassNote } from '../../../public/synth-bass.js';
+import { playBassNote } from '../../../public/engine/synth-bass.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

@@ -1,5 +1,5 @@
-import { getState } from './state.js';
-import { safeDisconnect, clampFreq } from './utils.js';
+import { getState } from '../state.js';
+import { safeDisconnect, clampFreq } from '../utils.js';
 
 export function killSoloistNote() {
     const { playback, soloist } = getState();

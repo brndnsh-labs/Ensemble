@@ -105,7 +105,7 @@ export function dispatch(action, payload) {
 async function handleEffects(action, payload, context = {}) {
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
-            const { togglePlay } = await import('./scheduler-core.js');
+            const { togglePlay } = await import('./engine/scheduler-core.js');
             togglePlay(payload?.viz, true); 
             break;
         }

@@ -28,7 +28,7 @@ vi.mock('../../../public/app-controller.js', () => ({
     setBpm: vi.fn(),
 }));
 
-vi.mock('../../../public/scheduler-core.js', () => ({
+vi.mock('../../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn(),
 }));
 

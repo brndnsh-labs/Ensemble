@@ -45,7 +45,7 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-import { playNote, updateSustain } from '../../../public/synth-chords.js';
+import { playNote, updateSustain } from '../../../public/engine/synth-chords.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

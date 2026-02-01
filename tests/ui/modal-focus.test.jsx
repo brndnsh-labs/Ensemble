@@ -22,10 +22,10 @@ vi.mock('../../public/midi-controller.js', () => ({
     initMIDI: vi.fn(),
     panic: vi.fn()
 }));
-vi.mock('../../public/engine.js', () => ({
+vi.mock('../../public/engine/engine.js', () => ({
     restoreGains: vi.fn()
 }));
-vi.mock('../../public/scheduler-core.js', () => ({
+vi.mock('../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn()
 }));
 vi.mock('../../public/instrument-controller.js', () => ({

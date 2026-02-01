@@ -3,7 +3,7 @@ import { useEnsembleState, useDispatch } from '../ui-bridge.js';
 import { ACTIONS } from '../types.js';
 import { syncWorker } from '../worker-client.js';
 import { flushBuffers } from '../instrument-controller.js';
-import { restoreGains } from '../engine.js';
+import { restoreGains } from '../engine/engine.js';
 import { saveCurrentState } from '../persistence.js';
 import { formatUnicodeSymbols } from '../utils.js';
 

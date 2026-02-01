@@ -73,7 +73,7 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 // Mock engine/ui
-vi.mock('../../../public/engine.js', () => ({
+vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     playDrumSound: vi.fn(),
     playNote: vi.fn(),
@@ -118,7 +118,7 @@ vi.mock('../../../public/midi-controller.js', () => ({
     sendMIDITransport: vi.fn()
 }));
 
-import { scheduler } from '../../../public/scheduler-core.js';
+import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

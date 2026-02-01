@@ -15,7 +15,7 @@ vi.mock('../../public/ui.js', () => ({
     updateActiveChordUI: vi.fn()
 }));
 
-vi.mock('../../public/engine.js', () => ({
+vi.mock('../../public/engine/engine.js', () => ({
     getVisualTime: vi.fn(() => playback.audio.currentTime)
 }));
 

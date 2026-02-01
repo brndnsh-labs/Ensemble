@@ -83,7 +83,7 @@ vi.mock('../../../public/utils.js', () => ({
     clampFreq: vi.fn((f) => Math.min(Math.max(0, f), 24000))
 }));
 
-import { playSoloNote } from '../../../public/synth-soloist.js';
+import { playSoloNote } from '../../../public/engine/synth-soloist.js';
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
 

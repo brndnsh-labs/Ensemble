@@ -1,16 +1,16 @@
-import { ACTIONS } from './types.js';
-import { getState, dispatch } from './state.js';
-import { triggerFlash } from './ui.js';
+import { ACTIONS } from '../types.js';
+import { getState, dispatch } from '../state.js';
+import { triggerFlash } from '../ui.js';
 import { initAudio, playNote, playDrumSound, playBassNote, playSoloNote, playHarmonyNote, killHarmonyNote, updateSustain, restoreGains, killAllNotes } from './engine.js';
-import { TIME_SIGNATURES } from './config.js';
-import { getStepsPerMeasure, getStepInfo, getMidi, midiToNote } from './utils.js';
-import { requestBuffer, syncWorker, flushWorker, stopWorker, startWorker, requestResolution } from './worker-client.js';
-import { conductorState, updateAutoConductor, updateLarsTempo, checkSectionTransition } from './conductor.js';
+import { TIME_SIGNATURES } from '../config.js';
+import { getStepsPerMeasure, getStepInfo, getMidi, midiToNote } from '../utils.js';
+import { requestBuffer, syncWorker, flushWorker, stopWorker, startWorker, requestResolution } from '../worker-client.js';
+import { conductorState, updateAutoConductor, updateLarsTempo, checkSectionTransition } from '../conductor.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
-import { loadDrumPreset, flushBuffers } from './instrument-controller.js';
-import { draw } from './animation-loop.js';
-import { sendMIDINote, sendMIDIDrum, sendMIDICC, normalizeMidiVelocity, panic, sendMIDITransport } from './midi-controller.js';
-import { initPlatform, unlockAudio, lockAudio, activateWakeLock, deactivateWakeLock } from './platform.js';
+import { loadDrumPreset, flushBuffers } from '../instrument-controller.js';
+import { draw } from '../animation-loop.js';
+import { sendMIDINote, sendMIDIDrum, sendMIDICC, normalizeMidiVelocity, panic, sendMIDITransport } from '../midi-controller.js';
+import { initPlatform, unlockAudio, lockAudio, activateWakeLock, deactivateWakeLock } from '../platform.js';
 
 const DRUM_VIS_PITCHES = {
     'Kick': 36, 'Snare': 38, 'HiHat': 42, 'ClosedHat': 42, 'Open': 46, 'OpenHat': 46,
@@ -24,6 +24,14 @@ let isResolutionTriggered = false;
 // Initialize platform-specific hacks (iOS Audio, WakeLock state)
 initPlatform();
 
+/**
+ * Toggles the playback state of the session.
+ * Handles audio context suspension/resumption, worker synchronization,
+ * and global state updates for starting or stopping the engine.
+ *
+ * @param {Object} [viz] - Optional visualizer instance override.
+ * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
+ */
 export function togglePlay(viz, fromDispatch = false) {
     const { playback, arranger, chords } = getState();
     const activeViz = viz || playback.viz;
@@ -144,6 +152,11 @@ function scheduleResolution(time) {
     }, measureDuration * 1000);
 }
 
+/**
+ * Main scheduling loop.
+ * Looks ahead by `playback.scheduleAheadTime` and schedules notes for all enabled instruments.
+ * Handles count-in, session timing, and resolution triggers.
+ */
 export function scheduler() {
     if (isScheduling) return;
     isScheduling = true;
@@ -301,6 +314,18 @@ function getChordAtStep(step) {
     return null;
 }
 
+/**
+ * Schedules drum sounds for a specific step.
+ * Applies pocket/timing offsets, handles fills, and pushes events to the visualizer queue.
+ *
+ * @param {number} step - The local drum loop step (0-15 etc).
+ * @param {number} time - The AudioContext time to play.
+ * @param {boolean} isDownbeat - Whether this step is the start of a measure.
+ * @param {boolean} isQuarter - Whether this step is a beat start.
+ * @param {boolean} isBackbeat - Whether this step is a backbeat (2 or 4).
+ * @param {number} absoluteStep - The global session step.
+ * @param {boolean} isGroupStart - Whether this step is the start of a rhythm group.
+ */
 export function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, absoluteStep, isGroupStart) {
     const { playback, groove, vizState, midi } = getState();
     const conductorVel = playback.conductorVelocity || 1.0;
@@ -371,6 +396,12 @@ export function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, abs
     });
 }
 
+/**
+ * Schedules drum notes directly from the worker buffer (for Resolution or pattern playback).
+ *
+ * @param {number} step - The global step index.
+ * @param {number} time - The AudioContext time to play.
+ */
 export function scheduleDrumsFromBuffer(step, time) {
     const { groove, playback, vizState, midi } = getState();
     const notes = groove.buffer.get(step);
@@ -401,6 +432,13 @@ export function scheduleDrumsFromBuffer(step, time) {
     }
 }
 
+/**
+ * Schedules bass notes from the worker buffer.
+ *
+ * @param {Object} chordData - The current chord context.
+ * @param {number} step - The global step index.
+ * @param {number} time - The AudioContext time to play.
+ */
 export function scheduleBass(chordData, step, time) {
     const { bass, playback, vizState, midi } = getState();
     const noteEntry = bass.buffer.get(step);
@@ -427,6 +465,15 @@ export function scheduleBass(chordData, step, time) {
     }
 }
 
+/**
+ * Schedules soloist (melody) notes from the worker buffer.
+ * Handles monophonic/polyphonic modes, bends, and MIDI output.
+ *
+ * @param {Object} chordData - The current chord context.
+ * @param {number} step - The global step index.
+ * @param {number} time - The AudioContext time (swung).
+ * @param {number} unswungTime - The AudioContext time (linear/unswung) for strict quantization.
+ */
 export function scheduleSoloist(chordData, step, time, unswungTime) {
     const { soloist, playback, vizState, midi } = getState();
     const notes = soloist.buffer.get(step);
@@ -503,6 +550,14 @@ export function scheduleChordVisuals(chordData, t) {
     }
 }
 
+/**
+ * Schedules chord notes from the worker buffer.
+ * Handles sustain pedal events (MIDI CC 64).
+ *
+ * @param {Object} chordData - The current chord context.
+ * @param {number} step - The global step index.
+ * @param {number} time - The AudioContext time to play.
+ */
 export function scheduleChords(chordData, step, time) {
     const { chords, playback, midi } = getState();
     const notes = chords.buffer.get(step);
@@ -546,6 +601,14 @@ export function scheduleChords(chordData, step, time) {
     }
 }
 
+/**
+ * Schedules harmony notes (pads, stabs) from the worker buffer.
+ * Handles voice killing for smoother transitions.
+ *
+ * @param {Object} chordData - The current chord context.
+ * @param {number} step - The global step index.
+ * @param {number} time - The AudioContext time to play.
+ */
 export function scheduleHarmonies(chordData, step, time) {
     const { harmony, playback, vizState, midi } = getState();
     const notes = harmony.buffer.get(step);
@@ -591,6 +654,13 @@ export function scheduleHarmonies(chordData, step, time) {
     }
 }
 
+/**
+ * Orchestrates global events for the current step.
+ * Updates conductor state, triggers MIDI automation, rhythm section masking, and metronome.
+ *
+ * @param {number} step - The global step index.
+ * @param {number} swungTime - The swung AudioContext time.
+ */
 export function scheduleGlobalEvent(step, swungTime) {
     const { arranger, playback, groove, soloist, midi, chords, bass, harmony } = getState();
     const globalTS = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -682,6 +752,12 @@ export function scheduleGlobalEvent(step, swungTime) {
     }
 }
 
+/**
+ * Syncs current state parameters to the worker and flushes the note buffers.
+ * Called when key parameters (genre, key, progression) change.
+ *
+ * @param {number} step - The current global step.
+ */
 export function syncAndFlushWorker(step) {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
     const syncData = {

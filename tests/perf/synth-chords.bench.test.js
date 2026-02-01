@@ -65,7 +65,7 @@ vi.mock('../../public/state.js', () => {
     };
 });
 
-import { playNote } from '../../public/synth-chords.js';
+import { playNote } from '../../public/engine/synth-chords.js';
 
 describe('Synth Chords Performance', () => {
     it('measures playNote high-intensity performance', () => {

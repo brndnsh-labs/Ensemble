@@ -60,7 +60,7 @@ vi.mock('../../../public/worker-client.js', () => ({
     syncWorker: vi.fn()
 }));
 
-vi.mock('../../../public/engine.js', () => ({
+vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn()
 }));
 
