@@ -31,6 +31,19 @@ export function getState() {
     return stateMap;
 }
 
+// Export individual state slices for dynamic imports
+export {
+    playback,
+    arranger,
+    chords,
+    bass,
+    soloist,
+    harmony,
+    groove,
+    midi,
+    vizState
+};
+
 // Persistence Helpers
 export const storage = {
     get: (key) => {

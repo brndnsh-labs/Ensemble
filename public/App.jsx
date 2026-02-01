@@ -223,7 +223,6 @@ function MobileNav({ activeTab }) {
         if (tab === 'grooves') {
             dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'smart' });
         }
-        dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'mobile', target: tab });
         const { groove } = getState();
         groove.mobileTab = tab;
         dispatch('MOBILE_TAB_SWITCH');
