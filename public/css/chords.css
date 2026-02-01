@@ -137,14 +137,14 @@
     max-height: none !important;
     z-index: var(--z-maximized);
     background: var(--bg-color);
-    padding: 1.5vh 1.5rem;
+    padding: 3vh 8vw;
     border-radius: 0;
     border: none;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .chord-maximized .section-block {
