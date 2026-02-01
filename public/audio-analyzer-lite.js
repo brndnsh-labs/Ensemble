@@ -19,7 +19,9 @@ const CHORD_PROFILES = {
     '6':    { 0: 1.6, 4: 1.4, 7: 1.1, 9: 1.2 },
     'm6':   { 0: 1.6, 3: 1.4, 7: 1.1, 9: 1.2 },
     'sus4': { 0: 1.6, 5: 1.4, 7: 1.1 },
-    'dim':  { 0: 1.7, 3: 1.4, 6: 1.4 }
+    'dim':  { 0: 1.7, 3: 1.4, 6: 1.4 },
+    'dim7': { 0: 1.6, 3: 1.4, 6: 1.4, 9: 1.4 },
+    'aug':  { 0: 1.6, 4: 1.4, 8: 1.4 }
 };
 const CHORD_PROFILE_ENTRIES = Object.entries(CHORD_PROFILES);
 
@@ -1001,11 +1003,16 @@ export class ChordAnalyzerLite {
                 if (type === '7' || type === 'm7' || type === 'maj7') {
                     const seventhIdx = (type === 'maj7') ? 11 : 10;
                     const absSeventhIdx = (root + seventhIdx) % 12;
-                    if (chroma[absSeventhIdx] < 0.1) {
-                        score *= 0.65; 
+                    if (chroma[absSeventhIdx] < 0.15) {
+                        score *= 0.6;
                     }
                 }
                 
+                // Simplicity Bias: Slight penalty for complex chords to favor triads if scores are close
+                if (['maj7', 'm7', '6', 'm6', 'dim7'].includes(type)) {
+                    score *= 0.96;
+                }
+
                 if (score > bestScore) {
                     bestScore = score;
                     bestChordData = { root, type };
