@@ -128,7 +128,7 @@ export function extractForm(beatData, beatsPerMeasure = 4) {
 
              if (i + len <= measures.length) {
                  const sim = getSimilarity(s.startMeasureIndex, i, len);
-                 if (sim >= 0.8) {
+                 if (sim >= 0.7) {
                      // Found a match!
                      // Is this better than what we have? (Longer is better)
                      if (len >= bestLen) {
@@ -136,7 +136,7 @@ export function extractForm(beatData, beatsPerMeasure = 4) {
                          // Check for repeats of this existing section structure
                          let lookAheadIdx = i + len;
                          while (lookAheadIdx + len <= measures.length) {
-                             if (getSimilarity(s.startMeasureIndex, lookAheadIdx, len) >= 0.8) {
+                             if (getSimilarity(s.startMeasureIndex, lookAheadIdx, len) >= 0.7) {
                                  currentRepeat++;
                                  lookAheadIdx += len;
                              } else {
@@ -170,7 +170,7 @@ export function extractForm(beatData, beatsPerMeasure = 4) {
                 let lookAheadIdx = i + len;
                 while (lookAheadIdx + len <= measures.length) {
                     const sim = getSimilarity(i, lookAheadIdx, len);
-                    if (sim >= 0.8) {
+                    if (sim >= 0.7) {
                         repeat++;
                         currentScore += sim;
                         lookAheadIdx += len;
@@ -233,7 +233,7 @@ export function extractForm(beatData, beatsPerMeasure = 4) {
         for (let k = 0; k < m1.length; k++) {
             error += getChordDistance(m1[k], m2[k]);
         }
-        return (1.0 - (error / m1.length)) >= 0.8;
+        return (1.0 - (error / m1.length)) >= 0.7;
     };
 
     sections.forEach(s => {
