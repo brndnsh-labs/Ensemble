@@ -74,24 +74,15 @@
         padding: 1.25rem;
     }
 
-    /* Instrument panels are "smaller" */
+    /* Instrument panels are "smaller" and always visible on desktop */
     .instrument-panel {
         padding: 1rem;
-        /* No specific grid column needed, it's inside the sidebar column */
+        display: flex;
+        animation: none;
     }
 
-    /* Arranger takes full height of its content, sidebar stacks naturally */
-    #panel-arranger {
-        /* No specific grid placement needed */
-    }
-    
     .mobile-tabs-nav {
         display: none; /* Hide tabs on desktop */
-    }
-
-    .instrument-panel {
-        display: flex !important; /* Always show instruments */
-        animation: none;
     }
 
     .desktop-power-btn {
