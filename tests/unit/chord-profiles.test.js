@@ -56,19 +56,19 @@ describe('Comprehensive Chord Recognition', () => {
     CHORD_TYPES.forEach(c => {
         it(`should identify ${c.name} (${c.type})`, async () => {
             const buffer = createChordBuffer(c.notes);
-            const { results } = await analyzer.analyze(buffer, { bpm: 120 });
+            const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
             // Check best chord. Note: analyze returns smoothed results.
             // For 1.0s buffer at 120bpm, we have 2 beats.
-            expect(results.length).toBeGreaterThan(0);
-            expect(results[0].chord).toBe(c.name);
+            expect(chords.length).toBeGreaterThan(0);
+            expect(chords[0].chord).toBe(c.name);
         });
     });
 
     it('should identify Cm7 (m7)', async () => {
         const buffer = createChordBuffer(['C4', 'Eb4', 'G4', 'Bb4']);
-        const { results } = await analyzer.analyze(buffer, { bpm: 120 });
+        const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
         // Cm7 (C Eb G Bb) share same notes as Eb6 (Eb G Bb C).
-        expect(['Cm7', 'Eb6']).toContain(results[0].chord);
+        expect(['Cm7', 'Eb6']).toContain(chords[0].chord);
     });
 
     describe('Slash Chords (Inversions)', () => {
@@ -76,15 +76,15 @@ describe('Comprehensive Chord Recognition', () => {
             // Bass E2 (within range 24-42: E2 is 40. Range is up to 42. Good.)
             // Chord: C4, G4, C5
             const buffer = createChordBuffer(['E2', 'C4', 'G4', 'C5']);
-            const { results } = await analyzer.analyze(buffer, { bpm: 120 });
-            expect(results[0].chord).toBe('C/E');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
+            expect(chords[0].chord).toBe('C/E');
         });
 
         it('should identify C/G (2nd Inversion)', async () => {
             // Testing G2 (43) which was previously outside default bass range (24-42)
             const buffer = createChordBuffer(['G2', 'C4', 'E4', 'C5']);
-            const { results } = await analyzer.analyze(buffer, { bpm: 120 });
-            expect(results[0].chord).toBe('C/G');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
+            expect(chords[0].chord).toBe('C/G');
         });
 
         it('should identify Am/G (Minor 7th in bass? No, G is 7th of Am)', async () => {
@@ -97,7 +97,7 @@ describe('Comprehensive Chord Recognition', () => {
             // G is m7 (10 semitones). Not in list.
             
             const buffer = createChordBuffer(['G1', 'A3', 'C4', 'E4']);
-            const { results } = await analyzer.analyze(buffer, { bpm: 120 });
+            const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
             
             // Should be Am7 or Am.
             // If bass G is strong, does it confuse root detection?
@@ -105,14 +105,14 @@ describe('Comprehensive Chord Recognition', () => {
             // It might detect as Am7.
             // Or if G is Bass, maybe C/G (C6/G)? A is 6th of C.
             // Let's see what it does.
-            expect(['Am7', 'Am', 'C6/G']).toContain(results[0].chord); 
+            expect(['Am7', 'Am', 'C6/G']).toContain(chords[0].chord); 
         });
         
         it('should identify F/C (2nd Inversion)', async () => {
             // C2 is 36. Inside range.
             const buffer = createChordBuffer(['C2', 'F3', 'A3', 'F4']);
-            const { results } = await analyzer.analyze(buffer, { bpm: 120 });
-            expect(results[0].chord).toBe('F/C');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
+            expect(chords[0].chord).toBe('F/C');
         });
     });
 });

@@ -2,9 +2,12 @@
  * Analyzes a raw sequence of chords to find repeating structures and suggest sections.
  * Optimized for standard song forms (AABA, Blues) and "Lead Sheet" style organization.
  * @param {Array} beatData Array of { chord, energy } objects
+ * @param {number|Object} beatsPerMeasure Number of beats per measure, or a pulse object containing beatsPerMeasure
  */
-export function extractForm(beatData, beatsPerMeasure = 4) {
+export function extractForm(beatData, options = 4) {
     if (!beatData || beatData.length < 4) return [];
+
+    const beatsPerMeasure = (typeof options === 'object') ? (options.beatsPerMeasure || 4) : options;
 
     // Flatten beat results into a full timeline
     const maxBeat = beatData[beatData.length - 1].beat;

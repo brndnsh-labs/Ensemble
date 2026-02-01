@@ -243,7 +243,7 @@ async function run() {
             // Note: We need to align detected beats to expected bars.
             // Simplified: Just count detected chords and see if they overlap with expected set.
             
-            const detectedChords = analysis.results.map(r => r.chord).filter(c => c !== 'Rest');
+            const detectedChords = analysis.chords.map(r => r.chord).filter(c => c !== 'Rest');
             const uniqueDetected = new Set(detectedChords.map(c => c.replace(/6|7|maj7|m7/, ''))); // Simplify
             
             // Expected

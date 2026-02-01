@@ -48,22 +48,15 @@ async function runTest() {
         console.log(`Meter: ${analysis.beatsPerMeasure}/4`);
         console.log(`Downbeat Offset: ${analysis.downbeatOffset.toFixed(3)}s`);
 
-        const form = extractForm(analysis.results, analysis.beatsPerMeasure);
-        
-        console.log("\n--- Detected Sections ---");
-        form.forEach(s => {
-            console.log(`[${s.label}] x${s.repeat}: ${s.value}`);
-        });
+        const form = extractForm(analysis.chords, analysis.pulse);
+        console.log(`\nDetected Form for ${filePath}:`);
+        form.forEach(s => console.log(`  ${s.label}: ${s.value} (x${s.repeat})`));
 
-        // Detailed chord check for the first few measures
-        console.log("\n--- First 12 Measures (Consolidated) ---");
-        // Group by measure
-        for (let i = 0; i < 12; i++) {
-            const measure = analysis.results.filter(r => r.beat >= i*4 && r.beat < (i+1)*4);
-            const chords = measure.map(m => m.chord).join(' | ');
-            console.log(`Bar ${i+1}: ${chords}`);
+        // Sample check of first 4 measures
+        for (let i = 0; i < 4; i++) {
+            const measure = analysis.chords.filter(r => r.beat >= i*4 && r.beat < (i+1)*4);
+            console.log(`Measure ${i+1}: ${measure.map(m => m.chord).join(' ')}`);
         }
-
     } catch (err) {
         console.error("Test failed:", err);
     }

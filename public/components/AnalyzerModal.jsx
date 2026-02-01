@@ -186,10 +186,8 @@ export function AnalyzerModal() {
         }
     }
 
-    async function handleFileUpload(e) {
-        const file = e.target.files[0];
+    async function processFile(file) {
         if (!file) return;
-
         setView('processing');
         setProgress(10);
         
@@ -209,6 +207,23 @@ export function AnalyzerModal() {
             console.error("[Analyzer] Load Error:", err);
             showToast("Failed to load audio");
             setView('idle');
+        }
+    }
+
+    async function handleFileUpload(e) {
+        processFile(e.target.files[0]);
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            processFile(e.dataTransfer.files[0]);
         }
     }
 
@@ -382,7 +397,13 @@ export function AnalyzerModal() {
 
                     {view === 'idle' && (
                         <Fragment>
-                            <label class="analyzer-drop-zone" id="analyzerDropZone" for="analyzerFileInput">
+                            <label 
+                                class="analyzer-drop-zone" 
+                                id="analyzerDropZone" 
+                                for="analyzerFileInput"
+                                onDragOver={handleDragOver}
+                                onDrop={handleDrop}
+                            >
                                 <div class="drop-zone-content">
                                     <span class="drop-icon">🎵</span>
                                     <p>Drag & drop an audio file here</p>

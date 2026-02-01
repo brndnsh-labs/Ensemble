@@ -368,11 +368,13 @@ export class ChordAnalyzerLite {
         fullSignal = null;
 
         return {
-            results: smoothed,
-            bpm,
-            candidates: pulse.candidates,
-            beatsPerMeasure,
-            downbeatOffset: pulse.downbeatOffset
+            chords: smoothed,
+            pulse: {
+                bpm,
+                candidates: pulse.candidates,
+                beatsPerMeasure,
+                downbeatOffset: pulse.downbeatOffset
+            }
         };
     }
 

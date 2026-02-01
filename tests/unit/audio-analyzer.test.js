@@ -78,43 +78,43 @@ describe('Audio Analyzer (Consolidated)', () => {
         it('should identify a perfect C Major triad', async () => {
             // C4 (261.63), E4 (329.63), G4 (392.00)
             const buffer = createChordBuffer([261.63, 329.63, 392.00]);
-            const { results } = await analyzer.analyze(buffer, { bpm: 60 });
-            expect(results[0].chord).toBe('C');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 60 });
+            expect(chords[0].chord).toBe('C');
         });
 
         it('should identify an A Minor triad', async () => {
             // A3 (220.00), C4 (261.63), E4 (329.63)
             const buffer = createChordBuffer([220.00, 261.63, 329.63]);
-            const { results } = await analyzer.analyze(buffer, { bpm: 60 });
-            expect(results[0].chord).toMatch(/^Am(\/E)?$/);
+            const { chords } = await analyzer.analyze(buffer, { bpm: 60 });
+            expect(chords[0].chord).toMatch(/^Am(\/E)?$/);
         });
 
         it('should identify a G Dominant 7th', async () => {
             // G3 (196.00), B3 (246.94), D4 (293.66), F4 (349.23)
             const buffer = createChordBuffer([196.00, 246.94, 293.66, 349.23]);
-            const { results } = await analyzer.analyze(buffer, { bpm: 60 });
-            expect(results[0].chord).toBe('G7');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 60 });
+            expect(chords[0].chord).toBe('G7');
         });
 
         it('should identify a C Major 7th (adjacent semitones check)', async () => {
             // C4 (261.63), E4 (329.63), G4 (392.00), B4 (493.88)
             // C and B are adjacent in chromagram (0 and 11)
             const buffer = createChordBuffer([261.63, 329.63, 392.00, 493.88]);
-            const { results } = await analyzer.analyze(buffer, { bpm: 60 });
-            expect(results[0].chord).toBe('Cmaj7');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 60 });
+            expect(chords[0].chord).toBe('Cmaj7');
         });
 
         it('should ignore high-frequency melody noise', async () => {
             // C Major triad + high-pitched "vocal" noise (A6 @ 1760Hz)
             const buffer = createChordBuffer([261.63, 329.63, 392.00, 1760.00]);
-            const { results } = await analyzer.analyze(buffer, { bpm: 60 });
-            expect(results[0].chord).toBe('C');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 60 });
+            expect(chords[0].chord).toBe('C');
         });
 
         it('should handle silence as Rest', async () => {
             const buffer = new MockAudioBuffer({ length: 1 * sampleRate, sampleRate });
-            const { results } = await analyzer.analyze(buffer, { bpm: 60 });
-            expect(results[0].chord).toBe('Rest');
+            const { chords } = await analyzer.analyze(buffer, { bpm: 60 });
+            expect(chords[0].chord).toBe('Rest');
         });
     });
 
@@ -145,10 +145,10 @@ describe('Audio Analyzer (Consolidated)', () => {
             // Use a slight startTime to skip any alignment transients
             const analysis = await analyzer.analyze(buffer, { startTime: 0.1 });
 
-            expect(analysis.bpm).toBeGreaterThan(110);
-            expect(analysis.bpm).toBeLessThan(130);
+            expect(analysis.pulse.bpm).toBeGreaterThan(110);
+            expect(analysis.pulse.bpm).toBeLessThan(130);
 
-            const chords = analysis.results;
+            const chords = analysis.chords;
             const detectedChords = chords.map(r => r.chord.replace('7', ''));
             expect(detectedChords).toContain('C');
             expect(detectedChords).toContain('F');
@@ -175,7 +175,7 @@ describe('Audio Analyzer (Consolidated)', () => {
             }
 
             const analysis = await analyzer.analyze(buffer, { bpm: 120 });
-            const sections = extractForm(analysis.results, 4);
+            const sections = extractForm(analysis.chords, analysis.pulse);
 
             expect(sections.length).toBeGreaterThanOrEqual(2);
             const labels = sections.map(s => s.label);
@@ -195,8 +195,8 @@ describe('Audio Analyzer (Consolidated)', () => {
                 data[i] += Math.sin(2 * Math.PI * baseFreq * 3 * t) * 0.3; // 3rd (G)
             }
 
-            const { results } = await analyzer.analyze(buffer, { bpm: 120 });
-            expect(results[0].chord).toMatch(/^C/);
+            const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
+            expect(chords[0].chord).toMatch(/^C/);
         });
 
         it('should robustly identify C7 blues even with chromatic walking bass', async () => {
@@ -239,7 +239,7 @@ describe('Audio Analyzer (Consolidated)', () => {
 
             expect(analyzer.notes[globalKey.root]).toBe('C');
 
-            const detectedChords = analysis.results.map(r => r.chord);
+            const detectedChords = analysis.chords.map(r => r.chord);
             const nonC = detectedChords.filter(c => !c.startsWith('C'));
             expect(nonC.length).toBe(0);
             expect(detectedChords.length).toBeGreaterThan(0);
