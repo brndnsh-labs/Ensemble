@@ -209,7 +209,7 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     filter.connect(outputGain);
 
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol, playTime, 0.02);
+    outputGain.gain.setTargetAtTime(vol * 0.8, playTime, 0.02);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.15);
 
     osc1.start(playTime);
