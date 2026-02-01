@@ -108,9 +108,8 @@ export function InstrumentSettings({ module }) {
                                 }}
                                 aria-label="Lead Sound Preset"
                             >
-                                <option value="classic">Classic</option>
+                                <option value="classic">Classic Sawtooth</option>
                                 <option value="acoustic">Acoustic Hybrid</option>
-                                <option value="granular">Granular Texture</option>
                                 <option value="neo">Neo-Juno</option>
                                 <option value="vowel">Vowel Lead</option>
                             </select>

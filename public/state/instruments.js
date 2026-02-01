@@ -60,39 +60,10 @@ export const bass = {
 
 /**
  * @typedef {Object} SoloistState
- * @property {boolean} enabled - Whether the soloist engine is active.
- * @property {string} preset - The synth sound profile ('classic', 'acoustic', 'granular', 'neo', 'vowel').
- * @property {number} volume - Volume level.
- * @property {number} reverb - Reverb level.
- * @property {number|null} lastFreq - Last generated frequency.
- * @property {number|null} lastPlayedFreq - Last played frequency.
- * @property {Map<number, Object>} buffer - Map of scheduled notes from the worker.
- * @property {number} lastNoteEnd - Time when the last note ends.
- * @property {number} octave - Base MIDI octave.
- * @property {string} style - Soloing style ID (e.g., 'blues', 'shred').
- * @property {number} direction - Melodic direction (1 or -1).
- * @property {string} melodicTrend - Current melodic direction intent ('Up', 'Down', 'Static').
- * @property {number} contourSteps - Remaining steps for the current melodic trend.
- * @property {number} currentPhraseSteps - Steps elapsed in current phrase.
- * @property {number} notesInPhrase - Number of notes played in the current phrase.
- * @property {string} qaState - Conversational state ('Question' or 'Answer').
- * @property {boolean} isResting - Whether the soloist is taking a breath.
- * @property {Array<number>} currentCell - Current rhythmic cell.
- * @property {number} busySteps - Counter for "busy" playing periods.
- * @property {Array<Object>} motifBuffer - Short-term memory for current phrase.
- * @property {Array<Object>} hookBuffer - Long-term memory for catchy loops.
- * @property {boolean} isReplayingMotif - Whether currently replaying a motif.
- * @property {number} motifReplayIndex - Current index in motif/hook replay.
- * @property {number} hookRetentionProb - Probability of retaining a motif as a "hook".
- * @property {number} tension - Current harmonic tension level (0.0 - 1.0).
- * @property {boolean} doubleStops - Whether to play double stops (two notes at once).
- * @property {Array<GainNode>} activeVoices - List of active gain nodes for voice stealing.
- * @property {number} sessionSteps - Total steps elapsed since playback started.
- * @property {Array<Object>} deviceBuffer - Buffer for multi-step melodic devices.
- * @property {string} activeTab - Currently active UI tab.
- * @property {Array<number>} pitchHistory - Rolling buffer of recent pitches for anti-stagnation.
- * @property {number} stagnationCount - Counter for consecutive small intervals.
- * @property {number} lastInterval - The interval between the last two notes.
+ * @property {boolean} enabled - Whether the soloist is active.
+ * @property {number} volume - Mix volume (0.0 - 1.0).
+ * @property {string} preset - The synth sound profile ('classic', 'acoustic', 'neo', 'vowel').
+ * @property {boolean} doubleStops - Whether to play harmonization lines.
  */
 export const soloist = {
     enabled: false,

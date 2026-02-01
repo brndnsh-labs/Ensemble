@@ -102,7 +102,7 @@ describe('Soloist Presets', () => {
         expect(soloist.activeVoices.length).toBe(1);
     });
 
-    it('should play Acoustic Hybrid (Noise Buffer + Delay)', () => {
+    it('should play Acoustic Hybrid (Noise Buffer + Triangle Body)', () => {
         soloist.preset = 'acoustic';
         playSoloNote(440, 10, 1.0);
 
@@ -110,18 +110,9 @@ describe('Soloist Presets', () => {
         expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
         // Delay line
         expect(playback.audio.createDelay).toHaveBeenCalledTimes(1);
-        // Sine body
+        // Triangle body
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(1);
 
-        expect(soloist.activeVoices.length).toBe(1);
-    });
-
-    it('should play Granular Texture (Many BufferSources)', () => {
-        soloist.preset = 'granular';
-        playSoloNote(440, 10, 1.0);
-
-        // With 1.0s duration and 0.04s interval, expect ~30 grains
-        expect(playback.audio.createBufferSource.mock.calls.length).toBeGreaterThan(10);
         expect(soloist.activeVoices.length).toBe(1);
     });
 
@@ -134,12 +125,12 @@ describe('Soloist Presets', () => {
         expect(soloist.activeVoices.length).toBe(1);
     });
 
-    it('should play Vowel Lead (Parallel Filters)', () => {
+    it('should play Vowel Lead (Parallel Filters + LFO)', () => {
         soloist.preset = 'vowel';
         playSoloNote(440, 10, 1.0);
 
-        // 1 Osc
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(1);
+        // 1 Osc + 1 LFO = 2 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(2);
         // 3 Formant filters
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
 

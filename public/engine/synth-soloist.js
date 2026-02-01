@@ -1,43 +1,6 @@
 import { getState } from '../state.js';
 import { safeDisconnect, clampFreq } from '../utils.js';
 
-let granularBuffer = null;
-
-/**
- * Generates a rich harmonic pad texture for the granular synth.
- * @param {AudioContext} ctx
- */
-function getGranularBuffer(ctx) {
-    if (granularBuffer) return granularBuffer;
-
-    const duration = 4.0;
-    const sampleRate = ctx.sampleRate;
-    const length = sampleRate * duration;
-    const buffer = ctx.createBuffer(1, length, sampleRate);
-    const data = buffer.getChannelData(0);
-
-    // Additive synthesis: stack of harmonics
-    const harmonics = [1, 2, 3, 4, 5, 6, 8];
-    const baseFreq = 110; // A2
-
-    for (let i = 0; i < length; i++) {
-        let sum = 0;
-        const t = i / sampleRate;
-        harmonics.forEach((h, idx) => {
-            const amp = 1 / (idx + 1); // Sawtooth-ish amplitude
-            sum += Math.sin(t * baseFreq * h * 2 * Math.PI) * amp;
-            // Add some detuned unison
-            sum += Math.sin(t * (baseFreq * h + 1.5) * 2 * Math.PI) * amp * 0.5;
-        });
-        // Apply a slow envelope
-        const env = Math.min(1, t * 2) * Math.min(1, (duration - t) * 2);
-        data[i] = sum * 0.15 * env;
-    }
-
-    granularBuffer = buffer;
-    return buffer;
-}
-
 export function killSoloistNote() {
     const { playback, soloist } = getState();
     if (soloist.activeVoices && soloist.activeVoices.length > 0) {
@@ -95,9 +58,6 @@ export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval 
     switch (preset) {
         case 'acoustic':
             playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
-            break;
-        case 'granular':
-            playGranular(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
             break;
         case 'neo':
             playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
@@ -212,7 +172,8 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
 }
 
 function playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
-    // Karplus-Strong (Noise -> Delay) + Sine Body
+    // Karplus-Strong (Noise -> Delay) + Triangle Body
+    // Refined: Replaced Sine with Triangle + LPF for "Plucked" body
     const noise = ctx.createBufferSource();
     const bufferSize = ctx.sampleRate * 0.1; // 100ms noise burst
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -222,7 +183,7 @@ function playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterva
 
     const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 2000;
+    noiseFilter.frequency.value = 2500; // Slightly brighter noise for attack definition
 
     // Delay line for Karplus-Strong
     const delayNode = ctx.createDelay();
@@ -230,15 +191,19 @@ function playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterva
     delayNode.delayTime.setValueAtTime(delayTime, playTime);
 
     const feedback = ctx.createGain();
-    feedback.gain.value = 0.96; // High feedback for string sustain
+    feedback.gain.value = 0.95; // Slightly reduced for better decay
 
-    // Sine Body
-    const sine = ctx.createOscillator();
-    sine.type = 'sine';
-    applyPitchEnvelope(sine, null, freq, playTime, duration, bendStartInterval, style);
+    // Body Oscillator (Triangle for woody tone)
+    const bodyOsc = ctx.createOscillator();
+    bodyOsc.type = 'triangle';
+    applyPitchEnvelope(bodyOsc, null, freq, playTime, duration, bendStartInterval, style);
 
-    voiceObj.nodes.push(noise, sine);
-    voiceObj.cleanup.push(noiseFilter, delayNode, feedback);
+    const bodyFilter = ctx.createBiquadFilter();
+    bodyFilter.type = 'lowpass';
+    bodyFilter.frequency.value = Math.min(freq * 4, 3000); // Warm up the triangle
+
+    voiceObj.nodes.push(noise, bodyOsc);
+    voiceObj.cleanup.push(noiseFilter, delayNode, feedback, bodyFilter);
 
     // Connections
     noise.connect(noiseFilter);
@@ -247,75 +212,20 @@ function playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterva
     delayNode.connect(feedback);
     feedback.connect(delayNode);
 
-    sine.connect(outputGain);
+    bodyOsc.connect(bodyFilter);
+    bodyFilter.connect(outputGain);
 
     // Envelopes
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 0.8, playTime, 0.005);
-    outputGain.gain.setTargetAtTime(0, playTime + duration, 0.1);
-
-    noise.start(playTime);
-    noise.stop(playTime + 0.02); // Short burst
-    sine.start(playTime);
-    sine.stop(playTime + duration + 0.5);
-
-    sine.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
-}
-
-function playGranular(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
-    const srcBuffer = getGranularBuffer(ctx);
-    const baseRate = freq / 110.0; // Buffer base is A2 (110Hz)
-
-    // Granular Params
-    const grainSize = 0.06; // 60ms
-    const grainOverlap = 0.04; // New grain every 40ms
-    const releaseTail = 0.2;
-    const totalDuration = duration + releaseTail;
-
-    // Master envelope
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol, playTime, 0.05);
+    outputGain.gain.setTargetAtTime(vol * 0.7, playTime, 0.005);
     outputGain.gain.setTargetAtTime(0, playTime + duration, 0.15);
 
-    let currentTime = playTime;
-    const endTime = playTime + totalDuration;
+    noise.start(playTime);
+    noise.stop(playTime + 0.03); // Short pluck
+    bodyOsc.start(playTime);
+    bodyOsc.stop(playTime + duration + 0.5);
 
-    while (currentTime < endTime) {
-        const src = ctx.createBufferSource();
-        src.buffer = srcBuffer;
-
-        // Randomize
-        const offset = Math.random() * (srcBuffer.duration - grainSize);
-        const randomRate = baseRate * (1 + (Math.random() - 0.5) * 0.04);
-        const randomPan = (Math.random() - 0.5) * 0.3;
-
-        src.playbackRate.value = randomRate;
-
-        // Grain Envelope / Panner
-        const env = ctx.createGain();
-        const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-        if (ctx.createStereoPanner) panner.pan.value = randomPan;
-
-        // Shape: Triangle/Parabolic
-        env.gain.value = 0;
-        env.gain.setValueAtTime(0, currentTime);
-        env.gain.linearRampToValueAtTime(0.7, currentTime + (grainSize * 0.5));
-        env.gain.linearRampToValueAtTime(0, currentTime + grainSize);
-
-        src.connect(env);
-        env.connect(panner);
-        panner.connect(outputGain);
-
-        src.start(currentTime, offset, grainSize);
-        src.stop(currentTime + grainSize + 0.02);
-
-        voiceObj.nodes.push(src);
-        voiceObj.cleanup.push(env, panner);
-
-        currentTime += grainOverlap;
-    }
-
-    setTimeout(() => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes)), (totalDuration + 1.0) * 1000);
+    bodyOsc.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
 function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
@@ -398,6 +308,21 @@ function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style,
     f3.type = 'bandpass';
     f3.frequency.value = 2500;
     f3.Q.value = 5;
+
+    // Movement LFO for "alive" vowels
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 1.5; // Slow breathing rate
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 50; // Subtle shift in Hz
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(f1.frequency);
+    lfoGain.connect(f2.frequency);
+
+    voiceObj.nodes.push(lfo);
+    voiceObj.cleanup.push(lfoGain);
+    lfo.start(playTime);
+    lfo.stop(playTime + duration + 0.5);
 
     // Parallel connection
     osc.connect(f1);
