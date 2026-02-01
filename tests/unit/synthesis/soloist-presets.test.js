@@ -102,20 +102,6 @@ describe('Soloist Presets', () => {
         expect(soloist.activeVoices.length).toBe(1);
     });
 
-    it('should play Acoustic Hybrid (Noise Buffer + Triangle Body)', () => {
-        soloist.preset = 'acoustic';
-        playSoloNote(440, 10, 1.0);
-
-        // Noise source
-        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
-        // Delay line
-        expect(playback.audio.createDelay).toHaveBeenCalledTimes(1);
-        // Triangle body
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(1);
-
-        expect(soloist.activeVoices.length).toBe(1);
-    });
-
     it('should play Neo-Juno (Dual Saw + 2 LFOs)', () => {
         soloist.preset = 'neo';
         playSoloNote(440, 10, 1.0);
@@ -161,7 +147,7 @@ describe('Soloist Presets', () => {
     });
 
     it('should manage voice stealing with complex nodes', () => {
-        soloist.preset = 'acoustic';
+        soloist.preset = 'neo';
         playSoloNote(440, 10, 1.0);
 
         const firstVoice = soloist.activeVoices[0];
@@ -170,6 +156,9 @@ describe('Soloist Presets', () => {
         playSoloNote(880, 10.1, 1.0);
 
         expect(firstVoice.gain.gain.setTargetAtTime).toHaveBeenCalled();
-        expect(firstVoice.nodes[0].stop).toHaveBeenCalled(); // Noise source stop
+        // Check that oscillators are stopped
+        firstVoice.nodes.forEach(node => {
+            if (node.stop) expect(node.stop).toHaveBeenCalled();
+        });
     });
 });

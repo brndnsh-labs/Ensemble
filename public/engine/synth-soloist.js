@@ -56,9 +56,6 @@ export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval 
     let voiceObj = { gain, time: playTime, duration, nodes: [], cleanup: [gain, pan] };
 
     switch (preset) {
-        case 'acoustic':
-            playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
-            break;
         case 'neo':
             playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
             break;
@@ -171,63 +168,6 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
-function playAcousticHybrid(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
-    // Karplus-Strong (Noise -> Delay) + Triangle Body
-    // Refined: Replaced Sine with Triangle + LPF for "Plucked" body
-    const noise = ctx.createBufferSource();
-    const bufferSize = ctx.sampleRate * 0.1; // 100ms noise burst
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    noise.buffer = buffer;
-
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 2500; // Slightly brighter noise for attack definition
-
-    // Delay line for Karplus-Strong
-    const delayNode = ctx.createDelay();
-    const delayTime = 1 / freq;
-    delayNode.delayTime.setValueAtTime(delayTime, playTime);
-
-    const feedback = ctx.createGain();
-    feedback.gain.value = 0.95; // Slightly reduced for better decay
-
-    // Body Oscillator (Triangle for woody tone)
-    const bodyOsc = ctx.createOscillator();
-    bodyOsc.type = 'triangle';
-    applyPitchEnvelope(bodyOsc, null, freq, playTime, duration, bendStartInterval, style);
-
-    const bodyFilter = ctx.createBiquadFilter();
-    bodyFilter.type = 'lowpass';
-    bodyFilter.frequency.value = Math.min(freq * 4, 3000); // Warm up the triangle
-
-    voiceObj.nodes.push(noise, bodyOsc);
-    voiceObj.cleanup.push(noiseFilter, delayNode, feedback, bodyFilter);
-
-    // Connections
-    noise.connect(noiseFilter);
-    noiseFilter.connect(delayNode);
-    delayNode.connect(outputGain);
-    delayNode.connect(feedback);
-    feedback.connect(delayNode);
-
-    bodyOsc.connect(bodyFilter);
-    bodyFilter.connect(outputGain);
-
-    // Envelopes
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 0.7, playTime, 0.005);
-    outputGain.gain.setTargetAtTime(0, playTime + duration, 0.15);
-
-    noise.start(playTime);
-    noise.stop(playTime + 0.03); // Short pluck
-    bodyOsc.start(playTime);
-    bodyOsc.stop(playTime + duration + 0.5);
-
-    bodyOsc.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
-}
-
 function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -336,7 +276,7 @@ function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style,
     voiceObj.cleanup.push(f1, f2, f3);
 
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.5, playTime, 0.03); // Needs boost due to bandpass
+    outputGain.gain.setTargetAtTime(vol * 1.8, playTime, 0.03); // Needs boost due to bandpass
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.1);
 
     osc.start(playTime);

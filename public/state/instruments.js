@@ -62,7 +62,7 @@ export const bass = {
  * @typedef {Object} SoloistState
  * @property {boolean} enabled - Whether the soloist is active.
  * @property {number} volume - Mix volume (0.0 - 1.0).
- * @property {string} preset - The synth sound profile ('classic', 'acoustic', 'neo', 'vowel').
+ * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
  * @property {boolean} doubleStops - Whether to play harmonization lines.
  */
 export const soloist = {
