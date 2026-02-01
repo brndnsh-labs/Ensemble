@@ -2,6 +2,8 @@ import { ACTIONS } from './types.js';
 import { getState, storage, dispatch } from './state.js';
 import { applyTheme } from './app-controller.js';
 import { decompressSections, generateId, normalizeKey } from './utils.js';
+import { TIME_SIGNATURES } from './config.js';
+import { CHORD_STYLES, SMART_GENRES } from './presets.js';
 
 export function hydrateState() {
     const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
@@ -146,28 +148,52 @@ export function loadFromUrl() {
     else if (params.get('prog')) { arranger.sections = [{ id: generateId(), label: 'Main', value: params.get('prog') }]; hasParams = true; }
     if (hasParams) clearChordPresetHighlight();
     if (params.get('key')) { arranger.key = normalizeKey(params.get('key')); }
-    if (params.get('ts')) { arranger.timeSignature = params.get('ts'); }
-    if (params.get('bpm')) { dispatch(ACTIONS.SET_BPM, params.get('bpm')); }
-    if (params.get('style')) {
-        // Dispatch style update instead of direct UI manipulation
-        dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: params.get('style') });
+
+    if (params.get('ts')) {
+        const ts = params.get('ts');
+        if (TIME_SIGNATURES[ts]) arranger.timeSignature = ts;
     }
+
+    if (params.get('bpm')) {
+        const bpm = parseFloat(params.get('bpm'));
+        if (!isNaN(bpm) && bpm >= 20 && bpm <= 300) {
+            dispatch(ACTIONS.SET_BPM, bpm);
+        }
+    }
+
+    if (params.get('style')) {
+        const style = params.get('style');
+        // Validate style against available presets
+        if (CHORD_STYLES.some(s => s.id === style)) {
+            dispatch(ACTIONS.SET_STYLE, { module: 'chords', style });
+        }
+    }
+
     if (params.get('genre')) {
         const genre = params.get('genre');
-        // Fallback since UI not ready for click simulation
-        groove.lastSmartGenre = genre;
-        groove.genreFeel = genre;
-        // Logic for applying genre feel should ideally be dispatched or handled by components reacting to 'genreFeel'
+        // Validate genre
+        if (SMART_GENRES[genre]) {
+            groove.lastSmartGenre = genre;
+            groove.genreFeel = genre;
+        }
     }
+
     if (params.get('int')) {
         const val = parseFloat(params.get('int'));
-        dispatch(ACTIONS.SET_BAND_INTENSITY, val);
+        if (!isNaN(val)) dispatch(ACTIONS.SET_BAND_INTENSITY, Math.max(0, Math.min(1, val)));
     }
+
     if (params.get('comp')) {
         const val = parseFloat(params.get('comp'));
-        dispatch(ACTIONS.SET_COMPLEXITY, val);
+        if (!isNaN(val)) dispatch(ACTIONS.SET_COMPLEXITY, Math.max(0, Math.min(1, val)));
     }
-    if (params.get('notation')) { arranger.notation = params.get('notation'); }
+
+    if (params.get('notation')) {
+        const not = params.get('notation');
+        if (['roman', 'nns', 'key', 'chord'].includes(not)) {
+            arranger.notation = not;
+        }
+    }
 }
 
 function clearChordPresetHighlight() {
