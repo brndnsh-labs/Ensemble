@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, vi, beforeEach, afterEach, expect, bench } from 'vitest';
+import { describe, it, beforeEach, afterEach} from 'vitest';
 import { UnifiedVisualizer } from '../../public/visualizer.js';
 
 describe('UnifiedVisualizer Render Benchmark', () => {
