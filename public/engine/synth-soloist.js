@@ -133,10 +133,10 @@ function manageVoices(playTime, soloist) {
                     oldest.gain.gain.setTargetAtTime(0, playTime, 0.01);
                     if (oldest.nodes) {
                         oldest.nodes.forEach(node => {
-                            try { if (node.stop) node.stop(playTime + 0.05); } catch { }
+                            try { if (node.stop) node.stop(playTime + 0.05); } catch { /* ignore cleanup errors */ }
                         });
                     }
-                } catch { }
+                } catch { /* ignore cleanup errors */ }
             }
         }
     }

@@ -40,6 +40,11 @@ export class UnifiedVisualizer {
         this.themeCache = null; // Lazy init
         this.isFillActive = false;
         
+        // Initial theme cache population
+        if (typeof document !== 'undefined' && document.documentElement) {
+            this.updateThemeCache();
+        }
+
         // Optimization: Pre-allocated array to avoid per-frame GC and Map overhead
         this.activeNoteColors = new Array(128).fill(null);
 
