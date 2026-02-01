@@ -249,7 +249,6 @@ export function extractForm(beatData, beatsPerMeasure = 4) {
     });
 
     // 5. LABELING (Lead Sheet Style)
-    const labelMap = new Map();
     let currentLetter = 'A';
     
     // Pre-scan for duplicates to assign letters
