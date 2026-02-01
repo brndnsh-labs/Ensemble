@@ -61,6 +61,7 @@ export const bass = {
 /**
  * @typedef {Object} SoloistState
  * @property {boolean} enabled - Whether the soloist engine is active.
+ * @property {string} preset - The synth sound profile ('classic', 'acoustic', 'granular', 'neo', 'vowel').
  * @property {number} volume - Volume level.
  * @property {number} reverb - Reverb level.
  * @property {number|null} lastFreq - Last generated frequency.
@@ -95,6 +96,7 @@ export const bass = {
  */
 export const soloist = {
     enabled: false,
+    preset: 'classic',
     volume: 0.5,
     reverb: 0.6,
     lastFreq: null,
@@ -173,7 +175,7 @@ export function instrumentReducer(action, payload) {
                 enabled: true, volume: 0.45, reverb: 0.05, octave: 38, style: 'smart', activeTab: 'smart'
             });
             Object.assign(soloist, {
-                enabled: false, volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', doubleStops: false
+                enabled: false, preset: 'classic', volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', doubleStops: false
             });
             Object.assign(harmony, {
                 enabled: false, volume: 0.4, reverb: 0.4, octave: 60, style: 'smart', complexity: 0.5, activeTab: 'smart'
@@ -207,6 +209,9 @@ export function instrumentReducer(action, payload) {
             return true;
         case ACTIONS.SET_DOUBLE_STOPS:
             Object.assign(soloist, { doubleStops: !!payload });
+            return true;
+        case ACTIONS.SET_SOLOIST_PRESET:
+            Object.assign(soloist, { preset: payload });
             return true;
         case ACTIONS.RESET_SESSION:
             Object.assign(soloist, { sessionSteps: 0 });

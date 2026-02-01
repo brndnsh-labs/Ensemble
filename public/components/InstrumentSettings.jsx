@@ -1,5 +1,4 @@
 import { h, Fragment } from 'preact';
-import React from 'preact/compat';
 import { useEnsembleState } from '../ui-bridge.js';
 import { ACTIONS } from '../types.js';
 import { dispatch, getState } from '../state.js';
@@ -97,20 +96,40 @@ export function InstrumentSettings({ module }) {
                 )}
 
                 {module === 'soloist' && (
-                    <div style="margin-bottom: 1rem;">
-                        <label style="font-size: 0.75rem; color: var(--green); display: flex; align-items: center; gap: 0.25rem; cursor: pointer; border-left: 1px solid rgba(133,153,0,0.2); padding-left: 1rem;">
-                            <input 
-                                id="soloistDoubleStops"
-                                type="checkbox" 
-                                checked={state.doubleStops} 
+                    <Fragment>
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Lead Sound</label>
+                            <select
+                                id="soloistPresetSelect"
+                                value={state.preset || 'classic'}
                                 onChange={(e) => {
-                                    dispatch(ACTIONS.SET_DOUBLE_STOPS, e.target.checked);
+                                    dispatch(ACTIONS.SET_SOLOIST_PRESET, e.target.value);
                                     saveCurrentState();
                                 }}
-                            />
-                            Double Stops
-                        </label>
-                    </div>
+                                aria-label="Lead Sound Preset"
+                            >
+                                <option value="classic">Classic</option>
+                                <option value="acoustic">Acoustic Hybrid</option>
+                                <option value="granular">Granular Texture</option>
+                                <option value="neo">Neo-Juno</option>
+                                <option value="vowel">Vowel Lead</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label style="font-size: 0.75rem; color: var(--green); display: flex; align-items: center; gap: 0.25rem; cursor: pointer; border-left: 1px solid rgba(133,153,0,0.2); padding-left: 1rem;">
+                                <input
+                                    id="soloistDoubleStops"
+                                    type="checkbox"
+                                    checked={state.doubleStops}
+                                    onChange={(e) => {
+                                        dispatch(ACTIONS.SET_DOUBLE_STOPS, e.target.checked);
+                                        saveCurrentState();
+                                    }}
+                                />
+                                Double Stops
+                            </label>
+                        </div>
+                    </Fragment>
                 )}
 
                 {module === 'groove' && (
