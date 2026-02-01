@@ -13,3 +13,7 @@
 ## 2024-05-24 - Object Allocation in High-Frequency Event Loops
 **Learning:** Creating new object literals (e.g., `{ time: ev.time, ... }`) inside the animation loop for every visual event (drums, notes) generates thousands of short-lived objects per session, triggering frequent minor GCs.
 **Action:** Reuse the event objects coming from the scheduler queue. Alias properties if necessary (e.g., `ev.noteName = ev.name`) instead of creating new adapter objects.
+
+## 2024-05-25 - Lookup Tables vs Allocations in Render Loops
+**Learning:** Even small array allocations like `[1, 3, 6, 8, 10].includes(x)` inside a render loop (running 60fps * 60 iterations) generate massive GC pressure (180k+ allocations/min).
+**Action:** Replace conditional logic or temporary arrays with static lookup tables (e.g., `const IS_BLACK = [false, true, ...]`) for O(1) access and zero allocation.

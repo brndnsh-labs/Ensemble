@@ -1,9 +1,19 @@
-const getCategory = (interval) => {
-    if (interval === 0) return "root";
-    if (interval === 3 || interval === 4) return "third";
-    if (interval === 7) return "fifth";
-    return "seventh";
-};
+const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
+
+const INTERVAL_CATEGORY = [
+    "root",    // 0
+    "seventh", // 1
+    "seventh", // 2
+    "third",   // 3
+    "third",   // 4
+    "seventh", // 5
+    "seventh", // 6
+    "fifth",   // 7
+    "seventh", // 8
+    "seventh", // 9
+    "seventh", // 10
+    "seventh"  // 11
+];
 
 export class UnifiedVisualizer {
     constructor(containerId) {
@@ -233,7 +243,7 @@ export class UnifiedVisualizer {
                     const rootPC = ev.rootMidi % 12;
                     for (const m of ev.notes) {
                          const interval = (m % 12 - rootPC + 12) % 12;
-                         const cat = getCategory(interval);
+                         const cat = INTERVAL_CATEGORY[interval];
                          this.activeNoteColors[m] = chordColors[cat];
                     }
                 }
@@ -269,7 +279,7 @@ export class UnifiedVisualizer {
         for (let m = startMidi; m <= endMidi; m++) {
             const y = getY(m);
             const noteInOctave = m % 12;
-            const isBlack = [1, 3, 6, 8, 10].includes(noteInOctave);
+            const isBlack = IS_BLACK[noteInOctave];
             
             if (this.activeNoteColors[m]) {
                 ctx.fillStyle = this.activeNoteColors[m];
@@ -302,8 +312,7 @@ export class UnifiedVisualizer {
         ctx.beginPath();
         for (let m = startMidi; m <= endMidi; m++) {
             const noteInOctave = m % 12;
-            const isBlack = [1, 3, 6, 8, 10].includes(noteInOctave);
-            if (!isBlack) {
+            if (!IS_BLACK[noteInOctave]) {
                 const y = getY(m);
                 ctx.moveTo(this.pianoRollWidth, y);
                 ctx.lineTo(w, y);
@@ -316,8 +325,7 @@ export class UnifiedVisualizer {
         ctx.beginPath();
         for (let m = startMidi; m <= endMidi; m++) {
             const noteInOctave = m % 12;
-            const isBlack = [1, 3, 6, 8, 10].includes(noteInOctave);
-            if (isBlack) {
+            if (IS_BLACK[noteInOctave]) {
                 const y = getY(m);
                 ctx.moveTo(this.pianoRollWidth, y);
                 ctx.lineTo(w, y);
@@ -389,7 +397,7 @@ export class UnifiedVisualizer {
                 ctx.globalAlpha = 0.1; // Optimization: Set alpha once
                 for (const interval of ev.intervals) {
                     const pc = (rootPC + interval) % 12;
-                    const cat = getCategory(interval);
+                    const cat = INTERVAL_CATEGORY[interval];
                     ctx.fillStyle = chordColors[cat];
                     
                     // Render in visible octaves
@@ -412,7 +420,7 @@ export class UnifiedVisualizer {
                 for (const midi of ev.notes) {
                     const y = Math.round(getY(midi));
                     const interval = (midi % 12 - rootPC + 12) % 12;
-                    const cat = getCategory(interval);
+                    const cat = INTERVAL_CATEGORY[interval];
                     ctx.fillStyle = chordColors[cat];
                     ctx.globalAlpha = 0.5;
                     if (y >= -10 && y <= h + 10) {
