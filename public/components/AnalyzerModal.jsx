@@ -222,13 +222,12 @@ export function AnalyzerModal() {
             const { extractForm } = await import('../form-extractor.js');
             const analyzer = new ChordAnalyzerLite();
             
-            const sampleRate = audioBuffer.sampleRate;
-            const startIdx = Math.floor(trimRange.start * sampleRate);
-            const endIdx = Math.floor(trimRange.end * sampleRate);
-            const slice = audioBuffer.getChannelData(0).slice(startIdx, endIdx);
-
             setProgress(50);
-            const result = await analyzer.analyzeProgression(slice, sampleRate);
+            const result = await analyzer.analyze(audioBuffer, {
+                startTime: trimRange.start,
+                endTime: trimRange.end,
+                onProgress: (p) => setProgress(20 + (p * 0.6))
+            });
             setProgress(80);
             
             const sections = extractForm(result.chords, result.pulse);
