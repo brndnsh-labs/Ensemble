@@ -18,9 +18,16 @@ const INTERVAL_CATEGORY = [
 export class UnifiedVisualizer {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
+        if (!this.container) {
+            console.warn(`[Visualizer] Container #${containerId} not found. Deferring initialization.`);
+        }
+
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d', { alpha: false }); // Optimization: no transparency
-        this.container.appendChild(this.canvas);
+        
+        if (this.container) {
+            this.container.appendChild(this.canvas);
+        }
         
         this.tracks = {}; // { name: { color, history: [] } }
         this.chordEvents = []; // { time, notes: [], duration, rootMidi, intervals }
@@ -30,7 +37,7 @@ export class UnifiedVisualizer {
         this.pianoRollWidth = 50;
         this.registers = { chords: 60 };
         this.beatReferenceTime = null;
-        this.themeCache = {};
+        this.themeCache = null; // Lazy init
         this.isFillActive = false;
         
         // Optimization: Pre-allocated array to avoid per-frame GC and Map overhead
@@ -44,8 +51,9 @@ export class UnifiedVisualizer {
             seventh: []
         };
 
-        this.initDOM();
-        this.updateThemeCache();
+        if (this.container) {
+            this.initDOM();
+        }
 
         // Observe theme changes
         this.themeObserver = new MutationObserver((mutations) => {
@@ -65,10 +73,15 @@ export class UnifiedVisualizer {
                 this.resize(entry.contentRect);
             }
         });
-        this.resizeObserver.observe(this.container);
+        
+        if (this.container) {
+            this.resizeObserver.observe(this.container);
+        }
     }
 
     updateThemeCache() {
+        if (!document.documentElement) return;
+        
         const style = getComputedStyle(document.documentElement);
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
                       (document.documentElement.getAttribute('data-theme') === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -131,7 +144,7 @@ export class UnifiedVisualizer {
     resize(contentRect) {
         const dpr = window.devicePixelRatio || 1;
         // Use provided rect or fallback to getBoundingClientRect
-        const rect = contentRect || this.container.getBoundingClientRect();
+        const rect = contentRect || this.container?.getBoundingClientRect() || { width: 0, height: 0 };
         
         // Ensure we have non-zero dimensions to avoid canvas errors
         if (rect.width === 0 || rect.height === 0) return;
@@ -206,6 +219,26 @@ export class UnifiedVisualizer {
     }
 
     render(currentTime, bpm, beatsPerMeasure = 4) {
+        if (!this.container) {
+            // Attempt recovery if container was missing at init
+            this.container = document.getElementById('unifiedVizContainer');
+            if (this.container) {
+                this.container.appendChild(this.canvas);
+                this.initDOM();
+                this.resizeObserver.observe(this.container);
+            } else {
+                return;
+            }
+        }
+
+        if (!this.themeCache) {
+            this.updateThemeCache();
+        }
+
+        if (!this.width || !this.height) {
+            this.resize();
+        }
+
         const ctx = this.ctx;
         const w = this.width;
         const h = this.height;
@@ -624,7 +657,9 @@ export class UnifiedVisualizer {
             this.tracks[name].label.textContent = "";
         }
         this.chordEvents = [];
-        this.ctx.clearRect(0, 0, this.width, this.height);
+        if (this.width && this.height) {
+            this.ctx.clearRect(0, 0, this.width, this.height);
+        }
     }
 
     destroy() {

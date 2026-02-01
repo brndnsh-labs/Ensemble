@@ -122,4 +122,9 @@ window.previewChord = (index) => {
     }
 };
 
-window.addEventListener('load', () => { init(); initPWA(); });
+window.addEventListener('load', () => { 
+    requestAnimationFrame(() => {
+        init(); 
+        initPWA(); 
+    });
+});

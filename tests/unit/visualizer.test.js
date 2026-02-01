@@ -190,7 +190,10 @@ describe('UnifiedVisualizer', () => {
             visualizer.pushNote('drums', { time: 1, midi: 36, duration: 1 });
             visualizer.pushNote('melody', { time: 1, midi: 72, duration: 1 });
 
-            // Clear any calls from setup
+            // Trigger initial lazy cache setup
+            visualizer.render(1.5, 120);
+
+            // Clear any calls from setup and initial lazy init
             getPropertyValueSpy.mockClear();
 
             const iterations = 100;
@@ -205,10 +208,13 @@ describe('UnifiedVisualizer', () => {
         it('should re-resolve colors when theme changes', async () => {
             visualizer.addTrack('bass', 'var(--blue)');
 
-            // Clear calls from init
+            // Trigger initial lazy cache setup
+            visualizer.render(0, 120);
+
+            // Clear calls from init and initial lazy setup
             getPropertyValueSpy.mockClear();
 
-            // 1. Render should not trigger calls
+            // 1. Subsequent Render should not trigger calls
             visualizer.render(0, 120);
             expect(getPropertyValueSpy.mock.calls.length).toBe(0);
 
