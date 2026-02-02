@@ -200,15 +200,60 @@
         <section id="chords">
             <h2>Arranger & Chords</h2>
             
-            <h3>Notation & Time</h3>
-            <p>Toggle notation styles in Settings (Names, Roman, Nashville). Supports time signatures from <strong>2/4</strong> to <strong>12/8</strong>, including odd meters (5/4, 7/8).</p>
+            <h3>Notation Syntax</h3>
+            <p>The arranger supports three standard notation formats. You can mix them, but consistency is recommended.</p>
+            <table class="notation-table">
+                <tr>
+                    <th>Format</th>
+                    <th>Example</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><strong>Absolute</strong></td>
+                    <td><code>Cmaj7 Am7 Dm7 G7</code></td>
+                    <td>Standard chord names. Good for specific songs.</td>
+                </tr>
+                <tr>
+                    <td><strong>Roman</strong></td>
+                    <td><code>Imaj7 vi7 ii7 V7</code></td>
+                    <td>Key-agnostic functional harmony. Best for transposing.</td>
+                </tr>
+                <tr>
+                    <td><strong>Nashville</strong></td>
+                    <td><code>1maj7 6-7 2-7 57</code></td>
+                    <td>Studio standard numbers. Use <code>-</code> for minor.</td>
+                </tr>
+            </table>
 
-            <h3>Editing & Arrangement</h3>
+            <div class="feature-card">
+                <h4>🔣 Advanced Syntax</h4>
+                <ul class="list-detailed">
+                    <li><strong>Slash Chords:</strong> Define a specific bass note using <code>/</code>. Works in all formats: <code>C/E</code>, <code>I/3</code>, <code>1/3</code>.</li>
+                    <li><strong>Measures & Beats:</strong> Use <code>|</code> to separate measures. Chords are distributed evenly.
+                        <br><code>C | F G |</code> = 1 bar of C (4 beats), 1 bar of F then G (2 beats each).
+                    </li>
+                    <li><strong>Line Breaks:</strong> Each line in the text area is treated as a continuation of the progression.</li>
+                </ul>
+            </div>
+
+            <h3>Section Controls</h3>
+            <p>Each section card in the arranger offers powerful overrides:</p>
             <ul class="list-detailed">
-                <li><strong>Actions Menu (⋮):</strong> Access specialized tools like <strong>Mutate</strong> (intelligent variations), <strong>Undo</strong>, and the <strong>Audio Workbench</strong>.</li>
-                <li><strong>Link Sections (🔗):</strong> Merge sections to create continuous phrases without drum fills.</li>
-                <li><strong>Reordering:</strong> Drag and drop section cards to experiment with different song forms instantly.</li>
+                <li><strong>Key & Time Overrides:</strong> Set a specific Key or Time Signature for just that section (e.g., modulate to G Major for the Chorus).</li>
+                <li><strong>Repeat (x):</strong> Loop a section multiple times (e.g., x4) to keep your arrangement compact.</li>
+                <li><strong>Seamless Link (🔗):</strong> Connects a section to the previous one without a drum fill or crash. Essential for creating long, continuous phrases (e.g., an 8-bar verse split into two 4-bar cards).</li>
+                <li><strong>Symbol Menu (⋮):</strong> Quickly insert complex jazz symbols (ø, °, ∆) via the kebab menu.</li>
             </ul>
+
+            <h3>Global Tools</h3>
+            <div class="feature-card">
+                <h4>🔄 Intelligent Transposition</h4>
+                <p style="font-size: 0.9rem; margin: 0;">Located in the top toolbar:</p>
+                <ul class="list-detailed" style="margin-top: 0.5rem; margin-bottom: 0.5rem;">
+                    <li><strong>Transpose (♭/♯):</strong> Shifts the entire song semitonally.</li>
+                    <li><strong>Relative Key (maj/min):</strong> Instantly swaps the song between its Relative Major and Minor keys (e.g., C Major ↔ A Minor). The engine intelligently rewrites the chords to preserve harmonic function.</li>
+                </ul>
+            </div>
 
             <div class="feature-card">
                 <h4>✨ Advanced Song Generator (Dice Icon)</h4>
