@@ -102,6 +102,7 @@ export function SectionCard({ section, index, totalSections }) {
                     <input 
                         class="section-label-input" 
                         value={section.label} 
+                        aria-label="Section Name"
                         onChange={(e) => onSectionUpdate(section.id, 'label', e.target.value)}
                     />
                 </div>
@@ -117,6 +118,7 @@ export function SectionCard({ section, index, totalSections }) {
                                 value={section.repeat || 1} 
                                 min="1" 
                                 max="8" 
+                                aria-label="Repeat Count"
                                 onChange={(e) => onSectionUpdate(section.id, 'repeat', parseInt(e.target.value))}
                             />
                         </div>
@@ -125,6 +127,7 @@ export function SectionCard({ section, index, totalSections }) {
                         <select 
                             class="section-key-select"
                             value={section.key || ''}
+                            aria-label="Section Key"
                             onChange={(e) => onSectionUpdate(section.id, 'key', e.target.value)}
                         >
                             <option value="">Key: Auto</option>
@@ -139,6 +142,7 @@ export function SectionCard({ section, index, totalSections }) {
                         <select 
                             class="section-ts-select"
                             value={section.timeSignature || ''}
+                            aria-label="Time Signature"
                             onChange={(e) => onSectionUpdate(section.id, 'timeSignature', e.target.value)}
                         >
                             <option value="">TS: Auto</option>
@@ -152,12 +156,14 @@ export function SectionCard({ section, index, totalSections }) {
                         <button 
                             class={`section-link-btn ${section.seamless ? 'active' : ''}`}
                             title={section.seamless ? 'Unlink from previous (Enable Fills)' : 'Link to previous (Seamless Transition)'}
+                            aria-label={section.seamless ? 'Disable seamless transition' : 'Enable seamless transition'}
                             onClick={() => handleViewTransition(() => onSectionUpdate(section.id, 'seamless', !section.seamless))}
                         >🔗</button>
 
                         <button 
                             class="section-move-btn" 
                             title="Move Up" 
+                            aria-label="Move Section Up"
                             onClick={() => handleViewTransition(() => onSectionUpdate(section.id, 'move', -1))}
                             disabled={index === 0}
                         >▴</button>
@@ -165,6 +171,7 @@ export function SectionCard({ section, index, totalSections }) {
                         <button 
                             class="section-move-btn" 
                             title="Move Down" 
+                            aria-label="Move Section Down"
                             onClick={() => handleViewTransition(() => onSectionUpdate(section.id, 'move', 1))}
                             disabled={index === totalSections - 1}
                         >▾</button>
@@ -172,6 +179,7 @@ export function SectionCard({ section, index, totalSections }) {
                         <button 
                             class="section-duplicate-btn" 
                             title="Duplicate" 
+                            aria-label="Duplicate Section"
                             onClick={() => onSectionDuplicate(section.id)}
                         >⎘</button>
 
@@ -179,6 +187,7 @@ export function SectionCard({ section, index, totalSections }) {
                             <button 
                                 class="section-kebab-btn" 
                                 title="Insert Symbol"
+                                aria-label="Section Actions Menu"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setIsMenuOpen(!isMenuOpen);
@@ -195,6 +204,7 @@ export function SectionCard({ section, index, totalSections }) {
                         <button 
                             class="section-delete-btn" 
                             title="Delete" 
+                            aria-label="Delete Section"
                             onClick={() => onSectionDelete(section.id)}
                         >✕</button>
                     </div>
@@ -205,6 +215,7 @@ export function SectionCard({ section, index, totalSections }) {
                 ref={textareaRef}
                 class="section-prog-input" 
                 value={section.value} 
+                aria-label="Chord Progression"
                 placeholder="Enter chords (e.g. C Am F G)"
                 onInput={(e) => onSectionUpdate(section.id, 'value', e.target.value)}
                 onFocus={() => {
