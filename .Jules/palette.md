@@ -13,3 +13,7 @@
 ## 2024-05-25 - Slider Label Association
 **Learning:** `input[type="range"]` needs explicit `aria-valuetext` when the visual value is descriptive (e.g., "Low", "Medium") rather than numeric, as screen readers only announce the numeric value by default.
 **Action:** When implementing sliders with descriptive states, always add `aria-valuetext` and ensure programmatic label association via `for`/`id`.
+
+## 2024-05-26 - Accessible Cards and Form Inputs
+**Learning:** Complex "card" interfaces often contain multiple unlabelled inputs and icon-only buttons. Using `aria-label` provides critical context that is visually implied but programmatically missing. For toggle buttons, using dynamic `aria-label` text (e.g., "Enable..." vs "Disable...") can be more effective than a static label.
+**Action:** Audit complex components for implied labels and make them explicit with `aria-label`, especially for icon-only controls.
