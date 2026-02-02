@@ -31,6 +31,7 @@ describe('UnifiedVisualizer Font Optimization', () => {
       fill: vi.fn(),
       arc: vi.fn(),
       fillText: vi.fn(),
+      drawImage: vi.fn(),
       set fillStyle(val) {},
       set strokeStyle(val) {},
       set globalAlpha(val) {},
@@ -77,6 +78,11 @@ describe('UnifiedVisualizer Font Optimization', () => {
   });
 
   it('measures redundant font property assignments per frame', () => {
+    // Clear counts from initialization/static render
+    fontSetCount = 0;
+    textAlignSetCount = 0;
+    textBaselineSetCount = 0;
+
     // Render one frame
     visualizer.render(0.5, 120);
 

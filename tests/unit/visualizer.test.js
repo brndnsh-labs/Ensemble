@@ -28,6 +28,7 @@ describe('UnifiedVisualizer', () => {
             clearRect: vi.fn(),
             scale: vi.fn(),
             fillText: vi.fn(),
+            drawImage: vi.fn(),
             measureText: vi.fn(() => ({ width: 10 })),
             fillStyle: '',
             strokeStyle: '',
