@@ -111,4 +111,26 @@ describe('Security: URL Parameter Validation', () => {
         loadFromUrl();
         expect(mockState.arranger.notation).toBe('nns');
     });
+
+    it('sanitizes prog parameter', () => {
+        window.location.search = '?prog=<script>alert(1)</script>Cmaj7';
+        loadFromUrl();
+        expect(mockState.arranger.sections[0].value).not.toContain('<script>');
+        expect(mockState.arranger.sections[0].value).not.toContain('>');
+        // stripDangerousChars removes < > " = `
+        expect(mockState.arranger.sections[0].value).toBe('scriptalert(1)/scriptCmaj7');
+    });
+
+    it('enforces length limit on prog parameter', () => {
+        const longString = 'C'.repeat(2000);
+        window.location.search = `?prog=${longString}`;
+        loadFromUrl();
+        expect(mockState.arranger.sections[0].value.length).toBeLessThanOrEqual(1000);
+    });
+
+    it('validates key parameter', () => {
+        window.location.search = '?key=<script>';
+        loadFromUrl();
+        expect(mockState.arranger.key).toBe('C');
+    });
 });

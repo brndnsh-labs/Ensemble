@@ -1,8 +1,8 @@
 import { ACTIONS } from './types.js';
 import { getState, storage, dispatch } from './state.js';
 import { applyTheme } from './app-controller.js';
-import { decompressSections, generateId, normalizeKey } from './utils.js';
-import { TIME_SIGNATURES } from './config.js';
+import { decompressSections, generateId, normalizeKey, stripDangerousChars } from './utils.js';
+import { TIME_SIGNATURES, KEY_ORDER } from './config.js';
 import { CHORD_STYLES, SMART_GENRES } from './presets.js';
 
 export function hydrateState() {
@@ -145,9 +145,20 @@ export function loadFromUrl() {
     const params = new URLSearchParams(window.location.search); 
     let hasParams = false;
     if (params.get('s')) { arranger.sections = decompressSections(params.get('s')); hasParams = true; }
-    else if (params.get('prog')) { arranger.sections = [{ id: generateId(), label: 'Main', value: params.get('prog') }]; hasParams = true; }
+    else if (params.get('prog')) {
+        let prog = params.get('prog');
+        if (prog.length > 1000) prog = prog.substring(0, 1000);
+        prog = stripDangerousChars(prog);
+        arranger.sections = [{ id: generateId(), label: 'Main', value: prog }];
+        hasParams = true;
+    }
     if (hasParams) clearChordPresetHighlight();
-    if (params.get('key')) { arranger.key = normalizeKey(params.get('key')); }
+    if (params.get('key')) {
+        const rawKey = normalizeKey(params.get('key'));
+        if (KEY_ORDER.includes(rawKey)) {
+            arranger.key = rawKey;
+        }
+    }
 
     if (params.get('ts')) {
         const ts = params.get('ts');
