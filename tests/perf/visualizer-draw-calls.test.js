@@ -24,6 +24,7 @@ describe('UnifiedVisualizer Optimization Check', () => {
       fill: vi.fn(),
       arc: vi.fn(),
       fillText: vi.fn(),
+      drawImage: vi.fn(),
       set fillStyle(val) {},
       set strokeStyle(val) {},
       set globalAlpha(val) {},
@@ -76,15 +77,20 @@ describe('UnifiedVisualizer Optimization Check', () => {
     visualizer.pushNote('bass', { time: 0, duration: 1, midi: 60 });
     visualizer.pushChord({ time: 0, duration: 1, rootMidi: 60, notes: [60, 64, 67] });
 
+    // Clear mocks to ignore initialization/static render calls
+    vi.clearAllMocks();
+
     visualizer.render(0.5, 120);
 
     const strokeCalls = mockCtx.stroke.mock.calls.length;
     const beginPathCalls = mockCtx.beginPath.mock.calls.length;
     const fillRectCalls = mockCtx.fillRect.mock.calls.length;
+    const drawImageCalls = mockCtx.drawImage.mock.calls.length;
 
     console.log(`Stroke calls: ${strokeCalls}`);
     console.log(`BeginPath calls: ${beginPathCalls}`);
     console.log(`FillRect calls: ${fillRectCalls}`);
+    console.log(`DrawImage calls: ${drawImageCalls}`);
 
     // Assert that draw calls are batched (should be much less than if we drew every note individually)
     expect(strokeCalls).toBeLessThan(15);

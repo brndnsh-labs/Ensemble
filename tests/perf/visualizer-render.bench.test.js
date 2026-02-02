@@ -24,6 +24,7 @@ describe('UnifiedVisualizer Render Benchmark', () => {
       fill: () => {},
       arc: () => {},
       fillText: () => {},
+      drawImage: () => {},
       createLinearGradient: () => ({ addColorStop: () => {} }),
     };
 

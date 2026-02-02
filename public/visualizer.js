@@ -25,6 +25,10 @@ export class UnifiedVisualizer {
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d', { alpha: false }); // Optimization: no transparency
         
+        // Static layer optimization
+        this.staticCanvas = document.createElement('canvas');
+        this.staticCtx = this.staticCanvas.getContext('2d', { alpha: false });
+
         if (this.container) {
             this.container.appendChild(this.canvas);
         }
@@ -116,6 +120,11 @@ export class UnifiedVisualizer {
         for (const name in this.tracks) {
             this.resolveTrackColor(name, style);
         }
+
+        // Force redraw of static layer if initialized
+        if (this.width && this.height) {
+            this.renderStaticLayer();
+        }
     }
 
     resolveTrackColor(name, style = null) {
@@ -159,6 +168,106 @@ export class UnifiedVisualizer {
         this.width = rect.width;
         this.height = rect.height;
         this.ctx.scale(dpr, dpr);
+
+        // Resize static layer
+        this.staticCanvas.width = this.canvas.width;
+        this.staticCanvas.height = this.canvas.height;
+        this.staticCtx.scale(dpr, dpr);
+
+        this.renderStaticLayer();
+    }
+
+    renderStaticLayer() {
+        if (!this.themeCache || !this.width || !this.height) return;
+
+        const ctx = this.staticCtx;
+        const w = this.width;
+        const h = this.height;
+        const yScale = h / this.visualRange;
+        const midY = h / 2;
+
+        const {
+            bgColor, keyWhite, keyBlack, keySeparator,
+            labelColor, guideLineBlack, guideLineWhite,
+            separatorColor
+        } = this.themeCache;
+
+        const getY = (m) => midY - (m - this.centerMidi) * yScale;
+
+        // Background
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, w, h);
+
+        const topMidi = this.centerMidi + (this.visualRange / 2);
+        const bottomMidi = this.centerMidi - (this.visualRange / 2);
+        const startMidi = Math.floor(bottomMidi);
+        const endMidi = Math.ceil(topMidi);
+
+        ctx.lineWidth = 1;
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        // Pass 1: Keys & Labels
+        for (let m = startMidi; m <= endMidi; m++) {
+            const y = getY(m);
+            const noteInOctave = m % 12;
+            const isBlack = IS_BLACK[noteInOctave];
+
+            ctx.fillStyle = isBlack ? keyBlack : keyWhite;
+            ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
+
+            if (noteInOctave === 0) {
+                ctx.fillStyle = labelColor;
+                const octave = (m / 12) - 1;
+                ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
+            }
+        }
+
+        // Pass 2: Separators
+        ctx.strokeStyle = keySeparator;
+        ctx.beginPath();
+        for (let m = startMidi; m <= endMidi; m++) {
+            const y = getY(m);
+            ctx.moveTo(0, y + yScale/2);
+            ctx.lineTo(this.pianoRollWidth, y + yScale/2);
+        }
+        ctx.stroke();
+
+        // Pass 3: Guide Lines
+        // White
+        ctx.strokeStyle = guideLineWhite;
+        ctx.beginPath();
+        for (let m = startMidi; m <= endMidi; m++) {
+            const noteInOctave = m % 12;
+            if (!IS_BLACK[noteInOctave]) {
+                const y = getY(m);
+                ctx.moveTo(this.pianoRollWidth, y);
+                ctx.lineTo(w, y);
+            }
+        }
+        ctx.stroke();
+
+        // Black
+        ctx.strokeStyle = guideLineBlack;
+        ctx.beginPath();
+        for (let m = startMidi; m <= endMidi; m++) {
+            const noteInOctave = m % 12;
+            if (IS_BLACK[noteInOctave]) {
+                const y = getY(m);
+                ctx.moveTo(this.pianoRollWidth, y);
+                ctx.lineTo(w, y);
+            }
+        }
+        ctx.stroke();
+
+        // Vertical Separator
+        ctx.strokeStyle = separatorColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.pianoRollWidth, 0);
+        ctx.lineTo(this.pianoRollWidth, h);
+        ctx.stroke();
     }
 
     addTrack(name, color) {
@@ -253,10 +362,8 @@ export class UnifiedVisualizer {
 
         // Use cached theme-aware colors
         const {
-            bgColor, keyWhite, keyBlack, keySeparator,
             gridColorMeasure, gridColorBeat, playheadColor,
-            outlineColor, labelColor, guideLineBlack, guideLineWhite,
-            separatorColor, chordColors
+            outlineColor, chordColors
         } = this.themeCache;
 
         // Pre-calculate math constants for this frame
@@ -267,9 +374,9 @@ export class UnifiedVisualizer {
         const getY = (m) => midY - (m - this.centerMidi) * yScale;
         const getX = (t) => this.pianoRollWidth + (currentTime - t) * timeScale;
 
-        // 0. Background
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, w, h);
+        // 0. Static Background
+        // Optimization: Draw pre-rendered static layer
+        ctx.drawImage(this.staticCanvas, 0, 0, w, h);
 
         // --- Collect Active Notes for Piano Roll Highlight ---
         this.activeNoteColors.fill(null);
@@ -299,85 +406,30 @@ export class UnifiedVisualizer {
             }
         }
 
-        // --- Piano Roll Layer ---
+        // --- Piano Roll Layer (Active Overlays) ---
         const topMidi = this.centerMidi + (this.visualRange / 2);
         const bottomMidi = this.centerMidi - (this.visualRange / 2);
         const startMidi = Math.floor(bottomMidi);
         const endMidi = Math.ceil(topMidi);
 
-        ctx.lineWidth = 1;
-
-        // Draw Keys (Batched for performance)
-        // Pass 1: Backgrounds & Labels (Fills)
-        // Optimization: Set font properties once per frame
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
         for (let m = startMidi; m <= endMidi; m++) {
-            const y = getY(m);
-            const noteInOctave = m % 12;
-            const isBlack = IS_BLACK[noteInOctave];
-            
             if (this.activeNoteColors[m]) {
+                const y = getY(m);
                 ctx.fillStyle = this.activeNoteColors[m];
-            } else {
-                ctx.fillStyle = isBlack ? keyBlack : keyWhite;
-            }
-            ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
+                ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
 
-            if (noteInOctave === 0) {
-                ctx.fillStyle = labelColor;
-                if (this.activeNoteColors[m]) ctx.fillStyle = '#fff';
-                const octave = (m / 12) - 1;
-                ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
+                // Restore label on top of highlight if it's a C-note
+                if (m % 12 === 0) {
+                     ctx.fillStyle = '#fff';
+                     const octave = (m / 12) - 1;
+                     ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
+                }
             }
         }
-
-        // Pass 2: Separators (Batch Stroke)
-        ctx.strokeStyle = keySeparator;
-        ctx.beginPath();
-        for (let m = startMidi; m <= endMidi; m++) {
-            const y = getY(m);
-            ctx.moveTo(0, y + yScale/2);
-            ctx.lineTo(this.pianoRollWidth, y + yScale/2);
-        }
-        ctx.stroke();
-
-        // Pass 3: Guide Lines (Batch Strokes by Color)
-        // White Keys Guide Lines
-        ctx.strokeStyle = guideLineWhite;
-        ctx.beginPath();
-        for (let m = startMidi; m <= endMidi; m++) {
-            const noteInOctave = m % 12;
-            if (!IS_BLACK[noteInOctave]) {
-                const y = getY(m);
-                ctx.moveTo(this.pianoRollWidth, y);
-                ctx.lineTo(w, y);
-            }
-        }
-        ctx.stroke();
-
-        // Black Keys Guide Lines
-        ctx.strokeStyle = guideLineBlack;
-        ctx.beginPath();
-        for (let m = startMidi; m <= endMidi; m++) {
-            const noteInOctave = m % 12;
-            if (IS_BLACK[noteInOctave]) {
-                const y = getY(m);
-                ctx.moveTo(this.pianoRollWidth, y);
-                ctx.lineTo(w, y);
-            }
-        }
-        ctx.stroke();
-
-        // Separator line between keys and graph
-        ctx.strokeStyle = separatorColor;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.pianoRollWidth, 0);
-        ctx.lineTo(this.pianoRollWidth, h);
-        ctx.stroke();
 
         // 1. Rhythmic Grid
         if (bpm && this.beatReferenceTime !== null) {
@@ -687,5 +739,7 @@ export class UnifiedVisualizer {
         if (this.infoLayer && this.infoLayer.parentNode) {
             this.infoLayer.parentNode.removeChild(this.infoLayer);
         }
+        this.staticCanvas = null;
+        this.staticCtx = null;
     }
 }
