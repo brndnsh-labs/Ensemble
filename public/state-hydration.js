@@ -122,6 +122,7 @@ export function hydrateState() {
             Object.assign(soloist, {
                 enabled: savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
                 style: savedState.soloist.style || 'smart',
+                preset: savedState.soloist.preset || 'neo',
                 octave: (savedState.soloist.octave === 77 || savedState.soloist.octave === 67 || savedState.soloist.octave === undefined) ? 72 : savedState.soloist.octave,
                 volume: savedState.soloist.volume !== undefined ? savedState.soloist.volume : 0.5,
                 reverb: savedState.soloist.reverb !== undefined ? savedState.soloist.reverb : 0.6,

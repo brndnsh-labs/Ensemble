@@ -35,7 +35,7 @@ export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval 
     const { playback, soloist } = getState();
     if (!Number.isFinite(freq)) return;
 
-    const preset = soloist.preset || 'classic';
+    const preset = soloist.preset || 'neo';
     const ctx = playback.audio;
     const now = ctx.currentTime;
     const playTime = Math.max(time, now);
