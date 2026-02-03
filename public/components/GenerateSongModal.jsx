@@ -82,32 +82,41 @@ export function GenerateSongModal() {
     };
 
     return (
-        <div id="generateSongOverlay" ref={overlayRef} class={`modal-overlay ${isOpen ? 'active' : ''}`} aria-hidden={!isOpen ? 'true' : 'false'} onClick={(e) => {
-            if (e.target.id === 'generateSongOverlay') close();
-        }}>
+        <div
+            id="generateSongOverlay"
+            ref={overlayRef}
+            class={`modal-overlay ${isOpen ? 'active' : ''}`}
+            aria-hidden={!isOpen ? 'true' : 'false'}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="generate-song-title"
+            onClick={(e) => {
+                if (e.target.id === 'generateSongOverlay') close();
+            }}
+        >
             <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
                 <button class="close-modal-btn" id="closeGenerateSongBtn" aria-label="Close Generator" onClick={close}>✕</button>
-                <h3>Song Generator</h3>
+                <h3 id="generate-song-title">Song Generator</h3>
                 
                 <div class="settings-controls">
                     <div class="settings-section">
                         <div class="setting-item">
-                            <label class="setting-label">Root Key</label>
-                            <select value={key} onChange={(e) => setKey(e.target.value)}>
+                            <label htmlFor="gen-root-key" class="setting-label">Root Key</label>
+                            <select id="gen-root-key" value={key} onChange={(e) => setKey(e.target.value)}>
                                 <option value="Random">Random</option>
                                 <option value="C">C</option><option value="Db">Db</option><option value="D">D</option><option value="Eb">Eb</option><option value="E">E</option><option value="F">F</option><option value="Gb">Gb</option><option value="G">G</option><option value="Ab">Ab</option><option value="A">A</option><option value="Bb">Bb</option><option value="B">B</option>
                             </select>
                         </div>
                         <div class="setting-item">
-                            <label class="setting-label">Time Signature</label>
-                            <select value={timeSignature} onChange={(e) => setTimeSignature(e.target.value)}>
+                            <label htmlFor="gen-time-sig" class="setting-label">Time Signature</label>
+                            <select id="gen-time-sig" value={timeSignature} onChange={(e) => setTimeSignature(e.target.value)}>
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option><option value="3/4">3/4</option><option value="2/4">2/4</option><option value="5/4">5/4</option><option value="6/8">6/8</option><option value="7/8">7/8</option><option value="12/8">12/8</option>
                             </select>
                         </div>
                         <div class="setting-item">
-                            <label class="setting-label">Structure</label>
-                            <select value={structure} onChange={(e) => setStructure(e.target.value)}>
+                            <label htmlFor="gen-structure" class="setting-label">Structure</label>
+                            <select id="gen-structure" value={structure} onChange={(e) => setStructure(e.target.value)}>
                                 <option value="pop">Pop (Verse-Chorus-Bridge)</option>
                                 <option value="blues">12-Bar Blues</option>
                                 <option value="jazz">Jazz Standard (AABA)</option>
@@ -124,8 +133,8 @@ export function GenerateSongModal() {
 
                         {useSeed && (
                             <div class="setting-item animate-in">
-                                <label class="setting-label">Seed as...</label>
-                                <select value={seedType} onChange={(e) => setSeedType(e.target.value)}>
+                                <label htmlFor="gen-seed-type" class="setting-label">Seed as...</label>
+                                <select id="gen-seed-type" value={seedType} onChange={(e) => setSeedType(e.target.value)}>
                                     <option value="Verse">Verse</option>
                                     <option value="Chorus">Chorus</option>
                                     <option value="Bridge">Bridge</option>
