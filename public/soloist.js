@@ -27,10 +27,10 @@ const RHYTHMIC_CELLS = [
 
 const STYLE_CONFIG = {
     scalar: {
-        restBase: 0.55, restGrowth: 0.15, cells: [2, 11, 1], registerSoar: 10,
-        tensionScale: 0.6, timingJitter: 8, maxNotesPerPhrase: 8,
+        restBase: 0.3, restGrowth: 0.07, cells: [2, 11, 1, 6], registerSoar: 10,
+        tensionScale: 0.6, timingJitter: 8, maxNotesPerPhrase: 12,
         doubleStopProb: 0.1, anticipationProb: 0.1, targetExtensions: [2, 9],
-        deviceProb: 0.1, allowedDevices: ['run', 'slide', 'guitarDouble'],
+        deviceProb: 0.12, allowedDevices: ['run', 'slide', 'guitarDouble'],
         motifProb: 0.3, hookProb: 0.1
     },
     shred: {
@@ -231,7 +231,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (soloist.notesInPhrase >= config.maxNotesPerPhrase) restProb += 0.4;
     
     if (soloist.isResting) {
-        const startProb = 0.2 + (effectiveIntensity * 0.4);
+        const startProb = 0.3 + (effectiveIntensity * 0.4);
         if (Math.random() < startProb) { 
             soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0;
             soloist.qaState = soloist.qaState === 'Question' ? 'Answer' : 'Question';

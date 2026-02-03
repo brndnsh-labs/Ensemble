@@ -92,6 +92,7 @@ describe('Soloist Synthesis', () => {
         vi.clearAllMocks();
         soloist.activeVoices = [];
         soloist.doubleStops = false;
+        soloist.preset = 'classic'; // Force classic for these tests
         playback.audio.currentTime = 10;
     });
 

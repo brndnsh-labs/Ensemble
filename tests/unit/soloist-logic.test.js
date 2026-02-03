@@ -55,13 +55,12 @@ describe('Soloist Logic Improvements', () => {
 
     it('should initialize a rhythmic cell even mid-beat (pickup logic)', () => {
         const chordC = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
-        // Step 3 is the last 16th of a beat (0, 1, 2, 3)
-        // Previous behavior: returns null because stepInBeat (3) !== 0
-        // New behavior: Initializes cell and ensures it plays on 3
+        // Force start in resting state
+        mockState.soloist.isResting = true;
+        mockState.soloist.currentPhraseSteps = 0;
         
-        // Force random to ensure we pick a cell (avoid rests if any probability check exists)
-        // But getSoloistNote has complex probability. 
-        // We just verify currentCell is set.
+        // Force Math.random to return 0.0 so startProb check passes
+        const spy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
         
         getSoloistNote(chordC, null, 3, 440, 60, 'scalar', 3);
 
@@ -71,6 +70,7 @@ describe('Soloist Logic Improvements', () => {
         if (mockState.soloist.currentCell) {
              expect(mockState.soloist.currentCell[3]).toBe(1);
         }
+        spy.mockRestore();
     });
 
     it('should calculate voice leading without crashing for non-bird styles', () => {
