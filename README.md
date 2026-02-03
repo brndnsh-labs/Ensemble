@@ -4,13 +4,13 @@ Ensemble is a Progressive Web App (PWA) designed for musicians to practice and e
 
 ## Key Features
 
-*   🖋️ **Advanced Arranger**: Build complex song structures using Roman Numerals, Nashville Numbers, or Absolute chord names. Features include song templates, drag-and-drop reordering, and a compact kebab-style action menu.
+*   🖋️ **Advanced Arranger**: Build complex song structures using Roman Numerals, Nashville Numbers, or Absolute chord names. Features include song templates, drag-and-drop reordering, section duplication, and a compact kebab-style symbol menu.
 *   🎤 **Audio Workbench**: A unified tool for analyzing existing audio files or live performances. Supports high-precision **Chord Detection** (polyphonic) and a specialized **Melody Harmonizer** (monophonic) that generates backing tracks from sung or played melodies.
 *   🧠 **Loop-Back Training**: The Harmonizer engine automatically "trains" itself by extracting musical knowledge from the Band's internal Soloist and Harmony modules, ensuring generated progressions are perfectly calibrated for the band's playing style.
 *   🎸 **Generative Virtual Band**: Intelligent **Bassist**, **Soloist**, and **Harmony** engines that utilize "Expressive Musicality" logic to generate human-like, intensity-aware accompaniment in real-time. Features advanced **Melodic Devices** (Enclosures, Quartal Harmony, Call & Response), **Motif Memory** for background hooks, and a **Smart Genres** system that coordinates all instruments for a cohesive feel.
 *   🥁 **Smart Drum Machine**: A multi-level velocity step sequencer with built-in genre presets and adjustable swing/humanization. Integrated with a procedural fill engine.
 *   📊 **Unified Visualizer**: A multi-track harmonic monitor that superimposes instrumental performance over chord data, with real-time interval analysis and retractable UI.
-*   🎹 **Pro Accompaniment**: Highly optimized voicing engine with adjustable density, styles (Pad, Funk, Reggae), and intelligent relative key transposition.
+*   🎹 **Pro Accompaniment**: Highly optimized voicing engine with adjustable density, styles (Pad, Funk, Reggae, Organ, Counterpoint), and intelligent relative key transposition.
 *   📁 **Workflow Tools**: Real-time Web MIDI output for DAW integration, MIDI file export, auto-save persistence, URL-based sharing, and a comprehensive user library for custom presets.
 *   📱 **PWA Ready**: Fully responsive, installable, and works offline with native Solarized theme support.
 
