@@ -1,18 +1,78 @@
 import { ACTIONS } from './types.js';
 import { getState, storage, dispatch } from './state.js';
 import { applyTheme } from './app-controller.js';
-import { decompressSections, generateId, normalizeKey, stripDangerousChars } from './utils.js';
+import { decompressSections, generateId, normalizeKey, stripDangerousChars, escapeHTML } from './utils.js';
 import { TIME_SIGNATURES, KEY_ORDER } from './config.js';
 import { CHORD_STYLES, SMART_GENRES } from './presets.js';
+
+/**
+ * Validates and sanitizes sections array from untrusted source.
+ * @param {Array} sections
+ * @returns {Array}
+ */
+function validateSections(sections) {
+    if (!Array.isArray(sections)) return [];
+
+    // 1. Limit number of sections (DoS prevention)
+    const safeSections = sections.slice(0, 500);
+
+    return safeSections.map((s, i) => {
+        if (!s || typeof s !== 'object') {
+            return { id: generateId(), label: `Section ${i+1}`, value: '', key: '', repeat: 1, timeSignature: '', seamless: false };
+        }
+
+        // 2. Sanitize Label (XSS prevention)
+        let safeLabel = escapeHTML(s.label || `Section ${i+1}`);
+        if (safeLabel.length > 100) safeLabel = safeLabel.substring(0, 100);
+
+        // 3. Sanitize Value (XSS prevention)
+        let safeValue = typeof s.value === 'string' ? s.value : '';
+        if (safeValue.length > 1000) safeValue = safeValue.substring(0, 1000);
+        safeValue = stripDangerousChars(safeValue);
+
+        // 4. Sanitize Key
+        let safeKey = '';
+        if (s.key && typeof s.key === 'string') {
+             const normKey = normalizeKey(s.key);
+             if (KEY_ORDER.includes(normKey)) safeKey = normKey;
+        }
+
+        return {
+            id: s.id || generateId(),
+            label: safeLabel,
+            value: safeValue,
+            key: safeKey,
+            repeat: Math.min(Math.max(1, parseInt(s.repeat) || 1), 64),
+            timeSignature: (typeof s.timeSignature === 'string' && TIME_SIGNATURES[s.timeSignature]) ? s.timeSignature : '',
+            seamless: !!s.seamless
+        };
+    });
+}
 
 export function hydrateState() {
     const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
     const savedState = storage.get('currentState');
     if (savedState && savedState.sections) {
+
+        // --- SECURITY VALIDATION ---
+        const validatedSections = validateSections(savedState.sections);
+
+        let validatedKey = 'C';
+        if (savedState.key) {
+            const normKey = normalizeKey(savedState.key);
+            if (KEY_ORDER.includes(normKey)) validatedKey = normKey;
+        }
+
+        let validatedTS = '4/4';
+        if (savedState.timeSignature && TIME_SIGNATURES[savedState.timeSignature]) {
+            validatedTS = savedState.timeSignature;
+        }
+        // ---------------------------
+
         Object.assign(arranger, {
-            sections: savedState.sections,
-            key: savedState.key || 'C',
-            timeSignature: savedState.timeSignature || '4/4',
+            sections: validatedSections,
+            key: validatedKey,
+            timeSignature: validatedTS,
             isMinor: savedState.isMinor || false,
             notation: savedState.notation || 'roman',
             lastChordPreset: savedState.lastChordPreset || 'Pop (Standard)'
