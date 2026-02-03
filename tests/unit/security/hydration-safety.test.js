@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { hydrateState } from '../../../public/state-hydration.js';
-import { arranger, dispatch } from '../../../public/state.js';
+import { arranger } from '../../../public/state.js';
 
 // Mock the dispatch function to avoid side effects during hydration
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
-        dispatch: vi.fn((action, payload) => {
+        dispatch: vi.fn(() => {
              // Pass through SET_PARAM actions to allow state updates if needed,
              // or just let the reducer logic run if we were using the real dispatch.
              // But since we are testing hydration which modifies state objects directly (mostly),
