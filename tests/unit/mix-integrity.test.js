@@ -200,16 +200,16 @@ describe('Mix & Signal Integrity Audit', () => {
 
         const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain + harmonyGain;
 
-        // Verification: The sum should be safe (~0.772 based on 0.5/0.45/etc volumes)
+        // Verification: The sum should be safe (~0.797 based on 0.5/0.45/etc volumes)
         expect(totalInstrumentGain).toBeLessThan(1.0);
         // Recalculating expected:
-        // Drums: 0.5 * 0.40 = 0.20
+        // Drums: 0.5 * 0.45 = 0.225
         // Bass: 0.45 * 0.32 = 0.144
         // Chords: 0.5 * 0.30 = 0.15
         // Soloist: 0.5 * 0.38 = 0.19
         // Harmony: 0.4 * 0.22 = 0.088
-        // Total = 0.772
-        expect(totalInstrumentGain).toBeCloseTo(0.772, 4);
+        // Total = 0.797
+        expect(totalInstrumentGain).toBeCloseTo(0.797, 4);
     });
 
     it('should calculate master gain correctly (Headroom Check)', () => {
