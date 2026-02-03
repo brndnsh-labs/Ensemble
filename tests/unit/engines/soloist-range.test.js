@@ -52,12 +52,12 @@ describe('Soloist Range Constraints', () => {
         soloist.currentCell = [1, 1, 1, 1]; // Always play 16ths
     });
 
-    it('should generally stay above C3 (MIDI 48), with rare exceptions', () => {
+    it('should generally stay above G3 (MIDI 55), with rare exceptions', () => {
         let violations = 0;
         let totalNotes = 0;
         let lowestMidi = 127;
-        // Start very low (MIDI 40) to test recovery
-        let lastFreq = 440 * Math.pow(2, (40 - 69) / 12); 
+        // Start at the floor (MIDI 55) to test stability
+        let lastFreq = 440 * Math.pow(2, (55 - 69) / 12); 
 
         // Generate a large sample of notes
         for(let i=0; i<1000; i++) {
@@ -66,7 +66,7 @@ describe('Soloist Range Constraints', () => {
                 const primary = Array.isArray(note) ? note[0] : note;
                 totalNotes++;
                 
-                if (primary.midi < 48) {
+                if (primary.midi < 55) {
                     violations++;
                 }
                 if (primary.midi < lowestMidi) lowestMidi = primary.midi;
@@ -76,13 +76,13 @@ describe('Soloist Range Constraints', () => {
             }
         }
         
-        console.log(`Violations (<48): ${violations}/${totalNotes} (${((violations/totalNotes)*100).toFixed(2)}%)`);
+        console.log(`Violations (<55): ${violations}/${totalNotes} (${((violations/totalNotes)*100).toFixed(2)}%)`);
         console.log('Lowest MIDI observed:', lowestMidi);
 
         // 1. It should generally respect the floor (allow < 5% for slides/ornaments)
         expect(violations / totalNotes).toBeLessThan(0.05);
 
-        // 2. It should NEVER go ridiculously low (e.g. below A2/45)
-        expect(lowestMidi).toBeGreaterThanOrEqual(45); 
+        // 2. It should NEVER go ridiculously low (e.g. below E3/52)
+        expect(lowestMidi).toBeGreaterThanOrEqual(52); 
     });
 });

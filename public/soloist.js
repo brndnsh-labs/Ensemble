@@ -141,9 +141,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     // registerSoar adds extra melodic "lift" at high intensity to prevent sticking.
     const soarValue = config.registerSoar || 8;
     const soarOffset = (intensity > 0.5) ? (intensity - 0.5) * soarValue : 0;
-    const centerMidi = 54 + (intensity * 18) + soarOffset; 
-    const MIN_GUITAR_MIDI = 48; // C3
-    const MAX_GUITAR_MIDI = 58 + (intensity * 30); // Dynamic Ceiling
+    const centerMidi = 60 + (intensity * 18) + soarOffset; 
+    const MIN_GUITAR_MIDI = 55; // G3
+    const MAX_GUITAR_MIDI = 65 + (intensity * 30); // Dynamic Ceiling
 
     if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
     const maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 1024);
