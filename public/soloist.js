@@ -27,10 +27,10 @@ const RHYTHMIC_CELLS = [
 
 const STYLE_CONFIG = {
     scalar: {
-        restBase: 0.2, restGrowth: 0.05, cells: [0, 2, 11, 1], registerSoar: 10,
-        tensionScale: 0.6, timingJitter: 8, maxNotesPerPhrase: 16,
+        restBase: 0.55, restGrowth: 0.15, cells: [2, 11, 1], registerSoar: 10,
+        tensionScale: 0.6, timingJitter: 8, maxNotesPerPhrase: 8,
         doubleStopProb: 0.1, anticipationProb: 0.1, targetExtensions: [2, 9],
-        deviceProb: 0.15, allowedDevices: ['run', 'slide', 'guitarDouble'],
+        deviceProb: 0.1, allowedDevices: ['run', 'slide', 'guitarDouble'],
         motifProb: 0.3, hookProb: 0.1
     },
     shred: {
@@ -184,7 +184,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     // --- 2. Phrasing & History Analysis ---
     if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
-        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.isResting = true; return null; 
+        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.isResting = true; soloist.currentCell = null; return null; 
     }
     
     HIST_COUNTS.fill(0);
@@ -231,7 +231,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (soloist.notesInPhrase >= config.maxNotesPerPhrase) restProb += 0.4;
     
     if (soloist.isResting) {
-        const startProb = 0.4 + (effectiveIntensity * 0.5);
+        const startProb = 0.2 + (effectiveIntensity * 0.4);
         if (Math.random() < startProb) { 
             soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0;
             soloist.qaState = soloist.qaState === 'Question' ? 'Answer' : 'Question';
@@ -266,7 +266,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         } else return null;
     }
         if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < restProb) {
-            soloist.isResting = true; soloist.currentPhraseSteps = 0; return null;
+            soloist.isResting = true; soloist.currentPhraseSteps = 0; soloist.currentCell = null; return null;
         }
     
         // --- 3. Motif Replay ---
@@ -320,7 +320,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     }
 
     // --- 4. Rhythmic Density ---
-    if (stepInBeat === 0) {
+    if (stepInBeat === 0 || !soloist.currentCell) {
         let pool = RHYTHMIC_CELLS.filter((_, idx) => config.cells.includes(idx));
         if (playback.complexity > 0.7 && !config.cells.includes(1)) pool.push(RHYTHMIC_CELLS[1]);
 
@@ -340,6 +340,12 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             pool.push(RHYTHMIC_CELLS[1]); // Ensure 8ths are there
             if (playback.bpm > 180) pool.push(RHYTHMIC_CELLS[2]); // Add quarters
             if (pool.length === 0) pool = [RHYTHMIC_CELLS[1]];
+        }
+
+        // Pickup Logic: If initializing mid-beat, ensure we pick a cell that plays on the current step
+        if (stepInBeat > 0) {
+            const playable = pool.filter(c => c[stepInBeat] === 1);
+            if (playable.length > 0) pool = playable;
         }
 
         soloist.currentCell = pool[Math.floor(Math.random() * pool.length)];
@@ -377,7 +383,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     // Voice Leading Target Calculation (Lookahead)
     let voiceLeadingTarget = null;
-    if (isApproachingChange && nextChord && activeStyle === 'bird') {
+    if (isApproachingChange && nextChord) {
         // Find the nearest chord tone in the NEXT chord to our current position
         const nextChordTones = nextChord.intervals.map(i => nextChord.rootMidi + i);
         // Normalize to nearest octave relative to lastMidi
