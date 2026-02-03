@@ -437,20 +437,42 @@ export class UnifiedVisualizer {
             const startBeat = Math.floor((minTime - this.beatReferenceTime) / beatLen);
             
             ctx.lineWidth = 1;
+
+            // Batch Measure Lines
+            ctx.strokeStyle = gridColorMeasure;
+            ctx.beginPath();
             for (let i = startBeat; ; i++) {
                 const t = this.beatReferenceTime + i * beatLen;
                 if (t > currentTime + 0.1) break;
+
+                // Optimization: Draw only if it's a measure line
+                if (i % beatsPerMeasure !== 0) continue;
                 
                 const x = getX(t);
-                if (x < this.pianoRollWidth) continue; 
+                if (x < this.pianoRollWidth) continue;
                 
-                const isMeasure = i % beatsPerMeasure === 0;
-                ctx.strokeStyle = isMeasure ? gridColorMeasure : gridColorBeat;
-                ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, h);
-                ctx.stroke();
             }
+            ctx.stroke();
+
+            // Batch Beat Lines
+            ctx.strokeStyle = gridColorBeat;
+            ctx.beginPath();
+            for (let i = startBeat; ; i++) {
+                const t = this.beatReferenceTime + i * beatLen;
+                if (t > currentTime + 0.1) break;
+
+                // Optimization: Draw only if it's NOT a measure line
+                if (i % beatsPerMeasure === 0) continue;
+
+                const x = getX(t);
+                if (x < this.pianoRollWidth) continue;
+
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            ctx.stroke();
         }
 
         // --- Fill Highlight ---
