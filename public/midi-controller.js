@@ -11,6 +11,12 @@ const activeNoteOffs = new Map();
 // Key: `${channel}_${note}`
 const activeNotes = new Set();
 
+// Cache for redundant message filtering to prevent flooding the MIDI stream.
+// Key: `${channel}_${controller}` -> value
+const sentCCValues = new Map();
+// Key: `${channel}` -> value
+const sentBendValues = new Map();
+
 /**
  * Handles incoming MIDI messages from controllers.
  */
@@ -125,6 +131,11 @@ export function sendMIDICC(channel, controller, value, time) {
     const output = midiAccess.outputs.get(midi.selectedOutputId);
     if (!output) return;
 
+    // Deduplication: Don't resend if value hasn't changed
+    const key = `${channel}_${controller}`;
+    if (sentCCValues.get(key) === value) return;
+    sentCCValues.set(key, value);
+
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
     const status = 0xB0 | (channel - 1);
     output.send([status, controller, value], midiTime);
@@ -164,6 +175,10 @@ export function sendMIDIPitchBend(channel, value, time) {
     if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
     const output = midiAccess.outputs.get(midi.selectedOutputId);
     if (!output) return;
+
+    // Deduplication
+    if (sentBendValues.get(channel) === value) return;
+    sentBendValues.set(channel, value);
 
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
     const status = 0xE0 | (channel - 1);
@@ -370,6 +385,10 @@ export function panic(resetAll = false) {
         output.send([status, note, 0]); // Immediate
     }
     activeNotes.clear();
+    
+    // Clear caches so next update forces send
+    sentCCValues.clear();
+    sentBendValues.clear();
 
     // 3. Send All Notes Off / Reset Controllers as backup
     for (let ch = 0; ch < 16; ch++) {
