@@ -416,15 +416,26 @@ export class UnifiedVisualizer {
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
+        let lastFillStyle = null;
+
         for (let m = startMidi; m <= endMidi; m++) {
             if (this.activeNoteColors[m]) {
                 const y = getY(m);
-                ctx.fillStyle = this.activeNoteColors[m];
+
+                // Optimization: Avoid redundant state changes
+                if (this.activeNoteColors[m] !== lastFillStyle) {
+                    ctx.fillStyle = this.activeNoteColors[m];
+                    lastFillStyle = this.activeNoteColors[m];
+                }
+
                 ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
 
                 // Restore label on top of highlight if it's a C-note
                 if (m % 12 === 0) {
                      ctx.fillStyle = '#fff';
+                     // Invalidate cache since we changed style
+                     lastFillStyle = '#fff';
+
                      const octave = (m / 12) - 1;
                      ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
                 }
@@ -529,17 +540,17 @@ export class UnifiedVisualizer {
 
             // Render specifically played notes (highlighted)
             if (ev.notes) {
+                ctx.globalAlpha = 0.5; // Optimization: Set alpha once per chord
                 for (const midi of ev.notes) {
                     const y = Math.round(getY(midi));
                     const interval = (midi % 12 - rootPC + 12) % 12;
                     const cat = INTERVAL_CATEGORY[interval];
                     ctx.fillStyle = chordColors[cat];
-                    ctx.globalAlpha = 0.5;
                     if (y >= -10 && y <= h + 10) {
                         ctx.fillRect(x, y - yScale/2 + 2, cw, yScale - 4);
                     }
-                    ctx.globalAlpha = 1.0;
                 }
+                ctx.globalAlpha = 1.0;
             }
         }
 
