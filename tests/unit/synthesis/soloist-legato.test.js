@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { playSoloNote, killSoloistNote } from '../../../public/engine/synth-soloist.js';
+import { playSoloNote } from '../../../public/engine/synth-soloist.js';
 import { getState } from '../../../public/state.js';
 
 // Mock State
