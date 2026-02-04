@@ -609,6 +609,16 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const baseVelocity = 0.5 + (effectiveIntensity * 0.7);
     const stepVelocity = isImportantStep ? baseVelocity * 1.15 : baseVelocity;
 
+    // --- Legato Logic ---
+    let isLegato = false;
+    const LEGATO_STYLES = ['neo', 'shred', 'bird', 'blues', 'metal', 'scalar'];
+    if (LEGATO_STYLES.includes(activeStyle) && Math.abs(selectedMidi - lastMidi) <= 2 && durationSteps <= 2) {
+        const legatoProb = (activeStyle === 'shred' || activeStyle === 'bird') ? 0.7 : 0.4;
+        if (Math.random() < legatoProb && !soloist.isResting && soloist.notesInPhrase > 1) {
+            isLegato = true;
+        }
+    }
+
     if (intensity < 0.4 && activeStyle !== 'bird') {
         durationSteps = Math.random() < 0.6 ? 4 : 8;
     } else if (isImportantStep && (activeStyle === 'neo' || activeStyle === 'blues' || activeStyle === 'minimal' || activeStyle === 'bossa')) {
@@ -628,7 +638,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         bendStartInterval = Math.random() < 0.7 ? 1 : 2;
     }
 
-    const result = { midi: selectedMidi, velocity: Math.min(1.25, stepVelocity), durationSteps, bendStartInterval, ccEvents: [], timingOffset: 0, style: activeStyle, isDoubleStop: false };
+    const result = { midi: selectedMidi, velocity: Math.min(1.25, stepVelocity), durationSteps, bendStartInterval, ccEvents: [], timingOffset: 0, style: activeStyle, isDoubleStop: false, isLegato };
     if (durationSteps > 1) soloist.busySteps = durationSteps - 1;
 
     const finalResult = (extraNotes.length > 0 && soloist.doubleStops) ? [...extraNotes.map(n => ({...result, ...n})), result] : result;

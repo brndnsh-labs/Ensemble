@@ -31,7 +31,7 @@ export function killSoloistNote() {
 /**
  * Main entry point for playing a soloist note.
  */
-export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval = 0, style = 'scalar') {
+export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval = 0, style = 'scalar', isLegato = false) {
     const { playback, soloist } = getState();
     if (!Number.isFinite(freq)) return;
 
@@ -54,17 +54,21 @@ export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval 
     pan.connect(playback.soloistGain);
 
     let voiceObj = { gain, time: playTime, duration, nodes: [], cleanup: [gain, pan] };
+    
+    // Retrieve last frequency for portamento
+    const prevFreq = soloist.lastRenderedFreq || freq;
+    soloist.lastRenderedFreq = freq;
 
     switch (preset) {
         case 'neo':
-            playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
+            playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj, isLegato, prevFreq);
             break;
         case 'vowel':
-            playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
+            playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj, isLegato, prevFreq);
             break;
         case 'classic':
         default:
-            playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj);
+            playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj, isLegato, prevFreq);
             break;
     }
 
@@ -101,7 +105,7 @@ function manageVoices(playTime, soloist) {
 
 // --- PRESET IMPLEMENTATIONS ---
 
-function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
+function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj, isLegato, prevFreq) {
     const { playback } = getState();
     const intensity = playback.bandIntensity || 0.5;
     const intensityGain = 0.5 + (intensity * 0.9);
@@ -117,7 +121,7 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     voiceObj.nodes.push(osc1, osc2);
 
     // Pitch Envelope
-    applyPitchEnvelope(osc1, osc2, freq, playTime, duration, bendStartInterval, style);
+    applyPitchEnvelope(osc1, osc2, freq, playTime, duration, bendStartInterval, style, isLegato, prevFreq);
 
     // Vibrato
     const { vibrato, vibGain } = createVibrato(ctx, freq, playTime, duration, style);
@@ -141,7 +145,7 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
 
     // Envelope
     const baseAttack = style === 'shred' ? 0.005 : 0.015;
-    const attack = Math.min(baseAttack, duration * 0.25);
+    const attack = isLegato ? 0.005 : Math.min(baseAttack, duration * 0.25);
     const releaseTime = duration * (style === 'minimal' ? 1.5 : 1.1);
 
     outputGain.gain.setValueAtTime(0, playTime);
@@ -168,7 +172,7 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
-function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
+function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj, isLegato, prevFreq) {
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
     const osc2 = ctx.createOscillator();
@@ -193,7 +197,7 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     voiceObj.nodes.push(osc1, osc2, lfo1, lfo2);
     voiceObj.cleanup.push(lfo1Gain, lfo2Gain);
 
-    applyPitchEnvelope(osc1, osc2, freq, playTime, duration, bendStartInterval, style);
+    applyPitchEnvelope(osc1, osc2, freq, playTime, duration, bendStartInterval, style, isLegato, prevFreq);
 
     // Filter - Warm Lowpass
     const filter = ctx.createBiquadFilter();
@@ -208,8 +212,10 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc2.connect(filter);
     filter.connect(outputGain);
 
+    const attack = isLegato ? 0.005 : 0.02;
+
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 0.8, playTime, 0.02);
+    outputGain.gain.setTargetAtTime(vol * 0.8, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.15);
 
     osc1.start(playTime);
@@ -226,11 +232,11 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
-function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj) {
+function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj, isLegato, prevFreq) {
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth'; // Rich harmonics for filtering
 
-    applyPitchEnvelope(osc, null, freq, playTime, duration, bendStartInterval, style);
+    applyPitchEnvelope(osc, null, freq, playTime, duration, bendStartInterval, style, isLegato, prevFreq);
     voiceObj.nodes.push(osc);
 
     // Formant Filters (Ah/Oh sound)
@@ -288,8 +294,19 @@ function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style,
 
 // --- HELPERS ---
 
-function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, style) {
-    if (bendInterval !== 0) {
+function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, style, isLegato, prevFreq) {
+    if (isLegato && prevFreq) {
+        // Portamento Glide
+        const glideTime = 0.04; // 40ms
+        if (osc1) {
+            osc1.frequency.setValueAtTime(prevFreq, time);
+            osc1.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
+        }
+        if (osc2) {
+            osc2.frequency.setValueAtTime(prevFreq, time);
+            osc2.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
+        }
+    } else if (bendInterval !== 0) {
         const startFreq = freq * Math.pow(2, -bendInterval / 12);
         let bendDuration = 0.1;
         if (style === 'blues') bendDuration = 0.15;
