@@ -246,6 +246,7 @@ export function Settings() {
                                         overflow: 'hidden'
                                     }}>
                                         <button id="sessionTimerDec" class="stepper-btn" style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
+                                            aria-label="Decrease session timer"
                                             onClick={() => {
                                                 const next = Math.max(1, sessionTimer - 1);
                                                 dispatch(ACTIONS.SET_SESSION_TIMER, next);
@@ -254,6 +255,7 @@ export function Settings() {
                                         >-</button>
                                         <input id="sessionTimerInput" type="number" value={sessionTimer > 0 ? sessionTimer : 5} readonly style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;" />
                                         <button id="sessionTimerInc" class="stepper-btn" style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
+                                            aria-label="Increase session timer"
                                             onClick={() => {
                                                 const next = Math.min(20, sessionTimer + 1);
                                                 dispatch(ACTIONS.SET_SESSION_TIMER, next);
@@ -344,13 +346,13 @@ export function Settings() {
                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, { [`${ch.toLowerCase()}Channel`]: parseInt(e.target.value) });
                                                     saveCurrentState();
                                                 }}
-                                                style="width: 50%;" title="Channel" />
+                                                style="width: 50%;" title="Channel" aria-label={`${ch} MIDI Channel`} />
                                             <input id={`midi${ch}Octave`} type="number" min="-2" max="2" value={midiOctaves[ch.toLowerCase()]}
                                                 onChange={(e) => {
                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, { [`${ch.toLowerCase()}Octave`]: parseInt(e.target.value) });
                                                     saveCurrentState();
                                                 }}
-                                                style="width: 50%;" title="Octave Offset" />
+                                                style="width: 50%;" title="Octave Offset" aria-label={`${ch} MIDI Octave Offset`} />
                                         </div>
                                     </div>
                                 ))}
@@ -366,7 +368,7 @@ export function Settings() {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, { latency: parseInt(e.target.value) });
                                         saveCurrentState();
                                     }}
-                                    style="width: 100%;" aria-label="MIDI Latency Offset" />
+                                    style="width: 100%;" aria-label="MIDI Latency Offset" aria-valuetext={`${midiLatency} ms`} />
                             </div>
 
                             <div style="margin-bottom: 0;">
@@ -379,7 +381,7 @@ export function Settings() {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, { velocitySensitivity: parseFloat(e.target.value) });
                                         saveCurrentState();
                                     }}
-                                    style="width: 100%;" aria-label="MIDI Velocity Sensitivity" />
+                                    style="width: 100%;" aria-label="MIDI Velocity Sensitivity" aria-valuetext={`${parseFloat(midiVelocity).toFixed(1)}x`} />
                             </div>
                         </div>
                     </div>
