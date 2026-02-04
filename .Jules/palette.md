@@ -17,3 +17,7 @@
 ## 2024-05-26 - Accessible Cards and Form Inputs
 **Learning:** Complex "card" interfaces often contain multiple unlabelled inputs and icon-only buttons. Using `aria-label` provides critical context that is visually implied but programmatically missing. For toggle buttons, using dynamic `aria-label` text (e.g., "Enable..." vs "Disable...") can be more effective than a static label.
 **Action:** Audit complex components for implied labels and make them explicit with `aria-label`, especially for icon-only controls.
+
+## 2024-05-27 - Settings Accessibility
+**Learning:** Grouped inputs (like MIDI channels) and stepper controls often lack individual labels, relying on visual context that is lost to screen readers. Adding `aria-label` to each input in a map loop and `aria-valuetext` to sliders restores this context.
+**Action:** Audit map-generated inputs and icon-only steppers for missing accessible labels.
