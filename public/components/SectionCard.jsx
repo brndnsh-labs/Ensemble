@@ -103,6 +103,7 @@ export function SectionCard({ section, index, totalSections }) {
                         class="section-label-input" 
                         value={section.label} 
                         aria-label="Section Name"
+                        maxLength={100}
                         onChange={(e) => onSectionUpdate(section.id, 'label', e.target.value)}
                     />
                 </div>
@@ -216,6 +217,7 @@ export function SectionCard({ section, index, totalSections }) {
                 class="section-prog-input" 
                 value={section.value} 
                 aria-label="Chord Progression"
+                maxLength={1000}
                 placeholder="Enter chords (e.g. C Am F G)"
                 onInput={(e) => onSectionUpdate(section.id, 'value', e.target.value)}
                 onFocus={() => {
