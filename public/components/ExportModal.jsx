@@ -64,7 +64,13 @@ export function ExportModal() {
         const loopMode = document.querySelector('input[name="exportMode"]:checked')?.value || 'once';
         const targetDurationInput = document.getElementById('exportDurationInput');
         const targetDuration = targetDurationInput ? parseFloat(targetDurationInput.value) : 1;
-        const finalFilename = filename.trim() || "Ensemble Export";
+        // Sanitize filename to prevent XSS and file system issues (defense in depth)
+        const safeFilename = (filename || "Ensemble Export")
+            .replace(/[^a-zA-Z0-9\s\-_()]/g, '')
+            .substring(0, 64)
+            .trim();
+
+        const finalFilename = safeFilename || "Ensemble Export";
         
         close();
         exportToMidi({ includedTracks, loopMode, targetDuration, filename: finalFilename });
@@ -87,7 +93,7 @@ export function ExportModal() {
                             <label class="setting-label">
                                 <span>Filename</span>
                             </label>
-                            <input type="text" id="exportFilenameInput" value={filename} onInput={(e) => setFilename(e.target.value)} style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" spellcheck="false" />
+                            <input type="text" id="exportFilenameInput" value={filename} maxLength={64} onInput={(e) => setFilename(e.target.value)} style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;" spellcheck="false" />
                         </div>
                     </div>
 
