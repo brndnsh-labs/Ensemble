@@ -60,6 +60,9 @@ export class UnifiedVisualizer {
             seventh: []
         };
 
+        // Optimization: Shared buffer for calculated geometry
+        this.geometryBuffer = [];
+
         if (this.container) {
             this.initDOM();
         }
@@ -585,15 +588,13 @@ export class UnifiedVisualizer {
             // Standard Melodic Tracks (Bass, Soloist, Harmony)
             const baseWidth = name === 'soloist' ? 4 : 5;
             let color = track.resolvedColor || track.color;
+            const geom = this.geometryBuffer;
+            geom.length = 0;
 
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            // First pass: Glow/outline for distinctness (Batched)
-            ctx.strokeStyle = outlineColor;
-            ctx.lineWidth = baseWidth + 2;
-            ctx.beginPath();
-            for (const ev of track.history) {
+            // Pass 0: Compute Geometry
+            // Optimization: Calculate coordinates once per frame per track
+            for (let i = 0; i < track.history.length; i++) {
+                const ev = track.history[i];
                 const noteEnd = ev.time + (ev.duration || 0.25);
                 if (noteEnd < minTime) continue;
                 if (ev.time > currentTime) break;
@@ -605,11 +606,39 @@ export class UnifiedVisualizer {
                 const y = Math.round(getY(ev.midi));
 
                 if (y >= -10 && y <= h + 10) {
-                    ctx.moveTo(x1, y);
-                    ctx.lineTo(x2, y);
+                    geom.push(x1, y, x2, i);
+
+                    // Check for active note
+                    if (ev.time <= currentTime && noteEnd >= currentTime) {
+                        activeX = x2; activeY = y; isActive = true;
+
+                        // Active color logic
+                        if (name === 'soloist') {
+                            if (ev.noteType === 'arp') activeColor = chordColors.fifth;
+                            else if (ev.noteType === 'target') activeColor = chordColors.root;
+                            else if (ev.noteType === 'altered') activeColor = chordColors.seventh;
+                            else activeColor = color;
+                        } else {
+                            activeColor = color;
+                        }
+                    }
                 }
             }
-            ctx.stroke();
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // First pass: Glow/outline for distinctness (Batched from geometry buffer)
+            if (geom.length > 0) {
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = baseWidth + 2;
+                ctx.beginPath();
+                for (let j = 0; j < geom.length; j += 4) {
+                    ctx.moveTo(geom[j], geom[j+1]);
+                    ctx.lineTo(geom[j+2], geom[j+1]);
+                }
+                ctx.stroke();
+            }
 
             // Second pass: Colored line (Batched)
             ctx.lineWidth = baseWidth;
@@ -622,35 +651,21 @@ export class UnifiedVisualizer {
                 batches.fifth.length = 0;
                 batches.seventh.length = 0;
 
-                for (const ev of track.history) {
-                    const noteEnd = ev.time + (ev.duration || 0.25);
-                    if (noteEnd < minTime) continue;
-                    if (ev.time > currentTime) break;
+                for (let j = 0; j < geom.length; j += 4) {
+                    const x1 = geom[j];
+                    const y = geom[j+1];
+                    const x2 = geom[j+2];
+                    const idx = geom[j+3];
+                    const ev = track.history[idx];
 
-                    const startT = Math.max(minTime, ev.time);
-                    const endT = Math.min(currentTime, noteEnd);
-                    const x1 = getX(startT);
-                    const x2 = getX(endT);
-                    const y = Math.round(getY(ev.midi));
-
-                    if (y >= -10 && y <= h + 10) {
-                        if (ev.noteType === 'arp') {
-                            batches.fifth.push(x1, y, x2);
-                        } else if (ev.noteType === 'target') {
-                            batches.root.push(x1, y, x2);
-                        } else if (ev.noteType === 'altered') {
-                            batches.seventh.push(x1, y, x2);
-                        } else {
-                            batches.default.push(x1, y, x2);
-                        }
-
-                        if (ev.time <= currentTime && noteEnd >= currentTime) {
-                            activeX = x2; activeY = y; isActive = true;
-                            if (ev.noteType === 'arp') activeColor = chordColors.fifth;
-                            else if (ev.noteType === 'target') activeColor = chordColors.root;
-                            else if (ev.noteType === 'altered') activeColor = chordColors.seventh;
-                            else activeColor = color;
-                        }
+                    if (ev.noteType === 'arp') {
+                        batches.fifth.push(x1, y, x2);
+                    } else if (ev.noteType === 'target') {
+                        batches.root.push(x1, y, x2);
+                    } else if (ev.noteType === 'altered') {
+                        batches.seventh.push(x1, y, x2);
+                    } else {
+                        batches.default.push(x1, y, x2);
                     }
                 }
 
@@ -694,30 +709,15 @@ export class UnifiedVisualizer {
 
             } else {
                 // Simple batch for non-soloist tracks
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                for (const ev of track.history) {
-                    const noteEnd = ev.time + (ev.duration || 0.25);
-                    if (noteEnd < minTime) continue;
-                    if (ev.time > currentTime) break;
-
-                    const startT = Math.max(minTime, ev.time);
-                    const endT = Math.min(currentTime, noteEnd);
-                    const x1 = getX(startT);
-                    const x2 = getX(endT);
-                    const y = Math.round(getY(ev.midi));
-
-                    if (y >= -10 && y <= h + 10) {
-                        ctx.moveTo(x1, y);
-                        ctx.lineTo(x2, y);
-                        
-                        if (ev.time <= currentTime && noteEnd >= currentTime) {
-                            activeX = x2; activeY = y; isActive = true;
-                            activeColor = color;
-                        }
+                if (geom.length > 0) {
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    for (let j = 0; j < geom.length; j += 4) {
+                        ctx.moveTo(geom[j], geom[j+1]);
+                        ctx.lineTo(geom[j+2], geom[j+1]);
                     }
+                    ctx.stroke();
                 }
-                ctx.stroke();
             }
 
             if (isActive) {
