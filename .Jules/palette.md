@@ -21,3 +21,7 @@
 ## 2024-05-27 - Settings Accessibility
 **Learning:** Grouped inputs (like MIDI channels) and stepper controls often lack individual labels, relying on visual context that is lost to screen readers. Adding `aria-label` to each input in a map loop and `aria-valuetext` to sliders restores this context.
 **Action:** Audit map-generated inputs and icon-only steppers for missing accessible labels.
+
+## 2024-05-28 - Musical Symbol Accessibility
+**Learning:** Musical symbols (like `ø` or `|`) are visual shorthand that screen readers often mispronounce (e.g., "slash o", "vertical bar"). Mapping these directly to descriptive `aria-label`s (e.g., "Half-Diminished 7th", "Bar Line") is essential for semantic understanding.
+**Action:** When using domain-specific symbols or notation, always pair them with a descriptive `aria-label` map.
