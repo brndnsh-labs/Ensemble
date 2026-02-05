@@ -7,3 +7,8 @@
 **Vulnerability:** Application trusted `localStorage` data implicitly, allowing potential DoS (via massive arrays) or XSS (via injected scripts) if storage was compromised.
 **Learning:** Defense in depth means never trusting any external input, even from "local" sources like `localStorage`, as they can be vectors for persistent attacks or bugs.
 **Prevention:** Validated all data loaded from storage in `hydrateState` using `validateSections` (caps length, sanitizes strings) and allowlist checks for enums.
+
+## 2025-02-19 - Client-Side File Export Sanitization
+**Vulnerability:** User-provided filenames for MIDI export were not validated or length-limited, allowing potential injection of control characters or excessively long filenames that could cause UI/filesystem issues.
+**Learning:** Even for client-side downloads, inputs must be sanitized. Relying on the browser to sanitize filenames is insufficient for UX and defense-in-depth.
+**Prevention:** Enforce strict allowlists (alphanumeric, safe symbols) and length limits on all user-defined filenames before processing exports.
