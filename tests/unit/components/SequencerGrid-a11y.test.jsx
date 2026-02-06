@@ -44,8 +44,20 @@ vi.mock('../../../public/state.js', () => {
         playback: {
             lastPlayingStep: 0,
             audio: { currentTime: 0 }
+        },
+        groove: {
+            instruments: [
+                { name: 'Kick', steps: new Array(16).fill(0), muted: false, symbol: 'K' }
+            ],
+            measures: 1,
+            gridVersion: 1
         }
     };
+
+    // Sync mock state steps with useEnsembleState mock logic
+    mockState.groove.instruments[0].steps[0] = 1;
+    mockState.groove.instruments[0].steps[1] = 2;
+
     return {
         ...mockState,
         getState: () => mockState
