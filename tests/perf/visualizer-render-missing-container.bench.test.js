@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, beforeEach, afterEach } from 'vitest';
 import { UnifiedVisualizer } from '../../public/visualizer.js';
 
 describe('UnifiedVisualizer Missing Container Benchmark', () => {

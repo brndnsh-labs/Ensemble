@@ -140,7 +140,11 @@ export function SequencerGrid() {
     const handleToggle = useCallback((e, instIdx, stepIdx) => {
         if (e.type === 'mouseover' && !isDragging) return;
         
-        const inst = instruments[instIdx];
+        // Optimization: Access global state directly to avoid dependency on 'instruments'
+        // which changes on every step toggle, preventing full grid re-renders.
+        const { groove } = getState();
+        const inst = groove.instruments[instIdx];
+
         let newType = dragType;
 
         if (e.type === 'mousedown' || e.type === 'keydown') {
@@ -155,13 +159,12 @@ export function SequencerGrid() {
         }
 
         // Only update if changed (though dispatch handles logic too)
-        // We use the local 'instruments' from closure, but actual update goes to store via dispatch
         if (inst.steps[stepIdx] !== newType) {
             inst.steps[stepIdx] = newType;
             clearDrumPresetHighlight();
             import('../state.js').then(({ dispatch }) => dispatch(ACTIONS.STEP_TOGGLE));
         }
-    }, [isDragging, dragType, instruments]);
+    }, [isDragging, dragType]);
 
     const handleAudition = useCallback((inst) => {
         import('../engine/engine.js').then(({ initAudio, playDrumSound }) => {

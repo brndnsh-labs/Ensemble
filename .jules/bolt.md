@@ -17,3 +17,7 @@
 ## 2024-05-25 - Lookup Tables vs Allocations in Render Loops
 **Learning:** Even small array allocations like `[1, 3, 6, 8, 10].includes(x)` inside a render loop (running 60fps * 60 iterations) generate massive GC pressure (180k+ allocations/min).
 **Action:** Replace conditional logic or temporary arrays with static lookup tables (e.g., `const IS_BLACK = [false, true, ...]`) for O(1) access and zero allocation.
+
+## 2024-05-25 - React Memoization Breakers in Closures
+**Learning:** Callbacks passed to `memo` components must be stable. If they depend on a changing object (like the entire store state), they break memoization for all children, causing massive re-renders. Using `getState()` inside the callback (instead of closing over the state) breaks this dependency chain while keeping the callback stable.
+**Action:** For high-frequency interaction handlers (like grid cells), avoid adding the data source to the dependency array. Fetch the data directly from the state store inside the handler.
