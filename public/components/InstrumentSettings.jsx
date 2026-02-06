@@ -74,7 +74,7 @@ export function InstrumentSettings({ module }) {
                     <div style="margin-bottom: 1rem;">
                         <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
                             <span>Complexity</span>
-                            <span id="harmonyComplexityValue">{Math.round((state.complexity || 0.5) * 100)}%</span>
+                            <span id="harmonyComplexityValue" style="color: var(--accent-color); font-weight: bold;">{Math.round((state.complexity || 0.5) * 100)}%</span>
                         </label>
                         <input 
                             id="harmonyComplexity"
@@ -139,7 +139,10 @@ export function InstrumentSettings({ module }) {
             <div>
                 <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: var(--accent-color);">Mixer</h4>
                 <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Volume</label>
+                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                        <span>Volume</span>
+                        <span style="color: var(--accent-color); font-weight: bold;">{Math.round(state.volume * 100)}%</span>
+                    </label>
                     <input 
                         id={`${moduleName}Volume`}
                         type="range" 
@@ -153,7 +156,10 @@ export function InstrumentSettings({ module }) {
                     />
                 </div>
                 <div>
-                    <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Reverb</label>
+                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                        <span>Reverb</span>
+                        <span style="color: var(--accent-color); font-weight: bold;">{Math.round(state.reverb * 100)}%</span>
+                    </label>
                     <input 
                         id={`${moduleName}Reverb`}
                         type="range" 
@@ -177,7 +183,10 @@ function GrooveControls({ state }) {
     return (
         <div>
             <div style="margin-bottom: 1rem;">
-                <label class="control-label" style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Swing</label>
+                <label class="control-label" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                    <span>Swing</span>
+                    <span style="color: var(--accent-color); font-weight: bold;">{swing || 0}%</span>
+                </label>
                 <div style="display: flex; gap: 0.4rem; align-items: center;">
                     <input 
                         id="swingSlider"
@@ -207,7 +216,10 @@ function GrooveControls({ state }) {
                 </div>
             </div>
             <div style="margin-bottom: 1rem;">
-                <label class="control-label" style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Humanize</label>
+                <label class="control-label" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                    <span>Humanize</span>
+                    <span style="color: var(--accent-color); font-weight: bold;">{state.humanize || 0}%</span>
+                </label>
                 <input 
                     id="humanizeSlider"
                     type="range" 
@@ -238,7 +250,7 @@ function GrooveControls({ state }) {
                 <div id="larsIntensityContainer" style={{ opacity: state.larsMode ? '1' : '0.5', pointerEvents: state.larsMode ? 'auto' : 'none' }}>
                     <label style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;">
                         <span>Lars Intensity</span>
-                        <span id="larsIntensityValue">{Math.round(state.larsIntensity * 100)}%</span>
+                        <span id="larsIntensityValue" style="color: var(--accent-color); font-weight: bold;">{Math.round(state.larsIntensity * 100)}%</span>
                     </label>
                     <input 
                         id="larsIntensitySlider"
