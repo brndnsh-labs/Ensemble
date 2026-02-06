@@ -712,19 +712,15 @@ select, input[type="range"] {
 
 .section-group .section-card:hover {
     z-index: 10; /* Bring to front on hover so border highlight is visible */
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2); /* Restore shadow on hover if desired, or keep it flat */
-    border-radius: 12px; /* Temporarily restore radius on hover for pop-out effect, or keep square?
-                          Let's keep square to maintain group structure, but maybe just bring border to front. */
-    border-radius: 0; /* Keep square */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    border-radius: 0; /* Maintain square edges within the group structure */
 }
 
 /* Fix corner radii on hover for first/last children */
 .section-group .section-card:first-child:hover {
     border-radius: 12px 12px 0 0;
 }
+
 .section-group .section-card:last-child:hover {
     border-radius: 0 0 12px 12px;
-}
-.section-group .section-card:not(:first-child):not(:last-child):hover {
-    border-radius: 0;
 }
