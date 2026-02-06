@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hydrateState } from '../../../public/state-hydration.js';
 import * as stateModule from '../../../public/state.js';
 
