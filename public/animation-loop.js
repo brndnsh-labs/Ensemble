@@ -45,10 +45,10 @@ export function draw(viz) {
     const now = getVisualTime();
     while (playback.drawQueue.length > 0 && playback.drawQueue[0].time < now - 2.0) playback.drawQueue.shift();
     if (playback.drawQueue.length > 300) playback.drawQueue = playback.drawQueue.slice(playback.drawQueue.length - 200);
+    const spm = getStepsPerMeasure(arranger.timeSignature);
     while (playback.drawQueue.length && playback.drawQueue[0].time <= now) {
         const ev = playback.drawQueue.shift();
         if (ev.type === 'drum_vis') {
-            const spm = getStepsPerMeasure(arranger.timeSignature);
             const stepMeasure = Math.floor(ev.step / spm);
             if (groove.followPlayback && stepMeasure !== groove.currentMeasure && playback.isPlaying) switchMeasure(stepMeasure, true);
             playback.lastPlayingStep = ev.step;
