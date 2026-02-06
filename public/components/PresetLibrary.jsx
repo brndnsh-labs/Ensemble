@@ -36,7 +36,8 @@ export function PresetLibrary({ type }) {
         ? CHORD_PRESETS 
         : Object.keys(DRUM_PRESETS).map(name => ({ name, ...DRUM_PRESETS[name] }));
 
-    const activeId = type === 'chord' ? lastChordPreset : lastDrumPreset;
+    // Optimization: Check isDirty state instead of manual DOM manipulation in arranger-controller
+    const activeId = type === 'chord' ? (isDirty ? null : lastChordPreset) : lastDrumPreset;
 
     const handleSelect = (item, isUser = false) => {
         if (type === 'chord') {
