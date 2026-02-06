@@ -337,15 +337,7 @@ export class UnifiedVisualizer {
 
     render(currentTime, bpm, beatsPerMeasure = 4) {
         if (!this.container) {
-            // Attempt recovery if container was missing at init
-            this.container = document.getElementById('unifiedVizContainer');
-            if (this.container) {
-                this.container.appendChild(this.canvas);
-                this.initDOM();
-                this.resizeObserver.observe(this.container);
-            } else {
-                return;
-            }
+            return;
         }
 
         if (!this.themeCache) {
