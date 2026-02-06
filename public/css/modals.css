@@ -681,29 +681,50 @@ select, input[type="range"] {
     width: 100%;
     /* Ensure group behaves like a single unit in the grid */
     height: fit-content;
+
+    /* Apply shadow to the group container instead of individual cards */
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    isolation: isolate; /* Create a new stacking context */
 }
 
 .section-group .section-card {
     box-shadow: none; /* Remove individual shadows when grouped */
+    margin-bottom: -1px; /* Overlap borders for seamless look */
+    z-index: 0; /* Let DOM order handle stacking by default */
 }
 
-/* Add shadow to the group or keep on cards but fix z-index? */
-/* Actually, let's keep shadows but fix stacking context or make them subtle */
-/* For now, just removing radius to show connection */
-
-.section-group .section-card:not(:last-child) {
+/* Handle rounded corners: only outer corners should be rounded */
+.section-group .section-card:first-child {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    border-bottom: 1px solid transparent; /* Hide bottom border to merge */
-    margin-bottom: -1px; /* Overlap borders */
-    z-index: 1;
 }
 
-.section-group .section-card:not(:first-child) {
+.section-group .section-card:last-child {
     border-top-left-radius: 0;
     border-top-right-radius: 0;
+    margin-bottom: 0; /* Reset margin for the last item */
+}
+
+.section-group .section-card:not(:first-child):not(:last-child) {
+    border-radius: 0;
 }
 
 .section-group .section-card:hover {
-    z-index: 5; /* Bring to front on hover */
+    z-index: 10; /* Bring to front on hover so border highlight is visible */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2); /* Restore shadow on hover if desired, or keep it flat */
+    border-radius: 12px; /* Temporarily restore radius on hover for pop-out effect, or keep square?
+                          Let's keep square to maintain group structure, but maybe just bring border to front. */
+    border-radius: 0; /* Keep square */
+}
+
+/* Fix corner radii on hover for first/last children */
+.section-group .section-card:first-child:hover {
+    border-radius: 12px 12px 0 0;
+}
+.section-group .section-card:last-child:hover {
+    border-radius: 0 0 12px 12px;
+}
+.section-group .section-card:not(:first-child):not(:last-child):hover {
+    border-radius: 0;
 }
