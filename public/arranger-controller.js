@@ -26,8 +26,8 @@ export function validateAndAnalyze() {
 }
 
 export function clearChordPresetHighlight() {
-    // Only remove the UI class, don't clear the state tracking
-    document.querySelectorAll('.chord-preset-chip, .user-preset-chip').forEach(c => c.classList.remove('active'));
+    // DOM manipulation is no longer needed; PresetLibrary.jsx tracks isDirty state
+    // Keeping this function as a no-op to maintain API compatibility
 }
 
 export function refreshArrangerUI() {
