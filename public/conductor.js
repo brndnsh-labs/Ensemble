@@ -281,14 +281,34 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 let targetEnergy = 0.5;
                 const currentInt = playback.bandIntensity;
 
-                // --- 1. THE MACRO-ARC (5+ Minute Jam Logic) ---
-                const grandCycle = conductorState.formIteration % 8;
+                // --- 1. THE MACRO-ARC ---
                 let macroFloor = 0.2, macroCeiling = 0.6;
-                if (grandCycle === 0) { macroFloor = 0.15; macroCeiling = 0.45; }
-                else if (grandCycle < 3) { macroFloor = 0.35; macroCeiling = 0.75; }
-                else if (grandCycle < 5) { macroFloor = 0.60; macroCeiling = 1.0; }
-                else if (grandCycle < 7) { macroFloor = 0.30; macroCeiling = 0.60; }
-                else { macroFloor = 0.10; macroCeiling = 0.35; }
+
+                // Priority: SESSION TIMER ARC
+                if (playback.sessionTimer > 0 && playback.sessionStartTime > 0) {
+                    const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
+                    const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
+
+                    if (progress < 0.15) { // Warmup (0-15%)
+                        macroFloor = 0.2; macroCeiling = 0.45;
+                    } else if (progress < 0.40) { // Development (15-40%)
+                        macroFloor = 0.4; macroCeiling = 0.7;
+                    } else if (progress < 0.65) { // The Pocket (40-65%)
+                        macroFloor = 0.5; macroCeiling = 0.8;
+                    } else if (progress < 0.85) { // Climax (65-85%)
+                        macroFloor = 0.7; macroCeiling = 1.0;
+                    } else { // Cool Down (85-100%)
+                        macroFloor = 0.2; macroCeiling = 0.5;
+                    }
+                } else {
+                    // Fallback: Repetition-Based Logic (5+ Minute Jam Logic)
+                    const grandCycle = conductorState.formIteration % 8;
+                    if (grandCycle === 0) { macroFloor = 0.15; macroCeiling = 0.45; }
+                    else if (grandCycle < 3) { macroFloor = 0.35; macroCeiling = 0.75; }
+                    else if (grandCycle < 5) { macroFloor = 0.60; macroCeiling = 1.0; }
+                    else if (grandCycle < 7) { macroFloor = 0.30; macroCeiling = 0.60; }
+                    else { macroFloor = 0.10; macroCeiling = 0.35; }
+                }
 
                 // --- 2. THE LOCAL FUNCTIONAL ROLE ---
                 if (conductorState.form && conductorState.form.sections) {
