@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { checkSectionTransition, conductorState } from '../../../public/conductor.js';
-import { getState, dispatch } from '../../../public/state.js';
+import { getState } from '../../../public/state.js';
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({
