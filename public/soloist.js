@@ -69,28 +69,28 @@ const STYLE_CONFIG = {
         motifProb: 0.7, hookProb: 0.5
     },
     bird: {
-        restBase: 0.15, restGrowth: 0.03, cells: [0, 1, 7, 3], registerSoar: 8,
+        restBase: 0.15, restGrowth: 0.03, cells: [0, 1, 7, 3], registerSoar: 5,
         tensionScale: 0.7, timingJitter: 12, maxNotesPerPhrase: 48,
         doubleStopProb: 0.05, anticipationProb: 0.6, targetExtensions: [2, 5, 6, 9],
         deviceProb: 0.6, allowedDevices: ['enclosure', 'run', 'birdFlurry'],
         motifProb: 0.2, hookProb: 0.1
     },
     disco: {
-        restBase: 0.25, restGrowth: 0.06, cells: [0, 2, 5, 10], registerSoar: 12,
+        restBase: 0.25, restGrowth: 0.06, cells: [0, 2, 5, 10], registerSoar: 8,
         tensionScale: 0.5, timingJitter: 8, maxNotesPerPhrase: 12,
         doubleStopProb: 0.05, anticipationProb: 0.2, targetExtensions: [2, 9],
         deviceProb: 0.1, allowedDevices: ['run'],
         motifProb: 0.4, hookProb: 0.2
     },
     bossa: {
-        restBase: 0.4, restGrowth: 0.08, cells: [11, 2, 0, 6, 8], registerSoar: 8,
+        restBase: 0.4, restGrowth: 0.08, cells: [11, 2, 0, 6, 8], registerSoar: 4,
         tensionScale: 0.7, timingJitter: 15, maxNotesPerPhrase: 8,
         doubleStopProb: 0.08, anticipationProb: 0.35, targetExtensions: [2, 6, 9],
         deviceProb: 0.2, allowedDevices: ['enclosure', 'slide', 'guitarDouble'],
         motifProb: 0.5, hookProb: 0.25
     },
     country: {
-        restBase: 0.12, restGrowth: 0.08, cells: [1, 3, 4, 12, 14, 6], registerSoar: 10,
+        restBase: 0.12, restGrowth: 0.08, cells: [1, 3, 4, 12, 14, 6], registerSoar: 6,
         tensionScale: 0.5, timingJitter: 4, maxNotesPerPhrase: 16,
         doubleStopProb: 0.5, anticipationProb: 0.2, targetExtensions: [2, 4, 9],
         deviceProb: 0.45, allowedDevices: ['guitarDouble', 'slide', 'countryBend', 'chickenPick', 'banjoRoll', 'graceSlide'],
@@ -102,6 +102,20 @@ const STYLE_CONFIG = {
         doubleStopProb: 0.05, anticipationProb: 0.05, targetExtensions: [2, 7],
         deviceProb: 0.5, allowedDevices: ['run'],
         motifProb: 0.1, hookProb: 0.05
+    },
+    reggae: {
+        restBase: 0.4, restGrowth: 0.1, cells: [2, 6, 12, 14], registerSoar: 3,
+        tensionScale: 0.6, timingJitter: 20, maxNotesPerPhrase: 6,
+        doubleStopProb: 0.2, anticipationProb: 0.1, targetExtensions: [2, 6, 9],
+        deviceProb: 0.15, allowedDevices: ['guitarDouble'],
+        motifProb: 0.6, hookProb: 0.4
+    },
+    acoustic: {
+        restBase: 0.5, restGrowth: 0.12, cells: [2, 11, 1, 13], registerSoar: 4,
+        tensionScale: 0.4, timingJitter: 15, maxNotesPerPhrase: 8,
+        doubleStopProb: 0.1, anticipationProb: 0.15, targetExtensions: [2, 9],
+        deviceProb: 0.2, allowedDevices: ['slide'],
+        motifProb: 0.5, hookProb: 0.3
     }
 };
 
@@ -126,7 +140,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     let activeStyle = style;
     if (activeStyle === 'smart') {
-        const mapping = { 'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues', 'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa', 'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'minimal', 'Reggae': 'minimal', 'Country': 'country' };
+        const mapping = { 'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues', 'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa', 'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'acoustic', 'Reggae': 'reggae', 'Country': 'country' };
         activeStyle = mapping[groove.genreFeel] || 'scalar';
     }
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
@@ -368,9 +382,12 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     // Note: chordTones check logic updated to use targetChord instead of currentChord for consistency during anticipation.
     
     const dynamicCenter = centerMidi; 
-    const lastMidi = prevFreq ? getMidi(prevFreq) : Math.round(dynamicCenter);
-    const minMidi = Math.max(MIN_GUITAR_MIDI, Math.min(dynamicCenter - 12, lastMidi - 14)); 
-    const maxMidi = Math.min(MAX_GUITAR_MIDI, Math.max(dynamicCenter + 12, lastMidi + 14));
+    const lastMidi = (prevFreq && !soloist.isResting) ? getMidi(prevFreq) : Math.round(dynamicCenter);
+    
+    // Reggae and Minimal should be more constrained in range
+    const rangeLimit = (activeStyle === 'reggae' || activeStyle === 'minimal') ? 12 : 14;
+    const minMidi = Math.max(MIN_GUITAR_MIDI, Math.min(dynamicCenter - 12, lastMidi - rangeLimit)); 
+    const maxMidi = Math.min(MAX_GUITAR_MIDI, Math.max(dynamicCenter + 12, lastMidi + rangeLimit));
 
     let totalWeight = 0;
     CANDIDATE_WEIGHTS.fill(0);
@@ -425,11 +442,13 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
         if (isGuideTone) weight += 30;
         if (isRoot) weight += 15;
-        if (activeStyle === 'country' && isPentatonicColor) weight += 100;
+        if (activeStyle === 'country' && isPentatonicColor) weight += 300;
 
         // Stepwise Motion Bonus (Melodic Integrity)
-        if (dist > 0 && dist <= 2) weight += 50;
-        if (activeStyle === 'bird' && dist <= 2) weight += 100; // Prefer stepwise for bebop lines
+        if (dist > 0 && dist <= 2 && activeStyle !== 'country') weight += 50;
+        if (activeStyle === 'bird' || activeStyle === 'bossa') weight += 150;
+        if (activeStyle === 'blues' || activeStyle === 'acoustic') weight += 100;
+        if (activeStyle === 'reggae') weight += 200; // Very strong stepwise preference for Reggae
 
         // Voice Leading Bonus
         if (voiceLeadingTarget !== null) {
@@ -454,6 +473,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             weight *= 0.0001; // Force a move
             if (isStagnant) weight = 0; 
         }
+
+        if (activeStyle === 'reggae' && dist > 2) weight *= 0.01;
+        if (['bird', 'country', 'bossa', 'acoustic'].includes(activeStyle) && dist > 4) weight *= 0.1;
+        if (['blues', 'funk', 'neo', 'disco'].includes(activeStyle) && dist > 6) weight *= 0.2;
 
         // High BPM Interval Control (Prevent erratic jumps)
         if (playback.bpm > 160 && dist > 4) {
@@ -502,9 +525,25 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             if (m < 0 || m > 127) continue;
             const pc = (m % 12 + 12) % 12;
             const interval = (pc - (rootMidi % 12) + 12) % 12;
-            if (scaleIntervals.includes(interval) && m !== lastMidi) fallbacks.push(m);
+            if (scaleIntervals.includes(interval) && m !== lastMidi) {
+                const dist = Math.abs(m - lastMidi);
+                let weight = 1.0;
+                if (dist <= 2) weight += 10;
+                if (activeStyle === 'reggae' && dist > 4) weight *= 0.1;
+                fallbacks.push({ midi: m, weight });
+            }
         }
-        selectedMidi = fallbacks.length > 0 ? fallbacks[Math.floor(Math.random() * fallbacks.length)] : lastMidi;
+        if (fallbacks.length > 0) {
+            let totalW = fallbacks.reduce((sum, f) => sum + f.weight, 0);
+            let rand = Math.random() * totalW;
+            for (const f of fallbacks) {
+                rand -= f.weight;
+                if (rand <= 0) { selectedMidi = f.midi; break; }
+            }
+            if (selectedMidi === -1) selectedMidi = fallbacks[0].midi;
+        } else {
+            selectedMidi = lastMidi;
+        }
     }
     
     soloist.lastInterval = selectedMidi - lastMidi;
