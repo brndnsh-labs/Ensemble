@@ -8,7 +8,7 @@ class MockWorker {
         this.path = path;
         this.onmessage = null;
     }
-    postMessage(data) {}
+    postMessage() {}
     terminate() {}
 }
 
@@ -59,7 +59,6 @@ describe('Worker Client Security', () => {
 
     it('should sanitize filename from worker before download', () => {
         const maliciousFilename = '../../etc/passwd.exe';
-        const safeFilename = 'etcpasswd.exe.mid'; // Depending on implementation
 
         // Simulate message from worker
         const event = {
