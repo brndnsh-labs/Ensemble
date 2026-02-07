@@ -528,61 +528,74 @@ export class UnifiedVisualizer {
             ctx.fillRect(this.pianoRollWidth, yMin, graphW, yMax - yMin);
         }
 
-        // 2. Chords
+        // 2. Chords - Pass 1: Background Guide Tones (Batched alpha change)
+        // Optimization: Set globalAlpha once for all guide tones instead of per-chord
+        ctx.globalAlpha = 0.1;
         for (const ev of this.chordEvents) {
             const chordEnd = ev.time + (ev.duration || 2.0);
             if (chordEnd < minTime) continue;
             if (ev.time > currentTime) break;
 
+            if (!ev.intervals) continue;
+
             const start = Math.max(minTime, ev.time);
             const end = Math.min(currentTime, chordEnd);
             
-            // Reversed: start (earlier) is further Right. end (later) is further Left.
             const xStart = getX(start);
             const xEnd = getX(end);
-            
             const x = xEnd; 
             const cw = xStart - xEnd;
             const rootPC = ev.rootMidi % 12;
 
-            // Render background guide tones
-            if (ev.intervals) {
-                ctx.globalAlpha = 0.1; // Optimization: Set alpha once
-                for (const interval of ev.intervals) {
-                    const pc = (rootPC + interval) % 12;
-                    const cat = INTERVAL_CATEGORY[interval];
-                    ctx.fillStyle = chordColors[cat];
-                    
-                    // Render in visible octaves
-                    const minOct = Math.floor(startMidi / 12);
-                    const maxOct = Math.ceil(endMidi / 12);
+            for (const interval of ev.intervals) {
+                const pc = (rootPC + interval) % 12;
+                const cat = INTERVAL_CATEGORY[interval];
+                ctx.fillStyle = chordColors[cat];
 
-                    for (let oct = minOct; oct <= maxOct; oct++) {
-                        const m = pc + oct * 12;
-                        const y = Math.round(getY(m));
-                        if (y >= -10 && y <= h + 10) {
-                            ctx.fillRect(x, y - yScale/2, cw, yScale);
-                        }
-                    }
-                }
-                ctx.globalAlpha = 1.0;
-            }
+                // Render in visible octaves
+                const minOct = Math.floor(startMidi / 12);
+                const maxOct = Math.ceil(endMidi / 12);
 
-            // Render specifically played notes (highlighted)
-            if (ev.notes) {
-                ctx.globalAlpha = 0.5; // Optimization: Set alpha once per chord
-                for (const midi of ev.notes) {
-                    const y = Math.round(getY(midi));
-                    const interval = (midi % 12 - rootPC + 12) % 12;
-                    const cat = INTERVAL_CATEGORY[interval];
-                    ctx.fillStyle = chordColors[cat];
+                for (let oct = minOct; oct <= maxOct; oct++) {
+                    const m = pc + oct * 12;
+                    const y = Math.round(getY(m));
                     if (y >= -10 && y <= h + 10) {
-                        ctx.fillRect(x, y - yScale/2 + 2, cw, yScale - 4);
+                        ctx.fillRect(x, y - yScale/2, cw, yScale);
                     }
                 }
-                ctx.globalAlpha = 1.0;
             }
         }
+
+        // 2. Chords - Pass 2: Active Notes (Batched alpha change)
+        // Optimization: Set globalAlpha once for all active notes
+        ctx.globalAlpha = 0.5;
+        for (const ev of this.chordEvents) {
+            const chordEnd = ev.time + (ev.duration || 2.0);
+            if (chordEnd < minTime) continue;
+            if (ev.time > currentTime) break;
+
+            if (!ev.notes) continue;
+
+            const start = Math.max(minTime, ev.time);
+            const end = Math.min(currentTime, chordEnd);
+
+            const xStart = getX(start);
+            const xEnd = getX(end);
+            const x = xEnd;
+            const cw = xStart - xEnd;
+            const rootPC = ev.rootMidi % 12;
+
+            for (const midi of ev.notes) {
+                const y = Math.round(getY(midi));
+                const interval = (midi % 12 - rootPC + 12) % 12;
+                const cat = INTERVAL_CATEGORY[interval];
+                ctx.fillStyle = chordColors[cat];
+                if (y >= -10 && y <= h + 10) {
+                    ctx.fillRect(x, y - yScale/2 + 2, cw, yScale - 4);
+                }
+            }
+        }
+        ctx.globalAlpha = 1.0;
 
         // 3. Melodic Tracks
         for (const name in this.tracks) {
