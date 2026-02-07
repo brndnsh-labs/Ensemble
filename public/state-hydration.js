@@ -81,7 +81,7 @@ export function hydrateState() {
         Object.assign(playback, {
             theme: savedState.theme || 'auto',
             bpm: Math.min(Math.max(20, Number(savedState.bpm) || 100), 300),
-            bandIntensity: savedState.bandIntensity !== undefined ? Math.min(Math.max(0, Number(savedState.bandIntensity) || 0), 1) : 0.5,
+            bandIntensity: savedState.bandIntensity !== undefined ? Math.min(Math.max(0, Number(savedState.bandIntensity) || 0), 1) : 0.35,
             complexity: savedState.complexity !== undefined ? Math.min(Math.max(0, Number(savedState.complexity) || 0), 1) : 0.3,
             autoIntensity: true,
             metronome: false,

@@ -68,7 +68,7 @@ describe('Conductor Logic', () => {
 
         playback.autoIntensity = true;
         playback.isPlaying = true;
-        playback.bandIntensity = 0.5;
+        playback.bandIntensity = 0.35;
         conductorState.target = 0.5;
         conductorState.stepSize = 0.01;
         conductorState.formIteration = 0;
@@ -83,23 +83,23 @@ describe('Conductor Logic', () => {
         it('should ramp intensity towards target', () => {
             conductorState.target = 0.6;
             updateAutoConductor();
-            expect(playback.bandIntensity).toBeGreaterThan(0.5);
+            expect(playback.bandIntensity).toBeGreaterThan(0.35);
         });
 
         it('should use asymmetric ramping (faster drops)', () => {
             vi.spyOn(Math, 'random').mockReturnValue(0.5);
             // Test Build
-            playback.bandIntensity = 0.5;
+            playback.bandIntensity = 0.35;
             conductorState.target = 0.7;
             conductorState.stepSize = 0.01;
             updateAutoConductor();
-            const buildDiff = playback.bandIntensity - 0.5;
+            const buildDiff = playback.bandIntensity - 0.35;
 
             // Test Drop
-            playback.bandIntensity = 0.5;
-            conductorState.target = 0.3;
+            playback.bandIntensity = 0.35;
+            conductorState.target = 0.1; // Lower than 0.35 to ensure a drop
             updateAutoConductor();
-            const dropDiff = 0.5 - playback.bandIntensity;
+            const dropDiff = 0.35 - playback.bandIntensity;
 
             // Drop should be faster (multiplier 2.5 in code when intensity > target)
             expect(dropDiff).toBeGreaterThan(buildDiff);

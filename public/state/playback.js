@@ -71,7 +71,7 @@ export const playback = {
     isDrawing: false,
     theme: 'auto',
     wakeLock: null,
-    bandIntensity: 0.5,
+    bandIntensity: 0.35,
     complexity: 0.3,
     autoIntensity: true,
     metronome: false,
@@ -117,7 +117,7 @@ export function playbackReducer(action, payload) {
             Object.assign(playback, {
                 bpm: 100,
                 theme: 'auto',
-                bandIntensity: 0.5,
+                bandIntensity: 0.35,
                 complexity: 0.3,
                 autoIntensity: true,
                 metronome: false,
