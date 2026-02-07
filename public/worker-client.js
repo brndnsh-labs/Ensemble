@@ -34,7 +34,12 @@ export function initWorker(onSchedulerRequest, onNotesReceived) {
             const url = URL.createObjectURL(new Blob([blob], { type: 'audio/midi' }));
             const a = document.createElement('a');
             a.href = url;
-            a.download = filename;
+
+            // Sanitize filename (Defense in Depth)
+            let safeName = (filename || 'ensemble-export').replace(/\.midi?$/i, '');
+            safeName = safeName.replace(/[^a-zA-Z0-9\s\-_()]/g, '').substring(0, 64).trim() || 'ensemble-export';
+
+            a.download = safeName + '.mid';
             a.click();
             URL.revokeObjectURL(url);
         }
