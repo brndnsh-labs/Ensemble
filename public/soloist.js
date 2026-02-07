@@ -363,9 +363,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     const scaleIntervals = getScaleForChord(targetChord, null, style);
     const rootMidi = targetChord.rootMidi;
-    const scaleTones = scaleIntervals.map(i => rootMidi + i);
-    
-    const chordTones = currentChord.intervals.map(i => rootMidi + i);
+    // Optimization: avoid allocating scaleTones and chordTones arrays.
+    // Instead check intervals directly against scaleIntervals and targetChord.intervals.
+    // Note: chordTones check logic updated to use targetChord instead of currentChord for consistency during anticipation.
     
     const dynamicCenter = centerMidi; 
     const lastMidi = prevFreq ? getMidi(prevFreq) : Math.round(dynamicCenter);
@@ -411,7 +411,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         const pc = (m % 12 + 12) % 12;
         const interval = (pc - (rootMidi % 12) + 12) % 12;
         let weight = 1.0;
-        if (!scaleTones.some(st => (st % 12 + 12) % 12 === pc)) continue; 
+
+        // Use pre-calculated interval (0-11) to check against scaleIntervals (also 0-11)
+        if (!scaleIntervals.includes(interval)) continue;
 
         const dist = Math.abs(m - lastMidi);
 
@@ -443,7 +445,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             if (isRoot) weight += qaBonus;
             if (isGuideTone) weight += qaBonus * 0.5;
         }
-        if (chordTones.some(ct => (ct % 12 + 12) % 12 === pc)) weight += 20;
+
+        // Check if interval matches target chord tones (handling extended intervals > 12)
+        if (targetChord.intervals.some(i => (i % 12 + 12) % 12 === interval)) weight += 20;
 
         // Penalties (Multiplicative)
         if (dist === 0) {
@@ -497,7 +501,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         for (let m = startM; m <= endM; m++) {
             if (m < 0 || m > 127) continue;
             const pc = (m % 12 + 12) % 12;
-            if (scaleTones.some(st => (st % 12 + 12) % 12 === pc) && m !== lastMidi) fallbacks.push(m);
+            const interval = (pc - (rootMidi % 12) + 12) % 12;
+            if (scaleIntervals.includes(interval) && m !== lastMidi) fallbacks.push(m);
         }
         selectedMidi = fallbacks.length > 0 ? fallbacks[Math.floor(Math.random() * fallbacks.length)] : lastMidi;
     }
