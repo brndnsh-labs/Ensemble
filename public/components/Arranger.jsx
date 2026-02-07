@@ -1,6 +1,6 @@
 import { h, Fragment } from 'preact';
 import React from 'preact/compat';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 import { SectionCard } from './SectionCard.jsx';
 import { onSectionUpdate } from '../arranger-controller.js';
@@ -11,9 +11,11 @@ export function Arranger() {
         lastInteractedSectionId: s.arranger.lastInteractedSectionId
     }));
 
+    const sectionRefs = useRef({});
+
     useEffect(() => {
         if (lastInteractedSectionId) {
-            const el = document.querySelector(`.section-card[data-id="${lastInteractedSectionId}"]`);
+            const el = sectionRefs.current[lastInteractedSectionId];
             if (el) {
                 // Delay slightly to allow modal transition
                 setTimeout(() => {
@@ -64,7 +66,8 @@ export function Arranger() {
                     const index = sections.findIndex(s => s.id === section.id);
                     return (
                         <SectionCard 
-                            key={section.id} 
+                            key={section.id}
+                            ref={el => sectionRefs.current[section.id] = el}
                             section={section} 
                             index={index} 
                             totalSections={sections.length} 
@@ -78,7 +81,8 @@ export function Arranger() {
                             const index = sections.findIndex(s => s.id === section.id);
                             return (
                                 <SectionCard 
-                                    key={section.id} 
+                                    key={section.id}
+                                    ref={el => sectionRefs.current[section.id] = el}
                                     section={section} 
                                     index={index} 
                                     totalSections={sections.length} 

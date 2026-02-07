@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import React from 'preact/compat';
+import React, { forwardRef } from 'preact/compat';
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 import { SymbolMenu } from './SymbolMenu.jsx';
@@ -9,7 +9,7 @@ import { onSectionUpdate, onSectionDelete, onSectionDuplicate } from '../arrange
 import { getState } from '../state.js';
 const { arranger } = getState();
 
-export function SectionCard({ section, index, totalSections }) {
+export const SectionCard = forwardRef(({ section, index, totalSections }, ref) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const textareaRef = useRef(null);
     
@@ -86,6 +86,7 @@ export function SectionCard({ section, index, totalSections }) {
 
     return (
         <div 
+            ref={ref}
             class={`section-card ${section.seamless ? 'linked' : ''} ${isMenuOpen ? 'menu-active' : ''}`}
             data-id={section.id}
             style={{ viewTransitionName: `editor-card-${section.id}` }}
@@ -227,4 +228,4 @@ export function SectionCard({ section, index, totalSections }) {
             />
         </div>
     );
-}
+});
