@@ -167,7 +167,10 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
         if (feel === 'Blues') activeStyle = 'organ';
         else if (feel === 'Jazz' || feel === 'Bossa Nova') activeStyle = 'strings';
         else if (feel === 'Disco' || feel === 'Hip Hop') activeStyle = 'plucks';
-        else if (feel === 'Funk' || feel === 'Metal') activeStyle = 'horns';
+        else if (feel === 'Funk' || feel === 'Metal' || feel === 'Afrobeat') activeStyle = 'horns';
+        else if (feel === 'Reggae') activeStyle = 'organ';
+        else if (feel === 'Neo-Soul') activeStyle = 'organ';
+        else if (feel === 'Country' || feel === 'Acoustic') activeStyle = 'strings';
         else activeStyle = 'strings';
     }
 

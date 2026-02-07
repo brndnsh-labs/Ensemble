@@ -190,6 +190,15 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     else if (chords.style === 'strum-country') genre = 'Country';
     else if (chords.style === 'power-metal') genre = 'Metal';
 
+    if (chords.style === 'smart') {
+        const smartMapping = {
+            'Afrobeat': 'Funk',
+            'Blues': 'Jazz',
+            'Country': 'Rock'
+        };
+        if (smartMapping[genre]) genre = smartMapping[genre];
+    }
+
     // --- Sticky Groove Logic ---
     if (STICKY_GENRES.includes(genre)) {
         compingState.grooveRetentionCount++;

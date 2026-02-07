@@ -20,7 +20,11 @@ const BOSSA_STEPS = [0, 6, 8, 14];
 export function isBassActive(style, step, stepInChord) {
     const { playback, groove, arranger } = getState();
     if (style === 'smart') {
-        const mapping = { 'Rock': 'rock', 'Jazz': 'quarter', 'Funk': 'funk', 'Disco': 'disco', 'Reggae': 'dub', 'Neo-Soul': 'neo', 'Bossa Nova': 'bossa' };
+        const mapping = { 
+            'Rock': 'rock', 'Jazz': 'quarter', 'Funk': 'funk', 'Disco': 'disco', 
+            'Reggae': 'dub', 'Neo-Soul': 'neo', 'Bossa Nova': 'bossa',
+            'Afrobeat': 'funk', 'Blues': 'quarter', 'Acoustic': 'rock', 'Country': 'country', 'Metal': 'metal'
+        };
         style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
     }
 
@@ -96,7 +100,12 @@ export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMid
     if (!chord) return null;
 
     if (style === 'smart') {
-        const mapping = { 'Rock': 'rock', 'Jazz': 'quarter', 'Funk': 'funk', 'Disco': 'disco', 'Reggae': 'dub', 'Neo-Soul': 'neo', 'Bossa Nova': 'bossa', 'Country': 'country', 'Metal': 'metal' };
+        const mapping = { 
+            'Rock': 'rock', 'Jazz': 'quarter', 'Funk': 'funk', 'Disco': 'disco', 
+            'Reggae': 'dub', 'Neo-Soul': 'neo', 'Bossa Nova': 'bossa', 
+            'Country': 'country', 'Metal': 'metal', 'Afrobeat': 'funk', 
+            'Blues': 'quarter', 'Acoustic': 'rock' 
+        };
         style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
     }
 
