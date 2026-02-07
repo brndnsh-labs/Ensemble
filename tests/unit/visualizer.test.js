@@ -131,7 +131,7 @@ describe('UnifiedVisualizer', () => {
         visualizer.pushNote('bass', { time: 0, midi: 36, duration: 1.0 });
         
         visualizer.truncateNotes('bass', 0.5);
-        expect(visualizer.tracks['bass'].history[0].duration).toBe(0.5);
+        expect(visualizer.tracks['bass'].history.at(0).duration).toBe(0.5);
     });
 
     it('should execute draw calls during render', () => {
