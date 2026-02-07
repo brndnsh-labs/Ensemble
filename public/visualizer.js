@@ -15,6 +15,45 @@ const INTERVAL_CATEGORY = [
     "seventh"  // 11
 ];
 
+class RingBuffer {
+    constructor(capacity) {
+        this.buffer = new Array(capacity);
+        this.capacity = capacity;
+        this.start = 0;
+        this.count = 0;
+    }
+
+    get length() {
+        return this.count;
+    }
+
+    push(item) {
+        if (this.count < this.capacity) {
+            this.buffer[(this.start + this.count) % this.capacity] = item;
+            this.count++;
+        } else {
+            this.buffer[this.start] = item;
+            this.start = (this.start + 1) % this.capacity;
+        }
+    }
+
+    at(index) {
+        if (index < 0 || index >= this.count) return undefined;
+        return this.buffer[(this.start + index) % this.capacity];
+    }
+
+    clear() {
+        this.start = 0;
+        this.count = 0;
+    }
+
+    *[Symbol.iterator]() {
+        for (let i = 0; i < this.count; i++) {
+            yield this.at(i);
+        }
+    }
+}
+
 export class UnifiedVisualizer {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
@@ -284,7 +323,7 @@ export class UnifiedVisualizer {
 
         this.tracks[name] = {
             color,
-            history: [],
+            history: new RingBuffer(100),
             label
         };
         this.resolveTrackColor(name);
@@ -304,10 +343,6 @@ export class UnifiedVisualizer {
         this.tracks[name].history.push(event);
         if (event.noteName && event.octave) {
             this.tracks[name].label.textContent = `${event.noteName}${event.octave}`;
-        }
-        // Optimization: Use shift instead of slice to avoid array allocation
-        while (this.tracks[name].history.length > 100) {
-            this.tracks[name].history.shift();
         }
     }
 
@@ -586,7 +621,7 @@ export class UnifiedVisualizer {
             // Pass 0: Compute Geometry
             // Optimization: Calculate coordinates once per frame per track
             for (let i = 0; i < track.history.length; i++) {
-                const ev = track.history[i];
+                const ev = track.history.at(i);
                 const noteEnd = ev.time + (ev.duration || 0.25);
                 if (noteEnd < minTime) continue;
                 if (ev.time > currentTime) break;
@@ -648,7 +683,7 @@ export class UnifiedVisualizer {
                     const y = geom[j+1];
                     const x2 = geom[j+2];
                     const idx = geom[j+3];
-                    const ev = track.history[idx];
+                    const ev = track.history.at(idx);
 
                     if (ev.noteType === 'arp') {
                         batches.fifth.push(x1, y, x2);
@@ -735,7 +770,7 @@ export class UnifiedVisualizer {
 
     clear() {
         for (const name in this.tracks) {
-            this.tracks[name].history = [];
+            this.tracks[name].history.clear();
             this.tracks[name].label.textContent = "";
         }
         this.chordEvents = [];
