@@ -202,6 +202,8 @@ export function SequencerGrid() {
                         <button 
                             className={`mute-toggle ${inst.muted ? 'active' : ''}`}
                             title={inst.muted ? 'Unmute' : 'Mute'}
+                            aria-label={`${inst.muted ? 'Unmute' : 'Mute'} ${inst.name}`}
+                            aria-pressed={inst.muted}
                             onClick={() => handleMute(inst, instIdx)}
                         >
                             M
