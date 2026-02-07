@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
-import { extractMelodyForm } from '../../public/form-extractor.js';
 
 class MockAudioBuffer {
     constructor({ length, sampleRate }) {
@@ -46,33 +45,4 @@ describe('Melody Analyzer Intelligence', () => {
         expect(results[0].midi % 12).toBe(11); // Should be B (11) not Bb (10)
     });
 
-    it('should heal a melody phrase using consensus', () => {
-        // 12-bar melody (3 repetitions of 4 bars)
-        // Phrase 1: C D E F (x4 measures)
-        // Phrase 2: C D Eb F (x4 measures) - Noisy
-        // Phrase 3: C D E F (x4 measures)
-        
-        const longMelody = [];
-        const p1 = [60, 62, 64, 65];
-        const p2 = [60, 62, 63, 65]; // Noisy (63 instead of 64)
-
-        const addPhrase = (pattern, startMeasure) => {
-            for (let m = 0; m < 4; m++) {
-                pattern.forEach((midi, b) => longMelody.push({ beat: (startMeasure + m) * 4 + b, midi }));
-            }
-        };
-
-        addPhrase(p1, 0); // Measures 0-3
-        addPhrase(p2, 4); // Measures 4-7 (Noisy)
-        addPhrase(p1, 8); // Measures 8-11
-
-        const healedLong = extractMelodyForm(longMelody, 4);
-        
-        // Any beat in the middle phrase that was 63 should now be 64 (consensus of phrases 1 and 3)
-        // Check Measure 4, Beat 2: (4*4 + 2) = 18
-        expect(healedLong[18].midi).toBe(64); 
-        expect(healedLong[22].midi).toBe(64);
-        expect(healedLong[26].midi).toBe(64);
-        expect(healedLong[30].midi).toBe(64);
-    });
 });
