@@ -12,15 +12,6 @@ import { UnifiedVisualizer } from './visualizer.js';
 
 let viz;
 
-/**
- * Diagnostic: Enables detailed logging of worker/scheduler interactions.
- */
-window.enableWorkerLogging = (enabled) => {
-    const { playback } = getState();
-    playback.workerLogging = enabled;
-    console.log(`[Worker] Logging ${enabled ? 'ENABLED' : 'DISABLED'}`);
-};
-
 function init() {
     const { playback, chords, bass, soloist, harmony, groove } = getState();
     try {

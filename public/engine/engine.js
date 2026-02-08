@@ -204,41 +204,6 @@ export function initAudio() {
     if (playback.audio.state === 'suspended') playback.audio.resume();
 }
 
-/**
- * Diagnostic: Monitors the master limiter's gain reduction.
- */
-export function monitorMasterLimiter() {
-    const { playback } = getState();
-    if (playback.masterLimiter && playback.masterLimiter.reduction.value < -0.1) {
-        // console.log(`[DSP] Master Limiting: ${playback.masterLimiter.reduction.value.toFixed(2)}dB`);
-    }
-}
-
-/**
- * Diagnostic: Bypasses the visual updates to isolate UI-induced audio glitches.
- */
-window.bypassVisuals = (shouldBypass) => {
-    const { playback } = getState();
-    playback.isDrawing = !shouldBypass;
-    // console.log(`[DSP] Visual Updates ${shouldBypass ? 'DISABLED' : 'ENABLED'}`);
-};
-
-/**
- * Diagnostic: Bypasses the mastering chain (Saturator + Limiter).
- */
-window.bypassMaster = (shouldBypass) => {
-    const { playback } = getState();
-    if (!playback.audio || !playback.masterGain) return;
-    playback.masterGain.disconnect();
-    if (shouldBypass) {
-        playback.masterGain.connect(playback.audio.destination);
-        // console.log("[DSP] Master Chain BYPASSED");
-    } else {
-        playback.masterGain.connect(playback.saturator);
-        // console.log("[DSP] Master Chain ACTIVE");
-    }
-};
-
 export function killChordBus() {
     const { playback } = getState();
     if (playback.chordsGain) {
