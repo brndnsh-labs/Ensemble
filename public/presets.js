@@ -772,7 +772,7 @@ export const CHORD_PRESETS = [
     },
     { 
         name: "Giant Steps", 
-        sections: [{ label: 'Main', value: "Bmaj7 D7 | Gmaj7 Bb7 | Ebmaj7 | Am7 D7 | Gmaj7 Bb7 | Ebmaj7 F#7 | Bmaj7 | Fm7 Bb7 | Ebmaj7 | Am7 D7 | Gmaj7 | C#m7 F#7 | Bmaj7 | Fm7 Bb7 | Ebmaj7 | C#m7 F#7" }], 
+        sections: [{ label: 'Main', value: "Imaj7 bIII7 | bVImaj7 VII7 | IIImaj7 | bviim7 bIII7 | bVImaj7 VII7 | IIImaj7 V7 | Imaj7 | #ivm7 VII7 | IIImaj7 | bviim7 bIII7 | bVImaj7 | iim7 V7 | Imaj7 | #ivm7 VII7 | IIImaj7 | iim7 V7" }], 
         category: "Jazz",
         isMinor: false,
         settings: { bpm: 220, style: 'jazz' }
@@ -780,10 +780,10 @@ export const CHORD_PRESETS = [
     { 
         name: "Ornithology", 
         sections: [
-            { label: 'A', value: "Gmaj7 | Gmaj7 | Gm7 | C7 | Fmaj7 | Fmaj7 | Fm7 | Bb7" },
-            { label: 'A', value: "Gmaj7 | Gmaj7 | Gm7 | C7 | Fmaj7 | Fmaj7 | Fm7 | Bb7" },
-            { label: 'B', value: "Ebmaj7 | Ebmaj7 | Am7b5 | D7b9 | Gm7 | Gm7 | Am7 | D7" },
-            { label: 'A', value: "Gmaj7 | Gmaj7 | Gm7 | C7 | Fm7 | Bb7 | Ebmaj7 D7 | Gmaj7" }
+            { label: 'A', value: "Imaj7 | Imaj7 | im7 | IV7 | bVIImaj7 | bVIImaj7 | bviim7 | bIII7" },
+            { label: 'A', value: "Imaj7 | Imaj7 | im7 | IV7 | bVIImaj7 | bVIImaj7 | bviim7 | bIII7" },
+            { label: 'B', value: "bVImaj7 | bVImaj7 | iim7b5 | V7b9 | im7 | im7 | iim7 | V7" },
+            { label: 'A', value: "Imaj7 | Imaj7 | im7 | IV7 | bviim7 | bIII7 | bVImaj7 V7 | Imaj7" }
         ], 
         category: "Jazz",
         isMinor: false,
@@ -816,10 +816,10 @@ export const CHORD_PRESETS = [
     { 
         name: "Stella by Starlight", 
         sections: [
-            { label: "A", value: "Em7b5 | A7alt | Cm7 | F7 | Fm7 | Bb7 | Ebmaj7 | Ab7" },
-            { label: "B", value: "Bbmaj7 | Em7b5 A7 | Dm7b5 | G7alt | Cm7b5 | F7alt | Bbmaj7 | Fm7 Bb7" },
-            { label: "C", value: "Ebmaj7 | Ab7#11 | Bbmaj7 | Em7b5 A7alt | Dm7b5 | G7alt | Cm7b5 | F7alt" },
-            { label: "D", value: "Bbmaj7 | Em7b5 A7alt | Dm7b5 | G7alt | Cm7b5 | F7alt | Bbmaj7 | Cm7 F7" }
+            { label: "A", value: "#ivm7b5 | VII7alt | iim7 | V7 | vm7 | I7 | IVmaj7 | bVII7" },
+            { label: "B", value: "Imaj7 | #ivm7b5 VII7 | iiim7b5 | VI7alt | iim7b5 | V7alt | Imaj7 | vm7 I7" },
+            { label: "C", value: "IVmaj7 | bVII7#11 | Imaj7 | #ivm7b5 VII7alt | iiim7b5 | VI7alt | iim7b5 | V7alt" },
+            { label: "D", value: "Imaj7 | #ivm7b5 VII7alt | iiim7b5 | VI7alt | iim7b5 | V7alt | Imaj7 | iim7 V7" }
         ],
         category: "Jazz",
         isMinor: false,
@@ -828,13 +828,13 @@ export const CHORD_PRESETS = [
     { 
         name: "All The Things You Are", 
         sections: [
-            { label: "A (Ab)", key: "Ab", value: "Fm7 | Bbm7 | Eb7 | Abmaj7 | Dbmaj7" },
-            { label: "A (C)", key: "C", value: "Dm7 | G7 | Cmaj7", seamless: true },
-            { label: "A2 (Eb)", key: "Eb", value: "Cm7 | Fm7 | Bb7 | Ebmaj7 | Abmaj7" },
-            { label: "A2 (G)", key: "G", value: "Am7 | D7 | Gmaj7", seamless: true },
-            { label: "B (G)", key: "G", value: "Am7 | D7 | Gmaj7 | Gmaj7" },
-            { label: "B (E)", key: "E", value: "F#m7b5 | B7 | Emaj7 | C7+", seamless: true },
-            { label: "A3 (Ab)", key: "Ab", value: "Fm7 | Bbm7 | Eb7 | Abmaj7 | Dbmaj7 | Dbm7 | Cm7 | Bdim7 | Bbm7 | Eb7+ | Abmaj7 | Abmaj7" }
+            { label: "A (Tonic)", value: "vi7 | ii7 | V7 | Imaj7 | IVmaj7" },
+            { label: "A (III)", value: "#ivm7 | VII7 | IIImaj7", seamless: true },
+            { label: "A2 (V)", value: "iiim7 | vi7 | II7 | Vmaj7 | Imaj7" },
+            { label: "A2 (VII)", value: "biim7 | #IV7 | VIImaj7", seamless: true },
+            { label: "B (VII)", value: "biim7 | #IV7 | VIImaj7 | VIImaj7" },
+            { label: "B (#IV)", value: "vm7b5 | I7 | IVmaj7 | II7+", seamless: true },
+            { label: "A3 (Tonic)", value: "vi7 | ii7 | V7 | Imaj7 | IVmaj7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7+ | Imaj7 | Imaj7" }
         ],
         category: "Jazz",
         isMinor: false,
@@ -889,13 +889,13 @@ export const CHORD_PRESETS = [
     {
         name: "Cherokee",
         sections: [
-            { label: "A", key: "Bb", value: "Bbmaj7 | Fm7 Bb7 | Ebmaj7 | Ebm7 Ab7 | Bbmaj7 C7 | Cm7 F7 | Bbmaj7 | Cm7 F7" },
-            { label: "A", key: "Bb", value: "Bbmaj7 | Fm7 Bb7 | Ebmaj7 | Ebm7 Ab7 | Bbmaj7 C7 | Cm7 F7 | Bbmaj7 | Bbmaj7" },
-            { label: "B (B)", key: "B", value: "C#m7 | F#7 | Bmaj7 | Bmaj7" },
-            { label: "B (A)", key: "A", value: "Bm7 | E7 | Amaj7 | Amaj7", seamless: true },
-            { label: "B (G)", key: "G", value: "Am7 | D7 | Gmaj7 | Gmaj7", seamless: true },
-            { label: "B (Bb)", key: "Bb", value: "Gm7 C7 | Cm7 F7", seamless: true },
-            { label: "A", key: "Bb", value: "Bbmaj7 | Fm7 Bb7 | Ebmaj7 | Ebm7 Ab7 | Bbmaj7 C7 | Cm7 F7 | Bbmaj7 | Bbmaj7" }
+            { label: "A", value: "Imaj7 | vm7 I7 | IVmaj7 | ivm7 bVII7 | Imaj7 II7 | iim7 V7 | Imaj7 | iim7 V7" },
+            { label: "A", value: "Imaj7 | vm7 I7 | IVmaj7 | ivm7 bVII7 | Imaj7 II7 | iim7 V7 | Imaj7 | Imaj7" },
+            { label: "B (bII)", value: "biim7 | bVI7 | bIImaj7 | bIImaj7" },
+            { label: "B (VII)", value: "viim7 | III7 | VIImaj7 | VIImaj7", seamless: true },
+            { label: "B (bVI)", value: "bviim7 | bIII7 | bVImaj7 | bVImaj7", seamless: true },
+            { label: "B (I)", value: "vim7 II7 | iim7 V7", seamless: true },
+            { label: "A", value: "Imaj7 | vm7 I7 | IVmaj7 | ivm7 bVII7 | Imaj7 II7 | iim7 V7 | Imaj7 | Imaj7" }
         ],
         category: "Jazz",
         isMinor: false,
@@ -904,9 +904,9 @@ export const CHORD_PRESETS = [
         {
             name: "Blue Bossa",
             sections: [
-                { label: "Main", key: "C", value: "Cm7 | Cm7 | Fm7 | Fm7 | Dm7b5 | G7alt | Cm7 | Cm7" },
-                { label: "Modulation", key: "Db", value: "Ebm7 | Ab7 | Dbmaj7 | Dbmaj7" },
-                { label: "Turnaround", key: "C", value: "Dm7b5 | G7alt | Cm7 | Dm7b5 G7alt" }
+                { label: "Main", value: "im7 | im7 | ivm7 | ivm7 | iim7b5 | V7alt | im7 | im7" },
+                { label: "Modulation", value: "biim7 | bVI7 | bIImaj7 | bIImaj7" },
+                { label: "Turnaround", value: "iim7b5 | V7alt | im7 | iim7b5 V7alt" }
             ],
             category: "Jazz",
             isMinor: true,
