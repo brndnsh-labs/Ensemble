@@ -42,6 +42,9 @@ export function togglePlay(viz, fromDispatch = false) {
 
     if (isStopping) {
         if (!fromDispatch) playback.isPlaying = false;
+        if (playback.autoIntensity) {
+            conductorState.target = 0.35;
+        }
         stopWorker();
         lockAudio();
         deactivateWakeLock();
@@ -75,6 +78,10 @@ export function togglePlay(viz, fromDispatch = false) {
             playback.sessionStartTime = performance.now();
         }
         
+        if (playback.autoIntensity) {
+            conductorState.target = 0.35;
+        }
+
         playback.step = 0;
         isResolutionTriggered = false;
         chords.scheduledChordIndex = 0;

@@ -138,6 +138,9 @@ export function playbackReducer(action, payload) {
             if (playback.isPlaying) {
                 playback.sessionStartTime = performance.now();
             }
+            if (playback.autoIntensity) {
+                playback.bandIntensity = 0.35;
+            }
             return true;
         case ACTIONS.SET_BPM:
             playback.bpm = Math.max(40, Math.min(240, parseInt(payload)));

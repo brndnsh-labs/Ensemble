@@ -6,7 +6,7 @@ import { generateProceduralFill } from './fills.js';
 import { triggerFlash } from './ui.js';
 
 export const conductorState = { 
-    target: 0.5, 
+    target: 0.35, 
     stepSize: 0.0005,
     loopCount: 0,
     formIteration: 0, // Tracks how many times the ENTIRE song has looped
