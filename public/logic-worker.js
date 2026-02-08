@@ -126,6 +126,19 @@ export function getChordAtStep(step, cursor = null) {
     let currentLastSectionIndex = cursor ? cursor.sectionIndex : lastSectionIndex;
     let currentLastChordIndex = cursor ? cursor.index : lastChordIndex;
 
+    // Reset cursors if targetStep is before our current position (looping back)
+    const lastStep = arranger.stepMap[currentLastChordIndex]?.start || 0;
+    if (targetStep < lastStep) {
+        currentLastSectionIndex = 0;
+        currentLastChordIndex = 0;
+        
+        // Also reset global state if not using a custom cursor
+        if (!cursor) {
+            lastSectionIndex = 0;
+            lastChordIndex = 0;
+        }
+    }
+
     let sectionData = null;
     if (arranger.sectionMap) {
         let startI = 0;

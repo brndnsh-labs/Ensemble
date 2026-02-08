@@ -9,7 +9,8 @@ import { ACTIONS } from '../types.js';
  * @property {number} octave - Base MIDI octave for voicing.
  * @property {string} density - Voicing density ('thin', 'standard', 'rich').
  * @property {boolean} pianoRoots - Whether the piano should play roots even if bass is enabled.
- * @property {number|null} lastActiveChordIndex - Index of the currently playing chord.
+ * @property {number|null} lastActiveChordIndex - Index of the currently playing chord (UI).
+ * @property {number|null} scheduledChordIndex - Index of the last scheduled chord (Internal).
  * @property {Map<number, Object>} buffer - Scheduled notes buffer.
  * @property {number} rhythmicMask - 16-bit mask of the current comping pattern.
  * @property {string} activeTab - Currently active UI tab ('classic' or 'smart').
@@ -23,6 +24,7 @@ export const chords = {
     density: 'standard', 
     pianoRoots: false,
     lastActiveChordIndex: null,
+    scheduledChordIndex: null,
     buffer: new Map(),
     rhythmicMask: 0,
     activeTab: 'smart'

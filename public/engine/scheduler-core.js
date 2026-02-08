@@ -48,6 +48,7 @@ export function togglePlay(viz, fromDispatch = false) {
         playback.drawQueue = [];
         playback.lastActiveDrumElements = null;
         chords.lastActiveChordIndex = null;
+        chords.scheduledChordIndex = null;
         if (activeViz) activeViz.clear();
         dispatch('VIS_RESET');
         killAllNotes();
@@ -76,6 +77,7 @@ export function togglePlay(viz, fromDispatch = false) {
         
         playback.step = 0;
         isResolutionTriggered = false;
+        chords.scheduledChordIndex = 0;
         dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
         dispatch(ACTIONS.SET_ENDING_PENDING, false);
         syncWorker(); 
@@ -302,12 +304,21 @@ function advanceGlobalStep() {
 }
 
 function getChordAtStep(step) {
-    const { arranger } = getState();
+    const { arranger, chords } = getState();
     if (arranger.totalSteps === 0) return null;
     const targetStep = step % arranger.totalSteps;
-    for (let i = 0; i < arranger.stepMap.length; i++) {
+
+    // Reset cursor if we are looping back
+    const lastStep = arranger.stepMap[chords.scheduledChordIndex || 0]?.start || 0;
+    if (targetStep < lastStep) {
+        chords.scheduledChordIndex = 0;
+    }
+
+    const startI = chords.scheduledChordIndex || 0;
+    for (let i = startI; i < arranger.stepMap.length; i++) {
         const entry = arranger.stepMap[i];
         if (targetStep >= entry.start && targetStep < entry.end) {
+            chords.scheduledChordIndex = i;
             return { chord: entry.chord, stepInChord: targetStep - entry.start, chordIndex: i };
         }
     }

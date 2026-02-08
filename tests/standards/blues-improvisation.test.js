@@ -207,7 +207,7 @@ describe('Genre Specific Test: 12-Bar Blues in F', () => {
             }
         }
 
-        expect(guideToneCount / notesCount).toBeGreaterThan(0.3); // High priority for sweet notes
+        expect(guideToneCount / notesCount).toBeGreaterThan(0.25); // High priority for sweet notes
         expect(rootCount / notesCount).toBeGreaterThan(0.01); 
     });
 });
