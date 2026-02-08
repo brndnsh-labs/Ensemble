@@ -80,4 +80,13 @@ describe('Settings Accessibility', () => {
         expect(velocitySlider.hasAttribute('aria-valuetext')).toBe(true);
         expect(velocitySlider.getAttribute('aria-valuetext')).toMatch(/\d+\.\d+x/);
     });
+
+    it('should have aria-valuetext on Master Volume slider', () => {
+        const masterVol = document.getElementById('masterVolume');
+        expect(masterVol).not.toBeNull();
+
+        // Should be formatted as percentage
+        expect(masterVol.hasAttribute('aria-valuetext')).toBe(true);
+        expect(masterVol.getAttribute('aria-valuetext')).toMatch(/^\d+%$/);
+    });
 });

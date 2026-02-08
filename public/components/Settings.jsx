@@ -179,6 +179,7 @@ export function Settings() {
                                 onInput={handleMasterVolume}
                                 style="width: 100%;" 
                                 aria-label="Master Volume"
+                                aria-valuetext={`${Math.round((masterVolume || 0.5) * 100)}%`}
                             />
                         </div>
 
