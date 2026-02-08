@@ -16,7 +16,12 @@ vi.mock('../../public/persistence.js', () => ({
 vi.mock('../../public/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
     onSectionDelete: vi.fn(),
-    onSectionDuplicate: vi.fn()
+    onSectionDuplicate: vi.fn(),
+    saveProgression: vi.fn(),
+    addSection: vi.fn(),
+    refreshArrangerUI: vi.fn(),
+    clearChordPresetHighlight: vi.fn(),
+    validateAndAnalyze: vi.fn()
 }));
 
 describe('Arranger Grouping Logic', () => {

@@ -18,12 +18,21 @@ vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn()
 }));
 vi.mock('../../public/instrument-controller.js', () => ({
-    clearDrumPresetHighlight: vi.fn()
+    clearDrumPresetHighlight: vi.fn(),
+    saveDrumPreset: vi.fn(),
+    togglePower: vi.fn(),
+    updateMeasures: vi.fn(),
+    cloneMeasure: vi.fn()
 }));
 vi.mock('../../public/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
     onSectionDelete: vi.fn(),
-    onSectionDuplicate: vi.fn()
+    onSectionDuplicate: vi.fn(),
+    saveProgression: vi.fn(),
+    addSection: vi.fn(),
+    refreshArrangerUI: vi.fn(),
+    clearChordPresetHighlight: vi.fn(),
+    validateAndAnalyze: vi.fn()
 }));
 
 describe('UI Layout Integrity', () => {

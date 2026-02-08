@@ -59,7 +59,8 @@ vi.mock('../../../public/persistence.js', () => ({
 vi.mock('../../../public/instrument-controller.js', () => ({
     togglePower: vi.fn(),
     updateMeasures: vi.fn(),
-    cloneMeasure: vi.fn()
+    cloneMeasure: vi.fn(),
+    saveDrumPreset: vi.fn()
 }));
 
 // Mock child components to simplify testing

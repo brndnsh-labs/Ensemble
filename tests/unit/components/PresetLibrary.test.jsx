@@ -42,12 +42,14 @@ vi.mock('../../../public/utils.js', () => ({
 vi.mock('../../../public/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     flushBuffers: vi.fn(),
-    switchMeasure: vi.fn()
+    switchMeasure: vi.fn(),
+    saveDrumPreset: vi.fn()
 }));
 
 vi.mock('../../../public/arranger-controller.js', () => ({
     validateAndAnalyze: vi.fn(),
-    clearChordPresetHighlight: vi.fn() // We mock it to verify calls if needed, though we test Reactivity
+    clearChordPresetHighlight: vi.fn(), // We mock it to verify calls if needed, though we test Reactivity
+    saveProgression: vi.fn()
 }));
 
 vi.mock('../../../public/persistence.js', () => ({
