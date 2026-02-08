@@ -5,7 +5,7 @@ import { flushBuffers } from './instrument-controller.js';
 import { restoreGains } from './engine/engine.js';
 import { syncWorker } from './worker-client.js';
 import { saveCurrentState } from './persistence.js';
-import { generateId, normalizeKey } from './utils.js';
+import { generateId, normalizeKey, compressSections } from './utils.js';
 import { pushHistory } from './history.js';
 import { analyzeForm } from './form-analysis.js';
 import { conductorState } from './conductor.js';
@@ -17,6 +17,25 @@ export function analyzeFormUI() {
         conductorState.form = form;
         // console.log(`Analyzed Form: ${form.sequence}`, form.sections);
     }
+}
+
+export function saveProgression() {
+    const { arranger } = getState();
+    const name = prompt("Name your chord progression:", arranger.lastChordPreset || "My Progression");
+    if (!name) return;
+
+    const userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
+    const newPreset = {
+        name: name.substring(0, 32),
+        sections: compressSections(arranger.sections),
+        isMinor: arranger.isMinor,
+        timestamp: Date.now()
+    };
+
+    userPresets.push(newPreset);
+    localStorage.setItem('ensemble_userPresets', JSON.stringify(userPresets));
+    window.dispatchEvent(new Event('storage_sync'));
+    showToast(`Saved "${name}" to library`);
 }
 
 export function validateAndAnalyze() {

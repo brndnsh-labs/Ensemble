@@ -56,6 +56,30 @@ export function loadDrumPreset(name) {
     dispatch('DRUM_PRESET_LOADED');
 }
 
+export function saveDrumPreset() {
+    const { groove } = getState();
+    const name = prompt("Name your drum pattern:", groove.lastDrumPreset || "My Pattern");
+    if (!name) return;
+
+    const userPresets = JSON.parse(localStorage.getItem('ensemble_userDrumPresets') || '[]');
+    const newPreset = {
+        name: name.substring(0, 32),
+        measures: groove.measures,
+        swing: groove.swing,
+        swingSub: groove.swingSub,
+        pattern: groove.instruments.map(inst => ({
+            name: inst.name,
+            steps: [...inst.steps]
+        })),
+        timestamp: Date.now()
+    };
+
+    userPresets.push(newPreset);
+    localStorage.setItem('ensemble_userDrumPresets', JSON.stringify(userPresets));
+    window.dispatchEvent(new Event('storage_sync'));
+    showToast(`Saved "${name}" to drum library`);
+}
+
 export function cloneMeasure() {
     const { groove, arranger } = getState();
     const spm = getStepsPerMeasure(arranger.timeSignature);

@@ -5,7 +5,7 @@ import { ACTIONS } from '../types.js';
 import { dispatch } from '../state.js';
 import { syncWorker } from '../worker-client.js';
 import { saveCurrentState } from '../persistence.js';
-import { togglePower, updateMeasures, cloneMeasure } from '../instrument-controller.js';
+import { togglePower, updateMeasures, cloneMeasure, saveDrumPreset } from '../instrument-controller.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { SequencerGrid } from './SequencerGrid.jsx';
@@ -61,7 +61,6 @@ export function GroovePanel({ isActiveMobile }) {
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8;">Style</label>
                     <PresetLibrary type="drum" />
-                    <div class="presets-container" id="userDrumPresetsContainer" style="border-top: 1px solid #334155; padding-top: 0.5rem; display: none;"></div>
                 </div>
                 <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin-bottom: 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -79,7 +78,10 @@ export function GroovePanel({ isActiveMobile }) {
                         </select>
                     </div>
                     <div id="measurePagination" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; align-items: center;"></div>
-                    <button id="cloneMeasureBtn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; margin-bottom: 1rem;" onClick={cloneMeasure}>⧉ Copy to All</button>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <button id="cloneMeasureBtn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; flex: 1;" onClick={cloneMeasure}>⧉ Copy to All</button>
+                        <button id="saveDrumBtn" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; flex: 1;" onClick={saveDrumPreset}>💾 Save Pattern</button>
+                    </div>
                     <div className="sequencer-grid" id="sequencerGrid">
                         <SequencerGrid />
                     </div>

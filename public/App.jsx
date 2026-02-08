@@ -91,7 +91,6 @@ function ArrangerPanel() {
             <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.5rem; min-height: 100px;">
                 <label class="library-label">Library</label>
                 <PresetLibrary type="chord" />
-                <div class="presets-container" id="userPresetsContainer" style="border-top: 1px solid #334155; padding-top: 0.5rem; display: none;"></div>
             </div>
         </div>
     );

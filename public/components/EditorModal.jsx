@@ -8,7 +8,7 @@ const { arranger } = getState();
 import { ACTIONS } from '../types.js';
 import { generateId } from '../utils.js';
 import { mutateProgression } from '../chords.js';
-import { addSection, refreshArrangerUI, clearChordPresetHighlight, validateAndAnalyze } from '../arranger-controller.js';
+import { addSection, refreshArrangerUI, clearChordPresetHighlight, validateAndAnalyze, saveProgression } from '../arranger-controller.js';
 import { undo, pushHistory } from '../history.js';
 import { shareProgression } from '../sharing.js';
 
@@ -104,6 +104,11 @@ export function EditorModal() {
         clearChordPresetHighlight();
     };
 
+    const handleSave = () => {
+        setIsMenuOpen(false);
+        saveProgression();
+    };
+
     const handleShare = () => {
         setIsMenuOpen(false);
         shareProgression();
@@ -152,6 +157,7 @@ export function EditorModal() {
                             <button id="randomizeBtn" title="Randomize Progression" aria-label="Randomize Progression" onClick={handleRandomize}>🎲 <span>Random</span></button>
                             <button id="mutateBtn" title="Mutate Progression" aria-label="Mutate Progression" onClick={handleMutate}>✨ <span>Mutate</span></button>
                             <button id="undoBtn" title="Undo Last Change" aria-label="Undo Last Change" onClick={handleUndo}>↩️ <span>Undo</span></button>
+                            <button id="saveBtn" title="Save to Library" aria-label="Save Progression" onClick={handleSave}>💾 <span>Save</span></button>
                             <button id="clearProgBtn" title="Clear Progression" aria-label="Clear Progression" onClick={handleClear}>🗑️ <span>Clear</span></button>
                             <button id="shareBtn" title="Share Progression" aria-label="Share Progression" onClick={handleShare}>🔗 <span>Share</span></button>
                         </div>
