@@ -6,6 +6,20 @@ import { TIME_SIGNATURES, KEY_ORDER } from './config.js';
 import { CHORD_STYLES, SMART_GENRES } from './presets.js';
 
 /**
+ * Helper to safely clamp numeric values from storage.
+ * @param {*} val - The value to check.
+ * @param {number} min - Minimum allowed value.
+ * @param {number} max - Maximum allowed value.
+ * @param {number} defaultVal - Default if invalid.
+ * @returns {number}
+ */
+const clamp = (val, min, max, defaultVal) => {
+    const num = parseFloat(val);
+    if (isNaN(num)) return defaultVal;
+    return Math.min(Math.max(min, num), max);
+};
+
+/**
  * Validates and sanitizes sections array from untrusted source.
  * @param {Array} sections
  * @returns {Array}
@@ -80,15 +94,15 @@ export function hydrateState() {
 
         Object.assign(playback, {
             theme: savedState.theme || 'auto',
-            bpm: Math.min(Math.max(20, Number(savedState.bpm) || 100), 300),
-            bandIntensity: savedState.bandIntensity !== undefined ? Math.min(Math.max(0, Number(savedState.bandIntensity) || 0), 1) : 0.35,
-            complexity: savedState.complexity !== undefined ? Math.min(Math.max(0, Number(savedState.complexity) || 0), 1) : 0.3,
+            bpm: clamp(savedState.bpm, 20, 300, 100),
+            bandIntensity: clamp(savedState.bandIntensity, 0, 1, 0.35),
+            complexity: clamp(savedState.complexity, 0, 1, 0.3),
             autoIntensity: true,
             metronome: false,
             visualFlash: savedState.visualFlash !== undefined ? savedState.visualFlash : false,
             haptic: savedState.haptic !== undefined ? savedState.haptic : false,
             countIn: savedState.countIn !== undefined ? savedState.countIn : true,
-            sessionTimer: savedState.sessionTimer !== undefined ? savedState.sessionTimer : 5,
+            sessionTimer: clamp(savedState.sessionTimer, 0, 60, 5),
             applyPresetSettings: savedState.applyPresetSettings !== undefined ? savedState.applyPresetSettings : false,
             stopAtEnd: false
         });
@@ -100,10 +114,10 @@ export function hydrateState() {
                 enabled: savedState.chords.enabled !== undefined ? savedState.chords.enabled : true,
                 style: savedState.chords.style || 'smart',
                 instrument: 'Piano',
-                octave: savedState.chords.octave,
+                octave: clamp(savedState.chords.octave, 0, 127, 48), // Reasonable MIDI range
                 density: savedState.chords.density,
-                volume: savedState.chords.volume !== undefined ? savedState.chords.volume : 0.5,
-                reverb: savedState.chords.reverb !== undefined ? savedState.chords.reverb : 0.3,
+                volume: clamp(savedState.chords.volume, 0, 1, 0.5),
+                reverb: clamp(savedState.chords.reverb, 0, 1, 0.3),
                 pianoRoots: savedState.chords.pianoRoots || false,
                 activeTab: savedState.chords.activeTab || 'smart'
             });
@@ -112,9 +126,9 @@ export function hydrateState() {
             Object.assign(bass, {
                 enabled: savedState.bass.enabled !== undefined ? savedState.bass.enabled : true,
                 style: savedState.bass.style || 'smart',
-                octave: savedState.bass.octave,
-                volume: savedState.bass.volume !== undefined ? savedState.bass.volume : 0.45,
-                reverb: savedState.bass.reverb !== undefined ? savedState.bass.reverb : 0.05,
+                octave: clamp(savedState.bass.octave, 0, 127, 36),
+                volume: clamp(savedState.bass.volume, 0, 1, 0.45),
+                reverb: clamp(savedState.bass.reverb, 0, 1, 0.05),
                 activeTab: savedState.bass.activeTab || 'smart'
             });
         }
@@ -123,9 +137,9 @@ export function hydrateState() {
                 enabled: savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
                 style: savedState.soloist.style || 'smart',
                 preset: savedState.soloist.preset || 'neo',
-                octave: (savedState.soloist.octave === 77 || savedState.soloist.octave === 67 || savedState.soloist.octave === undefined) ? 72 : savedState.soloist.octave,
-                volume: savedState.soloist.volume !== undefined ? savedState.soloist.volume : 0.5,
-                reverb: savedState.soloist.reverb !== undefined ? savedState.soloist.reverb : 0.6,
+                octave: (savedState.soloist.octave === 77 || savedState.soloist.octave === 67 || savedState.soloist.octave === undefined) ? 72 : clamp(savedState.soloist.octave, 0, 127, 72),
+                volume: clamp(savedState.soloist.volume, 0, 1, 0.5),
+                reverb: clamp(savedState.soloist.reverb, 0, 1, 0.6),
                 doubleStops: savedState.soloist.doubleStops !== undefined ? savedState.soloist.doubleStops : false,
                 activeTab: savedState.soloist.activeTab || 'smart'
             });
@@ -134,27 +148,27 @@ export function hydrateState() {
             Object.assign(harmony, {
                 enabled: savedState.harmony.enabled !== undefined ? savedState.harmony.enabled : false,
                 style: savedState.harmony.style || 'smart',
-                octave: savedState.harmony.octave || 60,
-                volume: savedState.harmony.volume !== undefined ? savedState.harmony.volume : 0.4,
-                reverb: savedState.harmony.reverb !== undefined ? savedState.harmony.reverb : 0.4,
-                complexity: savedState.harmony.complexity !== undefined ? savedState.harmony.complexity : 0.5,
+                octave: clamp(savedState.harmony.octave, 0, 127, 60),
+                volume: clamp(savedState.harmony.volume, 0, 1, 0.4),
+                reverb: clamp(savedState.harmony.reverb, 0, 1, 0.4),
+                complexity: clamp(savedState.harmony.complexity, 0, 1, 0.5),
                 activeTab: savedState.harmony.activeTab || 'smart'
             });
         }
         if (savedState.groove) { 
             Object.assign(groove, {
                 enabled: savedState.groove.enabled !== undefined ? savedState.groove.enabled : true,
-                volume: savedState.groove.volume !== undefined ? savedState.groove.volume : 0.5,
-                reverb: savedState.groove.reverb !== undefined ? savedState.groove.reverb : 0.2,
-                swing: savedState.groove.swing,
+                volume: clamp(savedState.groove.volume, 0, 1, 0.5),
+                reverb: clamp(savedState.groove.reverb, 0, 1, 0.2),
+                swing: clamp(savedState.groove.swing, 0, 100, 0),
                 swingSub: savedState.groove.swingSub,
-                measures: savedState.groove.measures || 1,
-                humanize: savedState.groove.humanize !== undefined ? savedState.groove.humanize : 20,
+                measures: clamp(savedState.groove.measures, 1, 8, 1),
+                humanize: clamp(savedState.groove.humanize, 0, 100, 20),
                 followPlayback: savedState.groove.followPlayback !== undefined ? savedState.groove.followPlayback : (savedState.groove.autoFollow !== undefined ? savedState.groove.autoFollow : true),
                 lastDrumPreset: savedState.groove.lastDrumPreset || 'Basic Rock',
                 genreFeel: (savedState.groove.genreFeel && SMART_GENRES[savedState.groove.genreFeel]) ? savedState.groove.genreFeel : 'Rock',
                 larsMode: savedState.groove.larsMode || false,
-                larsIntensity: savedState.groove.larsIntensity !== undefined ? Math.min(Math.max(0, Number(savedState.groove.larsIntensity) || 0), 1) : 0.5,
+                larsIntensity: clamp(savedState.groove.larsIntensity, 0, 1, 0.5),
                 lastSmartGenre: savedState.groove.lastSmartGenre || 'Rock',
                 activeTab: savedState.groove.activeTab || 'smart',
                 mobileTab: savedState.groove.mobileTab || 'chords',
