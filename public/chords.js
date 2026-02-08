@@ -363,8 +363,20 @@ export function resolveChordRoot(part, keyRootMidi, baseOctave) {
  * Omits root and often the 5th to focus on 3rd, 7th, and extensions.
  */
 function getRootlessVoicing(quality, is7th, isRich) {
-    const { groove } = getState();
+    const { groove, playback } = getState();
     const genre = groove.genreFeel;
+    const intensity = playback.bandIntensity;
+
+    // JAZZ BLOCK CHORDS (Red Garland Style)
+    // Triggered at high intensity in Jazz genre
+    if (genre === 'Jazz' && intensity > 0.7) {
+        // Red Garland: 1-5-8 in RH, 3-7 in LH (Shell)
+        // Expressed as intervals: [3, 10, 12, 19, 24] (m7) or [4, 11, 12, 19, 24] (maj7)
+        if (quality === 'minor') return [3, 10, 12, 19, 24];
+        if (quality === 'maj7' || quality === 'major') return [4, 11, 12, 19, 24];
+        if (quality === '7' || quality === '9') return [4, 10, 12, 19, 24];
+    }
+
     // Basic types
     const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
     const isDominant = !isMinor && !['dim', 'halfdim'].includes(quality) && (is7th || ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) || quality.startsWith('7'));
@@ -381,10 +393,12 @@ function getRootlessVoicing(quality, is7th, isRich) {
     }
 
     if (isMinor) {
-        // Neo-Soul Quartal / So-What Voicings
+        // Neo-Soul Quartal / Clusters
         if (genre === 'Neo-Soul' && quality === 'minor' && is7th) {
             // Modern quartal stacks: 4, b7, b3, 5, (9)
-            return isRich ? [5, 10, 15, 19, 26] : [5, 10, 15, 19]; 
+            // Added Clusters: 2nd + b3rd (2, 3) for that "crunch"
+            if (isRich || intensity > 0.6) return [2, 3, 5, 10, 15, 19];
+            return [5, 10, 15, 19]; 
         }
         if (quality === 'm13') return isRich ? [3, 10, 14, 17, 21] : [3, 10, 14, 21]; // b3, b7, 9, (11), 13
         if (quality === 'm11') return isRich ? [3, 10, 14, 17] : [3, 10, 17]; // b3, (b7), 11
