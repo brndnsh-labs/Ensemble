@@ -91,6 +91,7 @@ export function InstrumentSettings({ module }) {
                                 saveCurrentState();
                             }}
                             aria-label="Harmony Complexity" 
+                            aria-valuetext={`${Math.round((state.complexity || 0.5) * 100)}%`}
                         />
                     </div>
                 )}
@@ -152,6 +153,7 @@ export function InstrumentSettings({ module }) {
                         value={state.volume} 
                         onInput={(e) => updateAudio('volume', e.target.value)}
                         aria-label={`${module} Volume`} 
+                        aria-valuetext={`${Math.round(state.volume * 100)}%`}
                         style="width: 100%;"
                     />
                 </div>
@@ -169,6 +171,7 @@ export function InstrumentSettings({ module }) {
                         value={state.reverb} 
                         onInput={(e) => updateAudio('reverb', e.target.value)}
                         aria-label={`${module} Reverb`} 
+                        aria-valuetext={`${Math.round(state.reverb * 100)}%`}
                         style="width: 100%;"
                     />
                 </div>
@@ -200,6 +203,7 @@ function GrooveControls({ state }) {
                         }}
                         style="flex-grow: 1; height: 4px;" 
                         aria-label="Swing Amount" 
+                        aria-valuetext={`${swing || 0}%`}
                     />
                     <select 
                         id="swingBaseSelect"
@@ -232,6 +236,7 @@ function GrooveControls({ state }) {
                     }}
                     style="width: 100%; height: 4px;" 
                     aria-label="Humanize Amount" 
+                    aria-valuetext={`${state.humanize || 0}%`}
                 />
             </div>
             <div style="margin-bottom: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
@@ -267,6 +272,7 @@ function GrooveControls({ state }) {
                         }}
                         style="width: 100%; height: 4px;" 
                         aria-label="Lars Mode Intensity" 
+                        aria-valuetext={`${Math.round(state.larsIntensity * 100)}%`}
                     />
                 </div>
             </div>

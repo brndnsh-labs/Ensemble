@@ -88,6 +88,13 @@ describe('InstrumentSettings Component', () => {
 
         expect(spanTexts).toContain('80%');
         expect(spanTexts).toContain('20%');
+
+        // Verify accessibility attributes
+        expect(volumeSlider.hasAttribute('aria-valuetext')).toBe(true);
+        expect(volumeSlider.getAttribute('aria-valuetext')).toBe('80%');
+
+        expect(reverbSlider.hasAttribute('aria-valuetext')).toBe(true);
+        expect(reverbSlider.getAttribute('aria-valuetext')).toBe('20%');
     });
 
     it('should render Swing and Humanize sliders for groove module', () => {
@@ -127,5 +134,18 @@ describe('InstrumentSettings Component', () => {
 
         expect(spanTexts).toContain('30%');
         expect(spanTexts).toContain('40%');
+
+        // Verify accessibility attributes
+        expect(swingSlider.hasAttribute('aria-valuetext')).toBe(true);
+        expect(swingSlider.getAttribute('aria-valuetext')).toBe('30%');
+
+        expect(humanizeSlider.hasAttribute('aria-valuetext')).toBe(true);
+        expect(humanizeSlider.getAttribute('aria-valuetext')).toBe('40%');
+
+        const larsSlider = container.querySelector('#larsIntensitySlider');
+        expect(larsSlider).not.toBeNull();
+        expect(larsSlider.hasAttribute('aria-valuetext')).toBe(true);
+        // larsIntensity is 0.5, so 50%
+        expect(larsSlider.getAttribute('aria-valuetext')).toBe('50%');
     });
 });
