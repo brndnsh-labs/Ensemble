@@ -52,6 +52,31 @@ class RingBuffer {
             yield this.at(i);
         }
     }
+
+    /**
+     * Optimized iteration that avoids modulo operations per element.
+     * @param {function(item, index): boolean|void} callback - Return false to break loop
+     */
+    forEach(callback) {
+        const buffer = this.buffer;
+        const capacity = this.capacity;
+        const count = this.count;
+        const start = this.start;
+
+        // Loop 1: start to end of buffer (or count if no wrap)
+        const headLength = Math.min(count, capacity - start);
+        for (let i = 0; i < headLength; i++) {
+             if (callback(buffer[start + i], i) === false) return;
+        }
+
+        // Loop 2: wrapped part
+        if (headLength < count) {
+            const tailLength = count - headLength;
+            for (let i = 0; i < tailLength; i++) {
+                if (callback(buffer[i], headLength + i) === false) return;
+            }
+        }
+    }
 }
 
 export class UnifiedVisualizer {
@@ -429,11 +454,11 @@ export class UnifiedVisualizer {
         for (const name in this.tracks) {
             const track = this.tracks[name];
             let color = track.resolvedColor || track.color;
-            for (const ev of track.history) {
+            track.history.forEach((ev) => {
                  if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
                      this.activeNoteColors[ev.midi] = color;
                  }
-            }
+            });
         }
 
         // --- Piano Roll Layer (Active Overlays) ---
@@ -606,10 +631,10 @@ export class UnifiedVisualizer {
             if (name === 'drums') {
                 ctx.fillStyle = track.resolvedColor || track.color;
                 ctx.beginPath();
-                for (const ev of track.history) {
+                track.history.forEach((ev) => {
                     const noteEnd = ev.time + (ev.duration || 0.1);
-                    if (noteEnd < minTime) continue;
-                    if (ev.time > currentTime) break;
+                    if (noteEnd < minTime) return;
+                    if (ev.time > currentTime) return false;
 
                     const x = getX(ev.time);
                     const y = Math.round(getY(ev.midi));
@@ -620,7 +645,7 @@ export class UnifiedVisualizer {
                     ctx.lineTo(x + 4 * intensity, y);
                     ctx.lineTo(x, y + 6 * intensity);
                     ctx.lineTo(x - 4 * intensity, y);
-                }
+                });
                 ctx.fill();
                 continue;
             }
@@ -633,11 +658,10 @@ export class UnifiedVisualizer {
 
             // Pass 0: Compute Geometry
             // Optimization: Calculate coordinates once per frame per track
-            for (let i = 0; i < track.history.length; i++) {
-                const ev = track.history.at(i);
+            track.history.forEach((ev, i) => {
                 const noteEnd = ev.time + (ev.duration || 0.25);
-                if (noteEnd < minTime) continue;
-                if (ev.time > currentTime) break;
+                if (noteEnd < minTime) return;
+                if (ev.time > currentTime) return false;
 
                 const startT = Math.max(minTime, ev.time);
                 const endT = Math.min(currentTime, noteEnd);
@@ -663,7 +687,7 @@ export class UnifiedVisualizer {
                         }
                     }
                 }
-            }
+            });
 
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
