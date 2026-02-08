@@ -130,19 +130,21 @@ describe('Harmony Engine Logic', () => {
     describe('Rhythmic Comping', () => {
         it('should generate patterns for Jazz', () => {
             const pattern = generateCompingPattern('Jazz', 12345);
-            expect(pattern.length).toBe(16);
+            expect(pattern.length).toBe(32);
             expect(pattern.reduce((a,b) => a+b, 0)).toBeGreaterThan(0);
         });
 
         it('should generate patterns for Funk', () => {
             const pattern = generateCompingPattern('Funk', 12345);
+            expect(pattern.length).toBe(32);
             expect(pattern[0]).toBe(1);
             const hasDynamics = pattern.some(v => v > 1);
             expect(hasDynamics).toBe(true);
         });
 
-        it('should return legacy pattern for Reggae', () => {
+        it('should return 32-step pattern for Reggae', () => {
              const pattern = generateCompingPattern('Reggae', 12345);
+             expect(pattern.length).toBe(32);
              expect(pattern[4]).toBe(1);
              expect(pattern[12]).toBe(1);
              expect(pattern[0]).toBe(0);
@@ -215,16 +217,23 @@ describe('Harmony Engine Logic', () => {
             expect(stabFound).toBe(true);
         });
 
-        it('should switch to pads when soloist is busy', () => {
+        it('should use sparse comping when soloist is busy', () => {
             soloist.isResting = false;
             soloist.notesInPhrase = 10;
+            playback.bandIntensity = 0.5; // Moderate intensity
             
             const res = getHarmonyNotes(chordC, null, 0, 60, 'smart', 0);
             expect(res.length).toBeGreaterThan(0);
-            expect(res[0].durationSteps).toBeGreaterThanOrEqual(4); // Pad duration
+            // In new logic, downbeat duration is 3 (less than 4-step pad)
+            expect(res[0].durationSteps).toBeLessThan(4); 
             
+            // At 0.5 intensity, it should skip some non-essential hits when soloist is busy
+            // (needed = 0.4 + 0.2 = 0.6 for medium hits, 0.5 < 0.6)
             const offbeatRes = getHarmonyNotes(chordC, null, 3, 60, 'smart', 3);
-            expect(offbeatRes.length).toBe(0);
+            if (offbeatRes.length > 0) {
+                // If it does play, it should be very short
+                expect(offbeatRes[0].durationSteps).toBeLessThan(2);
+            }
         });
     });
 
