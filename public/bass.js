@@ -23,7 +23,8 @@ export function isBassActive(style, step, stepInChord) {
         const mapping = { 
             'Rock': 'rock', 'Jazz': 'quarter', 'Funk': 'funk', 'Disco': 'disco', 
             'Reggae': 'dub', 'Neo-Soul': 'neo', 'Bossa Nova': 'bossa',
-            'Afrobeat': 'funk', 'Blues': 'quarter', 'Acoustic': 'rock', 'Country': 'country', 'Metal': 'metal'
+            'Afrobeat': 'funk', 'Blues': 'quarter', 'Acoustic': 'rock', 'Country': 'country', 'Metal': 'metal',
+            'Ska-Punk': 'walking-ska', 'Ska': 'walking-ska'
         };
         style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
     }
@@ -91,6 +92,10 @@ export function isBassActive(style, step, stepInChord) {
         const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
         return step % (ts.stepsPerBeat / 2) === 0; // 8ths
     }
+    if (style === 'walking-ska') {
+        const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        return step % (ts.stepsPerBeat / 2) === 0; // 8th notes
+    }
 
     return false;
 }
@@ -104,7 +109,7 @@ export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMid
             'Rock': 'rock', 'Jazz': 'quarter', 'Funk': 'funk', 'Disco': 'disco', 
             'Reggae': 'dub', 'Neo-Soul': 'neo', 'Bossa Nova': 'bossa', 
             'Country': 'country', 'Metal': 'metal', 'Afrobeat': 'funk', 
-            'Blues': 'quarter', 'Acoustic': 'rock' 
+            'Blues': 'quarter', 'Acoustic': 'rock', 'Ska-Punk': 'walking-ska', 'Ska': 'walking-ska' 
         };
         style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
     }
@@ -237,7 +242,7 @@ export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMid
             else if (style === 'arp') durationSteps = (ts.stepsPerBeat);
             else if (style === 'rock') durationSteps = (ts.stepsPerBeat * 0.45);
             else if (style === 'funk') durationSteps = 0.8;
-            else if (style === 'disco' || style === 'rocco' || style === 'metal' || style === 'neo') durationSteps = 0.8;
+            else if (style === 'disco' || style === 'rocco' || style === 'metal' || style === 'neo' || style === 'walking-ska') durationSteps = 0.8;
             else durationSteps = ts.stepsPerBeat;
         }
 
@@ -586,6 +591,38 @@ export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMid
             return result(getFrequency(clampAndNormalize(deepRoot + interval)), dur, tunedVel * (0.95 + Math.random() * 0.1));
         }
         return null;
+    }
+
+    // --- WALKING SKA STYLE (Fast 8ths) ---
+    if (style === 'walking-ska') {
+        const is8th = (step % (ts.stepsPerBeat / 2) === 0);
+        if (!is8th) return null;
+
+        const isQuarter = (step % ts.stepsPerBeat === 0);
+        const beatIdx = Math.floor(stepInMeasure / ts.stepsPerBeat);
+
+        // 1. Foundation: Downbeats of 1 and 3 are usually Root or 5th
+        if (isQuarter && (beatIdx === 0 || beatIdx === 2)) {
+            const note = (beatIdx === 0 || Math.random() > 0.4) ? baseRoot : baseRoot + 7;
+            return result(getFrequency(clampAndNormalize(withOctaveJump(note))), 1, 1.1);
+        }
+
+        // 2. High Intensity: Melodic 8th note walking
+        if (intensity > 0.5) {
+            // Chromatic approach to the next beat
+            const isApproach = (step % ts.stepsPerBeat !== 0);
+            if (isApproach) {
+                const nextTargetMidi = nextChord ? nextChord.rootMidi : baseRoot;
+                const target = normalizeToRange(nextTargetMidi);
+                const approachNote = Math.random() < 0.5 ? target - 1 : target + 1;
+                return result(getFrequency(clampAndNormalize(withOctaveJump(approachNote))), 0.8, 1.0);
+            }
+        }
+
+        // 3. Scalar/Chordal movement for other steps
+        const noteIdx = Math.floor(Math.random() * scale.length);
+        const walkNote = baseRoot + scale[noteIdx];
+        return result(getFrequency(clampAndNormalize(withOctaveJump(walkNote))), 0.8, 0.95);
     }
 
     // --- QUARTER NOTE (WALKING) STYLE ---

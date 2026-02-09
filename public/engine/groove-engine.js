@@ -382,6 +382,23 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
 
         if (groove.genreFeel === 'Disco' && inst.name === 'Open') velocity *= 1.15; 
         
+        // --- Ska-Punk Final Polish ---
+        if (groove.genreFeel === 'Ska-Punk' && !inst.muted) {
+            instTimeOffset -= 0.005; // Pushing ahead for high energy
+            if (inst.name === 'HiHat' || inst.name === 'Open') {
+                if (loopStep % 4 === 2) {
+                    velocity *= 1.35; // Strong offbeat accent
+                    if (playback.bandIntensity > 0.6 && Math.random() < 0.3) {
+                        soundName = 'Open';
+                        velocity *= 1.1;
+                    }
+                } else {
+                    velocity *= 0.85;
+                }
+            }
+            if (inst.name === 'Snare' && (loopStep === 4 || loopStep === 12)) velocity *= 1.1;
+        }
+
         if (inst.name === 'HiHat' && groove.genreFeel !== 'Jazz' && playback.bandIntensity > 0.8 && isQuarter) { soundName = 'Open'; velocity *= 1.1; }
         if (inst.name === 'Kick') velocity *= isDownbeat ? 1.15 : (isGroupStart ? 1.1 : (isQuarter ? 1.05 : 0.9));
         else if (inst.name === 'Snare') velocity *= isBackbeat ? 1.1 : 0.9;

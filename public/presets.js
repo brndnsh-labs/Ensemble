@@ -370,6 +370,13 @@ export const DRUM_PRESETS = {
             'HiHat': "101010101010101010101010"
         }
     },
+    'Ska': {
+        category: 'Pop/Rock', swing: 0, sub: '8th',
+        'Kick': "2000000020000000",
+        'Snare': "0000200000002000",
+        'HiHat': "1010101010101010",
+        'Open': "0000000000000000"
+    },
     'Country (Two-Step)': {
         category: 'Country/Folk', swing: 55, sub: '8th',
         'Kick': "2000000020000000", 
@@ -633,7 +640,8 @@ export const SMART_GENRES = {
     'Acoustic': { swing: 15, sub: '8th', drum: 'Acoustic', feel: 'Acoustic', chord: 'pad', bass: 'half', soloist: 'minimal', harmony: 'strings' },
     'Bossa': { swing: 0, sub: '16th', drum: 'Bossa Nova', feel: 'Bossa Nova', chord: 'jazz', bass: 'bossa', soloist: 'bossa', harmony: 'strings' },
     'Country': { swing: 55, sub: '16th', drum: 'Country (Two-Step)', feel: 'Country', chord: 'strum-country', bass: 'country', soloist: 'country', harmony: 'smart' },
-    'Metal': { swing: 0, sub: '16th', drum: 'Metal (Speed)', feel: 'Metal', chord: 'power-metal', bass: 'metal', soloist: 'metal', harmony: 'smart' }
+    'Metal': { swing: 0, sub: '16th', drum: 'Metal (Speed)', feel: 'Metal', chord: 'power-metal', bass: 'metal', soloist: 'metal', harmony: 'smart' },
+    'Ska-Punk': { swing: 0, sub: '8th', drum: 'Ska', feel: 'Ska', chord: 'ska-upstroke', bass: 'walking-ska', soloist: 'ska-horns', harmony: 'horns' }
 };
 
 export const CHORD_STYLES = [
@@ -643,7 +651,8 @@ export const CHORD_STYLES = [
     { id: 'strum-country', name: 'Country Strum', category: 'Country/Folk' },
     { id: 'power-metal', name: 'Power Metal', category: 'Rock/Metal' },
     { id: 'jazz', name: 'Jazz Comp', category: 'Jazz' },
-    { id: 'funk', name: 'Funk Scratch', category: 'Soul/Funk' }
+    { id: 'funk', name: 'Funk Scratch', category: 'Soul/Funk' },
+    { id: 'ska-upstroke', name: 'Ska Upstroke', category: 'Pop/Rock' }
 ];
 
 export const BASS_STYLES = [
@@ -660,7 +669,8 @@ export const BASS_STYLES = [
     { id: 'disco', name: 'Disco (Octaves)', category: 'Soul/Funk' },
     { id: 'dub', name: 'Dub (Reggae)', category: 'World/Latin' },
     { id: 'neo', name: 'Neo-Soul', category: 'Soul/R&B' },
-    { id: 'bossa', name: 'Bossa Nova', category: 'World/Latin' }
+    { id: 'bossa', name: 'Bossa Nova', category: 'World/Latin' },
+    { id: 'walking-ska', name: 'Walking (Ska)', category: 'Pop/Rock' }
 ];
 
 export const SOLOIST_STYLES = [
@@ -673,7 +683,8 @@ export const SOLOIST_STYLES = [
     { id: 'neo', name: 'Neo-Soul', category: 'Soul/R&B' },
     { id: 'minimal', name: 'Minimal', category: 'Basic' },
     { id: 'bird', name: 'Bird', category: 'Jazz' },
-    { id: 'disco', name: 'Disco', category: 'Soul/Funk' }
+    { id: 'disco', name: 'Disco', category: 'Soul/Funk' },
+    { id: 'ska-horns', name: 'Ska Horns', category: 'Modern' }
 ];
 
 export const HARMONY_STYLES = [

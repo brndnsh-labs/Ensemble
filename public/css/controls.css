@@ -38,6 +38,7 @@
     .genre-btn[data-genre="Reggae"] { border-color: var(--orange); }
     .genre-btn[data-genre="Acoustic"] { border-color: var(--yellow); }
     .genre-btn[data-genre="Bossa"] { border-color: var(--green); }
+    .genre-btn[data-genre="Ska-Punk"] { border-color: var(--orange); }
     
 .genre-btn.active {
     background: var(--accent-color);
@@ -81,6 +82,7 @@
     .genre-btn.active[data-genre="Reggae"] { background: var(--orange); border-color: var(--orange); }
     .genre-btn.active[data-genre="Acoustic"] { background: var(--yellow); border-color: var(--yellow); }
     .genre-btn.active[data-genre="Bossa"] { background: var(--green); border-color: var(--green); }
+    .genre-btn.active[data-genre="Ska-Punk"] { background: var(--orange); border-color: var(--orange); }
 
 /* Play Button Internal Layout */
 #playBtn {

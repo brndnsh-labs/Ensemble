@@ -66,7 +66,7 @@ describe('Security: State Hydration Validation', () => {
 
         // Should fallback to default 'Rock' or similar if invalid
         expect(state.groove.genreFeel).not.toBe('MaliciousScript');
-        const validGenres = ['Rock', 'Jazz', 'Funk', 'Disco', 'Hip Hop', 'Blues', 'Neo-Soul', 'Reggae', 'Acoustic', 'Bossa', 'Country', 'Metal'];
+        const validGenres = ['Rock', 'Jazz', 'Funk', 'Disco', 'Hip Hop', 'Blues', 'Neo-Soul', 'Reggae', 'Acoustic', 'Bossa', 'Country', 'Metal', 'Ska-Punk'];
         expect(validGenres).toContain(state.groove.genreFeel);
     });
 });

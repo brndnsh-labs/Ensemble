@@ -17,7 +17,7 @@ vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 
 const GENRES = [
     'Rock', 'Jazz', 'Funk', 'Blues', 'Neo-Soul', 
-    'Disco', 'Bossa Nova', 'Reggae', 'Acoustic', 'Hip Hop'
+    'Disco', 'Bossa Nova', 'Reggae', 'Acoustic', 'Hip Hop', 'Ska-Punk'
 ];
 
 const INTENSITIES = [0.1, 0.5, 0.9];

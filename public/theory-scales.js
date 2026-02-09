@@ -56,7 +56,8 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
             'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues',
             'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa',
             'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'minimal',
-            'Reggae': 'minimal', 'Country': 'country', 'Metal': 'metal', 'Rock/Metal': 'metal'
+            'Reggae': 'minimal', 'Country': 'country', 'Metal': 'metal', 
+            'Rock/Metal': 'metal', 'Ska-Punk': 'scalar', 'Ska': 'scalar'
         };
         style = mapping[groove.genreFeel] || 'scalar';
     }

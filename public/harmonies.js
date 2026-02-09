@@ -118,6 +118,15 @@ export function generateCompingPattern(feel, seed) {
     } else if (feel === 'Reggae') {
         // Skank: Off-beats (Beats 2 and 4)
         [4, 12, 20, 28].forEach(s => { pattern[s] = 1; });
+    } else if (feel === 'Ska') {
+        // Off-beat stabs (And of 1, 2, 3, 4)
+        [2, 6, 10, 14, 18, 22, 26, 30].forEach(s => {
+            pattern[s] = 1;
+        });
+        // Occasional punchy syncopation
+        [3, 7, 11, 15, 19, 23, 27, 31].forEach(s => {
+            if (pseudoRandom() < 0.3) pattern[s] = 2;
+        });
     } else {
         // Default / Pop
         pattern[0] = 1;
@@ -166,7 +175,7 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
         if (feel === 'Blues') activeStyle = 'organ';
         else if (feel === 'Jazz' || feel === 'Bossa Nova') activeStyle = 'strings';
         else if (feel === 'Disco' || feel === 'Hip Hop') activeStyle = 'plucks';
-        else if (feel === 'Funk' || feel === 'Metal' || feel === 'Afrobeat') activeStyle = 'horns';
+        else if (feel === 'Funk' || feel === 'Metal' || feel === 'Afrobeat' || feel === 'Ska') activeStyle = 'horns';
         else if (feel === 'Reggae') activeStyle = 'organ';
         else if (feel === 'Neo-Soul') activeStyle = 'organ';
         else if (feel === 'Country' || feel === 'Acoustic') activeStyle = 'strings';

@@ -116,6 +116,13 @@ const STYLE_CONFIG = {
         doubleStopProb: 0.1, anticipationProb: 0.15, targetExtensions: [2, 9],
         deviceProb: 0.2, allowedDevices: ['slide'],
         motifProb: 0.5, hookProb: 0.3
+    },
+    ska: {
+        restBase: 0.3, restGrowth: 0.08, cells: [1, 6, 8, 10, 14], registerSoar: 10,
+        tensionScale: 0.5, timingJitter: 5, maxNotesPerPhrase: 12,
+        doubleStopProb: 0.2, anticipationProb: 0.1, targetExtensions: [2, 9],
+        deviceProb: 0.15, allowedDevices: ['run', 'slide', 'guitarDouble'],
+        motifProb: 0.6, hookProb: 0.4
     }
 };
 
@@ -140,7 +147,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     let activeStyle = style;
     if (activeStyle === 'smart') {
-        const mapping = { 'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues', 'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa', 'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'acoustic', 'Reggae': 'reggae', 'Country': 'country' };
+        const mapping = { 'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues', 'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa', 'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'acoustic', 'Reggae': 'reggae', 'Country': 'country', 'Ska-Punk': 'ska', 'Ska': 'ska' };
         activeStyle = mapping[groove.genreFeel] || 'scalar';
     }
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;

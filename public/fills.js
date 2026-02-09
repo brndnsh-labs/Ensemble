@@ -111,6 +111,17 @@ export const FILL_TEMPLATES = {
         high: [
             { steps: [8, 10, 12, 14, 15], instruments: ['High Tom', 'Conga', 'Mid Tom', 'Snare', 'Crash'], velocities: [0.6, 0.8, 0.7, 0.9, 1.1] }
         ]
+    },
+    'Ska-Punk': {
+        low: [
+            { steps: [12, 14, 15], instruments: ['Snare', 'Snare', 'Snare'], velocities: [0.8, 0.9, 1.1] }
+        ],
+        medium: [
+            { steps: [8, 10, 12, 13, 14, 15], instruments: ['Snare', 'Snare', 'Snare', 'Snare', 'Snare', 'Crash'], velocities: [0.6, 0.7, 0.8, 0.9, 1.0, 1.2] }
+        ],
+        high: [
+            { steps: [0, 2, 4, 6, 8, 10, 12, 14], instruments: ['Kick', 'Crash', 'Kick', 'Crash', 'Kick', 'Crash', 'Snare', 'Crash'], velocities: [1.2, 1.1, 1.2, 1.1, 1.2, 1.1, 1.2, 1.3] }
+        ]
     }
 };
 

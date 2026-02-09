@@ -20,7 +20,7 @@ export const compingState = {
     lastSectionId: null
 };
 
-const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul'];
+const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
 
 /**
  * Algorithmic Pattern Generator
@@ -59,6 +59,18 @@ export function generateCompingPattern(genre, vibe, length = 16) {
         if (vibe === 'active' || intensity > 0.7) {
             if (length >= 7) hit(6); // The "and" of 2
             if (length >= 15) hit(14); // The "and" of 4
+        }
+        return pattern;
+    }
+
+    if (genre === 'Ska') {
+        // Upstroke on every "and" (Steps 2, 6, 10, 14 in 16th grid)
+        // For Ska-Punk, these are very consistent.
+        [2, 6, 10, 14].forEach(s => { if (s < length) hit(s); });
+        
+        // Active: Add some 16th syncopations or "double upstrokes"
+        if (vibe === 'active' || intensity > 0.7) {
+            [3, 7, 11, 15].forEach(s => { if (s < length && Math.random() < 0.3) hit(s); });
         }
         return pattern;
     }
@@ -189,6 +201,7 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     else if (chords.style === 'strum8') genre = 'Rock';
     else if (chords.style === 'strum-country') genre = 'Country';
     else if (chords.style === 'power-metal') genre = 'Metal';
+    else if (chords.style === 'ska-upstroke') genre = 'Ska';
 
     if (chords.style === 'smart') {
         const smartMapping = {
@@ -268,7 +281,7 @@ function handleSustainEvents(step, measureStep, chordIndex, intensity, genre, st
     const isNewChord = chordIndex !== compingState.lastChordIndex;
     const isNewMeasure = measureStep === 0;
 
-    if (genre === 'Reggae' || genre === 'Funk' || genre === 'Disco') {
+    if (genre === 'Reggae' || genre === 'Funk' || genre === 'Disco' || genre === 'Ska') {
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: 0 }); // Sustain Off
         return events; 
     }
@@ -605,7 +618,7 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
         }
 
         let durationSteps = ts.stepsPerBeat * 2; // Default 2 beats
-        if (genre === 'Disco') durationSteps = ts.stepsPerBeat * 0.25; 
+        if (genre === 'Disco' || genre === 'Ska') durationSteps = ts.stepsPerBeat * 0.25; 
         else if (genre === 'Jazz') durationSteps = ts.stepsPerBeat * 1; 
         else if (genre === 'Acoustic') durationSteps = ts.stepsPerBeat * 2.5; 
         else if (genre === 'Rock' || genre === 'Bossa') durationSteps = ts.stepsPerBeat * 1.5;

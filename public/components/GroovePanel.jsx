@@ -178,7 +178,7 @@ function GenreSelector() {
 
     const genres = [
         'Rock', 'Jazz', 'Funk', 'Disco', 'Hip Hop', 'Blues',
-        'Neo-Soul', 'Reggae', 'Acoustic', 'Bossa', 'Country', 'Metal'
+        'Neo-Soul', 'Reggae', 'Acoustic', 'Bossa', 'Country', 'Metal', 'Ska-Punk'
     ];
 
     const handleGenreClick = (genre) => {
