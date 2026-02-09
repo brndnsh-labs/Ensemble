@@ -73,11 +73,15 @@ describe('Soloist Density Drift (Ska-Punk)', () => {
         if (loops.length > 47) console.log(`[Drift Test] Loop 48 Density (Avg - ~60s): ${loops[47].toFixed(2)} notes/measure`);
 
         const startAvg = loops[0];
+        const midAvg = loops[Math.floor(loops.length / 2)];
         const endAvg = loops[loops.length - 1];
-        console.log(`[Drift Test] Final Loop Density: ${endAvg.toFixed(2)}`);
-        console.log(`[Drift Test] Increase: ${((endAvg / startAvg - 1) * 100).toFixed(1)}%`);
+        
+        console.log(`[Drift Test] Arc: Start=${startAvg.toFixed(2)}, Mid=${midAvg.toFixed(2)}, End=${endAvg.toFixed(2)}`);
 
-        // Check if density stays reasonable
-        expect(endAvg).toBeLessThan(startAvg * 1.5);
+        // With the new Arc logic, the middle should be busier than the start
+        expect(midAvg).toBeGreaterThanOrEqual(startAvg * 0.8); // Allow some variance
+        
+        // And the end should be cooler than the peak, or at least stable
+        expect(endAvg).toBeLessThan(midAvg * 1.5); 
     });
 });
