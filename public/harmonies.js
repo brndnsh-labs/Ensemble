@@ -247,7 +247,7 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
 
     // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
     let isSuppressedByAntiphony = false;
-    if (feel === 'Ska-Punk' && playback.bandIntensity < 0.8) {
+    if (feel === 'Ska-Punk' && playback.bandIntensity < 0.7) {
         const measureIdx = Math.floor(step / stepsPerMeasure);
         // Harmony plays on even measures (0, 2, 4...) -> Response
         // Soloist plays on odd measures (1, 3, 5...) -> Call

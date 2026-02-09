@@ -216,7 +216,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     // --- 2. Phrasing & History Analysis ---
     if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
-        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.isResting = true; soloist.currentCell = null; return null; 
+        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.isResting = true; soloist.currentCell = null; 
+        if (!soloist.pitchHistory) soloist.pitchHistory = [];
+        return null; 
     }
     
     HIST_COUNTS.fill(0);
@@ -264,7 +266,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
     let isSuppressedByAntiphony = false;
-    if (groove.genreFeel === 'Ska-Punk' && intensity < 0.8 && !soloist.isReplayingMotif) {
+    if (groove.genreFeel === 'Ska-Punk' && effectiveIntensity < 0.7 && !soloist.isReplayingMotif) {
         const measureIdx = Math.floor(step / stepsPerMeasure);
         // Soloist plays on odd measures (1, 3, 5...) -> Call
         // Harmony plays on even measures (0, 2, 4...) -> Response
@@ -281,12 +283,16 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0;
             soloist.qaState = soloist.qaState === 'Question' ? 'Answer' : 'Question';
             
+            // Clear shared hook buffer on phrase start to ensure reinforcement is fresh
+            if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
+            
             // Motif Decision
             const currentRoot = currentChord.rootMidi % 12;
             const motifRoot = soloist.motifRoot !== undefined ? soloist.motifRoot : currentRoot;
             const rootDiff = Math.abs(currentRoot - motifRoot);
             const isSignificantShift = rootDiff > 0 && rootDiff !== 5 && rootDiff !== 7;
             const isStale = (soloist.motifReplayCount || 0) > 3;
+            const isOverwhelmed = effectiveIntensity > 0.7 && Math.random() < 0.5;
 
             let distinctPitchesCount = 0;
             let pitchRange = 0;
@@ -298,7 +304,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             }
             const isInteresting = distinctPitchesCount > 2 || pitchRange > 2;
 
-            if (soloist.motifBuffer && soloist.motifBuffer.length > 0 && isInteresting && Math.random() < config.motifProb && !isSignificantShift && !isStale) {
+            if (soloist.motifBuffer && soloist.motifBuffer.length > 0 && isInteresting && Math.random() < config.motifProb && !isSignificantShift && !isStale && !isOverwhelmed) {
                 soloist.isReplayingMotif = true;
                 soloist.motifReplayIndex = 0;
                 soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1;
@@ -311,7 +317,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         } else return null;
     }
         if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < restProb) {
-            soloist.isResting = true; soloist.currentPhraseSteps = 0; soloist.currentCell = null; return null;
+            soloist.isResting = true; soloist.currentPhraseSteps = 0; soloist.currentCell = null;
+            if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
+            return null;
         }
     
         // --- 3. Motif Replay ---
