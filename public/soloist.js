@@ -120,11 +120,11 @@ const STYLE_CONFIG = {
         motifProb: 0.5, hookProb: 0.3
     },
     ska: {
-        restBase: 0.3, restGrowth: 0.08, cells: [1, 6, 8, 10, 14, 15, 16], registerSoar: 10,
-        tensionScale: 0.5, timingJitter: 5, maxNotesPerPhrase: 12,
+        restBase: 0.6, restGrowth: 0.2, cells: [1, 6, 8, 10, 14, 15, 16], registerSoar: 10,
+        tensionScale: 0.5, timingJitter: 5, maxNotesPerPhrase: 8,
         doubleStopProb: 0.2, anticipationProb: 0.1, targetExtensions: [2, 9],
         deviceProb: 0.15, allowedDevices: ['run', 'slide', 'guitarDouble'],
-        motifProb: 0.7, hookProb: 0.5
+        motifProb: 0.5, hookProb: 0.3
     }
 };
 
@@ -171,7 +171,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
     const maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 1024);
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 2));
-    const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.25));
+    const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.1)); // Reduced from 0.25 to prevent long-term clutter
 
     /**
      * Internal helper to finalize a note, updating history and session tracking.
