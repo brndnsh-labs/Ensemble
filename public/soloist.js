@@ -386,13 +386,16 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         }
 
         // High BPM Filtering: Reduce busy 16th patterns
-        if (activeStyle === 'bird' && playback.bpm > 160) {
-            // Remove 0 (16ths), 3 (Gallop), 7 (Bebop) if we need to chill
-            // Keep 1 (8ths) and add 2 (Quarters) or 6 (Syncopated)
-            pool = pool.filter(c => ![0, 3, 7].includes(RHYTHMIC_CELLS.indexOf(c)));
-            pool.push(RHYTHMIC_CELLS[1]); // Ensure 8ths are there
-            if (playback.bpm > 180) pool.push(RHYTHMIC_CELLS[2]); // Add quarters
-            if (pool.length === 0) pool = [RHYTHMIC_CELLS[1]];
+        if ((activeStyle === 'bird' || activeStyle === 'ska') && playback.bpm > 160) {
+            // Remove 0 (16ths), 3 (Gallop), 7 (Bebop), 10 (16th Off), 14, 15, 16
+            // Keep 1 (8ths), 2 (Quarters), 6 (Sync 8ths), 8 (Offbeat 8ths)
+            pool = pool.filter(c => ![0, 3, 7, 10, 14, 15, 16].includes(RHYTHMIC_CELLS.indexOf(c)));
+            
+            // Ensure we have something left
+            if (pool.length === 0) pool = [RHYTHMIC_CELLS[1]]; // Fallback to 8ths
+            
+            // Add quarters for breathing room if really fast
+            if (playback.bpm > 180) pool.push(RHYTHMIC_CELLS[2]); 
         }
 
         // Pickup Logic: If initializing mid-beat, ensure we pick a cell that plays on the current step
