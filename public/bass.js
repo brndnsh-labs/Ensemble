@@ -94,7 +94,13 @@ export function isBassActive(style, step, stepInChord) {
     }
     if (style === 'walking-ska') {
         const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-        return step % (ts.stepsPerBeat / 2) === 0; // 8th notes
+        const is8th = step % (ts.stepsPerBeat / 2) === 0;
+        
+        // At extreme BPMs, simplify to quarter notes to prevent mud?
+        // Actually for Ska, 8ths are essential. Let's just ensure they are tight.
+        if (playback.bpm > 185 && step % ts.stepsPerBeat !== 0 && Math.random() < 0.3) return false;
+
+        return is8th;
     }
 
     return false;

@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getState, dispatch } from '../../../public/state.js';
+import { getState } from '../../../public/state.js';
 import { getBassNote, isBassActive } from '../../../public/bass.js';
 import { getAccompanimentNotes } from '../../../public/accompaniment.js';
 import { getSoloistNote } from '../../../public/soloist.js';
 import { getHarmonyNotes } from '../../../public/harmonies.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
-import { ACTIONS } from '../../../public/types.js';
 
 vi.mock('../../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
@@ -42,7 +41,7 @@ describe('Ska-Punk Genre Integrity', () => {
         expect(notesAnd.length).toBeGreaterThan(0);
         
         // Step 4 (Beat 2): Should be empty for Ska
-        const notesBeat2 = getAccompanimentNotes(chord, 4, 4, 4, { isBeatStart: true });
+        getAccompanimentNotes(chord, 4, 4, 4, { isBeatStart: true });
         // It might have a hit if "forced", but ideally not.
     });
 
@@ -76,6 +75,22 @@ describe('Ska-Punk Genre Integrity', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         // Just verify it doesn't crash and returns something or null
         const note = getSoloistNote(chord, null, 0, null, 5, 'smart', 0, false);
-        // Mapping check is internal, but we can verify it doesn't throw.
+        expect(note).toBeDefined();
+    });
+
+    it('should handle high tempos (195 BPM) without logic failure', () => {
+        playback.bpm = 195;
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4, freqs: [261.63, 329.63, 392.00] };
+        
+        // Check bass note generation at high BPM
+        const bassNote = getBassNote(chord, null, 0, null, 48, 'walking-ska', 0, 0, 0);
+        expect(bassNote).not.toBeNull();
+        expect(bassNote.durationSteps).toBeLessThanOrEqual(1.0); // Should be tight
+
+        // Check accompaniment notes at high BPM
+        const accNotes = getAccompanimentNotes(chord, 2, 2, 2, { isBeatStart: false });
+        if (accNotes.length > 0 && accNotes[0].midi > 0) {
+            expect(accNotes[0].durationSteps).toBeLessThanOrEqual(1.0); // Staccato
+        }
     });
 });

@@ -631,6 +631,10 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
         const intensityFactor = 0.5 + (intensity * 0.9);
         const velocity = (isStructural ? 0.6 : (isDownbeat ? 0.5 : 0.35)) * intensityFactor;
 
+        // Tighten up durations at high intensity/tempo
+        if (intensity > 0.7) durationSteps *= 0.8;
+        if (genre === 'Ska' || chords.style === 'ska-upstroke') durationSteps = Math.min(durationSteps, 1.0); // Ensure Ska upstrokes stay tight
+
         let voicing = [...chord.freqs];
         const complexity = playback.complexity;
 
