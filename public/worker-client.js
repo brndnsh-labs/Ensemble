@@ -107,7 +107,14 @@ export function syncWorker(action, payload) {
                 swingSub: groove.swingSub,
                 instruments: groove.instruments.map(i => ({ name: i.name, steps: [...i.steps], muted: i.muted }))
             },
-            playback: { bpm: playback.bpm, bandIntensity: playback.bandIntensity, complexity: playback.complexity, autoIntensity: playback.autoIntensity }
+            playback: { 
+                bpm: playback.bpm, 
+                bandIntensity: playback.bandIntensity, 
+                complexity: playback.complexity, 
+                autoIntensity: playback.autoIntensity,
+                sessionTimer: playback.sessionTimer,
+                sessionStartTime: playback.sessionStartTime
+            }
         };
     } else {
         // Delta Sync
@@ -149,6 +156,11 @@ export function syncWorker(action, payload) {
             case 'SET_SESSION_STEPS': data.soloist = { sessionSteps: payload }; break;
             case 'SET_DOUBLE_STOPS': data.soloist = { doubleStops: payload }; break;
             case 'SET_BPM': data.playback = { bpm: playback.bpm }; break;
+            case 'SET_SESSION_TIMER': data.playback = { sessionTimer: payload }; break;
+            case 'TOGGLE_PLAY': 
+                // Ensure session start time is synced when play starts
+                data.playback = { isPlaying: playback.isPlaying, sessionStartTime: playback.sessionStartTime }; 
+                break;
             case 'ARRANGER_UPDATE': // Custom action for large structural changes
                 data.arranger = {
                     progression: arranger.progression,

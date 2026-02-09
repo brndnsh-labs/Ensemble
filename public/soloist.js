@@ -169,7 +169,25 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const MAX_GUITAR_MIDI = 65 + (intensity * 30); // Dynamic Ceiling
 
     if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
-    const maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 1024);
+    
+    let maturityFactor = 0;
+    
+    // --- Song Arc Logic ---
+    // If a session timer is active, use the song progress to drive maturity/intensity
+    if (playback.sessionTimer > 0 && playback.sessionStartTime > 0) {
+         const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
+         const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
+         
+         // Arc: Warmup -> Development -> Climax -> Cooldown
+         if (progress < 0.15) maturityFactor = progress / 0.15 * 0.2; // 0.0 -> 0.2
+         else if (progress < 0.65) maturityFactor = 0.2 + ((progress - 0.15) / 0.5) * 0.6; // 0.2 -> 0.8
+         else if (progress < 0.85) maturityFactor = 0.8 + ((progress - 0.65) / 0.2) * 0.2; // 0.8 -> 1.0
+         else maturityFactor = 1.0 - ((progress - 0.85) / 0.15) * 0.8; // 1.0 -> 0.2 (Cooldown)
+    } else {
+         // Fallback: Linear ramp based on steps (but slower/capped)
+         maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 2048);
+    }
+
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 2));
     const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.1)); // Reduced from 0.25 to prevent long-term clutter
 
