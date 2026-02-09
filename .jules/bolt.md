@@ -21,3 +21,7 @@
 ## 2024-05-25 - React Memoization Breakers in Closures
 **Learning:** Callbacks passed to `memo` components must be stable. If they depend on a changing object (like the entire store state), they break memoization for all children, causing massive re-renders. Using `getState()` inside the callback (instead of closing over the state) breaks this dependency chain while keeping the callback stable.
 **Action:** For high-frequency interaction handlers (like grid cells), avoid adding the data source to the dependency array. Fetch the data directly from the state store inside the handler.
+
+## 2024-05-26 - Interaction State (Drag) Triggering Re-Renders
+**Learning:** Using `useState` for interaction flags like `isDragging` inside a large grid component forces a re-render of the parent, which invalidates memoized callbacks passed to children, causing ALL children to re-render.
+**Action:** Use `useRef` for interaction state that doesn't need to trigger a visual update on the container itself, keeping event handlers stable.

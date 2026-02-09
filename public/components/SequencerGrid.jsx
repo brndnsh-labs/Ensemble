@@ -1,13 +1,13 @@
 import { h, Fragment } from 'preact';
 import React from 'preact/compat';
 import { memo } from 'preact/compat';
-import { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'preact/hooks';
+import { useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure, getStepInfo } from '../utils.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { ACTIONS } from '../types.js';
 import { clearDrumPresetHighlight } from '../instrument-controller.js';
-import { getState } from '../state.js';
+import { getState, dispatch } from '../state.js';
 const { playback: playbackState } = getState();
 
 const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) => {
@@ -53,8 +53,8 @@ export function SequencerGrid() {
         isPlaying: s.playback.isPlaying
     }));
 
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragType, setDragType] = useState(0);
+    const isDraggingRef = useRef(false);
+    const dragTypeRef = useRef(0);
     const gridRef = useRef(null);
     const stepCache = useRef(new Map());
 
@@ -63,7 +63,7 @@ export function SequencerGrid() {
     const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
 
     useEffect(() => {
-        const handleMouseUp = () => setIsDragging(false);
+        const handleMouseUp = () => { isDraggingRef.current = false; };
         window.addEventListener('mouseup', handleMouseUp);
         return () => window.removeEventListener('mouseup', handleMouseUp);
     }, []);
@@ -138,14 +138,14 @@ export function SequencerGrid() {
     }, [isPlaying, totalSteps]);
 
     const handleToggle = useCallback((e, instIdx, stepIdx) => {
-        if (e.type === 'mouseover' && !isDragging) return;
+        if (e.type === 'mouseover' && !isDraggingRef.current) return;
         
         // Optimization: Access global state directly to avoid dependency on 'instruments'
         // which changes on every step toggle, preventing full grid re-renders.
         const { groove } = getState();
         const inst = groove.instruments[instIdx];
 
-        let newType = dragType;
+        let newType = dragTypeRef.current;
 
         if (e.type === 'mousedown' || e.type === 'keydown') {
             if (inst.steps[stepIdx] === 0) newType = 1;
@@ -153,8 +153,8 @@ export function SequencerGrid() {
             else newType = 0;
             
             if (e.type === 'mousedown') {
-                setDragType(newType);
-                setIsDragging(true);
+                dragTypeRef.current = newType;
+                isDraggingRef.current = true;
             }
         }
 
@@ -162,9 +162,9 @@ export function SequencerGrid() {
         if (inst.steps[stepIdx] !== newType) {
             inst.steps[stepIdx] = newType;
             clearDrumPresetHighlight();
-            import('../state.js').then(({ dispatch }) => dispatch(ACTIONS.STEP_TOGGLE));
+            dispatch(ACTIONS.STEP_TOGGLE);
         }
-    }, [isDragging, dragType]);
+    }, []);
 
     const handleAudition = useCallback((inst) => {
         import('../engine/engine.js').then(({ initAudio, playDrumSound }) => {
@@ -175,7 +175,7 @@ export function SequencerGrid() {
 
     const handleMute = useCallback((inst, instIdx) => {
         inst.muted = !inst.muted;
-        import('../state.js').then(({ dispatch }) => dispatch('MUTE_TOGGLE'));
+        dispatch('MUTE_TOGGLE');
     }, []);
 
     return (
