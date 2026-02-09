@@ -818,6 +818,7 @@ if (typeof self !== 'undefined') {
                     soloist.deviceBuffer = [];
                     bass.busySteps = 0;
                     soloist.motifBuffer = []; soloist.hookBuffer = []; soloist.isReplayingMotif = false;
+                    soloist.sharedHookBuffer = [];
                     harmony.motifBuffer = [];
                     harmony.lastMidis = [];
                     

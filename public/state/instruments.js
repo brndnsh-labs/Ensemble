@@ -92,6 +92,7 @@ export const soloist = {
     isReplayingMotif: false,
     motifReplayIndex: 0,
     hookRetentionProb: 0.4,
+    sharedHookBuffer: [], // Shared hooks for band interaction
     tension: 0,
     doubleStops: false,
     activeVoices: [],

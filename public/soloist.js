@@ -22,7 +22,9 @@ const RHYTHMIC_CELLS = [
     [1, 0, 0, 0, 0, 0, 0, 0], // 11: Half note (if 8 steps used)
     [0, 0, 1, 0], // 12: Single Offbeat 8th (the "And")
     [1, 0, 1, 0, 1, 0], // 13: Triplet-esque (Feel)
-    [0, 1, 0, 0]  // 14: Single Syncopated 16th (the "e")
+    [0, 1, 0, 0],  // 14: Single Syncopated 16th (the "e")
+    [1, 0, 0, 1, 0, 0, 1, 0], // 15: 3-3-2 Syncopation (Dotted 8ths)
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] // 16: 16th triplets (if 12 steps used)
 ];
 
 const STYLE_CONFIG = {
@@ -118,11 +120,11 @@ const STYLE_CONFIG = {
         motifProb: 0.5, hookProb: 0.3
     },
     ska: {
-        restBase: 0.3, restGrowth: 0.08, cells: [1, 6, 8, 10, 14], registerSoar: 10,
+        restBase: 0.3, restGrowth: 0.08, cells: [1, 6, 8, 10, 14, 15, 16], registerSoar: 10,
         tensionScale: 0.5, timingJitter: 5, maxNotesPerPhrase: 12,
         doubleStopProb: 0.2, anticipationProb: 0.1, targetExtensions: [2, 9],
         deviceProb: 0.15, allowedDevices: ['run', 'slide', 'guitarDouble'],
-        motifProb: 0.6, hookProb: 0.4
+        motifProb: 0.7, hookProb: 0.5
     }
 };
 
@@ -188,6 +190,15 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (!primary.isDoubleStop) soloist.lastFreq = getFrequency(primary.midi);
         soloist.notesInPhrase++;
         soloist.currentPhraseSteps++; // Ensure phrase progression
+
+        // -- Shared Hook Logic --
+        // If in Ska-Punk mode and replaying a motif, sync to shared buffer for band reinforcement
+        if (groove.genreFeel === 'Ska-Punk' && soloist.isReplayingMotif) {
+            if (!soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
+            // Use a sliding window of the last few notes for reinforcement
+            soloist.sharedHookBuffer.push({ step, res });
+            if (soloist.sharedHookBuffer.length > 16) soloist.sharedHookBuffer.shift();
+        }
         
         return res;
     };
@@ -250,8 +261,21 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     }
     restProb = Math.max(0.05, restProb - (maturityFactor * 0.15));
     if (soloist.notesInPhrase >= config.maxNotesPerPhrase) restProb += 0.4;
+
+    // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
+    let isSuppressedByAntiphony = false;
+    if (groove.genreFeel === 'Ska-Punk' && intensity < 0.8 && !soloist.isReplayingMotif) {
+        const measureIdx = Math.floor(step / stepsPerMeasure);
+        // Soloist plays on odd measures (1, 3, 5...) -> Call
+        // Harmony plays on even measures (0, 2, 4...) -> Response
+        if (measureIdx % 2 === 0) {
+            isSuppressedByAntiphony = true;
+            restProb = 1.0; // Force rest
+        }
+    }
     
     if (soloist.isResting) {
+        if (isSuppressedByAntiphony) return null;
         const startProb = 0.3 + (effectiveIntensity * 0.4);
         if (Math.random() < startProb) { 
             soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0;

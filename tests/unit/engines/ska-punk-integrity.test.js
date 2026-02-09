@@ -93,4 +93,38 @@ describe('Ska-Punk Genre Integrity', () => {
             expect(accNotes[0].durationSteps).toBeLessThanOrEqual(1.0); // Staccato
         }
     });
+
+    it('should alternate activity between Soloist and Harmony (Antiphony)', () => {
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+        playback.bandIntensity = 0.5; // Medium intensity triggers antiphony
+        
+        // Measure 0 (Step 0): Harmony should be active, Soloist should be suppressed
+        const soloistM0 = getSoloistNote(chord, null, 0, null, 5, 'ska', 0, false);
+        getHarmonyNotes(chord, null, 0, 0, 'horns', 0);
+        
+        expect(soloistM0).toBeNull();
+        
+        // Measure 1 (Step 16): Soloist should be active, Harmony should be suppressed
+        getSoloistNote(chord, null, 16, null, 5, 'ska', 0, false);
+        const harmonyM1 = getHarmonyNotes(chord, null, 16, 0, 'horns', 0);
+        
+        expect(harmonyM1).toEqual([]);
+    });
+
+    it('should reinforce soloist hooks in harmony section', () => {
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+        playback.bandIntensity = 0.7; // High intensity for hook reinforcement
+        groove.genreFeel = 'Ska-Punk';
+        soloist.enabled = true;
+        
+        // 1. Prime the hook by simulating a motif replay
+        // We set isReplayingMotif to FALSE to test the specific Ska-Punk sharedHookBuffer logic
+        soloist.isReplayingMotif = false;
+        soloist.sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
+        
+        // 2. Harmony should now latch to this step even if it's not a standard stab step
+        const notes = getHarmonyNotes(chord, null, 0, 0, 'horns', 0, { midi: 72 });
+        expect(notes.length).toBeGreaterThan(0);
+        expect(notes[0].isLatched).toBe(true);
+    });
 });

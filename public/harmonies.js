@@ -245,6 +245,15 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
     const motif = motifCache.get(sectionId);
     if (harmony.rhythmicMask !== motif.rhythmicMask) harmony.rhythmicMask = motif.rhythmicMask;
 
+    // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
+    let isSuppressedByAntiphony = false;
+    if (feel === 'Ska-Punk' && playback.bandIntensity < 0.8) {
+        const measureIdx = Math.floor(step / stepsPerMeasure);
+        // Harmony plays on even measures (0, 2, 4...) -> Response
+        // Soloist plays on odd measures (1, 3, 5...) -> Call
+        if (measureIdx % 2 !== 0) isSuppressedByAntiphony = true;
+    }
+
     // 4. Decision: Should we play?
     let shouldPlay = false;
     let durationSteps = 1;
@@ -252,12 +261,26 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
     let isGhost = false;
 
     // Latching Logic (Soloist Hook Reinforcement)
-    if (soloist.enabled && soloist.isReplayingMotif && soloistResult && playback.bandIntensity > 0.6) {
-        shouldPlay = true;
-        isLatched = true;
-        durationSteps = 1;
-        rhythmicStyle = 'stabs';
+    if (soloist.enabled && soloistResult && playback.bandIntensity > 0.6) {
+        let reinforce = false;
+        if (soloist.isReplayingMotif) reinforce = true;
+        
+        // -- Shared Hook Reinforcement --
+        if (!reinforce && feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
+            // Check if the soloist is currently playing a known shared hook
+            const hookMatch = soloist.sharedHookBuffer.find(h => h.step === step);
+            if (hookMatch) reinforce = true;
+        }
+
+        if (reinforce) {
+            shouldPlay = true;
+            isLatched = true;
+            durationSteps = 1;
+            rhythmicStyle = 'stabs';
+        }
     }
+
+    if (!isLatched && isSuppressedByAntiphony) return [];
 
     if (!isLatched) {
         // -- Pads Logic --
