@@ -310,11 +310,13 @@ describe('Soloist Engine Logic', () => {
         });
 
         it('should adjust bendStartInterval when nudging motif notes for scale compliance', () => {
-            const recordedNote = { midi: 64, bendStartInterval: 1, durationSteps: 4 };
+            const recordedNote = { midi: 64, bendStartInterval: 1, durationSteps: 4, phraseStep: 1 };
             soloist.motifBuffer = [recordedNote];
             soloist.motifRoot = 0;
             soloist.isReplayingMotif = true;
             soloist.motifReplayIndex = 0;
+            soloist.currentPhraseSteps = 0; // Will be incremented to 1 inside getSoloistNote
+            soloist.isResting = false;
 
             const chordGm = { rootMidi: 67, quality: 'minor', intervals: [0, 3, 7], beats: 4 };
             const replayed = getSoloistNote(chordGm, null, 16, 440, 72, 'scalar', 0);

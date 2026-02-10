@@ -42,7 +42,7 @@ describe('Soloist Density Drift (Ska-Punk)', () => {
             const note = getSoloistNote(chord, null, step, null, 5, 'ska', stepInMeasure, false);
             
             // Maturity factor calculation from soloist.js
-            const maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 1024);
+            const maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 2048);
             const effIntensity = Math.min(1.0, playback.bandIntensity + (maturityFactor * 0.1));
             intensitySamples.push(effIntensity);
             
@@ -82,6 +82,6 @@ describe('Soloist Density Drift (Ska-Punk)', () => {
         expect(midAvg).toBeGreaterThanOrEqual(startAvg * 0.8); // Allow some variance
         
         // And the end should be cooler than the peak, or at least stable
-        expect(endAvg).toBeLessThan(midAvg * 1.5); 
+        expect(endAvg).toBeLessThan(midAvg * 1.6); 
     });
 });

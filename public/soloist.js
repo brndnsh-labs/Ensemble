@@ -191,6 +191,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 2));
     const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.1)); // Reduced from 0.25 to prevent long-term clutter
 
+    if (!soloist.isResting) soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1;
+
     /**
      * Internal helper to finalize a note, updating history and session tracking.
      */
@@ -207,7 +209,6 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         // Update session tracking for continuity
         if (!primary.isDoubleStop) soloist.lastFreq = getFrequency(primary.midi);
         soloist.notesInPhrase++;
-        soloist.currentPhraseSteps++; // Ensure phrase progression
 
         // -- Shared Hook Logic --
         // If in Ska-Punk mode and replaying a motif, sync to shared buffer for band reinforcement
@@ -243,9 +244,13 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     PC_COUNTS.fill(0);
     const historyCounts = HIST_COUNTS;
     const pcCounts = PC_COUNTS;
-    const historyLen = soloist.pitchHistory ? soloist.pitchHistory.length : 0;
+    const history = soloist.pitchHistory || [];
+    const fullLen = history.length;
+    const windowSize = 32; // Use a fixed window for repetition statistics
+    const historyLen = Math.min(fullLen, windowSize);
     if (historyLen > 0) {
-        for (const p of soloist.pitchHistory) {
+        for (let i = fullLen - historyLen; i < fullLen; i++) {
+            const p = history[i];
             if (p >= 0 && p < 128) historyCounts[p]++;
             pcCounts[(p % 12 + 12) % 12]++;
         }
@@ -255,14 +260,15 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     let restProb = (config.restBase * (3.0 - effectiveIntensity * 2.0)) + (phraseBars * config.restGrowth);
     restProb += (1.0 - warmupFactor) * 0.4; // Conservative start
 
-    // Low intensity damping
-    if (intensity < 0.35) {
+    // Low intensity damping (Continuous)
+    // Avoids abrupt jumps at the 0.35 threshold by using a smooth interpolation.
+    if (intensity < 0.5) {
+        const dampingAmount = Math.max(0, (0.5 - intensity) * 1.5); 
         if (activeStyle === 'bird') {
-             // Bird should stay busy. Counteract the low-intensity rest growth.
-             restProb -= 0.1;
+             // Bird should stay busy but still has a slight intensity floor
+             restProb -= (intensity * 0.1); 
         } else {
-             // Others back off significantly to prevent busyness
-             restProb += 0.4;
+             restProb += dampingAmount;
         }
     }
 
@@ -342,7 +348,11 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
         // --- 3. Motif Replay ---
     if (soloist.isReplayingMotif) {
-        const motifNote = soloist.motifBuffer[soloist.motifReplayIndex];
+        const motifNote = soloist.motifBuffer.find(n => {
+            const primary = Array.isArray(n) ? n[0] : n;
+            return primary && primary.phraseStep === soloist.currentPhraseSteps;
+        });
+
         if (motifNote && historyLen > 12) {
             const primaryMidi = Array.isArray(motifNote) ? motifNote[0].midi : motifNote.midi;
             const count = historyCounts[primaryMidi] || 0;
@@ -354,8 +364,11 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         }
 
         if (soloist.isReplayingMotif) {
-            soloist.motifReplayIndex++;
-            if (soloist.motifReplayIndex >= soloist.motifBuffer.length) soloist.isReplayingMotif = false;
+            const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
+            const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
+            if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
+                soloist.isReplayingMotif = false;
+            }
             
             if (motifNote) {
                 const currentRoot = currentChord.rootMidi % 12;
@@ -387,6 +400,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 soloist.busySteps = (primary.durationSteps || 1) - 1;
                 return finalizeNote(res);
             }
+            return null; // Respect rests during motif replay
         }
     }
 
@@ -748,7 +762,11 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const finalResult = (extraNotes.length > 0 && soloist.doubleStops) ? [...extraNotes.map(n => ({...result, ...n})), result] : result;
     
     if (!soloist.isReplayingMotif) {
-        soloist.motifBuffer.push(finalResult);
+        const motifEntry = Array.isArray(finalResult) 
+            ? finalResult.map(n => ({ ...n, phraseStep: soloist.currentPhraseSteps }))
+            : { ...finalResult, phraseStep: soloist.currentPhraseSteps };
+            
+        soloist.motifBuffer.push(motifEntry);
         if (soloist.motifBuffer.length > 16) soloist.motifBuffer.shift();
         soloist.motifRoot = targetChord.rootMidi % 12;
     }
