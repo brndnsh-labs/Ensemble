@@ -67,6 +67,7 @@ export const groove = {
     larsIntensity: 0.5,
     lastSmartGenre: 'Rock',
     pendingGenreFeel: null,
+    genreSwitchCountdown: null,
     fillActive: false,
     fillSteps: {},
     buffer: new Map(),
@@ -106,6 +107,12 @@ export function grooveReducer(action, payload, playback) {
         case ACTIONS.SET_LARS_INTENSITY:
             Object.assign(groove, { larsIntensity: Math.max(0, Math.min(1, payload)) });
             return true;
+        case ACTIONS.SET_GENRE_COUNTDOWN:
+            if (groove.genreSwitchCountdown !== payload) {
+                Object.assign(groove, { genreSwitchCountdown: payload });
+                return true;
+            }
+            return false;
         case ACTIONS.SET_GENRE_FEEL:
             if (playback.isPlaying) {
                 Object.assign(groove, { pendingGenreFeel: payload });

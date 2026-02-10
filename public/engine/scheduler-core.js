@@ -178,9 +178,13 @@ export function scheduler() {
         if (groove.pendingGenreFeel) {
             const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
             const stepsRemaining = stepsPerMeasure - (playback.step % stepsPerMeasure);
-            if (stepsRemaining > 0 && stepsRemaining <= 16) {
-                // Pre-notify for genre changes
+            const beatsRemaining = Math.ceil(stepsRemaining / 4);
+
+            if (groove.genreSwitchCountdown !== beatsRemaining) {
+                dispatch(ACTIONS.SET_GENRE_COUNTDOWN, beatsRemaining);
             }
+        } else if (groove.genreSwitchCountdown !== null) {
+            dispatch(ACTIONS.SET_GENRE_COUNTDOWN, null);
         }
 
         while (playback.nextNoteTime < playback.audio.currentTime + playback.scheduleAheadTime) {

@@ -171,9 +171,10 @@ function ComplexitySlider() {
 }
 
 function GenreSelector() {
-    const { lastSmartGenre, pendingGenreFeel } = useEnsembleState(s => ({
+    const { lastSmartGenre, pendingGenreFeel, genreSwitchCountdown } = useEnsembleState(s => ({
         lastSmartGenre: s.groove.lastSmartGenre,
-        pendingGenreFeel: s.groove.pendingGenreFeel
+        pendingGenreFeel: s.groove.pendingGenreFeel,
+        genreSwitchCountdown: s.groove.genreSwitchCountdown
     }));
 
     const genres = [
@@ -217,6 +218,7 @@ function GenreSelector() {
                             key={genre}
                             className={`genre-btn ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}`}
                             data-genre={genre}
+                            data-countdown={isPending && genreSwitchCountdown ? genreSwitchCountdown : undefined}
                             onClick={() => handleGenreClick(genre)}
                             aria-pressed={isActive ? 'true' : 'false'}
                         >
