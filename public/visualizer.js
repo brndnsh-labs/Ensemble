@@ -183,6 +183,9 @@ export class UnifiedVisualizer {
             }
         };
 
+        // Optimization: Pre-calculate interval color lookup
+        this.intervalColors = INTERVAL_CATEGORY.map(cat => this.themeCache.chordColors[cat]);
+
         // Update track colors
         for (const name in this.tracks) {
             this.resolveTrackColor(name, style);
@@ -443,8 +446,8 @@ export class UnifiedVisualizer {
                     const rootPC = ev.rootMidi % 12;
                     for (const m of ev.notes) {
                          const interval = (m % 12 - rootPC + 12) % 12;
-                         const cat = INTERVAL_CATEGORY[interval];
-                         this.activeNoteColors[m] = chordColors[cat];
+                         // Optimization: Direct array lookup
+                         this.activeNoteColors[m] = this.intervalColors[interval];
                     }
                 }
             }
@@ -574,8 +577,8 @@ export class UnifiedVisualizer {
 
             for (const interval of ev.intervals) {
                 const pc = (rootPC + interval) % 12;
-                const cat = INTERVAL_CATEGORY[interval];
-                ctx.fillStyle = chordColors[cat];
+                // Optimization: Direct array lookup
+                ctx.fillStyle = this.intervalColors[interval];
 
                 // Render in visible octaves
                 const minOct = Math.floor(startMidi / 12);
@@ -613,8 +616,8 @@ export class UnifiedVisualizer {
             for (const midi of ev.notes) {
                 const y = Math.round(getY(midi));
                 const interval = (midi % 12 - rootPC + 12) % 12;
-                const cat = INTERVAL_CATEGORY[interval];
-                ctx.fillStyle = chordColors[cat];
+                // Optimization: Direct array lookup
+                ctx.fillStyle = this.intervalColors[interval];
                 if (y >= -10 && y <= h + 10) {
                     ctx.fillRect(x, y - yScale/2 + 2, cw, yScale - 4);
                 }
@@ -658,7 +661,7 @@ export class UnifiedVisualizer {
 
             // Pass 0: Compute Geometry
             // Optimization: Calculate coordinates once per frame per track
-            track.history.forEach((ev, i) => {
+            track.history.forEach((ev) => {
                 const noteEnd = ev.time + (ev.duration || 0.25);
                 if (noteEnd < minTime) return;
                 if (ev.time > currentTime) return false;
@@ -670,7 +673,14 @@ export class UnifiedVisualizer {
                 const y = Math.round(getY(ev.midi));
 
                 if (y >= -10 && y <= h + 10) {
-                    geom.push(x1, y, x2, i);
+                    // Optimization: Store typeCode directly to avoid RingBuffer.at() lookup in render pass
+                    let typeCode = 0; // default
+                    if (name === 'soloist') {
+                        if (ev.noteType === 'arp') typeCode = 1;
+                        else if (ev.noteType === 'target') typeCode = 2;
+                        else if (ev.noteType === 'altered') typeCode = 3;
+                    }
+                    geom.push(x1, y, x2, typeCode);
 
                     // Check for active note
                     if (ev.time <= currentTime && noteEnd >= currentTime) {
@@ -719,14 +729,14 @@ export class UnifiedVisualizer {
                     const x1 = geom[j];
                     const y = geom[j+1];
                     const x2 = geom[j+2];
-                    const idx = geom[j+3];
-                    const ev = track.history.at(idx);
+                    const typeCode = geom[j+3];
 
-                    if (ev.noteType === 'arp') {
+                    // Optimization: Use typeCode from geometry buffer
+                    if (typeCode === 1) { // arp
                         batches.fifth.push(x1, y, x2);
-                    } else if (ev.noteType === 'target') {
+                    } else if (typeCode === 2) { // target
                         batches.root.push(x1, y, x2);
-                    } else if (ev.noteType === 'altered') {
+                    } else if (typeCode === 3) { // altered
                         batches.seventh.push(x1, y, x2);
                     } else {
                         batches.default.push(x1, y, x2);
