@@ -441,6 +441,7 @@ export class UnifiedVisualizer {
 
         // Active Chords
         for (const ev of this.chordEvents) {
+            if (ev.time > currentTime) break; // Optimization: Early exit
             if (ev.time <= currentTime && ev.time + (ev.duration || 2.0) >= currentTime) {
                 if (ev.notes) {
                     const rootPC = ev.rootMidi % 12;
@@ -458,6 +459,8 @@ export class UnifiedVisualizer {
             const track = this.tracks[name];
             let color = track.resolvedColor || track.color;
             track.history.forEach((ev) => {
+                 // Optimization: RingBuffer.forEach stops iteration when callback returns false
+                 if (ev.time > currentTime) return false;
                  if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
                      this.activeNoteColors[ev.midi] = color;
                  }
