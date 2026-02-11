@@ -1,3 +1,0 @@
-## 2024-05-22 - Buffer Aliasing in Reused Arrays
-**Learning:** Reusing a single `Float32Array` buffer for multiple calculation steps (e.g. `chroma` and `bassChroma`) to save memory can lead to subtle aliasing bugs if intermediate steps (like `rotateChroma`) sometimes return the input buffer (optimization for identity) and sometimes return a new buffer.
-**Action:** When reusing buffers, always ensure that data persisting across steps is copied to a distinct buffer or that the reuse pattern explicitly handles the persistence needs (e.g., using `finalChroma` and `finalBassChroma` destination buffers).

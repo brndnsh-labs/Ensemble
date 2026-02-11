@@ -1,3 +1,7 @@
+## 2024-05-22 - Buffer Aliasing in Reused Arrays
+**Learning:** Reusing a single `Float32Array` buffer for multiple calculation steps (e.g. `chroma` and `bassChroma`) to save memory can lead to subtle aliasing bugs if intermediate steps (like `rotateChroma`) sometimes return the input buffer (optimization for identity) and sometimes return a new buffer.
+**Action:** When reusing buffers, always ensure that data persisting across steps is copied to a distinct buffer or that the reuse pattern explicitly handles the persistence needs (e.g., using `finalChroma` and `finalBassChroma` destination buffers).
+
 ## 2024-05-23 - Global State Subscription Overhead & Mutable State Traps
 **Learning:** Connecting Preact components to a global event bus without equality checks caused massive re-render storms on every dispatch (even irrelevant ones). Furthermore, relying on reference equality for selectors fails when the underlying state is mutable (e.g. arrays modified in place), requiring explicit version counters to signal updates reliably.
 **Action:** Always implement equality checks in custom store hooks. When using mutable state, add version/timestamp properties to signal changes to subscribers.
