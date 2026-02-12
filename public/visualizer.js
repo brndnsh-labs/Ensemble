@@ -113,16 +113,8 @@ export class UnifiedVisualizer {
             this.updateThemeCache();
         }
 
-        // Optimization: Pre-allocated array to avoid per-frame GC and Map overhead
-        this.activeNoteColors = new Array(128).fill(null);
-
-        // Optimization: Pre-allocated batches to avoid per-frame GC
-        this.soloistBatches = {
-            default: [],
-            root: [],
-            fifth: [],
-            seventh: []
-        };
+        // Optimization: Track which C-notes are covered by highlights to redraw labels
+        this.cNotesBuffer = new Uint8Array(128);
 
         // Optimization: Shared buffer for calculated geometry
         this.geometryBuffer = [];
@@ -436,71 +428,70 @@ export class UnifiedVisualizer {
         // Optimization: Draw pre-rendered static layer
         ctx.drawImage(this.staticCanvas, 0, 0, w, h);
 
-        // --- Collect Active Notes for Piano Roll Highlight ---
-        this.activeNoteColors.fill(null);
-
-        // Active Chords
-        for (const ev of this.chordEvents) {
-            if (ev.time > currentTime) break; // Optimization: Early exit
-            if (ev.time <= currentTime && ev.time + (ev.duration || 2.0) >= currentTime) {
-                if (ev.notes) {
-                    const rootPC = ev.rootMidi % 12;
-                    for (const m of ev.notes) {
-                         const interval = (m % 12 - rootPC + 12) % 12;
-                         // Optimization: Direct array lookup
-                         this.activeNoteColors[m] = this.intervalColors[interval];
-                    }
-                }
-            }
-        }
-
-        // Active Tracks
-        for (const name in this.tracks) {
-            const track = this.tracks[name];
-            let color = track.resolvedColor || track.color;
-            track.history.forEach((ev) => {
-                 // Optimization: RingBuffer.forEach stops iteration when callback returns false
-                 if (ev.time > currentTime) return false;
-                 if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
-                     this.activeNoteColors[ev.midi] = color;
-                 }
-            });
-        }
-
         // --- Piano Roll Layer (Active Overlays) ---
         const topMidi = this.centerMidi + (this.visualRange / 2);
         const bottomMidi = this.centerMidi - (this.visualRange / 2);
         const startMidi = Math.floor(bottomMidi);
         const endMidi = Math.ceil(topMidi);
 
+        // Optimization: Direct draw (no intermediate array) + Batch Label Redraw
+        this.cNotesBuffer.fill(0);
+
+        // Active Chords (Direct Draw)
+        for (const ev of this.chordEvents) {
+            if (ev.time > currentTime) break; // Optimization: Early exit
+            if (ev.time <= currentTime && ev.time + (ev.duration || 2.0) >= currentTime) {
+                if (ev.notes) {
+                    const rootPC = ev.rootMidi % 12;
+                    for (const m of ev.notes) {
+                        if (m < startMidi || m > endMidi) continue;
+
+                        const interval = (m % 12 - rootPC + 12) % 12;
+                        const y = getY(m);
+
+                        ctx.fillStyle = this.intervalColors[interval];
+                        ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
+
+                        if (m % 12 === 0) this.cNotesBuffer[m] = 1;
+                    }
+                }
+            }
+        }
+
+        // Active Tracks (Direct Draw)
+        for (const name in this.tracks) {
+            const track = this.tracks[name];
+            let color = track.resolvedColor || track.color;
+            ctx.fillStyle = color; // Batch style change per track
+
+            track.history.forEach((ev) => {
+                 // Optimization: RingBuffer.forEach stops iteration when callback returns false
+                 if (ev.time > currentTime) return false;
+                 if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
+                     if (ev.midi >= startMidi && ev.midi <= endMidi) {
+                         const y = getY(ev.midi);
+                         ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
+
+                         if (ev.midi % 12 === 0) this.cNotesBuffer[ev.midi] = 1;
+                     }
+                 }
+            });
+        }
+
+        // Batch Label Redraw (for covered C-notes)
+        ctx.fillStyle = '#fff';
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
-        let lastFillStyle = null;
-
-        for (let m = startMidi; m <= endMidi; m++) {
-            if (this.activeNoteColors[m]) {
-                const y = getY(m);
-
-                // Optimization: Avoid redundant state changes
-                if (this.activeNoteColors[m] !== lastFillStyle) {
-                    ctx.fillStyle = this.activeNoteColors[m];
-                    lastFillStyle = this.activeNoteColors[m];
-                }
-
-                ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
-
-                // Restore label on top of highlight if it's a C-note
-                if (m % 12 === 0) {
-                     ctx.fillStyle = '#fff';
-                     // Invalidate cache since we changed style
-                     lastFillStyle = '#fff';
-
-                     const octave = (m / 12) - 1;
-                     ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
-                }
-            }
+        // Only iterate relevant range in steps of 12
+        const startC = Math.ceil(startMidi / 12) * 12;
+        for (let m = startC; m <= endMidi; m += 12) {
+             if (this.cNotesBuffer[m]) {
+                 const y = getY(m);
+                 const octave = (m / 12) - 1;
+                 ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
+             }
         }
 
         // 1. Rhythmic Grid
@@ -720,69 +711,59 @@ export class UnifiedVisualizer {
             // Second pass: Colored line (Batched)
             ctx.lineWidth = baseWidth;
             if (name === 'soloist') {
-                // For soloist, we need to batch by color category
-                // Optimization: Reuse arrays and flatten data
-                const batches = this.soloistBatches;
-                batches.default.length = 0;
-                batches.root.length = 0;
-                batches.fifth.length = 0;
-                batches.seventh.length = 0;
+                // Optimization: Multi-pass iteration of geometry buffer to avoid allocation/copying
 
+                // Batch 1: Default
+                ctx.strokeStyle = color;
+                ctx.beginPath();
+                let hasDefault = false;
                 for (let j = 0; j < geom.length; j += 4) {
-                    const x1 = geom[j];
-                    const y = geom[j+1];
-                    const x2 = geom[j+2];
-                    const typeCode = geom[j+3];
+                    if (geom[j+3] === 0) { // default
+                        ctx.moveTo(geom[j], geom[j+1]);
+                        ctx.lineTo(geom[j+2], geom[j+1]);
+                        hasDefault = true;
+                    }
+                }
+                if (hasDefault) ctx.stroke();
 
-                    // Optimization: Use typeCode from geometry buffer
-                    if (typeCode === 1) { // arp
-                        batches.fifth.push(x1, y, x2);
-                    } else if (typeCode === 2) { // target
-                        batches.root.push(x1, y, x2);
-                    } else if (typeCode === 3) { // altered
-                        batches.seventh.push(x1, y, x2);
-                    } else {
-                        batches.default.push(x1, y, x2);
+                // Batch 2: Root (Target)
+                ctx.strokeStyle = chordColors.root;
+                ctx.beginPath();
+                let hasRoot = false;
+                for (let j = 0; j < geom.length; j += 4) {
+                    if (geom[j+3] === 2) { // target
+                        ctx.moveTo(geom[j], geom[j+1]);
+                        ctx.lineTo(geom[j+2], geom[j+1]);
+                        hasRoot = true;
                     }
                 }
+                if (hasRoot) ctx.stroke();
 
-                // Render batches
-                if (batches.default.length) {
-                    ctx.strokeStyle = color;
-                    ctx.beginPath();
-                    for (let i = 0; i < batches.default.length; i += 3) {
-                        ctx.moveTo(batches.default[i], batches.default[i+1]);
-                        ctx.lineTo(batches.default[i+2], batches.default[i+1]);
+                // Batch 3: Fifth (Arp)
+                ctx.strokeStyle = chordColors.fifth;
+                ctx.beginPath();
+                let hasFifth = false;
+                for (let j = 0; j < geom.length; j += 4) {
+                    if (geom[j+3] === 1) { // arp
+                        ctx.moveTo(geom[j], geom[j+1]);
+                        ctx.lineTo(geom[j+2], geom[j+1]);
+                        hasFifth = true;
                     }
-                    ctx.stroke();
                 }
-                if (batches.root.length) {
-                    ctx.strokeStyle = chordColors.root;
-                    ctx.beginPath();
-                    for (let i = 0; i < batches.root.length; i += 3) {
-                        ctx.moveTo(batches.root[i], batches.root[i+1]);
-                        ctx.lineTo(batches.root[i+2], batches.root[i+1]);
+                if (hasFifth) ctx.stroke();
+
+                // Batch 4: Seventh (Altered)
+                ctx.strokeStyle = chordColors.seventh;
+                ctx.beginPath();
+                let hasSeventh = false;
+                for (let j = 0; j < geom.length; j += 4) {
+                    if (geom[j+3] === 3) { // altered
+                        ctx.moveTo(geom[j], geom[j+1]);
+                        ctx.lineTo(geom[j+2], geom[j+1]);
+                        hasSeventh = true;
                     }
-                    ctx.stroke();
                 }
-                if (batches.fifth.length) {
-                    ctx.strokeStyle = chordColors.fifth;
-                    ctx.beginPath();
-                    for (let i = 0; i < batches.fifth.length; i += 3) {
-                        ctx.moveTo(batches.fifth[i], batches.fifth[i+1]);
-                        ctx.lineTo(batches.fifth[i+2], batches.fifth[i+1]);
-                    }
-                    ctx.stroke();
-                }
-                if (batches.seventh.length) {
-                    ctx.strokeStyle = chordColors.seventh;
-                    ctx.beginPath();
-                    for (let i = 0; i < batches.seventh.length; i += 3) {
-                        ctx.moveTo(batches.seventh[i], batches.seventh[i+1]);
-                        ctx.lineTo(batches.seventh[i+2], batches.seventh[i+1]);
-                    }
-                    ctx.stroke();
-                }
+                if (hasSeventh) ctx.stroke();
 
             } else {
                 // Simple batch for non-soloist tracks
