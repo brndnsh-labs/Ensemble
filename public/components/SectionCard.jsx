@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import React, { forwardRef } from 'preact/compat';
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useState, useRef, useEffect, useImperativeHandle } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 import { SymbolMenu } from './SymbolMenu.jsx';
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
@@ -12,6 +12,20 @@ const { arranger } = getState();
 export const SectionCard = forwardRef(({ section, index, totalSections }, ref) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const textareaRef = useRef(null);
+    const rootRef = useRef(null);
+
+    useImperativeHandle(ref, () => ({
+        scrollIntoView: (options) => {
+            if (rootRef.current) {
+                rootRef.current.scrollIntoView(options);
+            }
+        },
+        focusInput: () => {
+            if (textareaRef.current) {
+                textareaRef.current.focus();
+            }
+        }
+    }));
     
     const { isMinor, arrangerKey } = useEnsembleState(s => ({
         isMinor: s.arranger.isMinor,
@@ -86,7 +100,7 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
 
     return (
         <div 
-            ref={ref}
+            ref={rootRef}
             class={`section-card ${section.seamless ? 'linked' : ''} ${isMenuOpen ? 'menu-active' : ''}`}
             data-id={section.id}
             style={{ viewTransitionName: `editor-card-${section.id}` }}
