@@ -62,6 +62,11 @@ export function SequencerGrid() {
     const totalSteps = measures * spm;
     const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
 
+    // Optimization: Memoize step info objects to prevent re-renders of memoized Step components
+    const allStepInfos = useMemo(() => {
+        return Array.from({ length: totalSteps }, (_, i) => getStepInfo(i, ts));
+    }, [totalSteps, ts]);
+
     useEffect(() => {
         const handleMouseUp = () => { isDraggingRef.current = false; };
         window.addEventListener('mouseup', handleMouseUp);
@@ -210,14 +215,14 @@ export function SequencerGrid() {
                         </button>
                     </div>
                     <div className="steps" style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}>
-                        {Array.from({ length: totalSteps }).map((_, stepIdx) => (
+                        {allStepInfos.map((stepInfo, stepIdx) => (
                             <Step 
                                 key={stepIdx}
                                 instIdx={instIdx}
                                 stepIdx={stepIdx}
                                 value={inst.steps[stepIdx]}
                                 instName={inst.name}
-                                stepInfo={getStepInfo(stepIdx, ts)}
+                                stepInfo={stepInfo}
                                 onToggle={handleToggle}
                             />
                         ))}
@@ -229,8 +234,7 @@ export function SequencerGrid() {
             <div className="track label-row">
                 <div className="track-header label-header"></div>
                 <div className="steps" style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}>
-                    {Array.from({ length: totalSteps }).map((_, i) => {
-                        const stepInfo = getStepInfo(i, ts);
+                    {allStepInfos.map((stepInfo, i) => {
                         const isBeatStart = stepInfo.isBeatStart;
                         const label = isBeatStart ? (stepInfo.beatIndex + 1) : ((i % ts.stepsPerBeat) + 1);
                         return (
