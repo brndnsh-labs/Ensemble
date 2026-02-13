@@ -80,9 +80,7 @@ describe('Worker Client Security', () => {
         // unless we captured it.
         const anchor = createElementSpy.mock.results[0].value;
 
-        // This assertion will fail until we implement the fix
-        // Currently it accepts whatever the worker sends
-        // We expect it to be sanitized
+        // Verify sanitization
         expect(anchor.download).not.toBe(maliciousFilename);
         expect(anchor.download).toMatch(/^[a-zA-Z0-9\s\-_()]+\.mid$/);
     });
