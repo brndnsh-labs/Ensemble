@@ -42,7 +42,8 @@ vi.mock('../../public/state.js', () => {
             hookBuffer: [],
             lastFreq: 440,
             pitchHistory: [],
-            deviceBuffer: []
+            deviceBuffer: [],
+            sessionSteps: 0
         },
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120 },
@@ -85,15 +86,24 @@ vi.mock('../../public/theory-scales.js', () => ({
 }));
 
 import { getSoloistNote } from '../../public/soloist.js';
+import { getState } from '../../public/state.js';
 
 function runSimulation(bpm, steps = 256) {
-    // Reset State
-    playbackState.bpm = bpm;
-    soloistState.busySteps = 0;
-    soloistState.currentPhraseSteps = 0;
-    soloistState.notesInPhrase = 0;
-    soloistState.pitchHistory = [];
-    soloistState.lastFreq = 261.63; // Middle C
+    // Reset State properly via the mock accessor
+    const state = getState();
+    state.playback.bpm = bpm;
+    state.soloist.busySteps = 0;
+    state.soloist.currentPhraseSteps = 0;
+    state.soloist.notesInPhrase = 0;
+    state.soloist.pitchHistory = [];
+    state.soloist.sessionSteps = 0;
+    state.soloist.deviceBuffer = [];
+    state.soloist.motifBuffer = [];
+    state.soloist.isResting = true;
+    state.soloist.lastFreq = 261.63; // Middle C
+
+    // Reset local test state tracking
+    soloistState.lastFreq = 261.63;
 
     let noteCount = 0;
     let intervals = [];
@@ -155,9 +165,12 @@ describe('Bird Soloist Density Analysis', () => {
         console.log(`120 BPM -> Density: ${stats120.density.toFixed(2)}, Avg Interval: ${stats120.avgInterval.toFixed(2)} semitones`);
         console.log(`200 BPM -> Density: ${stats200.density.toFixed(2)}, Avg Interval: ${stats200.avgInterval.toFixed(2)} semitones`);
 
-        // Currently, without the fix, we expect 200 BPM to have similar (high) density and erratic intervals.
-        // We aren't asserting failure here, just logging baseline.
-        // But for the sake of the test suite passing, we just add a dummy expect.
-        expect(true).toBe(true);
+        // Assertions for high BPM density reduction and interval control
+        // Baseline 120 BPM is around 0.60 density.
+        // At 200 BPM, we want it significantly lower to avoid chaos, or at least similar but controlled.
+        // With current fixes, we aim for < 0.55 density and < 3.5 semitone avg interval.
+
+        expect(stats200.density).toBeLessThan(0.55);
+        expect(stats200.avgInterval).toBeLessThan(3.5);
     });
 });

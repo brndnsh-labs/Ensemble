@@ -266,7 +266,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         const dampingAmount = Math.max(0, (0.5 - intensity) * 1.5); 
         if (activeStyle === 'bird') {
              // Bird should stay busy but still has a slight intensity floor
-             restProb -= (intensity * 0.1); 
+             // But NOT at extreme BPMs where density is already high
+             if (playback.bpm < 185) {
+                 restProb -= (intensity * 0.1);
+             }
         } else {
              restProb += dampingAmount;
         }
@@ -276,6 +279,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (playback.bpm > 150) {
         restProb += 0.15;
         if (playback.bpm > 180) restProb += 0.15;
+        if (activeStyle === 'bird' && playback.bpm > 185) restProb += 0.25; // Extra damping for Bird at 200 BPM
     }
 
     // Phrase interlocking
@@ -559,6 +563,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (playback.bpm > 180 && dist > 3) {
              weight *= 0.05; // Stricter
         }
+        if (playback.bpm > 190 && dist > 2) {
+             weight *= 0.05; // Super strict at 200 BPM (mostly stepwise)
+        }
 
         if (historyLen > 12) {
             const count = historyCounts[m] || 0;
@@ -627,7 +634,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const deviceBaseProb = config.deviceProb * (0.5 + playback.complexity * 1.0);
     
     // Throttle devices at high BPM
-    const bpmDeviceThrottle = playback.bpm > 160 ? 0.3 : 1.0;
+    let bpmDeviceThrottle = playback.bpm > 160 ? 0.3 : 1.0;
+    if (playback.bpm > 185) bpmDeviceThrottle = 0.05; // Almost no devices at 200 BPM to prevent 16th bursts
 
     if (allowFlash && stepInBeat === 0 && Math.random() < (deviceBaseProb * 0.7 * warmupFactor * bpmDeviceThrottle)) {
         const deviceType = config.allowedDevices ? config.allowedDevices[Math.floor(Math.random() * config.allowedDevices.length)] : null;
@@ -677,6 +685,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             return finalizeNote(res);
         }
         if (deviceType === 'birdFlurry') {
+            // Throttle flurry at high BPM
+            if (playback.bpm > 180 && Math.random() < 0.8) return null;
+
             let flurry = []; let curr = selectedMidi + 3; 
             for (let i = 0; i < 4; i++) {
                 let n = curr - 1; while (!scaleIntervals.includes((n - rootMidi + 120) % 12) && n > curr - 5) n--;
