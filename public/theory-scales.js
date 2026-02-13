@@ -189,8 +189,10 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
 
     // --- GENRE SPECIFIC FALLBACKS ---
 
-    if (style === 'metal') {
-        return isDominant ? SCALE_INTERVALS.PHRYGIAN_DOMINANT : SCALE_INTERVALS.NATURAL_MINOR;
+    // Metal: Only override Dominant chords (Phrygian Dominant).
+    // Non-dominant chords fall through to Default Fallbacks (Natural Minor for Minor, Major for Major).
+    if (style === 'metal' && isDominant) {
+        return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
     }
 
     // Default Fallbacks if not Diatonic
@@ -198,6 +200,10 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
 
     // Jazz/Bossa prefer Lydian for non-diatonic Major chords (e.g. bIImaj7, bVImaj7)
     if (style === 'bird' || style === 'bossa') return SCALE_INTERVALS.LYDIAN;
+
+    // Explicitly handle 'scalar' style for non-diatonic Major chords to ensure consonance (Ionian/Lydian)
+    // as requested by dissonance prevention logic (e.g. F Major in C Minor).
+    if (style === 'scalar') return SCALE_INTERVALS.MAJOR;
 
     return SCALE_INTERVALS.MAJOR;
 }
