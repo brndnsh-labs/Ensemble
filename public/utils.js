@@ -40,12 +40,24 @@ export function stripDangerousChars(str) {
     return str.replace(/[<>"=`]/g, '');
 }
 
+// Pre-calculate frequencies for standard MIDI range (0-127) to avoid expensive Math.pow calls
+const FREQUENCY_CACHE = new Float32Array(128);
+for (let i = 0; i < 128; i++) {
+    FREQUENCY_CACHE[i] = 440 * Math.pow(2, (i - 69) / 12);
+}
+
 /**
  * Converts a MIDI note number to a frequency in Hertz.
  * @param {number} midi - The MIDI note number.
  * @returns {number} The frequency in Hz.
  */
 export function getFrequency(midi) { 
+    // Fast path: lookup from cache if within 0-127 and integer
+    // Float32Array returns undefined for out-of-bounds or non-integer indices
+    const freq = FREQUENCY_CACHE[midi];
+    if (freq !== undefined) return freq;
+
+    // Slow path: calculate for extended range or microtonal values
     return 440 * Math.pow(2, (midi - 69) / 12); 
 }
 
