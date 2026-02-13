@@ -6,6 +6,7 @@ import { getScaleForChord } from './theory-scales.js';
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 const HIST_COUNTS = new Float32Array(128);
 const PC_COUNTS = new Float32Array(12);
+const SCALE_LOOKUP = new Int8Array(12);
 
 const RHYTHMIC_CELLS = [
     [1, 1, 1, 1], // 0: 16ths
@@ -466,6 +467,13 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (nextChord && isLateInChord && Math.random() < (config.anticipationProb || 0)) targetChord = nextChord;
 
     const scaleIntervals = getScaleForChord(targetChord, null, style);
+
+    // Optimization: Pre-calculate scale intervals lookup table for O(1) access
+    SCALE_LOOKUP.fill(0);
+    for (let i = 0; i < scaleIntervals.length; i++) {
+        SCALE_LOOKUP[scaleIntervals[i]] = 1;
+    }
+
     const rootMidi = targetChord.rootMidi;
     // Optimization: avoid allocating scaleTones and chordTones arrays.
     // Instead check intervals directly against scaleIntervals and targetChord.intervals.
@@ -520,7 +528,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         let weight = 1.0;
 
         // Use pre-calculated interval (0-11) to check against scaleIntervals (also 0-11)
-        if (!scaleIntervals.includes(interval)) continue;
+        if (SCALE_LOOKUP[interval] === 0) continue;
 
         const dist = Math.abs(m - lastMidi);
 
@@ -618,7 +626,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             if (m < 0 || m > 127) continue;
             const pc = (m % 12 + 12) % 12;
             const interval = (pc - (rootMidi % 12) + 12) % 12;
-            if (scaleIntervals.includes(interval) && m !== lastMidi) {
+            if (SCALE_LOOKUP[interval] === 1 && m !== lastMidi) {
                 const dist = Math.abs(m - lastMidi);
                 let weight = 1.0;
                 if (dist <= 2) weight += 10;
@@ -702,7 +710,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
             let flurry = []; let curr = selectedMidi + 3; 
             for (let i = 0; i < 4; i++) {
-                let n = curr - 1; while (!scaleIntervals.includes((n - rootMidi + 120) % 12) && n > curr - 5) n--;
+                let n = curr - 1; while (SCALE_LOOKUP[(n - rootMidi + 120) % 12] === 0 && n > curr - 5) n--;
                 flurry.push({ midi: n, velocity: devBaseVel * 1.05, durationSteps: 1, style: activeStyle });
                 curr = n;
             }
