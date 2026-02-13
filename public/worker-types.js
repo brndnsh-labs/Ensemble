@@ -25,6 +25,7 @@ export const WORKER_RESP = {
     NOTES: 'notes',
     TICK: 'tick',
     EXPORT_COMPLETE: 'exportComplete',
+    EXPORT_PROGRESS: 'exportProgress',
     ERROR: 'error'
 };
 

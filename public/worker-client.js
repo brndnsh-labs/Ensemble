@@ -4,8 +4,13 @@ import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 let timerWorker = null;
 let schedulerRequestHandler = null;
 let notesReceivedHandler = null;
+let exportProgressHandler = null;
 
 export const getTimerWorker = () => timerWorker;
+
+export function setExportProgressHandler(handler) {
+    exportProgressHandler = handler;
+}
 
 export function initWorker(onSchedulerRequest, onNotesReceived) {
     if (timerWorker) {
@@ -27,9 +32,16 @@ export function initWorker(onSchedulerRequest, onNotesReceived) {
             if (typeof schedulerRequestHandler === 'function') schedulerRequestHandler();
         } else if (type === WORKER_RESP.NOTES) {
             if (typeof notesReceivedHandler === 'function') notesReceivedHandler(notes, requestTimestamp, workerProcessTime);
+        } else if (type === WORKER_RESP.EXPORT_PROGRESS) {
+            if (typeof exportProgressHandler === 'function') {
+                exportProgressHandler(e.data.progress);
+            }
         } else if (type === WORKER_RESP.ERROR) {
             console.error("[Worker Error]", data);
         } else if (type === WORKER_RESP.EXPORT_COMPLETE) {
+            if (typeof exportProgressHandler === 'function') {
+                exportProgressHandler(1.0); // Ensure 100%
+            }
             const { blob, filename } = e.data;
             const url = URL.createObjectURL(new Blob([blob], { type: 'audio/midi' }));
             const a = document.createElement('a');
