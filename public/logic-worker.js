@@ -214,7 +214,7 @@ class ExportProcessor {
     start() {
         if (arranger.progression.length === 0) {
             postMessage({ type: WORKER_RESP.ERROR, data: "No progression to export" });
-            this.cleanup(false);
+            this.cleanup();
             return;
         }
 
@@ -300,7 +300,7 @@ class ExportProcessor {
             this.finish();
         } catch (e) {
             postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
-            this.cleanup(false);
+            this.cleanup();
         }
     }
 
@@ -584,7 +584,7 @@ class ExportProcessor {
         this.metaTrack.endOfTrack(finalPulse);
 
         // Restore State
-        this.cleanup(true);
+        this.cleanup();
 
         const header = new Uint8Array([...writeString('MThd'), ...writeInt32(6), ...writeInt16(1), ...writeInt16(finalTrackList.length), ...writeInt16(PPQ)]);
         const trackChunks = finalTrackList.map(t => t.compile());
@@ -598,7 +598,7 @@ class ExportProcessor {
         postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
     }
 
-    cleanup(success) {
+    cleanup() {
         if (this.prevStates) {
             chords.enabled = this.prevStates.chords;
             bass.enabled = this.prevStates.bass;

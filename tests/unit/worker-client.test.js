@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Worker
 const mockPostMessage = vi.fn();
@@ -16,8 +16,8 @@ global.Worker = class MockWorker {
 global.URL.createObjectURL = vi.fn(() => 'blob:mock');
 global.URL.revokeObjectURL = vi.fn();
 
-import { initWorker, setExportProgressHandler, startExport } from '../../public/worker-client.js';
-import { WORKER_RESP, WORKER_MSG } from '../../public/worker-types.js';
+import { initWorker, setExportProgressHandler } from '../../public/worker-client.js';
+import { WORKER_RESP } from '../../public/worker-types.js';
 
 describe('Worker Client', () => {
     let worker;
