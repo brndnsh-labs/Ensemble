@@ -357,54 +357,66 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             return primary && primary.phraseStep === soloist.currentPhraseSteps;
         });
 
-        if (motifNote && historyLen > 12) {
-            const primaryMidi = Array.isArray(motifNote) ? motifNote[0].midi : motifNote.midi;
-            const count = historyCounts[primaryMidi] || 0;
-            const pcCount = pcCounts[primaryMidi % 12] || 0;
-            if ((count / historyLen) > 0.35 || (pcCount / historyLen) > 0.45) {
-                soloist.isReplayingMotif = false;
-                soloist.motifBuffer = [];
-            }
-        }
+        if (motifNote) {
+            const currentRoot = currentChord.rootMidi % 12;
+            const motifRoot = soloist.motifRoot !== undefined ? soloist.motifRoot : currentRoot;
+            const shift = (currentRoot - motifRoot + 12) % 12;
+            const octaveShift = shift > 6 ? -12 : (shift < -6 ? 12 : 0);
 
-        if (soloist.isReplayingMotif) {
-            const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
-            const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
-            if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                soloist.isReplayingMotif = false;
+            let res = motifNote;
+            if (Array.isArray(motifNote)) {
+                res = motifNote.map(n => ({ ...n, midi: n.midi + shift + octaveShift }));
+            } else {
+                res = { ...motifNote, midi: motifNote.midi + shift + octaveShift };
             }
             
-            if (motifNote) {
-                const currentRoot = currentChord.rootMidi % 12;
-                const motifRoot = soloist.motifRoot !== undefined ? soloist.motifRoot : currentRoot;
-                const shift = (currentRoot - motifRoot + 12) % 12;
-                const octaveShift = shift > 6 ? -12 : (shift < -6 ? 12 : 0);
-                
-                let res = motifNote;
-                if (Array.isArray(motifNote)) {
-                    res = motifNote.map(n => ({ ...n, midi: n.midi + shift + octaveShift }));
-                } else {
-                    res = { ...motifNote, midi: motifNote.midi + shift + octaveShift };
+            let primary = Array.isArray(res) ? res[0] : res;
+            const scaleIntervals = getScaleForChord(currentChord, null, style);
+            const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
+
+            if (!scaleIntervals.includes(relPC)) {
+                const nearest = scaleIntervals.reduce((prev, curr) => Math.abs(curr - relPC) < Math.abs(prev - relPC) ? curr : prev);
+                const nudge = nearest - relPC;
+                if (Array.isArray(res)) res = res.map(n => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
+                else {
+                    res.midi += nudge;
+                    res.bendStartInterval = 0;
                 }
-                
-                const primary = Array.isArray(res) ? res[0] : res;
-                const scaleIntervals = getScaleForChord(currentChord, null, style);
-                const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
-                
-                if (!scaleIntervals.includes(relPC)) {
-                    const nearest = scaleIntervals.reduce((prev, curr) => Math.abs(curr - relPC) < Math.abs(prev - relPC) ? curr : prev);
-                    const nudge = nearest - relPC;
-                    if (Array.isArray(res)) res = res.map(n => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
-                    else {
-                        res.midi += nudge;
-                        res.bendStartInterval = 0;
-                    }
+                primary = Array.isArray(res) ? res[0] : res;
+            }
+
+            // Stale check on actual played note (transposed)
+            if (historyLen > 12) {
+                const count = historyCounts[primary.midi] || 0;
+                const pcCount = pcCounts[primary.midi % 12] || 0;
+                if ((count / historyLen) > 0.3 || (pcCount / historyLen) > 0.4) {
+                    soloist.isReplayingMotif = false;
+                    soloist.motifBuffer = [];
+                    // Abort immediately? Or fall through to normal generation?
+                    // Fall through effectively cancels replay for this step and future steps
+                }
+            }
+
+            if (soloist.isReplayingMotif) {
+                const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
+                const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
+                if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
+                    soloist.isReplayingMotif = false;
                 }
 
                 soloist.busySteps = (primary.durationSteps || 1) - 1;
                 return finalizeNote(res);
             }
-            return null; // Respect rests during motif replay
+        }
+
+        // If replaying but current step is a rest in the motif
+        if (soloist.isReplayingMotif && !motifNote) {
+             const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
+             const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
+             if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
+                soloist.isReplayingMotif = false;
+             }
+             return null;
         }
     }
 
