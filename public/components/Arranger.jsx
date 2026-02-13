@@ -15,14 +15,16 @@ export function Arranger() {
 
     useEffect(() => {
         if (lastInteractedSectionId) {
-            const el = sectionRefs.current[lastInteractedSectionId];
-            if (el) {
+            const handle = sectionRefs.current[lastInteractedSectionId];
+            if (handle) {
                 // Delay slightly to allow modal transition
                 setTimeout(() => {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Highlight or focus the textarea
-                    const textarea = el.querySelector('textarea');
-                    if (textarea) textarea.focus();
+                    if (handle.scrollIntoView) {
+                        handle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    if (handle.focusInput) {
+                        handle.focusInput();
+                    }
                 }, 150);
             }
         }
