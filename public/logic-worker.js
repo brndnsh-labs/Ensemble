@@ -25,6 +25,10 @@ const mainCursor = { index: 0, sectionIndex: 0 };
 const lookaheadCursor = { index: 0, sectionIndex: 0 };
 const LOOKAHEAD = 64;
 
+// Export State
+let isExporting = false;
+const messageQueue = [];
+
 // --- EXPORT HELPERS ---
 
 const PPQ = 480; 
@@ -113,6 +117,501 @@ class MidiTrack {
         }
         const len = writeInt32(binary.length);
         return new Uint8Array([...writeString('MTrk'), ...len, ...binary]);
+    }
+}
+
+class ExportProcessor {
+    constructor(options) {
+        this.options = options;
+        this.includedTracks = options.includedTracks || ['chords', 'bass', 'soloist', 'harmonies', 'drums'];
+        this.targetDuration = options.targetDuration || 3;
+        this.loopMode = options.loopMode || 'time';
+        this.filename = options.filename;
+
+        this.CHUNK_MS = 12; // Allow execution for ~12ms per frame
+
+        // Initialize Export State
+        this.ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        this.totalStepsOneLoop = arranger.totalSteps;
+        this.stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
+        const loopSeconds = (this.totalStepsOneLoop / this.ts.stepsPerBeat) * (60 / playback.bpm);
+        this.loopCount = (this.loopMode === 'once') ? 1 : Math.max(1, Math.min(100, Math.ceil((this.targetDuration * 60) / loopSeconds)));
+        this.totalStepsWithoutEnding = this.totalStepsOneLoop * this.loopCount;
+        this.totalStepsExport = this.totalStepsWithoutEnding + 16;
+
+        this.exportCursor = { index: 0, sectionIndex: 0 };
+        this.exportLookaheadCursor = { index: 0, sectionIndex: 0 };
+
+        // Timing Map
+        this.stepTimes = new Array(this.totalStepsExport + 128);
+        this.secondsPerBeat = 60.0 / playback.bpm;
+        this.sixteenthSec = 0.25 * this.secondsPerBeat;
+
+        let accumulatedSeconds = 0;
+        for (let i = 0; i < this.stepTimes.length; i++) {
+            this.stepTimes[i] = accumulatedSeconds;
+            let duration = this.sixteenthSec;
+            if (groove.swing > 0 && this.ts.stepsPerBeat === 4) {
+                const shift = (this.sixteenthSec / 3) * (groove.swing / 100);
+                if (groove.swingSub === '16th') {
+                    duration += (i % 2 === 0) ? shift : -shift;
+                } else {
+                    duration += ((i % 4) < 2) ? shift : -shift;
+                }
+            }
+            accumulatedSeconds += duration;
+        }
+
+        // MIDI Tracks
+        this.metaTrack = new MidiTrack();
+        this.chordTrack = new MidiTrack();
+        this.bassTrack = new MidiTrack();
+        this.soloistTrack = new MidiTrack();
+        this.harmonyTrack = new MidiTrack();
+        this.drumTrack = new MidiTrack();
+
+        this.metaTrack.setName(0, 'Ensemble Export');
+        this.metaTrack.setTempo(0, playback.bpm);
+        this.metaTrack.setKeySig(0, arranger.key, arranger.isMinor);
+        const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
+        this.metaTrack.setTimeSig(0, tsNum, tsDenom);
+
+        this.chordTrack.setName(0, 'Chords'); this.chordTrack.programChange(0, 0, 4);
+        this.bassTrack.setName(0, 'Bass'); this.bassTrack.programChange(0, 1, 34);
+        this.soloistTrack.setName(0, 'Soloist'); this.soloistTrack.programChange(0, 2, 80);
+        this.harmonyTrack.setName(0, 'Harmonies'); this.harmonyTrack.programChange(0, 3, 61);
+        this.drumTrack.setName(0, 'Drums');
+
+        // Snapshot and Apply Overrides
+        this.prevStates = {
+            chords: chords.enabled,
+            bass: bass.enabled,
+            soloist: soloist.enabled,
+            harmony: harmony.enabled,
+            groove: groove.enabled,
+            intensity: playback.bandIntensity,
+            doubleStops: soloist.doubleStops,
+            sessionSteps: soloist.sessionSteps
+        };
+
+        chords.enabled = true; bass.enabled = true; soloist.enabled = true; harmony.enabled = true; groove.enabled = true;
+        soloist.sessionSteps = 1000;
+        compingState.lockedUntil = 0; compingState.lastChordIndex = -1;
+        soloist.busySteps = 0; soloist.isResting = false; soloist.currentPhraseSteps = 0;
+
+        // Conductor State
+        this.exportConductor = {
+            loopCount: 0,
+            formIteration: 0,
+            targetIntensity: playback.bandIntensity,
+            stepSize: 0,
+            form: analyzeForm()
+        };
+
+        this.globalStep = 0;
+    }
+
+    start() {
+        if (arranger.progression.length === 0) {
+            postMessage({ type: WORKER_RESP.ERROR, data: "No progression to export" });
+            this.cleanup(false);
+            return;
+        }
+
+        isExporting = true;
+        this.processChunk();
+    }
+
+    toPulses(t) {
+        return Math.round(t * (playback.bpm / 60.0) * PPQ);
+    }
+
+    checkWorkerTransition(step) {
+        if (!groove.enabled) return;
+        const modStep = step % this.totalStepsOneLoop;
+
+        if (modStep === 0 && step > 0) {
+            this.exportConductor.loopCount++;
+            this.exportConductor.formIteration++;
+        }
+
+        const entry = arranger.stepMap.find(e => modStep >= e.start && modStep < e.end);
+        if (!entry) return;
+
+        const sectionEnd = entry.end;
+        const fillStart = sectionEnd - this.stepsPerMeasure;
+
+        if (modStep === fillStart) {
+            const currentIndex = arranger.stepMap.indexOf(entry);
+            let nextEntry = arranger.stepMap[currentIndex + 1];
+            let isLoopEnd = false;
+            if (!nextEntry) { nextEntry = arranger.stepMap[0]; isLoopEnd = true; }
+
+            if (nextEntry.chord.sectionId !== entry.chord.sectionId || isLoopEnd) {
+                let shouldFill = true;
+                if (isLoopEnd && this.totalStepsOneLoop <= 64) {
+                    const freq = playback.bandIntensity > 0.75 ? 1 : (playback.bandIntensity > 0.4 ? 2 : 4);
+                    shouldFill = (this.exportConductor.loopCount % freq === 0);
+                }
+                if (shouldFill) {
+                    groove.fillSteps = generateProceduralFill(groove.genreFeel, playback.bandIntensity, this.stepsPerMeasure);
+                    groove.fillActive = true;
+                    groove.fillStartStep = step;
+                    groove.fillLength = this.stepsPerMeasure;
+                    groove.pendingCrash = true;
+                }
+            }
+        }
+
+        if (playback.autoIntensity && modStep === 0 && this.exportConductor.formIteration > 0) {
+            const grandCycle = this.exportConductor.formIteration % 8;
+            let target = 0.5;
+            if (grandCycle < 3) target = 0.6;
+            else if (grandCycle < 5) target = 0.9;
+            else target = 0.4;
+            playback.bandIntensity = playback.bandIntensity + (target - playback.bandIntensity) * 0.5;
+        }
+
+        harmony.complexity = Math.max(0, (playback.bandIntensity - 0.2) * 1.25);
+
+        const isLastLoop = (this.exportConductor.loopCount >= this.loopCount - 1);
+        if (isLastLoop && this.loopCount > 1) {
+            harmony.complexity = Math.max(harmony.complexity, 0.85);
+        }
+    }
+
+    processChunk() {
+        try {
+            const chunkStart = performance.now();
+
+            while (this.globalStep < this.totalStepsWithoutEnding) {
+                // Check time budget
+                if (performance.now() - chunkStart > this.CHUNK_MS) {
+                    const progress = Math.min(0.99, this.globalStep / this.totalStepsExport);
+                    postMessage({ type: WORKER_RESP.EXPORT_PROGRESS, progress });
+                    setTimeout(() => this.processChunk(), 0);
+                    return;
+                }
+
+                this.processStep(this.globalStep);
+                this.globalStep++;
+            }
+
+            this.finish();
+        } catch (e) {
+            postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
+            this.cleanup(false);
+        }
+    }
+
+    processStep(globalStep) {
+        this.checkWorkerTransition(globalStep);
+
+        const stepTimeS = this.stepTimes[globalStep];
+        const measureStep = globalStep % this.stepsPerMeasure;
+        const stepInfo = getStepInfo(globalStep, this.ts);
+        const chordData = getChordAtStep(globalStep, this.exportCursor);
+
+        if (chordData) {
+            const { chord, stepInChord } = chordData;
+            const nextChordData = getChordAtStep(globalStep + 4, this.exportLookaheadCursor);
+
+            if (this.includedTracks.includes('chords')) {
+                const notes = getAccompanimentNotes(chord, globalStep, stepInChord, measureStep, stepInfo);
+                const numVoices = notes.filter(n => n.midi > 0).length;
+                const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
+
+                notes.forEach(n => {
+                    const noteTimeS = stepTimeS + (n.timingOffset || 0);
+                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
+
+                    if (n.midi > 0) {
+                        n.ccEvents.forEach(cc => this.chordTrack.cc(notePulse, 0, cc.controller, cc.value));
+
+                        let finalVel = n.velocity * polyphonyComp;
+                        if (n.muted) finalVel *= 0.3;
+                        const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
+
+                        this.chordTrack.noteOn(notePulse, 0, n.midi, midiVel);
+
+                        let endTimeS;
+                        if (n.durationSteps < 1) {
+                            endTimeS = noteTimeS + (n.durationSteps * this.sixteenthSec);
+                        } else {
+                            const targetStepIdx = globalStep + Math.round(n.durationSteps);
+                            endTimeS = this.stepTimes[targetStepIdx] || (noteTimeS + (n.durationSteps * this.sixteenthSec));
+                        }
+                        if (endTimeS - noteTimeS < 0.05) endTimeS = noteTimeS + 0.05;
+
+                        this.chordTrack.noteOff(this.toPulses(endTimeS), 0, n.midi);
+                    } else if (n.ccEvents.length > 0) {
+                        n.ccEvents.forEach(cc => this.chordTrack.cc(notePulse, 0, cc.controller, cc.value));
+                    }
+                });
+            }
+
+            if (this.includedTracks.includes('bass') && isBassActive(bass.style, globalStep, stepInChord)) {
+                const { sectionStart, sectionEnd } = chordData;
+                const res = getBassNote(chord, nextChordData?.chord, stepInChord / this.ts.stepsPerBeat, bass.lastFreq, bass.octave, bass.style, chordData.chordIndex, globalStep, stepInChord, { sectionStart, sectionEnd });
+                if (res && res.midi) {
+                    const noteTimeS = stepTimeS + (res.timingOffset || 0);
+                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
+
+                    let finalVel = res.velocity;
+                    if (res.muted) finalVel *= 0.25;
+                    const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
+
+                    this.bassTrack.noteOn(notePulse, 1, res.midi, midiVel);
+
+                    let endTimeS;
+                    if (res.durationSteps < 1) {
+                        endTimeS = noteTimeS + (res.durationSteps * this.sixteenthSec);
+                    } else {
+                        const targetStepIdx = globalStep + Math.round(res.durationSteps);
+                        endTimeS = this.stepTimes[targetStepIdx] || (noteTimeS + (res.durationSteps * this.sixteenthSec));
+                    }
+                    if (endTimeS - noteTimeS < 0.05) endTimeS = noteTimeS + 0.05;
+                    endTimeS += 0.02;
+
+                    this.bassTrack.noteOff(this.toPulses(endTimeS), 1, res.midi);
+                    bass.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12);
+                }
+            }
+
+            if (this.includedTracks.includes('soloist')) {
+                const { sectionStart, sectionEnd } = chordData;
+                const soloResult = getSoloistNote(chord, nextChordData?.chord, globalStep, soloist.lastFreq, soloist.octave, soloist.style, stepInChord, false, { sectionStart, sectionEnd });
+                if (soloResult) {
+                    const results = Array.isArray(soloResult) ? soloResult : [soloResult];
+                    const polyphonyComp = 1 / Math.sqrt(Math.max(1, results.length));
+
+                    results.forEach(res => {
+                        if (res.midi) {
+                            const noteTimeS = stepTimeS + (res.timingOffset || 0);
+                            const notePulse = Math.max(0, this.toPulses(noteTimeS));
+
+                            const midiVel = Math.max(1, Math.min(127, Math.round(res.velocity * polyphonyComp * 127)));
+
+                            if (res.bendStartInterval) {
+                                this.soloistTrack.pitchBend(notePulse, 2, Math.round(-(res.bendStartInterval / 2) * 8192));
+                                this.soloistTrack.noteOn(notePulse, 2, res.midi, midiVel);
+                                this.soloistTrack.pitchBend(this.toPulses(stepTimeS + this.sixteenthSec), 2, 0);
+                            } else {
+                                this.soloistTrack.noteOn(notePulse, 2, res.midi, midiVel);
+                            }
+
+                            let endTimeS;
+                            if (res.durationSteps < 1) {
+                                endTimeS = noteTimeS + (res.durationSteps * this.sixteenthSec);
+                            } else {
+                                const targetStepIdx = globalStep + Math.round(res.durationSteps);
+                                endTimeS = this.stepTimes[targetStepIdx] || (noteTimeS + (res.durationSteps * this.sixteenthSec));
+                            }
+                            if (endTimeS - noteTimeS < 0.05) endTimeS = noteTimeS + 0.05;
+                            endTimeS += 0.015;
+
+                            this.soloistTrack.noteOff(this.toPulses(endTimeS), 2, res.midi);
+                            if (!res.isDoubleStop) soloist.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12);
+                        }
+                    });
+                }
+
+                if (this.includedTracks.includes('harmonies')) {
+                    const harmonyNotes = getHarmonyNotes(chord, nextChordData?.chord, globalStep, harmony.octave, harmony.style, stepInChord);
+                    const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
+
+                    harmonyNotes.forEach(n => {
+                        const noteTimeS = stepTimeS + (n.timingOffset || 0);
+                        const notePulse = Math.max(0, this.toPulses(noteTimeS));
+                        const midiVel = Math.max(1, Math.min(127, Math.round(n.velocity * polyphonyComp * 127)));
+
+                        this.harmonyTrack.noteOn(notePulse, 3, n.midi, midiVel);
+
+                        let endTimeS;
+                        if (n.durationSteps < 1) {
+                            endTimeS = noteTimeS + (n.durationSteps * this.sixteenthSec);
+                        } else {
+                            const targetStepIdx = globalStep + Math.round(n.durationSteps);
+                            endTimeS = this.stepTimes[targetStepIdx] || (noteTimeS + (n.durationSteps * this.sixteenthSec));
+                        }
+                        this.harmonyTrack.noteOff(this.toPulses(endTimeS), 3, n.midi);
+                    });
+                }
+            }
+
+            if (this.includedTracks.includes('drums')) {
+                let pocketOffset = 0;
+                if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') pocketOffset += 0.015;
+
+                if (playback.bandIntensity > 0.75) pocketOffset -= 0.008;
+                else if (playback.bandIntensity < 0.3) pocketOffset += 0.010;
+
+                const drumTimeS = stepTimeS + pocketOffset;
+                const drumPulse = Math.max(0, this.toPulses(drumTimeS));
+
+                const nextStepTimeS = this.stepTimes[globalStep + 1] || (stepTimeS + this.sixteenthSec);
+                const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;
+                const drumMap = {
+                    'Kick': 36, 'Snare': 38, 'HiHat': 42, 'Open': 46, 'Crash': 49,
+                    'Clave': 75, 'Conga': 63, 'Bongo': 60, 'Perc': 67, 'Shaker': 82, 'Guiro': 74,
+                    'High Tom': 50, 'Mid Tom': 47, 'Low Tom': 43
+                };
+
+                let fillPlayed = false;
+
+                if (groove.fillActive) {
+                    const fillStep = globalStep - groove.fillStartStep;
+
+                    if (fillStep >= 0 && fillStep < groove.fillLength) {
+                        if (playback.bandIntensity >= 0.5 || fillStep >= (groove.fillLength / 2)) {
+                            const fillNotes = groove.fillSteps[fillStep];
+                            if (fillNotes && fillNotes.length > 0) {
+                                fillNotes.forEach(n => {
+                                    const midi = drumMap[n.name];
+                                    if (midi) {
+                                        const durS = n.name === 'Crash' ? this.secondsPerBeat : tightDurationS;
+                                        const midiVel = Math.max(1, Math.min(127, Math.round(n.vel * 127)));
+                                        this.drumTrack.noteOn(drumPulse, 9, midi, midiVel);
+                                        this.drumTrack.noteOff(this.toPulses(drumTimeS + durS), 9, midi);
+                                    }
+                                });
+                                fillPlayed = true;
+                            }
+                        }
+                    } else if (fillStep === groove.fillLength) {
+                        groove.fillActive = false;
+                        if (groove.pendingCrash) {
+                            this.drumTrack.noteOn(drumPulse, 9, drumMap['Crash'], 110);
+                            this.drumTrack.noteOff(this.toPulses(drumTimeS + this.secondsPerBeat), 9, drumMap['Crash']);
+                            groove.pendingCrash = false;
+                        }
+                    }
+                }
+
+                if (!fillPlayed) {
+                    groove.instruments.forEach(inst => {
+                        const val = inst.steps[globalStep % (groove.measures * this.stepsPerMeasure)];
+                        if (val > 0 && !inst.muted) {
+                            const midi = drumMap[inst.name];
+                            if (midi) {
+                                const durS = inst.name === 'Crash' ? this.secondsPerBeat : tightDurationS;
+                                const baseVel = val === 2 ? 110 : 90;
+                                const midiVel = Math.max(1, Math.min(127, baseVel));
+                                this.drumTrack.noteOn(drumPulse, 9, midi, midiVel);
+                                this.drumTrack.noteOff(this.toPulses(drumTimeS + durS), 9, midi);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    finish() {
+        const resolutionStep = this.totalStepsWithoutEnding;
+        const resTimeS = this.stepTimes[resolutionStep];
+
+        const resolutionNotes = generateResolutionNotes(resolutionStep, arranger, {
+            bass: this.includedTracks.includes('bass'),
+            chords: this.includedTracks.includes('chords'),
+            soloist: this.includedTracks.includes('soloist'),
+            harmony: this.includedTracks.includes('harmonies'),
+            groove: this.includedTracks.includes('drums')
+        }, playback.bpm);
+
+        resolutionNotes.forEach(n => {
+            let track;
+            let channel = 0;
+            if (n.module === 'bass') { track = this.bassTrack; channel = 1; }
+            else if (n.module === 'chords') { track = this.chordTrack; channel = 0; }
+            else if (n.module === 'soloist') { track = this.soloistTrack; channel = 2; }
+            else if (n.module === 'harmony') { track = this.harmonyTrack; channel = 3; }
+            else if (n.module === 'groove') { track = this.drumTrack; channel = 9; }
+
+            if (!track) return;
+
+            const offsetS = n.timingOffset || 0;
+            const notePulse = this.toPulses(resTimeS + offsetS);
+
+            if (n.ccEvents) {
+                n.ccEvents.forEach(cc => {
+                     track.cc(this.toPulses(resTimeS + (cc.timingOffset || 0)), channel, cc.controller, cc.value);
+                });
+            }
+
+            if (n.midi > 0) {
+                 if (n.module === 'soloist' && n.bendStartInterval) {
+                     track.pitchBend(notePulse, channel, Math.round(-(n.bendStartInterval / 2) * 8192));
+                 }
+
+                 track.noteOn(notePulse, channel, n.midi, n.midiVelocity || 90);
+
+                 if (n.module === 'soloist' && n.bendStartInterval) {
+                     track.pitchBend(this.toPulses(resTimeS + this.sixteenthSec), channel, 0);
+                 }
+
+                 const durationS = (n.durationSteps || 1) * this.sixteenthSec;
+                 track.noteOff(this.toPulses(resTimeS + offsetS + durationS), channel, n.midi);
+            } else if (n.module === 'groove' && n.name) {
+                const drumMap = {
+                    'Kick': 36, 'Snare': 38, 'HiHat': 42, 'Open': 46, 'Crash': 49,
+                    'Clave': 75, 'Conga': 63, 'Bongo': 60, 'Perc': 67, 'Shaker': 82, 'Guiro': 74,
+                    'High Tom': 50, 'Mid Tom': 47, 'Low Tom': 43
+                };
+                const midi = drumMap[n.name];
+                if (midi) {
+                    track.noteOn(notePulse, channel, midi, n.midiVelocity || 110);
+                    const durS = (n.name === 'Crash') ? 3.0 : 0.1;
+                    track.noteOff(this.toPulses(resTimeS + offsetS + durS), channel, midi);
+                }
+            }
+        });
+
+        // Cleanup: Release sustain for chords if they were active
+        if (this.includedTracks.includes('chords')) {
+            this.chordTrack.cc(this.toPulses(resTimeS + (16.1 * this.sixteenthSec)), 0, 64, 0);
+        }
+
+        const finalPulse = this.toPulses(this.stepTimes[this.totalStepsExport - 1] + this.sixteenthSec);
+        const finalTrackList = [this.metaTrack];
+        const trackRefs = { chords: this.chordTrack, bass: this.bassTrack, soloist: this.soloistTrack, harmonies: this.harmonyTrack, drums: this.drumTrack };
+        ['chords', 'bass', 'soloist', 'harmonies', 'drums'].forEach(key => {
+            if (this.includedTracks.includes(key)) {
+                trackRefs[key].endOfTrack(finalPulse);
+                finalTrackList.push(trackRefs[key]);
+            }
+        });
+        this.metaTrack.endOfTrack(finalPulse);
+
+        // Restore State
+        this.cleanup(true);
+
+        const header = new Uint8Array([...writeString('MThd'), ...writeInt32(6), ...writeInt16(1), ...writeInt16(finalTrackList.length), ...writeInt16(PPQ)]);
+        const trackChunks = finalTrackList.map(t => t.compile());
+        const totalSize = header.length + trackChunks.reduce((acc, c) => acc + c.length, 0);
+        const result = new Uint8Array(totalSize);
+        result.set(header, 0);
+        let offset = header.length;
+        trackChunks.forEach(c => { result.set(c, offset); offset += c.length; });
+
+        let finalFilename = (this.filename || 'ensemble-export').replace(/\.midi?$/i, '') + '.mid';
+        postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
+    }
+
+    cleanup(success) {
+        if (this.prevStates) {
+            chords.enabled = this.prevStates.chords;
+            bass.enabled = this.prevStates.bass;
+            soloist.enabled = this.prevStates.soloist;
+            harmony.enabled = this.prevStates.harmony;
+            groove.enabled = this.prevStates.groove;
+            playback.bandIntensity = this.prevStates.intensity;
+            soloist.doubleStops = this.prevStates.doubleStops;
+            soloist.sessionSteps = this.prevStates.sessionSteps;
+        }
+
+        isExporting = false;
+        processMessageQueue();
     }
 }
 
@@ -298,550 +797,142 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
 
 export function handleExport(options) {
     try {
-        const { includedTracks = ['chords', 'bass', 'soloist', 'harmonies', 'drums'], targetDuration = 3, loopMode = 'time', filename } = options;
-        if (arranger.progression.length === 0) { postMessage({ type: WORKER_RESP.ERROR, data: "No progression to export" }); return; }
+        const processor = new ExportProcessor(options);
+        processor.start();
+    } catch (e) {
+        postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
+    }
+}
 
-        const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-        const totalStepsOneLoop = arranger.totalSteps;
-        const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-        const loopSeconds = (totalStepsOneLoop / ts.stepsPerBeat) * (60 / playback.bpm);
-        let loopCount = (loopMode === 'once') ? 1 : Math.max(1, Math.min(100, Math.ceil((targetDuration * 60) / loopSeconds)));
-        const totalStepsWithoutEnding = totalStepsOneLoop * loopCount;
-        const totalStepsExport = totalStepsWithoutEnding + 16; // Add one resolution measure
-
-        // Independent cursors for export
-        const exportCursor = { index: 0, sectionIndex: 0 };
-        const exportLookaheadCursor = { index: 0, sectionIndex: 0 };
-
-        // --- 1:1 TIMING MAP GENERATION ---
-        const stepTimes = new Array(totalStepsExport + 128);
-        const secondsPerBeat = 60.0 / playback.bpm;
-        const sixteenthSec = 0.25 * secondsPerBeat;
-        
-        let accumulatedSeconds = 0;
-        for (let i = 0; i < stepTimes.length; i++) {
-            stepTimes[i] = accumulatedSeconds;
-            
-            let duration = sixteenthSec;
-            if (groove.swing > 0 && ts.stepsPerBeat === 4) {
-                const shift = (sixteenthSec / 3) * (groove.swing / 100);
-                if (groove.swingSub === '16th') {
-                    duration += (i % 2 === 0) ? shift : -shift;
-                } else {
-                    duration += ((i % 4) < 2) ? shift : -shift;
-                }
-            }
-            accumulatedSeconds += duration;
-        }
-
-        // Helper to convert any absolute second timestamp to MIDI Pulses
-        const toPulses = (t) => Math.round(t * (playback.bpm / 60.0) * PPQ);
-
-        const metaTrack = new MidiTrack();
-        const chordTrack = new MidiTrack();
-        const bassTrack = new MidiTrack();
-        const soloistTrack = new MidiTrack();
-        const harmonyTrack = new MidiTrack();
-        const drumTrack = new MidiTrack();
-
-        metaTrack.setName(0, 'Ensemble Export');
-        metaTrack.setTempo(0, playback.bpm);
-        metaTrack.setKeySig(0, arranger.key, arranger.isMinor);
-        const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
-        metaTrack.setTimeSig(0, tsNum, tsDenom);
-
-        chordTrack.setName(0, 'Chords'); chordTrack.programChange(0, 0, 4);
-        bassTrack.setName(0, 'Bass'); bassTrack.programChange(0, 1, 34);
-        soloistTrack.setName(0, 'Soloist'); soloistTrack.programChange(0, 2, 80);
-        harmonyTrack.setName(0, 'Harmonies'); harmonyTrack.programChange(0, 3, 61); // Brass/Synth
-        drumTrack.setName(0, 'Drums');
-
-        const prevStates = { chords: chords.enabled, bass: bass.enabled, soloist: soloist.enabled, harmony: harmony.enabled, groove: groove.enabled, intensity: playback.bandIntensity, doubleStops: soloist.doubleStops, sessionSteps: soloist.sessionSteps };
-        chords.enabled = true; bass.enabled = true; soloist.enabled = true; harmony.enabled = true; groove.enabled = true;
-        soloist.sessionSteps = 1000; // Bypass warm-up for export
-        compingState.lockedUntil = 0; compingState.lastChordIndex = -1;
-        soloist.busySteps = 0; soloist.isResting = false; soloist.currentPhraseSteps = 0;
-
-        // --- EXPORT CONDUCTOR ---
-        const exportConductor = {
-            loopCount: 0,
-            formIteration: 0,
-            targetIntensity: playback.bandIntensity,
-            stepSize: 0,
-            form: analyzeForm()
-        };
-
-        const checkWorkerTransition = (step) => {
-            if (!groove.enabled) return;
-            const modStep = step % totalStepsOneLoop;
-            
-            if (modStep === 0 && step > 0) {
-                exportConductor.loopCount++;
-                exportConductor.formIteration++;
-            }
-
-            const entry = arranger.stepMap.find(e => modStep >= e.start && modStep < e.end);
-            if (!entry) return;
-            
-            const sectionEnd = entry.end;
-            const fillStart = sectionEnd - stepsPerMeasure;
-            
-            if (modStep === fillStart) {
-                const currentIndex = arranger.stepMap.indexOf(entry);
-                let nextEntry = arranger.stepMap[currentIndex + 1];
-                let isLoopEnd = false;
-                if (!nextEntry) { nextEntry = arranger.stepMap[0]; isLoopEnd = true; }
-                
-                if (nextEntry.chord.sectionId !== entry.chord.sectionId || isLoopEnd) {
-                    let shouldFill = true;
-                    if (isLoopEnd && totalStepsOneLoop <= 64) {
-                        const freq = playback.bandIntensity > 0.75 ? 1 : (playback.bandIntensity > 0.4 ? 2 : 4);
-                        shouldFill = (exportConductor.loopCount % freq === 0);
-                    }
-                    if (shouldFill) {
-                        groove.fillSteps = generateProceduralFill(groove.genreFeel, playback.bandIntensity, stepsPerMeasure);
-                        groove.fillActive = true;
-                        groove.fillStartStep = step;
-                        groove.fillLength = stepsPerMeasure;
-                        groove.pendingCrash = true;
-                    }
-                }
-            }
-            
-            if (playback.autoIntensity && modStep === 0 && exportConductor.formIteration > 0) {
-                const grandCycle = exportConductor.formIteration % 8;
-                let target = 0.5;
-                if (grandCycle < 3) target = 0.6;
-                else if (grandCycle < 5) target = 0.9; 
-                else target = 0.4; 
-                playback.bandIntensity = playback.bandIntensity + (target - playback.bandIntensity) * 0.5;
-            }
-
-            // --- Intelligent Harmony Export Scaling ---
-            // Mirror the conductor's logic: scale complexity with intensity
-            harmony.complexity = Math.max(0, (playback.bandIntensity - 0.2) * 1.25);
-            
-            // "Final Build" for MIDI: If we are in the last loop of the export, push for a climax
-            const isLastLoop = (exportConductor.loopCount >= loopCount - 1);
-            if (isLastLoop && loopCount > 1) {
-                harmony.complexity = Math.max(harmony.complexity, 0.85);
-            }
-        };
-
-        for (let globalStep = 0; globalStep < totalStepsWithoutEnding; globalStep++) {
-            checkWorkerTransition(globalStep);
-
-            const stepTimeS = stepTimes[globalStep];
-
-            const measureStep = globalStep % stepsPerMeasure;
-            const stepInfo = getStepInfo(globalStep, ts);
-            const chordData = getChordAtStep(globalStep, exportCursor);
-
-            if (chordData) {
-                const { chord, stepInChord } = chordData;
-                const nextChordData = getChordAtStep(globalStep + 4, exportLookaheadCursor);
-
-                if (includedTracks.includes('chords')) {
-                    const notes = getAccompanimentNotes(chord, globalStep, stepInChord, measureStep, stepInfo);
-                    const numVoices = notes.filter(n => n.midi > 0).length;
-                    const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
-
-                    notes.forEach(n => {
-                        const noteTimeS = stepTimeS + (n.timingOffset || 0);
-                        const notePulse = Math.max(0, toPulses(noteTimeS));
+function processMessage(type, data, startTime) {
+    try {
+        switch (type) {
+            case WORKER_MSG.START:
+                if (!timerID) {
+                    timerID = setInterval(() => {
+                        const startTime = performance.now();
+                        postMessage({ type: WORKER_RESP.TICK });
                         
-                        if (n.midi > 0) {
-                            n.ccEvents.forEach(cc => chordTrack.cc(notePulse, 0, cc.controller, cc.value));
-                            
-                            // Safe MIDI Velocity for Chords with power compensation
-                            let finalVel = n.velocity * polyphonyComp;
-                            if (n.muted) finalVel *= 0.3; // Scale ghost "chucks"
-                            const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
-                            
-                            chordTrack.noteOn(notePulse, 0, n.midi, midiVel);
-                            
-                            let endTimeS;
-                            if (n.durationSteps < 1) {
-                                endTimeS = noteTimeS + (n.durationSteps * sixteenthSec);
-                            } else {
-                                const targetStepIdx = globalStep + Math.round(n.durationSteps);
-                                endTimeS = stepTimes[targetStepIdx] || (noteTimeS + (n.durationSteps * sixteenthSec));
-                            }
-                            if (endTimeS - noteTimeS < 0.05) endTimeS = noteTimeS + 0.05;
-                            
-                            chordTrack.noteOff(toPulses(endTimeS), 0, n.midi);
-                        } else if (n.ccEvents.length > 0) {
-                            n.ccEvents.forEach(cc => chordTrack.cc(notePulse, 0, cc.controller, cc.value));
-                        }
-                    });
+                        const s = playback.step;
+                        fillBuffers(s, null, startTime);
+                    }, interval);
                 }
-
-                if (includedTracks.includes('bass') && isBassActive(bass.style, globalStep, stepInChord)) {
-                    const { sectionStart, sectionEnd } = chordData;
-                    const res = getBassNote(chord, nextChordData?.chord, stepInChord / ts.stepsPerBeat, bass.lastFreq, bass.octave, bass.style, chordData.chordIndex, globalStep, stepInChord, { sectionStart, sectionEnd });
-                    if (res && res.midi) {
-                        const noteTimeS = stepTimeS + (res.timingOffset || 0);
-                        const notePulse = Math.max(0, toPulses(noteTimeS));
-                        
-                        // Safe MIDI Velocity for Bass
-                        let finalVel = res.velocity;
-                        if (res.muted) finalVel *= 0.25; 
-                        const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
-
-                        bassTrack.noteOn(notePulse, 1, res.midi, midiVel);
-                        
-                        let endTimeS;
-                        if (res.durationSteps < 1) {
-                            endTimeS = noteTimeS + (res.durationSteps * sixteenthSec);
-                        } else {
-                            const targetStepIdx = globalStep + Math.round(res.durationSteps);
-                            endTimeS = stepTimes[targetStepIdx] || (noteTimeS + (res.durationSteps * sixteenthSec));
-                        }
-                        if (endTimeS - noteTimeS < 0.05) endTimeS = noteTimeS + 0.05;
-
-                        // Add small release tail (20ms) to bass notes to prevent "choked" sound 
-                        endTimeS += 0.02;
-
-                        bassTrack.noteOff(toPulses(endTimeS), 1, res.midi);
-                        bass.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12);
-                    }
+                break;
+            case WORKER_MSG.STOP:
+                if (timerID) {
+                    clearInterval(timerID);
+                    timerID = null;
                 }
-
-                if (includedTracks.includes('soloist')) {
-                    const { sectionStart, sectionEnd } = chordData;
-                    const soloResult = getSoloistNote(chord, nextChordData?.chord, globalStep, soloist.lastFreq, soloist.octave, soloist.style, stepInChord, false, { sectionStart, sectionEnd });
-                    if (soloResult) {
-                        const results = Array.isArray(soloResult) ? soloResult : [soloResult];
-                        const polyphonyComp = 1 / Math.sqrt(Math.max(1, results.length));
-
-                        results.forEach(res => {
-                            if (res.midi) {
-                                const noteTimeS = stepTimeS + (res.timingOffset || 0);
-                                const notePulse = Math.max(0, toPulses(noteTimeS));
-                                
-                                // Safe MIDI Velocity for Soloist with power compensation
-                                const midiVel = Math.max(1, Math.min(127, Math.round(res.velocity * polyphonyComp * 127)));
-
-                                if (res.bendStartInterval) {
-                                    soloistTrack.pitchBend(notePulse, 2, Math.round(-(res.bendStartInterval / 2) * 8192));
-                                    soloistTrack.noteOn(notePulse, 2, res.midi, midiVel);
-                                    soloistTrack.pitchBend(toPulses(stepTimeS + sixteenthSec), 2, 0);
-                                } else {
-                                    soloistTrack.noteOn(notePulse, 2, res.midi, midiVel);
-                                }
-                                
-                                let endTimeS;
-                                if (res.durationSteps < 1) {
-                                    endTimeS = noteTimeS + (res.durationSteps * sixteenthSec);
-                                } else {
-                                    const targetStepIdx = globalStep + Math.round(res.durationSteps);
-                                    endTimeS = stepTimes[targetStepIdx] || (noteTimeS + (res.durationSteps * sixteenthSec));
-                                }
-                                if (endTimeS - noteTimeS < 0.05) endTimeS = noteTimeS + 0.05;
-
-                                // Add small release tail (15ms) for soloist
-                                endTimeS += 0.015;
-
-                                soloistTrack.noteOff(toPulses(endTimeS), 2, res.midi);
-                                if (!res.isDoubleStop) soloist.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12);
-                            }
+                break;
+            case WORKER_MSG.SYNC_STATE:
+                if (data.arranger) {
+                    Object.assign(arranger, data.arranger);
+                    arranger.totalSteps = data.arranger.totalSteps;
+                    arranger.stepMap = data.arranger.stepMap;
+                    arranger.sectionMap = data.arranger.sectionMap;
+                }
+                if (data.chords) Object.assign(chords, data.chords);
+                if (data.bass) Object.assign(bass, data.bass);
+                if (data.soloist) Object.assign(soloist, data.soloist);
+                if (data.harmony) Object.assign(harmony, data.harmony);
+                if (data.groove) {
+                    Object.assign(groove, data.groove);
+                    if (data.groove.instruments) {
+                        data.groove.instruments.forEach(di => {
+                            const inst = groove.instruments.find(i => i.name === di.name);
+                            if (inst) inst.steps = di.steps;
                         });
                     }
                 }
-
-                if (includedTracks.includes('harmonies')) {
-                    const harmonyNotes = getHarmonyNotes(chord, nextChordData?.chord, globalStep, harmony.octave, harmony.style, stepInChord);
-                    const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
-
-                    harmonyNotes.forEach(n => {
-                        const noteTimeS = stepTimeS + (n.timingOffset || 0);
-                        const notePulse = Math.max(0, toPulses(noteTimeS));
-                        const midiVel = Math.max(1, Math.min(127, Math.round(n.velocity * polyphonyComp * 127)));
-
-                        harmonyTrack.noteOn(notePulse, 3, n.midi, midiVel);
-
-                        let endTimeS;
-                        if (n.durationSteps < 1) {
-                            endTimeS = noteTimeS + (n.durationSteps * sixteenthSec);
-                        } else {
-                            const targetStepIdx = globalStep + Math.round(n.durationSteps);
-                            endTimeS = stepTimes[targetStepIdx] || (noteTimeS + (n.durationSteps * sixteenthSec));
-                        }
-                        harmonyTrack.noteOff(toPulses(endTimeS), 3, n.midi);
-                    });
-                }
-            }
-
-            if (includedTracks.includes('drums')) {
-                let pocketOffset = 0;
-                if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') pocketOffset += 0.015;
-
-                if (playback.bandIntensity > 0.75) pocketOffset -= 0.008; 
-                else if (playback.bandIntensity < 0.3) pocketOffset += 0.010;
-
-                const drumTimeS = stepTimeS + pocketOffset;
-                const drumPulse = Math.max(0, toPulses(drumTimeS));
-                
-                const nextStepTimeS = stepTimes[globalStep + 1] || (stepTimeS + sixteenthSec);
-                const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75; 
-                const drumMap = { 
-                    'Kick': 36, 'Snare': 38, 'HiHat': 42, 'Open': 46, 'Crash': 49,
-                    'Clave': 75, 'Conga': 63, 'Bongo': 60, 'Perc': 67, 'Shaker': 82, 'Guiro': 74,
-                    'High Tom': 50, 'Mid Tom': 47, 'Low Tom': 43
-                };
-
-                let fillPlayed = false;
-
-                if (groove.fillActive) {
-                    const fillStep = globalStep - groove.fillStartStep;
-                    
-                    if (fillStep >= 0 && fillStep < groove.fillLength) {
-                        if (playback.bandIntensity >= 0.5 || fillStep >= (groove.fillLength / 2)) {
-                            const fillNotes = groove.fillSteps[fillStep];
-                            if (fillNotes && fillNotes.length > 0) {
-                                fillNotes.forEach(n => {
-                                    const midi = drumMap[n.name];
-                                    if (midi) {
-                                        const durS = n.name === 'Crash' ? secondsPerBeat : tightDurationS;
-                                        // Safe MIDI Velocity for Drums (Fills)
-                                        const midiVel = Math.max(1, Math.min(127, Math.round(n.vel * 127)));
-                                        drumTrack.noteOn(drumPulse, 9, midi, midiVel);
-                                        drumTrack.noteOff(toPulses(drumTimeS + durS), 9, midi);
-                                    }
-                                });
-                                fillPlayed = true; 
-                            }
-                        }
-                    } else if (fillStep === groove.fillLength) {
-                        groove.fillActive = false;
-                        if (groove.pendingCrash) {
-                            drumTrack.noteOn(drumPulse, 9, drumMap['Crash'], 110);
-                            drumTrack.noteOff(toPulses(drumTimeS + secondsPerBeat), 9, drumMap['Crash']);
-                            groove.pendingCrash = false;
-                        }
+                if (data.playback) Object.assign(playback, data.playback);
+                break;
+            case WORKER_MSG.REQUEST_BUFFER:
+                fillBuffers(data.step, data.requestTimestamp, startTime);
+                break;
+            case WORKER_MSG.FLUSH:
+                if (data.syncData) {
+                    const syncData = data.syncData;
+                    if (syncData.arranger) {
+                        Object.assign(arranger, syncData.arranger);
+                        arranger.totalSteps = syncData.arranger.totalSteps;
+                        arranger.stepMap = syncData.arranger.stepMap;
+                        arranger.sectionMap = syncData.arranger.sectionMap;
+                        lastChordIndex = 0;
+                        lastSectionIndex = 0;
+                        mainCursor.index = 0; mainCursor.sectionIndex = 0;
+                        lookaheadCursor.index = 0; lookaheadCursor.sectionIndex = 0;
                     }
+                    if (syncData.chords) {
+                        Object.assign(chords, syncData.chords);
+                        if (syncData.chords.rhythmicMask !== undefined) chords.rhythmicMask = syncData.chords.rhythmicMask;
+                    }
+                    if (syncData.bass) Object.assign(bass, syncData.bass);
+                    if (syncData.soloist) Object.assign(soloist, syncData.soloist);
+                    if (syncData.harmony) {
+                        Object.assign(harmony, syncData.harmony);
+                        if (syncData.harmony.rhythmicMask !== undefined) harmony.rhythmicMask = syncData.harmony.rhythmicMask;
+                        if (syncData.harmony.pocketOffset !== undefined) harmony.pocketOffset = syncData.harmony.pocketOffset;
+                    }
+                    if (syncData.groove) {
+                        Object.assign(groove, syncData.groove);
+                        if (syncData.groove.instruments) { syncData.groove.instruments.forEach(di => { const inst = groove.instruments.find(i => i.name === di.name); if (inst) { inst.steps = di.steps; inst.muted = di.muted; } }); }
+                        if (syncData.groove.snareMask !== undefined) groove.snareMask = syncData.groove.snareMask;
+                    }
+                    if (syncData.playback) Object.assign(playback, syncData.playback);
                 }
 
-                if (!fillPlayed) {
-                    groove.instruments.forEach(inst => {
-                        const val = inst.steps[globalStep % (groove.measures * stepsPerMeasure)];
-                        if (val > 0 && !inst.muted) {
-                            const midi = drumMap[inst.name];
-                            if (midi) {
-                                const durS = inst.name === 'Crash' ? secondsPerBeat : tightDurationS;
-                                // Safe MIDI Velocity for Drums (Grid)
-                                const baseVel = val === 2 ? 110 : 90;
-                                const midiVel = Math.max(1, Math.min(127, baseVel));
-                                drumTrack.noteOn(drumPulse, 9, midi, midiVel);
-                                drumTrack.noteOff(toPulses(drumTimeS + durS), 9, midi);
-                            }
-                        }
-                    });
+                bbBufferHead = data.step; sbBufferHead = data.step; cbBufferHead = data.step; hbBufferHead = data.step;
+                soloist.isResting = false; soloist.busySteps = 0; soloist.currentPhraseSteps = 0;
+                soloist.sessionSteps = 0;
+                soloist.deviceBuffer = [];
+                bass.busySteps = 0;
+                soloist.motifBuffer = []; soloist.hookBuffer = []; soloist.isReplayingMotif = false;
+                soloist.sharedHookBuffer = [];
+                harmony.motifBuffer = [];
+                harmony.lastMidis = [];
+
+                // Reset accompaniment memory
+                compingState.lastChordIndex = -1;
+                compingState.lockedUntil = 0;
+                compingState.rhythmPattern = [];
+
+                if (data.primeSteps > 0) {
+                    handlePrime(data.primeSteps);
                 }
-            }
+
+                fillBuffers(data.step, data.requestTimestamp, startTime);
+                break;
+            case WORKER_MSG.PRIME:
+                handlePrime(data);
+                break;
+            case WORKER_MSG.RESOLUTION:
+                handleResolution(data.step, data.requestTimestamp, startTime);
+                break;
+            case WORKER_MSG.EXPORT: handleExport(data); break;
         }
+    } catch (err) { postMessage({ type: WORKER_RESP.ERROR, data: err.message, stack: err.stack }); }
+}
 
-        // --- FINAL RESOLUTION MEASURE ---
-        const resolutionStep = totalStepsWithoutEnding;
-        const resTimeS = stepTimes[resolutionStep];
-
-        const resolutionNotes = generateResolutionNotes(resolutionStep, arranger, { 
-            bass: includedTracks.includes('bass'), 
-            chords: includedTracks.includes('chords'), 
-            soloist: includedTracks.includes('soloist'), 
-            harmony: includedTracks.includes('harmonies'),
-            groove: includedTracks.includes('drums') 
-        }, playback.bpm);
-
-        resolutionNotes.forEach(n => {
-            let track;
-            let channel = 0;
-            if (n.module === 'bass') { track = bassTrack; channel = 1; }
-            else if (n.module === 'chords') { track = chordTrack; channel = 0; }
-            else if (n.module === 'soloist') { track = soloistTrack; channel = 2; }
-            else if (n.module === 'harmony') { track = harmonyTrack; channel = 3; }
-            else if (n.module === 'groove') { track = drumTrack; channel = 9; }
-            
-            if (!track) return;
-
-            const offsetS = n.timingOffset || 0;
-            const notePulse = toPulses(resTimeS + offsetS);
-
-            if (n.ccEvents) {
-                n.ccEvents.forEach(cc => {
-                     track.cc(toPulses(resTimeS + (cc.timingOffset || 0)), channel, cc.controller, cc.value);
-                });
-            }
-
-            if (n.midi > 0) {
-                 if (n.module === 'soloist' && n.bendStartInterval) {
-                     track.pitchBend(notePulse, channel, Math.round(-(n.bendStartInterval / 2) * 8192));
-                 }
-                 
-                 track.noteOn(notePulse, channel, n.midi, n.midiVelocity || 90);
-
-                 if (n.module === 'soloist' && n.bendStartInterval) {
-                     track.pitchBend(toPulses(resTimeS + sixteenthSec), channel, 0);
-                 }
-                 
-                 const durationS = (n.durationSteps || 1) * sixteenthSec;
-                 track.noteOff(toPulses(resTimeS + offsetS + durationS), channel, n.midi);
-            } else if (n.module === 'groove' && n.name) {
-                const drumMap = { 
-                    'Kick': 36, 'Snare': 38, 'HiHat': 42, 'Open': 46, 'Crash': 49,
-                    'Clave': 75, 'Conga': 63, 'Bongo': 60, 'Perc': 67, 'Shaker': 82, 'Guiro': 74,
-                    'High Tom': 50, 'Mid Tom': 47, 'Low Tom': 43
-                };
-                const midi = drumMap[n.name];
-                if (midi) {
-                    track.noteOn(notePulse, channel, midi, n.midiVelocity || 110);
-                    const durS = (n.name === 'Crash') ? 3.0 : 0.1;
-                    track.noteOff(toPulses(resTimeS + offsetS + durS), channel, midi);
-                }
-            }
-        });
-
-        // Cleanup: Release sustain for chords if they were active
-        if (includedTracks.includes('chords')) {
-            chordTrack.cc(toPulses(resTimeS + (16.1 * sixteenthSec)), 0, 64, 0);
-        }
-
-        const finalPulse = toPulses(stepTimes[totalStepsExport - 1] + sixteenthSec);
-        const finalTrackList = [metaTrack];
-        const trackRefs = { chords: chordTrack, bass: bassTrack, soloist: soloistTrack, harmonies: harmonyTrack, drums: drumTrack };
-        ['chords', 'bass', 'soloist', 'harmonies', 'drums'].forEach(key => {
-            if (includedTracks.includes(key)) {
-                trackRefs[key].endOfTrack(finalPulse);
-                finalTrackList.push(trackRefs[key]);
-            }
-        });
-        metaTrack.endOfTrack(finalPulse);
-
-        chords.enabled = prevStates.chords; bass.enabled = prevStates.bass; soloist.enabled = prevStates.soloist; harmony.enabled = prevStates.harmony; groove.enabled = prevStates.groove; playback.bandIntensity = prevStates.intensity; soloist.doubleStops = prevStates.doubleStops; soloist.sessionSteps = prevStates.sessionSteps;
-
-        const header = new Uint8Array([...writeString('MThd'), ...writeInt32(6), ...writeInt16(1), ...writeInt16(finalTrackList.length), ...writeInt16(PPQ)]);
-        const trackChunks = finalTrackList.map(t => t.compile());
-        const totalSize = header.length + trackChunks.reduce((acc, c) => acc + c.length, 0);
-        const result = new Uint8Array(totalSize);
-        result.set(header, 0);
-        let offset = header.length;
-        trackChunks.forEach(c => { result.set(c, offset); offset += c.length; });
-
-        let finalFilename = (filename || 'ensemble-export').replace(/\.midi?$/i, '') + '.mid';
-        postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
-    } catch (e) { postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack }); }
+function processMessageQueue() {
+    while (messageQueue.length > 0) {
+        const { type, data, startTime } = messageQueue.shift();
+        processMessage(type, data, startTime);
+        // If an export started, stop processing the queue until it finishes
+        if (isExporting) break;
+    }
 }
 
 if (typeof self !== 'undefined') {
     self.onmessage = (e) => {
         const { type, data } = e.data;
         var startTime = performance.now();
-        try {
-            switch (type) {
-                case WORKER_MSG.START:
-                    if (!timerID) {
-                        timerID = setInterval(() => {
-                            const startTime = performance.now();
-                            postMessage({ type: WORKER_RESP.TICK });
-                            
-                            const s = playback.step;
-                            fillBuffers(s, null, startTime);
-                        }, interval);
-                    }
-                    break;
-                case WORKER_MSG.STOP:
-                    if (timerID) {
-                        clearInterval(timerID);
-                        timerID = null;
-                    }
-                    break;
-                case WORKER_MSG.SYNC_STATE:
-                    if (data.arranger) {
-                        Object.assign(arranger, data.arranger);
-                        arranger.totalSteps = data.arranger.totalSteps;
-                        arranger.stepMap = data.arranger.stepMap;
-                        arranger.sectionMap = data.arranger.sectionMap;
-                    }
-                    if (data.chords) Object.assign(chords, data.chords);
-                    if (data.bass) Object.assign(bass, data.bass);
-                    if (data.soloist) Object.assign(soloist, data.soloist);
-                    if (data.harmony) Object.assign(harmony, data.harmony);
-                    if (data.groove) {
-                        Object.assign(groove, data.groove);
-                        if (data.groove.instruments) {
-                            data.groove.instruments.forEach(di => {
-                                const inst = groove.instruments.find(i => i.name === di.name);
-                                if (inst) inst.steps = di.steps;
-                            });
-                        }
-                    }
-                    if (data.playback) Object.assign(playback, data.playback);
-                    break;
-                case WORKER_MSG.REQUEST_BUFFER:
-                    fillBuffers(data.step, data.requestTimestamp, startTime);
-                    break;
-                case WORKER_MSG.FLUSH:
-                    if (data.syncData) {
-                        const syncData = data.syncData;
-                        if (syncData.arranger) {
-                            Object.assign(arranger, syncData.arranger);
-                            arranger.totalSteps = syncData.arranger.totalSteps;
-                            arranger.stepMap = syncData.arranger.stepMap;
-                            arranger.sectionMap = syncData.arranger.sectionMap;
-                            lastChordIndex = 0;
-                            lastSectionIndex = 0;
-                            mainCursor.index = 0; mainCursor.sectionIndex = 0;
-                            lookaheadCursor.index = 0; lookaheadCursor.sectionIndex = 0;
-                        }
-                        if (syncData.chords) {
-                            Object.assign(chords, syncData.chords);
-                            if (syncData.chords.rhythmicMask !== undefined) chords.rhythmicMask = syncData.chords.rhythmicMask;
-                        }
-                        if (syncData.bass) Object.assign(bass, syncData.bass);
-                        if (syncData.soloist) Object.assign(soloist, syncData.soloist);
-                        if (syncData.harmony) {
-                            Object.assign(harmony, syncData.harmony);
-                            if (syncData.harmony.rhythmicMask !== undefined) harmony.rhythmicMask = syncData.harmony.rhythmicMask;
-                            if (syncData.harmony.pocketOffset !== undefined) harmony.pocketOffset = syncData.harmony.pocketOffset;
-                        }
-                        if (syncData.groove) {
-                            Object.assign(groove, syncData.groove);
-                            if (syncData.groove.instruments) { syncData.groove.instruments.forEach(di => { const inst = groove.instruments.find(i => i.name === di.name); if (inst) { inst.steps = di.steps; inst.muted = di.muted; } }); }
-                            if (syncData.groove.snareMask !== undefined) groove.snareMask = syncData.groove.snareMask;
-                        }
-                        if (syncData.playback) Object.assign(playback, syncData.playback);
-                    }
-                    
-                    bbBufferHead = data.step; sbBufferHead = data.step; cbBufferHead = data.step; hbBufferHead = data.step;
-                    soloist.isResting = false; soloist.busySteps = 0; soloist.currentPhraseSteps = 0;
-                    soloist.sessionSteps = 0;
-                    soloist.deviceBuffer = [];
-                    bass.busySteps = 0;
-                    soloist.motifBuffer = []; soloist.hookBuffer = []; soloist.isReplayingMotif = false;
-                    soloist.sharedHookBuffer = [];
-                    harmony.motifBuffer = [];
-                    harmony.lastMidis = [];
-                    
-                    // Reset accompaniment memory
-                    compingState.lastChordIndex = -1;
-                    compingState.lockedUntil = 0;
-                    compingState.rhythmPattern = [];
 
-                    if (data.primeSteps > 0) {
-                        handlePrime(data.primeSteps);
-                    }
-
-                    fillBuffers(data.step, data.requestTimestamp, startTime);
-                    break;
-                case WORKER_MSG.PRIME:
-                    handlePrime(data);
-                    break;
-                case WORKER_MSG.RESOLUTION:
-                    handleResolution(data.step, data.requestTimestamp, startTime);
-                    break;
-                case WORKER_MSG.EXPORT: handleExport(data); break;
-            }
-        } catch (err) { postMessage({ type: WORKER_RESP.ERROR, data: err.message, stack: err.stack }); }
+        if (isExporting) {
+            // Queue all messages during export to ensure state consistency
+            messageQueue.push({ type, data, startTime });
+        } else {
+            processMessage(type, data, startTime);
+        }
     };
 }
 
