@@ -50,11 +50,3 @@ export function useDispatch() {
         internalDispatch(action, payload);
     }, []);
 }
-
-/**
- * Helper to force a re-render if needed (rarely used if selectors are good)
- */
-export function useForceUpdate() {
-    const [, setTick] = useState(0);
-    return useCallback(() => setTick(t => t + 1), []);
-}

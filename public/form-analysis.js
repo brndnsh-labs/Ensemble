@@ -1,6 +1,6 @@
 import { getState } from './state.js';
 
-export const SECTION_ENERGY_MAP = {
+const SECTION_ENERGY_MAP = {
     'intro': 0.4, 'verse': 0.5, 'pre-chorus': 0.6, 'build': 0.7,
     'chorus': 0.9, 'drop': 1.0, 'bridge': 0.6, 'solo': 0.8,
     'outro': 0.4, 'breakdown': 0.3

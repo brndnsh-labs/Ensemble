@@ -70,7 +70,7 @@ export async function initMIDI() {
 /**
  * Updates the state with current list of MIDI outputs.
  */
-export function syncMIDIOutputs() {
+function syncMIDIOutputs() {
     if (!midiAccess) return;
     const outputs = [];
     for (const output of midiAccess.outputs.values()) {
@@ -86,7 +86,7 @@ export function syncMIDIOutputs() {
  * @param {number} velocity - 0-127
  * @param {number} time - AudioContext time
  */
-export function sendMIDINoteOn(channel, note, velocity, time) {
+function sendMIDINoteOn(channel, note, velocity, time) {
     const { playback, midi } = getState();
     if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
     const output = midiAccess.outputs.get(midi.selectedOutputId);
@@ -105,7 +105,7 @@ export function sendMIDINoteOn(channel, note, velocity, time) {
  * @param {number} note - MIDI note number 0-127
  * @param {number} time - AudioContext time
  */
-export function sendMIDINoteOff(channel, note, time) {
+function sendMIDINoteOff(channel, note, time) {
     const { playback, midi } = getState();
     if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
     const output = midiAccess.outputs.get(midi.selectedOutputId);

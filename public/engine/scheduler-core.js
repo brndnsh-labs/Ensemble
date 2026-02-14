@@ -348,7 +348,7 @@ function getChordAtStep(step) {
  * @param {number} absoluteStep - The global session step.
  * @param {boolean} isGroupStart - Whether this step is the start of a rhythm group.
  */
-export function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, absoluteStep, isGroupStart) {
+function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, absoluteStep, isGroupStart) {
     const { playback, groove, vizState, midi } = getState();
     const conductorVel = playback.conductorVelocity || 1.0;
     const finalTime = time + calculatePocketOffset(playback, groove);
@@ -424,7 +424,7 @@ export function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, abs
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-export function scheduleDrumsFromBuffer(step, time) {
+function scheduleDrumsFromBuffer(step, time) {
     const { groove, playback, vizState, midi } = getState();
     const notes = groove.buffer.get(step);
     groove.buffer.delete(step);
@@ -461,7 +461,7 @@ export function scheduleDrumsFromBuffer(step, time) {
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-export function scheduleBass(chordData, step, time) {
+function scheduleBass(chordData, step, time) {
     const { bass, playback, vizState, midi } = getState();
     const noteEntry = bass.buffer.get(step);
     bass.buffer.delete(step);
@@ -496,7 +496,7 @@ export function scheduleBass(chordData, step, time) {
  * @param {number} time - The AudioContext time (swung).
  * @param {number} unswungTime - The AudioContext time (linear/unswung) for strict quantization.
  */
-export function scheduleSoloist(chordData, step, time, unswungTime) {
+function scheduleSoloist(chordData, step, time, unswungTime) {
     const { soloist, playback, vizState, midi } = getState();
     const notes = soloist.buffer.get(step);
     soloist.buffer.delete(step);
@@ -580,7 +580,7 @@ export function scheduleChordVisuals(chordData, t) {
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-export function scheduleChords(chordData, step, time) {
+function scheduleChords(chordData, step, time) {
     const { chords, playback, midi } = getState();
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
@@ -631,7 +631,7 @@ export function scheduleChords(chordData, step, time) {
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-export function scheduleHarmonies(chordData, step, time) {
+function scheduleHarmonies(chordData, step, time) {
     const { harmony, playback, vizState, midi } = getState();
     const notes = harmony.buffer.get(step);
     harmony.buffer.delete(step);
@@ -780,7 +780,7 @@ export function scheduleGlobalEvent(step, swungTime) {
  *
  * @param {number} step - The current global step.
  */
-export function syncAndFlushWorker(step) {
+function syncAndFlushWorker(step) {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
     const syncData = {
         arranger: { 

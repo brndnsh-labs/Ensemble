@@ -127,92 +127,6 @@ export function getBestInversion(rootMidi, intervals, previousMidis, isPivot = f
     return finalResult.sort((a, b) => a - b);
 }
 
-/**
- * Generates a musically coherent random progression based on style.
- * @returns {string} The generated progression string.
- */
-export function generateRandomProgression(style = 'pop') {
-    const pools = {
-        pop: {
-            tonics: ['I', 'vi', 'Imaj7', 'vi7'],
-            subdominants: ['IV', 'ii', 'ii7', 'IVmaj7'],
-            dominants: ['V', 'V7', 'Vsus4'],
-            flavor: ['bVII', 'bVI', 'IVm']
-        },
-        jazz: {
-            tonics: ['Imaj7', 'vi7', 'I6', 'iiim7'],
-            subdominants: ['iim7', 'IVmaj7', 'iiø7'],
-            dominants: ['V7', 'V7alt', 'V7b9', 'bII7'], // Including tritone sub
-            flavor: ['VI7', 'II7', 'IVm7', 'bVII7']
-        },
-        blues: {
-            tonics: ['I7', 'I7', 'I7', 'I7'],
-            subdominants: ['IV7', 'IV7', '#IVdim7'],
-            dominants: ['V7', 'V7', 'V7alt'],
-            flavor: ['bVI7', 'bVII7']
-        },
-        neo: {
-            tonics: ['Imaj9', 'vim9', 'Imaj13', 'III7#9'],
-            subdominants: ['IVmaj9', 'iim11', 'IVmaj7#11'],
-            dominants: ['V13', 'V7alt', 'V9sus4'],
-            flavor: ['bIImaj7', 'bVImaj7', 'v7']
-        }
-    };
-
-    const s = pools[style] || pools.pop;
-    const getRand = (arr) => arr[Math.floor(Math.random() * arr.length)];
-    
-    const generate4Bars = (isFinal = true) => {
-        let p = [];
-        if (style === 'blues') {
-            // Standard 12-bar blues chunks
-            if (!isFinal) { // First 4 bars
-                p = ['I7', 'IV7', 'I7', 'I7'];
-            } else { // Last 4 bars (actually middle/last depends on context, but let's simplify)
-                p = ['V7', 'IV7', 'I7', 'V7'];
-            }
-        } else if (style === 'jazz') {
-            // Jazz often uses ii-V-I
-            const type = Math.random();
-            if (type < 0.4) p = ['iim7', 'V7', 'Imaj7', 'VI7'];
-            else if (type < 0.7) p = ['Imaj7', 'IVmaj7', 'iiø7', 'V7alt'];
-            else p = ['iiim7', 'VI7', 'iim7', 'V7'];
-        } else {
-            p.push(getRand(s.tonics)); // Tonic start
-            p.push(getRand([...s.tonics, ...s.subdominants, ...s.flavor]));
-            p.push(getRand([...s.subdominants, ...s.dominants]));
-            
-            if (isFinal) {
-                p.push(getRand(s.dominants));
-            } else {
-                p.push(Math.random() > 0.5 ? getRand(s.dominants) : getRand(s.tonics));
-            }
-        }
-        return p;
-    };
-
-    const length = Math.random() > 0.5 ? 8 : 4;
-    let progression = [];
-
-    if (length === 4) {
-        progression = generate4Bars(true);
-    } else {
-        if (style === 'blues') {
-            progression = ['I7', 'IV7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'];
-        } else {
-            const phrase1 = generate4Bars(false);
-            const phrase2 = generate4Bars(true);
-            
-            if (Math.random() < 0.5) {
-                phrase2[0] = phrase1[0];
-                phrase2[1] = phrase1[1];
-            }
-            progression = [...phrase1, ...phrase2];
-        }
-    }
-
-    return progression.join(' | ');
-}
 
 /**
  * Mutates an existing progression string by subtly changing one or more chords.
@@ -323,7 +237,7 @@ export function transformRelativeProgression(input, semitoneShift) {
     return transformed.join('');
 }
 
-export function resolveChordRoot(part, keyRootMidi, baseOctave) {
+function resolveChordRoot(part, keyRootMidi, baseOctave) {
     const romanMatch = part.match(ROMAN_REGEX);
     const nnsMatch = part.match(NNS_REGEX);
     const noteMatch = part.match(NOTE_REGEX);

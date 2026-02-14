@@ -180,7 +180,7 @@ export function updateLarsTempo(currentStep) {
     updateBpmUI();
 }
 
-export function updateBpmUI() {
+function updateBpmUI() {
     const { groove, playback } = getState();
     const bpmInput = document.getElementById('bpmInput');
     const bpmControlGroup = document.getElementById('bpmControlGroup');
