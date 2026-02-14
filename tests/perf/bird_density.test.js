@@ -22,7 +22,7 @@ const { soloistState } = vi.hoisted(() => ({
         lastFreq: 440,
         lastInterval: 0,
         stagnationCount: 0,
-        doubleStops: false
+        mode: 'monophonic'
     }
 }));
 

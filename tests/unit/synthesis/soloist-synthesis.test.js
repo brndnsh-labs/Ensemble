@@ -1,25 +1,29 @@
 /* eslint-disable */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Define OscillatorNode for instanceof checks
+global.OscillatorNode = class OscillatorNode {
+    constructor() {
+        this.type = '';
+        this.frequency = {
+            setValueAtTime: vi.fn(),
+            exponentialRampToValueAtTime: vi.fn(),
+            setTargetAtTime: vi.fn(),
+            value: 0
+        };
+        this.detune = { setValueAtTime: vi.fn() };
+    }
+    connect() {}
+    start() {}
+    stop() {}
+};
+
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
     const mockPlayback = {
         audio: {
             currentTime: 0,
-            createOscillator: vi.fn(() => ({
-                type: '',
-                frequency: { 
-                    setValueAtTime: vi.fn(), 
-                    exponentialRampToValueAtTime: vi.fn(), 
-                    setTargetAtTime: vi.fn(),
-                    value: 0
-                },
-                detune: { setValueAtTime: vi.fn() },
-                connect: vi.fn(),
-                start: vi.fn(),
-                stop: vi.fn(),
-                onended: null
-            })),
+            createOscillator: vi.fn(() => new global.OscillatorNode()),
             createGain: vi.fn(() => ({
                 gain: { 
                     value: 1, 
@@ -51,7 +55,7 @@ vi.mock('../../../public/state.js', () => {
     };
     const mockSoloist = { 
         activeVoices: [],
-        doubleStops: false
+        mode: 'monophonic'
     };
     const mockHarmony = { 
         activeVoices: []
@@ -91,7 +95,7 @@ describe('Soloist Synthesis', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         soloist.activeVoices = [];
-        soloist.doubleStops = false;
+        soloist.mode = 'monophonic';
         soloist.preset = 'classic'; // Force classic for these tests
         playback.audio.currentTime = 10;
     });
@@ -108,8 +112,8 @@ describe('Soloist Synthesis', () => {
         expect(mockGains[0].value.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.01);
     });
 
-    it('should allow two voices when doubleStops is enabled', () => {
-        soloist.doubleStops = true;
+    it('should allow two voices when mode is guitar', () => {
+        soloist.mode = 'guitar';
         playSoloNote(440, 10, 1.0);
         playSoloNote(554, 10, 1.0); // Same time, double stop
 
@@ -127,13 +131,25 @@ describe('Soloist Synthesis', () => {
     it('should configure vibrato for the "blues" style', () => {
         playSoloNote(440, 10, 1.0, 0.4, 0, 'blues');
 
-        // Vibrato is the 3rd oscillator created
+        // Vibrato is the 3rd oscillator created (osc1, osc2, vibrato)
         const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
         
         // Blues speed is 4.8 + random
         expect(vibSpeed).toBeGreaterThanOrEqual(4.8);
         expect(vibSpeed).toBeLessThanOrEqual(5.3);
+    });
+
+    it('should disable vibrato in piano mode', () => {
+        soloist.mode = 'piano';
+        playSoloNote(440, 10, 1.0, 0.4, 0, 'blues');
+
+        // Should only create osc1 and osc2 (and maybe filter etc), but NO vibrato osc
+        const oscs = playback.audio.createOscillator.mock.results.map(r => r.value);
+        // Expect only 2 oscillators (sawtooth/triangle) + 0 for vibrato
+        expect(oscs.length).toBe(2);
+        expect(oscs[0].type).toBe('sawtooth');
+        expect(oscs[1].type).toBe('triangle');
     });
 
     it('should use mixed sawtooth and triangle oscillators for rich tone', () => {
@@ -147,7 +163,7 @@ describe('Soloist Synthesis', () => {
     });
 
     it('should handle rapid note triggers (shredding) without exceeding voice limit', () => {
-        soloist.doubleStops = false;
+        soloist.mode = 'monophonic';
         // Trigger 10 notes very rapidly
         for(let i = 0; i < 10; i++) {
             playSoloNote(440 + i*10, 10 + (i * 0.05), 0.1);

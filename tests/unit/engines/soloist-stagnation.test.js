@@ -21,7 +21,7 @@ vi.mock('../../../public/config.js', () => ({
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5 },
-        soloist: { busySteps: 0, tension: 0, doubleStops: false, sessionSteps: 1000, pitchHistory: [], motifBuffer: [], deviceBuffer: [] },
+        soloist: { busySteps: 0, tension: 0, mode: 'monophonic', sessionSteps: 1000, pitchHistory: [], motifBuffer: [], deviceBuffer: [] },
         groove: { genreFeel: 'Jazz' },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},

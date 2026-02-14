@@ -6,7 +6,7 @@ vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.5 },
         groove: { genreFeel: 'Rock' },
-        soloist: { busySteps: 0, tension: 0, doubleStops: false, sessionSteps: 1000, pitchHistory: [], notesInPhrase: 0, currentPhraseSteps: 0, isResting: false, motifBuffer: [], deviceBuffer: [] },
+        soloist: { busySteps: 0, tension: 0, mode: 'monophonic', sessionSteps: 1000, pitchHistory: [], notesInPhrase: 0, currentPhraseSteps: 0, isResting: false, motifBuffer: [], deviceBuffer: [] },
         harmony: { enabled: false, rhythmicMask: 0, complexity: 0.5 },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
@@ -145,7 +145,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Integrity & Overlaps', () => {
         it('should respect double stop toggle', () => {
-            soloist.doubleStops = false;
+            soloist.mode = 'monophonic';
             let arrayFound = false;
             for (let i = 0; i < 500; i++) {
                 soloist.busySteps = 0;
@@ -335,7 +335,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Double Stop Generation', () => {
         it('should return an array of notes when double stops are triggered', () => {
-            soloist.doubleStops = true;
+            soloist.mode = 'guitar';
             let arrayFound = false;
             for (let i = 0; i < 2000; i++) {
                 soloist.busySteps = 0;

@@ -115,18 +115,20 @@ export function InstrumentSettings({ module }) {
                             </select>
                         </div>
                         <div style="margin-bottom: 1rem;">
-                            <label style="font-size: 0.75rem; color: var(--green); display: flex; align-items: center; gap: 0.25rem; cursor: pointer; border-left: 1px solid rgba(133,153,0,0.2); padding-left: 1rem;">
-                                <input
-                                    id="soloistDoubleStops"
-                                    type="checkbox"
-                                    checked={state.doubleStops}
-                                    onChange={(e) => {
-                                        dispatch(ACTIONS.SET_DOUBLE_STOPS, e.target.checked);
-                                        saveCurrentState();
-                                    }}
-                                />
-                                Double Stops
-                            </label>
+                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Phrasing Mode</label>
+                            <select
+                                id="soloistModeSelect"
+                                value={state.mode || 'monophonic'}
+                                onChange={(e) => {
+                                    dispatch(ACTIONS.SET_SOLOIST_MODE, e.target.value);
+                                    saveCurrentState();
+                                }}
+                                aria-label="Soloist Phrasing Mode"
+                            >
+                                <option value="monophonic">Monophonic</option>
+                                <option value="guitar">Guitar</option>
+                                <option value="piano">Piano</option>
+                            </select>
                         </div>
                     </Fragment>
                 )}

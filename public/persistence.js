@@ -24,7 +24,7 @@ export function saveCurrentState() {
         autoIntensity: playback.autoIntensity,
         chords: { enabled: chords.enabled, style: chords.style, instrument: chords.instrument, octave: chords.octave, density: chords.density, volume: chords.volume, reverb: chords.reverb, pianoRoots: chords.pianoRoots, activeTab: chords.activeTab },
         bass: { enabled: bass.enabled, style: bass.style, octave: bass.octave, volume: bass.volume, reverb: bass.reverb, activeTab: bass.activeTab },
-        soloist: { enabled: soloist.enabled, style: soloist.style, preset: soloist.preset, octave: soloist.octave, volume: soloist.volume, reverb: soloist.reverb, doubleStops: soloist.doubleStops, activeTab: soloist.activeTab },
+        soloist: { enabled: soloist.enabled, style: soloist.style, preset: soloist.preset, octave: soloist.octave, volume: soloist.volume, reverb: soloist.reverb, mode: soloist.mode, activeTab: soloist.activeTab },
         harmony: { enabled: harmony.enabled, style: harmony.style, octave: harmony.octave, volume: harmony.volume, reverb: harmony.reverb, complexity: harmony.complexity, activeTab: harmony.activeTab },
         groove: {
             enabled: groove.enabled,

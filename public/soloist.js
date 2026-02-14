@@ -652,13 +652,20 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     // --- 6. Melodic Devices ---
     const allowFlash = intensity > 0.5;
     const deviceBaseProb = config.deviceProb * (0.5 + playback.complexity * 1.0);
+    const isPiano = soloist.mode === 'piano';
+    const isPolyphonic = soloist.mode !== 'monophonic';
     
     // Throttle devices at high BPM
     let bpmDeviceThrottle = playback.bpm > 160 ? 0.3 : 1.0;
     if (playback.bpm > 185) bpmDeviceThrottle = 0.05; // Almost no devices at 200 BPM to prevent 16th bursts
 
     if (allowFlash && stepInBeat === 0 && Math.random() < (deviceBaseProb * 0.7 * warmupFactor * bpmDeviceThrottle)) {
-        const deviceType = config.allowedDevices ? config.allowedDevices[Math.floor(Math.random() * config.allowedDevices.length)] : null;
+        let allowed = config.allowedDevices || [];
+        if (isPiano) {
+            allowed = allowed.filter(d => !['slide', 'countryBend', 'graceSlide', 'chickenPick'].includes(d));
+        }
+
+        const deviceType = allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         const devBaseVel = 0.5 + (effectiveIntensity * 0.6);
         
         if (deviceType === 'banjoRoll') {
@@ -683,7 +690,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             soloist.busySteps = 0;
             return finalizeNote(res);
         }
-        if (deviceType === 'countryBend' && soloist.doubleStops) {
+        if (deviceType === 'countryBend' && isPolyphonic && !isPiano) {
             // Pedal Steel style: Hold one note, bend the other into a chord tone
             const topNote = selectedMidi + ([3, 4, 7].includes((selectedMidi - rootMidi + 12) % 12) ? 0 : 2);
             const bottomNote = selectedMidi - 5; 
@@ -731,7 +738,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             soloist.busySteps = (res.durationSteps || 1) - 1;
             return finalizeNote(res);
         }
-        if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && soloist.doubleStops) {
+        if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
             let dsInt = (activeStyle === 'blues' || activeStyle === 'scalar') ? 5 : 4;
             const res = [{ midi: selectedMidi + dsInt, velocity: devBaseVel * 1.05, durationSteps: 1, style: activeStyle, isDoubleStop: true }, { midi: selectedMidi, velocity: devBaseVel * 1.2, durationSteps: 1, style: activeStyle, isDoubleStop: false }];
             soloist.busySteps = 0; 
@@ -741,7 +748,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     let extraNotes = [];
     const dsChance = (config.doubleStopProb + (maturityFactor * 0.2)) * (stepInBeat === 2 ? 1.2 : 0.6) * warmupFactor;
-    if (soloist.doubleStops && Math.random() < dsChance) {
+    if (isPolyphonic && Math.random() < dsChance) {
         let dsInt = [5, 7, 9, 12][Math.floor(Math.random() * 4)];
         // Country specific: Exclusively use Sixths (8 or 9)
         if (activeStyle === 'country') {
@@ -787,10 +794,15 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         bendStartInterval = Math.random() < 0.7 ? 1 : 2;
     }
 
+    if (isPiano) {
+        bendStartInterval = 0;
+        isLegato = false;
+    }
+
     const result = { midi: selectedMidi, velocity: Math.min(1.25, stepVelocity), durationSteps, bendStartInterval, ccEvents: [], timingOffset: 0, style: activeStyle, isDoubleStop: false, isLegato };
     if (durationSteps > 1) soloist.busySteps = durationSteps - 1;
 
-    const finalResult = (extraNotes.length > 0 && soloist.doubleStops) ? [...extraNotes.map(n => ({...result, ...n})), result] : result;
+    const finalResult = (extraNotes.length > 0 && isPolyphonic) ? [...extraNotes.map(n => ({...result, ...n})), result] : result;
     
     if (!soloist.isReplayingMotif) {
         const motifEntry = Array.isArray(finalResult) 
