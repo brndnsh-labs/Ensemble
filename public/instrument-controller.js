@@ -4,9 +4,6 @@ import { ACTIONS } from './types.js';
 import { DRUM_PRESETS } from './presets.js';
 import { saveCurrentState } from './persistence.js';
 import { syncWorker, flushWorker } from './worker-client.js';
-import { MIXER_GAIN_MULTIPLIERS } from './config.js';
-import { applyTheme } from './app-controller.js';
-import { analyzeFormUI } from './arranger-controller.js';
 import { getStepsPerMeasure } from './utils.js';
 import { restoreGains, killChordBus, killBassBus, killSoloistBus, killHarmonyBus, killDrumBus, killAllPianoNotes, killSoloistNote, killHarmonyNote, killBassNote, killDrumNote } from './engine/engine.js';
 
