@@ -231,6 +231,11 @@ export class UnifiedVisualizer {
         this.height = rect.height;
         this.ctx.scale(dpr, dpr);
 
+        // Optimization: Cache geometry calculations to avoid per-frame re-calculation
+        this.yScale = this.height / this.visualRange;
+        this.midY = this.height / 2;
+        this.timeScale = (this.width - this.pianoRollWidth) / this.windowSize;
+
         // Resize static layer
         this.staticCanvas.width = this.canvas.width;
         this.staticCanvas.height = this.canvas.height;
@@ -239,22 +244,24 @@ export class UnifiedVisualizer {
         this.renderStaticLayer();
     }
 
+    // Optimization: Stable method for Y calculation to avoid closure allocation
+    getY(m) {
+        return this.midY - (m - this.centerMidi) * this.yScale;
+    }
+
     renderStaticLayer() {
         if (!this.themeCache || !this.width || !this.height) return;
 
         const ctx = this.staticCtx;
         const w = this.width;
         const h = this.height;
-        const yScale = h / this.visualRange;
-        const midY = h / 2;
+        const yScale = this.yScale;
 
         const {
             bgColor, keyWhite, keyBlack, keySeparator,
             labelColor, guideLineBlack, guideLineWhite,
             separatorColor
         } = this.themeCache;
-
-        const getY = (m) => midY - (m - this.centerMidi) * yScale;
 
         // Background
         ctx.fillStyle = bgColor;
@@ -272,7 +279,7 @@ export class UnifiedVisualizer {
 
         // Pass 1: Keys & Labels
         for (let m = startMidi; m <= endMidi; m++) {
-            const y = getY(m);
+            const y = this.getY(m);
             const noteInOctave = m % 12;
             const isBlack = IS_BLACK[noteInOctave];
 
@@ -290,7 +297,7 @@ export class UnifiedVisualizer {
         ctx.strokeStyle = keySeparator;
         ctx.beginPath();
         for (let m = startMidi; m <= endMidi; m++) {
-            const y = getY(m);
+            const y = this.getY(m);
             ctx.moveTo(0, y + yScale/2);
             ctx.lineTo(this.pianoRollWidth, y + yScale/2);
         }
@@ -303,7 +310,7 @@ export class UnifiedVisualizer {
         for (let m = startMidi; m <= endMidi; m++) {
             const noteInOctave = m % 12;
             if (!IS_BLACK[noteInOctave]) {
-                const y = getY(m);
+                const y = this.getY(m);
                 ctx.moveTo(this.pianoRollWidth, y);
                 ctx.lineTo(w, y);
             }
@@ -316,7 +323,7 @@ export class UnifiedVisualizer {
         for (let m = startMidi; m <= endMidi; m++) {
             const noteInOctave = m % 12;
             if (IS_BLACK[noteInOctave]) {
-                const y = getY(m);
+                const y = this.getY(m);
                 ctx.moveTo(this.pianoRollWidth, y);
                 ctx.lineTo(w, y);
             }
@@ -408,7 +415,7 @@ export class UnifiedVisualizer {
         const h = this.height;
         const graphW = w - this.pianoRollWidth;
         const minTime = currentTime - this.windowSize;
-        const yScale = h / this.visualRange;
+        const yScale = this.yScale;
 
         // Use cached theme-aware colors
         const {
@@ -416,13 +423,9 @@ export class UnifiedVisualizer {
             outlineColor, chordColors
         } = this.themeCache;
 
-        // Pre-calculate math constants for this frame
-        const midY = h / 2;
-        const timeScale = graphW / this.windowSize;
-
         // Inline helpers to avoid closure allocation if possible, or just use optimized variables
-        const getY = (m) => midY - (m - this.centerMidi) * yScale;
-        const getX = (t) => this.pianoRollWidth + (currentTime - t) * timeScale;
+        // optimization: use this.getY(m) and pre-calculated timeScale
+        const getX = (t) => this.pianoRollWidth + (currentTime - t) * this.timeScale;
 
         // 0. Static Background
         // Optimization: Draw pre-rendered static layer
@@ -433,6 +436,10 @@ export class UnifiedVisualizer {
         const bottomMidi = this.centerMidi - (this.visualRange / 2);
         const startMidi = Math.floor(bottomMidi);
         const endMidi = Math.ceil(topMidi);
+
+        // Optimization: Pre-calculate visible octave range for the frame
+        const minOct = Math.floor(startMidi / 12);
+        const maxOct = Math.ceil(endMidi / 12);
 
         // Optimization: Direct draw (no intermediate array) + Batch Label Redraw
         this.cNotesBuffer.fill(0);
@@ -447,7 +454,7 @@ export class UnifiedVisualizer {
                         if (m < startMidi || m > endMidi) continue;
 
                         const interval = (m % 12 - rootPC + 12) % 12;
-                        const y = getY(m);
+                        const y = this.getY(m);
 
                         ctx.fillStyle = this.intervalColors[interval];
                         ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
@@ -469,7 +476,7 @@ export class UnifiedVisualizer {
                  if (ev.time > currentTime) return false;
                  if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
                      if (ev.midi >= startMidi && ev.midi <= endMidi) {
-                         const y = getY(ev.midi);
+                         const y = this.getY(ev.midi);
                          ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
 
                          if (ev.midi % 12 === 0) this.cNotesBuffer[ev.midi] = 1;
@@ -488,7 +495,7 @@ export class UnifiedVisualizer {
         const startC = Math.ceil(startMidi / 12) * 12;
         for (let m = startC; m <= endMidi; m += 12) {
              if (this.cNotesBuffer[m]) {
-                 const y = getY(m);
+                 const y = this.getY(m);
                  const octave = (m / 12) - 1;
                  ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
              }
@@ -540,8 +547,8 @@ export class UnifiedVisualizer {
 
         // --- Fill Highlight ---
         if (this.isFillActive) {
-            const yMin = getY(52); // Top of drum range
-            const yMax = getY(36); // Bottom of drum range
+            const yMin = this.getY(52); // Top of drum range
+            const yMax = this.getY(36); // Bottom of drum range
             const fillGradient = ctx.createLinearGradient(this.pianoRollWidth, yMin, this.pianoRollWidth, yMax);
             fillGradient.addColorStop(0, 'rgba(211, 54, 130, 0)');
             fillGradient.addColorStop(0.5, 'rgba(211, 54, 130, 0.15)');
@@ -574,13 +581,10 @@ export class UnifiedVisualizer {
                 // Optimization: Direct array lookup
                 ctx.fillStyle = this.intervalColors[interval];
 
-                // Render in visible octaves
-                const minOct = Math.floor(startMidi / 12);
-                const maxOct = Math.ceil(endMidi / 12);
-
+                // Render in visible octaves (using hoisted range)
                 for (let oct = minOct; oct <= maxOct; oct++) {
                     const m = pc + oct * 12;
-                    const y = Math.round(getY(m));
+                    const y = Math.round(this.getY(m));
                     if (y >= -10 && y <= h + 10) {
                         ctx.fillRect(x, y - yScale/2, cw, yScale);
                     }
@@ -608,7 +612,7 @@ export class UnifiedVisualizer {
             const rootPC = ev.rootMidi % 12;
 
             for (const midi of ev.notes) {
-                const y = Math.round(getY(midi));
+                const y = Math.round(this.getY(midi));
                 const interval = (midi % 12 - rootPC + 12) % 12;
                 // Optimization: Direct array lookup
                 ctx.fillStyle = this.intervalColors[interval];
@@ -634,7 +638,7 @@ export class UnifiedVisualizer {
                     if (ev.time > currentTime) return false;
 
                     const x = getX(ev.time);
-                    const y = Math.round(getY(ev.midi));
+                    const y = Math.round(this.getY(ev.midi));
                     const intensity = ev.velocity || 1.0;
                     
                     // Render drum hits as diamonds or vertical diamonds
@@ -664,7 +668,7 @@ export class UnifiedVisualizer {
                 const endT = Math.min(currentTime, noteEnd);
                 const x1 = getX(startT);
                 const x2 = getX(endT);
-                const y = Math.round(getY(ev.midi));
+                const y = Math.round(this.getY(ev.midi));
 
                 if (y >= -10 && y <= h + 10) {
                     // Optimization: Store typeCode directly to avoid RingBuffer.at() lookup in render pass
