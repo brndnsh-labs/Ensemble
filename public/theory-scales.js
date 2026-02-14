@@ -9,7 +9,7 @@ import { getState } from './state.js';
  * taking into account genre, harmonic context, and tension.
  */
 
-export const SCALE_INTERVALS = {
+const SCALE_INTERVALS = {
     // Diatonic
     MAJOR: [0, 2, 4, 5, 7, 9, 11],
     NATURAL_MINOR: [0, 2, 3, 5, 7, 8, 10],

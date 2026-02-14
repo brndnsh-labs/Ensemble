@@ -14,7 +14,7 @@ vi.mock('../../../public/ui.js', () => ({
     }
 }));
 
-describe('Cross-Browser & Hardware Heuristics', () => {
+describe('Audio Engine & Cross-Browser Heuristics', () => {
     function getMockAudioContextClass(options = {}) {
         return class MockAudioContext {
             constructor() {
@@ -82,6 +82,11 @@ describe('Cross-Browser & Hardware Heuristics', () => {
         expect(playback.audio.resume).toHaveBeenCalled();
     });
 
+    it('should return 0 for visual time if audio context is missing', () => {
+        playback.audio = null;
+        expect(getVisualTime()).toBe(0);
+    });
+
     it('should compensate for hardware output latency in visualizer timing', () => {
         global.window.AudioContext = getMockAudioContextClass({ outputLatency: 0.080 }); // 80ms latency
         
@@ -92,7 +97,7 @@ describe('Cross-Browser & Hardware Heuristics', () => {
         expect(visualTime).toBeCloseTo(9.92, 2);
     });
 
-    it('should fallback to OS-specific defaults if outputLatency is not reported', () => {
+    it('should fallback to OS-specific defaults if outputLatency is not reported (Chrome/Chromium)', () => {
         let nowValue = 1000;
         vi.spyOn(performance, 'now').mockImplementation(() => nowValue);
         

@@ -25,7 +25,8 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         drawQueue: [],
         visualFlash: false,
         metronome: false,
-        countIn: false
+        countIn: false,
+        viz: null
     };
     const mockGroove = { genreFeel: 'Rock', instruments: [], humanize: 0, measures: 1 };
     const mockMidi = { enabled: false };
@@ -58,18 +59,49 @@ vi.mock('../../../public/ui.js', () => ({
     ui: {
         metronome: { checked: false },
         visualFlash: { checked: false }
-    }
+    },
+    triggerFlash: vi.fn()
 }));
 
-import { scheduleGlobalEvent } from '../../../public/engine/scheduler-core.js';
+// Mock platform dependencies often used by scheduler
+vi.mock('../../../public/platform.js', () => ({
+    initPlatform: vi.fn(),
+    unlockAudio: vi.fn(),
+    lockAudio: vi.fn(),
+    activateWakeLock: vi.fn(),
+    deactivateWakeLock: vi.fn(),
+}));
+
+vi.mock('../../../public/worker-client.js', () => ({
+    requestBuffer: vi.fn(),
+    syncWorker: vi.fn(),
+    flushWorker: vi.fn(),
+    stopWorker: vi.fn(),
+    startWorker: vi.fn(),
+    requestResolution: vi.fn(),
+}));
+
+vi.mock('../../../public/conductor.js', () => ({
+    conductorState: {},
+    updateAutoConductor: vi.fn(),
+    updateLarsTempo: vi.fn(),
+    checkSectionTransition: vi.fn(),
+}));
+
+import { scheduleGlobalEvent, scheduleChordVisuals } from '../../../public/engine/scheduler-core.js';
 import { getState } from '../../../public/state.js';
-const { arranger, playback } = getState();
+const { arranger, playback, vizState } = getState();
 
 describe('Scheduler Core System', () => {
     
     beforeEach(() => {
         vi.clearAllMocks();
         playback.currentKey = '';
+        playback.drawQueue.length = 0;
+        playback.visualFlash = false;
+        vizState.enabled = false;
+        playback.viz = null;
+
         // Setup a simple song structure with a key change
         // Bar 1 (Step 0): Key A
         // Bar 2 (Step 16): Key B
@@ -84,26 +116,68 @@ describe('Scheduler Core System', () => {
         ];
     });
 
-    it('should emit a key-updated event when playhead crosses section threshold', () => {
-        // Trigger Step 0 (Key A)
-        scheduleGlobalEvent(0, 0);
-        
-        expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ 
-            type: 'key-change', 
-            detail: { key: 'A' } 
-        }));
-        
-        window.dispatchEvent.mockClear();
-        
-        // Trigger Step 15 (Still Key A)
-        scheduleGlobalEvent(15, 0);
-        expect(window.dispatchEvent).not.toHaveBeenCalled();
-        
-        // Trigger Step 16 (Key B)
-        scheduleGlobalEvent(16, 0);
-        expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ 
-            type: 'key-change', 
-            detail: { key: 'B' } 
-        }));
+    describe('Global Event Scheduling', () => {
+        it('should emit a key-updated event when playhead crosses section threshold', () => {
+            // Trigger Step 0 (Key A)
+            scheduleGlobalEvent(0, 0);
+
+            expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
+                type: 'key-change',
+                detail: { key: 'A' }
+            }));
+
+            window.dispatchEvent.mockClear();
+
+            // Trigger Step 15 (Still Key A)
+            scheduleGlobalEvent(15, 0);
+            expect(window.dispatchEvent).not.toHaveBeenCalled();
+
+            // Trigger Step 16 (Key B)
+            scheduleGlobalEvent(16, 0);
+            expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
+                type: 'key-change',
+                detail: { key: 'B' }
+            }));
+        });
+    });
+
+    describe('Visual Scheduling', () => {
+        it('should push chord_vis event to drawQueue even when visualizer is disabled', () => {
+            const chordData = {
+                stepInChord: 0,
+                chordIndex: 1,
+                chord: {
+                    freqs: [440, 550, 660],
+                    rootMidi: 60,
+                    intervals: [0, 4, 7],
+                    beats: 4
+                }
+            };
+            const time = 10.0;
+
+            vizState.enabled = false;
+            playback.viz = null;
+
+            scheduleChordVisuals(chordData, time);
+
+            expect(playback.drawQueue.length).toBe(1);
+            expect(playback.drawQueue[0]).toMatchObject({
+                type: 'chord_vis',
+                time: time,
+                index: 1
+            });
+        });
+
+        it('should not push chord_vis event if stepInChord is not 0', () => {
+            const chordData = {
+                stepInChord: 1,
+                chordIndex: 1,
+                chord: { freqs: [] }
+            };
+
+            scheduleChordVisuals(chordData, 10.0);
+
+            expect(playback.drawQueue.length).toBe(0);
+        });
     });
 });

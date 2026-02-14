@@ -82,10 +82,6 @@ export function requestResolution(step) {
     if (timerWorker) timerWorker.postMessage({ type: WORKER_MSG.RESOLUTION, data: { step, requestTimestamp: performance.now() } });
 }
 
-export function primeWorker(steps = 32) {
-    if (timerWorker) timerWorker.postMessage({ type: WORKER_MSG.PRIME, data: steps });
-}
-
 export function syncWorker(action, payload) {
     if (!timerWorker) return;
     const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
