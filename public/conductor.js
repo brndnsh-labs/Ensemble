@@ -15,7 +15,7 @@ export const conductorState = {
 };
 
 export function applyConductor() {
-    const { playback, soloist, groove, chords, bass, harmony } = getState();
+    const { playback, soloist, groove, chords, bass, harmony, arranger } = getState();
     const intensity = playback.bandIntensity; // 0.0 - 1.0
     const complexity = playback.complexity;   // 0.0 - 1.0
 
@@ -38,23 +38,49 @@ export function applyConductor() {
     // Harmonies follow the complexity signal for activity level.
     let targetHbComplexity = complexity; 
     
-    // If session timer is active and we are in the last 30 seconds, push for a "Final Build"
-    if (playback.sessionTimer > 0 && playback.isEndingPending) {
+    // If Song Mode is active and we are in the last 30 seconds, push for a "Final Build"
+    const elapsedMins = (playback.sessionTimer > 0 && playback.sessionStartTime > 0) ? (performance.now() - playback.sessionStartTime) / 60000 : 0;
+    const progress = (playback.sessionTimer > 0) ? Math.min(1.0, elapsedMins / playback.sessionTimer) : 0;
+
+    if (playback.songMode && playback.isEndingPending) {
         targetHbComplexity = Math.max(targetHbComplexity, 0.85);
+    }
+
+    // --- 5. Expression (Lyrical vs Involved) ---
+    // Lyrical = 1.0 (Melodic, slower), Involved = 0.0 (Busy, technical)
+    let lyricalBias = 0.5;
+    
+    // Song Arc: Start lyrical, get involved at peak, end lyrical
+    if (playback.songMode && playback.sessionTimer > 0) {
+        if (progress < 0.2) lyricalBias = 0.8;
+        else if (progress < 0.7) lyricalBias = 0.4;
+        else if (progress < 0.9) lyricalBias = 0.2; // Peak Soloing
+        else lyricalBias = 0.9; // Resolution
+    }
+
+    // Section Overrides
+    const modStep = (arranger.totalSteps > 0) ? (playback.step % arranger.totalSteps) : 0;
+    const currentEntry = arranger.stepMap.find(e => modStep >= e.start && modStep < e.end);
+    if (currentEntry) {
+        const label = currentEntry.chord.sectionLabel.toLowerCase();
+        if (label.includes('solo')) lyricalBias = Math.min(lyricalBias, 0.2);
+        else if (label.includes('verse')) lyricalBias = Math.max(lyricalBias, 0.7);
+        else if (label.includes('outro') || label.includes('intro')) lyricalBias = Math.max(lyricalBias, 0.85);
     }
 
     dispatch(ACTIONS.UPDATE_CONDUCTOR_DECISION, {
         density: targetDensity,
         velocity: targetVelocity,
         hookProb: targetHookProb,
-        intent: { density: targetIntentDensity }
+        intent: { density: targetIntentDensity },
+        lyricalBias: lyricalBias
     });
 
     dispatch(ACTIONS.UPDATE_HB, {
         complexity: targetHbComplexity
     });
 
-    // --- 5. Micro-Timing (Pocket) ---
+    // --- 6. Micro-Timing (Pocket) ---
     let targetBassPocket = 0;
     const genre = groove.genreFeel;
     if (genre === 'Neo-Soul') targetBassPocket = 0.025; // 25ms "Dilla" lag

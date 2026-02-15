@@ -195,7 +195,7 @@ export function scheduler() {
                 const spm = getStepsPerMeasure(arranger.timeSignature);
                 
                 // --- Session Timer Check ---
-                if (playback.sessionTimer > 0 && !playback.isEndingPending) {
+                if (playback.songMode && playback.sessionTimer > 0 && !playback.isEndingPending) {
                     const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
                     if (elapsedMins >= playback.sessionTimer) {
                         dispatch(ACTIONS.SET_ENDING_PENDING, true);
@@ -203,9 +203,32 @@ export function scheduler() {
                 }
 
                 // --- Resolution Trigger Logic ---
-                // If ending is pending or stopAtEnd is active, and we reach a loop boundary (Step 0)
-                if (playback.step > 0 && (playback.step % arranger.totalSteps === 0)) {
-                    if (playback.isEndingPending || playback.stopAtEnd || isResolutionTriggered) {
+                // If ending is pending or stopAtEnd is active, check for appropriate boundary
+                if (playback.step > 0) {
+                    let shouldStop = false;
+                    
+                    if (playback.songMode && playback.isEndingPending) {
+                        // In Song Mode, we can end at ANY section boundary, not just the loop end
+                        const modStep = playback.step % arranger.totalSteps;
+                        const entry = arranger.sectionMap.find(s => modStep === s.start);
+                        
+                        if (entry) {
+                            // Found a boundary!
+                            // Heuristic: If we are at the very start of a "Solo" or "Chorus", maybe keep going?
+                            // For now, let's just end at any section boundary for responsiveness.
+                            shouldStop = true;
+                        } else if (modStep === 0) {
+                            // Also end at the loop start (which is a section boundary too)
+                            shouldStop = true;
+                        }
+                    } else if (playback.step % arranger.totalSteps === 0) {
+                        // Legacy behavior: only end at loop boundaries
+                        if (playback.isEndingPending || playback.stopAtEnd || isResolutionTriggered) {
+                            shouldStop = true;
+                        }
+                    }
+
+                    if (shouldStop) {
                         if (!isResolutionTriggered) {
                             isResolutionTriggered = true;
                             playback.stopAtEnd = false;
@@ -807,7 +830,16 @@ function syncAndFlushWorker(step) {
                     swingSub: groove.swingSub,
                     instruments: groove.instruments.map(i => ({ name: i.name, steps: [...i.steps], muted: i.muted }))
                 },
-                playback: { bpm: playback.bpm, bandIntensity: playback.bandIntensity, complexity: playback.complexity, autoIntensity: playback.autoIntensity }
+                playback: { 
+                    bpm: playback.bpm, 
+                    bandIntensity: playback.bandIntensity, 
+                    complexity: playback.complexity, 
+                    autoIntensity: playback.autoIntensity,
+                    songMode: playback.songMode,
+                    sessionTimer: playback.sessionTimer,
+                    sessionStartTime: playback.sessionStartTime,
+                    isEndingPending: playback.isEndingPending
+                }
             };
         
             chords.buffer.clear();
