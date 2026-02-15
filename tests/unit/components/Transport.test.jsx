@@ -58,7 +58,8 @@ describe('Transport Component', () => {
             isPlaying: false,
             bpm: 120,
             sessionTimer: 5,
-            sessionStartTime: 0
+            sessionStartTime: 0,
+            songMode: true
         }));
 
         act(() => {
@@ -74,7 +75,8 @@ describe('Transport Component', () => {
             isPlaying: true,
             bpm: 120,
             sessionTimer: 0,
-            sessionStartTime: 1000
+            sessionStartTime: 1000,
+            songMode: true
         }));
 
         act(() => {
@@ -93,7 +95,8 @@ describe('Transport Component', () => {
             isPlaying: true,
             bpm: 120,
             sessionTimer: sessionTimer,
-            sessionStartTime: startTime
+            sessionStartTime: startTime,
+            songMode: true
         }));
 
         // Mock performance.now to return startTime initially

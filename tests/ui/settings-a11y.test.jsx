@@ -46,8 +46,8 @@ describe('Settings Accessibility', () => {
         expect(decBtn).not.toBeNull();
         expect(incBtn).not.toBeNull();
 
-        expect(decBtn.getAttribute('aria-label')).toBe('Decrease session timer');
-        expect(incBtn.getAttribute('aria-label')).toBe('Increase session timer');
+        expect(decBtn.getAttribute('aria-label')).toBe('Decrease song duration');
+        expect(incBtn.getAttribute('aria-label')).toBe('Increase song duration');
     });
 
     it('should have aria-labels on MIDI Channel and Octave inputs', () => {
