@@ -143,7 +143,8 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     const cutoffBase = style === 'bird' ? freq * 3.5 * brightnessBase : Math.min(freq * 4 * brightnessBase, 12000);
     
     // Guitar Palm Mute Layer (Low velocity = Muted/Snappy)
-    const isMuted = soloist.mode === 'guitar' && vol < 0.6;
+    const muteThreshold = intensity < 0.4 ? 0.7 : 0.55;
+    const isMuted = soloist.mode === 'guitar' && vol < muteThreshold;
     const isPiano = soloist.mode === 'piano';
     
     filter.frequency.setValueAtTime(clampFreq(cutoffBase), playTime);
@@ -167,13 +168,15 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
         outputGain.gain.setValueAtTime(0, playTime);
         outputGain.gain.setTargetAtTime(randomizedVol, playTime, 0.005); // Faster snap
         outputGain.gain.setTargetAtTime(0, playTime + 0.05, 0.02); // Short decay
-        releaseTime = 0.1;
-    } else if (isPiano && vol < 0.5) {
-        // Piano Sustain Pedal Emulation (Longer release for soft notes)
+        releaseTime = 0.12;
+    } else if (isPiano && (vol < 0.5 || duration > 0.6)) {
+        // Piano Sustain Pedal Emulation (Longer release for soft notes or long notes)
         outputGain.gain.setValueAtTime(0, playTime);
         outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
-        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.2); // Slower release
-        releaseTime = 0.4;
+        const sustainDecay = Math.max(0.1, randomizedVol * 0.2);
+        outputGain.gain.setTargetAtTime(sustainDecay, playTime + 0.1, 0.1); // Natural string decay
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.95, 0.3); // Slower release
+        releaseTime = Math.max(0.5, duration * 1.2);
     } else {
         outputGain.gain.setValueAtTime(0, playTime);
         outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
@@ -338,7 +341,9 @@ function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, styl
     if (isLegato && prevFreq) {
         // Portamento Glide - Smoother for monophonic lead mode
         const { soloist } = getState();
-        const glideTime = soloist.mode === 'monophonic' ? 0.06 : 0.04;
+        // Guitar hammer-ons/pull-offs are faster (0.03s), synths slightly slower
+        const glideTime = soloist.mode === 'monophonic' ? 0.06 : 
+                         (soloist.mode === 'guitar' ? 0.03 : 0.04);
         
         if (osc1) {
             osc1.frequency.setValueAtTime(prevFreq, time);
@@ -389,10 +394,13 @@ function createVibrato(ctx, freq, time, duration, style) {
     else if (style === 'neo') { vibSpeed = 4.2; depthFactor = 0.015; }
     else if (style === 'shred') { vibSpeed = 6.5; depthFactor = 0.004; }
 
-    // Mode-specific differentiation (Lead Synth/Horn feel)
+    // Mode-specific differentiation (Lead Synth/Horn/Guitar feel)
     if (soloist.mode === 'monophonic') {
         vibSpeed -= 0.5; // Slightly slower, more deliberate
         depthFactor *= 1.2; // Slightly deeper
+    } else if (soloist.mode === 'guitar') {
+        vibSpeed += 0.4; // Finger vibrato is often a bit faster
+        depthFactor *= 1.5; // And very expressive
     }
 
     vibrato.frequency.setValueAtTime(vibSpeed, time);

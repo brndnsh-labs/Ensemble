@@ -663,14 +663,23 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (playback.bpm > 185) bpmDeviceThrottle = 0.05; // Almost no devices at 200 BPM to prevent 16th bursts
 
     if (allowFlash && stepInBeat === 0 && Math.random() < (deviceBaseProb * 0.7 * warmupFactor * bpmDeviceThrottle)) {
-        let allowed = config.allowedDevices || [];
+        let allowed = [...(config.allowedDevices || [])];
         if (isPiano) {
             allowed = allowed.filter(d => !['slide', 'countryBend', 'graceSlide', 'chickenPick'].includes(d));
+            // Piano-specific devices
+            if (!allowed.includes('graceNote')) allowed.push('graceNote');
         }
 
         const deviceType = allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         const devBaseVel = 0.5 + (effectiveIntensity * 0.6);
         
+        if (deviceType === 'graceNote') {
+            // Half-step or scale-step below, very fast
+            const res = { midi: selectedMidi - 1, velocity: devBaseVel * 0.8, durationSteps: 1, style: activeStyle };
+            soloist.deviceBuffer = [{ midi: selectedMidi, velocity: devBaseVel * 1.1, durationSteps: 2, style: activeStyle }];
+            soloist.busySteps = 0;
+            return finalizeNote(res);
+        }
         if (deviceType === 'banjoRoll') {
             // Arpeggiated 16th notes using chord tones + 2nd/6th
             const root = targetChord.rootMidi;
@@ -736,8 +745,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             return finalizeNote(res);
         }
         if (deviceType === 'slide') {
+            // Favor sliding from below, but guitar/jazz often slide from above
+            const dir = (soloist.mode === 'guitar' || activeStyle === 'bird') && Math.random() < 0.3 ? 1 : -1;
             soloist.deviceBuffer = [ { midi: selectedMidi, velocity: devBaseVel * 1.15, durationSteps: 1, style: activeStyle } ];
-            const res = { midi: selectedMidi - 1, velocity: devBaseVel * 0.95, durationSteps: 1, style: activeStyle };
+            const res = { midi: selectedMidi + dir, velocity: devBaseVel * 0.95, durationSteps: 1, style: activeStyle };
             soloist.busySteps = (res.durationSteps || 1) - 1;
             return finalizeNote(res);
         }
@@ -755,17 +766,20 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (isPolyphonic && Math.random() < dsChance) {
         // Mode-specific voicing differentiation
         if (soloist.mode === 'piano') {
-            // Block Chord Logic: Add two chord tones immediately below the melody
             const currentRoot = currentChord.rootMidi;
-            
-            // Look for chord tones below selectedMidi
-            let count = 0;
-            for (let m = selectedMidi - 1; m > selectedMidi - 13 && count < 2; m--) {
-                const pc = (m % 12 + 12) % 12;
-                // If it's a chord tone (root, 3rd, 5th, 7th)
-                if (currentChord.intervals.some(i => (i % 12) === (pc - (currentRoot % 12) + 12) % 12)) {
-                    extraNotes.push({ midi: m, velocity: (0.5 + effectiveIntensity * 0.6) * 0.85, isDoubleStop: true });
-                    count++;
+            // Modern Jazz/Neo: Use Quartal voicings (4ths)
+            if ((activeStyle === 'neo' || activeStyle === 'bird') && Math.random() < 0.6) {
+                extraNotes.push({ midi: selectedMidi - 5, velocity: (0.4 + effectiveIntensity * 0.5) * 0.8, isDoubleStop: true });
+                if (Math.random() < 0.4) extraNotes.push({ midi: selectedMidi - 10, velocity: (0.3 + effectiveIntensity * 0.5) * 0.7, isDoubleStop: true });
+            } else {
+                // Classic Block Chord Logic: Add two chord tones immediately below the melody
+                let count = 0;
+                for (let m = selectedMidi - 1; m > selectedMidi - 13 && count < 2; m--) {
+                    const pc = (m % 12 + 12) % 12;
+                    if (currentChord.intervals.some(i => (i % 12) === (pc - (currentRoot % 12) + 12) % 12)) {
+                        extraNotes.push({ midi: m, velocity: (0.5 + effectiveIntensity * 0.6) * 0.85, isDoubleStop: true });
+                        count++;
+                    }
                 }
             }
         } else if (activeStyle === 'country') {
@@ -773,8 +787,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             const dsInt = [8, 9][Math.floor(Math.random() * 2)];
             extraNotes.push({ midi: selectedMidi + dsInt, velocity: (0.5 + effectiveIntensity * 0.6) * 0.95, isDoubleStop: true });
         } else if (soloist.mode === 'guitar') {
-            // Guitar specific: Restrict to fretboard-friendly intervals (3rds, 4ths, 6ths)
-            const dsInt = [3, 4, 5, 8, 9][Math.floor(Math.random() * 5)];
+            // Hendrix-style: favor 4ths and 5ths with potential for ornaments
+            const dsInt = (activeStyle === 'blues' || activeStyle === 'neo') ? 
+                [5, 7, 5, 4][Math.floor(Math.random() * 4)] : 
+                [3, 4, 5, 8, 9][Math.floor(Math.random() * 5)];
             extraNotes.push({ midi: selectedMidi + dsInt, velocity: (0.5 + effectiveIntensity * 0.6) * 0.95, isDoubleStop: true });
         } else {
             // Default generic double stop
@@ -818,9 +834,9 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const isGuideTone = [3, 4, 10, 11].includes((pc - (targetChord.rootMidi % 12) + 12) % 12);
     
     // Guitar mode favors bending UP into notes (pre-bends)
-    const guitarBendProb = (soloist.mode === 'guitar') ? 0.35 : 0;
+    const guitarBendProb = (soloist.mode === 'guitar') ? (0.35 + (isGuideTone ? 0.2 : 0)) : 0;
 
-    if (((isRoot || isGuideTone) && Math.abs(lastMidi - selectedMidi) === 1 && Math.random() < (0.4 + intensity * 0.3)) || Math.random() < guitarBendProb) {
+    if (((isRoot || isGuideTone) && Math.abs(lastMidi - selectedMidi) <= 2 && Math.random() < (0.4 + intensity * 0.3)) || Math.random() < guitarBendProb) {
         // Bend up from 1 or 2 semitones below
         bendStartInterval = -1;
         if (Math.random() < 0.4 || soloist.mode === 'guitar' && Math.random() < 0.5) bendStartInterval = -2;
