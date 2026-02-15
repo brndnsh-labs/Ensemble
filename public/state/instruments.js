@@ -65,7 +65,7 @@ export const bass = {
  * @property {boolean} enabled - Whether the soloist is active.
  * @property {number} volume - Mix volume (0.0 - 1.0).
  * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
- * @property {boolean} doubleStops - Whether to play harmonization lines.
+ * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
  */
 export const soloist = {
     enabled: false,
@@ -94,7 +94,7 @@ export const soloist = {
     hookRetentionProb: 0.4,
     sharedHookBuffer: [], // Shared hooks for band interaction
     tension: 0,
-    doubleStops: false,
+    mode: 'monophonic',
     activeVoices: [],
     sessionSteps: 0,
     deviceBuffer: [],
@@ -149,7 +149,7 @@ export function instrumentReducer(action, payload) {
                 enabled: true, volume: 0.45, reverb: 0.05, octave: 38, style: 'smart', activeTab: 'smart'
             });
             Object.assign(soloist, {
-                enabled: false, preset: 'neo', volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', doubleStops: false
+                enabled: false, preset: 'neo', volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', mode: 'monophonic'
             });
             Object.assign(harmony, {
                 enabled: false, volume: 0.4, reverb: 0.4, octave: 60, style: 'smart', complexity: 0.5, activeTab: 'smart'
@@ -181,8 +181,8 @@ export function instrumentReducer(action, payload) {
         case ACTIONS.SET_PIANO_ROOTS:
             Object.assign(chords, { pianoRoots: payload });
             return true;
-        case ACTIONS.SET_DOUBLE_STOPS:
-            Object.assign(soloist, { doubleStops: !!payload });
+        case ACTIONS.SET_SOLOIST_MODE:
+            Object.assign(soloist, { mode: payload });
             return true;
         case ACTIONS.SET_SOLOIST_PRESET:
             Object.assign(soloist, { preset: payload });

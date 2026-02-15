@@ -56,7 +56,7 @@ vi.mock('../../../public/state.js', () => {
     // We mock soloist state and will mutate it in tests
     const mockSoloist = {
         activeVoices: [],
-        doubleStops: false,
+        mode: 'monophonic',
         preset: 'classic'
     };
 
@@ -88,7 +88,7 @@ describe('Soloist Presets', () => {
         vi.clearAllMocks();
         soloist.activeVoices = [];
         soloist.preset = 'classic';
-        soloist.doubleStops = false;
+        soloist.mode = 'monophonic';
         playback.audio.currentTime = 10;
     });
 

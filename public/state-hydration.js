@@ -140,7 +140,7 @@ export function hydrateState() {
                 octave: (savedState.soloist.octave === 77 || savedState.soloist.octave === 67 || savedState.soloist.octave === undefined) ? 72 : clamp(savedState.soloist.octave, 0, 127, 72),
                 volume: clamp(savedState.soloist.volume, 0, 1, 0.5),
                 reverb: clamp(savedState.soloist.reverb, 0, 1, 0.6),
-                doubleStops: savedState.soloist.doubleStops !== undefined ? savedState.soloist.doubleStops : false,
+                mode: savedState.soloist.mode ? savedState.soloist.mode : (savedState.soloist.doubleStops ? 'guitar' : 'monophonic'),
                 activeTab: savedState.soloist.activeTab || 'smart'
             });
         }

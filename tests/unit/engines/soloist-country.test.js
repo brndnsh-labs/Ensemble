@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.5 },
-        soloist: { busySteps: 0, tension: 0, doubleStops: true, sessionSteps: 1000, pitchHistory: [], motifBuffer: [], deviceBuffer: [] },
+        soloist: { busySteps: 0, tension: 0, mode: 'guitar', sessionSteps: 1000, pitchHistory: [], motifBuffer: [], deviceBuffer: [] },
         groove: { genreFeel: 'Country' },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},

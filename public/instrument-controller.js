@@ -152,7 +152,7 @@ export function flushBuffers(primeSteps = 0) {
         },
         chords: { style: chords.style, octave: chords.octave, density: chords.density, enabled: chords.enabled, volume: chords.volume },
         bass: { style: bass.style, octave: bass.octave, enabled: bass.enabled, lastFreq: bass.lastFreq, volume: bass.volume },
-        soloist: { style: soloist.style, octave: soloist.octave, enabled: soloist.enabled, lastFreq: soloist.lastFreq, volume: soloist.volume, doubleStops: soloist.doubleStops, sessionSteps: soloist.sessionSteps },
+        soloist: { style: soloist.style, octave: soloist.octave, enabled: soloist.enabled, lastFreq: soloist.lastFreq, volume: soloist.volume, mode: soloist.mode, sessionSteps: soloist.sessionSteps },
         harmony: { style: harmony.style, octave: harmony.octave, enabled: harmony.enabled, volume: harmony.volume, complexity: harmony.complexity },
         groove: { 
             genreFeel: groove.genreFeel, 

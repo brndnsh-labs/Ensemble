@@ -17,7 +17,7 @@ vi.mock('../../public/state.js', () => ({
             motifBuffer: [],
             stagnationCount: 0,
             lastFreq: 440,
-            doubleStops: false,
+            mode: 'monophonic',
             tension: 0.5
         },
         harmony: { enabled: true, rhythmicMask: 0, complexity: 0.5 },

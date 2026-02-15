@@ -190,7 +190,7 @@ class ExportProcessor {
             harmony: harmony.enabled,
             groove: groove.enabled,
             intensity: playback.bandIntensity,
-            doubleStops: soloist.doubleStops,
+            mode: soloist.mode,
             sessionSteps: soloist.sessionSteps
         };
 
@@ -606,7 +606,7 @@ class ExportProcessor {
             harmony.enabled = this.prevStates.harmony;
             groove.enabled = this.prevStates.groove;
             playback.bandIntensity = this.prevStates.intensity;
-            soloist.doubleStops = this.prevStates.doubleStops;
+            soloist.mode = this.prevStates.mode;
             soloist.sessionSteps = this.prevStates.sessionSteps;
         }
 

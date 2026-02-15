@@ -103,7 +103,7 @@ export function syncWorker(action, payload) {
             },
             chords: { style: chords.style, octave: chords.octave, density: chords.density, enabled: chords.enabled, volume: chords.volume },
             bass: { style: bass.style, octave: bass.octave, enabled: bass.enabled, lastFreq: bass.lastFreq, volume: bass.volume },
-            soloist: { style: soloist.style, octave: soloist.octave, enabled: soloist.enabled, lastFreq: soloist.lastFreq, volume: soloist.volume, doubleStops: soloist.doubleStops, sessionSteps: soloist.sessionSteps },
+            soloist: { style: soloist.style, octave: soloist.octave, enabled: soloist.enabled, lastFreq: soloist.lastFreq, volume: soloist.volume, mode: soloist.mode, sessionSteps: soloist.sessionSteps },
             harmony: { style: harmony.style, octave: harmony.octave, enabled: harmony.enabled, volume: harmony.volume, complexity: harmony.complexity, pocketOffset: harmony.pocketOffset },
             groove: { 
                 genreFeel: groove.genreFeel, 
@@ -162,7 +162,7 @@ export function syncWorker(action, payload) {
             case 'SET_SWING': data.groove = { swing: payload }; break;
             case 'SET_SWING_SUB': data.groove = { swingSub: payload }; break;
             case 'SET_SESSION_STEPS': data.soloist = { sessionSteps: payload }; break;
-            case 'SET_DOUBLE_STOPS': data.soloist = { doubleStops: payload }; break;
+            case 'SET_SOLOIST_MODE': data.soloist = { mode: payload }; break;
             case 'SET_BPM': data.playback = { bpm: playback.bpm }; break;
             case 'SET_SESSION_TIMER': data.playback = { sessionTimer: payload }; break;
             case 'TOGGLE_PLAY': 

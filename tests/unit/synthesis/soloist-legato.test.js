@@ -42,7 +42,7 @@ vi.mock('../../../public/state.js', () => {
         soloist: { 
             activeVoices: [], 
             preset: 'neo', 
-            doubleStops: false,
+            mode: 'monophonic',
             lastRenderedFreq: null // New property
         }
     };

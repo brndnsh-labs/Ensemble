@@ -504,7 +504,7 @@ function scheduleSoloist(chordData, step, time, unswungTime) {
     if (notes && notes.length > 0) {
         // Optimization: Avoid allocation if we only play one note (Common case)
         let notesToPlay = notes;
-        if (!soloist.doubleStops && notes.length > 1) {
+        if (soloist.mode === 'monophonic' && notes.length > 1) {
              notesToPlay = [notes[0]];
         }
         
@@ -536,7 +536,7 @@ function scheduleSoloist(chordData, step, time, unswungTime) {
                 playSoloNote(freq, playTime, duration, vel, bendStartInterval || 0, style);
                 
                 // Soloist is monophonic UNLESS double stops are enabled
-                const isMono = !soloist.doubleStops;
+                const isMono = soloist.mode === 'monophonic';
                 
                 // Support Pitch Bend for MIDI scoops
                 let bend = 0;
@@ -795,7 +795,7 @@ function syncAndFlushWorker(step) {
         },
         chords: { style: chords.style, octave: chords.octave, density: chords.density, enabled: chords.enabled, volume: chords.volume },
         bass: { style: bass.style, octave: bass.octave, enabled: bass.enabled, lastFreq: bass.lastFreq, volume: bass.volume },
-                soloist: { style: soloist.style, octave: soloist.octave, enabled: soloist.enabled, lastFreq: soloist.lastFreq, volume: soloist.volume, doubleStops: soloist.doubleStops },
+                soloist: { style: soloist.style, octave: soloist.octave, enabled: soloist.enabled, lastFreq: soloist.lastFreq, volume: soloist.volume, mode: soloist.mode },
                 harmony: { style: harmony.style, octave: harmony.octave, enabled: harmony.enabled, volume: harmony.volume, complexity: harmony.complexity },
                 groove: {
                     genreFeel: groove.genreFeel,
