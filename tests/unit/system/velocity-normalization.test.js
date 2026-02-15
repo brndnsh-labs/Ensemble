@@ -54,6 +54,7 @@ import { handleExport } from '../../../public/logic-worker.js';
 
 describe('Velocity Normalization & MIDI Limits', () => {
     beforeEach(() => {
+        vi.useFakeTimers();
         capturedMessages.length = 0;
         playback.bandIntensity = 1.0; // Max intensity
         
@@ -66,12 +67,18 @@ describe('Velocity Normalization & MIDI Limits', () => {
         arranger.stepMap = [{ start: 0, end: 16, chord: mockChord, chordIndex: 0 }];
     });
 
-    it('should clamp all MIDI velocities to 127 even at maximum intensity', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('should clamp all MIDI velocities to 127 even at maximum intensity', async () => {
         // High intensity + high conductor velocity
         playback.bandIntensity = 1.0;
         
         handleExport({ includedTracks: ['chords', 'bass', 'soloist', 'drums'], targetDuration: 0.1 });
         
+        await vi.runAllTimersAsync();
+
         const exportMsg = capturedMessages.find(m => m.type === 'exportComplete');
         expect(exportMsg).toBeDefined();
         

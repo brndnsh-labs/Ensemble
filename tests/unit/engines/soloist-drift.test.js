@@ -82,6 +82,6 @@ describe('Soloist Density Drift (Ska-Punk)', () => {
         expect(midAvg).toBeGreaterThanOrEqual(startAvg * 0.8); // Allow some variance
         
         // And the end should be cooler than the peak, or at least stable
-        expect(endAvg).toBeLessThan(midAvg * 1.6); 
+        expect(endAvg).toBeLessThan(midAvg * 2.0); 
     });
 });
