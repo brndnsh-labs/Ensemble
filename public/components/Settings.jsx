@@ -14,7 +14,7 @@ import { triggerInstall } from '../pwa.js';
 
 export function Settings() {
     const { 
-        theme, countIn, metronome, visualFlash, haptic, sessionTimer,
+        theme, countIn, metronome, visualFlash, haptic, sessionTimer, songMode,
         midiEnabled, midiMuteLocal, midiSelectedOutputId, midiOutputs,
         midiChannels, midiOctaves, midiLatency, midiVelocity
     } = useEnsembleState(state => ({
@@ -24,6 +24,7 @@ export function Settings() {
         visualFlash: state.playback.visualFlash, 
         haptic: state.playback.haptic,
         sessionTimer: state.playback.sessionTimer,
+        songMode: state.playback.songMode,
         
         midiEnabled: state.midi.enabled,
         midiMuteLocal: state.midi.muteLocal,
@@ -220,22 +221,21 @@ export function Settings() {
                                     <input 
                                         id="sessionTimerCheck"
                                         type="checkbox" 
-                                        checked={sessionTimer > 0} 
+                                        checked={songMode} 
                                         onChange={(e) => {
-                                            const val = e.target.checked ? 5 : 0;
-                                            dispatch(ACTIONS.SET_SESSION_TIMER, val);
+                                            dispatch(ACTIONS.SET_SONG_MODE, e.target.checked);
                                             saveCurrentState();
                                         }}
                                     />
-                                    <span>Session Timer</span>
+                                    <span>Song Mode</span>
                                 </label>
                                 
                                 <div id="sessionTimerDurationContainer" style={{
                                     display: 'flex', 
                                     alignItems: 'center', 
                                     gap: '0.5rem', 
-                                    opacity: sessionTimer > 0 ? '1' : '0.4', 
-                                    pointerEvents: sessionTimer > 0 ? 'auto' : 'none',
+                                    opacity: songMode ? '1' : '0.4', 
+                                    pointerEvents: songMode ? 'auto' : 'none',
                                     transition: 'all 0.2s ease'
                                 }}>
                                     <div id="sessionTimerStepper" class="stepper-control" style={{
@@ -247,7 +247,7 @@ export function Settings() {
                                         overflow: 'hidden'
                                     }}>
                                         <button id="sessionTimerDec" class="stepper-btn" style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
-                                            aria-label="Decrease session timer"
+                                            aria-label="Decrease song duration"
                                             onClick={() => {
                                                 const next = Math.max(1, sessionTimer - 1);
                                                 dispatch(ACTIONS.SET_SESSION_TIMER, next);
@@ -256,7 +256,7 @@ export function Settings() {
                                         >-</button>
                                         <input id="sessionTimerInput" type="number" value={sessionTimer > 0 ? sessionTimer : 5} readonly style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;" />
                                         <button id="sessionTimerInc" class="stepper-btn" style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
-                                            aria-label="Increase session timer"
+                                            aria-label="Increase song duration"
                                             onClick={() => {
                                                 const next = Math.min(20, sessionTimer + 1);
                                                 dispatch(ACTIONS.SET_SESSION_TIMER, next);
@@ -267,7 +267,7 @@ export function Settings() {
                                     <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Minutes</span>
                                 </div>
                             </div>
-                            <p class="performance-ending-footer" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">The band will complete the current progression loop before performing the resolution.</p>
+                            <p class="performance-ending-footer" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">The band will evolve the energy naturally and perform a resolution at a logical section boundary once the time expires.</p>
                         </div>
                     </div>
 

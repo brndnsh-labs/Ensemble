@@ -9,11 +9,12 @@ const { playback } = getState(); // Direct access for viz, audio
 import { handleTap } from '../instrument-controller.js';
 
 export function Transport() {
-    const { isPlaying, bpm, sessionTimer, sessionStartTime } = useEnsembleState(state => ({
+    const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode } = useEnsembleState(state => ({
         isPlaying: state.playback.isPlaying,
         bpm: state.playback.bpm,
         sessionTimer: state.playback.sessionTimer,
-        sessionStartTime: state.playback.sessionStartTime
+        sessionStartTime: state.playback.sessionStartTime,
+        songMode: state.playback.songMode
     }));
 
     const [tapActive, setTapActive] = useState(false);
@@ -21,7 +22,7 @@ export function Transport() {
 
     useEffect(() => {
         let interval;
-        if (isPlaying && sessionTimer > 0 && sessionStartTime) {
+        if (isPlaying && songMode && sessionTimer > 0 && sessionStartTime) {
             const updateTimer = () => {
                 const elapsedMs = performance.now() - sessionStartTime;
                 const totalMs = sessionTimer * 60 * 1000;
@@ -38,7 +39,7 @@ export function Transport() {
             setTimeLeft(null);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, sessionTimer, sessionStartTime]);
+    }, [isPlaying, sessionTimer, sessionStartTime, songMode]);
 
     const onTogglePlay = () => {
         dispatch(ACTIONS.TOGGLE_PLAY, { viz: playback.viz });
@@ -68,7 +69,7 @@ export function Transport() {
             >
                 <span id="playBtnText">
                     {isPlaying
-                        ? (timeLeft ? `STOP (${timeLeft})` : 'STOP')
+                        ? (timeLeft && songMode ? `STOP (${timeLeft})` : 'STOP')
                         : 'START'
                     }
                 </span>
