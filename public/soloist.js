@@ -203,6 +203,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 2));
     const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.1)); // Reduced from 0.25 to prevent long-term clutter
+    const lyricalBias = playback.lyricalBias !== undefined ? playback.lyricalBias : 0.5;
 
     if (!soloist.isResting) soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1;
 
@@ -273,6 +274,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     let restProb = (config.restBase * (3.0 - effectiveIntensity * 2.0)) + (phraseBars * config.restGrowth);
     restProb += (1.0 - warmupFactor) * 0.4; // Conservative start
 
+    // Apply lyrical bias: Higher bias = more rests, shorter phrases
+    restProb += (lyricalBias * 0.2); 
+    const effectiveMaxNotes = Math.max(2, Math.round(config.maxNotesPerPhrase * (1.5 - lyricalBias)));
+
     // Low intensity damping (Continuous)
     // Avoids abrupt jumps at the 0.35 threshold by using a smooth interpolation.
     if (intensity < 0.5) {
@@ -303,7 +308,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (hasHarmonyHit && !soloist.isResting) restProb += (0.2 * harmony.complexity);
     }
     restProb = Math.max(0.05, restProb - (maturityFactor * 0.15));
-    if (soloist.notesInPhrase >= config.maxNotesPerPhrase) restProb += 0.4;
+    if (soloist.notesInPhrase >= effectiveMaxNotes) restProb += 0.4;
 
     // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
     let isSuppressedByAntiphony = false;
@@ -436,6 +441,17 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     // --- 4. Rhythmic Density ---
     if (stepInBeat === 0 || !soloist.currentCell) {
         let pool = [...config.cellPool];
+        
+        // Lyrical Bias: Remove busy 16th-based patterns if lyrical
+        if (lyricalBias > 0.6) {
+             pool = pool.filter(c => {
+                 const idx = RHYTHMIC_CELLS.indexOf(c);
+                 // Indices for 16ths and gallops
+                 return ![0, 3, 4, 7, 10, 16].includes(idx);
+             });
+             if (pool.length === 0) pool = [RHYTHMIC_CELLS[1], RHYTHMIC_CELLS[2]]; // Fallback to 8ths/quarters
+        }
+
         if (playback.complexity > 0.7 && !config.cells.includes(1)) pool.push(RHYTHMIC_CELLS[1]);
 
         // Intensity-based filtering
@@ -663,7 +679,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     // --- 6. Melodic Devices ---
     const allowFlash = intensity > 0.5;
-    const deviceBaseProb = config.deviceProb * (0.5 + playback.complexity * 1.0);
+    const deviceBaseProb = config.deviceProb * (0.5 + playback.complexity * 1.0) * (1.2 - lyricalBias);
     const isPiano = soloist.mode === 'piano';
     // Certain styles MUST allow double stops even in monophonic mode for authentic character,
     // but ONLY if the configuration (global or local) actually allows them.
