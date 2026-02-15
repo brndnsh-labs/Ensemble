@@ -5,7 +5,7 @@ describe('Resolution Engine', () => {
     const mockArranger = {
         key: 'C',
         isMinor: false,
-        stepMap: [{ start: 0, end: 16, chord: { key: 'C', value: 'I' } }]
+        stepMap: [{ start: 0, end: 16, chord: { key: 'C', value: 'I', rootMidi: 60, quality: 'Major' } }]
     };
     const enabled = { bass: true, chords: true, soloist: true, harmony: true, groove: true };
 

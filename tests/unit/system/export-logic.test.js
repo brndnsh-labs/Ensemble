@@ -94,16 +94,30 @@ describe('Export and Resolution Logic Validation', () => {
     it('should generate an m9 voicing for Minor keys in resolution', () => {
         arranger.key = 'A';
         arranger.isMinor = true;
+        // Update last chord to be Am
+        arranger.stepMap[0].chord = { 
+            key: 'A', value: 'im', rootMidi: 57, quality: 'Minor',
+            freqs: [220, 261.63, 329.63], intervals: [0, 3, 7]
+        };
         handleResolution(0);
         
         const noteMsg = capturedMessages.find(m => m.type === 'notes');
         const chordNotes = noteMsg.notes.filter(n => n.module === 'chords' && n.midi > 0);
         const midis = [...new Set(chordNotes.map(n => n.midi))].sort();
-        expect(midis).toEqual([62, 66, 69, 73, 76, 81]); // New Rock cadence notes
+        // Rock Minor Cadence (iv - i): Dm (D, F, A) -> Am (A, C, E, A)
+        // D (62), F (65), A (69)
+        // A (57), C (60), E (64), A (69)
+        // Combined & Sorted: [57, 60, 62, 64, 65, 69]
+        expect(midis).toEqual([57, 60, 62, 64, 65, 69]);
     });
 
     it('should include a deep root for the bass in resolution with correct duration', () => {
         arranger.key = 'G';
+        // Update last chord to be G
+        arranger.stepMap[0].chord = { 
+            key: 'G', value: 'I', rootMidi: 67, quality: 'Major',
+            freqs: [392, 493.88, 587.33], intervals: [0, 4, 7]
+        };
         handleResolution(0);
         
         const noteMsg = capturedMessages.find(m => m.type === 'notes');
