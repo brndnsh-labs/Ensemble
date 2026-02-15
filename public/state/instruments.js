@@ -95,6 +95,7 @@ export const soloist = {
     sharedHookBuffer: [], // Shared hooks for band interaction
     tension: 0,
     mode: 'monophonic',
+    doubleStopProb: 1.0,
     activeVoices: [],
     sessionSteps: 0,
     deviceBuffer: [],

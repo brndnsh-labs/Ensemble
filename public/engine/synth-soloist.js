@@ -142,20 +142,43 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     const brightnessBase = 1.0 + (intensity * 1.5) + (vol * 1.5);
     const cutoffBase = style === 'bird' ? freq * 3.5 * brightnessBase : Math.min(freq * 4 * brightnessBase, 12000);
     
+    // Guitar Palm Mute Layer (Low velocity = Muted/Snappy)
+    const isMuted = soloist.mode === 'guitar' && vol < 0.6;
+    const isPiano = soloist.mode === 'piano';
+    
     filter.frequency.setValueAtTime(clampFreq(cutoffBase), playTime);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(cutoffBase * (style === 'bird' ? 0.7 : 0.6)), playTime + duration);
-    filter.Q.value = style === 'bird' ? 1.5 : (duration > 0.4 ? 2 : 1);
+    if (isMuted) {
+        // Snappy filter decay for palm mutes
+        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.08);
+        filter.Q.value = 4; // More 'pop'
+    } else {
+        filter.frequency.exponentialRampToValueAtTime(clampFreq(cutoffBase * (style === 'bird' ? 0.7 : 0.6)), playTime + duration);
+        filter.Q.value = isPiano ? 0.7 : (style === 'bird' ? 1.5 : (duration > 0.4 ? 2 : 1));
+    }
 
     voiceObj.cleanup.push(filter);
 
     // Envelope
     const baseAttack = style === 'shred' ? 0.005 : 0.015;
     const attack = isLegato ? 0.005 : Math.min(baseAttack, duration * 0.25);
-    const releaseTime = duration * (style === 'minimal' ? 1.5 : 1.1);
-
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
+    let releaseTime = duration * (style === 'minimal' ? 1.5 : 1.1);
+    
+    if (isMuted) {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(randomizedVol, playTime, 0.005); // Faster snap
+        outputGain.gain.setTargetAtTime(0, playTime + 0.05, 0.02); // Short decay
+        releaseTime = 0.1;
+    } else if (isPiano && vol < 0.5) {
+        // Piano Sustain Pedal Emulation (Longer release for soft notes)
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.2); // Slower release
+        releaseTime = 0.4;
+    } else {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
+    }
 
     osc1.connect(filter);
     osc2.connect(filter);
@@ -170,7 +193,7 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
 
     // Only apply vibrato if note is long enough
     if (duration > 0.15 && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find(n => n instanceof OscillatorNode && n.frequency.value < 20); // Find LFO
+        const vibrato = voiceObj.nodes.find(n => n.frequency && n.frequency.value < 20); // Find LFO
         if (vibrato) {
             vibrato.start(playTime);
             vibrato.stop(stopTime);
@@ -313,8 +336,10 @@ function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, styl
     }
 
     if (isLegato && prevFreq) {
-        // Portamento Glide
-        const glideTime = 0.04; // 40ms
+        // Portamento Glide - Smoother for monophonic lead mode
+        const { soloist } = getState();
+        const glideTime = soloist.mode === 'monophonic' ? 0.06 : 0.04;
+        
         if (osc1) {
             osc1.frequency.setValueAtTime(prevFreq, time);
             osc1.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
@@ -354,6 +379,7 @@ function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, styl
 }
 
 function createVibrato(ctx, freq, time, duration, style) {
+    const { soloist } = getState();
     const vibrato = ctx.createOscillator();
     let vibSpeed = 5.5;
     let depthFactor = 0.005;
@@ -362,6 +388,12 @@ function createVibrato(ctx, freq, time, duration, style) {
     if (style === 'blues') { vibSpeed = 4.8; depthFactor = 0.012; }
     else if (style === 'neo') { vibSpeed = 4.2; depthFactor = 0.015; }
     else if (style === 'shred') { vibSpeed = 6.5; depthFactor = 0.004; }
+
+    // Mode-specific differentiation (Lead Synth/Horn feel)
+    if (soloist.mode === 'monophonic') {
+        vibSpeed -= 0.5; // Slightly slower, more deliberate
+        depthFactor *= 1.2; // Slightly deeper
+    }
 
     vibrato.frequency.setValueAtTime(vibSpeed, time);
 
@@ -372,7 +404,8 @@ function createVibrato(ctx, freq, time, duration, style) {
 
     vibGain.gain.setValueAtTime(0, time);
     vibGain.gain.setValueAtTime(0, time + vibDelay);
-    vibGain.gain.linearRampToValueAtTime(finalVibDepth, time + vibDelay + 0.3);
+    // Smoothly ramp in the vibrato
+    vibGain.gain.exponentialRampToValueAtTime(Math.max(0.001, finalVibDepth), time + vibDelay + (isLongNote ? 0.5 : 0.2));
 
     return { vibrato, vibGain };
 }

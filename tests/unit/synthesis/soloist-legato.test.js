@@ -72,18 +72,29 @@ describe('Soloist Legato Articulation', () => {
         // First note to establish prevFreq
         playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
         
-        // Legato note
+        // Legato note (Monophonic Mode)
+        soloist.mode = 'monophonic';
         playSoloNote(554, 100.5, 0.5, 0.5, 0, 'scalar', true);
         
-        // Voice limit is 1, so the first note is gone. 
-        // The active voice at index 0 is the NEW note.
         const voice = soloist.activeVoices[0];
         const osc = voice.nodes.find(n => n.frequency && n.frequency.setValueAtTime);
         
         // Should start at prevFreq (440)
         expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(440, 100.5);
         
-        // Should ramp to new freq (554) over glide time (40ms)
+        // Monophonic mode should use 60ms glide
+        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.06);
+    });
+
+    it('should use 40ms glide for non-monophonic modes', () => {
+        soloist.mode = 'guitar';
+        playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
+        playSoloNote(554, 100.5, 0.5, 0.5, 0, 'scalar', true);
+        
+        const voice = soloist.activeVoices[0];
+        const osc = voice.nodes.find(n => n.frequency && n.frequency.setValueAtTime);
+        
+        // Non-monophonic (e.g. guitar) should still use 40ms glide
         expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.04);
     });
 
