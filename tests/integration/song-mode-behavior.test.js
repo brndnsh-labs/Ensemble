@@ -93,7 +93,7 @@ describe('Song Mode Behavior', () => {
         // Run scheduler again at step 16
         scheduler();
         
-        // Should have triggered resolution
+        // Should have triggered resolution (with groove and soloist context)
         expect(workerClient.requestResolution).toHaveBeenCalledWith(16);
     });
 

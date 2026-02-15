@@ -517,7 +517,7 @@ class ExportProcessor {
             soloist: this.includedTracks.includes('soloist'),
             harmony: this.includedTracks.includes('harmonies'),
             groove: this.includedTracks.includes('drums')
-        }, playback.bpm);
+        }, playback.bpm, groove, soloist);
 
         resolutionNotes.forEach(n => {
             let track;
@@ -937,7 +937,7 @@ if (typeof self !== 'undefined') {
 }
 
 export function handleResolution(step, requestTimestamp = null, processStartTime = null) {
-    const notesToMain = generateResolutionNotes(step, arranger, { bass: bass.enabled, chords: chords.enabled, soloist: soloist.enabled, harmony: harmony.enabled, groove: groove.enabled }, playback.bpm);
+    const notesToMain = generateResolutionNotes(step, arranger, { bass: bass.enabled, chords: chords.enabled, soloist: soloist.enabled, harmony: harmony.enabled, groove: groove.enabled }, playback.bpm, groove, soloist);
     var workerProcessTime = processStartTime ? performance.now() - processStartTime : 0;
     postMessage({ type: WORKER_RESP.NOTES, notes: notesToMain, requestTimestamp, workerProcessTime });
 }
