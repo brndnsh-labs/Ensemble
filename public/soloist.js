@@ -129,6 +129,19 @@ const STYLE_CONFIG = {
     }
 };
 
+const GENRE_STYLE_MAPPING = {
+    'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues', 'Neo-Soul': 'neo',
+    'Disco': 'disco', 'Bossa': 'bossa', 'Bossa Nova': 'bossa', 'Afrobeat': 'funk',
+    'Acoustic': 'acoustic', 'Reggae': 'reggae', 'Country': 'country',
+    'Ska-Punk': 'ska', 'Ska': 'ska'
+};
+
+// Optimization: Pre-calculate rhythmic cell pools for each style
+for (const key in STYLE_CONFIG) {
+    const conf = STYLE_CONFIG[key];
+    conf.cellPool = RHYTHMIC_CELLS.filter((_, idx) => conf.cells.includes(idx));
+}
+
 /**
  * Generates a soloist note (or notes for double stops) for a specific step.
  * Implements phrasing logic, rhythmic cell selection, melodic contour resolution, 
@@ -150,8 +163,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     let activeStyle = style;
     if (activeStyle === 'smart') {
-        const mapping = { 'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues', 'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa', 'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'acoustic', 'Reggae': 'reggae', 'Country': 'country', 'Ska-Punk': 'ska', 'Ska': 'ska' };
-        activeStyle = mapping[groove.genreFeel] || 'scalar';
+        activeStyle = GENRE_STYLE_MAPPING[groove.genreFeel] || 'scalar';
     }
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
     const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -423,7 +435,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     // --- 4. Rhythmic Density ---
     if (stepInBeat === 0 || !soloist.currentCell) {
-        let pool = RHYTHMIC_CELLS.filter((_, idx) => config.cells.includes(idx));
+        let pool = [...config.cellPool];
         if (playback.complexity > 0.7 && !config.cells.includes(1)) pool.push(RHYTHMIC_CELLS[1]);
 
         // Intensity-based filtering
