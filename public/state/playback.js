@@ -32,7 +32,9 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} metronome - Whether the metronome is active.
  * @property {boolean} applyPresetSettings - Whether to apply BPM/Style from presets.
  * @property {boolean} sustainActive - Whether the global sustain pedal is "pressed".
+ * @property {boolean} songMode - Whether "Song Mode" (intelligent evolution and endings) is active.
  * @property {number} sessionTimer - Session timer in minutes (0 = infinite).
+ * @property {number} sessionStartTime - The performance.now() timestamp when playback started.
  * @property {boolean} stopAtEnd - Whether to stop at the end of the current progression/loop.
  * @property {boolean} isEndingPending - Whether the resolution sequence is about to trigger.
  * @property {Object} intent - Current rhythmic intent (syncopation, anticipation, etc).
@@ -77,6 +79,7 @@ export const playback = {
     metronome: false,
     applyPresetSettings: false,
     sustainActive: false,
+    songMode: true,
     sessionTimer: 5,
     sessionStartTime: 0,
     stopAtEnd: false,
@@ -93,6 +96,7 @@ export const playback = {
     viz: null,
     suspendTimeout: null,
     conductorVelocity: 1.0,
+    lyricalBias: 0.5,
     masterLimiter: null,
     masterVolume: 0.4,
     countIn: true,
@@ -172,6 +176,9 @@ export function playbackReducer(action, payload) {
         case ACTIONS.SET_PRESET_SETTINGS_MODE:
             Object.assign(playback, { applyPresetSettings: payload });
             return true;
+        case ACTIONS.SET_SONG_MODE:
+            Object.assign(playback, { songMode: !!payload });
+            return true;
         case ACTIONS.SET_SESSION_TIMER:
             Object.assign(playback, { sessionTimer: payload });
             return true;
@@ -193,6 +200,7 @@ export function playbackReducer(action, payload) {
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
             if (payload.velocity) playback.conductorVelocity = payload.velocity;
+            if (payload.lyricalBias !== undefined) playback.lyricalBias = payload.lyricalBias;
             if (payload.intent) Object.assign(playback.intent, payload.intent);
             break;
         case ACTIONS.SHOW_TOAST: {
