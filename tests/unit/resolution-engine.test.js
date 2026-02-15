@@ -58,8 +58,6 @@ describe('Resolution Engine', () => {
     it('should include chromatic bass approach for Jazz', () => {
         const notes = generateResolutionNotes(0, mockArranger, enabled, 120, { genreFeel: 'Jazz' });
         
-        // Approach notes are scheduled at (time - 0.5) beats
-        const approachNotes = notes.filter(n => n.module === 'bass' && n.timingOffset < 0);
         // Step 2 approach is at 1.5 beats, Step 3 at 3.5 beats
         const beatTimings = notes.filter(n => n.module === 'bass').map(n => n.timingOffset / (60/120));
         

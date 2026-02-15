@@ -52,7 +52,6 @@ export function generateResolutionNotes(step, arranger, enabled, bpm = 100, groo
     }
 
     const keyPC = KEY_ORDER.indexOf(resolutionKey);
-    const rootMidi = keyPC + 60; // Middle C octave
     const isMinor = arranger.isMinor;
 
     // --- CADENCE DEFINITIONS ---
@@ -101,8 +100,6 @@ export function generateResolutionNotes(step, arranger, enabled, bpm = 100, groo
             ];
     }
 
-    const finalStep = steps[steps.length - 1];
-
     // --- 1. Bass Resolution ---
     if (enabled.bass) {
         steps.forEach((s, idx) => {
@@ -111,7 +108,6 @@ export function generateResolutionNotes(step, arranger, enabled, bpm = 100, groo
             
             // Add chromatic approach if Jazz and not first step
             if (cadenceType === CADENCE_TYPES.JAZZ && idx > 0) {
-                const prevS = steps[idx-1];
                 const approachPC = (s.pc + 1) % 12; // bII approach
                 const approachMidi = (approachPC % 12) + 24 + (approachPC > 7 ? -12 : 0);
                 notes.push({
@@ -177,10 +173,11 @@ export function generateResolutionNotes(step, arranger, enabled, bpm = 100, groo
     if (enabled.soloist) {
         // Simple "Hero" lick logic: 
         // Play guide tones for early steps, resolve to root/ext on last step
+        const baseOctave = soloist.octave || 72;
         steps.forEach((s, idx) => {
             const isLast = idx === steps.length - 1;
             const pc = isLast ? (s.pc + (Math.random() < 0.5 ? 0 : 7)) % 12 : (s.pc + 4) % 12; // Root/5th vs 3rd
-            const soloistMidi = pc + 72 + (pc < 5 ? 12 : 0); // Higher octave
+            const soloistMidi = pc + baseOctave + (pc < 5 ? 12 : 0); // Dynamic octave offset
 
             notes.push({
                 midi: soloistMidi,
