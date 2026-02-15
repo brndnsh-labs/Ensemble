@@ -32,7 +32,7 @@ vi.mock('../../public/state.js', () => {
 
 // Mock Theory Scales
 vi.mock('../../public/theory-scales.js', () => ({
-    getScaleForChord: (chord) => {
+    getScaleForChord: () => {
         // Return C Major scale tones [0, 2, 4, 5, 7, 9, 11]
         return [0, 2, 4, 5, 7, 9, 11];
     }

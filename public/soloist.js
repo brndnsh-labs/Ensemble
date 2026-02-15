@@ -757,8 +757,6 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (soloist.mode === 'piano') {
             // Block Chord Logic: Add two chord tones immediately below the melody
             const currentRoot = currentChord.rootMidi;
-            // Get scale tones relative to current root
-            const scaleTones = getScaleForChord(currentChord, null, style).map(i => (i + currentRoot) % 12);
             
             // Look for chord tones below selectedMidi
             let count = 0;
