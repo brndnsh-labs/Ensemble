@@ -152,7 +152,8 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
         horns: { density: 2, rhythmicStyle: 'stabs', timingJitter: 0.005, velocity: 0.85, octaveOffset: 0 },
         strings: { density: 2, rhythmicStyle: 'pads', timingJitter: 0.02, velocity: 0.6, octaveOffset: 0 },
         organ: { density: 3, rhythmicStyle: 'stabs', timingJitter: 0.015, velocity: 0.85, octaveOffset: 0 },
-        plucks: { density: 2, rhythmicStyle: 'stabs', timingJitter: 0.002, velocity: 0.7, octaveOffset: 24 },
+        plucks: { density: 2, rhythmicStyle: 'stabs', timingJitter: 0.002, velocity: 0.7, octaveOffset: 12 },
+        disco: { density: 2, rhythmicStyle: 'stabs', timingJitter: 0.005, velocity: 0.75, octaveOffset: 12 },
         counter: { density: 1, rhythmicStyle: 'pads', timingJitter: 0.03, velocity: 0.75, octaveOffset: -12 },
         smart: { density: 2, rhythmicStyle: 'auto', timingJitter: 0.008, velocity: 0.75, octaveOffset: 0 }
     };

@@ -246,6 +246,16 @@ export function playHarmonyNote(freq, time, duration, vol = 0.4, style = 'stabs'
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
         }
     }
+    else if (style === 'disco') {
+        // Disco Synth Stab: Punchy but with more body than plucks
+        osc1.type = 'triangle';
+        osc2.type = 'sawtooth';
+        osc2.detune.setValueAtTime(4, playTime);
+        if (sub) {
+            sub.type = 'sine';
+            sub.frequency.setValueAtTime(freq * 0.5, playTime);
+        }
+    }
     else if (style === 'counter') {
         // Cello/Trombone hybrid: Sawtooth with heavy filtering
         osc1.type = 'sawtooth';
@@ -304,6 +314,11 @@ export function playHarmonyNote(freq, time, duration, vol = 0.4, style = 'stabs'
         filter.frequency.setValueAtTime(clampFreq(freq * 8), playTime);
         filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.1); // Fast snap (Reduced from 0.15)
         filter.Q.setValueAtTime(5 + (intensity * 5), playTime); // High resonance
+    } else if (style === 'disco') {
+        // Warm punchy envelope
+        filter.frequency.setValueAtTime(clampFreq(freq * 6), playTime);
+        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2), playTime + 0.12);
+        filter.Q.setValueAtTime(2 + (intensity * 3), playTime); // Lower resonance than plucks
     } else if (style === 'counter') {
         // Expressive swell
         const start = freq * 1.5;
