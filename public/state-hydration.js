@@ -103,6 +103,7 @@ export function hydrateState() {
             haptic: savedState.haptic !== undefined ? savedState.haptic : false,
             countIn: savedState.countIn !== undefined ? savedState.countIn : true,
             sessionTimer: clamp(savedState.sessionTimer, 0, 60, 5),
+            songMode: savedState.songMode !== undefined ? !!savedState.songMode : true,
             applyPresetSettings: savedState.applyPresetSettings !== undefined ? savedState.applyPresetSettings : false,
             stopAtEnd: false
         });

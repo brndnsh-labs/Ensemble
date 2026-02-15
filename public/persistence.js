@@ -20,6 +20,7 @@ export function saveCurrentState() {
         countIn: playback.countIn,
         applyPresetSettings: playback.applyPresetSettings,
         sessionTimer: playback.sessionTimer,
+        songMode: playback.songMode,
         vizEnabled: vizState.enabled,
         autoIntensity: playback.autoIntensity,
         chords: { enabled: chords.enabled, style: chords.style, instrument: chords.instrument, octave: chords.octave, density: chords.density, volume: chords.volume, reverb: chords.reverb, pianoRoots: chords.pianoRoots, activeTab: chords.activeTab },
