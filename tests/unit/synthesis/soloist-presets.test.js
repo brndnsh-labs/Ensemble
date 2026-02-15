@@ -16,7 +16,7 @@ vi.mock('../../../public/state.js', () => {
             onended: null
         })),
         createGain: vi.fn(() => ({
-            gain: { value: 1, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn(), linearRampToValueAtTime: vi.fn() },
+            gain: { value: 1, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
             connect: vi.fn()
         })),
         createBiquadFilter: vi.fn(() => ({

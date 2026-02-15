@@ -653,7 +653,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const allowFlash = intensity > 0.5;
     const deviceBaseProb = config.deviceProb * (0.5 + playback.complexity * 1.0);
     const isPiano = soloist.mode === 'piano';
-    const isPolyphonic = soloist.mode !== 'monophonic';
+    // Certain styles MUST allow double stops even in monophonic mode for authentic character,
+    // but ONLY if the configuration (global or local) actually allows them.
+    const isPolyphonic = (soloist.doubleStopProb ?? 1.0) > 0 && config.doubleStopProb > 0 && 
+        (soloist.mode !== 'monophonic' || ['country', 'reggae', 'blues', 'ska'].includes(activeStyle));
     
     // Throttle devices at high BPM
     let bpmDeviceThrottle = playback.bpm > 160 ? 0.3 : 1.0;
@@ -747,14 +750,39 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     }
 
     let extraNotes = [];
-    const dsChance = (config.doubleStopProb + (maturityFactor * 0.2)) * (stepInBeat === 2 ? 1.2 : 0.6) * warmupFactor;
+    const dsChance = (config.doubleStopProb + (maturityFactor * 0.2)) * (stepInBeat === 2 ? 1.2 : 0.6) * warmupFactor * (soloist.doubleStopProb ?? 1.0);
+    
     if (isPolyphonic && Math.random() < dsChance) {
-        let dsInt = [5, 7, 9, 12][Math.floor(Math.random() * 4)];
-        // Country specific: Exclusively use Sixths (8 or 9)
-        if (activeStyle === 'country') {
-            dsInt = [8, 9][Math.floor(Math.random() * 2)];
+        // Mode-specific voicing differentiation
+        if (soloist.mode === 'piano') {
+            // Block Chord Logic: Add two chord tones immediately below the melody
+            const currentRoot = currentChord.rootMidi;
+            // Get scale tones relative to current root
+            const scaleTones = getScaleForChord(currentChord, null, style).map(i => (i + currentRoot) % 12);
+            
+            // Look for chord tones below selectedMidi
+            let count = 0;
+            for (let m = selectedMidi - 1; m > selectedMidi - 13 && count < 2; m--) {
+                const pc = (m % 12 + 12) % 12;
+                // If it's a chord tone (root, 3rd, 5th, 7th)
+                if (currentChord.intervals.some(i => (i % 12) === (pc - (currentRoot % 12) + 12) % 12)) {
+                    extraNotes.push({ midi: m, velocity: (0.5 + effectiveIntensity * 0.6) * 0.85, isDoubleStop: true });
+                    count++;
+                }
+            }
+        } else if (activeStyle === 'country') {
+            // Country specific: Exclusively use Sixths (8 or 9)
+            const dsInt = [8, 9][Math.floor(Math.random() * 2)];
+            extraNotes.push({ midi: selectedMidi + dsInt, velocity: (0.5 + effectiveIntensity * 0.6) * 0.95, isDoubleStop: true });
+        } else if (soloist.mode === 'guitar') {
+            // Guitar specific: Restrict to fretboard-friendly intervals (3rds, 4ths, 6ths)
+            const dsInt = [3, 4, 5, 8, 9][Math.floor(Math.random() * 5)];
+            extraNotes.push({ midi: selectedMidi + dsInt, velocity: (0.5 + effectiveIntensity * 0.6) * 0.95, isDoubleStop: true });
+        } else {
+            // Default generic double stop
+            let dsInt = [5, 7, 9, 12][Math.floor(Math.random() * 4)];
+            extraNotes.push({ midi: selectedMidi + dsInt, velocity: (0.5 + effectiveIntensity * 0.6) * 0.95, isDoubleStop: true });
         }
-        extraNotes.push({ midi: selectedMidi + dsInt, velocity: (0.5 + effectiveIntensity * 0.6) * 0.95, isDoubleStop: true });
     }
 
     // --- 7. Dynamic Duration & Bending ---
@@ -769,7 +797,11 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     let isLegato = false;
     const LEGATO_STYLES = ['neo', 'shred', 'bird', 'blues', 'metal', 'scalar'];
     if (LEGATO_STYLES.includes(activeStyle) && Math.abs(selectedMidi - lastMidi) <= 2 && durationSteps <= 2) {
-        const legatoProb = (activeStyle === 'shred' || activeStyle === 'bird') ? 0.7 : 0.4;
+        let legatoProb = (activeStyle === 'shred' || activeStyle === 'bird') ? 0.7 : 0.4;
+        
+        // Boost legato significantly for monophonic lead instruments
+        if (soloist.mode === 'monophonic') legatoProb = 0.85;
+
         if (Math.random() < legatoProb && !soloist.isResting && soloist.notesInPhrase > 1) {
             isLegato = true;
         }
@@ -787,10 +819,15 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const isRoot = pc === (targetChord.rootMidi % 12);
     const isGuideTone = [3, 4, 10, 11].includes((pc - (targetChord.rootMidi % 12) + 12) % 12);
     
-    if ((isRoot || (isGuideTone && activeStyle === 'minimal')) && Math.abs(lastMidi - selectedMidi) === 1 && Math.random() < (0.4 + intensity * 0.3)) {
+    // Guitar mode favors bending UP into notes (pre-bends)
+    const guitarBendProb = (soloist.mode === 'guitar') ? 0.35 : 0;
+
+    if (((isRoot || isGuideTone) && Math.abs(lastMidi - selectedMidi) === 1 && Math.random() < (0.4 + intensity * 0.3)) || Math.random() < guitarBendProb) {
+        // Bend up from 1 or 2 semitones below
         bendStartInterval = -1;
-        if (Math.random() < 0.3) bendStartInterval = -2;
+        if (Math.random() < 0.4 || soloist.mode === 'guitar' && Math.random() < 0.5) bendStartInterval = -2;
     } else if (durationSteps >= 4 && Math.random() < (0.3 + maturityFactor * 0.2)) {
+        // Natural release/vibrato bend (up)
         bendStartInterval = Math.random() < 0.7 ? 1 : 2;
     }
 

@@ -145,7 +145,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Integrity & Overlaps', () => {
         it('should respect double stop toggle', () => {
-            soloist.mode = 'monophonic';
+            soloist.doubleStopProb = 0;
             let arrayFound = false;
             for (let i = 0; i < 500; i++) {
                 soloist.busySteps = 0;
@@ -154,6 +154,7 @@ describe('Soloist Engine Logic', () => {
                 }
             }
             expect(arrayFound).toBe(false);
+            soloist.doubleStopProb = 1.0; // Reset
         });
 
         it('should limit overlapping notes', () => {
