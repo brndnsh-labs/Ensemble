@@ -54,7 +54,7 @@ vi.mock('../../../public/config.js', () => ({
 
 import { dispatch, getState, storage } from '../../../public/state.js';
 const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import { handleResolution, handleExport } from '../../../public/logic-worker.js';
+import { handleResolution, handleExport, MidiTrack } from '../../../public/logic-worker.js';
 
 describe('Export and Resolution Logic Validation', () => {
     
@@ -83,6 +83,27 @@ describe('Export and Resolution Logic Validation', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+    });
+
+    it('MidiTrack should record markers, text, and lyrics', () => {
+        const track = new MidiTrack();
+        track.marker(0, 'Test Marker');
+        track.text(100, 'Test Text');
+        track.lyric(200, 'Test Lyric');
+        
+        expect(track.events.length).toBe(3);
+        
+        // Marker FF 06
+        expect(track.events[0].data[0]).toBe(0xFF);
+        expect(track.events[0].data[1]).toBe(0x06);
+        
+        // Text FF 01
+        expect(track.events[1].data[0]).toBe(0xFF);
+        expect(track.events[1].data[1]).toBe(0x01);
+        
+        // Lyric FF 05
+        expect(track.events[2].data[0]).toBe(0xFF);
+        expect(track.events[2].data[1]).toBe(0x05);
     });
 
     it('should generate a valid voicing for Major keys in resolution', () => {
@@ -189,11 +210,6 @@ describe('Export and Resolution Logic Validation', () => {
 
         const exportMsg = capturedMessages.find(m => m.type === 'exportComplete');
         
-        if (!exportMsg) {
-            const errorMsg = capturedMessages.find(m => m.type === 'error');
-            if (errorMsg) console.error("Export Error:", errorMsg.data, errorMsg.stack);
-        }
-
         expect(exportMsg).toBeDefined();
         expect(exportMsg.blob).toBeInstanceOf(Uint8Array);
         expect(exportMsg.filename).toContain('.mid');

@@ -57,7 +57,7 @@ function writeInt16(val) {
     return [(val >> 8) & 0xFF, val & 0xFF];
 }
 
-class MidiTrack {
+export class MidiTrack {
     constructor() {
         this.events = [];
     }
@@ -77,6 +77,18 @@ class MidiTrack {
     setName(time, name) {
         const bytes = writeString(name);
         this.addEvent(time, [0xFF, 0x03, ...writeVarInt(bytes.length), ...bytes]);
+    }
+    marker(time, text) {
+        const bytes = writeString(text);
+        this.addEvent(time, [0xFF, 0x06, ...writeVarInt(bytes.length), ...bytes]);
+    }
+    text(time, text) {
+        const bytes = writeString(text);
+        this.addEvent(time, [0xFF, 0x01, ...writeVarInt(bytes.length), ...bytes]);
+    }
+    lyric(time, text) {
+        const bytes = writeString(text);
+        this.addEvent(time, [0xFF, 0x05, ...writeVarInt(bytes.length), ...bytes]);
     }
     setTempo(time, bpm) {
         const mspb = Math.round(60000000 / bpm);
@@ -316,6 +328,22 @@ class ExportProcessor {
             const { chord, stepInChord } = chordData;
             const nextChordData = getChordAtStep(globalStep + 4, this.exportLookaheadCursor);
 
+            // Emit Metadata on Chord/Section Change
+            if (stepInChord === 0) {
+                const pulse = this.toPulses(stepTimeS);
+                const modStep = globalStep % this.totalStepsOneLoop;
+                const section = arranger.sectionMap?.find(s => s.start === modStep);
+                
+                if (section) {
+                    this.metaTrack.marker(pulse, `--- ${section.label} ---`);
+                }
+                this.metaTrack.marker(pulse, chord.absName || 'Chord');
+                
+                if (this.includedTracks.includes('chords')) {
+                    this.chordTrack.text(pulse, chord.absName || 'Chord');
+                }
+            }
+
             if (this.includedTracks.includes('chords')) {
                 const notes = getAccompanimentNotes(chord, globalStep, stepInChord, measureStep, stepInfo);
                 const numVoices = notes.filter(n => n.midi > 0).length;
@@ -510,6 +538,9 @@ class ExportProcessor {
     finish() {
         const resolutionStep = this.totalStepsWithoutEnding;
         const resTimeS = this.stepTimes[resolutionStep];
+        const resPulse = this.toPulses(resTimeS);
+
+        this.metaTrack.marker(resPulse, "=== Resolution ===");
 
         const resolutionNotes = generateResolutionNotes(resolutionStep, arranger, {
             bass: this.includedTracks.includes('bass'),
