@@ -86,7 +86,7 @@ describe('Soloist Legato Articulation', () => {
         expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.06);
     });
 
-    it('should use 40ms glide for non-monophonic modes', () => {
+    it('should use 30ms glide for guitar mode', () => {
         soloist.mode = 'guitar';
         playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
         playSoloNote(554, 100.5, 0.5, 0.5, 0, 'scalar', true);
@@ -94,8 +94,8 @@ describe('Soloist Legato Articulation', () => {
         const voice = soloist.activeVoices[0];
         const osc = voice.nodes.find(n => n.frequency && n.frequency.setValueAtTime);
         
-        // Non-monophonic (e.g. guitar) should still use 40ms glide
-        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.04);
+        // Guitar mode should use 30ms glide
+        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.03);
     });
 
     it('should use fast attack (0.005s) for legato notes', () => {

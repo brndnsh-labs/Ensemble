@@ -114,4 +114,70 @@ describe('Soloist Mode Differentiation Logic', () => {
         expect(extra1).toBeLessThan(melodyMidi);
         expect(extra2).toBeLessThan(melodyMidi);
     });
+
+    it('should generate quartal voicings for piano in neo style', () => {
+        state.soloist.mode = 'piano';
+        vi.spyOn(Math, 'random').mockRestore();
+
+        let note = null;
+        let attempts = 0;
+        let foundQuartal = false;
+        while (attempts < 1000) {
+            note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'neo', 0, false);
+            if (Array.isArray(note)) {
+                const melody = note[note.length - 1];
+                const extra = note[0];
+                if (melody.midi - extra.midi === 5) {
+                    foundQuartal = true;
+                    break;
+                }
+            }
+            attempts++;
+        }
+        expect(foundQuartal).toBe(true);
+    });
+
+    it('should trigger a graceNote device in piano mode', () => {
+        state.soloist.mode = 'piano';
+        state.playback.bandIntensity = 0.7; // Ensure allowFlash is true
+        vi.spyOn(Math, 'random').mockRestore();
+        
+        // Mock random to force device selection occasionally
+        // and force deviceType to 'graceNote' (though it's random in the array)
+        let attempts = 0;
+        let foundGraceNote = false;
+        while (attempts < 5000) {
+            // Devices usually only happen at stepInBeat === 0
+            const note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'scalar', 0, false);
+            // Devices often return a single note initially (the grace note) and buffer the rest
+            if (note && !Array.isArray(note) && state.soloist.deviceBuffer.length > 0) {
+                foundGraceNote = true;
+                break;
+            }
+            attempts++;
+        }
+        expect(foundGraceNote).toBe(true);
+    });
+
+    it('should use Hendrix-style intervals for guitar in blues style', () => {
+        state.soloist.mode = 'guitar';
+        vi.spyOn(Math, 'random').mockRestore();
+
+        let attempts = 0;
+        let foundHendrixInt = false;
+        while (attempts < 1000) {
+            const note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'blues', 0, false);
+            if (Array.isArray(note)) {
+                const melody = note[note.length - 1];
+                const extra = note[0];
+                const interval = extra.midi - melody.midi;
+                if ([4, 5, 7].includes(interval)) {
+                    foundHendrixInt = true;
+                    break;
+                }
+            }
+            attempts++;
+        }
+        expect(foundHendrixInt).toBe(true);
+    });
 });

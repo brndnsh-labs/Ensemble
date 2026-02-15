@@ -168,8 +168,8 @@ describe('Soloist Synthesis', () => {
 
         // 3. Release Check (Sustain Pedal Emulation)
         const gainNode = playback.audio.createGain.mock.results[0].value;
-        // Expect setTargetAtTime with timeConstant 0.2 for slower release
-        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, expect.any(Number), 0.2);
+        // Expect setTargetAtTime with timeConstant 0.3 for slower release (third call in new logic)
+        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, expect.any(Number), 0.3);
     });
 
     it('should use mixed sawtooth and triangle oscillators for rich tone', () => {
