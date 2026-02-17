@@ -175,11 +175,19 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     // --- Dynamic Register Control & Soar Lift ---
     // registerSoar adds extra melodic "lift" at high intensity to prevent sticking.
-    const soarValue = config.registerSoar || 8;
-    const soarOffset = (intensity > 0.5) ? (intensity - 0.5) * soarValue : 0;
-    const centerMidi = 60 + (intensity * 18) + soarOffset; 
+    const isDeparture = soloist.srdcState === 'Departure';
+    const isConclusion = soloist.srdcState === 'Conclusion';
+    const isBird = activeStyle === 'bird';
+
+    // Soften SRDC for Jazz/Bird to keep it fluid
+    const srdcIntensity = isBird ? 0.5 : 1.0;
+
+    const srdcRegisterOffset = (isDeparture ? 8 : (isConclusion ? -4 : 0)) * srdcIntensity;
+    const soarValue = (config.registerSoar || 8) * (isDeparture ? (1.0 + 0.5 * srdcIntensity) : 1.0);
+    const soarOffset = (intensity > 0.5 || isDeparture) ? (intensity - 0.4) * soarValue : 0;
+    const centerMidi = 60 + (intensity * 18) + soarOffset + srdcRegisterOffset; 
     const MIN_GUITAR_MIDI = 55; // G3
-    const MAX_GUITAR_MIDI = 65 + (intensity * 30); // Dynamic Ceiling
+    const MAX_GUITAR_MIDI = 65 + (intensity * 30) + (isDeparture ? 12 * srdcIntensity : 0); // Dynamic Ceiling
 
     if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
     
@@ -201,8 +209,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
          maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 2048);
     }
 
-    const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 2));
-    const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.1)); // Reduced from 0.25 to prevent long-term clutter
+    const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 8));
+    const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.05) + (playback.intent.soloistMod || 0));
     const lyricalBias = playback.lyricalBias !== undefined ? playback.lyricalBias : 0.5;
 
     if (!soloist.isResting) soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1;
@@ -249,7 +257,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     // --- 2. Phrasing & History Analysis ---
     if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
-        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.isResting = true; soloist.currentCell = null; 
+        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.srdcState = 'Conclusion'; soloist.isResting = true; soloist.currentCell = null; 
         if (!soloist.pitchHistory) soloist.pitchHistory = [];
         return null; 
     }
@@ -327,7 +335,14 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         const startProb = 0.3 + (effectiveIntensity * 0.4);
         if (Math.random() < startProb) { 
             soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0;
-            soloist.qaState = soloist.qaState === 'Question' ? 'Answer' : 'Question';
+
+            // --- SRDC State Machine ---
+            const srdcOrder = ['Statement', 'Restatement', 'Departure', 'Conclusion'];
+            const currentIndex = srdcOrder.indexOf(soloist.srdcState || 'Conclusion');
+            soloist.srdcState = srdcOrder[(currentIndex + 1) % 4];
+            
+            // Sync legacy QA state for compatibility (S/D = Question, R/C = Answer)
+            soloist.qaState = (soloist.srdcState === 'Statement' || soloist.srdcState === 'Departure') ? 'Question' : 'Answer';
             
             // Clear shared hook buffer on phrase start to ensure reinforcement is fresh
             if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
@@ -349,8 +364,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 pitchRange = Math.max(...pitches) - Math.min(...pitches);
             }
             const isInteresting = distinctPitchesCount > 2 || pitchRange > 2;
+            const isRestatement = soloist.srdcState === 'Restatement';
+            const motifProb = isRestatement ? 0.95 : config.motifProb;
 
-            if (soloist.motifBuffer && soloist.motifBuffer.length > 0 && isInteresting && Math.random() < config.motifProb && !isSignificantShift && !isStale && !isOverwhelmed) {
+            if (soloist.motifBuffer && soloist.motifBuffer.length > 0 && isInteresting && Math.random() < motifProb && !isSignificantShift && !isStale && !isOverwhelmed) {
                 soloist.isReplayingMotif = true;
                 soloist.motifReplayIndex = 0;
                 soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1;
@@ -441,6 +458,15 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     // --- 4. Rhythmic Density ---
     if (stepInBeat === 0 || !soloist.currentCell) {
         let pool = [...config.cellPool];
+
+        // SRDC Density Filtering: Departure is busier, Conclusion is sparse
+        if (soloist.srdcState === 'Departure') {
+            const busyPool = pool.filter(c => c.reduce((a, b) => a + b, 0) >= 3);
+            if (busyPool.length > 0) pool = busyPool;
+        } else if (soloist.srdcState === 'Conclusion') {
+            const sparsePool = pool.filter(c => c.reduce((a, b) => a + b, 0) <= 2);
+            if (sparsePool.length > 0) pool = sparsePool;
+        }
         
         // Lyrical Bias: Remove busy 16th-based patterns if lyrical
         if (lyricalBias > 0.6) {
@@ -583,6 +609,13 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             if (distToTarget <= 2 && distToTarget > 0) {
                  weight += 500; // Strong pull towards voice leading target
             }
+        }
+
+        // SRDC Tension & Resolution Bonuses
+        if (soloist.srdcState === 'Departure') {
+            const tensionBonus = 150 * effectiveIntensity;
+            // Favor 2nds, #11/b5, b6, and 7ths for tension
+            if ([1, 2, 6, 8, 11].includes(interval)) weight += tensionBonus;
         }
 
         if (soloist.qaState === 'Answer') {
