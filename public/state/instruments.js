@@ -84,6 +84,7 @@ export const soloist = {
     currentPhraseSteps: 0,
     notesInPhrase: 0,
     qaState: 'Question',
+    srdcState: 'Conclusion',
     isResting: false,
     currentCell: [1, 0, 1, 0],
     busySteps: 0,
