@@ -118,6 +118,7 @@ export class UnifiedVisualizer {
 
         // Optimization: Shared buffer for calculated geometry
         this.geometryBuffer = [];
+        this.soloistBuffers = [[], [], [], []];
 
         if (this.container) {
             this.initDOM();
@@ -717,6 +718,9 @@ export class UnifiedVisualizer {
             let color = track.resolvedColor || track.color;
             const geom = this.geometryBuffer;
             geom.length = 0;
+            if (name === 'soloist') {
+                 for(let b=0; b<4; b++) this.soloistBuffers[b].length = 0;
+            }
 
             // Pass 0: Compute Geometry
             // Optimization: Calculate coordinates once per frame per track via inline RingBuffer iteration
@@ -742,13 +746,16 @@ export class UnifiedVisualizer {
                 const y = Math.round(this.getY(ev.midi));
 
                 if (y >= -10 && y <= h + 10) {
-                    let typeCode = 0; // default
                     if (name === 'soloist') {
+                        let typeCode = 0; // default
                         if (ev.noteType === 'arp') typeCode = 1;
                         else if (ev.noteType === 'target') typeCode = 2;
                         else if (ev.noteType === 'altered') typeCode = 3;
+
+                        this.soloistBuffers[typeCode].push(x1, y, x2);
+                    } else {
+                        geom.push(x1, y, x2);
                     }
-                    geom.push(x1, y, x2, typeCode);
 
                     if (ev.time <= currentTime && noteEnd >= currentTime) {
                         activeX = x2; activeY = y; isActive = true;
@@ -782,13 +789,16 @@ export class UnifiedVisualizer {
                     const y = Math.round(this.getY(ev.midi));
 
                     if (y >= -10 && y <= h + 10) {
-                        let typeCode = 0; // default
                         if (name === 'soloist') {
+                            let typeCode = 0; // default
                             if (ev.noteType === 'arp') typeCode = 1;
                             else if (ev.noteType === 'target') typeCode = 2;
                             else if (ev.noteType === 'altered') typeCode = 3;
+
+                            this.soloistBuffers[typeCode].push(x1, y, x2);
+                        } else {
+                            geom.push(x1, y, x2);
                         }
-                        geom.push(x1, y, x2, typeCode);
 
                         if (ev.time <= currentTime && noteEnd >= currentTime) {
                             activeX = x2; activeY = y; isActive = true;
@@ -809,81 +819,90 @@ export class UnifiedVisualizer {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            // First pass: Glow/outline for distinctness (Batched from geometry buffer)
-            if (geom.length > 0) {
-                ctx.strokeStyle = outlineColor;
-                ctx.lineWidth = baseWidth + 2;
-                ctx.beginPath();
-                for (let j = 0; j < geom.length; j += 4) {
-                    ctx.moveTo(geom[j], geom[j+1]);
-                    ctx.lineTo(geom[j+2], geom[j+1]);
-                }
-                ctx.stroke();
+            // First pass: Glow/outline for distinctness
+            ctx.strokeStyle = outlineColor;
+            ctx.lineWidth = baseWidth + 2;
+            ctx.beginPath();
+            let hasOutline = false;
+
+            if (name === 'soloist') {
+                 for(let b = 0; b < 4; b++) {
+                     const buf = this.soloistBuffers[b];
+                     if (buf.length > 0) {
+                         hasOutline = true;
+                         for (let j = 0; j < buf.length; j += 3) {
+                            ctx.moveTo(buf[j], buf[j+1]);
+                            ctx.lineTo(buf[j+2], buf[j+1]);
+                         }
+                     }
+                 }
+            } else {
+                 if (geom.length > 0) {
+                     hasOutline = true;
+                     for (let j = 0; j < geom.length; j += 3) {
+                         ctx.moveTo(geom[j], geom[j+1]);
+                         ctx.lineTo(geom[j+2], geom[j+1]);
+                     }
+                 }
             }
+            if (hasOutline) ctx.stroke();
 
             // Second pass: Colored line (Batched)
             ctx.lineWidth = baseWidth;
             if (name === 'soloist') {
-                // Optimization: Multi-pass iteration of geometry buffer to avoid allocation/copying
-
-                // Batch 1: Default
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                let hasDefault = false;
-                for (let j = 0; j < geom.length; j += 4) {
-                    if (geom[j+3] === 0) { // default
-                        ctx.moveTo(geom[j], geom[j+1]);
-                        ctx.lineTo(geom[j+2], geom[j+1]);
-                        hasDefault = true;
+                // Batch 1: Default (0)
+                if (this.soloistBuffers[0].length > 0) {
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    const buf = this.soloistBuffers[0];
+                    for (let j = 0; j < buf.length; j += 3) {
+                        ctx.moveTo(buf[j], buf[j+1]);
+                        ctx.lineTo(buf[j+2], buf[j+1]);
                     }
+                    ctx.stroke();
                 }
-                if (hasDefault) ctx.stroke();
 
-                // Batch 2: Root (Target)
-                ctx.strokeStyle = chordColors.root;
-                ctx.beginPath();
-                let hasRoot = false;
-                for (let j = 0; j < geom.length; j += 4) {
-                    if (geom[j+3] === 2) { // target
-                        ctx.moveTo(geom[j], geom[j+1]);
-                        ctx.lineTo(geom[j+2], geom[j+1]);
-                        hasRoot = true;
+                // Batch 2: Root (Target - 2)
+                if (this.soloistBuffers[2].length > 0) {
+                    ctx.strokeStyle = chordColors.root;
+                    ctx.beginPath();
+                    const buf = this.soloistBuffers[2];
+                    for (let j = 0; j < buf.length; j += 3) {
+                        ctx.moveTo(buf[j], buf[j+1]);
+                        ctx.lineTo(buf[j+2], buf[j+1]);
                     }
+                    ctx.stroke();
                 }
-                if (hasRoot) ctx.stroke();
 
-                // Batch 3: Fifth (Arp)
-                ctx.strokeStyle = chordColors.fifth;
-                ctx.beginPath();
-                let hasFifth = false;
-                for (let j = 0; j < geom.length; j += 4) {
-                    if (geom[j+3] === 1) { // arp
-                        ctx.moveTo(geom[j], geom[j+1]);
-                        ctx.lineTo(geom[j+2], geom[j+1]);
-                        hasFifth = true;
+                // Batch 3: Fifth (Arp - 1)
+                if (this.soloistBuffers[1].length > 0) {
+                    ctx.strokeStyle = chordColors.fifth;
+                    ctx.beginPath();
+                    const buf = this.soloistBuffers[1];
+                    for (let j = 0; j < buf.length; j += 3) {
+                        ctx.moveTo(buf[j], buf[j+1]);
+                        ctx.lineTo(buf[j+2], buf[j+1]);
                     }
+                    ctx.stroke();
                 }
-                if (hasFifth) ctx.stroke();
 
-                // Batch 4: Seventh (Altered)
-                ctx.strokeStyle = chordColors.seventh;
-                ctx.beginPath();
-                let hasSeventh = false;
-                for (let j = 0; j < geom.length; j += 4) {
-                    if (geom[j+3] === 3) { // altered
-                        ctx.moveTo(geom[j], geom[j+1]);
-                        ctx.lineTo(geom[j+2], geom[j+1]);
-                        hasSeventh = true;
+                // Batch 4: Seventh (Altered - 3)
+                if (this.soloistBuffers[3].length > 0) {
+                    ctx.strokeStyle = chordColors.seventh;
+                    ctx.beginPath();
+                    const buf = this.soloistBuffers[3];
+                    for (let j = 0; j < buf.length; j += 3) {
+                        ctx.moveTo(buf[j], buf[j+1]);
+                        ctx.lineTo(buf[j+2], buf[j+1]);
                     }
+                    ctx.stroke();
                 }
-                if (hasSeventh) ctx.stroke();
-
             } else {
                 // Simple batch for non-soloist tracks
                 if (geom.length > 0) {
                     ctx.strokeStyle = color;
                     ctx.beginPath();
-                    for (let j = 0; j < geom.length; j += 4) {
+                    for (let j = 0; j < geom.length; j += 3) {
                         ctx.moveTo(geom[j], geom[j+1]);
                         ctx.lineTo(geom[j+2], geom[j+1]);
                     }
