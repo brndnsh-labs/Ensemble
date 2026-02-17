@@ -4,10 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.5 },
+        playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         groove: { genreFeel: 'Rock' },
         soloist: { busySteps: 0, tension: 0, mode: 'monophonic', sessionSteps: 1000, pitchHistory: [], notesInPhrase: 0, currentPhraseSteps: 0, isResting: false, motifBuffer: [], deviceBuffer: [] },
-        harmony: { enabled: false, rhythmicMask: 0, complexity: 0.5 },
+        harmony: { enabled: false, rhythmicMask: 0, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
         bass: {},

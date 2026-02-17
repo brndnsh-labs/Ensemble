@@ -4,7 +4,7 @@ import { getSoloistNote } from '../../public/soloist.js';
 // Mock state
 vi.mock('../../public/state.js', () => ({
     getState: () => ({
-        playback: { bandIntensity: 0.7, bpm: 120, complexity: 0.5 },
+        playback: { bandIntensity: 0.7, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         groove: { genreFeel: 'Rock' },
         soloist: {
             sessionSteps: 100,
@@ -20,7 +20,7 @@ vi.mock('../../public/state.js', () => ({
             mode: 'monophonic',
             tension: 0.5
         },
-        harmony: { enabled: true, rhythmicMask: 0, complexity: 0.5 },
+        harmony: { enabled: true, rhythmicMask: 0, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: { timeSignature: '4/4', key: 'C', isMinor: false }
     })
 }));

@@ -60,7 +60,7 @@ vi.mock('../../public/state.js', () => {
                 { name: 'Kick', steps: new Array(16).fill(0), muted: false }
             ]
         },
-        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.3 },
+        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.3, intent: { soloistMod: 0 } },
         chords: { pianoRoots: true },
         harmony: { enabled: false, buffer: new Map() },
         arranger: mockArranger,

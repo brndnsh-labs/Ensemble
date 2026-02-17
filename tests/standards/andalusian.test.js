@@ -12,7 +12,7 @@ vi.mock('../../public/state.js', () => {
             sessionSteps: 1000
         },
         chords: { enabled: true, octave: 60, density: 'standard', pianoRoots: true },
-        playback: { bandIntensity: 0.5, bpm: 120, audio: { currentTime: 0 }, intent: { anticipation: 0, syncopation: 0, layBack: 0 } },
+        playback: { bandIntensity: 0.5, bpm: 120, audio: { currentTime: 0 }, intent: { soloistMod: 0 }, intent: { soloistMod: 0 }, intent: { anticipation: 0, syncopation: 0, layBack: 0 } },
         arranger: { 
             key: 'A', 
             isMinor: true,

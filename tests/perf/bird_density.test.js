@@ -6,7 +6,7 @@ const { soloistState } = vi.hoisted(() => ({
         bpm: 120,
         bandIntensity: 0.5,
         complexity: 0.5,
-        intent: { anticipation: 0.1 }
+        intent: { anticipation: 0.1, soloistMod: 0 }
     },
     soloistState: {
         enabled: true,
@@ -46,7 +46,7 @@ vi.mock('../../public/state.js', () => {
             sessionSteps: 0
         },
         groove: { genreFeel: 'Jazz' },
-        playback: { bandIntensity: 0.5, bpm: 120 },
+        playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
         bass: {},

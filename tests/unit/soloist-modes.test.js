@@ -5,7 +5,7 @@ import { getState } from '../../public/state.js';
 // Mock State
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        playback: { bandIntensity: 0.5, bpm: 120, sessionTimer: 0, complexity: 0.5 },
+        playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120, sessionTimer: 0, complexity: 0.5 },
         soloist: {
             enabled: true,
             busySteps: 0,

@@ -21,7 +21,7 @@ vi.mock('../../public/state.js', () => {
             deviceBuffer: []
         },
         groove: { genreFeel: 'Jazz' },
-        playback: { bandIntensity: 0.5, bpm: 120 },
+        playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
         bass: {},

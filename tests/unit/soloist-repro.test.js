@@ -16,7 +16,7 @@ const mockState = {
         sessionSteps: 0
     },
     groove: { genreFeel: 'Rock' },
-    playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5 },
+    playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120, complexity: 0.5 },
     arranger: { timeSignature: '4/4' },
     chords: {},
     bass: {},

@@ -15,7 +15,7 @@ const mockState = {
         motifBuffer: []
     },
     groove: { genreFeel: 'Jazz' },
-    playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5 },
+    playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
     arranger: { timeSignature: '4/4' },
     chords: {},
     bass: {},

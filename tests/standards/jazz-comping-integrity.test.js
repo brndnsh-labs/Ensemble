@@ -8,7 +8,7 @@ vi.mock('../../public/state.js', () => {
             enabled: true, busySteps: 0, lastFreq: 440
         },
         chords: { enabled: true, style: 'smart', density: 'standard', octave: 60, currentCell: new Array(16).fill(0) },
-        playback: { bandIntensity: 0.5, complexity: 0.5, audio: { currentTime: 0 }, intent: { anticipation: 0, syncopation: 0, layBack: 0 } },
+        playback: { bandIntensity: 0.5, complexity: 0.5, intent: { soloistMod: 0 }, audio: { currentTime: 0 }, intent: { soloistMod: 0 }, intent: { soloistMod: 0 }, intent: { anticipation: 0, syncopation: 0, layBack: 0 } },
         arranger: { 
             key: 'Bb', 
             isMinor: false,
