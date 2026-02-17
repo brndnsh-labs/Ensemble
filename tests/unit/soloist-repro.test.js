@@ -63,7 +63,7 @@ describe('Soloist Motif Repetition Repro', () => {
         vi.spyOn(Math, 'random').mockReturnValue(0.5);
     });
 
-    it('should show increased motif replay likelihood after history buffer fills', () => {
+    it('should regulate motif replay likelihood to prevent dense repetition', () => {
         const chordC = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         
         // Scenario: We want to see how many times isReplayingMotif is true 
@@ -77,7 +77,7 @@ describe('Soloist Motif Repetition Repro', () => {
         // restProb is around 0.3-0.5
         // startProb is 0.3 + 0.5*0.4 = 0.5
         
-        const randomSpy = vi.spyOn(Math, 'random');
+        const randomSpy = vi.spyOn(Math.randomSpy || Math, 'random');
         
         // Sequence of random values to:
         // 1. Start a phrase (random < 0.5)
@@ -112,12 +112,9 @@ describe('Soloist Motif Repetition Repro', () => {
         console.log(`Replay Count Early: ${replayCountEarly}`);
         console.log(`Replay Count Late: ${replayCountLate}`);
         
-        // If the bug exists, replayCountLate should be significantly higher because 
-        // the "stale" check (count / historyLen > 0.35) fails to trigger.
-        // Actually, the check is inside isReplayingMotif block, it TURNS OFF replaying if stale.
-        // So if it's NOT stale, it stays on.
-        // If the check is weak, it stays on more often.
+        // The "stale" check (count / historyLen > 0.3) should trigger as the history fills,
+        // reducing the replay count in the late phase.
         
-        expect(replayCountLate).toBeGreaterThanOrEqual(replayCountEarly);
+        expect(replayCountLate).toBeLessThan(replayCountEarly);
     });
 });
