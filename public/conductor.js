@@ -50,29 +50,56 @@ export function applyConductor() {
     // Lyrical = 1.0 (Melodic, slower), Involved = 0.0 (Busy, technical)
     let lyricalBias = 0.5;
     
-    // Song Arc: Start lyrical, get involved at peak, end lyrical
+    // Song Arc: Smooth interpolation instead of hard jumps
     if (playback.songMode && playback.sessionTimer > 0) {
-        if (progress < 0.2) lyricalBias = 0.8;
-        else if (progress < 0.7) lyricalBias = 0.4;
-        else if (progress < 0.9) lyricalBias = 0.2; // Peak Soloing
-        else lyricalBias = 0.9; // Resolution
+        if (progress < 0.3) {
+            // Warmup: 0.9 down to 0.5
+            lyricalBias = 0.9 - (progress / 0.3) * 0.4;
+        } else if (progress < 0.7) {
+            // Development: 0.5 down to 0.2
+            lyricalBias = 0.5 - ((progress - 0.3) / 0.4) * 0.3;
+        } else if (progress < 0.9) {
+            // Peak: 0.2
+            lyricalBias = 0.2;
+        } else {
+            // Resolution: 0.2 up to 0.95
+            lyricalBias = 0.2 + ((progress - 0.9) / 0.1) * 0.75;
+        }
     }
 
-    // Section Overrides
+    // Soloist Fatigue Regulation
+    // If the soloist has played many notes recently, boost lyricalBias to force rests
+    const recentDensity = (soloist.notesInPhrase || 0) / 16; // 16 is a high-water mark for a phrase
+    if (recentDensity > 0.6) {
+        lyricalBias = Math.max(lyricalBias, recentDensity * 0.8);
+    }
+
+    // Section Overrides (Smoothed)
     const modStep = (arranger.totalSteps > 0) ? (playback.step % arranger.totalSteps) : 0;
     const currentEntry = arranger.stepMap.find(e => modStep >= e.start && modStep < e.end);
     if (currentEntry) {
         const label = currentEntry.chord.sectionLabel.toLowerCase();
-        if (label.includes('solo')) lyricalBias = Math.min(lyricalBias, 0.2);
-        else if (label.includes('verse')) lyricalBias = Math.max(lyricalBias, 0.7);
-        else if (label.includes('outro') || label.includes('intro')) lyricalBias = Math.max(lyricalBias, 0.85);
+        let sectionBias = 0.5;
+        if (label.includes('solo')) sectionBias = 0.2;
+        else if (label.includes('verse')) sectionBias = 0.75;
+        else if (label.includes('outro') || label.includes('intro')) sectionBias = 0.9;
+        
+        // Blend section bias with song arc (70% section, 30% arc)
+        lyricalBias = (sectionBias * 0.7) + (lyricalBias * 0.3);
     }
+
+    // Soloist Energy Cap: Prevent "runaway" density at loop starts
+    const isFirstHalfOfSection = (currentEntry && (modStep - currentEntry.start) < (currentEntry.end - currentEntry.start) / 2);
+    const soloistIntensityMod = isFirstHalfOfSection ? -0.15 : 0.05;
 
     dispatch(ACTIONS.UPDATE_CONDUCTOR_DECISION, {
         density: targetDensity,
         velocity: targetVelocity,
         hookProb: targetHookProb,
-        intent: { density: targetIntentDensity },
+        intent: { 
+            density: targetIntentDensity,
+            soloistMod: soloistIntensityMod 
+        },
         lyricalBias: lyricalBias
     });
 
