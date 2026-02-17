@@ -182,12 +182,18 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     // Soften SRDC for Jazz/Bird to keep it fluid
     const srdcIntensity = isBird ? 0.5 : 1.0;
 
-    const srdcRegisterOffset = (isDeparture ? 8 : (isConclusion ? -4 : 0)) * srdcIntensity;
-    const soarValue = (config.registerSoar || 8) * (isDeparture ? (1.0 + 0.5 * srdcIntensity) : 1.0);
+    const srdcRegisterOffset = (isDeparture ? 6 : (isConclusion ? -4 : 0)) * srdcIntensity;
+    const soarValue = (config.registerSoar || 8) * (isDeparture ? (1.0 + 0.25 * srdcIntensity) : 1.0);
     const soarOffset = (intensity > 0.5 || isDeparture) ? (intensity - 0.4) * soarValue : 0;
-    const centerMidi = 60 + (intensity * 18) + soarOffset + srdcRegisterOffset; 
+    
+    // Absolute melodic ceiling to prevent piercing whistle tones
+    const ABSOLUTE_MAX_MIDI = 96; // C7 (Top of Soprano range)
+    
+    let centerMidi = 60 + (intensity * 15) + soarOffset + srdcRegisterOffset; 
+    centerMidi = Math.min(ABSOLUTE_MAX_MIDI - 12, centerMidi);
+
     const MIN_GUITAR_MIDI = 55; // G3
-    const MAX_GUITAR_MIDI = 65 + (intensity * 30) + (isDeparture ? 12 * srdcIntensity : 0); // Dynamic Ceiling
+    const MAX_GUITAR_MIDI = Math.min(ABSOLUTE_MAX_MIDI, 65 + (intensity * 25) + (isDeparture ? 8 * srdcIntensity : 0)); 
 
     if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
     
