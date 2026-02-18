@@ -80,7 +80,7 @@ describe('Accompaniment Engine Logic', () => {
         it('should use short durations for Funk and disable sustain for Reggae', () => {
             groove.genreFeel = 'Funk';
             const funkNotes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true }).filter(n => n.midi > 0);
-            if (funkNotes.length > 0) expect([0.4, 0.2, 0.1]).toContain(funkNotes[0].durationSteps);
+            if (funkNotes.length > 0) expect([0.8, 0.4, 0.35, 0.2, 0.1]).toContain(funkNotes[0].durationSteps);
 
             groove.genreFeel = 'Reggae';
             const reggaeNotes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });

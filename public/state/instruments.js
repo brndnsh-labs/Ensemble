@@ -40,7 +40,6 @@ export const chords = {
  * @property {Map<number, Object>} buffer - Map of scheduled notes from the worker.
  * @property {number} octave - Base MIDI octave.
  * @property {string} style - Playing style ID (e.g., 'walking', 'funk').
- * @property {number} pocketOffset - Micro-timing offset in seconds (e.g. 0.02 for 20ms lag).
  * @property {number} busySteps - Counter for "busy" playing periods.
  * @property {string} activeTab - Currently active UI tab.
  * @property {number|null} lastBassGain - Last velocity/gain value for dynamic continuity.
@@ -54,7 +53,6 @@ export const bass = {
     buffer: new Map(),
     octave: 38,
     style: 'smart',
-    pocketOffset: 0.0,
     busySteps: 0,
     activeTab: 'smart',
     lastBassGain: null
@@ -130,7 +128,6 @@ export const harmony = {
     motifBuffer: [],
     lastMidis: [],
     rhythmicMask: 0,
-    pocketOffset: 0.0,
     activeTab: 'smart'
 };
 

@@ -1,6 +1,7 @@
 import { getBestInversion } from './chords.js';
 import { getState } from './state.js';
 import { TIME_SIGNATURES } from './config.js';
+import { calculateTimingOffset } from './utils.js';
 
 /**
  * HARMONIES.JS
@@ -370,7 +371,10 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
     if (currentMidis.length > 0) lastPlayedStep = step;
     const polyphonyComp = 1 / Math.sqrt(currentMidis.length || 1);
     
-    const pocketOffset = harmony.pocketOffset || 0;
+    // --- Holistic Pocket Implementation ---
+    const intensity = playback.bandIntensity;
+    const basePocketOffset = calculateTimingOffset('chords', groove.pocket, intensity); // Harmonies share Chord gravity
+    
     const styleOffset = config.octaveOffset || 0;
     const finalMidisForMemory = [];
 
@@ -385,7 +389,6 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
         if (finalMidi > 100) finalMidi -= 12; // Shift down an octave if too high
         if (finalMidi > 100) continue; // Skip if still too high (rare)
         
-        const intensity = playback.bandIntensity;
         let slideInterval = 0, slideDuration = 0, vibrato = { rate: 0, depth: 0 };
 
         // Neo-Soul Slide
@@ -408,9 +411,9 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
         if (isGhost) baseVol *= 0.4; // Ghost notes are much softer
 
         const stagger = (i - (currentMidis.length - 1) / 2) * 0.005;
-        let finalOffset = pocketOffset + stagger + (Math.random() * config.timingJitter);
+        let finalOffset = basePocketOffset + stagger + (Math.random() * config.timingJitter);
 
-        // Neo-Soul "Drunken" Pocket (Late)
+        // Neo-Soul "Dilla" Pocket (Late): Layered on top
         if (feel === 'Neo-Soul') finalOffset += 0.015;
 
         notes.push({
