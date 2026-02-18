@@ -89,28 +89,38 @@ export function generateCompingPattern(genre, vibe, length = 16) {
     if (genre === 'Funk') {
         // The "One" is often rest in piano comping for Funk to leave space for Bass
         // Focus on "e" and "a" (16th subdivisions)
-        if (Math.random() > 0.6) hit(0); // Optional 1
+        if (Math.random() > 0.75) hit(0); // Very optional 1
         
-        // E and A placements
-        const slots = [3, 4, 6, 7, 10, 12, 13, 15];
-        let density = 2;
-        if (vibe === 'active') density = 5;
-        if (vibe === 'sparse') density = 1;
+        // Funk Archetype Placements (syncopated clusters)
+        const clusters = [
+            [3, 4], [6, 7], [10, 11], [14, 15], // The "ah-1" types
+            [1, 2], [5, 6], [9, 10], [13, 14]   // The "e-and" types
+        ];
+        
+        let density = 1;
+        if (vibe === 'active') density = 3;
+        if (vibe === 'sparse' && Math.random() < 0.5) return pattern; // Allow total silence
         
         for (let i = 0; i < density; i++) {
-            const slot = slots[Math.floor(Math.random() * slots.length)];
-            hit(slot);
+            const cluster = clusters[Math.floor(Math.random() * clusters.length)];
+            cluster.forEach(s => { if (Math.random() > 0.3) hit(s); });
         }
         return pattern;
     }
     
-    if (genre === 'Jazz' || genre === 'Bossa') {
+    if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
+        const { arranger } = getState();
+        const total = arranger.totalSteps || 0;
+        const modStep = playback.step % total;
+        // Turnaround detection: last 2 measures of the song loop
+        const isTurnaround = (genre === 'Blues') && total > 32 && (modStep >= total - 32);
+
         const type = Math.random();
         
-        if (type > 0.75) { 
+        if (type > 0.75 || (isTurnaround && Math.random() < 0.5)) { 
             // Charleston: 1 and &2 (Steps 0 and 7)
             hit(0);
-            if (vibe !== 'sparse') hit(7); 
+            if (vibe !== 'sparse' || isTurnaround) hit(7); 
         } else if (type > 0.5) {
             // Reverse Charleston: &1 and 3 (Steps 3 and 8)
             hit(3);
@@ -123,17 +133,18 @@ export function generateCompingPattern(genre, vibe, length = 16) {
             // Red Garland Lite: 1, &2, &3 (Steps 0, 7, 11)
             hit(0);
             hit(7);
-            if (vibe === 'active') hit(11);
+            if (vibe === 'active' || isTurnaround) hit(11);
         } else {
             // Sparse Anticipation: &4 (Step 15)
             hit(15);
         }
         
-        if (vibe === 'active') {
-            // Add comping chatter
+        if (vibe === 'active' || isTurnaround) {
+            // Add comping chatter / Turnaround Flourish
             if (length >= 4 && Math.random() > 0.5) hit(4);
             if (length >= 10 && Math.random() > 0.5) hit(10);
-            if (length >= 13 && Math.random() > 0.7) hit(12);
+            if (length >= 13 && Math.random() > (isTurnaround ? 0.3 : 0.7)) hit(12);
+            if (isTurnaround && Math.random() < 0.4) hit(14); // Extra syncopation for turnaround
         }
         return pattern;
     }
@@ -262,7 +273,7 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     for (let i = 0; i < 16; i++) {
         if (newCell[i] === 1) mask |= (1 << i);
     }
-    chords.rhythmicMask = mask;
+    chords.rhythmicMask = mask; // @worker-mutation
 
     playback.intent.anticipation = (intensity * 0.2);
     if (genre === 'Jazz' || genre === 'Bossa') playback.intent.anticipation += 0.15;
@@ -539,8 +550,14 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
 
     if (genre === 'Funk') {
         // Clav-Style: 16th note syncopation with ghost notes ("chucks")
-        const isHit = compingState.currentCell[measureStep % spm] === 1;
-        const ghostProb = 0.2 + (intensity * 0.4);
+        let isHit = compingState.currentCell[measureStep % spm] === 1;
+        
+        // Conversational Displacement: Occasionally shift a hit by 16th if complexity is high
+        if (isHit && playback.complexity > 0.7 && soloist.busySteps > 0 && Math.random() < 0.4) {
+            isHit = false;
+        }
+
+        const ghostProb = 0.15 + (intensity * 0.35);
         const isGhost = !isHit && (Math.random() < ghostProb);
 
         if (isHit || isGhost) {
@@ -549,22 +566,29 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
             let voicing = [];
             
             // Extract 3rd and 7th from intervals if possible, otherwise use slice
-            const three = chord.intervals ? chord.intervals.find(i => i === 3 || i === 4) : undefined;
-            const seven = chord.intervals ? chord.intervals.find(i => i === 10 || i === 11) : undefined;
+            const third = chord.intervals ? chord.intervals.find(i => i === 3 || i === 4) : undefined;
+            const seven = chord.intervals ? chord.intervals.find(i => i === 10 || i === 11 || i === 9) : undefined;
             
-            if (three !== undefined && seven !== undefined) {
-                voicing = [chord.rootMidi + three, chord.rootMidi + seven];
+            if (third !== undefined && seven !== undefined) {
+                voicing = [chord.rootMidi + third, chord.rootMidi + seven];
             } else {
                 voicing = chord.freqs.slice(0, 2).map(f => getMidi(f));
             }
             
+            // Register Slotting: Ensure it stays in a punchy mid-register (C3-C5)
+            voicing = voicing.map(m => {
+                while (m < 48) m += 12;
+                while (m > 72) m -= 12;
+                return m;
+            });
+
             voicing.forEach((m, i) => {
                 notes.push({
                     midi: m,
-                    velocity: (isGhost ? 0.2 : 0.6) * (0.5 + intensity * 0.9) * (0.9 + Math.random() * 0.2),
-                    durationSteps: isGhost ? 0.1 : 0.4, // Super short ghost "chucks"
+                    velocity: (isGhost ? 0.18 : 0.65) * (0.5 + intensity * 0.9) * (0.9 + Math.random() * 0.2),
+                    durationSteps: isGhost ? 0.1 : 0.35, // Super short ghost "chucks"
                     ccEvents: (i === 0) ? ccEvents : [],
-                    timingOffset: (i * 0.004) + (isGhost ? (0.005 + Math.random() * 0.01) : 0),
+                    timingOffset: (i * 0.003) + (isGhost ? (0.005 + Math.random() * 0.01) : -0.005),
                     instrument: 'Piano',
                     muted: isGhost,
                     dry: true
@@ -601,6 +625,16 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
     if (measureStep === 0 && !isHit && Math.random() < 0.8) isHit = true;
     if (stepInfo && stepInfo.isGroupStart && !isHit && Math.random() < (0.4 + intensity * 0.4)) isHit = true;
     
+    if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
+        const isBlues = genre === 'Blues';
+        // ... (existing logic)
+        
+        // Conversational Displacement for Jazz/Blues
+        if (isHit && soloist.busySteps > 0 && playback.complexity > 0.6 && Math.random() < 0.3) {
+            isHit = false;
+        }
+    }
+
     // Pad Style Override
     if (chords.style === 'pad') isHit = (stepInChord === 0);
 

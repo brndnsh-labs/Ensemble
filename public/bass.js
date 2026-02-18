@@ -474,25 +474,48 @@ export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMid
     if (style === 'funk') {
         const stepInBeat = stepInChord % 4;
         const intBeatFunk = Math.floor(stepInChord / 4);
-        if (stepInChord === 0) return result(getFrequency(withOctaveJump(baseRoot)), 0.9, 1.2);
-        if (stepInBeat === 2 && intBeatFunk < 3 && Math.random() < 0.45) {
-             return result(getFrequency(clampAndNormalize(withOctaveJump(baseRoot + 12))), 0.4, 1.0); 
+        const isOne = stepInChord === 0;
+        
+        // 1. "The One" is the anchor - Always strong
+        if (isOne) return result(getFrequency(withOctaveJump(baseRoot)), 0.9, 1.25);
+
+        // 2. The "And" (8th notes) - Prime candidates for Octave Pops
+        if (stepInBeat === 2) {
+            const octavePopProb = 0.2 + (intensity * 0.4);
+            if (Math.random() < octavePopProb) {
+                const note = baseRoot + 12;
+                // Pop velocity: triggers brighter synth mode
+                const popVel = 1.15 + (intensity * 0.15); 
+                return result(getFrequency(clampAndNormalize(note)), 0.4, popVel);
+            }
+            // Occasional 5th or Octave down for variety
+            if (Math.random() < 0.3) {
+                const note = Math.random() < 0.5 ? baseRoot + 7 : baseRoot - 12;
+                return result(getFrequency(clampAndNormalize(note)), 0.6, 0.9);
+            }
         }
-        if (intBeatFunk === 2 && stepInBeat === 0 && Math.random() < 0.4) {
-             return result(getFrequency(withOctaveJump(baseRoot)), 0.8, 0.9);
+
+        // 3. High Intensity: Melodic Walking / Chromatic Approaches
+        if (intensity > 0.6) {
+            // Approach to Beat 3 (Step 8) or Beat 1 (Step 0)
+            if ((stepInChord === 7 || stepInChord === 15) && Math.random() < 0.5) {
+                const target = (stepInChord === 7) ? baseRoot : (nextChord ? normalizeToRange(nextChord.rootMidi) : baseRoot);
+                const approach = Math.random() < 0.5 ? target - 1 : target + 1;
+                return result(getFrequency(clampAndNormalize(approach)), 0.5, 1.05);
+            }
         }
-        if ((stepInBeat === 1 || stepInBeat === 3) && Math.random() < 0.3 && !isSoloistBusy) {
-            const hasFlat7 = scale.includes(10);
-            const interval = hasFlat7 ? 10 : 7;
-            return result(getFrequency(clampAndNormalize(withOctaveJump(baseRoot + interval))), 0.5, 0.7);
+
+        // 4. Ghost Note "Peeling"
+        if (!isSoloistBusy && (stepInBeat === 1 || stepInBeat === 3) && Math.random() < (0.1 + intensity * 0.3)) {
+             // Muted "chucks" to keep the 16th engine moving
+             return result(getFrequency(prevMidi || baseRoot), 0.2, 0.4, true);
         }
-        if (intBeatFunk === 3 && stepInBeat >= 2 && Math.random() < 0.5) {
-            const approach = Math.random() < 0.5 ? baseRoot - 1 : baseRoot + 7;
-            return result(getFrequency(clampAndNormalize(withOctaveJump(approach))), 0.5, 0.9);
+
+        // 5. Mid-phrase stability (Beat 3)
+        if (intBeatFunk === 2 && stepInBeat === 0) {
+             return result(getFrequency(withOctaveJump(baseRoot)), 0.8, 1.0);
         }
-        if (!isSoloistBusy && Math.random() < 0.15) {
-             return result(getFrequency(prevMidi || baseRoot), 0.25, 0.35, true);
-        }
+
         return null;
     }
 

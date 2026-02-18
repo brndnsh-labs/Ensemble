@@ -87,28 +87,46 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
 
     // --- Funk Procedural Overrides ---
     if (groove.genreFeel === 'Funk' && !inst.muted) {
-        // 1. Intelligent Snare Ghosting
+        // 1. Intelligent Snare Ghosting (Linear Style)
         if (inst.name === 'Snare' && stepVal === 0) {
-            const isSubdivision = loopStep % 4 !== 0 && loopStep % 4 !== 2; 
+            const isSubdivision = loopStep % 2 === 1; // Prioritize e and ah
             if (isSubdivision) {
                 const kickInst = groove.instruments.find(i => i.name === 'Kick');
-                const kickPlaying = kickInst && kickInst.steps[step] > 0;
+                const kickPlaying = kickInst && (kickInst.steps[step] > 0 || (loopStep === 0 && playback.bandIntensity > 0.8));
 
-                let ghostProb = playback.complexity * 0.5;
-                if (playback.bpm > 160) ghostProb *= 0.4; // Reduce clutter at high BPM
+                let ghostProb = 0.15 + (playback.complexity * 0.4);
+                if (playback.bpm > 160) ghostProb *= 0.4; 
 
+                // Avoid ghosting if kick is playing or about to play (tight linear feel)
                 if (!kickPlaying && Math.random() < ghostProb) {
                     shouldPlay = true;
-                    velocity = 0.15 + (Math.random() * 0.1); 
+                    velocity = 0.12 + (Math.random() * 0.1); 
                 }
             }
         }
         
-        // 2. Dynamic Hi-Hat Barks
+        // 2. Dynamic Hi-Hat Barks & Transitions
         if (inst.name === 'HiHat' && shouldPlay) {
-            if (loopStep % 4 === 3 && Math.random() < (playback.bandIntensity * 0.35)) {
+            const barkProb = (playback.bandIntensity * 0.4);
+            // Anticipatory bark leading to "The One" (step 14) or offbeat funk bark (step 3/11)
+            if ([3, 11, 14].includes(loopStep) && Math.random() < barkProb) {
                 soundName = 'Open';
-                velocity *= 1.1; 
+                velocity *= 1.15; 
+            }
+        }
+
+        // 3. Procedural "The One" Reinforcement
+        if (inst.name === 'Kick' && loopStep === 0 && playback.bandIntensity > 0.8 && !shouldPlay) {
+            shouldPlay = true;
+            velocity = 1.3;
+        }
+
+        // 4. Syncopated Kick "Hiccups"
+        if (inst.name === 'Kick' && stepVal === 0 && playback.complexity > 0.6) {
+            // Add skippy kick on "a" of 2 or "e" of 3
+            if ((loopStep === 7 || loopStep === 9) && Math.random() < (playback.bandIntensity * 0.3)) {
+                shouldPlay = true;
+                velocity = 0.7;
             }
         }
     }
@@ -238,8 +256,22 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
             }
         } else if (inst.name === 'Kick') {
             if (loopStep === 0) { shouldPlay = true; velocity = 1.2; }
+            // Add skippy kick on "and" of 2 (step 6)
+            if (loopStep === 6 && playback.bandIntensity > 0.6 && Math.random() < 0.3) {
+                shouldPlay = true; velocity = 0.8;
+            }
         } else if (inst.name === 'Snare') {
-            if (loopStep === 4 || loopStep === 12) { shouldPlay = true; velocity = 1.1; }
+            if (loopStep === 4 || loopStep === 12) { 
+                shouldPlay = true; velocity = 1.1; 
+            }
+            // 1. Procedural Snare "Drags" (Ghost notes leading into backbeats)
+            if (stepVal === 0 && [3, 11].includes(loopStep) && playback.complexity > 0.5) {
+                if (Math.random() < (0.2 + playback.bandIntensity * 0.4)) {
+                    shouldPlay = true;
+                    velocity = 0.15 + (Math.random() * 0.1);
+                    instTimeOffset += 0.005; // Drag slightly
+                }
+            }
         }
     }
 
@@ -380,6 +412,11 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
             }
         } else if (groove.genreFeel === 'Funk' && stepVal === 2) velocity *= 1.1;
 
+        // --- Funk Driving Feel (Timing Push) ---
+        if (groove.genreFeel === 'Funk' && inst.name === 'Snare' && (loopStep === 4 || loopStep === 12)) {
+            instTimeOffset -= 0.004; // Drive the backbeat slightly
+        }
+
         if (groove.genreFeel === 'Disco' && inst.name === 'Open') velocity *= 1.15; 
         
         // --- Ska-Punk Final Polish ---
@@ -426,6 +463,12 @@ export function calculatePocketOffset(playback, groove) {
     
     // Genre-specific "Dilla" feel
     if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') pocketOffset += 0.015;
+
+    // Blues Shuffle Drift (Breathing pocket)
+    if (groove.genreFeel === 'Blues') {
+        // Lay back more at low intensity, drive slightly at high
+        pocketOffset += (0.005 - (playback.bandIntensity * 0.012)); 
+    }
     
     return pocketOffset;
 }
