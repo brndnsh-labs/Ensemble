@@ -335,3 +335,53 @@ export function clampFreq(freq, max = 24000) {
     // Nominal range for most browser implementations of BiquadFilter is [0, 24000]
     return Math.min(Math.max(0, freq), max);
 }
+
+/**
+ * Calculates a unified timing offset for an instrument based on the global pocket state.
+ * @param {string} instrument - 'drums', 'bass', 'chords', or 'soloist'.
+ * @param {Object} pocket - The global pocket state.
+ * @param {number} intensity - Current band intensity.
+ * @returns {number} Offset in seconds.
+ */
+export function calculateTimingOffset(instrument, pocket, intensity) {
+    if (!pocket) return 0;
+
+    // 1. Global Drive (The whole band pushes or pulls)
+    // Scale: 1.0 drive = -12ms (ahead), -1.0 drive = +12ms (behind)
+    const driveBase = -(pocket.globalDrive * 0.012);
+
+    // 2. Tightness (Inverse variance)
+    // High tightness (1.0) = no random jitter. Low tightness (0.0) = ±8ms jitter.
+    const jitter = (1.0 - pocket.tightness) * (Math.random() - 0.5) * 0.016;
+    
+    let instrumentSpecific = 0;
+
+    // 3. Holistic Gravity (Instruments following each other)
+    switch (instrument) {
+        case 'drums':
+            // Drums set the grid reference.
+            if (intensity > 0.8) instrumentSpecific -= 0.005; 
+            break;
+        case 'bass':
+            // Bass follows Kick. High gravity = perfectly with Kick.
+            // Low gravity = adds 'human' displacement (usually laid back).
+            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.008;
+            break;
+        case 'chords':
+            // Chords follow Bass. 
+            instrumentSpecific += (1.0 - pocket.chordGravity) * 0.006;
+            // Inherit 30% of the bass's expected displacement for cohesion
+            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.003;
+            break;
+        case 'soloist':
+            // Soloist is the most elastic, but still feels the 'pull' of the band.
+            instrumentSpecific += (1.0 - pocket.soloistGravity) * 0.012;
+            break;
+    }
+
+    // 4. Intensity Elasticity: High intensity forces everyone closer to the base drive
+    const elasticity = 0.4 + (intensity * 0.6); // 0.4 to 1.0
+    const finalOffset = driveBase + (instrumentSpecific + jitter) * (1.1 - elasticity);
+    
+    return finalOffset;
+}

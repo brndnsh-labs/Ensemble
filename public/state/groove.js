@@ -78,7 +78,15 @@ export const groove = {
     fillLength: 0,
     snareMask: 0,
     pendingCrash: false,
-    gridVersion: 0
+    gridVersion: 0,
+    // --- Unified Rhythmic Pocket System ---
+    pocket: {
+        globalDrive: 0,      // -1.0 (behind) to 1.0 (ahead)
+        tightness: 0.5,      // 0.0 (loose/jittery) to 1.0 (grid-locked)
+        bassGravity: 0.8,    // 0.0 to 1.0 (how much bass follows Kick)
+        chordGravity: 0.6,   // 0.0 to 1.0 (how much chords follow Bass)
+        soloistGravity: 0.4  // 0.0 to 1.0 (how much soloist follows Snare/Hats)
+    }
 };
 
 export function grooveReducer(action, payload, playback) {
@@ -87,8 +95,23 @@ export function grooveReducer(action, payload, playback) {
             Object.assign(groove, {
                 enabled: true, volume: 0.5, reverb: 0.2, swing: 0, swingSub: '8th', genreFeel: 'Rock', activeTab: 'smart', lastSmartGenre: 'Rock', measures: 1, currentMeasure: 0
             });
+            Object.assign(groove.pocket, {
+                globalDrive: 0, tightness: 0.5, bassGravity: 0.8, chordGravity: 0.6, soloistGravity: 0.4
+            });
             groove.instruments.forEach(inst => { inst.steps.fill(0); inst.muted = false; });
             return true;
+        case ACTIONS.SET_POCKET_CONFIG:
+            Object.assign(groove.pocket, payload);
+            return true;
+        case ACTIONS.SET_GROOVE_STEPS: {
+            const inst = groove.instruments.find(i => i.name === payload.instrument);
+            if (inst) {
+                inst.steps.fill(0);
+                payload.steps.forEach((v, i) => { if (i < 128) inst.steps[i] = v; });
+                return true;
+            }
+            return false;
+        }
         case ACTIONS.SET_SWING:
             Object.assign(groove, { swing: payload });
             return true;

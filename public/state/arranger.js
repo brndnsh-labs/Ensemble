@@ -67,6 +67,9 @@ export function arrangerReducer(action, payload) {
         case ACTIONS.SET_NOTATION:
             Object.assign(arranger, { notation: payload });
             return true;
+        case ACTIONS.SET_ARRANGEMENT:
+            arranger.sections = payload;
+            return true;
     }
     return false;
 }
