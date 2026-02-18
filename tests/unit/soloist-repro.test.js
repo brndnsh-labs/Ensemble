@@ -35,7 +35,8 @@ vi.mock('../../public/config.js', () => ({
 
 vi.mock('../../public/utils.js', () => ({
     getFrequency: (midi) => 440 * Math.pow(2, (midi - 69) / 12),
-    getMidi: (freq) => Math.round(12 * Math.log2(freq / 440) + 69)
+    getMidi: (freq) => Math.round(12 * Math.log2(freq / 440) + 69),
+    calculateTimingOffset: vi.fn(() => 0)
 }));
 
 vi.mock('../../public/theory-scales.js', () => ({

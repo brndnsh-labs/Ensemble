@@ -41,7 +41,8 @@ vi.mock('../../public/theory-scales.js', () => ({
 // Mock Utils
 vi.mock('../../public/utils.js', () => ({
     getFrequency: (midi) => 440 * Math.pow(2, (midi - 69) / 12),
-    getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440))
+    getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
+    calculateTimingOffset: vi.fn(() => 0)
 }));
 
 describe('Soloist Mode Differentiation Logic', () => {

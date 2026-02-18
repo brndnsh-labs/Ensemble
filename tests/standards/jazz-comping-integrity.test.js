@@ -53,7 +53,8 @@ vi.mock('../../public/utils.js', () => ({
         return map[norm] || norm;
     },
     getFrequency: (m) => 440 * Math.pow(2, (m - 69) / 12),
-    getMidi: (f) => Math.round(12 * Math.log2(f / 440) + 69)
+    getMidi: (f) => Math.round(12 * Math.log2(f / 440) + 69),
+    calculateTimingOffset: vi.fn(() => 0)
 }));
 
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));

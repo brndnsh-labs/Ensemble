@@ -34,7 +34,8 @@ vi.mock('../../public/config.js', () => ({
 
 vi.mock('../../public/utils.js', () => ({
     getFrequency: () => 440,
-    getMidi: () => 60
+    getMidi: () => 60,
+    calculateTimingOffset: vi.fn(() => 0)
 }));
 
 vi.mock('../../public/theory-scales.js', () => ({
