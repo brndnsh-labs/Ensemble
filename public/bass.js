@@ -1,4 +1,4 @@
-import { getFrequency, getMidi } from './utils.js';
+import { getFrequency, getMidi, calculateTimingOffset } from './utils.js';
 import { getState } from './state.js';
 import { TIME_SIGNATURES, REGGAE_RIDDIMS } from './config.js';
 import { getScaleForChord } from './theory-scales.js';
@@ -107,7 +107,7 @@ export function isBassActive(style, step, stepInChord) {
 }
 
 export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMidi, style, chordIndex, step, stepInChord, context = {}) {
-    const { playback, groove, bass, soloist, arranger } = getState();
+    const { playback, groove, soloist, arranger } = getState();
     if (!chord) return null;
 
     if (style === 'smart') {
@@ -229,15 +229,11 @@ export function getBassNote(chord, nextChord, beatInMeasure, prevFreq, centerMid
     const velocity = (intBeat % 2 === 1) ? 1.15 : 1.0;
 
     const result = (freq, durationMultiplier = null, velocityParam = 1.0, muted = false, bendStartInterval = 0) => {
-        let timingOffset = bass.pocketOffset || 0;
+        let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
         
-        // Intensity-based timing: Push slightly ahead during climaxes
-        if (intensity > 0.8 && style !== 'neo') timingOffset -= 0.005;
-
-        // Neo-Soul "Drunken" Lag: Tightened up (reduced base and scaling)
+        // Neo-Soul "Dilla" Lag: Layered on top of holistic pocket
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
             timingOffset += 0.010 + (intensity * 0.015);
-            // Reduced jitter
         }
 
         let durationSteps = 1;

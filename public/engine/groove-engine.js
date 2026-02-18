@@ -488,6 +488,8 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
     return { shouldPlay, velocity, soundName, instTimeOffset };
 }
 
+import { calculateTimingOffset } from '../utils.js';
+
 /**
  * Calculates the micro-timing offset (pocket) for the drum kit.
  * @param {Object} playback - Global context.
@@ -495,26 +497,10 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
  * @returns {number} Offset in seconds.
  */
 export function calculatePocketOffset(playback, groove) {
-    let pocketOffset = 0;
-    // Push slightly ahead during high intensity/climaxes
-    if (playback.bandIntensity > 0.75) pocketOffset -= 0.008; 
-    // Lay back during low intensity/cool-downs
-    else if (playback.bandIntensity < 0.3) pocketOffset += 0.010;
+    let pocketOffset = calculateTimingOffset('drums', groove.pocket, playback.bandIntensity);
     
-    // Genre-specific "Dilla" feel
+    // Genre-specific "Dilla" feel (Layered on top of holistic pocket)
     if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') pocketOffset += 0.015;
-
-    // Blues Shuffle Drift (Breathing pocket)
-    if (groove.genreFeel === 'Blues') {
-        // Lay back more at low intensity, drive slightly at high
-        pocketOffset += (0.005 - (playback.bandIntensity * 0.012)); 
-    }
-
-    // Jazz Pocket Drift
-    if (groove.genreFeel === 'Jazz') {
-        // Jazz drummers often push the ride cymbal at higher intensities
-        pocketOffset -= (playback.bandIntensity * 0.010); 
-    }
     
     return pocketOffset;
 }

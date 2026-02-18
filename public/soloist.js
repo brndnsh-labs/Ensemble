@@ -1,4 +1,4 @@
-import { getFrequency, getMidi } from './utils.js';
+import { getFrequency, getMidi, calculateTimingOffset } from './utils.js';
 import { getState } from './state.js';
 import { TIME_SIGNATURES } from './config.js';
 import { getScaleForChord } from './theory-scales.js';
@@ -229,6 +229,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (!res) return null;
         const primary = Array.isArray(res) ? res[0] : res;
         
+        // --- Holistic Pocket Implementation ---
+        const timingOffset = calculateTimingOffset('soloist', groove.pocket, (playback.bandIntensity || 0.5));
+        primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
+
         // Update Global Pitch History
         if (soloist.pitchHistory) {
             soloist.pitchHistory.push(primary.midi);
