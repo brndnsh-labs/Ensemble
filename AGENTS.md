@@ -1,6 +1,10 @@
 # AI Agent Protocols for Ensemble
 
-This document outlines mandatory protocols for AI agents (Jules, Gemini, etc.) working on the Ensemble codebase. Strict adherence is required to maintain system stability and test integrity.
+> **MANDATORY CHECKLIST FOR ALL AGENTS:**
+> 1. **State Writes:** ALWAYS use `dispatch(ACTIONS.TYPE, payload)`. NEVER mutate `state` objects directly.
+> 2. **UI Updates:** Check `public/components/` first. Use Preact components; avoid direct DOM manipulation.
+> 3. **Musical Logic:** After engine changes, you MUST run `npm test tests/standards/`.
+> 4. **Refactoring:** Before moving code, `grep` the entire project for usages. Update imports immediately.
 
 ## 1. Refactoring & File Movements
 **Context:** Recent refactors caused widespread `TypeError` failures because test imports were not updated when functions moved from `soloist.js` to `theory-scales.js`.

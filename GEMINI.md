@@ -21,6 +21,14 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
     2.  **Implementation**: Add the new feature or fix the bug. Commit.
     3.  **Verification**: Add tests or update documentation. Commit.
     *   *Example*: Do not combine "Setup ESLint" (tooling) with "Fix Bass Logic" (bugfix). These must be separate commits.
+
+## Definition of Done (Mandatory)
+Before concluding any task, an agent MUST:
+1.  Run `./scripts/verify-agent-standards.sh`.
+2.  Ensure ALL tests pass (especially `tests/standards/`).
+3.  Verify that no NEW direct state mutations were introduced.
+4.  Run `npm run lint` and fix any new warnings.
+
 *   **Branch Management**: Do NOT delete feature branches until the user has confirmed the implementation works as expected in the UI or through integration tests. Always verify behavior before merging and deleting.
 
 ## Roadmap & Future Goals
