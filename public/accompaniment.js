@@ -626,7 +626,6 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
     if (stepInfo && stepInfo.isGroupStart && !isHit && Math.random() < (0.4 + intensity * 0.4)) isHit = true;
     
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
-        const isBlues = genre === 'Blues';
         // ... (existing logic)
         
         // Conversational Displacement for Jazz/Blues

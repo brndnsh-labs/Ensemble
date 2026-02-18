@@ -1,9 +1,12 @@
+import { getState } from '../state.js';
+
 /**
  * Applies procedural groove logic based on the active genre and band intensity.
  * @param {Object} params - The current step parameters.
  * @returns {Object} { shouldPlay, velocity, soundName, instTimeOffset }
  */
 export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, isDownbeat, isQuarter, isBackbeat, isGroupStart }) {
+    const { soloist } = getState();
     let instTimeOffset = 0;
     let velocity = stepVal === 2 ? 1.25 : 0.9;
     let shouldPlay = stepVal > 0;
@@ -189,55 +192,92 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
 
     // --- Jazz Procedural Overrides ---
     if (groove.genreFeel === 'Jazz' && !inst.muted) {
+        const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
+        
         if (inst.name === 'Open') {
             shouldPlay = false;
-            if ([0, 4, 6, 8, 12, 14].includes(loopStep)) {
-                // High BPM: Flatten the swing pattern to reduce wash
-                if (playback.bpm > 170 && (loopStep === 6 || loopStep === 14)) {
-                     // Mute the "a" of "1, 2-a" occasionally or lower velocity
-                     if (Math.random() < 0.5) shouldPlay = true;
-                     else shouldPlay = false;
-                } else {
+            // Standard Ride Pattern: 1, 2, 2-a, 3, 4, 4-a
+            const rideSteps = [0, 4, 6, 8, 12, 14];
+            if (rideSteps.includes(loopStep)) {
+                // Procedural Ride Variation: Occasionally skip the 'a' or accent the 'and'
+                const isSkipBeat = (loopStep === 6 || loopStep === 14);
+                let rideProb = 1.0;
+                if (isSkipBeat && playback.complexity < 0.4) rideProb = 0.7; // Simpler ride at low complexity
+                
+                if (Math.random() < rideProb) {
                     shouldPlay = true;
-                }
-
-                if (shouldPlay) {
-                    if (loopStep % 4 === 0) velocity = 1.15;
-                    else velocity = 0.75;
+                    // Velocity contour: Strong 1 and 3
+                    if (loopStep % 8 === 0) velocity = 1.1 + (playback.bandIntensity * 0.2);
+                    else velocity = 0.75 + (playback.complexity * 0.15);
                 }
             }
+            
+            // High BPM: Flatten the pattern to reduce wash
+            if (playback.bpm > 180 && (loopStep === 6 || loopStep === 14) && Math.random() < 0.4) {
+                 shouldPlay = false;
+            }
         } else if (inst.name === 'HiHat') {
+            // Foot pedal on 2 and 4
             shouldPlay = false;
             if (loopStep === 4 || loopStep === 12) {
                 shouldPlay = true;
-                velocity = 0.8;
+                velocity = 0.8 + (playback.bandIntensity * 0.2);
             }
         } else if (inst.name === 'Kick') {
             shouldPlay = false;
-            if (loopStep % 4 === 0) { shouldPlay = true; velocity = 0.35; }
-            let bombProb = playback.bandIntensity * 0.3;
-            if (playback.bpm > 165) bombProb *= 0.5; // Fewer bombs at fast swing
+            // 1. Feathering (The heartbeat) - low velocity on quarters
+            if (loopStep % 4 === 0) { 
+                shouldPlay = true; 
+                velocity = 0.3 + (playback.bandIntensity * 0.15); 
+            }
+            
+            // 2. Bombs (Interaction)
+            let bombProb = playback.bandIntensity * 0.25;
+            if (isSoloistBusy) bombProb *= 1.5; // More bombs to support a busy soloist
+            if (playback.bpm > 170) bombProb *= 0.4;
 
             if (Math.random() < bombProb) {
-                if ([10, 14, 15].includes(loopStep)) { shouldPlay = true; velocity = 0.9 + (Math.random() * 0.2); }
+                // Typical bomb placements: & of 2, & of 4, or the 'a' of 4
+                if ([6, 14, 15].includes(loopStep)) { 
+                    shouldPlay = true; 
+                    velocity = 0.9 + (Math.random() * 0.3); 
+                }
             }
         } else if (inst.name === 'Snare') {
             shouldPlay = false;
-            let compProb = 0.08;
-            if (playback.bpm > 165) compProb = 0.04;
+            
+            // CONVERSATIONAL COMPING: If soloist is resting, drummer "fills the gap"
+            let compProb = 0.1 + (playback.complexity * 0.3);
+            if (!isSoloistBusy) compProb += 0.2; // Increase activity during soloist breath
+            if (playback.bpm > 175) compProb *= 0.5;
 
-            if (Math.random() < compProb) { shouldPlay = true; velocity = 0.25; }
-
-            // Comping logic
-            if (loopStep === 14) {
-                if (Math.random() < 0.6 + (playback.bandIntensity * 0.3)) { shouldPlay = true; velocity = 0.85; }
-            } else if (loopStep === 6) {
-                if (Math.random() < 0.3 + (playback.bandIntensity * 0.3)) { shouldPlay = true; velocity = 0.8; }
+            // Placement logic
+            if (loopStep === 14) { // & of 4 (Strongest jazz syncopation)
+                if (Math.random() < (0.5 + compProb)) shouldPlay = true;
+            } else if (loopStep === 6) { // & of 2
+                if (Math.random() < (0.3 + compProb)) shouldPlay = true;
+            } else if ([3, 11, 15].includes(loopStep)) { // Ghost/Syncopated chatter
+                if (Math.random() < (compProb * 0.4)) shouldPlay = true;
             }
 
-            // High BPM Comping Throttling
-            if (playback.bpm > 175 && shouldPlay && velocity > 0.5 && Math.random() < 0.3) {
-                 shouldPlay = false; // Thin out the comping
+            if (shouldPlay) {
+                velocity = 0.4 + (playback.bandIntensity * 0.6);
+                // Low intensity simulation (Sidestick/Brushes approximation)
+                if (playback.bandIntensity < 0.4) {
+                    soundName = 'Sidestick';
+                    velocity *= 0.8;
+                }
+            }
+
+            // 3. THE BIG FINISH (Ending Signaling)
+            if (playback.songMode && playback.isEndingPending && !inst.muted) {
+                const endingStep = step % 16;
+                // Add flams and rolls in the last 2 bars
+                if ([13, 15].includes(endingStep) && Math.random() < 0.7) {
+                    shouldPlay = true;
+                    velocity = 1.1;
+                    instTimeOffset -= 0.005; // Slightly rushed flam feel
+                }
             }
         }
     }
@@ -468,6 +508,12 @@ export function calculatePocketOffset(playback, groove) {
     if (groove.genreFeel === 'Blues') {
         // Lay back more at low intensity, drive slightly at high
         pocketOffset += (0.005 - (playback.bandIntensity * 0.012)); 
+    }
+
+    // Jazz Pocket Drift
+    if (groove.genreFeel === 'Jazz') {
+        // Jazz drummers often push the ride cymbal at higher intensities
+        pocketOffset -= (playback.bandIntensity * 0.010); 
     }
     
     return pocketOffset;
