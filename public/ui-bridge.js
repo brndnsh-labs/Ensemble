@@ -42,6 +42,8 @@ export function useEnsembleState(selector) {
     return slice;
 }
 
+useEnsembleState.getState = getState;
+
 /**
  * Hook to get the dispatch function.
  */

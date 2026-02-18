@@ -43,66 +43,58 @@ export function PresetLibrary({ type }) {
         if (type === 'chord') {
             if (isDirty && !confirm("Discard your custom arrangement and load this preset?")) return;
             
-            import('../state.js').then(({ arranger, playback }) => {
-                if (isUser) {
-                    arranger.sections = item.sections ? decompressSections(item.sections) : [{ id: generateId(), label: 'Main', value: item.prog }];
-                } else {
-                    arranger.sections = item.sections.map(s => ({
-                        id: generateId(),
-                        label: s.label,
-                        value: s.value,
-                        repeat: s.repeat || 1,
-                        key: s.key || '',
-                        timeSignature: s.timeSignature || '',
-                        seamless: !!s.seamless
-                    }));
-                }
-                
-                arranger.isDirty = false;
-                arranger.isMinor = item.isMinor || false;
-                arranger.lastChordPreset = item.name;
+            const newSections = isUser 
+                ? (item.sections ? decompressSections(item.sections) : [{ id: generateId(), label: 'Main', value: item.prog }])
+                : item.sections.map(s => ({
+                    id: generateId(),
+                    label: s.label,
+                    value: s.value,
+                    repeat: s.repeat || 1,
+                    key: s.key || '',
+                    timeSignature: s.timeSignature || '',
+                    seamless: !!s.seamless
+                }));
+            
+            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: false });
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isMinor', value: item.isMinor || false });
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'lastChordPreset', value: item.name });
 
-                if (item.settings) {
-                    if (playback.applyPresetSettings) {
-                        if (item.settings.bpm) dispatch(ACTIONS.SET_BPM, item.settings.bpm);
-                        if (item.settings.style) dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: item.settings.style });
-                    }
-                    if (item.settings.timeSignature) {
-                        arranger.timeSignature = item.settings.timeSignature;
-                    }
+            if (item.settings) {
+                if (useEnsembleState.getState().playback.applyPresetSettings) {
+                    if (item.settings.bpm) dispatch(ACTIONS.SET_BPM, item.settings.bpm);
+                    if (item.settings.style) dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: item.settings.style });
                 }
+                if (item.settings.timeSignature) {
+                    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'timeSignature', value: item.settings.timeSignature });
+                }
+            }
 
-                validateAndAnalyze();
-                flushBuffers();
-                saveCurrentState();
-            });
+            validateAndAnalyze();
+            flushBuffers();
+            saveCurrentState();
         } else {
             if (isUser) {
-                import('../state.js').then(({ groove }) => {
-                    if (item.measures) {
-                        groove.measures = item.measures;
-                        groove.currentMeasure = 0;
-                    }
-                    item.pattern.forEach(savedInst => {
-                        const inst = groove.instruments.find(i => i.name === savedInst.name);
-                        if (inst) {
-                            inst.steps.fill(0);
-                            savedInst.steps.forEach((v, i) => { if (i < 128) inst.steps[i] = v; });
-                        }
+                if (item.measures) {
+                    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: item.measures });
+                    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'currentMeasure', value: 0 });
+                }
+                item.pattern.forEach(savedInst => {
+                    dispatch(ACTIONS.SET_GROOVE_STEPS, { 
+                        instrument: savedInst.name, 
+                        steps: savedInst.steps 
                     });
-                    if (item.swing !== undefined) groove.swing = item.swing;
-                    if (item.swingSub) groove.swingSub = item.swingSub;
-                    groove.lastDrumPreset = item.name;
-                    syncWorker();
-                    saveCurrentState();
                 });
+                if (item.swing !== undefined) dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'swing', value: item.swing });
+                if (item.swingSub) dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'swingSub', value: item.swingSub });
+                dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'lastDrumPreset', value: item.name });
+                syncWorker();
+                saveCurrentState();
             } else {
                 loadDrumPreset(item.name);
-                import('../state.js').then(({ groove }) => {
-                    groove.lastDrumPreset = item.name;
-                    syncWorker();
-                    saveCurrentState();
-                });
+                dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'lastDrumPreset', value: item.name });
+                syncWorker();
+                saveCurrentState();
             }
         }
     };

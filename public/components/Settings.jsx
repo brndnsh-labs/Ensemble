@@ -56,7 +56,7 @@ export function Settings() {
 
     const handleMasterVolume = (e) => {
         const val = parseFloat(e.target.value);
-        playback.masterVolume = val;
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: val });
         
         if (playback.masterGain && playback.audio) {
             const target = Math.max(0.0001, val * MIXER_GAIN_MULTIPLIERS.master);
