@@ -5,7 +5,7 @@ import { getStepsPerMeasure } from './utils.js';
 
 export function applyTheme(theme) {
     const { playback } = getState();
-    playback.theme = theme;
+    playback.theme = theme; // @direct-mutation
     if (theme === 'auto') {
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -27,14 +27,14 @@ export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
         const now = playback.audio.currentTime;
         const ratio = currentBpm / newBpm;
         const noteTimeRemaining = playback.nextNoteTime - now;
-        if (noteTimeRemaining > 0) playback.nextNoteTime = now + (noteTimeRemaining * ratio);
+        if (noteTimeRemaining > 0) playback.nextNoteTime = now + (noteTimeRemaining * ratio); // @direct-mutation
         
         const unswungNextNoteTimeRemaining = playback.unswungNextNoteTime - now;
-        if (unswungNextNoteTimeRemaining > 0) playback.unswungNextNoteTime = now + (unswungNextNoteTimeRemaining * ratio);
+        if (unswungNextNoteTimeRemaining > 0) playback.unswungNextNoteTime = now + (unswungNextNoteTimeRemaining * ratio); // @direct-mutation
     }
     
     if (!fromDispatch) {
-        playback.bpm = newBpm;
+        playback.bpm = newBpm; // @direct-mutation
     }
     
     syncWorker();

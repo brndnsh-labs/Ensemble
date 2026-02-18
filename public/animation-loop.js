@@ -30,13 +30,13 @@ export function draw(viz) {
     lastFrameTime = nowFrame;
 
     if (!playback.audio) {
-        playback.isDrawing = false;
+        playback.isDrawing = false; // @direct-mutation
         return;
     }
     if (!playback.isPlaying && playback.drawQueue.length === 0) {
-        playback.isDrawing = false;
+        playback.isDrawing = false; // @direct-mutation
         if (chords.lastActiveChordIndex !== null) {
-            chords.lastActiveChordIndex = null;
+            chords.lastActiveChordIndex = null; // @direct-mutation
             dispatch('VIS_RESET');
         }
         if (viz) viz.clear();
@@ -44,18 +44,18 @@ export function draw(viz) {
     }
     const now = getVisualTime();
     while (playback.drawQueue.length > 0 && playback.drawQueue[0].time < now - 2.0) playback.drawQueue.shift();
-    if (playback.drawQueue.length > 300) playback.drawQueue = playback.drawQueue.slice(playback.drawQueue.length - 200);
+    if (playback.drawQueue.length > 300) playback.drawQueue = playback.drawQueue.slice(playback.drawQueue.length - 200); // @direct-mutation
     const spm = getStepsPerMeasure(arranger.timeSignature);
     while (playback.drawQueue.length && playback.drawQueue[0].time <= now) {
         const ev = playback.drawQueue.shift();
         if (ev.type === 'drum_vis') {
             const stepMeasure = Math.floor(ev.step / spm);
             if (groove.followPlayback && stepMeasure !== groove.currentMeasure && playback.isPlaying) switchMeasure(stepMeasure, true);
-            playback.lastPlayingStep = ev.step;
+            playback.lastPlayingStep = ev.step; // @direct-mutation
         }
         else if (ev.type === 'chord_vis') {
             if (chords.lastActiveChordIndex !== ev.index) {
-                chords.lastActiveChordIndex = ev.index;
+                chords.lastActiveChordIndex = ev.index; // @direct-mutation
                 dispatch('VIS_UPDATE', { type: 'chord', index: ev.index });
             }
             if (viz && vizState.enabled && playback.isDrawing) {
@@ -95,7 +95,7 @@ export function draw(viz) {
             vizCrashCount++;
             if (vizCrashCount > 3) {
                 console.warn("Visualizer disabled due to repeated errors.");
-                vizState.enabled = false;
+                vizState.enabled = false; // @direct-mutation
                 vizCrashCount = 0;
             }
         }

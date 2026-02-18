@@ -122,7 +122,7 @@ class AudioHealthMonitor {
         try {
             // Force recreation of the graph nodes
             playback.audio.close().then(async () => {
-                playback.audio = null; // Clear reference
+                playback.audio = null; // @worker-mutation // Clear reference
                 initAudio(); // Rebuild from scratch
                 
                 // 4. Restore levels

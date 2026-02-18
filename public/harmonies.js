@@ -16,10 +16,10 @@ let lastPlayedStep = -1;
 export function clearHarmonyMemory() {
     const { harmony, soloist } = getState();
     motifCache.clear();
-    harmony.lastMidis = [];
+    harmony.lastMidis = []; // @worker-mutation
     lastPlayedStep = -1;
-    soloist.motifBuffer = [];
-    soloist.isReplayingMotif = false;
+    soloist.motifBuffer = []; // @worker-mutation
+    soloist.isReplayingMotif = false; // @worker-mutation
 }
 
 /**
@@ -244,7 +244,7 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
     }
 
     const motif = motifCache.get(sectionId);
-    if (harmony.rhythmicMask !== motif.rhythmicMask) harmony.rhythmicMask = motif.rhythmicMask;
+    if (harmony.rhythmicMask !== motif.rhythmicMask) harmony.rhythmicMask = motif.rhythmicMask; // @worker-mutation
 
     // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
     let isSuppressedByAntiphony = false;
@@ -428,6 +428,6 @@ export function getHarmonyNotes(chord, nextChord, step, octave, style, stepInCho
         finalMidisForMemory.push(finalMidi);
     }
 
-    harmony.lastMidis = finalMidisForMemory;
+    harmony.lastMidis = finalMidisForMemory; // @worker-mutation
     return notes;
 }

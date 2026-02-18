@@ -16,14 +16,14 @@ export function setInstrumentControllerRefs(scheduler, viz) {
 export function switchMeasure(idx) {
     const { groove } = getState();
     if (groove.currentMeasure === idx) return;
-    groove.currentMeasure = idx;
+    groove.currentMeasure = idx; // @worker-mutation
     dispatch('MEASURE_SWITCH');
 }
 
 export function updateMeasures(val) {
     const { groove } = getState();
-    groove.measures = parseInt(val);
-    if (groove.currentMeasure >= groove.measures) groove.currentMeasure = 0;
+    groove.measures = parseInt(val); // @worker-mutation
+    if (groove.currentMeasure >= groove.measures) groove.currentMeasure = 0; // @worker-mutation
     saveCurrentState();
 }
 
@@ -174,13 +174,13 @@ export function flushBuffers(primeSteps = 0) {
 export function flushBuffer(type, primeSteps = 0) {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
-        if (bass.lastPlayedFreq !== null) bass.lastFreq = bass.lastPlayedFreq;
+        if (bass.lastPlayedFreq !== null) bass.lastFreq = bass.lastPlayedFreq; // @worker-mutation
         bass.buffer.clear();
         killBassNote();
         killBassBus();
     }
     if (type === 'soloist' || type === 'all') {
-        if (soloist.lastPlayedFreq !== null) soloist.lastFreq = soloist.lastPlayedFreq;
+        if (soloist.lastPlayedFreq !== null) soloist.lastFreq = soloist.lastPlayedFreq; // @worker-mutation
         soloist.buffer.clear();
         killSoloistNote();
         killSoloistBus();

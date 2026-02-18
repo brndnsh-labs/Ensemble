@@ -206,10 +206,10 @@ class ExportProcessor {
             sessionSteps: soloist.sessionSteps
         };
 
-        chords.enabled = true; bass.enabled = true; soloist.enabled = true; harmony.enabled = true; groove.enabled = true;
-        soloist.sessionSteps = 1000;
+        chords.enabled = true; bass.enabled = true; soloist.enabled = true; harmony.enabled = true; groove.enabled = true; // @worker-mutation
+        soloist.sessionSteps = 1000; // @worker-mutation
         compingState.lockedUntil = 0; compingState.lastChordIndex = -1;
-        soloist.busySteps = 0; soloist.isResting = false; soloist.currentPhraseSteps = 0;
+        soloist.busySteps = 0; soloist.isResting = false; soloist.currentPhraseSteps = 0; // @worker-mutation
 
         // Conductor State
         this.exportConductor = {
@@ -266,11 +266,11 @@ class ExportProcessor {
                     shouldFill = (this.exportConductor.loopCount % freq === 0);
                 }
                 if (shouldFill) {
-                    groove.fillSteps = generateProceduralFill(groove.genreFeel, playback.bandIntensity, this.stepsPerMeasure);
-                    groove.fillActive = true;
-                    groove.fillStartStep = step;
-                    groove.fillLength = this.stepsPerMeasure;
-                    groove.pendingCrash = true;
+                    groove.fillSteps = generateProceduralFill(groove.genreFeel, playback.bandIntensity, this.stepsPerMeasure); // @worker-mutation
+                    groove.fillActive = true; // @worker-mutation
+                    groove.fillStartStep = step; // @worker-mutation
+                    groove.fillLength = this.stepsPerMeasure; // @worker-mutation
+                    groove.pendingCrash = true; // @worker-mutation
                 }
             }
         }
@@ -281,14 +281,14 @@ class ExportProcessor {
             if (grandCycle < 3) target = 0.6;
             else if (grandCycle < 5) target = 0.9;
             else target = 0.4;
-            playback.bandIntensity = playback.bandIntensity + (target - playback.bandIntensity) * 0.5;
+            playback.bandIntensity = playback.bandIntensity + (target - playback.bandIntensity) * 0.5; // @worker-mutation
         }
 
-        harmony.complexity = Math.max(0, (playback.bandIntensity - 0.2) * 1.25);
+        harmony.complexity = Math.max(0, (playback.bandIntensity - 0.2) * 1.25); // @worker-mutation
 
         const isLastLoop = (this.exportConductor.loopCount >= this.loopCount - 1);
         if (isLastLoop && this.loopCount > 1) {
-            harmony.complexity = Math.max(harmony.complexity, 0.85);
+            harmony.complexity = Math.max(harmony.complexity, 0.85); // @worker-mutation
         }
     }
 
@@ -402,7 +402,7 @@ class ExportProcessor {
                     endTimeS += 0.02;
 
                     this.bassTrack.noteOff(this.toPulses(endTimeS), 1, res.midi);
-                    bass.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12);
+                    bass.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12); // @worker-mutation
                 }
             }
 
@@ -439,7 +439,7 @@ class ExportProcessor {
                             endTimeS += 0.015;
 
                             this.soloistTrack.noteOff(this.toPulses(endTimeS), 2, res.midi);
-                            if (!res.isDoubleStop) soloist.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12);
+                            if (!res.isDoubleStop) soloist.lastFreq = 440 * Math.pow(2, (res.midi - 69) / 12); // @worker-mutation
                         }
                     });
                 }
@@ -507,11 +507,11 @@ class ExportProcessor {
                             }
                         }
                     } else if (fillStep === groove.fillLength) {
-                        groove.fillActive = false;
+                        groove.fillActive = false; // @worker-mutation
                         if (groove.pendingCrash) {
                             this.drumTrack.noteOn(drumPulse, 9, drumMap['Crash'], 110);
                             this.drumTrack.noteOff(this.toPulses(drumTimeS + this.secondsPerBeat), 9, drumMap['Crash']);
-                            groove.pendingCrash = false;
+                            groove.pendingCrash = false; // @worker-mutation
                         }
                     }
                 }
@@ -631,14 +631,14 @@ class ExportProcessor {
 
     cleanup() {
         if (this.prevStates) {
-            chords.enabled = this.prevStates.chords;
-            bass.enabled = this.prevStates.bass;
-            soloist.enabled = this.prevStates.soloist;
-            harmony.enabled = this.prevStates.harmony;
-            groove.enabled = this.prevStates.groove;
-            playback.bandIntensity = this.prevStates.intensity;
-            soloist.mode = this.prevStates.mode;
-            soloist.sessionSteps = this.prevStates.sessionSteps;
+            chords.enabled = this.prevStates.chords; // @worker-mutation
+            bass.enabled = this.prevStates.bass; // @worker-mutation
+            soloist.enabled = this.prevStates.soloist; // @worker-mutation
+            harmony.enabled = this.prevStates.harmony; // @worker-mutation
+            groove.enabled = this.prevStates.groove; // @worker-mutation
+            playback.bandIntensity = this.prevStates.intensity; // @worker-mutation
+            soloist.mode = this.prevStates.mode; // @worker-mutation
+            soloist.sessionSteps = this.prevStates.sessionSteps; // @worker-mutation
         }
 
         isExporting = false;
@@ -758,7 +758,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                         if (!bassResult.midi) bassResult.midi = getMidi(bassResult.freq);
                         if (!bassResult.freq) bassResult.freq = getFrequency(bassResult.midi);
-                        bass.lastFreq = bassResult.freq;
+                        bass.lastFreq = bassResult.freq; // @worker-mutation
                         notesToMain.push({ ...bassResult, step, module: 'bass' });
                     }
                 }
@@ -781,7 +781,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                         if (res.freq || res.midi) {
                             if (!res.midi) res.midi = getMidi(res.freq);
                             if (!res.freq) res.freq = getFrequency(res.midi);
-                            if (!res.isDoubleStop) soloist.lastFreq = res.freq;
+                            if (!res.isDoubleStop) soloist.lastFreq = res.freq; // @worker-mutation
                             notesToMain.push({ ...res, step, module: 'soloist' });
                         }
                     }
@@ -895,32 +895,32 @@ function processMessage(type, data, startTime) {
                     }
                     if (syncData.chords) {
                         Object.assign(chords, syncData.chords);
-                        if (syncData.chords.rhythmicMask !== undefined) chords.rhythmicMask = syncData.chords.rhythmicMask;
+                        if (syncData.chords.rhythmicMask !== undefined) chords.rhythmicMask = syncData.chords.rhythmicMask; // @worker-mutation
                     }
                     if (syncData.bass) Object.assign(bass, syncData.bass);
                     if (syncData.soloist) Object.assign(soloist, syncData.soloist);
                     if (syncData.harmony) {
                         Object.assign(harmony, syncData.harmony);
-                        if (syncData.harmony.rhythmicMask !== undefined) harmony.rhythmicMask = syncData.harmony.rhythmicMask;
-                        if (syncData.harmony.pocketOffset !== undefined) harmony.pocketOffset = syncData.harmony.pocketOffset;
+                        if (syncData.harmony.rhythmicMask !== undefined) harmony.rhythmicMask = syncData.harmony.rhythmicMask; // @worker-mutation
+                        if (syncData.harmony.pocketOffset !== undefined) harmony.pocketOffset = syncData.harmony.pocketOffset; // @worker-mutation
                     }
                     if (syncData.groove) {
                         Object.assign(groove, syncData.groove);
                         if (syncData.groove.instruments) { syncData.groove.instruments.forEach(di => { const inst = groove.instruments.find(i => i.name === di.name); if (inst) { inst.steps = di.steps; inst.muted = di.muted; } }); }
-                        if (syncData.groove.snareMask !== undefined) groove.snareMask = syncData.groove.snareMask;
+                        if (syncData.groove.snareMask !== undefined) groove.snareMask = syncData.groove.snareMask; // @worker-mutation
                     }
                     if (syncData.playback) Object.assign(playback, syncData.playback);
                 }
 
                 bbBufferHead = data.step; sbBufferHead = data.step; cbBufferHead = data.step; hbBufferHead = data.step;
-                soloist.isResting = false; soloist.busySteps = 0; soloist.currentPhraseSteps = 0;
-                soloist.sessionSteps = 0;
-                soloist.deviceBuffer = [];
-                bass.busySteps = 0;
-                soloist.motifBuffer = []; soloist.hookBuffer = []; soloist.isReplayingMotif = false;
-                soloist.sharedHookBuffer = [];
-                harmony.motifBuffer = [];
-                harmony.lastMidis = [];
+                soloist.isResting = false; soloist.busySteps = 0; soloist.currentPhraseSteps = 0; // @worker-mutation
+                soloist.sessionSteps = 0; // @worker-mutation
+                soloist.deviceBuffer = []; // @worker-mutation
+                bass.busySteps = 0; // @worker-mutation
+                soloist.motifBuffer = []; soloist.hookBuffer = []; soloist.isReplayingMotif = false; // @worker-mutation
+                soloist.sharedHookBuffer = []; // @worker-mutation
+                harmony.motifBuffer = []; // @worker-mutation
+                harmony.lastMidis = []; // @worker-mutation
 
                 // Reset accompaniment memory
                 compingState.lastChordIndex = -1;
@@ -984,13 +984,13 @@ function handlePrime(steps) {
     }
 
     // Reset soloist state for priming
-    soloist.isResting = false;
-    soloist.busySteps = 0;
-    bass.busySteps = 0;
-    soloist.currentPhraseSteps = 0;
-    soloist.motifBuffer = [];
-    soloist.hookBuffer = [];
-    soloist.isReplayingMotif = false;
+    soloist.isResting = false; // @worker-mutation
+    soloist.busySteps = 0; // @worker-mutation
+    bass.busySteps = 0; // @worker-mutation
+    soloist.currentPhraseSteps = 0; // @worker-mutation
+    soloist.motifBuffer = []; // @worker-mutation
+    soloist.hookBuffer = []; // @worker-mutation
+    soloist.isReplayingMotif = false; // @worker-mutation
 
     // Local cursors for priming
     const primeCursor = { index: 0, sectionIndex: 0 };
@@ -1028,7 +1028,7 @@ function handlePrime(steps) {
                     );
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                          if (!bassResult.freq) bassResult.freq = 440 * Math.pow(2, (bassResult.midi - 69) / 12);
-                         bass.lastFreq = bassResult.freq;
+                         bass.lastFreq = bassResult.freq; // @worker-mutation
                     }
                 }
             }
@@ -1036,7 +1036,7 @@ function handlePrime(steps) {
             // 2. Prime Soloist
             const { sectionStart, sectionEnd } = chordData;
             // Manually increment sessionSteps for priming logic
-            soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
+            soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
             
             const soloResult = getSoloistNote(
                 chord, 
@@ -1055,7 +1055,7 @@ function handlePrime(steps) {
                 results.forEach(res => {
                     if (res.freq || res.midi) {
                          if (!res.freq) res.freq = 440 * Math.pow(2, (res.midi - 69) / 12);
-                         if (!res.isDoubleStop) soloist.lastFreq = res.freq;
+                         if (!res.isDoubleStop) soloist.lastFreq = res.freq; // @worker-mutation
                     }
                 });
             }
@@ -1068,7 +1068,7 @@ function handlePrime(steps) {
     }
 
     // Reset physical and session state for the REAL start at Step 0
-    soloist.busySteps = 0;
-    bass.busySteps = 0;
-    soloist.sessionSteps = 0;
+    soloist.busySteps = 0; // @worker-mutation
+    bass.busySteps = 0; // @worker-mutation
+    soloist.sessionSteps = 0; // @worker-mutation
 }
