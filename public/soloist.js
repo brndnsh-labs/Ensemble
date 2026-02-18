@@ -161,6 +161,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const { playback, groove, soloist, harmony, arranger } = getState();
     if (!currentChord) return null;
     
+    let targetChord = currentChord;
     let activeStyle = style;
     if (activeStyle === 'smart') {
         activeStyle = GENRE_STYLE_MAPPING[groove.genreFeel] || 'scalar';
@@ -195,7 +196,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const MIN_GUITAR_MIDI = 55; // G3
     const MAX_GUITAR_MIDI = Math.min(ABSOLUTE_MAX_MIDI, 65 + (intensity * 25) + (isDeparture ? 8 * srdcIntensity : 0)); 
 
-    if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1;
+    if (!isPriming) soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
     
     let maturityFactor = 0;
     
@@ -219,7 +220,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.05) + (playback.intent.soloistMod || 0));
     const lyricalBias = playback.lyricalBias !== undefined ? playback.lyricalBias : 0.5;
 
-    if (!soloist.isResting) soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1;
+    if (!soloist.isResting) soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
 
     /**
      * Internal helper to finalize a note, updating history and session tracking.
@@ -235,13 +236,27 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         }
         
         // Update session tracking for continuity
-        if (!primary.isDoubleStop) soloist.lastFreq = getFrequency(primary.midi);
-        soloist.notesInPhrase++;
+        if (!primary.isDoubleStop) soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
+        soloist.notesInPhrase++; // @worker-mutation
+
+        // --- Blues Micro-Bend Inflections ---
+        if (activeStyle === 'blues' && !soloist.isReplayingMotif) {
+            const pc = (primary.midi % 12);
+            const rootPC = (targetChord.rootMidi % 12);
+            const relativeInterval = (pc - rootPC + 12) % 12;
+            
+            // Blue Notes: b3 (3) and b5 (6)
+            if ((relativeInterval === 3 || relativeInterval === 6) && primary.bendStartInterval === 0) {
+                // Procedural "curl" or "scoop"
+                // Quarter-tone approximation using small bendStartInterval (-0.5 or +0.5)
+                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
+            }
+        }
 
         // -- Shared Hook Logic --
         // If in Ska-Punk mode and replaying a motif, sync to shared buffer for band reinforcement
         if (groove.genreFeel === 'Ska-Punk' && soloist.isReplayingMotif) {
-            if (!soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
+            if (!soloist.sharedHookBuffer) soloist.sharedHookBuffer = []; // @worker-mutation
             // Use a sliding window of the last few notes for reinforcement
             soloist.sharedHookBuffer.push({ step, res });
             if (soloist.sharedHookBuffer.length > 16) soloist.sharedHookBuffer.shift();
@@ -254,7 +269,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     if (soloist.deviceBuffer && soloist.deviceBuffer.length > 0) {
         const devNote = soloist.deviceBuffer.shift();
         const primaryNote = Array.isArray(devNote) ? devNote[0] : devNote;
-        soloist.busySteps = (primaryNote.durationSteps || 1) - 1;
+        soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
         return finalizeNote(devNote);
     }
     if (soloist.busySteps > 0) { 
@@ -263,8 +278,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     // --- 2. Phrasing & History Analysis ---
     if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
-        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.srdcState = 'Conclusion'; soloist.isResting = true; soloist.currentCell = null; 
-        if (!soloist.pitchHistory) soloist.pitchHistory = [];
+        soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.srdcState = 'Conclusion'; soloist.isResting = true; soloist.currentCell = null; // @worker-mutation 
+        if (!soloist.pitchHistory) soloist.pitchHistory = []; // @worker-mutation
         return null; 
     }
     
@@ -340,18 +355,18 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (isSuppressedByAntiphony) return null;
         const startProb = 0.3 + (effectiveIntensity * 0.4);
         if (Math.random() < startProb) { 
-            soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0;
+            soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; // @worker-mutation
 
             // --- SRDC State Machine ---
             const srdcOrder = ['Statement', 'Restatement', 'Departure', 'Conclusion'];
             const currentIndex = srdcOrder.indexOf(soloist.srdcState || 'Conclusion');
-            soloist.srdcState = srdcOrder[(currentIndex + 1) % 4];
+            soloist.srdcState = srdcOrder[(currentIndex + 1) % 4]; // @worker-mutation
             
             // Sync legacy QA state for compatibility (S/D = Question, R/C = Answer)
-            soloist.qaState = (soloist.srdcState === 'Statement' || soloist.srdcState === 'Departure') ? 'Question' : 'Answer';
+            soloist.qaState = (soloist.srdcState === 'Statement' || soloist.srdcState === 'Departure') ? 'Question' : 'Answer'; // @worker-mutation
             
             // Clear shared hook buffer on phrase start to ensure reinforcement is fresh
-            if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
+            if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = []; // @worker-mutation
             
             // Motif Decision
             const currentRoot = currentChord.rootMidi % 12;
@@ -374,20 +389,20 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             const motifProb = isRestatement ? 0.95 : config.motifProb;
 
             if (soloist.motifBuffer && soloist.motifBuffer.length > 0 && isInteresting && Math.random() < motifProb && !isSignificantShift && !isStale && !isOverwhelmed) {
-                soloist.isReplayingMotif = true;
-                soloist.motifReplayIndex = 0;
-                soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1;
+                soloist.isReplayingMotif = true; // @worker-mutation
+                soloist.motifReplayIndex = 0; // @worker-mutation
+                soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1; // @worker-mutation
             } else {
-                soloist.isReplayingMotif = false;
-                soloist.motifBuffer = []; 
-                soloist.motifRoot = currentRoot;
-                soloist.motifReplayCount = 0;
+                soloist.isReplayingMotif = false; // @worker-mutation
+                soloist.motifBuffer = []; // @worker-mutation 
+                soloist.motifRoot = currentRoot; // @worker-mutation
+                soloist.motifReplayCount = 0; // @worker-mutation
             }
         } else return null;
     }
         if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < restProb) {
-            soloist.isResting = true; soloist.currentPhraseSteps = 0; soloist.currentCell = null;
-            if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = [];
+            soloist.isResting = true; soloist.currentPhraseSteps = 0; soloist.currentCell = null; // @worker-mutation
+            if (soloist.sharedHookBuffer) soloist.sharedHookBuffer = []; // @worker-mutation
             return null;
         }
     
@@ -431,8 +446,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 const count = historyCounts[primary.midi] || 0;
                 const pcCount = pcCounts[primary.midi % 12] || 0;
                 if ((count / historyLen) > 0.3 || (pcCount / historyLen) > 0.4) {
-                    soloist.isReplayingMotif = false;
-                    soloist.motifBuffer = [];
+                    soloist.isReplayingMotif = false; // @worker-mutation
+                    soloist.motifBuffer = []; // @worker-mutation
                     // Abort immediately? Or fall through to normal generation?
                     // Fall through effectively cancels replay for this step and future steps
                 }
@@ -442,10 +457,10 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
                 const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
                 if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                    soloist.isReplayingMotif = false;
+                    soloist.isReplayingMotif = false; // @worker-mutation
                 }
 
-                soloist.busySteps = (primary.durationSteps || 1) - 1;
+                soloist.busySteps = (primary.durationSteps || 1) - 1; // @worker-mutation
                 return finalizeNote(res);
             }
         }
@@ -455,7 +470,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
              const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
              const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
              if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                soloist.isReplayingMotif = false;
+                soloist.isReplayingMotif = false; // @worker-mutation
              }
              return null;
         }
@@ -513,12 +528,11 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             if (playable.length > 0) pool = playable;
         }
 
-        soloist.currentCell = pool[Math.floor(Math.random() * pool.length)];
+        soloist.currentCell = pool[Math.floor(Math.random() * pool.length)]; // @worker-mutation
     }
     if (soloist.currentCell && soloist.currentCell[stepInBeat] === 1) { /* hit */ } else return null;
 
     // --- 5. Pitch Selection ---
-    let targetChord = currentChord;
     const isLateInChord = stepInChord >= (currentChord.beats * stepsPerBeat) - 2;
     // Enhanced Anticipation for Voice Leading
     const anticipationWindow = activeStyle === 'bird' ? 4 : 2;
@@ -552,8 +566,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const lastInterval = soloist.lastInterval || 0; 
     const isResolvingSkip = Math.abs(lastInterval) > 4;
     
-    if (Math.abs(lastInterval) < 3) soloist.stagnationCount = (soloist.stagnationCount || 0) + 1;
-    else soloist.stagnationCount = 0;
+    if (Math.abs(lastInterval) < 3) soloist.stagnationCount = (soloist.stagnationCount || 0) + 1; // @worker-mutation
+    else soloist.stagnationCount = 0; // @worker-mutation
     const isStagnant = soloist.stagnationCount > 4;
 
     // Voice Leading Target Calculation (Lookahead)
@@ -714,7 +728,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         }
     }
     
-    soloist.lastInterval = selectedMidi - lastMidi;
+    soloist.lastInterval = selectedMidi - lastMidi; // @worker-mutation
 
     // --- 6. Melodic Devices ---
     const allowFlash = intensity > 0.5;
@@ -743,8 +757,8 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         if (deviceType === 'graceNote') {
             // Half-step or scale-step below, very fast
             const res = { midi: selectedMidi - 1, velocity: devBaseVel * 0.8, durationSteps: 1, style: activeStyle };
-            soloist.deviceBuffer = [{ midi: selectedMidi, velocity: devBaseVel * 1.1, durationSteps: 2, style: activeStyle }];
-            soloist.busySteps = 0;
+            soloist.deviceBuffer = [{ midi: selectedMidi, velocity: devBaseVel * 1.1, durationSteps: 2, style: activeStyle }]; // @worker-mutation
+            soloist.busySteps = 0; // @worker-mutation
             return finalizeNote(res);
         }
         if (deviceType === 'banjoRoll') {
@@ -756,17 +770,17 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 const midi = rollPitches[i % rollPitches.length];
                 roll.push({ midi, velocity: devBaseVel * (i === 0 ? 1.1 : 0.9), durationSteps: 1, style: activeStyle });
             }
-            soloist.deviceBuffer = roll;
+            soloist.deviceBuffer = roll; // @worker-mutation
             const first = soloist.deviceBuffer.shift();
-            soloist.busySteps = 0;
+            soloist.busySteps = 0; // @worker-mutation
             return finalizeNote(first);
         }
         if (deviceType === 'graceSlide') {
             // Half-step slide into a chord tone (usually minor 3rd to major 3rd)
             const targetMidi = selectedMidi;
             const res = { midi: targetMidi - 1, velocity: devBaseVel * 1.1, durationSteps: 1, style: activeStyle, bendStartInterval: 0 };
-            soloist.deviceBuffer = [{ midi: targetMidi, velocity: devBaseVel * 1.2, durationSteps: 2, style: activeStyle }];
-            soloist.busySteps = 0;
+            soloist.deviceBuffer = [{ midi: targetMidi, velocity: devBaseVel * 1.2, durationSteps: 2, style: activeStyle }]; // @worker-mutation
+            soloist.busySteps = 0; // @worker-mutation
             return finalizeNote(res);
         }
         if (deviceType === 'countryBend' && isPolyphonic && !isPiano) {
@@ -777,7 +791,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 { midi: topNote, velocity: devBaseVel * 1.2, durationSteps: 4, style: activeStyle, bendStartInterval: -1, isDoubleStop: true },
                 { midi: bottomNote, velocity: devBaseVel * 0.9, durationSteps: 4, style: activeStyle, isDoubleStop: false }
             ];
-            soloist.busySteps = 3;
+            soloist.busySteps = 3; // @worker-mutation
             return finalizeNote(res);
         }
         if (deviceType === 'chickenPick') {
@@ -787,7 +801,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 { midi: selectedMidi + dsInt, velocity: 1.25, durationSteps: 1, style: activeStyle, isDoubleStop: true },
                 { midi: selectedMidi, velocity: 1.2, durationSteps: 1, style: activeStyle, isDoubleStop: false }
             ];
-            soloist.busySteps = 0;
+            soloist.busySteps = 0; // @worker-mutation
             return finalizeNote(res);
         }
         if (deviceType === 'birdFlurry') {
@@ -800,29 +814,29 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
                 flurry.push({ midi: n, velocity: devBaseVel * 1.05, durationSteps: 1, style: activeStyle });
                 curr = n;
             }
-            soloist.deviceBuffer = flurry;
+            soloist.deviceBuffer = flurry; // @worker-mutation
             const first = soloist.deviceBuffer.shift(); 
-            soloist.busySteps = (first.durationSteps || 1) - 1;
+            soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
             return finalizeNote(first);
         }
         if (deviceType === 'run' || deviceType === 'enclosure') {
-            soloist.deviceBuffer = [ { midi: selectedMidi - 1, velocity: devBaseVel * 1.1, durationSteps: 1, style: activeStyle }, { midi: selectedMidi, velocity: devBaseVel * 1.2, durationSteps: 1, style: activeStyle } ];
+            soloist.deviceBuffer = [ { midi: selectedMidi - 1, velocity: devBaseVel * 1.1, durationSteps: 1, style: activeStyle }, { midi: selectedMidi, velocity: devBaseVel * 1.2, durationSteps: 1, style: activeStyle } ]; // @worker-mutation
             const res = { midi: selectedMidi + (deviceType === 'run' ? -2 : 1), velocity: devBaseVel * 0.9, durationSteps: 1, style: activeStyle };
-            soloist.busySteps = (res.durationSteps || 1) - 1;
+            soloist.busySteps = (res.durationSteps || 1) - 1; // @worker-mutation
             return finalizeNote(res);
         }
         if (deviceType === 'slide') {
             // Favor sliding from below, but guitar/jazz often slide from above
             const dir = (soloist.mode === 'guitar' || activeStyle === 'bird') && Math.random() < 0.3 ? 1 : -1;
-            soloist.deviceBuffer = [ { midi: selectedMidi, velocity: devBaseVel * 1.15, durationSteps: 1, style: activeStyle } ];
+            soloist.deviceBuffer = [ { midi: selectedMidi, velocity: devBaseVel * 1.15, durationSteps: 1, style: activeStyle } ]; // @worker-mutation
             const res = { midi: selectedMidi + dir, velocity: devBaseVel * 0.95, durationSteps: 1, style: activeStyle };
-            soloist.busySteps = (res.durationSteps || 1) - 1;
+            soloist.busySteps = (res.durationSteps || 1) - 1; // @worker-mutation
             return finalizeNote(res);
         }
         if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
             let dsInt = (activeStyle === 'blues' || activeStyle === 'scalar') ? 5 : 4;
             const res = [{ midi: selectedMidi + dsInt, velocity: devBaseVel * 1.05, durationSteps: 1, style: activeStyle, isDoubleStop: true }, { midi: selectedMidi, velocity: devBaseVel * 1.2, durationSteps: 1, style: activeStyle, isDoubleStop: false }];
-            soloist.busySteps = 0; 
+            soloist.busySteps = 0; // @worker-mutation 
             return finalizeNote(res);
         }
     }
@@ -918,7 +932,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     }
 
     const result = { midi: selectedMidi, velocity: Math.min(1.25, stepVelocity), durationSteps, bendStartInterval, ccEvents: [], timingOffset: 0, style: activeStyle, isDoubleStop: false, isLegato };
-    if (durationSteps > 1) soloist.busySteps = durationSteps - 1;
+    if (durationSteps > 1) soloist.busySteps = durationSteps - 1; // @worker-mutation
 
     const finalResult = (extraNotes.length > 0 && isPolyphonic) ? [...extraNotes.map(n => ({...result, ...n})), result] : result;
     
@@ -929,7 +943,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
             
         soloist.motifBuffer.push(motifEntry);
         if (soloist.motifBuffer.length > 16) soloist.motifBuffer.shift();
-        soloist.motifRoot = targetChord.rootMidi % 12;
+        soloist.motifRoot = targetChord.rootMidi % 12; // @worker-mutation
     }
 
     return finalizeNote(finalResult);
