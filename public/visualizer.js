@@ -250,6 +250,11 @@ export class UnifiedVisualizer {
         return this.midY - (m - this.centerMidi) * this.yScale;
     }
 
+    // Optimization: Stable method for X calculation to avoid closure allocation
+    getX(t, currentTime) {
+        return this.pianoRollWidth + (currentTime - t) * this.timeScale;
+    }
+
     renderStaticLayer() {
         if (!this.themeCache || !this.width || !this.height) return;
 
@@ -424,10 +429,6 @@ export class UnifiedVisualizer {
             outlineColor, chordColors
         } = this.themeCache;
 
-        // Inline helpers to avoid closure allocation if possible, or just use optimized variables
-        // optimization: use this.getY(m) and pre-calculated timeScale
-        const getX = (t) => this.pianoRollWidth + (currentTime - t) * this.timeScale;
-
         // 0. Static Background
         // Optimization: Draw pre-rendered static layer
         ctx.drawImage(this.staticCanvas, 0, 0, w, h);
@@ -547,7 +548,7 @@ export class UnifiedVisualizer {
                 // Optimization: Draw only if it's a measure line
                 if (i % beatsPerMeasure !== 0) continue;
                 
-                const x = getX(t);
+                const x = this.getX(t, currentTime);
                 if (x < this.pianoRollWidth) continue;
                 
                 ctx.moveTo(x, 0);
@@ -565,7 +566,7 @@ export class UnifiedVisualizer {
                 // Optimization: Draw only if it's NOT a measure line
                 if (i % beatsPerMeasure === 0) continue;
 
-                const x = getX(t);
+                const x = this.getX(t, currentTime);
                 if (x < this.pianoRollWidth) continue;
 
                 ctx.moveTo(x, 0);
@@ -599,8 +600,8 @@ export class UnifiedVisualizer {
             const start = Math.max(minTime, ev.time);
             const end = Math.min(currentTime, chordEnd);
             
-            const xStart = getX(start);
-            const xEnd = getX(end);
+            const xStart = this.getX(start, currentTime);
+            const xEnd = this.getX(end, currentTime);
             const x = xEnd; 
             const cw = xStart - xEnd;
             const rootPC = ev.rootMidi % 12;
@@ -634,8 +635,8 @@ export class UnifiedVisualizer {
             const start = Math.max(minTime, ev.time);
             const end = Math.min(currentTime, chordEnd);
 
-            const xStart = getX(start);
-            const xEnd = getX(end);
+            const xStart = this.getX(start, currentTime);
+            const xEnd = this.getX(end, currentTime);
             const x = xEnd;
             const cw = xStart - xEnd;
             const rootPC = ev.rootMidi % 12;
@@ -678,7 +679,7 @@ export class UnifiedVisualizer {
                     const noteEnd = ev.time + (ev.duration || 0.1);
                     if (noteEnd < minTime) continue;
 
-                    const x = getX(ev.time);
+                    const x = this.getX(ev.time, currentTime);
                     const y = Math.round(this.getY(ev.midi));
                     const intensity = ev.velocity || 1.0;
                     
@@ -698,7 +699,7 @@ export class UnifiedVisualizer {
                         const noteEnd = ev.time + (ev.duration || 0.1);
                         if (noteEnd < minTime) continue;
 
-                        const x = getX(ev.time);
+                        const x = this.getX(ev.time, currentTime);
                         const y = Math.round(this.getY(ev.midi));
                         const intensity = ev.velocity || 1.0;
 
@@ -741,8 +742,8 @@ export class UnifiedVisualizer {
 
                 const startT = Math.max(minTime, ev.time);
                 const endT = Math.min(currentTime, noteEnd);
-                const x1 = getX(startT);
-                const x2 = getX(endT);
+                const x1 = this.getX(startT, currentTime);
+                const x2 = this.getX(endT, currentTime);
                 const y = Math.round(this.getY(ev.midi));
 
                 if (y >= -10 && y <= h + 10) {
@@ -784,8 +785,8 @@ export class UnifiedVisualizer {
 
                     const startT = Math.max(minTime, ev.time);
                     const endT = Math.min(currentTime, noteEnd);
-                    const x1 = getX(startT);
-                    const x2 = getX(endT);
+                    const x1 = this.getX(startT, currentTime);
+                    const x2 = this.getX(endT, currentTime);
                     const y = Math.round(this.getY(ev.midi));
 
                     if (y >= -10 && y <= h + 10) {
