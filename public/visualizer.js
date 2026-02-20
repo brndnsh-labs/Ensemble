@@ -15,6 +15,10 @@ const INTERVAL_CATEGORY = [
     "seventh"  // 11
 ];
 
+// Optimization: Map interval indices (0-11) to color categories (0-3)
+// 0=root, 1=third, 2=fifth, 3=seventh
+const INTERVAL_COLOR_INDEX = [0, 3, 3, 1, 1, 3, 3, 2, 3, 3, 3, 3];
+
 class RingBuffer {
     constructor(capacity) {
         this.buffer = new Array(capacity);
@@ -120,6 +124,11 @@ export class UnifiedVisualizer {
         this.geometryBuffer = [];
         this.soloistBuffers = [[], [], [], []];
 
+        // Optimization: Batched rendering buffers
+        // 4 categories: Root, Third, Fifth, Seventh
+        this.activeChordBuffers = [[], [], [], []]; // Stores Y coordinates
+        this.guideToneBuffers = [[], [], [], []];   // Stores [x, y, w, h] flat layout
+
         if (this.container) {
             this.initDOM();
         }
@@ -178,6 +187,12 @@ export class UnifiedVisualizer {
 
         // Optimization: Pre-calculate interval color lookup
         this.intervalColors = INTERVAL_CATEGORY.map(cat => this.themeCache.chordColors[cat]);
+        this.categoryColors = [
+            this.themeCache.chordColors.root,
+            this.themeCache.chordColors.third,
+            this.themeCache.chordColors.fifth,
+            this.themeCache.chordColors.seventh
+        ];
 
         // Update track colors
         for (const name in this.tracks) {
@@ -447,6 +462,11 @@ export class UnifiedVisualizer {
         this.cNotesBuffer.fill(0);
 
         // Active Chords (Direct Draw)
+        // Optimization: Batch rendering by color
+
+        // Reset buffers
+        for (let i = 0; i < 4; i++) this.activeChordBuffers[i].length = 0;
+
         for (const ev of this.chordEvents) {
             if (ev.time > currentTime) break; // Optimization: Early exit
             if (ev.time <= currentTime && ev.time + (ev.duration || 2.0) >= currentTime) {
@@ -457,13 +477,24 @@ export class UnifiedVisualizer {
 
                         const interval = (m % 12 - rootPC + 12) % 12;
                         const y = this.getY(m);
+                        const colorIdx = INTERVAL_COLOR_INDEX[interval];
 
-                        ctx.fillStyle = this.intervalColors[interval];
-                        ctx.fillRect(0, y - yScale/2, this.pianoRollWidth, yScale);
+                        this.activeChordBuffers[colorIdx].push(y);
 
                         if (m % 12 === 0) this.cNotesBuffer[m] = 1;
                     }
                 }
+            }
+        }
+
+        // Render Batches
+        for (let i = 0; i < 4; i++) {
+            const buffer = this.activeChordBuffers[i];
+            if (buffer.length === 0) continue;
+
+            ctx.fillStyle = this.categoryColors[i];
+            for (let j = 0; j < buffer.length; j++) {
+                ctx.fillRect(0, buffer[j] - yScale/2, this.pianoRollWidth, yScale);
             }
         }
 
@@ -588,8 +619,12 @@ export class UnifiedVisualizer {
         }
 
         // 2. Chords - Pass 1: Background Guide Tones (Batched alpha change)
-        // Optimization: Set globalAlpha once for all guide tones instead of per-chord
+        // Optimization: Batch rendering by color to reduce context state changes
         ctx.globalAlpha = 0.1;
+
+        // Reset buffers
+        for (let i = 0; i < 4; i++) this.guideToneBuffers[i].length = 0;
+
         for (const ev of this.chordEvents) {
             const chordEnd = ev.time + (ev.duration || 2.0);
             if (chordEnd < minTime) continue;
@@ -608,23 +643,39 @@ export class UnifiedVisualizer {
 
             for (const interval of ev.intervals) {
                 const pc = (rootPC + interval) % 12;
-                // Optimization: Direct array lookup
-                ctx.fillStyle = this.intervalColors[interval];
+                const colorIdx = INTERVAL_COLOR_INDEX[interval];
+                const buffer = this.guideToneBuffers[colorIdx];
 
                 // Render in visible octaves (using hoisted range)
                 for (let oct = minOct; oct <= maxOct; oct++) {
                     const m = pc + oct * 12;
                     const y = Math.round(this.getY(m));
                     if (y >= -10 && y <= h + 10) {
-                        ctx.fillRect(x, y - yScale/2, cw, yScale);
+                         // Push flat layout: x, y, w, h
+                        buffer.push(x, y - yScale/2, cw, yScale);
                     }
                 }
             }
         }
 
+        // Render Batches
+        for (let i = 0; i < 4; i++) {
+            const buffer = this.guideToneBuffers[i];
+            if (buffer.length === 0) continue;
+
+            ctx.fillStyle = this.categoryColors[i];
+            for (let j = 0; j < buffer.length; j += 4) {
+                ctx.fillRect(buffer[j], buffer[j+1], buffer[j+2], buffer[j+3]);
+            }
+        }
+
         // 2. Chords - Pass 2: Active Notes (Batched alpha change)
-        // Optimization: Set globalAlpha once for all active notes
+        // Optimization: Batch rendering by color
         ctx.globalAlpha = 0.5;
+
+        // Reuse guideToneBuffers
+        for (let i = 0; i < 4; i++) this.guideToneBuffers[i].length = 0;
+
         for (const ev of this.chordEvents) {
             const chordEnd = ev.time + (ev.duration || 2.0);
             if (chordEnd < minTime) continue;
@@ -644,13 +695,25 @@ export class UnifiedVisualizer {
             for (const midi of ev.notes) {
                 const y = Math.round(this.getY(midi));
                 const interval = (midi % 12 - rootPC + 12) % 12;
-                // Optimization: Direct array lookup
-                ctx.fillStyle = this.intervalColors[interval];
+                const colorIdx = INTERVAL_COLOR_INDEX[interval];
+
                 if (y >= -10 && y <= h + 10) {
-                    ctx.fillRect(x, y - yScale/2 + 2, cw, yScale - 4);
+                    this.guideToneBuffers[colorIdx].push(x, y - yScale/2 + 2, cw, yScale - 4);
                 }
             }
         }
+
+        // Render Batches
+        for (let i = 0; i < 4; i++) {
+            const buffer = this.guideToneBuffers[i];
+            if (buffer.length === 0) continue;
+
+            ctx.fillStyle = this.categoryColors[i];
+            for (let j = 0; j < buffer.length; j += 4) {
+                ctx.fillRect(buffer[j], buffer[j+1], buffer[j+2], buffer[j+3]);
+            }
+        }
+
         ctx.globalAlpha = 1.0;
 
         // 3. Melodic Tracks
