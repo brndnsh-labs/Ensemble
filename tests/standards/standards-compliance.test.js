@@ -299,6 +299,49 @@ describe('Standards Compliance Test Suite', () => {
         });
     });
 
+    // --- Donna Lee ---
+    describe('Donna Lee', () => {
+        beforeEach(() => {
+            arranger.key = 'Ab'; arranger.isMinor = false; groove.genreFeel = 'Jazz'; playback.bpm = 220;
+            arranger.sections = [
+                { id: 'A1', label: "A1", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7" },
+                { id: 'A2', label: "A2 (G)", value: "Imaj7 | VI7 | II7 | II7 | #im7 #IV7 | VIImaj7 | iim7 | V7" },
+                { id: 'A3', label: "A3 (E)", value: "Imaj7 | VI7 | II7 | II7 | bviim7 bIII7 | bVImaj7 | iim7 | V7" }
+            ];
+            validateProgression();
+        });
+
+        it('should correctly handle the Bird-style chromatic shifts', () => {
+            const p = arranger.progression;
+            expect(getScaleForChord(p[1], p[2], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // VI7 (F7)
+            expect(getScaleForChord(p[2], p[3], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // II7 (Bb7)
+        });
+
+        it('should select correct scales for the modulation to G Major (A2)', () => {
+            const p = arranger.progression;
+            // A2 starts at index 9
+            const am7 = p[13]; // #im7
+            const d7 = p[14];  // #IV7
+            const gmaj7 = p[15]; // VIImaj7
+            
+            expect(getScaleForChord(am7, d7, 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Am7 Dorian
+            expect(getScaleForChord(d7, gmaj7, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // D7 Mixolydian
+            expect(getScaleForChord(gmaj7, null, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Gmaj7 Lydian (not diatonic)
+        });
+
+        it('should select correct scales for the modulation to E Major (A3)', () => {
+            const p = arranger.progression;
+            // A3 starts at index 18
+            const gbm7 = p[22]; // bviim7
+            const b7 = p[23];   // bIII7
+            const emaj7 = p[24]; // bVImaj7
+            
+            expect(getScaleForChord(gbm7, b7, 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Gbm7 Dorian
+            expect(getScaleForChord(b7, emaj7, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // B7 Mixolydian
+            expect(getScaleForChord(emaj7, null, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Emaj7 Lydian
+        });
+    });
+
     // --- Royal Road ---
     describe('Royal Road', () => {
         beforeEach(() => {
