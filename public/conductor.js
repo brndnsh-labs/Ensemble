@@ -1,7 +1,7 @@
 import { ACTIONS } from './types.js';
 import { getState, dispatch } from './state.js';
 import { getSectionEnergy } from './form-analysis.js';
-import { debounceSaveState } from './persistence.js';
+import { debounceSaveState, saveCurrentState } from './persistence.js';
 import { generateProceduralFill } from './fills.js';
 import { triggerFlash } from './ui.js';
 
@@ -311,6 +311,29 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
         const nextEntry = (nextChordIdx !== -1) ? arranger.stepMap[nextChordIdx] : null;
 
         if (nextEntry && (isLoopEnd || nextEntry.chord.sectionId !== entry.chord.sectionId)) {
+            // --- 1. THE SOLOIST TRADE ---
+            // Real musicians trade even if there isn't a drum fill!
+            const { soloist: soloistState } = getState();
+            if (soloistState && (soloistState.tradeMode === 'sections' || (soloistState.tradeMode === 'loops' && isLoopEnd))) {
+                const nextSoloState = !soloistState.enabled;
+                const sbUpdate = { enabled: nextSoloState };
+                
+                if (nextSoloState) {
+                    Object.assign(sbUpdate, {
+                        isWaitingForEntry: true,
+                        isResting: true,
+                        currentPhraseSteps: 0,
+                        srdcState: 'Conclusion'
+                    });
+                } else {
+                    sbUpdate.isYielding = true;
+                }
+                
+                dispatch(ACTIONS.UPDATE_SB, sbUpdate);
+                dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloistState.activeTab });
+                saveCurrentState();
+            }
+
             let shouldFill = true;
 
             // CHECK FOR SEAMLESS TRANSITION
@@ -394,27 +417,6 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
 
                 if (isLoopEnd && playback.autoIntensity) {
                     targetEnergy = Math.max(0.3, Math.min(0.95, targetEnergy + (Math.random() * 0.2 - 0.1)));
-                }
-
-                // --- 3. THE SOLOIST TRADE ---
-                const { soloist: soloistState } = getState();
-                if (soloistState && (soloistState.tradeMode === 'sections' || (soloistState.tradeMode === 'loops' && isLoopEnd))) {
-                    if (soloistState.enabled) {
-                        // Instead of immediate OFF, we set isYielding to let it finish the phrase
-                        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: true });
-                        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'enabled', value: false });
-                        // Wait, if I set enabled=false the scheduler stops.
-                        // I should keep enabled=true but set a 'pending stop' flag if I want it to finish.
-                        // BUT, for now, let's just make entries natural. 
-                        // If I set enabled=false, it stops.
-                    } else {
-                        soloistState.enabled = true;
-                        soloistState.isWaitingForEntry = true;
-                        soloistState.isResting = true;
-                        soloistState.currentPhraseSteps = 0;
-                        soloistState.srdcState = 'Conclusion';
-                    }
-                    dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloistState.activeTab });
                 }
 
                 const fillSteps = generateProceduralFill(groove.genreFeel, playback.bandIntensity, stepsPerMeasure);

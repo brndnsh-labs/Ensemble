@@ -133,6 +133,9 @@ export function syncWorker(action, payload) {
             case 'UPDATE_HB':
                 data.harmony = payload;
                 break;
+            case 'UPDATE_SB':
+                data.soloist = payload;
+                break;
             case 'SET_PARAM': 
                 if (payload.module) {
                     data[payload.module] = { [payload.param]: payload.value };

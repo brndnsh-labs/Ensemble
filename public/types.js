@@ -29,6 +29,7 @@ export const ACTIONS = {
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
     SET_SOLOIST_PRESET: 'SET_SOLOIST_PRESET',
+    UPDATE_SB: 'UPDATE_SB',
 
     // --- Groove / Drums ---
     SET_SWING: 'SET_SWING',

@@ -218,6 +218,9 @@ export function instrumentReducer(action, payload) {
         case ACTIONS.UPDATE_HB:
             Object.assign(harmony, payload);
             return true;
+        case ACTIONS.UPDATE_SB:
+            Object.assign(soloist, payload);
+            return true;
     }
     return false;
 }
