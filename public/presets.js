@@ -884,10 +884,10 @@ export const CHORD_PRESETS = [
     { 
         name: "Donna Lee", 
         sections: [
-            { label: "A1", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7" },
-            { label: "A2 (G)", value: "Imaj7 | VI7 | II7 | II7 | #im7 #IV7 | VIImaj7 | iim7 | V7", seamless: true },
-            { label: "A3 (E)", value: "Imaj7 | VI7 | II7 | II7 | bviim7 bIII7 | bVImaj7 | iim7 | V7", seamless: true },
-            { label: "A4", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7", seamless: true }
+            { label: "A", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7" },
+            { label: "B (G)", value: "Imaj7 | VI7 | II7 | II7 | #im7 #IV7 | VIImaj7 | iim7 | V7" },
+            { label: "A", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | III7 | vi7" },
+            { label: "C", value: "IVmaj7 | #IVdim7 | Imaj7/V | VI7 | II7 | V7 | Imaj7 | iim7 V7" }
         ],
         category: "Jazz",
         isMinor: false,
