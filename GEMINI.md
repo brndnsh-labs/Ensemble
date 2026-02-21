@@ -20,11 +20,11 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
     1.  **Refactor**: Clean up or restructure code *without* changing behavior. Commit.
     2.  **Implementation**: Add the new feature or fix the bug. Commit.
     3.  **Verification**: Add tests or update documentation. Commit.
-    *   *Example*: Do not combine "Setup ESLint" (tooling) with "Fix Bass Logic" (bugfix). These must be separate commits.
+    *   *Example*: Do not combine "Biome Setup" (tooling) with "Fix Bass Logic" (bugfix). These must be separate commits.
 
 ## Definition of Done (Mandatory)
 Before concluding any task, an agent MUST:
-1.  Run `npm test` and ensure all checks pass (State Integrity, Linting, and 700+ tests).
+1.  Run `npm test` and ensure all checks pass (State Integrity, Biome Linting/Formatting, and 700+ tests).
 2.  Verify that no NEW direct state mutations were introduced (check the `npm test` output).
 3.  Fix any new linting warnings or architectural regressions.
 
@@ -32,16 +32,17 @@ Before concluding any task, an agent MUST:
 
 ## Roadmap & Future Goals
 
-The project has completed the **v2.29 Codebase Health & Standards Audit**, achieving high architectural modularity, performance resilience, and production-grade linting.
+The project has completed the **v2.29 Codebase Health & Standards Audit**, achieving high architectural modularity, performance resilience, and production-grade linting via Biome.
 
 1.  **Soloist Engine (v2.0)**: COMPLETED implementation of advanced melodic devices (Enclosures, Quartal Harmony) and tension-building logic.
 2.  **Bass Engine (v2.1)**: COMPLETED chromatic walking logic, "Slap & Pop" synthesis for Funk, and micro-timing (Dilla feel) for Neo-Soul.
 3.  **Accompaniment Engine**: COMPLETED "Expressive Phrasing" for Rock/Pop/Acoustic and conversational "Call & Response" logic.
 4.  **Authenticity Verification**: COMPLETED expansion of the probabilistic testing suite with integration tests for congestion, continuity, and velocity normalization.
-5.  **Standards & Linting (v2.29)**: COMPLETED project-wide ESLint configuration and resolved all engine regressions. Verified 374 tests passing.
+5.  **Standards & Linting (v2.29)**: COMPLETED project-wide Biome configuration and resolved all engine regressions. Verified 719 tests passing.
 6.  **Harmony Module (v2.3)**: COMPLETED implementation of intelligent background engine with "Stabs" and "Pads" styles, motif memory, and soloist-aware phrasing.
 7.  **Latin/Bossa Percussion**: COMPLETED expansion of procedural percussion synthesis (Shakers/Agogo/Guiro) for Latin styles to complement the existing Bossa kit.
 8.  **Reference-Driven Tuning**: Calibrating velocity maps and timing offsets against classic genre recordings to achieve a "pro-level" musical feel.
 9.  **Melody Harmonizer (v2.4)**: COMPLETED implementation of monophonic audio analysis and symbolic "Loop-Back Training" for melody-driven chord generation. Unified into the Audio Workbench UI.
 10. **Test Suite Cleanup**: COMPLETED removal of redundant multi-key integration tests (`autumn-leaves-multikey.test.js`) in favor of centralized harmony logic tests, improving CI cycle time.
 11. **Ska-Punk Smart Genre**: COMPLETED implementation of high-energy Ska-Punk style with upstroke-heavy accompaniment, fast melodic walking bass, and punchy horn section hooks. Optimized for high-BPM stability.
+12. **Unified Infrastructure**: COMPLETED transition from ESLint to Biome for blazing-fast, consolidated linting and formatting. Verified 100% build stability.

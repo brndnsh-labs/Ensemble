@@ -42,6 +42,6 @@
     *   **Complex Actions:** For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function (e.g., from `scheduler-core.js` or `app-controller.js`) instead of dispatching raw actions.
 
 ## 5. Final Verification
-*   **Linting:** Run `npm run lint` to catch unused imports or variables introduced during refactoring.
+*   **Biome Check:** Run `npm run lint` to catch unused variables or formatting issues introduced during refactoring. Biome handles both linting and formatting in a single pass.
 *   **Build:** Ensure the project builds/transpiles if applicable.
 *   **State Integrity:** Verify that any changes to state schema are reflected in the domain slices in `public/state/`.

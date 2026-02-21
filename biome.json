@@ -1,0 +1,98 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.4.4/schema.json",
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 100
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "single"
+        },
+        "jsxRuntime": "reactClassic",
+        "globals": [
+            "WORKER_PATH",
+            "describe",
+            "it",
+            "expect",
+            "vi",
+            "beforeEach",
+            "afterEach",
+            "performance",
+            "requestAnimationFrame",
+            "setTimeout",
+            "setInterval",
+            "clearTimeout",
+            "clearInterval",
+            "console",
+            "document",
+            "window",
+            "navigator",
+            "AudioContext",
+            "GainNode",
+            "OscillatorNode",
+            "DynamicsCompressorNode",
+            "WaveShaperNode",
+            "ConvolverNode",
+            "BiquadFilterNode",
+            "StereoPannerNode",
+            "localStorage",
+            "location",
+            "history",
+            "fetch",
+            "HTMLElement",
+            "AudioBuffer",
+            "AudioBufferSourceNode",
+            "BiquadFilterNode",
+            "PannerNode",
+            "WaveShaperNode",
+            "DynamicsCompressorNode",
+            "GainNode",
+            "OscillatorNode",
+            "h",
+            "Fragment"
+        ]
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "recommended": true,
+            "correctness": {
+                "noUnusedVariables": "warn",
+                "noUnusedImports": "off",
+                "noUnreachable": "error",
+                "noUndeclaredVariables": "error",
+                "useParseIntRadix": "error",
+                "noPrecisionLoss": "error"
+            },
+            "complexity": {
+                "useOptionalChain": "error",
+                "noForEach": "off"
+            },
+            "a11y": {
+                "recommended": false
+            },
+            "style": {
+                "useBlockStatements": "error",
+                "useNamingConvention": "off",
+                "useSelfClosingElements": "error",
+                "useConst": "error",
+                "noNonNullAssertion": "off"
+            },
+            "suspicious": {
+                "noAssignInExpressions": "error",
+                "noDoubleEquals": "error",
+                "noExplicitAny": "off",
+                "noShadowRestrictedNames": "off",
+                "noPrototypeBuiltins": "off",
+                "useIterableCallbackReturn": "off"
+            }
+        }
+    }
+}

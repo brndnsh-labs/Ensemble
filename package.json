@@ -1,25 +1,24 @@
 {
-  "name": "ensemble",
-  "description": "Generative musical accompaniment and chord visualization PWA",
-  "version": "1.2.2",
-  "license": "AGPL-3.0-only",
-  "type": "module",
-  "scripts": {
-    "test": "npm run check-mutations && npm run lint && vitest run",
-    "lint": "eslint . --quiet",
-    "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
-    "deploy:test": "./scripts/deploy-test.sh",
-    "deploy:prod": "./scripts/deploy-prod.sh"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "esbuild": "^0.27.2",
-    "eslint": "^9.39.2",
-    "globals": "^17.0.0",
-    "happy-dom": "^20.1.0",
-    "vitest": "^4.0.17"
-  },
-  "dependencies": {
-    "preact": "^10.28.2"
-  }
+    "name": "ensemble",
+    "description": "Generative musical accompaniment and chord visualization PWA",
+    "version": "1.2.2",
+    "license": "AGPL-3.0-only",
+    "type": "module",
+    "scripts": {
+        "test": "npm run check-mutations && npm run lint && vitest run",
+        "lint": "biome check .",
+        "format": "biome check --write .",
+        "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
+        "deploy:test": "./scripts/deploy-test.sh",
+        "deploy:prod": "./scripts/deploy-prod.sh"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.4.4",
+        "esbuild": "^0.27.2",
+        "happy-dom": "^20.1.0",
+        "vitest": "^4.0.17"
+    },
+    "dependencies": {
+        "preact": "^10.28.2"
+    }
 }
