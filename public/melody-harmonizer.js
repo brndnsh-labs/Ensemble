@@ -7,8 +7,6 @@ import { normalizeKey } from './utils.js';
  */
 export class Harmonizer {
     constructor() {
-        this.knowledgeBase = null;
-
         // Define strategies with different weights
         this.strategies = {
             'Consonant': {
@@ -56,10 +54,6 @@ export class Harmonizer {
             major: { 0: 10, 2: 4, 4: 4, 5: 8, 7: 9, 9: 6, 11: 2 }, // I, ii, iii, IV, V, vi, vii
             minor: { 0: 10, 2: 3, 3: 9, 5: 6, 7: 8, 8: 7, 10: 5 }  // i, ii, III, iv, v, VI, VII
         };
-    }
-
-    setKnowledgeBase(kb) {
-        this.knowledgeBase = kb;
     }
 
     /**
@@ -272,15 +266,6 @@ export class Harmonizer {
             } else {
                 // Clash penalty
                 score -= note.weight * 2.0;
-            }
-
-            // Band Knowledge (if available)
-            if (this.knowledgeBase && this.knowledgeBase[quality]) {
-                const relativeMelodyPC = (note.pc - root + 12) % 12;
-                const bandPreference = this.knowledgeBase[quality][relativeMelodyPC];
-                if (bandPreference > 0) {
-                    score += (bandPreference * note.weight * 2.0);
-                }
             }
         });
 
