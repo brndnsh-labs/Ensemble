@@ -8,6 +8,7 @@ import { requestBuffer, syncWorker, flushWorker, stopWorker, startWorker, reques
 import { conductorState, updateAutoConductor, updateLarsTempo, checkSectionTransition } from '../conductor.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
 import { loadDrumPreset, flushBuffers } from '../instrument-controller.js';
+import { DRUM_PRESETS } from '../presets.js';
 import { draw } from '../animation-loop.js';
 import { sendMIDINote, sendMIDIDrum, sendMIDICC, normalizeMidiVelocity, panic, sendMIDITransport } from '../midi-controller.js';
 import { initPlatform, unlockAudio, lockAudio, activateWakeLock, deactivateWakeLock } from '../platform.js';
@@ -370,12 +371,14 @@ function getChordAtStep(step) {
  * @param {boolean} isBackbeat - Whether this step is a backbeat (2 or 4).
  * @param {number} absoluteStep - The global session step.
  * @param {boolean} isGroupStart - Whether this step is the start of a rhythm group.
+ * @param {string} sectionId - The ID of the current song section.
  */
-function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, absoluteStep, isGroupStart) {
+function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, absoluteStep, isGroupStart, sectionId) {
     const { playback, groove, vizState, midi } = getState();
     const conductorVel = playback.conductorVelocity || 1.0;
     const finalTime = time + calculatePocketOffset(playback, groove);
     
+    // ... (fill logic) ...
     if (groove.fillActive) {
         const fillStep = absoluteStep - groove.fillStartStep;
         if (fillStep >= groove.fillLength) {
@@ -416,9 +419,23 @@ function scheduleDrums(step, time, isDownbeat, isQuarter, isBackbeat, absoluteSt
         playback.drawQueue.push({ type: 'fill_active', time: finalTime, active: false });
     }
 
+    // --- MULTI-SEED LIVE LOGIC ---
+    const seedIdx = (groove.sectionSeedMap && sectionId) ? (groove.sectionSeedMap[sectionId] || 0) : 0;
+    const preset = DRUM_PRESETS[groove.lastDrumPreset];
+
     groove.instruments.forEach(inst => {
+        let stepVal = inst.steps[step];
+        
+        // If creativity is on and we have a valid preset variation, override the step value
+        if (groove.creativity && preset && preset.variations && preset.variations[seedIdx]) {
+            const varInst = preset.variations[seedIdx][inst.name];
+            if (varInst) {
+                stepVal = varInst[step];
+            }
+        }
+
         const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides({
-            step, inst, stepVal: inst.steps[step], playback, groove, isDownbeat, isQuarter, isBackbeat, isGroupStart
+            step, inst, stepVal, playback, groove, isDownbeat, isQuarter, isBackbeat, isGroupStart
         });
 
                 if (shouldPlay && !inst.muted) {
@@ -780,7 +797,11 @@ export function scheduleGlobalEvent(step, swungTime) {
         }
         
         playback.drawQueue.push({ type: 'drum_vis', step: drumStep, time: swungTime });
-        scheduleDrums(drumStep, t, stepInfo.isMeasureStart, isQuarter, isBackbeat, step, stepInfo.isGroupStart);
+        
+        const chordDataForDrums = getChordAtStep(step);
+        const sectionId = chordDataForDrums?.chord?.sectionId || null;
+        
+        scheduleDrums(drumStep, t, stepInfo.isMeasureStart, isQuarter, isBackbeat, step, stepInfo.isGroupStart, sectionId);
     }
 
     const chordData = getChordAtStep(step);

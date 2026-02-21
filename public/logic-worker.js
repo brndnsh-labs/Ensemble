@@ -8,6 +8,7 @@ import { TIME_SIGNATURES } from './config.js';
 import { getMidi, getStepInfo, getFrequency } from './utils.js';
 import { generateProceduralFill } from './fills.js';
 import { analyzeForm } from './form-analysis.js';
+import { DRUM_PRESETS } from './presets.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
 const { arranger, chords, bass, soloist, groove, harmony, playback } = getState();
@@ -518,7 +519,22 @@ class ExportProcessor {
 
                 if (!fillPlayed) {
                     groove.instruments.forEach(inst => {
-                        const val = inst.steps[globalStep % (groove.measures * this.stepsPerMeasure)];
+                        // --- MULTI-SEED LOGIC ---
+                        // Find the seed assigned to this section
+                        const seedIdx = (groove.sectionSeedMap && chordData.sectionId) ? (groove.sectionSeedMap[chordData.sectionId] || 0) : 0;
+                        
+                        let val = 0;
+                        const preset = DRUM_PRESETS[groove.lastDrumPreset];
+                        if (preset && preset.variations && preset.variations[seedIdx]) {
+                            const varInst = preset.variations[seedIdx][inst.name];
+                            if (varInst) {
+                                val = varInst[globalStep % (groove.measures * this.stepsPerMeasure)];
+                            }
+                        } else {
+                            // Fallback to main grid if no variation/preset found
+                            val = inst.steps[globalStep % (groove.measures * this.stepsPerMeasure)];
+                        }
+
                         if (val > 0 && !inst.muted) {
                             const midi = drumMap[inst.name];
                             if (midi) {

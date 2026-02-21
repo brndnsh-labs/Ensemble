@@ -79,6 +79,7 @@ export const groove = {
     snareMask: 0,
     pendingCrash: false,
     creativity: false,
+    sectionSeedMap: {},
     gridVersion: 0,
     // --- Unified Rhythmic Pocket System ---
     pocket: {
@@ -133,6 +134,10 @@ export function grooveReducer(action, payload, playback) {
             return true;
         case ACTIONS.SET_CREATIVITY:
             Object.assign(groove, { creativity: !!payload });
+            return true;
+        case ACTIONS.SET_GROOVE_SEED:
+            if (!groove.sectionSeedMap) groove.sectionSeedMap = {};
+            groove.sectionSeedMap[payload.sectionId] = payload.seed;
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== payload) {

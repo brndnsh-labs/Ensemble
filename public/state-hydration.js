@@ -174,6 +174,7 @@ export function hydrateState() {
                 activeTab: savedState.groove.activeTab || 'smart',
                 mobileTab: savedState.groove.mobileTab || 'chords',
                 creativity: savedState.groove.creativity !== undefined ? !!savedState.groove.creativity : false,
+                sectionSeedMap: savedState.groove.sectionSeedMap || {},
                 currentMeasure: 0
             });
 
