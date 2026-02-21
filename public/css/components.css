@@ -256,7 +256,32 @@
     transition: all 0.3s ease;
 }
 
-/* --- Accessibility Focus Styles --- */
+/* --- Utility Toggle Buttons --- */
+.mini-toggle-btn {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0.3rem 0.2rem;
+    font-size: 0.65rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    font-weight: 600;
+}
+
+.mini-toggle-btn:hover {
+    background: var(--card-bg-hover);
+    border-color: var(--text-secondary);
+}
+
+.mini-toggle-btn.active {
+    background: var(--soloist-color);
+    color: white;
+    border-color: var(--soloist-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Accessibility Focus Styles --- */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,

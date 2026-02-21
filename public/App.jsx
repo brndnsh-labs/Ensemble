@@ -304,8 +304,8 @@ function SoloistSmartTab() {
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem;">
                     {['manual', 'sections', 'loops'].map(mode => (
                         <button 
-                            class={`tab-btn ${tradeMode === mode ? 'active' : ''}`}
-                            style="font-size: 0.65rem; padding: 0.3rem 0.1rem; text-transform: capitalize;"
+                            class={`mini-toggle-btn ${tradeMode === mode ? 'active' : ''}`}
+                            style="text-transform: capitalize;"
                             onClick={() => setTradeMode(mode)}
                         >
                             {mode}
