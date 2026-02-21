@@ -102,11 +102,11 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         // Lydian Dominant (7#11)
         if (quality === '7#11') return SCALE_INTERVALS.LYDIAN_DOMINANT;
         
-        // Backdoor Dominant (bVII7) -> Lydian Dominant
+        // Lydian Dominant detection for Jazz/Bossa
         if (arranger.key && (style === 'bird' || style === 'bossa')) {
            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
-           if (intervalFromKey === 10) { // b7
+           if (intervalFromKey === 10 || intervalFromKey === 2) { // b7 or II7
                return SCALE_INTERVALS.LYDIAN_DOMINANT;
            }
         }
