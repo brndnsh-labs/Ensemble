@@ -228,6 +228,11 @@ export function togglePower(type) {
     
     dispatch(ACTIONS.SET_PARAM, { module: moduleName, param: 'enabled', value: newState });
     
+    // If turning off Soloist, also disable automated trade modes to ensure consistent UI state
+    if (normalizedType === 'soloist' && !newState) {
+        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: 'manual' });
+    }
+    
     // Viz cleanup
     if (normalizedType === 'viz' && !newState && vizRef) {
         vizRef.clear();
