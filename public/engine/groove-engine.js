@@ -12,6 +12,9 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
     let shouldPlay = stepVal > 0;
     let soundName = inst.name;
     const loopStep = step % 16;
+    
+    // Creativity drives the internal complexity of the drum engine
+    const drumComplexity = groove.creativity ? 0.8 : 0.3;
 
     // --- Neo-Soul "Dilla" Quantization Mismatch ---
     if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') {
@@ -28,7 +31,7 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
 
         // 2. Ghost Note "Peeling" (Density increases with intensity and complexity)
         if (inst.name === 'Snare' && stepVal === 0) {
-            const ghostProb = 0.1 + (playback.bandIntensity * 0.3) + (playback.complexity * 0.2);
+            const ghostProb = 0.1 + (playback.bandIntensity * 0.3) + (drumComplexity * 0.2);
             if (Math.random() < ghostProb && [2, 3, 6, 7, 10, 11, 14, 15].includes(loopStep)) {
                 shouldPlay = true;
                 velocity = 0.15 + (Math.random() * 0.1);
@@ -97,7 +100,7 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
                 const kickInst = groove.instruments.find(i => i.name === 'Kick');
                 const kickPlaying = kickInst && (kickInst.steps[step] > 0 || (loopStep === 0 && playback.bandIntensity > 0.8));
 
-                let ghostProb = 0.15 + (playback.complexity * 0.4);
+                let ghostProb = 0.15 + (drumComplexity * 0.4);
                 if (playback.bpm > 160) ghostProb *= 0.4; 
 
                 // Avoid ghosting if kick is playing or about to play (tight linear feel)
@@ -125,7 +128,7 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
         }
 
         // 4. Syncopated Kick "Hiccups"
-        if (inst.name === 'Kick' && stepVal === 0 && playback.complexity > 0.6) {
+        if (inst.name === 'Kick' && stepVal === 0 && drumComplexity > 0.6) {
             // Add skippy kick on "a" of 2 or "e" of 3
             if ((loopStep === 7 || loopStep === 9) && Math.random() < (playback.bandIntensity * 0.3)) {
                 shouldPlay = true;
@@ -166,7 +169,7 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
                 }
             }
             if (loopStep % 2 === 1) { 
-                const discoCompProb = 0.4 + (playback.complexity * 0.4); // Scales from 0.4 to 0.8
+                const discoCompProb = 0.4 + (drumComplexity * 0.4); // Scales from 0.4 to 0.8
                 if (Math.random() < discoCompProb) {
                     shouldPlay = true;
                     soundName = 'HiHat';
@@ -202,13 +205,13 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
                 // Procedural Ride Variation: Occasionally skip the 'a' or accent the 'and'
                 const isSkipBeat = (loopStep === 6 || loopStep === 14);
                 let rideProb = 1.0;
-                if (isSkipBeat && playback.complexity < 0.4) rideProb = 0.7; // Simpler ride at low complexity
+                if (isSkipBeat && drumComplexity < 0.4) rideProb = 0.7; // Simpler ride at low complexity
                 
                 if (Math.random() < rideProb) {
                     shouldPlay = true;
                     // Velocity contour: Strong 1 and 3
                     if (loopStep % 8 === 0) velocity = 1.1 + (playback.bandIntensity * 0.2);
-                    else velocity = 0.75 + (playback.complexity * 0.15);
+                    else velocity = 0.75 + (drumComplexity * 0.15);
                 }
             }
             
@@ -247,7 +250,7 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
             shouldPlay = false;
             
             // CONVERSATIONAL COMPING: If soloist is resting, drummer "fills the gap"
-            let compProb = 0.1 + (playback.complexity * 0.3);
+            let compProb = 0.1 + (drumComplexity * 0.3);
             if (!isSoloistBusy) compProb += 0.2; // Increase activity during soloist breath
             if (playback.bpm > 175) compProb *= 0.5;
 
@@ -305,7 +308,7 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
                 shouldPlay = true; velocity = 1.1; 
             }
             // 1. Procedural Snare "Drags" (Ghost notes leading into backbeats)
-            if (stepVal === 0 && [3, 11].includes(loopStep) && playback.complexity > 0.5) {
+            if (stepVal === 0 && [3, 11].includes(loopStep) && drumComplexity > 0.5) {
                 if (Math.random() < (0.2 + playback.bandIntensity * 0.4)) {
                     shouldPlay = true;
                     velocity = 0.15 + (Math.random() * 0.1);
@@ -392,6 +395,23 @@ export function applyGrooveOverrides({ step, inst, stepVal, playback, groove, is
                     velocity = 0.6;
                 }
             }
+        }
+    }
+
+    // --- GENRE-AUTHENTIC ENTROPY (Creativity Mode) ---
+    if (groove.creativity && !inst.muted && !shouldPlay && Math.random() < (playback.bandIntensity * 0.15)) {
+        // Only add entropy on non-primary steps to avoid clashing with the "core" of the genre
+        const isSyncopated = loopStep % 2 === 1;
+        const isHeavySync = loopStep % 4 === 2;
+
+        if (inst.name === 'Snare' && isSyncopated) {
+            shouldPlay = true;
+            velocity = 0.1 + (Math.random() * 0.15);
+            soundName = (playback.bandIntensity < 0.4) ? 'Sidestick' : 'Snare';
+        } else if ((inst.name === 'HiHat' || inst.name === 'Open') && isHeavySync) {
+            shouldPlay = true;
+            velocity = 0.2 + (Math.random() * 0.2);
+            soundName = 'HiHat';
         }
     }
 

@@ -173,6 +173,7 @@ export function hydrateState() {
                 lastSmartGenre: savedState.groove.lastSmartGenre || 'Rock',
                 activeTab: savedState.groove.activeTab || 'smart',
                 mobileTab: savedState.groove.mobileTab || 'chords',
+                creativity: savedState.groove.creativity !== undefined ? !!savedState.groove.creativity : false,
                 currentMeasure: 0
             });
 

@@ -78,6 +78,7 @@ export const groove = {
     fillLength: 0,
     snareMask: 0,
     pendingCrash: false,
+    creativity: false,
     gridVersion: 0,
     // --- Unified Rhythmic Pocket System ---
     pocket: {
@@ -129,6 +130,9 @@ export function grooveReducer(action, payload, playback) {
             return true;
         case ACTIONS.SET_LARS_INTENSITY:
             Object.assign(groove, { larsIntensity: Math.max(0, Math.min(1, payload)) });
+            return true;
+        case ACTIONS.SET_CREATIVITY:
+            Object.assign(groove, { creativity: !!payload });
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== payload) {
