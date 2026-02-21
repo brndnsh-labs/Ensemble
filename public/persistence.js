@@ -41,6 +41,8 @@ export function saveCurrentState() {
             lastSmartGenre: groove.lastSmartGenre,
             activeTab: groove.activeTab,
             mobileTab: groove.mobileTab,
+            creativity: groove.creativity,
+            sectionSeedMap: groove.sectionSeedMap,
             pattern: groove.instruments.map(inst => ({ name: inst.name, steps: [...inst.steps] }))
         },
         midi: {

@@ -82,5 +82,7 @@ describe('Persistence Integrity', () => {
         expect(savedData.chords).toHaveProperty('pianoRoots');
         expect(savedData.groove).toHaveProperty('followPlayback');
         expect(savedData.groove).toHaveProperty('humanize');
+        expect(savedData.groove).toHaveProperty('creativity');
+        expect(savedData.groove).toHaveProperty('sectionSeedMap');
     });
 });
