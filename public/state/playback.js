@@ -105,6 +105,8 @@ export const playback = {
     toasts: [],
     flashIntensity: 0,
     updateAvailable: false,
+    resolutionTriggered: false,
+    isScheduling: false,
     modals: {
         settings: false,
         editor: false,

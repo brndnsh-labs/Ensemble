@@ -19,9 +19,6 @@ const DRUM_VIS_PITCHES = {
     'Rimshot': 37, 'Clap': 39, 'Shaker': 70, 'Cowbell': 56
 };
 
-let isScheduling = false;
-let isResolutionTriggered = false;
-
 // Initialize platform-specific hacks (iOS Audio, WakeLock state)
 initPlatform();
 
@@ -53,6 +50,8 @@ export function togglePlay(viz, fromDispatch = false) {
         playback.lastActiveDrumElements = null;
         chords.lastActiveChordIndex = null;
         chords.scheduledChordIndex = null;
+        playback.resolutionTriggered = false;
+        playback.isScheduling = false;
         if (activeViz) activeViz.clear();
         dispatch('VIS_RESET');
         killAllNotes();
@@ -84,7 +83,8 @@ export function togglePlay(viz, fromDispatch = false) {
         }
 
         playback.step = 0;
-        isResolutionTriggered = false;
+        playback.resolutionTriggered = false;
+        playback.isScheduling = false;
         chords.scheduledChordIndex = 0;
         dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
         dispatch(ACTIONS.SET_ENDING_PENDING, false);
@@ -168,11 +168,11 @@ function scheduleResolution(time) {
  * Handles count-in, session timing, and resolution triggers.
  */
 export function scheduler() {
-    if (isScheduling) return;
-    isScheduling = true;
+    const { playback, groove, arranger } = getState();
+    if (playback.isScheduling) return;
+    playback.isScheduling = true;
 
     try {
-        const { playback, groove, arranger } = getState();
         requestBuffer(playback.step);
         
         // Update genre UI (countdowns)
@@ -205,33 +205,10 @@ export function scheduler() {
 
                 // --- Resolution Trigger Logic ---
                 // If ending is pending or stopAtEnd is active, check for appropriate boundary
-                if (playback.step > 0) {
-                    let shouldStop = false;
-                    
-                    if (playback.songMode && playback.isEndingPending) {
-                        // In Song Mode, we can end at ANY section boundary, not just the loop end
-                        const modStep = playback.step % arranger.totalSteps;
-                        const entry = arranger.sectionMap.find(s => modStep === s.start);
-                        
-                        if (entry) {
-                            // Found a boundary!
-                            // Heuristic: If we are at the very start of a "Solo" or "Chorus", maybe keep going?
-                            // For now, let's just end at any section boundary for responsiveness.
-                            shouldStop = true;
-                        } else if (modStep === 0) {
-                            // Also end at the loop start (which is a section boundary too)
-                            shouldStop = true;
-                        }
-                    } else if (playback.step % arranger.totalSteps === 0) {
-                        // Legacy behavior: only end at loop boundaries
-                        if (playback.isEndingPending || playback.stopAtEnd || isResolutionTriggered) {
-                            shouldStop = true;
-                        }
-                    }
-
-                    if (shouldStop) {
-                        if (!isResolutionTriggered) {
-                            isResolutionTriggered = true;
+                if (playback.step > 0 && playback.step % arranger.totalSteps === 0) {
+                    if (playback.isEndingPending || playback.stopAtEnd || playback.resolutionTriggered) {
+                        if (!playback.resolutionTriggered) {
+                            playback.resolutionTriggered = true;
                             playback.stopAtEnd = false;
                             triggerResolution(playback.nextNoteTime);
                         }
@@ -248,7 +225,8 @@ export function scheduler() {
             }
         }
     } finally {
-        isScheduling = false;
+        const { playback: pb } = getState();
+        pb.isScheduling = false;
     }
 }
 

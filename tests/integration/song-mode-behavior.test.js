@@ -62,7 +62,14 @@ describe('Song Mode Behavior', () => {
         playback.sessionTimer = 1; // 1 minute
         playback.sessionStartTime = performance.now() - 70000; // Already expired
         playback.step = 0;
-        playback.audio = { currentTime: 0 };
+        playback.audio = { 
+            currentTime: 0,
+            createGain: () => ({ connect: () => {}, gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} } }),
+            createStereoPanner: () => ({ connect: () => {}, pan: { setValueAtTime: () => {} } }),
+            createOscillator: () => ({ connect: () => {}, start: () => {}, stop: () => {}, frequency: { setValueAtTime: () => {} } }),
+            createBufferSource: () => ({ connect: () => {}, start: () => {}, stop: () => {}, buffer: null })
+        };
+        getState().groove.enabled = false;
         playback.nextNoteTime = 0;
         playback.scheduleAheadTime = 0.1;
     });
@@ -77,24 +84,30 @@ describe('Song Mode Behavior', () => {
         expect(playback.isEndingPending).toBe(true);
     });
 
-    it('should trigger resolution at section boundary (Step 16) in Song Mode', () => {
+    it('should NOT trigger resolution at mid-loop section boundary (Step 16) in Song Mode', () => {
         const { playback } = getState();
         playback.isEndingPending = true;
-        playback.step = 15; // Just before boundary
+        playback.step = 16; 
         playback.nextNoteTime = 0;
         playback.audio.currentTime = 0;
-        playback.scheduleAheadTime = 0.5;
+        playback.scheduleAheadTime = 0.1; // Only enough for one step
 
-        scheduler(); // Schedules step 15
+        scheduler(); 
         
-        // Advance to step 16
-        expect(playback.step).toBe(16);
-        
-        // Run scheduler again at step 16
-        scheduler();
-        
-        // Should have triggered resolution (with groove and soloist context)
-        expect(workerClient.requestResolution).toHaveBeenCalledWith(16);
+        // Should NOT have triggered resolution anymore at section boundaries
+        expect(workerClient.requestResolution).not.toHaveBeenCalled();
+    });
+
+    it('should trigger resolution only at the end of the entire loop (Step 32)', () => {
+        const { playback } = getState();
+        playback.isEndingPending = true;
+        playback.step = 32; 
+        playback.nextNoteTime = 0;
+        playback.audio.currentTime = 0;
+        playback.scheduleAheadTime = 0.1;
+
+        scheduler(); 
+        expect(workerClient.requestResolution).toHaveBeenCalledWith(32);
     });
 
     it('should NOT trigger resolution mid-section in Song Mode', () => {
