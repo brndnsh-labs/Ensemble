@@ -228,9 +228,19 @@ export function togglePower(type) {
     
     dispatch(ACTIONS.SET_PARAM, { module: moduleName, param: 'enabled', value: newState });
     
-    // If turning off Soloist, also disable automated trade modes to ensure consistent UI state
-    if (normalizedType === 'soloist' && !newState) {
-        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: 'manual' });
+    // Soloist Phrasing Improvements
+    if (normalizedType === 'soloist') {
+        if (newState) {
+            // Turning ON: Force a clean entry on the next measure
+            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isWaitingForEntry', value: true });
+            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isResting', value: true });
+            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: false });
+        } else {
+            // Turning OFF: Reset flags
+            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: 'manual' });
+            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: false });
+            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isWaitingForEntry', value: false });
+        }
     }
     
     // Viz cleanup

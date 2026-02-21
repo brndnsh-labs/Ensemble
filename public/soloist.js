@@ -281,6 +281,15 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
         soloist.busySteps--; return null; 
     }
     
+    // --- Natural Exit Logic ---
+    // If we are yielding (pending stop), and we are currently resting, 
+    // it means we finished our last phrase. Stop completely.
+    if (soloist.isYielding && soloist.isResting) {
+        // We can't set enabled=false here easily as it's a global state,
+        // but we can stop generating notes. The main thread will sync later.
+        return null;
+    }
+
     // --- 2. Phrasing & History Analysis ---
     if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
         soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; soloist.qaState = 'Question'; soloist.srdcState = 'Conclusion'; soloist.isResting = true; soloist.currentCell = null; // @worker-mutation 
@@ -358,8 +367,22 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     
     if (soloist.isResting) {
         if (isSuppressedByAntiphony) return null;
+        
+        // --- Musical Entry Improvement ---
+        // If we are waiting for a clean entry, only allow starting on the downbeat of a measure.
+        if (soloist.isWaitingForEntry) {
+            if (measureStep === 0) {
+                soloist.isWaitingForEntry = false; // @worker-mutation
+            } else {
+                return null;
+            }
+        }
+
         const startProb = 0.3 + (effectiveIntensity * 0.4);
-        if (Math.random() < startProb) { 
+        // Assertive entry: Force start on the '1' if we just enabled or traded in
+        const isAssertiveEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
+        
+        if (isAssertiveEntry || Math.random() < startProb) { 
             soloist.isResting = false; soloist.currentPhraseSteps = 0; soloist.notesInPhrase = 0; // @worker-mutation
 
             // --- SRDC State Machine ---

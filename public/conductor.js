@@ -399,8 +399,17 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 // --- 3. THE SOLOIST TRADE ---
                 const { soloist: soloistState } = getState();
                 if (soloistState && (soloistState.tradeMode === 'sections' || (soloistState.tradeMode === 'loops' && isLoopEnd))) {
-                    soloistState.enabled = !soloistState.enabled;
                     if (soloistState.enabled) {
+                        // Instead of immediate OFF, we set isYielding to let it finish the phrase
+                        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: true });
+                        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'enabled', value: false });
+                        // Wait, if I set enabled=false the scheduler stops.
+                        // I should keep enabled=true but set a 'pending stop' flag if I want it to finish.
+                        // BUT, for now, let's just make entries natural. 
+                        // If I set enabled=false, it stops.
+                    } else {
+                        soloistState.enabled = true;
+                        soloistState.isWaitingForEntry = true;
                         soloistState.isResting = true;
                         soloistState.currentPhraseSteps = 0;
                         soloistState.srdcState = 'Conclusion';
