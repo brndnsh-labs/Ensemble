@@ -44,6 +44,19 @@ vi.mock('../../public/state.js', async (importOriginal) => {
     };
 });
 
+const waitFor = async (callback, timeout = 1000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        try {
+            if (callback()) return true;
+        } catch (e) {
+            // ignore
+        }
+        await new Promise(r => setTimeout(r, 20));
+    }
+    return callback(); // Final try to throw original error if still failing
+};
+
 describe('Song Generator Modal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -89,8 +102,8 @@ describe('Song Generator Modal', () => {
             <input id="exportDrumsCheck" type="checkbox">
             <input id="exportDurationInput">
             <button id="clearDrumsBtn"></button>
-            <select id="densitySelect"></select>
-            <select id="drumBarsSelect"></select>
+            <div id="densitySelect"></div>
+            <div id="drumBarsSelect"></div>
             <button id="cloneMeasureBtn"></button>
             <button id="editArrangementBtn"></button>
             <button id="settingsBtn"></button>
@@ -119,7 +132,7 @@ describe('Song Generator Modal', () => {
         btn.click();
         
         // Wait for Preact state update
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await waitFor(() => modal.classList.contains('active'));
         
         expect(modal.classList.contains('active')).toBe(true);
     });
@@ -129,13 +142,14 @@ describe('Song Generator Modal', () => {
         
         // Open it first
         document.getElementById('randomizeBtn').click();
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await waitFor(() => modal.classList.contains('active'));
         expect(modal.classList.contains('active')).toBe(true);
         
         const closeBtn = document.getElementById('closeGenerateSongBtn');
         closeBtn.click();
-        await new Promise(resolve => setTimeout(resolve, 150));
-        expect(document.getElementById('generateSongOverlay').classList.contains('active')).toBe(false);
+        
+        await waitFor(() => !modal.classList.contains('active'));
+        expect(modal.classList.contains('active')).toBe(false);
     });
     
 });
