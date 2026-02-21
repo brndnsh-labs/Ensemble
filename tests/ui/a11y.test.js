@@ -43,8 +43,9 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'exportChordsCheck', 'exportBassCheck', 'exportSoloistCheck', 'exportDrumsCheck', 'exportDurationInput',
             'exportDurationContainer', 'exportFilenameInput', 'installAppBtn', 'flashOverlay', 'resetSettingsBtn',
             'refreshAppBtn', 'editorOverlay', 'editArrangementBtn', 'closeEditorBtn', 'intensitySlider', 'complexitySlider',
-            'intensityValue', 'autoIntensityCheck', 'complexityValue', 'panel-visualizer', 'clearDrumsBtn', 'masterVolume',
+            'intensityValue', 'autoIntensityCheck', 'panel-visualizer', 'clearDrumsBtn', 'masterVolume',
             'countInCheck', 'metronomeCheck', 'visualFlashCheck', 'hapticCheck', 'applyPresetSettingsCheck', 'swingBaseSelect',
+            'creativityCheck',
             'closeSettingsBtn', 'sessionTimerSelect'
         ];
         mockIds.forEach(id => {

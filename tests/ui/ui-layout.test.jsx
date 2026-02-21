@@ -70,8 +70,9 @@ describe('UI Layout Integrity', () => {
             'exportChordsCheck', 'exportBassCheck', 'exportSoloistCheck', 'exportDrumsCheck', 'exportDurationInput',
             'exportDurationContainer', 'exportFilenameInput', 'installAppBtn', 'flashOverlay', 'resetSettingsBtn',
             'refreshAppBtn', 'editorOverlay', 'editArrangementBtn', 'closeEditorBtn', 'intensitySlider', 'complexitySlider',
-            'intensityValue', 'autoIntensityCheck', 'complexityValue', 'panel-visualizer', 'chordVolume', 'bassVolume',
+            'intensityValue', 'autoIntensityCheck', 'panel-visualizer', 'chordVolume', 'bassVolume',
             'soloistVolume', 'drumVolume', 'clearDrumsBtn', 'masterVolume', 'countInCheck', 'metronomeCheck',
+            'creativityCheck',
             'visualFlashCheck', 'hapticCheck', 'applyPresetSettingsCheck', 'swingBaseSelect', 'closeSettingsBtn',
             'sessionTimerSelect', 'sessionTimerDurationContainer', 'sessionTimerStepper', 'sessionTimerDec', 'sessionTimerInc', 'sessionTimerInput'
         ];

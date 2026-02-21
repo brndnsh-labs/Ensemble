@@ -18,7 +18,8 @@ vi.mock('../../../public/ui-bridge.js', () => ({
                 measures: 1,
                 fillActive: false,
                 lastSmartGenre: 'Rock',
-                pendingGenreFeel: null
+                pendingGenreFeel: null,
+                creativity: false
             },
             playback: {
                 bandIntensity: 0.5,
@@ -36,7 +37,8 @@ vi.mock('../../../public/state.js', () => ({
     ACTIONS: {
         SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
         SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
-        SET_COMPLEXITY: 'SET_COMPLEXITY'
+        SET_COMPLEXITY: 'SET_COMPLEXITY',
+        SET_CREATIVITY: 'SET_CREATIVITY'
     }
 }));
 
@@ -44,7 +46,8 @@ vi.mock('../../../public/types.js', () => ({
     ACTIONS: {
         SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
         SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
-        SET_COMPLEXITY: 'SET_COMPLEXITY'
+        SET_COMPLEXITY: 'SET_COMPLEXITY',
+        SET_CREATIVITY: 'SET_CREATIVITY'
     }
 }));
 
@@ -87,22 +90,14 @@ describe('GroovePanel Accessibility', () => {
         render(<GroovePanel />, container);
     });
 
-    it('Complexity Slider should have accessible label and value text', () => {
-        const slider = container.querySelector('#complexitySlider');
-        expect(slider).toBeTruthy();
+    it('Creativity Toggle should have accessible label', () => {
+        const check = container.querySelector('#creativityCheck');
+        expect(check).toBeTruthy();
 
         // 1. Check for associated label
-        const id = slider.getAttribute('id');
-        const label = container.querySelector(`label[for="${id}"]`);
-
-        // This is expected to FAIL currently
+        const label = check.closest('label');
         expect(label).toBeTruthy();
-        expect(label.textContent).toContain('Complexity');
-
-        // 2. Check for aria-valuetext
-        // This is expected to FAIL currently
-        const valueText = slider.getAttribute('aria-valuetext');
-        expect(valueText).toBe('Medium'); // Based on mock complexity 0.5
+        expect(label.textContent).toContain('Creativity');
     });
 
     it('Intensity Slider should have accessible label', () => {

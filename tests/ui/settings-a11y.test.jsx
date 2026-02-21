@@ -89,4 +89,13 @@ describe('Settings Accessibility', () => {
         expect(masterVol.hasAttribute('aria-valuetext')).toBe(true);
         expect(masterVol.getAttribute('aria-valuetext')).toMatch(/^\d+%$/);
     });
+
+    it('should have aria-valuetext on Global Complexity slider', () => {
+        const complexitySlider = document.getElementById('complexitySlider');
+        expect(complexitySlider).not.toBeNull();
+
+        // Should be one of Low, Medium, High
+        const label = complexitySlider.getAttribute('aria-valuetext');
+        expect(['Low', 'Medium', 'High']).toContain(label);
+    });
 });
