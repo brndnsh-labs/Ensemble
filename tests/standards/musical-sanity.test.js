@@ -2,19 +2,21 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getAccompanimentNotes, compingState } from '../../public/accompaniment.js';
-import { dispatch, getState, storage } from '../../public/state.js';
-import { getMidi, getFrequency } from '../../public/utils.js';
-import { conductorState, checkSectionTransition } from '../../public/conductor.js';
+import { compingState, getAccompanimentNotes } from '../../public/accompaniment.js';
+import { checkSectionTransition, conductorState } from '../../public/conductor.js';
+import { getState } from '../../public/state.js';
 
 // Mock state.js
 vi.mock('../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
-    
+
     // Create distinct mock objects
-    const mockPlayback = { ...actual.playback, intent: { anticipation: 0, syncopation: 0, layBack: 0 } };
+    const mockPlayback = {
+        ...actual.playback,
+        intent: { anticipation: 0, syncopation: 0, layBack: 0 },
+    };
     const mockArranger = { ...actual.arranger, sections: [] };
     const mockGroove = { ...actual.groove };
     const mockHarmony = { enabled: false, buffer: new Map() };
@@ -31,7 +33,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
         chords: mockChords,
         bass: mockBass,
         soloist: mockSoloist,
-        conductorState: mockConductorState
+        conductorState: mockConductorState,
     };
 
     return {
@@ -39,8 +41,10 @@ vi.mock('../../public/state.js', async (importOriginal) => {
         ...mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn((action, payload) => {
-            if (action === 'SET_BAND_INTENSITY') mockPlayback.bandIntensity = payload;
-        })
+            if (action === 'SET_BAND_INTENSITY') {
+                mockPlayback.bandIntensity = payload;
+            }
+        }),
     };
 });
 
@@ -50,17 +54,17 @@ vi.mock('../../public/ui.js', () => ({
         densitySelect: { value: 'standard' },
         intensitySlider: { value: 0 },
         intensityValue: { textContent: '' },
-        visualFlash: { checked: false }
+        visualFlash: { checked: false },
     },
-    triggerFlash: vi.fn()
+    triggerFlash: vi.fn(),
 }));
 
 vi.mock('../../public/persistence.js', () => ({
-    debounceSaveState: vi.fn()
+    debounceSaveState: vi.fn(),
 }));
 
 vi.mock('../../public/fills.js', () => ({
-    generateProceduralFill: vi.fn(() => ({}))
+    generateProceduralFill: vi.fn(() => ({})),
 }));
 
 describe('Musical Sanity & Collision Detection', () => {
@@ -95,10 +99,10 @@ describe('Musical Sanity & Collision Detection', () => {
         it('should shift piano voicings up to avoid masking the bass', () => {
             const chord = {
                 rootMidi: 48, // C3
-                freqs: [130.81, 164.81, 196.00], // C3, E3, G3
+                freqs: [130.81, 164.81, 196.0], // C3, E3, G3
                 intervals: [0, 4, 7],
                 quality: 'maj',
-                beats: 4
+                beats: 4,
             };
 
             // Set bass to play a C2 (MIDI 36)
@@ -110,11 +114,16 @@ describe('Musical Sanity & Collision Detection', () => {
             playback.bandIntensity = 0.6; // Higher intensity for more reliable hits
             for (let i = 0; i < 1000; i++) {
                 compingState.lockedUntil = 0;
-                notes = getAccompanimentNotes(chord, i * 16, 0, 0, { isBeatStart: true, isGroupStart: true });
-                if (notes.some(n => n.midi > 0)) break;
+                notes = getAccompanimentNotes(chord, i * 16, 0, 0, {
+                    isBeatStart: true,
+                    isGroupStart: true,
+                });
+                if (notes.some((n) => n.midi > 0)) {
+                    break;
+                }
             }
-            
-            const pianoMidis = notes.filter(n => n.midi > 0).map(n => n.midi);
+
+            const pianoMidis = notes.filter((n) => n.midi > 0).map((n) => n.midi);
             expect(pianoMidis.length).toBeGreaterThan(0);
             expect(pianoMidis[0]).toBeGreaterThanOrEqual(bassMidi + 12);
         });
@@ -122,10 +131,10 @@ describe('Musical Sanity & Collision Detection', () => {
         it('should reduce density when the soloist is active in a high register', () => {
             const chord = {
                 rootMidi: 60,
-                freqs: [261.63, 329.63, 392.00, 493.88], // C4, E4, G4, B4
+                freqs: [261.63, 329.63, 392.0, 493.88], // C4, E4, G4, B4
                 intervals: [0, 4, 7, 11],
                 quality: 'maj7',
-                beats: 4
+                beats: 4,
             };
 
             // Soloist is busy and high (C5 = 72)
@@ -136,10 +145,13 @@ describe('Musical Sanity & Collision Detection', () => {
             // Run multiple times to overcome Math.random() < 0.7
             let totalNotes = 0;
             const iterations = 100;
-            for(let i = 0; i < iterations; i++) {
+            for (let i = 0; i < iterations; i++) {
                 compingState.lockedUntil = 0;
-                const notes = getAccompanimentNotes(chord, i * 16, 0, 0, { isBeatStart: true, isGroupStart: true });
-                totalNotes += notes.filter(n => n.midi > 0).length;
+                const notes = getAccompanimentNotes(chord, i * 16, 0, 0, {
+                    isBeatStart: true,
+                    isGroupStart: true,
+                });
+                totalNotes += notes.filter((n) => n.midi > 0).length;
             }
 
             const avgNotes = totalNotes / iterations;
@@ -152,7 +164,7 @@ describe('Musical Sanity & Collision Detection', () => {
         beforeEach(() => {
             arranger.totalSteps = 128; // > 64 to ensure fill logic triggers every loop for consistent testing
             arranger.stepMap = [
-                { start: 0, end: 128, chord: { sectionId: 's1', sectionLabel: 'A' } }
+                { start: 0, end: 128, chord: { sectionId: 's1', sectionLabel: 'A' } },
             ];
             conductorState.formIteration = 0;
             conductorState.target = 0.5; // Reset target to avoid state pollution

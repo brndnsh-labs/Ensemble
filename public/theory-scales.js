@@ -35,7 +35,7 @@ const SCALE_INTERVALS = {
     HALF_WHOLE_DIMINISHED: [0, 1, 3, 4, 6, 7, 9, 10], // Dominant function
     WHOLE_HALF_DIMINISHED: [0, 2, 3, 5, 6, 8, 9, 11], // Diminished chord function
     WHOLE_TONE: [0, 2, 4, 6, 8, 10],
-    PHRYGIAN_DOMINANT: [0, 1, 4, 5, 7, 8, 10] // 5th mode of harmonic minor
+    PHRYGIAN_DOMINANT: [0, 1, 4, 5, 7, 8, 10], // 5th mode of harmonic minor
 };
 
 /**
@@ -48,16 +48,29 @@ const SCALE_INTERVALS = {
  */
 export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     const { arranger, groove, soloist } = getState();
-    if (!chord) return SCALE_INTERVALS.MAJOR;
+    if (!chord) {
+        return SCALE_INTERVALS.MAJOR;
+    }
 
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
         const mapping = {
-            'Rock': 'scalar', 'Jazz': 'bird', 'Funk': 'funk', 'Blues': 'blues',
-            'Neo-Soul': 'neo', 'Disco': 'disco', 'Bossa': 'bossa',
-            'Bossa Nova': 'bossa', 'Afrobeat': 'funk', 'Acoustic': 'minimal',
-            'Reggae': 'minimal', 'Country': 'country', 'Metal': 'metal', 
-            'Rock/Metal': 'metal', 'Ska-Punk': 'scalar', 'Ska': 'scalar'
+            Rock: 'scalar',
+            Jazz: 'bird',
+            Funk: 'funk',
+            Blues: 'blues',
+            'Neo-Soul': 'neo',
+            Disco: 'disco',
+            Bossa: 'bossa',
+            'Bossa Nova': 'bossa',
+            Afrobeat: 'funk',
+            Acoustic: 'minimal',
+            Reggae: 'minimal',
+            Country: 'country',
+            Metal: 'metal',
+            'Rock/Metal': 'metal',
+            'Ska-Punk': 'scalar',
+            Ska: 'scalar',
         };
         style = mapping[groove.genreFeel] || 'scalar';
     }
@@ -69,57 +82,85 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         }
         // Signature Country: Pure Major Pentatonic
         // We add 3 (blue note) only if tension is high, but default to the sweet sound.
-        if (soloist.tension > 0.7) return [0, 2, 3, 4, 7, 9].sort((a,b)=>a-b);
+        if (soloist.tension > 0.7) {
+            return [0, 2, 3, 4, 7, 9].sort((a, b) => a - b);
+        }
         return SCALE_INTERVALS.MAJOR_PENTATONIC;
     }
 
     const quality = chord.quality || 'major';
     const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
-    const isDominant = !isMinor && !quality.startsWith('maj') && !['dim', 'halfdim'].includes(quality) &&
-                       (chord.is7th || ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) || quality.startsWith('7'));
+    const isDominant =
+        !isMinor &&
+        !quality.startsWith('maj') &&
+        !['dim', 'halfdim'].includes(quality) &&
+        (chord.is7th ||
+            ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
+            quality.startsWith('7'));
 
     // --- SPECIAL QUALITY HANDLING ---
 
     // Diminished
-    if (quality === 'dim' || quality === 'dim7') return SCALE_INTERVALS.WHOLE_HALF_DIMINISHED;
+    if (quality === 'dim' || quality === 'dim7') {
+        return SCALE_INTERVALS.WHOLE_HALF_DIMINISHED;
+    }
 
     // Half-Diminished (m7b5)
-    if (quality === 'halfdim') return SCALE_INTERVALS.LOCRIAN;
+    if (quality === 'halfdim') {
+        return SCALE_INTERVALS.LOCRIAN;
+    }
 
     // Augmented
-    if (quality === 'aug') return SCALE_INTERVALS.WHOLE_TONE;
-    if (quality === 'augmaj7') return [0, 2, 4, 6, 8, 9, 11]; // Lydian Augmented
+    if (quality === 'aug') {
+        return SCALE_INTERVALS.WHOLE_TONE;
+    }
+    if (quality === 'augmaj7') {
+        return [0, 2, 4, 6, 8, 9, 11]; // Lydian Augmented
+    }
 
     // --- DOMINANT CHORD HANDLING ---
 
     if (isDominant) {
         // High Tension / Altered Dominants
-        if (quality === '7alt' || quality === '7#9' || (soloist.tension > 0.7 && style !== 'rock' && style !== 'country')) {
-            if (style === 'funk' || style === 'blues') return SCALE_INTERVALS.BLUES;
+        if (
+            quality === '7alt' ||
+            quality === '7#9' ||
+            (soloist.tension > 0.7 && style !== 'rock' && style !== 'country')
+        ) {
+            if (style === 'funk' || style === 'blues') {
+                return SCALE_INTERVALS.BLUES;
+            }
             return SCALE_INTERVALS.ALTERED;
         }
 
         // Lydian Dominant (7#11)
-        if (quality === '7#11') return SCALE_INTERVALS.LYDIAN_DOMINANT;
-        
+        if (quality === '7#11') {
+            return SCALE_INTERVALS.LYDIAN_DOMINANT;
+        }
+
         // Lydian Dominant detection for Jazz/Bossa
         if (arranger.key && (style === 'bird' || style === 'bossa')) {
-           const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-           const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
-           if (intervalFromKey === 10 || intervalFromKey === 2) { // b7 or II7
-               return SCALE_INTERVALS.LYDIAN_DOMINANT;
-           }
+            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
+            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
+            if (intervalFromKey === 10 || intervalFromKey === 2) {
+                // b7 or II7
+                return SCALE_INTERVALS.LYDIAN_DOMINANT;
+            }
         }
 
         // Phrygian Dominant (7b9, 7b13)
-        if (quality === '7b9' || quality === '7b13') return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+        if (quality === '7b9' || quality === '7b13') {
+            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+        }
 
         // V7 resolving to i (Minor) -> Phrygian Dominant (Harmonic Minor 5th mode)
         if (nextChord) {
-            const isNextMinor = nextChord.quality.startsWith('m') && !nextChord.quality.startsWith('maj');
+            const isNextMinor =
+                nextChord.quality.startsWith('m') && !nextChord.quality.startsWith('maj');
             if (isNextMinor) {
                 const interval = (nextChord.rootMidi - chord.rootMidi + 120) % 12;
-                if (interval === 5) { // Resolving down a 5th (or up a 4th) to a minor chord
+                if (interval === 5) {
+                    // Resolving down a 5th (or up a 4th) to a minor chord
                     return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
                 }
             }
@@ -127,7 +168,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
 
         if (style === 'blues' || style === 'rock') {
             // Mixolydian with added b3 (Blue note)
-            return [0, 2, 3, 4, 5, 7, 9, 10].sort((a,b)=>a-b);
+            return [0, 2, 3, 4, 5, 7, 9, 10].sort((a, b) => a - b);
         }
 
         return SCALE_INTERVALS.MIXOLYDIAN;
@@ -137,7 +178,10 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
 
     if (isMinor) {
         // Flavor overrides: Neo-Soul/Jazz/Funk often prefer Dorian over Aeolian
-        const favorDorian = ['neo', 'bird', 'funk', 'bossa'].includes(style) || groove.genreFeel === 'Jazz' || groove.genreFeel === 'Neo-Soul';
+        const favorDorian =
+            ['neo', 'bird', 'funk', 'bossa'].includes(style) ||
+            groove.genreFeel === 'Jazz' ||
+            groove.genreFeel === 'Neo-Soul';
 
         if (favorDorian) {
             // Even if diatonic is Aeolian, these genres often reharmonize to Dorian
@@ -152,15 +196,18 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
 
     if (quality === 'major' || quality.startsWith('maj')) {
         // if (style === 'bossa') return SCALE_INTERVALS.MAJOR; // Removed to allow Lydian fallback
-        if ((style === 'blues' || style === 'funk') && !quality.includes('maj7')) return SCALE_INTERVALS.MAJOR_BLUES;
-        
+        if ((style === 'blues' || style === 'funk') && !quality.includes('maj7')) {
+            return SCALE_INTERVALS.MAJOR_BLUES;
+        }
+
         // V in Minor Key -> Phrygian Dominant (Dominant function even if triad)
         if (arranger.isMinor && arranger.key) {
-             const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-             const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
-             if (intervalFromKey === 7) { // V
-                 return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
-             }
+            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
+            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
+            if (intervalFromKey === 7) {
+                // V
+                return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+            }
         }
 
         // Lydian is handled by Diatonic Logic (IV chord)
@@ -172,17 +219,21 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
 
     if (arranger.key) {
         const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-        const keyIntervals = arranger.isMinor ? SCALE_INTERVALS.NATURAL_MINOR : SCALE_INTERVALS.MAJOR;
-        const keyNotes = keyIntervals.map(i => (keyRootIdx + i) % 12);
+        const keyIntervals = arranger.isMinor
+            ? SCALE_INTERVALS.NATURAL_MINOR
+            : SCALE_INTERVALS.MAJOR;
+        const keyNotes = keyIntervals.map((i) => (keyRootIdx + i) % 12);
 
         const chordRootPC = chord.rootMidi % 12;
-        const chordTones = chord.intervals.map(i => (chordRootPC + i) % 12);
+        const chordTones = chord.intervals.map((i) => (chordRootPC + i) % 12);
 
-        const isDiatonic = chordTones.every(note => keyNotes.includes(note));
+        const isDiatonic = chordTones.every((note) => keyNotes.includes(note));
 
         if (isDiatonic) {
             // Build the mode
-            const mode = keyNotes.map(note => (note - chordRootPC + 12) % 12).sort((a,b) => a - b);
+            const mode = keyNotes
+                .map((note) => (note - chordRootPC + 12) % 12)
+                .sort((a, b) => a - b);
             return mode;
         }
     }
@@ -196,14 +247,20 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     }
 
     // Default Fallbacks if not Diatonic
-    if (isMinor) return SCALE_INTERVALS.NATURAL_MINOR;
+    if (isMinor) {
+        return SCALE_INTERVALS.NATURAL_MINOR;
+    }
 
     // Jazz/Bossa prefer Lydian for non-diatonic Major chords (e.g. bIImaj7, bVImaj7)
-    if (style === 'bird' || style === 'bossa') return SCALE_INTERVALS.LYDIAN;
+    if (style === 'bird' || style === 'bossa') {
+        return SCALE_INTERVALS.LYDIAN;
+    }
 
     // Explicitly handle 'scalar' style for non-diatonic Major chords to ensure consonance (Ionian/Lydian)
     // as requested by dissonance prevention logic (e.g. F Major in C Minor).
-    if (style === 'scalar') return SCALE_INTERVALS.MAJOR;
+    if (style === 'scalar') {
+        return SCALE_INTERVALS.MAJOR;
+    }
 
     return SCALE_INTERVALS.MAJOR;
 }

@@ -2,10 +2,10 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import { scheduler } from '../../../public/engine/scheduler-core.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getState } from '../../../public/state.js';
+
+const { playback, groove, arranger } = getState();
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({
@@ -14,10 +14,10 @@ vi.mock('../../../public/ui.js', () => ({
         countIn: { checked: false },
         metronome: { checked: false },
         visualFlash: { checked: false },
-        sequencerGrid: { scrollTo: vi.fn() }
+        sequencerGrid: { scrollTo: vi.fn() },
     },
     triggerFlash: vi.fn(),
-    clearActiveVisuals: vi.fn()
+    clearActiveVisuals: vi.fn(),
 }));
 
 vi.mock('../../../public/engine/engine.js', () => ({
@@ -28,7 +28,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     playSoloNote: vi.fn(),
     updateSustain: vi.fn(),
     killAllNotes: vi.fn(),
-    restoreGains: vi.fn()
+    restoreGains: vi.fn(),
 }));
 
 vi.mock('../../../public/worker-client.js', () => ({
@@ -36,23 +36,23 @@ vi.mock('../../../public/worker-client.js', () => ({
     syncWorker: vi.fn(),
     flushWorker: vi.fn(),
     stopWorker: vi.fn(),
-    startWorker: vi.fn()
+    startWorker: vi.fn(),
 }));
 
 vi.mock('../../../public/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
-    checkSectionTransition: vi.fn()
+    checkSectionTransition: vi.fn(),
 }));
 
 vi.mock('../../../public/engine/groove-engine.js', () => ({
     applyGrooveOverrides: vi.fn(() => ({ shouldPlay: false })),
-    calculatePocketOffset: vi.fn(() => 0)
+    calculatePocketOffset: vi.fn(() => 0),
 }));
 
 vi.mock('../../../public/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     flushBuffers: vi.fn(),
-    switchMeasure: vi.fn()
+    switchMeasure: vi.fn(),
 }));
 
 vi.mock('../../../public/animation-loop.js', () => ({ draw: vi.fn() }));
@@ -69,12 +69,20 @@ describe('Clock Drift & Scheduling Precision', () => {
         arranger.timeSignature = '4/4';
         arranger.totalSteps = 64;
         arranger.stepMap = [{ start: 0, end: 64, chord: { freqs: [261.63] } }];
-        
+
         playback.audio = {
             currentTime: 0,
-            createOscillator: vi.fn(() => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn(), frequency: { setValueAtTime: vi.fn() } })),
-            createGain: vi.fn(() => ({ connect: vi.fn(), gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() } })),
-            state: 'running'
+            createOscillator: vi.fn(() => ({
+                connect: vi.fn(),
+                start: vi.fn(),
+                stop: vi.fn(),
+                frequency: { setValueAtTime: vi.fn() },
+            })),
+            createGain: vi.fn(() => ({
+                connect: vi.fn(),
+                gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+            })),
+            state: 'running',
         };
         playback.nextNoteTime = 0;
         playback.unswungNextNoteTime = 0;
@@ -85,17 +93,17 @@ describe('Clock Drift & Scheduling Precision', () => {
         const SIXTEENTH = 0.25 * (60.0 / BPM); // 0.125s
         const MINUTES = 30;
         const TOTAL_STEPS = Math.round((MINUTES * 60) / SIXTEENTH); // 14400 steps
-        
+
         // Mock the advanceGlobalStep logic to run without real-time delay
         for (let i = 0; i < TOTAL_STEPS; i++) {
             const step = playback.step;
             const sixteenth = 0.25 * (60.0 / playback.bpm);
             let duration = sixteenth;
-            
+
             if (groove.swing > 0) {
                 const shift = (sixteenth / 3) * (groove.swing / 100);
                 // Swing 8th (swing every other 8th note, i.e., steps 2, 6, 10...)
-                duration += (((step % 4) < 2) ? shift : -shift);
+                duration += step % 4 < 2 ? shift : -shift;
             }
 
             playback.nextNoteTime += duration;
@@ -104,9 +112,9 @@ describe('Clock Drift & Scheduling Precision', () => {
 
             // Periodically check drift
             if (i % 1000 === 0) {
-                const expectedUnswung = i * SIXTEENTH + SIXTEENTH; 
+                const expectedUnswung = i * SIXTEENTH + SIXTEENTH;
                 expect(playback.unswungNextNoteTime).toBeCloseTo(expectedUnswung, 10);
-                
+
                 // Ensure swung time hasn't drifted from unswung reference by more than one swing shift
                 const shift = (SIXTEENTH / 3) * (groove.swing / 100);
                 const diff = Math.abs(playback.nextNoteTime - playback.unswungNextNoteTime);
@@ -122,10 +130,10 @@ describe('Clock Drift & Scheduling Precision', () => {
     it('should correctly reset nextNoteTime to unswung reference on genre changes', () => {
         playback.nextNoteTime = 10.05; // Swung
         playback.unswungNextNoteTime = 10.0; // Anchor
-        
+
         // Simulating the applyPendingGenre reset logic
         playback.nextNoteTime = playback.unswungNextNoteTime;
-        
+
         expect(playback.nextNoteTime).toBe(10.0);
     });
 
@@ -133,14 +141,14 @@ describe('Clock Drift & Scheduling Precision', () => {
         const sixteenthOld = 0.25 * (60.0 / 120); // 0.125
         playback.nextNoteTime = 10 * sixteenthOld;
         playback.unswungNextNoteTime = 10 * sixteenthOld;
-        
+
         playback.bpm = 60; // Half speed
         const sixteenthNew = 0.25 * (60.0 / 60); // 0.25
-        
+
         // Advance one step at new BPM
         playback.nextNoteTime += sixteenthNew;
         playback.unswungNextNoteTime += sixteenthNew;
-        
+
         expect(playback.unswungNextNoteTime).toBe(10 * sixteenthOld + sixteenthNew);
         expect(playback.unswungNextNoteTime).toBe(1.25 + 0.25);
     });

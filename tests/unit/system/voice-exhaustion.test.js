@@ -1,33 +1,45 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Unified mock for state.js to ensure internal synthesis logic sees consistent state
 vi.mock('../../../public/state.js', () => {
-    const mockPlayback = { 
-        audio: { 
-            currentTime: 0, 
+    const mockPlayback = {
+        audio: {
+            currentTime: 0,
             createOscillator: vi.fn(() => ({
-                connect: vi.fn(), start: vi.fn(), stop: vi.fn(), 
-                setPeriodicWave: vi.fn(), frequency: { setValueAtTime: vi.fn() },
-                detune: { setValueAtTime: vi.fn() }
+                connect: vi.fn(),
+                start: vi.fn(),
+                stop: vi.fn(),
+                setPeriodicWave: vi.fn(),
+                frequency: { setValueAtTime: vi.fn() },
+                detune: { setValueAtTime: vi.fn() },
             })),
             createGain: vi.fn(() => ({
-                connect: vi.fn(), 
-                gain: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }
+                connect: vi.fn(),
+                gain: {
+                    setValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                    cancelScheduledValues: vi.fn(),
+                },
             })),
             createBiquadFilter: vi.fn(() => ({
-                connect: vi.fn(), frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                Q: { setValueAtTime: vi.fn() }, type: 'lowpass'
+                connect: vi.fn(),
+                frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                Q: { setValueAtTime: vi.fn() },
+                type: 'lowpass',
             })),
             createPeriodicWave: vi.fn(() => ({})),
-            createBufferSource: vi.fn(() => ({ 
-                connect: vi.fn(), start: vi.fn(), stop: vi.fn(), buffer: null 
-            }))
+            createBufferSource: vi.fn(() => ({
+                connect: vi.fn(),
+                start: vi.fn(),
+                stop: vi.fn(),
+                buffer: null,
+            })),
         },
         bandIntensity: 0.5,
         sustainActive: true,
         chordsGain: {},
-        audioBuffers: { noise: {} }
+        audioBuffers: { noise: {} },
     };
     const mockGroove = { audioBuffers: { noise: {} } };
     const mockChords = {};
@@ -35,33 +47,36 @@ vi.mock('../../../public/state.js', () => {
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
-        chords: mockChords
+        chords: mockChords,
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
 import { playNote, updateSustain } from '../../../public/engine/synth-chords.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../../public/state.js';
+
+const { playback } = getState();
 
 describe('Voice Exhaustion & Stealing', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         playback.audio.currentTime = 10.0;
         playback.sustainActive = true;
-        if (!playback.heldNotes) playback.heldNotes = new Set();
+        if (!playback.heldNotes) {
+            playback.heldNotes = new Set();
+        }
         playback.heldNotes.clear();
     });
 
     it('should limit total active voices to 64 when sustain is active', () => {
         // Ensure theft logic triggers
         for (let i = 0; i < 70; i++) {
-            playback.audio.currentTime = 10.0 + (i * 0.1);
+            playback.audio.currentTime = 10.0 + i * 0.1;
             playNote(440, playback.audio.currentTime, 1.0, { instrument: 'Piano' });
         }
 
@@ -78,8 +93,8 @@ describe('Voice Exhaustion & Stealing', () => {
                     value: 0,
                     setValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
-                    cancelScheduledValues: vi.fn()
-                }
+                    cancelScheduledValues: vi.fn(),
+                },
             };
             gains.push(g);
             return g;
@@ -94,10 +109,10 @@ describe('Voice Exhaustion & Stealing', () => {
         updateSustain(false, 11.0);
 
         // Released notes use 0.12 damping constant for long notes
-        const releasedGains = gains.filter(g => 
-            g.gain.setTargetAtTime.mock.calls.some(call => call[1] === 11.0 && call[2] === 0.12)
+        const releasedGains = gains.filter((g) =>
+            g.gain.setTargetAtTime.mock.calls.some((call) => call[1] === 11.0 && call[2] === 0.12),
         );
-        
+
         expect(releasedGains.length).toBe(10);
     });
 

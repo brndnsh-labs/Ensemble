@@ -5,61 +5,80 @@
  * @param {number|Object} beatsPerMeasure Number of beats per measure, or a pulse object containing beatsPerMeasure
  */
 export function extractForm(beatData, options = 4) {
-    if (!beatData || beatData.length < 4) return [];
+    if (!beatData || beatData.length < 4) {
+        return [];
+    }
 
-    const beatsPerMeasure = (typeof options === 'object') ? (options.beatsPerMeasure || 4) : options;
+    const beatsPerMeasure = typeof options === 'object' ? options.beatsPerMeasure || 4 : options;
 
     // Flatten beat results into a full timeline
     const maxBeat = beatData[beatData.length - 1].beat;
     const timeline = new Array(maxBeat + 1).fill(null);
-    beatData.forEach(b => { timeline[b.beat] = b; });
-    
+    beatData.forEach((b) => {
+        timeline[b.beat] = b;
+    });
+
     // Fill gaps
-    let current = timeline.find(b => b !== null) || { chord: "C", energy: 0 };
+    let current = timeline.find((b) => b !== null) || { chord: 'C', energy: 0 };
     for (let i = 0; i < timeline.length; i++) {
-        if (timeline[i]) current = timeline[i];
-        else timeline[i] = { ...current, beat: i };
+        if (timeline[i]) {
+            current = timeline[i];
+        } else {
+            timeline[i] = { ...current, beat: i };
+        }
     }
 
     // 1. HARMONIC SIMPLIFICATION (The "Ear" Pass)
     const simplify = (c) => {
-        if (!c || c === 'Rest' || c === '-') return '-';
+        if (!c || c === 'Rest' || c === '-') {
+            return '-';
+        }
         // Normalize: Cmaj7 -> C, Cm7 -> Cm, C7 -> C
         // We keep root and quality (major/minor) but drop extensions
-        return c.replace(/maj7|maj9|m7|m9|m6|m11|7|6|9|11|13|sus4|sus2|dim|aug|5/g, (match) => {
-            if (match.startsWith('m')) return 'm'; 
-            return ''; 
-        }).trim();
+        return c
+            .replace(/maj7|maj9|m7|m9|m6|m11|7|6|9|11|13|sus4|sus2|dim|aug|5/g, (match) => {
+                if (match.startsWith('m')) {
+                    return 'm';
+                }
+                return '';
+            })
+            .trim();
     };
 
     // Helper: Calculate harmonic distance between two simplified chords
     // 0 = Exact Match, 0.5 = Root Match (different quality), 1.0 = No Match
     const getChordDistance = (c1, c2) => {
-        if (c1 === c2) return 0;
+        if (c1 === c2) {
+            return 0;
+        }
         const root1 = c1.replace(/m$/, '');
         const root2 = c2.replace(/m$/, '');
-        if (root1 === root2) return 0.4; // Same root, different quality (e.g. C vs Cm)
+        if (root1 === root2) {
+            return 0.4; // Same root, different quality (e.g. C vs Cm)
+        }
         return 1.0;
     };
 
     // 2. MEASURE CONSOLIDATION
     const measures = [];
-    const originalMeasures = []; 
+    const originalMeasures = [];
     const measureEnergy = [];
-    
+
     for (let i = 0; i < timeline.length; i += beatsPerMeasure) {
         const slice = timeline.slice(i, i + beatsPerMeasure);
-        if (slice.length < beatsPerMeasure) break;
+        if (slice.length < beatsPerMeasure) {
+            break;
+        }
 
         const counts = {};
         let totalEnergy = 0;
-        slice.forEach(b => {
+        slice.forEach((b) => {
             counts[b.chord] = (counts[b.chord] || 0) + 1;
             totalEnergy += b.energy;
         });
-        
+
         // Majority vote for the measure's chord
-        const majority = Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+        const majority = Object.entries(counts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
         measureEnergy.push(totalEnergy / beatsPerMeasure);
 
         // If the majority chord takes up at least half the bar, use it.
@@ -99,7 +118,7 @@ export function extractForm(beatData, options = 4) {
             error += dist;
         }
         // Return similarity score (1.0 = perfect, 0.0 = terrible)
-        return 1.0 - (error / len);
+        return 1.0 - error / len;
     };
 
     const getConsensusValue = (startIdx, len, repeats) => {
@@ -125,46 +144,48 @@ export function extractForm(beatData, options = 4) {
         // Prioritize matching the current block to an already identified section (e.g. A3 -> A1)
         // This prevents A3 from being interpreted as a local loop if it matches the global structure.
         for (const s of sections) {
-             const len = s.lengthInMeasures;
-             // We only care about sections that are "significant" (>= 4 bars)
-             if (len < 4) continue;
+            const len = s.lengthInMeasures;
+            // We only care about sections that are "significant" (>= 4 bars)
+            if (len < 4) {
+                continue;
+            }
 
-             if (i + len <= measures.length) {
-                 const sim = getSimilarity(s.startMeasureIndex, i, len);
-                 if (sim >= 0.7) {
-                     // Found a match!
-                     // Is this better than what we have? (Longer is better)
-                     if (len >= bestLen) {
-                         let currentRepeat = 1;
-                         // Check for repeats of this existing section structure
-                         let lookAheadIdx = i + len;
-                         while (lookAheadIdx + len <= measures.length) {
-                             if (getSimilarity(s.startMeasureIndex, lookAheadIdx, len) >= 0.7) {
-                                 currentRepeat++;
-                                 lookAheadIdx += len;
-                             } else {
-                                 break;
-                             }
-                         }
+            if (i + len <= measures.length) {
+                const sim = getSimilarity(s.startMeasureIndex, i, len);
+                if (sim >= 0.7) {
+                    // Found a match!
+                    // Is this better than what we have? (Longer is better)
+                    if (len >= bestLen) {
+                        let currentRepeat = 1;
+                        // Check for repeats of this existing section structure
+                        let lookAheadIdx = i + len;
+                        while (lookAheadIdx + len <= measures.length) {
+                            if (getSimilarity(s.startMeasureIndex, lookAheadIdx, len) >= 0.7) {
+                                currentRepeat++;
+                                lookAheadIdx += len;
+                            } else {
+                                break;
+                            }
+                        }
 
-                         // Score Bonus for Global Consistency
-                         // A local loop of 4 bars x 2 has score ~2.0.
-                         // A Global match of 8 bars should beat it.
-                         // Base score 5.0 ensures it wins against most local loops.
-                         const score = 5.0 + len + currentRepeat;
+                        // Score Bonus for Global Consistency
+                        // A local loop of 4 bars x 2 has score ~2.0.
+                        // A Global match of 8 bars should beat it.
+                        // Base score 5.0 ensures it wins against most local loops.
+                        const score = 5.0 + len + currentRepeat;
 
-                         if (score > bestScore) {
-                             bestLen = len;
-                             bestRepeat = currentRepeat;
-                             bestScore = score;
-                         }
-                     }
-                 }
-             }
+                        if (score > bestScore) {
+                            bestLen = len;
+                            bestRepeat = currentRepeat;
+                            bestScore = score;
+                        }
+                    }
+                }
+            }
         }
 
         // B. LOCAL PATTERN MINING (New Sections)
-        for (let len of [32, 16, 12, 8, 4]) {
+        for (const len of [32, 16, 12, 8, 4]) {
             if (i + len <= measures.length) {
                 // Check for immediate repetition
                 let currentScore = 0;
@@ -185,7 +206,7 @@ export function extractForm(beatData, options = 4) {
                 // Normalize score
                 const avgScore = repeat > 1 ? currentScore / (repeat - 1) : 0;
                 // Local loop score
-                let weightedScore = avgScore * Math.sqrt(len);
+                const weightedScore = avgScore * Math.sqrt(len);
 
                 if (repeat > 1 && weightedScore > bestScore) {
                     bestLen = len;
@@ -197,13 +218,15 @@ export function extractForm(beatData, options = 4) {
 
         if (bestLen > 0) {
             const value = getConsensusValue(i, bestLen, bestRepeat);
-            const avgEnergy = measureEnergy.slice(i, i + bestLen * bestRepeat).reduce((a, b) => a + b, 0) / (bestLen * bestRepeat);
-            sections.push({ 
-                value, 
-                repeat: bestRepeat, 
+            const avgEnergy =
+                measureEnergy.slice(i, i + bestLen * bestRepeat).reduce((a, b) => a + b, 0) /
+                (bestLen * bestRepeat);
+            sections.push({
+                value,
+                repeat: bestRepeat,
                 energy: avgEnergy,
                 startMeasureIndex: i,
-                lengthInMeasures: bestLen
+                lengthInMeasures: bestLen,
             });
             i += bestLen * bestRepeat;
         } else {
@@ -211,12 +234,12 @@ export function extractForm(beatData, options = 4) {
             const len = Math.min(4, measures.length - i);
             const value = originalMeasures.slice(i, i + len).join(' | ');
             const avgEnergy = measureEnergy.slice(i, i + len).reduce((a, b) => a + b, 0) / len;
-            sections.push({ 
-                value, 
-                repeat: 1, 
+            sections.push({
+                value,
+                repeat: 1,
                 energy: avgEnergy,
                 startMeasureIndex: i,
-                lengthInMeasures: len
+                lengthInMeasures: len,
             });
             i += len;
         }
@@ -224,22 +247,24 @@ export function extractForm(beatData, options = 4) {
 
     // 4. AGGRESSIVE CONSOLIDATION (Merging adjacent variations)
     // If Section A (x1) is followed by Section A (x1) [which might be a slight variation], merge them!
-    let consolidated = [];
+    const consolidated = [];
 
     // Helper to check if two values are "close enough"
     const areValuesSimilar = (v1, v2) => {
         const m1 = v1.split(' | ').map(simplify);
         const m2 = v2.split(' | ').map(simplify);
-        if (m1.length !== m2.length) return false;
+        if (m1.length !== m2.length) {
+            return false;
+        }
 
         let error = 0;
         for (let k = 0; k < m1.length; k++) {
             error += getChordDistance(m1[k], m2[k]);
         }
-        return (1.0 - (error / m1.length)) >= 0.7;
+        return 1.0 - error / m1.length >= 0.7;
     };
 
-    sections.forEach(s => {
+    sections.forEach((s) => {
         const last = consolidated[consolidated.length - 1];
         if (last && areValuesSimilar(last.value, s.value)) {
             // Merge!
@@ -253,55 +278,55 @@ export function extractForm(beatData, options = 4) {
 
     // 5. LABELING (Lead Sheet Style)
     let currentLetter = 'A';
-    
+
     // Pre-scan for duplicates to assign letters
     const uniqueProgressions = [];
 
-    consolidated.forEach(s => {
+    consolidated.forEach((s) => {
         // Find if this progression matches a known one
-        let match = uniqueProgressions.find(p => areValuesSimilar(p.value, s.value));
-        
+        let match = uniqueProgressions.find((p) => areValuesSimilar(p.value, s.value));
+
         if (!match) {
             match = {
                 value: s.value,
-                label: `Section ${currentLetter}`
+                label: `Section ${currentLetter}`,
             };
-            
+
             // Heuristic Labels
             const isShort = s.lengthInMeasures <= 8;
             const isFirst = uniqueProgressions.length === 0;
             const isLast = consolidated.indexOf(s) === consolidated.length - 1;
             const isLowEnergy = s.energy < 0.4;
-            
+
             if (isFirst && isShort && isLowEnergy) {
-                match.label = "Intro";
+                match.label = 'Intro';
             } else if (isLast && isShort && isLowEnergy) {
-                match.label = "Outro";
+                match.label = 'Outro';
             } else {
                 // Advance letter only if it's a "real" section
                 currentLetter = String.fromCharCode(currentLetter.charCodeAt(0) + 1);
             }
-            
+
             uniqueProgressions.push(match);
         }
-        
+
         s.label = match.label;
     });
 
     // 6. FINAL CLEANUP (Formatting)
-    return consolidated.map(s => {
+    return consolidated.map((s) => {
         // Calculate beat ranges
         const totalMeasures = s.value.split('|').length * s.repeat;
         const startBeat = s.startMeasureIndex * beatsPerMeasure;
         const loopLengthBeats = s.lengthInMeasures * beatsPerMeasure;
-        
+
         return {
             ...s,
             startBeat,
             loopLengthBeats,
             endBeat: startBeat + loopLengthBeats,
-            blockEndBeat: startBeat + (totalMeasures * beatsPerMeasure),
-            isLoop: true // Everything is a loop candidate in this view
+            blockEndBeat: startBeat + totalMeasures * beatsPerMeasure,
+            isLoop: true, // Everything is a loop candidate in this view
         };
     });
 }

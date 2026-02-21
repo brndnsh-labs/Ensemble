@@ -1,16 +1,17 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import { h, render } from 'preact';
 import React from 'preact/compat';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalShortcuts } from '../../public/components/GlobalShortcuts.jsx';
 import { togglePlay } from '../../public/engine/scheduler-core.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock scheduler-core
 vi.mock('../../public/engine/scheduler-core.js', () => ({
-    togglePlay: vi.fn()
+    togglePlay: vi.fn(),
 }));
 
 // Mock State
@@ -18,21 +19,21 @@ vi.mock('../../public/state.js', () => {
     const mockState = {
         playback: {
             viz: {},
-            modals: { editor: false, settings: false }
+            modals: { editor: false, settings: false },
         },
         groove: { currentMeasure: 0, measures: 4 },
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
         getState: () => mockState,
-        dispatch: mockState.dispatch
+        dispatch: mockState.dispatch,
     };
 });
 
 // Mock instrument-controller
 vi.mock('../../public/instrument-controller.js', () => ({
-    switchMeasure: vi.fn()
+    switchMeasure: vi.fn(),
 }));
 
 describe('Global Shortcuts', () => {
@@ -42,7 +43,7 @@ describe('Global Shortcuts', () => {
         container = document.createElement('div');
         document.body.appendChild(container);
         render(<GlobalShortcuts />, container);
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 100));
     });
 
     afterEach(() => {
@@ -74,6 +75,9 @@ describe('Global Shortcuts', () => {
         const event = new KeyboardEvent('keydown', { key: 'e' });
         window.dispatchEvent(event);
 
-        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_MODAL_OPEN, {
+            modal: 'editor',
+            open: true,
+        });
     });
 });

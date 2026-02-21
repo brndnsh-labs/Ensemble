@@ -1,7 +1,7 @@
 /* eslint-disable */
-import { describe, it, expect } from 'vitest';
-import { getStepsPerMeasure, getStepInfo } from '../../public/utils.js';
+import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
 
 describe('Time Signature Logic', () => {
     describe('getStepsPerMeasure', () => {
@@ -21,7 +21,7 @@ describe('Time Signature Logic', () => {
         });
 
         it('should match config.js definitions', () => {
-            Object.keys(TIME_SIGNATURES).forEach(ts => {
+            Object.keys(TIME_SIGNATURES).forEach((ts) => {
                 const config = TIME_SIGNATURES[ts];
                 const expected = config.beats * config.stepsPerBeat;
                 expect(getStepsPerMeasure(ts)).toBe(expected);
@@ -48,14 +48,14 @@ describe('Time Signature Logic', () => {
 
         it('should correctly handle 5/4 with 3+2 grouping', () => {
             const config54 = TIME_SIGNATURES['5/4']; // { beats: 5, stepsPerBeat: 4, grouping: [3, 2] }
-            
+
             // Group 1 (Beats 1, 2, 3)
             expect(getStepInfo(0, config54).isGroupStart).toBe(true);
             expect(getStepInfo(0, config54).groupIndex).toBe(0);
-            
+
             expect(getStepInfo(4, config54).isGroupStart).toBe(false);
             expect(getStepInfo(4, config54).groupIndex).toBe(0);
-            
+
             // Group 2 (Beats 4, 5)
             expect(getStepInfo(12, config54).isGroupStart).toBe(true);
             expect(getStepInfo(12, config54).groupIndex).toBe(1);
@@ -64,15 +64,15 @@ describe('Time Signature Logic', () => {
 
         it('should correctly handle 7/8 with 2+2+3 grouping', () => {
             const config78 = TIME_SIGNATURES['7/8']; // { beats: 7, stepsPerBeat: 2, grouping: [2, 2, 3] }
-            
+
             // Group 1: Steps 0-3 (Beats 1-2)
             expect(getStepInfo(0, config78).isGroupStart).toBe(true);
             expect(getStepInfo(0, config78).groupIndex).toBe(0);
-            
+
             // Group 2: Steps 4-7 (Beats 3-4)
             expect(getStepInfo(4, config78).isGroupStart).toBe(true);
             expect(getStepInfo(4, config78).groupIndex).toBe(1);
-            
+
             // Group 3: Steps 8-13 (Beats 5-7)
             expect(getStepInfo(8, config78).isGroupStart).toBe(true);
             expect(getStepInfo(8, config78).groupIndex).toBe(2);
@@ -82,10 +82,10 @@ describe('Time Signature Logic', () => {
 
         it('should handle 6/8 with 3+3 grouping', () => {
             const config68 = TIME_SIGNATURES['6/8']; // { beats: 6, stepsPerBeat: 2, grouping: [3, 3] }
-            
+
             expect(getStepInfo(0, config68).isGroupStart).toBe(true);
             expect(getStepInfo(0, config68).groupIndex).toBe(0);
-            
+
             expect(getStepInfo(6, config68).isGroupStart).toBe(true);
             expect(getStepInfo(6, config68).groupIndex).toBe(1);
         });
@@ -99,7 +99,7 @@ describe('Time Signature Logic', () => {
         const measureMap = [
             { start: 0, end: 16, ts: '4/4' },
             { start: 16, end: 28, ts: '3/4' },
-            { start: 28, end: 44, ts: '4/4' }
+            { start: 28, end: 44, ts: '4/4' },
         ];
 
         const tsConfig = TIME_SIGNATURES['4/4'];

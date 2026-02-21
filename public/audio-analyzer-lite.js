@@ -5,23 +5,23 @@
  */
 
 // Helper to allow UI updates during heavy processing
-const yieldToMain = () => new Promise(r => setTimeout(r, 0));
+const yieldToMain = () => new Promise((r) => setTimeout(r, 0));
 
 // --- Static Data (Optimization: Avoid Re-allocation) ---
 const KEY_TYPES = ['major', 'minor', 'dominant', 'bluesMaj', 'bluesMin'];
 
 const CHORD_PROFILES = {
-    'maj':  { 0: 1.6, 4: 1.4, 7: 1.1 },
-    'm':    { 0: 1.6, 3: 1.4, 7: 1.1 },
-    '7':    { 0: 1.6, 4: 1.3, 7: 1.1, 10: 1.5 },
-    'maj7': { 0: 1.6, 4: 1.3, 7: 1.1, 11: 1.2 },
-    'm7':   { 0: 2.0, 3: 1.4, 7: 1.1, 10: 1.3 },
-    '6':    { 0: 1.6, 4: 1.4, 7: 1.1, 9: 1.2 },
-    'm6':   { 0: 1.6, 3: 1.4, 7: 1.1, 9: 1.2 },
-    'sus4': { 0: 1.6, 5: 1.4, 7: 1.1 },
-    'dim':  { 0: 1.7, 3: 1.4, 6: 1.4 },
-    'dim7': { 0: 1.6, 3: 1.4, 6: 1.4, 9: 1.4 },
-    'aug':  { 0: 1.6, 4: 1.4, 8: 1.4 }
+    maj: { 0: 1.6, 4: 1.4, 7: 1.1 },
+    m: { 0: 1.6, 3: 1.4, 7: 1.1 },
+    7: { 0: 1.6, 4: 1.3, 7: 1.1, 10: 1.5 },
+    maj7: { 0: 1.6, 4: 1.3, 7: 1.1, 11: 1.2 },
+    m7: { 0: 2.0, 3: 1.4, 7: 1.1, 10: 1.3 },
+    6: { 0: 1.6, 4: 1.4, 7: 1.1, 9: 1.2 },
+    m6: { 0: 1.6, 3: 1.4, 7: 1.1, 9: 1.2 },
+    sus4: { 0: 1.6, 5: 1.4, 7: 1.1 },
+    dim: { 0: 1.7, 3: 1.4, 6: 1.4 },
+    dim7: { 0: 1.6, 3: 1.4, 6: 1.4, 9: 1.4 },
+    aug: { 0: 1.6, 4: 1.4, 8: 1.4 },
 };
 const CHORD_PROFILE_ENTRIES = Object.entries(CHORD_PROFILES);
 
@@ -32,21 +32,21 @@ export class ChordAnalyzerLite {
     constructor() {
         /** @type {string[]} */
         this.notes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-        
-        /** 
+
+        /**
          * Pre-calculate frequencies for notes from MIDI 24 (C1) to 96 (C7)
-         * @type {Array<{midi: number, freq: number, bin: number}>} 
+         * @type {Array<{midi: number, freq: number, bin: number}>}
          */
         this.pitchFrequencies = [];
         for (let m = 24; m <= 96; m++) {
             this.pitchFrequencies.push({
                 midi: m,
-                freq: 440 * Math.pow(2, (m - 69) / 12),
-                bin: m % 12
+                freq: 440 * 2 ** ((m - 69) / 12),
+                bin: m % 12,
             });
         }
 
-        /** 
+        /**
          * Krumhansl-Schmuckler Key Profiles (Major and Minor)
          * Weights used for global key identification.
          */
@@ -55,7 +55,7 @@ export class ChordAnalyzerLite {
             minor: [6.5, 2.5, 3.5, 5.0, 2.5, 3.5, 2.5, 4.5, 4.0, 2.5, 3.5, 3.0],
             dominant: [7.5, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 5.0, 2.0, 3.5, 4.5, 2.0], // Stronger Root and b7
             bluesMaj: [7.5, 1.0, 2.0, 2.5, 6.0, 4.0, 1.5, 4.5, 1.5, 2.0, 5.5, 1.0], // Strong 3, b7
-            bluesMin: [7.5, 1.0, 2.0, 6.0, 2.0, 4.0, 1.5, 4.5, 1.5, 2.0, 5.5, 1.0]  // Strong b3, b7
+            bluesMin: [7.5, 1.0, 2.0, 6.0, 2.0, 4.0, 1.5, 4.5, 1.5, 2.0, 5.5, 1.0], // Strong b3, b7
         };
     }
 
@@ -71,7 +71,7 @@ export class ChordAnalyzerLite {
         // Test -2.0 to +2.0 semitones in 0.1 steps (higher res)
         for (let offset = -20; offset <= 20; offset++) {
             const rotatedChroma = this.rotateChroma(totalChroma, offset * 0.1, rotatedBuffer);
-            
+
             for (let root = 0; root < 12; root++) {
                 for (const type of KEY_TYPES) {
                     let score = 0;
@@ -80,11 +80,15 @@ export class ChordAnalyzerLite {
                     }
 
                     // Bias towards zero tuning offset (favors standard 440Hz)
-                    const offsetBias = 1.0 - (Math.abs(offset) * 0.02);
+                    const offsetBias = 1.0 - Math.abs(offset) * 0.02;
                     // Strong bias towards dominant/blues for groovier signals
-                    const typeBias = (type.startsWith('blues')) ? 1.2 : (type === 'dominant') ? 1.15 : 1.0;
-                    
-                    score *= (offsetBias * typeBias);
+                    const typeBias = type.startsWith('blues')
+                        ? 1.2
+                        : type === 'dominant'
+                          ? 1.15
+                          : 1.0;
+
+                    score *= offsetBias * typeBias;
 
                     if (score > bestScore) {
                         bestScore = score;
@@ -110,9 +114,9 @@ export class ChordAnalyzerLite {
                 for (let i = 0; i < 12; i++) {
                     score += chroma[(root + i) % 12] * this.keyProfiles[type][i];
                 }
-                
+
                 // Bias (same as Global)
-                const typeBias = (type.startsWith('blues')) ? 1.2 : (type === 'dominant') ? 1.15 : 1.0;
+                const typeBias = type.startsWith('blues') ? 1.2 : type === 'dominant' ? 1.15 : 1.0;
                 score *= typeBias;
 
                 if (score > bestScore) {
@@ -128,12 +132,16 @@ export class ChordAnalyzerLite {
      * Rotates a 12-bin chromagram by a fractional semitone using linear interpolation.
      */
     rotateChroma(chroma, amount, output = null) {
-        if (!output && amount === 0) return chroma;
+        if (!output && amount === 0) {
+            return chroma;
+        }
 
         const result = output || new Float32Array(12);
 
         if (amount === 0) {
-            if (result !== chroma) result.set(chroma);
+            if (result !== chroma) {
+                result.set(chroma);
+            }
             return result;
         }
 
@@ -153,29 +161,34 @@ export class ChordAnalyzerLite {
     async analyze(audioBuffer, options = {}) {
         // 1. Identify Pulse (BPM, Meter, Downbeat)
         const pulse = await this.identifyPulse(audioBuffer, options);
-        
+
         // Ensure we have a valid numeric BPM
         let bpm = 120;
-        if (typeof options.bpm === 'number' && options.bpm > 0) bpm = options.bpm;
-        else if (typeof pulse.bpm === 'number' && pulse.bpm > 0) bpm = pulse.bpm;
-        
+        if (typeof options.bpm === 'number' && options.bpm > 0) {
+            bpm = options.bpm;
+        } else if (typeof pulse.bpm === 'number' && pulse.bpm > 0) {
+            bpm = pulse.bpm;
+        }
+
         const beatsPerMeasure = pulse.beatsPerMeasure || 4;
-        
+
         // console.log(`[Analyzer-Lite] Pulse Detected: ${bpm} BPM, ${beatsPerMeasure}/4 Meter, Offset: ${pulse.downbeatOffset.toFixed(3)}s`);
-        
+
         const sampleRate = audioBuffer.sampleRate;
         let fullSignal = audioBuffer.getChannelData(0); // Mono
-        
+
         // Handle Trimming & Downbeat Alignment
         // We start analysis exactly on the detected downbeat to ensure measures align.
         const startOffset = options.startTime || 0;
         // In synthetic tests without transients, downbeatOffset might be 0 but we check for sanity
-        const alignmentOffset = (pulse.downbeatOffset >= 0) ? pulse.downbeatOffset : 0;
-        
+        const alignmentOffset = pulse.downbeatOffset >= 0 ? pulse.downbeatOffset : 0;
+
         let startSample = Math.floor((startOffset + alignmentOffset) * sampleRate);
         // Safety: If alignment offset pushes us past the end, start at 0
         if (startSample >= fullSignal.length) {
-            console.warn(`[Analyzer-Lite] Alignment offset (${alignmentOffset.toFixed(3)}s) exceeds signal length. Starting at 0.`);
+            console.warn(
+                `[Analyzer-Lite] Alignment offset (${alignmentOffset.toFixed(3)}s) exceeds signal length. Starting at 0.`,
+            );
             startSample = 0;
         }
 
@@ -183,35 +196,44 @@ export class ChordAnalyzerLite {
         const samplesPerBeat = Math.floor(secondsPerBeat * sampleRate);
 
         // Safety: If alignment offset leaves less than one beat, but the original signal was long enough, reset to 0
-        if (fullSignal.length - startSample < samplesPerBeat && fullSignal.length >= samplesPerBeat) {
-            console.warn(`[Analyzer-Lite] Alignment offset (${alignmentOffset.toFixed(3)}s) leaves insufficient data (< 1 beat). Resetting to 0.`);
+        if (
+            fullSignal.length - startSample < samplesPerBeat &&
+            fullSignal.length >= samplesPerBeat
+        ) {
+            console.warn(
+                `[Analyzer-Lite] Alignment offset (${alignmentOffset.toFixed(3)}s) leaves insufficient data (< 1 beat). Resetting to 0.`,
+            );
             startSample = Math.floor(startOffset * sampleRate);
         }
-        
-        const endSample = options.endTime ? Math.floor(options.endTime * sampleRate) : fullSignal.length;
+
+        const endSample = options.endTime
+            ? Math.floor(options.endTime * sampleRate)
+            : fullSignal.length;
         const signal = fullSignal.subarray(startSample, endSample);
-        
+
         const beats = Math.floor(signal.length / samplesPerBeat);
-        
+
         // --- PASS 1: Global Key Inference ---
         // Analyze the entire signal with a large step to find the consensus key.
         // We raise minMidi to 48 (C3) to ignore the walking bass, which is chromatical and confusing for key detection.
-        const globalChroma = this.calculateChromagram(signal, sampleRate, { 
-            minMidi: 48, 
-            maxMidi: 84, 
+        const globalChroma = this.calculateChromagram(signal, sampleRate, {
+            minMidi: 48,
+            maxMidi: 84,
             skipSharpening: true,
             suppressHarmonics: false,
-            step: Math.max(4, Math.floor(signal.length / 1000000)) 
+            step: Math.max(4, Math.floor(signal.length / 1000000)),
         });
         const globalKey = this.identifyGlobalKey(globalChroma);
         const tuningOffset = globalKey.tuningOffset;
-        
-        if (options.onProgress) options.onProgress(15);
+
+        if (options.onProgress) {
+            options.onProgress(15);
+        }
         // console.log(`[Analyzer-Lite] Global Key Detected: ${this.notes[globalKey.root]} ${globalKey.type} (Tuning: ${tuningOffset.toFixed(2)} semitones)`);
-        
+
         const results = [];
         let lastChord = 'Rest';
-        
+
         // Local Key Tracking
         const rollingChroma = new Float32Array(12).fill(0);
         const ROLL_DECAY = 0.1; // Fast adaptation for rapid modulation (Coltrane changes)
@@ -228,14 +250,15 @@ export class ChordAnalyzerLite {
 
         // Pre-calculate window values
         for (let i = 0, idx = 0; i < samplesPerBeat; i += step, idx++) {
-            windowValuesBuffer[idx] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (samplesPerBeat - 1)));
+            windowValuesBuffer[idx] =
+                0.5 * (1 - Math.cos((2 * Math.PI * i) / (samplesPerBeat - 1)));
         }
 
         const sharedBuffers = {
             chroma: chromaBuffer,
             pitchEnergy: pitchEnergyBuffer,
             windowValues: windowValuesBuffer,
-            windowedSignal: windowedSignalBuffer
+            windowedSignal: windowedSignalBuffer,
         };
 
         const fullChromaOptions = {
@@ -243,7 +266,7 @@ export class ChordAnalyzerLite {
             maxMidi: 88,
             suppressHarmonics: false,
             step: step,
-            buffers: sharedBuffers
+            buffers: sharedBuffers,
         };
 
         const bassChromaOptions = {
@@ -251,19 +274,21 @@ export class ChordAnalyzerLite {
             maxMidi: 47,
             suppressHarmonics: false,
             step: step,
-            buffers: sharedBuffers
+            buffers: sharedBuffers,
         };
 
         const finalChroma = new Float32Array(12);
         const finalBassChroma = new Float32Array(12);
 
         for (let b = 0; b < beats; b++) {
-            if (b % 10 === 0) await yieldToMain();
+            if (b % 10 === 0) {
+                await yieldToMain();
+            }
 
             const start = b * samplesPerBeat;
             const end = start + samplesPerBeat;
             const window = signal.subarray(start, end);
-            
+
             // Calculate relative energy for this beat
             const energy = Math.sqrt(window.reduce((sum, x) => sum + x * x, 0) / window.length);
 
@@ -273,7 +298,7 @@ export class ChordAnalyzerLite {
             // We DISABLE harmonic suppression because it removes the Chord Root/5th when the Bass plays the Root!
             let chroma = this.calculateChromagram(window, sampleRate, fullChromaOptions);
             chroma = this.rotateChroma(chroma, tuningOffset, finalChroma);
-            
+
             // Update Rolling Chroma (Local Key Context)
             if (energy > 0.0001) {
                 for (let i = 0; i < 12; i++) {
@@ -281,7 +306,7 @@ export class ChordAnalyzerLite {
                 }
             }
             const localKey = this.identifySimpleKey(rollingChroma);
-            
+
             // 2. Bass Chromagram (for inversions)
             let bassChroma = this.calculateChromagram(window, sampleRate, bassChromaOptions);
             bassChroma = this.rotateChroma(bassChroma, tuningOffset, finalBassChroma);
@@ -289,22 +314,22 @@ export class ChordAnalyzerLite {
             // Identify Chord with Local Key Bias
             let chord = 'Rest';
             if (energy > 0.0001) {
-                chord = this.identifyChord(chroma, { 
+                chord = this.identifyChord(chroma, {
                     keyBias: localKey,
                     bassNote: this.getStrongestBassNote(bassChroma),
-                    bassChroma: bassChroma
+                    bassChroma: bassChroma,
                 });
-                
-                // If it's a weak detection, maybe keep the last chord? 
+
+                // If it's a weak detection, maybe keep the last chord?
                 // This helps with walking bass passing tones.
                 if (chord === 'Rest' && lastChord !== 'Rest' && energy > 0.0002) {
                     chord = lastChord;
                 }
             }
-            
+
             results.push({ beat: b, chord, energy, localKey });
             lastChord = chord;
-        
+
             if (options.onProgress) {
                 // Scale progress from 15% to 100%
                 options.onProgress(15 + (b / beats) * 85);
@@ -321,26 +346,26 @@ export class ChordAnalyzerLite {
             // Sliding window: [Previous, Current, Next]
             const window = results.slice(Math.max(0, i - 1), Math.min(results.length, i + 2));
             const counts = {};
-            
-            window.forEach(r => {
-                let chord = r.chord;
+
+            window.forEach((r) => {
+                const chord = r.chord;
                 // We keep it simple for now: raw count.
                 counts[chord] = (counts[chord] || 0) + 1;
             });
-            
+
             // Average energy in the same window
             const avgEnergy = window.reduce((a, b) => a + b.energy, 0) / window.length;
-            
+
             // Pick the winner
-            const consensus = Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+            const consensus = Object.entries(counts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
 
             if (consensus !== lastConsensus || (i === 0 && smoothed.length === 0)) {
-                smoothed.push({ 
-                    beat: i, 
-                    time: i * secondsPerBeat, 
-                    chord: consensus, 
+                smoothed.push({
+                    beat: i,
+                    time: i * secondsPerBeat,
+                    chord: consensus,
                     bpm,
-                    energy: avgEnergy 
+                    energy: avgEnergy,
                 });
                 lastConsensus = consensus;
             }
@@ -353,7 +378,7 @@ export class ChordAnalyzerLite {
                 time: 0,
                 chord: results[0].chord,
                 bpm,
-                energy: results[0].energy
+                energy: results[0].energy,
             });
         }
 
@@ -366,8 +391,8 @@ export class ChordAnalyzerLite {
                 bpm,
                 candidates: pulse.candidates,
                 beatsPerMeasure,
-                downbeatOffset: pulse.downbeatOffset
-            }
+                downbeatOffset: pulse.downbeatOffset,
+            },
         };
     }
 
@@ -384,10 +409,12 @@ export class ChordAnalyzerLite {
         const secondsPerBeat = 60 / bpm;
         const samplesPerBeat = Math.floor(secondsPerBeat * sampleRate);
         const startSample = Math.floor((pulseData.downbeatOffset || 0) * sampleRate);
-        
+
         // Safety check
-        if (startSample >= signal.length) return [];
-        
+        if (startSample >= signal.length) {
+            return [];
+        }
+
         const workingSignal = signal.subarray(startSample);
         const beats = Math.floor(workingSignal.length / samplesPerBeat);
         const melodyLine = [];
@@ -404,12 +431,14 @@ export class ChordAnalyzerLite {
         const maxMidi = 84;
 
         for (let b = 0; b < beats; b++) {
-            if (b % 20 === 0) await yieldToMain();
+            if (b % 20 === 0) {
+                await yieldToMain();
+            }
 
             const start = b * samplesPerBeat;
             const end = start + samplesPerBeat;
             const window = workingSignal.subarray(start, end);
-            
+
             // Calculate energy for this beat to ignore silence
             const rms = Math.sqrt(window.reduce((sum, x) => sum + x * x, 0) / window.length);
             if (rms < 0.01) {
@@ -434,8 +463,8 @@ export class ChordAnalyzerLite {
                 const delta = 4 * angleStep;
                 const cosDelta = Math.cos(delta);
                 const sinDelta = Math.sin(delta);
-                let c = 1.0; 
-                let s = 0.0; 
+                let c = 1.0;
+                let s = 0.0;
 
                 for (let i = 0; i < window.length; i += 4) {
                     const val = window[i];
@@ -448,8 +477,8 @@ export class ChordAnalyzerLite {
                     s = nextS;
                 }
 
-                const energy = (real * real + imag * imag);
-                
+                const energy = real * real + imag * imag;
+
                 // --- Diatonic Gravity ---
                 let score = energy;
                 if (scale) {
@@ -466,12 +495,12 @@ export class ChordAnalyzerLite {
             }
 
             // Normalize energy score using the raw energy of the winner
-            const normalizedEnergy = Math.min(1.0, maxScore / 130); 
-            
-            melodyLine.push({ 
-                beat: b, 
-                midi: bestMidi, 
-                energy: normalizedEnergy 
+            const normalizedEnergy = Math.min(1.0, maxScore / 130);
+
+            melodyLine.push({
+                beat: b,
+                midi: bestMidi,
+                energy: normalizedEnergy,
             });
         }
 
@@ -479,14 +508,14 @@ export class ChordAnalyzerLite {
     }
 
     /**
-     * Identifies the "Pulse" (BPM, Meter, and Downbeat) of the audio using 
+     * Identifies the "Pulse" (BPM, Meter, and Downbeat) of the audio using
      * Spectral Flux for robust onset detection and autocorrelation.
      * Includes "Top-Down" structural snapping based on clip duration.
      */
     async identifyPulse(audioBuffer, options = {}) {
         const signal = audioBuffer.getChannelData(0);
         const sampleRate = audioBuffer.sampleRate;
-        
+
         // Use effective duration from options (trim) or buffer
         const startTime = options.startTime || 0;
         const rawEndTime = options.endTime || audioBuffer.duration;
@@ -496,16 +525,17 @@ export class ChordAnalyzerLite {
 
         // If a valid BPM is provided, we skip the search and just find the downbeat
         const manualBpm = typeof options.bpm === 'number' && options.bpm > 0 ? options.bpm : 0;
-        
+
         // 1. Calculate Spectral Flux...
         // We use 20ms windows (50Hz resolution) to capture transients
         const winSize = Math.floor(sampleRate * 0.02);
         const hopSize = Math.floor(sampleRate * 0.01); // 10ms hop
-        
+
         // Only analyze first 30s for pulse to save time (unless duration is close)
         const pulseMaxSeconds = Math.max(30, durationRaw + 1);
-        const numWindows = Math.floor(Math.min(signal.length, sampleRate * pulseMaxSeconds) / hopSize) - 2;
-        
+        const numWindows =
+            Math.floor(Math.min(signal.length, sampleRate * pulseMaxSeconds) / hopSize) - 2;
+
         const flux = new Float32Array(numWindows);
         let lastSpectrum = new Float32Array(12); // Use 12-bin chroma spectrum for flux
 
@@ -532,44 +562,57 @@ export class ChordAnalyzerLite {
                 chroma: chromaBuffer,
                 pitchEnergy: pitchEnergyBuffer,
                 windowValues: windowValuesBuffer,
-                windowedSignal: windowedSignalBuffer
-            }
+                windowedSignal: windowedSignalBuffer,
+            },
         };
 
         let lastActiveHop = 0;
         for (let w = 0; w < numWindows; w++) {
-            if (w % 500 === 0) await yieldToMain();
+            if (w % 500 === 0) {
+                await yieldToMain();
+            }
 
             const start = w * hopSize;
             const window = signal.subarray(start, start + winSize);
-            
+
             const currentSpectrum = this.calculateChromagram(window, sampleRate, calcOptions);
 
             let sum = 0;
             for (let i = 0; i < 12; i++) {
                 const diff = currentSpectrum[i] - lastSpectrum[i];
-                if (diff > 0) sum += diff;
+                if (diff > 0) {
+                    sum += diff;
+                }
             }
             flux[w] = sum;
-            if (sum > 0.001) lastActiveHop = w; // Track last activity
+            if (sum > 0.001) {
+                lastActiveHop = w; // Track last activity
+            }
             lastSpectrum.set(currentSpectrum);
         }
 
         // --- Flux-Based Tail Compensation ---
         // Use the last detected transient to determine the musical end.
         // We add a small buffer (0.5s) to the last transient.
-        effectiveEndTime = Math.min(rawEndTime, (lastActiveHop * hopSize + winSize) / sampleRate + 0.5);
-        
+        effectiveEndTime = Math.min(
+            rawEndTime,
+            (lastActiveHop * hopSize + winSize) / sampleRate + 0.5,
+        );
+
         // If the trimmed duration is very close to the raw duration, don't trim.
-        if (rawEndTime - effectiveEndTime < 0.2) effectiveEndTime = rawEndTime;
+        if (rawEndTime - effectiveEndTime < 0.2) {
+            effectiveEndTime = rawEndTime;
+        }
 
         const duration = effectiveEndTime - startTime;
 
         // Half-wave rectification and normalization of flux
         const maxFlux = Math.max(...flux);
-        const onsets = flux.map(v => v / (maxFlux || 1));
+        const onsets = flux.map((v) => v / (maxFlux || 1));
 
-        if (options.onProgress) options.onProgress(5);
+        if (options.onProgress) {
+            options.onProgress(5);
+        }
 
         // 2. Generate Structural BPM Candidates (Top-Down)
         // If the user meant 120BPM for a 16-bar phrase, it's 32.0s exactly.
@@ -577,22 +620,29 @@ export class ChordAnalyzerLite {
         const commonBarCounts = [4, 8, 12, 16, 24, 32, 48, 64];
         const commonMeters = [4, 3];
 
-        commonBarCounts.forEach(bars => {
-            commonMeters.forEach(meter => {
+        commonBarCounts.forEach((bars) => {
+            commonMeters.forEach((meter) => {
                 const totalBeats = bars * meter;
                 let bpm = (totalBeats * 60) / duration;
-                
+
                 // Favor integers for structural targets if very close
-                if (Math.abs(bpm - Math.round(bpm)) < 0.1) bpm = Math.round(bpm);
+                if (Math.abs(bpm - Math.round(bpm)) < 0.1) {
+                    bpm = Math.round(bpm);
+                }
 
                 if (bpm >= 50 && bpm <= 200) {
-                    structuralCandidates.push({ bpm, bars, meter, lag: Math.round(60 / (bpm * 0.01)) });
+                    structuralCandidates.push({
+                        bpm,
+                        bars,
+                        meter,
+                        lag: Math.round(60 / (bpm * 0.01)),
+                    });
                 }
             });
         });
 
         // 3. Find BPM via autocorrelation (Search range: 25 - 240 BPM)
-        const minLag = 25; 
+        const minLag = 25;
         const maxLag = 240;
         let bestLag = 60;
         let maxCorr = -1;
@@ -602,68 +652,85 @@ export class ChordAnalyzerLite {
             bestLag = Math.round(60 / (manualBpm * 0.01));
         } else {
             for (let lag = minLag; lag <= maxLag; lag++) {
-                if (lag % 20 === 0) await yieldToMain();
+                if (lag % 20 === 0) {
+                    await yieldToMain();
+                }
 
                 let corr = 0;
                 for (let i = 0; i < onsets.length - lag; i++) {
                     corr += onsets[i] * onsets[i + lag];
                 }
-                
+
                 // --- Top-Down Structural Bias ---
                 let structuralBoost = 1.0;
                 const currentBPM = 60 / (lag * 0.01);
-                
+
                 for (const cand of structuralCandidates) {
                     const bpmDiff = Math.abs(currentBPM - cand.bpm);
                     // If within 2.5%, apply a boost. Favor closer matches.
                     if (bpmDiff < cand.bpm * 0.025) {
-                        structuralBoost = Math.max(structuralBoost, 2.0 * (1 - bpmDiff / (cand.bpm * 0.025)));
+                        structuralBoost = Math.max(
+                            structuralBoost,
+                            2.0 * (1 - bpmDiff / (cand.bpm * 0.025)),
+                        );
                     }
                 }
 
                 // Musical Range Bias: Favor 60-160 BPM
                 let rangeBias = 1.0;
-                if (lag >= 42 && lag <= 75) rangeBias = 1.25;
-                else if (lag >= 37 && lag <= 100) rangeBias = 1.10;
-                else if (lag > 120) rangeBias = 0.8;
+                if (lag >= 42 && lag <= 75) {
+                    rangeBias = 1.25;
+                } else if (lag >= 37 && lag <= 100) {
+                    rangeBias = 1.1;
+                } else if (lag > 120) {
+                    rangeBias = 0.8;
+                }
 
                 const biasedScore = corr * rangeBias * structuralBoost;
                 correlations[lag] = biasedScore;
-                
+
                 if (biasedScore > maxCorr) {
                     maxCorr = biasedScore;
                     bestLag = lag;
                 }
             }
         }
-        if (options.onProgress) options.onProgress(5);
-        
+        if (options.onProgress) {
+            options.onProgress(5);
+        }
+
         // Harmonic Check: Detect if we picked a "sub-beat" pulse (too fast) or "measure" pulse (too slow)
         const checkHarmonic = (targetLag) => {
             let currentLag = targetLag;
-            
+
             // 1. Check for slower tempos (downward)
             let changed = true;
             while (changed) {
                 changed = false;
                 for (const m of [2, 3, 4]) {
                     const slowerLag = Math.round(currentLag * m);
-                    if (slowerLag > maxLag) continue;
+                    if (slowerLag > maxLag) {
+                        continue;
+                    }
 
                     const scoreSlower = correlations[slowerLag];
                     const targetScore = correlations[currentLag];
-                    
+
                     let threshold = 0.75;
                     // Be reluctant to slow down if we are already in a good range
-                    if (currentLag >= 46 && currentLag <= 85) threshold = 1.3;
-                    if (slowerLag > 120) threshold = 2.5;
+                    if (currentLag >= 46 && currentLag <= 85) {
+                        threshold = 1.3;
+                    }
+                    if (slowerLag > 120) {
+                        threshold = 2.5;
+                    }
 
                     if (scoreSlower > targetScore * threshold) {
                         currentLag = slowerLag;
                         changed = true;
-                        break; 
+                        break;
                     }
-                }                            
+                }
             }
 
             // 2. Check for faster tempos (upward)
@@ -671,17 +738,20 @@ export class ChordAnalyzerLite {
             changed = true;
             while (changed) {
                 changed = false;
-                if (currentLag > 85) { // < 70 BPM
+                if (currentLag > 85) {
+                    // < 70 BPM
                     for (const m of [2, 3, 4]) {
                         const fasterLag = Math.round(currentLag / m);
-                        if (fasterLag < minLag) continue;
+                        if (fasterLag < minLag) {
+                            continue;
+                        }
 
                         const scoreFaster = correlations[fasterLag];
                         const scoreCurrent = correlations[currentLag];
-                        
+
                         // If the faster pulse is at least 40% of the slow one, take it.
                         // We give a bonus if the faster pulse is in the sweet spot.
-                        let bonus = (fasterLag >= 42 && fasterLag <= 75) ? 1.5 : 1.0;
+                        const bonus = fasterLag >= 42 && fasterLag <= 75 ? 1.5 : 1.0;
 
                         if (scoreFaster * bonus > scoreCurrent * 0.5) {
                             currentLag = fasterLag;
@@ -700,11 +770,11 @@ export class ChordAnalyzerLite {
         let primaryBPM = 60 / (bestLag * 0.01);
         const snapThresholdBPM = 2.5; // Snap if within 2.5 BPM of a structural target
         let bestStructuralMatch = null;
-        
+
         // 1. Check for a structural match using the EFFECTIVE (tail-trimmed) duration
         // This is preferred as it ignores silent tails.
         bestStructuralMatch = structuralCandidates
-            .filter(c => Math.abs(c.bpm - primaryBPM) < snapThresholdBPM)
+            .filter((c) => Math.abs(c.bpm - primaryBPM) < snapThresholdBPM)
             .sort((a, b) => Math.abs(a.bpm - primaryBPM) - Math.abs(b.bpm - primaryBPM))[0];
 
         if (bestStructuralMatch) {
@@ -715,15 +785,17 @@ export class ChordAnalyzerLite {
             // This handles perfectly trimmed loops where tail-trimming might be too aggressive.
             const fullDuration = rawEndTime - startTime;
             const structuralCandidatesFull = [];
-            [4, 8, 12, 16, 24, 32, 48, 64].forEach(bars => {
-                [4, 3].forEach(meter => {
+            [4, 8, 12, 16, 24, 32, 48, 64].forEach((bars) => {
+                [4, 3].forEach((meter) => {
                     const bpm = (bars * meter * 60) / fullDuration;
-                    if (bpm >= 50 && bpm <= 200) structuralCandidatesFull.push({ bpm, bars, meter });
+                    if (bpm >= 50 && bpm <= 200) {
+                        structuralCandidatesFull.push({ bpm, bars, meter });
+                    }
                 });
             });
 
             bestStructuralMatch = structuralCandidatesFull
-                .filter(c => Math.abs(c.bpm - primaryBPM) < snapThresholdBPM)
+                .filter((c) => Math.abs(c.bpm - primaryBPM) < snapThresholdBPM)
                 .sort((a, b) => Math.abs(a.bpm - primaryBPM) - Math.abs(b.bpm - primaryBPM))[0];
 
             if (bestStructuralMatch) {
@@ -734,7 +806,7 @@ export class ChordAnalyzerLite {
 
         // Generate candidates
         const candidatesMap = new Map();
-        [2, 1, 0.5, 4, 0.25].forEach(mult => {
+        [2, 1, 0.5, 4, 0.25].forEach((mult) => {
             const lag = Math.round(bestLag * mult);
             if (lag >= minLag && lag <= maxLag) {
                 const bpm = mult === 1 ? primaryBPM : Math.round(60 / (lag * 0.01));
@@ -744,19 +816,22 @@ export class ChordAnalyzerLite {
             }
         });
 
-        const candidates = Array.from(candidatesMap.entries()).map(([bpm, score]) => ({ bpm, score }));
-        const primaryCandidate = candidates.find(c => c.bpm === primaryBPM);
-        
+        const candidates = Array.from(candidatesMap.entries()).map(([bpm, score]) => ({
+            bpm,
+            score,
+        }));
+        const primaryCandidate = candidates.find((c) => c.bpm === primaryBPM);
+
         // If we have a structural match, give it an overwhelming score boost to ensure it wins
         if (primaryCandidate) {
-            primaryCandidate.score *= (bestStructuralMatch ? 100.0 : 3.0); 
+            primaryCandidate.score *= bestStructuralMatch ? 100.0 : 3.0;
         }
         candidates.sort((a, b) => b.score - a.score);
 
         // 4. Meter Detection (3/4 vs 4/4)
         // If we snapped to a structural match, use its meter!
         let beatsPerMeasure = bestStructuralMatch ? bestStructuralMatch.meter : 4;
-        
+
         if (!bestStructuralMatch) {
             let score3 = 0;
             let score4 = 0;
@@ -768,7 +843,7 @@ export class ChordAnalyzerLite {
                     score4 += onsets[i] * onsets[i + lag4];
                 }
             }
-            beatsPerMeasure = score3 > (score4 * 1.4) ? 3 : 4;
+            beatsPerMeasure = score3 > score4 * 1.4 ? 3 : 4;
         }
 
         // 5. Downbeat Detection (Phase Alignment)
@@ -799,7 +874,7 @@ export class ChordAnalyzerLite {
             bpm: finalBpm,
             candidates: candidates.length > 0 ? candidates : [{ bpm: finalBpm, score: 1 }],
             beatsPerMeasure,
-            downbeatOffset: bestPhase * 0.01
+            downbeatOffset: bestPhase * 0.01,
         };
     }
 
@@ -819,7 +894,7 @@ export class ChordAnalyzerLite {
     }
 
     /**
-     * Calculates energy in 12 semitone bins using a bank of targeted 
+     * Calculates energy in 12 semitone bins using a bank of targeted
      * single-frequency filters with Hann windowing and Harmonic Suppression.
      */
     calculateChromagram(signal, sampleRate, options = {}) {
@@ -836,12 +911,12 @@ export class ChordAnalyzerLite {
         }
 
         const len = signal.length;
-        const step = options.step || 4; 
+        const step = options.step || 4;
         const minMidi = options.minMidi || 0;
         const maxMidi = options.maxMidi || 127;
 
         // Pre-calculate window function
-        if (options.buffers && options.buffers.windowValues) {
+        if (options.buffers?.windowValues) {
             windowValues = options.buffers.windowValues;
         } else {
             const numSteps = Math.ceil(len / step);
@@ -865,7 +940,7 @@ export class ChordAnalyzerLite {
 
         // Pre-windowing Optimization: Apply window function once, outside the frequency loop.
         let windowedSignal;
-        if (options.buffers && options.buffers.windowedSignal) {
+        if (options.buffers?.windowedSignal) {
             windowedSignal = options.buffers.windowedSignal;
         } else {
             const numSteps = Math.ceil(len / step);
@@ -878,7 +953,7 @@ export class ChordAnalyzerLite {
 
         for (let pfIdx = startIdx; pfIdx < endIdx; pfIdx++) {
             const p = this.pitchFrequencies[pfIdx];
-            
+
             let real = 0;
             let imag = 0;
             const angleStep = (2 * Math.PI * p.freq) / sampleRate;
@@ -901,41 +976,59 @@ export class ChordAnalyzerLite {
                 s = nextS;
             }
 
-            pitchEnergy[p.midi] = (real * real + imag * imag);
+            pitchEnergy[p.midi] = real * real + imag * imag;
         }
 
         // Harmonic Suppression: Remove overtones of low fundamentals
         if (options.suppressHarmonics) {
             for (let m = 24; m <= 72; m++) {
                 const energy = pitchEnergy[m];
-                if (energy <= 0) continue;
+                if (energy <= 0) {
+                    continue;
+                }
 
                 // Suppress 2nd harmonic (Octave) - REDUCED WEIGHTS
-                if (m + 12 < 128) pitchEnergy[m + 12] = Math.max(0, pitchEnergy[m + 12] - energy * 0.2);
+                if (m + 12 < 128) {
+                    pitchEnergy[m + 12] = Math.max(0, pitchEnergy[m + 12] - energy * 0.2);
+                }
                 // Suppress 3rd harmonic (Perfect 5th + Octave)
-                if (m + 19 < 128) pitchEnergy[m + 19] = Math.max(0, pitchEnergy[m + 19] - energy * 0.1);
+                if (m + 19 < 128) {
+                    pitchEnergy[m + 19] = Math.max(0, pitchEnergy[m + 19] - energy * 0.1);
+                }
                 // Suppress 4th harmonic (Two Octaves)
-                if (m + 24 < 128) pitchEnergy[m + 24] = Math.max(0, pitchEnergy[m + 24] - energy * 0.1);
+                if (m + 24 < 128) {
+                    pitchEnergy[m + 24] = Math.max(0, pitchEnergy[m + 24] - energy * 0.1);
+                }
                 // Suppress 5th harmonic (Major 3rd + Two Octaves)
-                if (m + 28 < 128) pitchEnergy[m + 28] = Math.max(0, pitchEnergy[m + 28] - energy * 0.05);
+                if (m + 28 < 128) {
+                    pitchEnergy[m + 28] = Math.max(0, pitchEnergy[m + 28] - energy * 0.05);
+                }
             }
         }
 
         // Map suppressed pitch energy to 12-bin Chroma, RESPECTING minMidi/maxMidi
         for (let m = 24; m <= 96; m++) {
-            if (m < minMidi || m > maxMidi) continue;
+            if (m < minMidi || m > maxMidi) {
+                continue;
+            }
 
             const mag = pitchEnergy[m];
             let weight = 1.0;
             // De-emphasize very low notes for chord detection to avoid walking bass interference
-            if (m < 48) weight = 0.6; 
-            else if (m < 72) weight = 1.2; // Focus on the "meat" of the chords
-            else if (m > 80) weight = 0.5; 
-            
+            if (m < 48) {
+                weight = 0.6;
+            } else if (m < 72) {
+                weight = 1.2; // Focus on the "meat" of the chords
+            } else if (m > 80) {
+                weight = 0.5;
+            }
+
             chroma[m % 12] += mag * weight;
         }
 
-        if (options.skipSharpening) return chroma;
+        if (options.skipSharpening) {
+            return chroma;
+        }
 
         // Apply "Harmonic Sharpening"
         const sharpened = new Float32Array(12);
@@ -952,7 +1045,9 @@ export class ChordAnalyzerLite {
         // Normalize
         const max = Math.max(...sharpened);
         if (max > 0) {
-            for (let i = 0; i < 12; i++) sharpened[i] /= max;
+            for (let i = 0; i < 12; i++) {
+                sharpened[i] /= max;
+            }
         }
 
         return sharpened;
@@ -965,58 +1060,73 @@ export class ChordAnalyzerLite {
         for (let root = 0; root < 12; root++) {
             for (const [type, profile] of CHORD_PROFILE_ENTRIES) {
                 let score = 0;
-                
+
                 // 1. Profile Match
                 for (let i = 0; i < 12; i++) {
                     const chromaIdx = (root + i) % 12;
                     const val = chroma[chromaIdx];
                     if (profile[i]) {
                         let effectiveVal = val;
-                        if (val < 0.1 && options.bassChroma && options.bassChroma[chromaIdx] > 0.1) {
+                        if (
+                            val < 0.1 &&
+                            options.bassChroma &&
+                            options.bassChroma[chromaIdx] > 0.1
+                        ) {
                             effectiveVal = options.bassChroma[chromaIdx];
                         }
 
                         score += effectiveVal * profile[i];
-                        if (effectiveVal < 0.1) score -= 2.0; // Penalty for missing a required note
+                        if (effectiveVal < 0.1) {
+                            score -= 2.0; // Penalty for missing a required note
+                        }
+                    } else {
+                        score -= val * 0.5;
                     }
-                    else score -= val * 0.5;
                 }
 
                 // 2. Global Key Bias
                 if (options.keyBias) {
                     const relativeRoot = (root - options.keyBias.root + 12) % 12;
                     let isDiatonic = false;
-                    
-                    if (options.keyBias.type === 'major') isDiatonic = MAJOR_DIATONIC.includes(relativeRoot);
-                    else if (options.keyBias.type === 'minor') isDiatonic = MINOR_DIATONIC.includes(relativeRoot);
-                    else if (options.keyBias.type === 'dominant') {
+
+                    if (options.keyBias.type === 'major') {
+                        isDiatonic = MAJOR_DIATONIC.includes(relativeRoot);
+                    } else if (options.keyBias.type === 'minor') {
+                        isDiatonic = MINOR_DIATONIC.includes(relativeRoot);
+                    } else if (options.keyBias.type === 'dominant') {
                         // Mixolydian: I7, II, iii, IV, v, vi, bVII
                         isDiatonic = [0, 2, 4, 5, 7, 9, 10].includes(relativeRoot);
-                        if (isDiatonic && type === '7' && [0, 5, 7, 10].includes(relativeRoot)) score *= 1.20; // Extra boost for 7th chords in blues
+                        if (isDiatonic && type === '7' && [0, 5, 7, 10].includes(relativeRoot)) {
+                            score *= 1.2; // Extra boost for 7th chords in blues
+                        }
+                    } else if (options.keyBias.type.startsWith('blues')) {
+                        // Blues Scale-ish: I7, IV7, V7 are kings. bIII, bVI, bVII are common.
+                        // Major: I, IV, V.  Minor: i, iv, v.
+                        // Roots: 0, 3, 5, 7, 10
+                        if ([0, 5, 7].includes(relativeRoot) && type === '7') {
+                            score *= 1.35; // Primary Blues Chords
+                        } else if ([3, 10].includes(relativeRoot)) {
+                            score *= 1.15; // Secondary Blues Chords
+                        }
+                        isDiatonic = [0, 3, 5, 7, 10].includes(relativeRoot);
                     }
-                    else if (options.keyBias.type.startsWith('blues')) {
-                         // Blues Scale-ish: I7, IV7, V7 are kings. bIII, bVI, bVII are common.
-                         // Major: I, IV, V.  Minor: i, iv, v.
-                         // Roots: 0, 3, 5, 7, 10
-                         if ([0, 5, 7].includes(relativeRoot) && type === '7') score *= 1.35; // Primary Blues Chords
-                         else if ([3, 10].includes(relativeRoot)) score *= 1.15; // Secondary Blues Chords
-                         isDiatonic = [0, 3, 5, 7, 10].includes(relativeRoot);
+
+                    if (isDiatonic) {
+                        score *= 1.3; // 30% boost for diatonic chords
                     }
-                    
-                    if (isDiatonic) score *= 1.30; // 30% boost for diatonic chords
                 }
 
                 // Sanity Check for 7th Chords
                 // If a chord claims to be a 7th but has minimal energy in the 7th interval,
                 // penalize it to prevent false positives from bias/overtones.
                 if (type === '7' || type === 'm7' || type === 'maj7') {
-                    const seventhIdx = (type === 'maj7') ? 11 : 10;
+                    const seventhIdx = type === 'maj7' ? 11 : 10;
                     const absSeventhIdx = (root + seventhIdx) % 12;
                     if (chroma[absSeventhIdx] < 0.15) {
                         score *= 0.6;
                     }
                 }
-                
+
                 // Simplicity Bias: Slight penalty for complex chords to favor triads if scores are close
                 if (['maj7', 'm7', '6', 'm6', 'dim7'].includes(type)) {
                     score *= 0.96;
@@ -1030,22 +1140,26 @@ export class ChordAnalyzerLite {
         }
 
         const energy = chroma.reduce((a, b) => a + b, 0);
-        if (energy < 0.05) return 'Rest';
+        if (energy < 0.05) {
+            return 'Rest';
+        }
 
-        let chordName = this.notes[bestChordData.root] + (bestChordData.type === 'maj' ? '' : bestChordData.type);
+        let chordName =
+            this.notes[bestChordData.root] +
+            (bestChordData.type === 'maj' ? '' : bestChordData.type);
 
         // 3. Slash Chord Detection (Inversions)
         if (options.bassNote && options.bassNote !== this.notes[bestChordData.root]) {
             // Check if bass note is strong relative to total energy
             const totalEnergy = chroma.reduce((a, b) => a + b, 0);
             const bassIdx = this.notes.indexOf(options.bassNote);
-            
+
             let bassEnergy = chroma[bassIdx];
             // If bassChroma is provided, use it to capture energy below the main analysis range (e.g. C1-B2)
             if (options.bassChroma) {
                 bassEnergy = Math.max(bassEnergy, options.bassChroma[bassIdx]);
             }
-            
+
             // Significant bass presence (at least 12% of total chromagram energy to avoid jitter in walking lines)
             if (bassEnergy > totalEnergy * 0.12) {
                 const root = bestChordData.root;
@@ -1053,9 +1167,9 @@ export class ChordAnalyzerLite {
                 // Only consider 3rd or 5th as stable inversions for this demo
                 // IGNORE 7th in bass as it's often a passing tone or just muddy
                 const isStableInversion = [3, 4, 7].includes(interval);
-                
+
                 if (isStableInversion) {
-                    chordName += '/' + options.bassNote;
+                    chordName += `/${options.bassNote}`;
                 }
             }
         }

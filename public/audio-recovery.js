@@ -1,9 +1,9 @@
+import { initAudio, killAllNotes, restoreGains } from './engine/engine.js';
 import { getState } from './state.js';
-import { initAudio, restoreGains, killAllNotes } from './engine/engine.js';
 
 /**
  * AudioRecovery.js
- * 
+ *
  * robust "Watchdog" service that monitors the Web Audio Context for:
  * 1. Unexpected suspensions (OS interruptions, headset unplugging)
  * 2. DSP Instability (NaN/Infinity detection indicative of blown filters)
@@ -21,9 +21,11 @@ class AudioHealthMonitor {
     }
 
     start() {
-        if (this.intervalId) return;
+        if (this.intervalId) {
+            return;
+        }
         this.intervalId = setInterval(() => this.healthCheck(), this.checkInterval);
-        console.log("[AudioWatchdog] Monitoring started.");
+        console.log('[AudioWatchdog] Monitoring started.');
     }
 
     stop() {
@@ -35,45 +37,53 @@ class AudioHealthMonitor {
 
     attachToMaster(masterNode) {
         const { playback } = getState();
-        if (!playback.audio) return;
-        
+        if (!playback.audio) {
+            return;
+        }
+
         try {
             if (typeof playback.audio.createAnalyser !== 'function') {
-                console.warn("[AudioWatchdog] createAnalyser not supported by current AudioContext.");
+                console.warn(
+                    '[AudioWatchdog] createAnalyser not supported by current AudioContext.',
+                );
                 return;
             }
             this.analyser = playback.audio.createAnalyser();
             this.analyser.fftSize = 256; // Smallest efficient size
             this.dataBuffer = new Float32Array(this.analyser.fftSize);
-            
+
             // Connect Master -> Analyser (Fan-out)
             masterNode.connect(this.analyser);
         } catch (e) {
-            console.warn("[AudioWatchdog] Failed to attach analyser:", e);
+            console.warn('[AudioWatchdog] Failed to attach analyser:', e);
         }
     }
 
     async healthCheck() {
         const { playback } = getState();
-        if (!playback.audio) return;
-        if (this.isRecovering) return;
+        if (!playback.audio) {
+            return;
+        }
+        if (this.isRecovering) {
+            return;
+        }
 
         const state = playback.audio.state;
         const isPlaying = playback.isPlaying;
 
         // 1. Check Context State
         if (state === 'suspended' && isPlaying) {
-            console.warn("[AudioWatchdog] Context suspended while playing. Attempting resume...");
+            console.warn('[AudioWatchdog] Context suspended while playing. Attempting resume...');
             try {
                 await playback.audio.resume();
             } catch (e) {
-                console.error("[AudioWatchdog] Resume failed:", e);
+                console.error('[AudioWatchdog] Resume failed:', e);
             }
             return;
         }
 
         if (state === 'closed' && isPlaying) {
-            console.error("[AudioWatchdog] Context is CLOSED. Fatal error.");
+            console.error('[AudioWatchdog] Context is CLOSED. Fatal error.');
             this.triggerFullRestart();
             return;
         }
@@ -81,9 +91,9 @@ class AudioHealthMonitor {
         // 2. Check for NaN / Infinite (Blown Filters)
         if (this.analyser && isPlaying) {
             this.analyser.getFloatTimeDomainData(this.dataBuffer);
-            
+
             let hasNaN = false;
-            
+
             for (let i = 0; i < this.dataBuffer.length; i++) {
                 const val = this.dataBuffer[i];
                 if (Number.isNaN(val) || !Number.isFinite(val)) {
@@ -93,7 +103,9 @@ class AudioHealthMonitor {
             }
 
             if (hasNaN) {
-                console.error("[AudioWatchdog] DSP CORRUPTION DETECTED (NaN/Infinity). Static detected.");
+                console.error(
+                    '[AudioWatchdog] DSP CORRUPTION DETECTED (NaN/Infinity). Static detected.',
+                );
                 this.triggerDSPReset();
             }
         }
@@ -104,14 +116,16 @@ class AudioHealthMonitor {
         this.isRecovering = true;
         this.crashCount++;
 
-        console.log("[AudioWatchdog] Initiating Emergency DSP Reset...");
-        
+        console.log('[AudioWatchdog] Initiating Emergency DSP Reset...');
+
         // 1. Mute everything immediately to stop the static
         if (playback.masterGain) {
             try {
                 playback.masterGain.disconnect();
                 playback.masterGain.gain.value = 0;
-            } catch { /* ignore */ }
+            } catch {
+                /* ignore */
+            }
         }
 
         // 2. Kill all note scheduling
@@ -124,18 +138,20 @@ class AudioHealthMonitor {
             playback.audio.close().then(async () => {
                 playback.audio = null; // @worker-mutation // Clear reference
                 initAudio(); // Rebuild from scratch
-                
+
                 // 4. Restore levels
                 restoreGains();
-                
-                // 5. Re-attach watchdog
-                if (playback.masterGain) this.attachToMaster(playback.masterGain);
 
-                console.log("[AudioWatchdog] DSP Reset Complete. Audio should be clean.");
+                // 5. Re-attach watchdog
+                if (playback.masterGain) {
+                    this.attachToMaster(playback.masterGain);
+                }
+
+                console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
                 this.isRecovering = false;
             });
         } catch {
-            console.error("[AudioWatchdog] DSP Reset Failed");
+            console.error('[AudioWatchdog] DSP Reset Failed');
             this.isRecovering = false;
         }
     }

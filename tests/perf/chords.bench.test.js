@@ -1,7 +1,7 @@
-
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { validateProgression } from '../../public/chords.js';
 import { getState } from '../../public/state.js';
+
 const { arranger } = getState();
 
 describe('Chords Logic Performance', () => {
@@ -16,7 +16,7 @@ describe('Chords Logic Performance', () => {
                 value: 'I | IV | V | vi', // 4 chords per section
                 repeat: 1,
                 timeSignature: '4/4',
-                key: 'C'
+                key: 'C',
             });
         }
 
@@ -29,7 +29,9 @@ describe('Chords Logic Performance', () => {
         const end = performance.now();
 
         const duration = end - start;
-        console.log(`validateProgression (500 sections, 1 repeat each) took ${duration.toFixed(2)}ms`);
+        console.log(
+            `validateProgression (500 sections, 1 repeat each) took ${duration.toFixed(2)}ms`,
+        );
 
         // Sanity check
         expect(arranger.progression.length).toBeGreaterThan(0);

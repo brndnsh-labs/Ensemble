@@ -2,16 +2,18 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { h, render } from 'preact';
 import React from 'preact/compat';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Arranger } from '../../public/components/Arranger.jsx';
 import { getState } from '../../public/state.js';
+
 const { arranger } = getState();
 
 // Mock dependencies
 vi.mock('../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
@@ -21,7 +23,7 @@ vi.mock('../../public/arranger-controller.js', () => ({
     addSection: vi.fn(),
     refreshArrangerUI: vi.fn(),
     clearChordPresetHighlight: vi.fn(),
-    validateAndAnalyze: vi.fn()
+    validateAndAnalyze: vi.fn(),
 }));
 
 describe('Arranger Grouping Logic', () => {
@@ -38,21 +40,21 @@ describe('Arranger Grouping Logic', () => {
             { id: '2', label: 'Linked 1', value: 'IV', seamless: true },
             { id: '3', label: 'New Group', value: 'V', seamless: false },
             { id: '4', label: 'Linked 2', value: 'I', seamless: true },
-            { id: '5', label: 'Linked 3', value: 'V', seamless: true }
+            { id: '5', label: 'Linked 3', value: 'V', seamless: true },
         ];
 
         const container = document.getElementById('sectionList');
         render(<Arranger />, container);
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
-        // We expect groups to be created. 
+        // We expect groups to be created.
         // Logic: [Start, Linked 1] and [New Group, Linked 2, Linked 3]
         // If grouping is implemented via a wrapper div with class 'section-group'
-        
+
         const groups = container.querySelectorAll('.section-group');
-        
+
         expect(groups.length).toBe(2);
-        
+
         const firstGroup = groups[0];
         const cards1 = firstGroup.querySelectorAll('.section-card');
         expect(cards1.length).toBe(2);

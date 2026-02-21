@@ -61,5 +61,5 @@ export const ACTIONS = {
     RESET_STATE: 'RESET_STATE',
 
     // --- MIDI ---
-    SET_MIDI_CONFIG: 'SET_MIDI_CONFIG'
+    SET_MIDI_CONFIG: 'SET_MIDI_CONFIG',
 };

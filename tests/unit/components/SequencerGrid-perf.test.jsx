@@ -1,11 +1,12 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { h, render } from 'preact';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockDispatch } = vi.hoisted(() => ({
-    mockDispatch: vi.fn()
+    mockDispatch: vi.fn(),
 }));
 
 // Mock dependencies
@@ -14,52 +15,52 @@ vi.mock('../../../public/ui-bridge.js', () => ({
         const state = {
             groove: {
                 instruments: [
-                    { name: 'Kick', steps: new Array(16).fill(0), muted: false, symbol: 'K' }
+                    { name: 'Kick', steps: new Array(16).fill(0), muted: false, symbol: 'K' },
                 ],
                 measures: 1,
-                gridVersion: 1
+                gridVersion: 1,
             },
             arranger: {
-                timeSignature: '4/4'
+                timeSignature: '4/4',
             },
             playback: {
-                isPlaying: false
-            }
+                isPlaying: false,
+            },
         };
         return selector(state);
     },
-    useDispatch: () => mockDispatch
+    useDispatch: () => mockDispatch,
 }));
 
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         dispatch: mockDispatch,
         ACTIONS: {
-            STEP_TOGGLE: 'STEP_TOGGLE'
+            STEP_TOGGLE: 'STEP_TOGGLE',
         },
         playback: {
             lastPlayingStep: 0,
-            audio: { currentTime: 0 }
+            audio: { currentTime: 0 },
         },
         groove: {
             instruments: [
-                { name: 'Kick', steps: new Array(16).fill(0), muted: false, symbol: 'K' }
+                { name: 'Kick', steps: new Array(16).fill(0), muted: false, symbol: 'K' },
             ],
             measures: 1,
-            gridVersion: 1
-        }
+            gridVersion: 1,
+        },
     };
 
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 vi.mock('../../../public/types.js', () => ({
     ACTIONS: {
-        STEP_TOGGLE: 'STEP_TOGGLE'
-    }
+        STEP_TOGGLE: 'STEP_TOGGLE',
+    },
 }));
 
 vi.mock('../../../public/utils.js', () => ({
@@ -67,23 +68,23 @@ vi.mock('../../../public/utils.js', () => ({
     getStepInfo: (idx) => ({
         isBeatStart: idx % 4 === 0,
         isGroupStart: idx % 16 === 0,
-        beatIndex: Math.floor(idx / 4)
-    })
+        beatIndex: Math.floor(idx / 4),
+    }),
 }));
 
 vi.mock('../../../public/config.js', () => ({
     TIME_SIGNATURES: {
-        '4/4': { stepsPerBeat: 4 }
-    }
+        '4/4': { stepsPerBeat: 4 },
+    },
 }));
 
 vi.mock('../../../public/instrument-controller.js', () => ({
-    clearDrumPresetHighlight: vi.fn()
+    clearDrumPresetHighlight: vi.fn(),
 }));
 
 vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
-    playDrumSound: vi.fn()
+    playDrumSound: vi.fn(),
 }));
 
 import { SequencerGrid } from '../../../public/components/SequencerGrid.jsx';
@@ -135,7 +136,7 @@ describe('SequencerGrid Drag Interaction', () => {
         step2.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
 
         // Check immediately and wait a bit to ensure nothing happens
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         expect(mockDispatch).not.toHaveBeenCalled();
     });
 });

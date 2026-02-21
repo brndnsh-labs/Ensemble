@@ -1,22 +1,22 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockStartExport, mockSyncWorker } = vi.hoisted(() => {
     return {
         mockStartExport: vi.fn(),
         mockSyncWorker: vi.fn(),
-    }
+    };
 });
 
 vi.mock('../../public/worker-client.js', () => ({
     startExport: mockStartExport,
-    syncWorker: mockSyncWorker
+    syncWorker: mockSyncWorker,
 }));
 
 vi.mock('../../public/ui.js', () => ({
-    showToast: vi.fn()
+    showToast: vi.fn(),
 }));
 
 import { exportToMidi } from '../../public/midi-export.js';

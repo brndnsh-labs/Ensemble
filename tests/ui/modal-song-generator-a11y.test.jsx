@@ -1,27 +1,28 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { h, render } from 'preact';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GenerateSongModal } from '../../public/components/GenerateSongModal.jsx';
 import { dispatch } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies
 vi.mock('../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/app-controller.js', () => ({
-    setBpm: vi.fn()
+    setBpm: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({
     togglePower: vi.fn(),
     switchMeasure: vi.fn(),
     updateMeasures: vi.fn(),
-    cloneMeasure: vi.fn()
+    cloneMeasure: vi.fn(),
 }));
 vi.mock('../../public/ui-song-generator-controller.js', () => ({
-    setupSongGeneratorHandlers: vi.fn()
+    setupSongGeneratorHandlers: vi.fn(),
 }));
 
 vi.mock('../../public/state.js', async (importOriginal) => {
@@ -30,7 +31,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
         ...actual,
         playback: {
             ...actual.playback,
-            modals: { generateSong: true, editor: false }
+            modals: { generateSong: true, editor: false },
         },
         arranger: { ...actual.arranger, totalSteps: 64 },
     };
@@ -38,7 +39,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
         ...mockState,
         getState: () => mockState,
         dispatch: actual.dispatch,
-        ACTIONS: actual.ACTIONS
+        ACTIONS: actual.ACTIONS,
     };
 });
 
@@ -72,7 +73,7 @@ describe('Song Generator Modal Accessibility', () => {
         const selects = [
             { id: 'gen-root-key', labelText: 'Root Key' },
             { id: 'gen-time-sig', labelText: 'Time Signature' },
-            { id: 'gen-structure', labelText: 'Structure' }
+            { id: 'gen-structure', labelText: 'Structure' },
         ];
 
         selects.forEach(({ id, labelText }) => {
@@ -95,7 +96,7 @@ describe('Song Generator Modal Accessibility', () => {
         seedCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
 
         // Wait for re-render
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
 
         const seedSelect = document.getElementById('gen-seed-type');
         expect(seedSelect).not.toBeNull();

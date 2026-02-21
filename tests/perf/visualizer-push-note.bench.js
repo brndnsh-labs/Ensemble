@@ -1,4 +1,4 @@
-import { describe, bench } from 'vitest';
+import { bench, describe } from 'vitest';
 import { UnifiedVisualizer } from '../../public/visualizer.js';
 
 describe('UnifiedVisualizer PushNote Performance', () => {
@@ -15,13 +15,17 @@ describe('UnifiedVisualizer PushNote Performance', () => {
         visualizer.pushNote('bench', { time: i, midi: 60, duration: 0.1 });
     }
 
-    bench('pushNote with history full (triggering shift)', () => {
-        visualizer.pushNote('bench', {
-            time: 100,
-            midi: 60,
-            duration: 0.1,
-            noteName: 'C',
-            octave: 4
-        });
-    }, { time: 1000 });
+    bench(
+        'pushNote with history full (triggering shift)',
+        () => {
+            visualizer.pushNote('bench', {
+                time: 100,
+                midi: 60,
+                duration: 0.1,
+                noteName: 'C',
+                octave: 4,
+            });
+        },
+        { time: 1000 },
+    );
 });

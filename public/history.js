@@ -1,5 +1,7 @@
 import { getState } from './state.js';
+
 const { arranger } = getState();
+
 import { showToast } from './ui.js';
 
 // We need some function references that are usually in main.js
@@ -8,15 +10,19 @@ import { showToast } from './ui.js';
 
 export function pushHistory() {
     arranger.history.push(JSON.stringify(arranger.sections));
-    if (arranger.history.length > 20) arranger.history.shift();
+    if (arranger.history.length > 20) {
+        arranger.history.shift();
+    }
 }
 
 export function undo(refreshArrangerUI) {
-    if (arranger.history.length === 0) return;
+    if (arranger.history.length === 0) {
+        return;
+    }
     const last = arranger.history.pop();
     arranger.sections = JSON.parse(last);
     if (refreshArrangerUI) {
         refreshArrangerUI();
     }
-    showToast("Undo successful");
+    showToast('Undo successful');
 }

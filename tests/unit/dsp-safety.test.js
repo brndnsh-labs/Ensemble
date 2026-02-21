@@ -2,47 +2,56 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 // Mock dependencies
 vi.mock('../../public/ui.js', () => ({
     ui: {
         masterVol: { value: '0.5' },
         densitySelect: { value: 'standard' },
         intensitySlider: { value: 0 },
-        intensityValue: { textContent: '' }
-    }
+        intensityValue: { textContent: '' },
+    },
 }));
 
 vi.mock('../../public/persistence.js', () => ({
-    debounceSaveState: vi.fn()
+    debounceSaveState: vi.fn(),
 }));
 
 vi.mock('../../public/fills.js', () => ({
-    generateProceduralFill: vi.fn(() => ({}))
+    generateProceduralFill: vi.fn(() => ({})),
 }));
 
-import { createSoftClipCurve, clampFreq } from '../../public/utils.js';
 import { initAudio } from '../../public/engine/engine.js';
-import { dispatch, getState, storage } from '../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../public/state.js';
+import { clampFreq, createSoftClipCurve } from '../../public/utils.js';
+
+const { playback, chords, bass } = getState();
+
 import { applyConductor } from '../../public/conductor.js';
 
 describe('DSP & Signal Safety', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        
-        const MockAudioContext = vi.fn().mockImplementation(function() {
+
+        const MockAudioContext = vi.fn().mockImplementation(function () {
             this.state = 'running';
             this.currentTime = 0;
             this.sampleRate = 44100;
             this.createGain = vi.fn().mockImplementation(() => ({
                 connect: vi.fn(),
-                gain: { value: 1, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() }
+                gain: {
+                    value: 1,
+                    setTargetAtTime: vi.fn(),
+                    setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                    cancelScheduledValues: vi.fn(),
+                },
             }));
             this.createWaveShaper = vi.fn().mockImplementation(() => ({
                 connect: vi.fn(),
                 curve: null,
-                oversample: 'none'
+                oversample: 'none',
             }));
             this.createDynamicsCompressor = vi.fn().mockImplementation(() => ({
                 connect: vi.fn(),
@@ -50,17 +59,19 @@ describe('DSP & Signal Safety', () => {
                 ratio: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
                 knee: { setValueAtTime: vi.fn() },
                 attack: { setValueAtTime: vi.fn() },
-                release: { setValueAtTime: vi.fn() }
+                release: { setValueAtTime: vi.fn() },
             }));
             this.createBiquadFilter = vi.fn().mockImplementation(() => ({
                 connect: vi.fn(),
                 frequency: { setValueAtTime: vi.fn() },
                 Q: { setValueAtTime: vi.fn() },
                 gain: { setValueAtTime: vi.fn() },
-                type: 'lowpass'
+                type: 'lowpass',
             }));
             this.createConvolver = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
-            this.createBuffer = vi.fn(() => ({ getChannelData: vi.fn(() => new Float32Array(1024)) }));
+            this.createBuffer = vi.fn(() => ({
+                getChannelData: vi.fn(() => new Float32Array(1024)),
+            }));
             this.destination = {};
         });
 
@@ -72,33 +83,33 @@ describe('DSP & Signal Safety', () => {
         const curve = createSoftClipCurve();
         expect(curve).toBeInstanceOf(Float32Array);
         expect(curve.length).toBe(44100);
-        
+
         // Midpoint should be 0
         expect(curve[22050]).toBeCloseTo(0, 2);
-        
+
         // Ends should be clamped/saturated
         expect(curve[0]).toBeLessThan(-0.9);
         expect(curve[44099]).toBeGreaterThan(0.9);
-        
+
         // Monotonic check
-        for(let i = 1; i < curve.length; i += 100) {
-            expect(curve[i]).toBeGreaterThanOrEqual(curve[i-1]);
+        for (let i = 1; i < curve.length; i += 100) {
+            expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1]);
         }
     });
 
     it('should adjust master limiter based on band intensity to prevent clipping', () => {
         initAudio(); // Initialize nodes
-        
+
         // Low intensity
         playback.bandIntensity = 0.2;
         applyConductor();
         const lowThreshold = playback.masterLimiter.threshold.setTargetAtTime.mock.calls[0][0];
-        
+
         // High intensity
         playback.bandIntensity = 0.9;
         applyConductor();
         const highThreshold = playback.masterLimiter.threshold.setTargetAtTime.mock.calls[1][0];
-        
+
         // High intensity should have a lower threshold (more compression/limiting)
         expect(highThreshold).toBeLessThan(lowThreshold);
     });
@@ -107,10 +118,10 @@ describe('DSP & Signal Safety', () => {
         // High reverb settings in state
         chords.reverb = 1.2; // Over 1.0!
         bass.reverb = 0.8;
-        
+
         initAudio();
-        
-        // The engine should clamp or handle these. 
+
+        // The engine should clamp or handle these.
         // Let's verify what the gain nodes were actually set to.
         // (Depends on engine.js implementation)
     });

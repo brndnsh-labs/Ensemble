@@ -2,21 +2,35 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Global Mocks
-vi.stubGlobal('window', { 
-    addEventListener: vi.fn(), 
+vi.stubGlobal('window', {
+    addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn()
+    dispatchEvent: vi.fn(),
 });
-vi.stubGlobal('CustomEvent', class { constructor(type, detail) { this.type = type; this.detail = detail?.detail; } });
+vi.stubGlobal(
+    'CustomEvent',
+    class {
+        constructor(type, detail) {
+            this.type = type;
+            this.detail = detail?.detail;
+        }
+    },
+);
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
-    
-    const mockArranger = { stepMap: [], sections: [], totalSteps: 0, timeSignature: '4/4', measureMap: new Map() };
-    const mockPlayback = { 
+
+    const mockArranger = {
+        stepMap: [],
+        sections: [],
+        totalSteps: 0,
+        timeSignature: '4/4',
+        measureMap: new Map(),
+    };
+    const mockPlayback = {
         audio: { currentTime: 0 },
         unswungNextNoteTime: 0,
         currentKey: '',
@@ -26,7 +40,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         visualFlash: false,
         metronome: false,
         countIn: false,
-        viz: null
+        viz: null,
     };
     const mockGroove = { genreFeel: 'Rock', instruments: [], humanize: 0, measures: 1 };
     const mockMidi = { enabled: false };
@@ -45,22 +59,22 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         vizState: mockVizState,
         bass: mockBass,
         chords: mockChords,
-        harmony: mockHarmony
+        harmony: mockHarmony,
     };
 
     return {
         ...actual,
         ...mockStateMap,
-        getState: () => mockStateMap
+        getState: () => mockStateMap,
     };
 });
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
         metronome: { checked: false },
-        visualFlash: { checked: false }
+        visualFlash: { checked: false },
     },
-    triggerFlash: vi.fn()
+    triggerFlash: vi.fn(),
 }));
 
 // Mock platform dependencies often used by scheduler
@@ -88,12 +102,15 @@ vi.mock('../../../public/conductor.js', () => ({
     checkSectionTransition: vi.fn(),
 }));
 
-import { scheduleGlobalEvent, scheduleChordVisuals } from '../../../public/engine/scheduler-core.js';
+import {
+    scheduleChordVisuals,
+    scheduleGlobalEvent,
+} from '../../../public/engine/scheduler-core.js';
 import { getState } from '../../../public/state.js';
+
 const { arranger, playback, vizState } = getState();
 
 describe('Scheduler Core System', () => {
-    
     beforeEach(() => {
         vi.clearAllMocks();
         playback.currentKey = '';
@@ -107,12 +124,34 @@ describe('Scheduler Core System', () => {
         // Bar 2 (Step 16): Key B
         arranger.totalSteps = 32;
         arranger.stepMap = [
-            { start: 0, end: 16, chord: { sectionId: 's1', key: 'A', freqs: [], rootMidi: 60, intervals: [0, 4, 7], beats: 4 } },
-            { start: 16, end: 32, chord: { sectionId: 's2', key: 'B', freqs: [], rootMidi: 62, intervals: [0, 4, 7], beats: 4 } }
+            {
+                start: 0,
+                end: 16,
+                chord: {
+                    sectionId: 's1',
+                    key: 'A',
+                    freqs: [],
+                    rootMidi: 60,
+                    intervals: [0, 4, 7],
+                    beats: 4,
+                },
+            },
+            {
+                start: 16,
+                end: 32,
+                chord: {
+                    sectionId: 's2',
+                    key: 'B',
+                    freqs: [],
+                    rootMidi: 62,
+                    intervals: [0, 4, 7],
+                    beats: 4,
+                },
+            },
         ];
         arranger.sections = [
             { id: 's1', key: 'A' },
-            { id: 's2', key: 'B' }
+            { id: 's2', key: 'B' },
         ];
     });
 
@@ -121,10 +160,12 @@ describe('Scheduler Core System', () => {
             // Trigger Step 0 (Key A)
             scheduleGlobalEvent(0, 0);
 
-            expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'key-change',
-                detail: { key: 'A' }
-            }));
+            expect(window.dispatchEvent).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: 'key-change',
+                    detail: { key: 'A' },
+                }),
+            );
 
             window.dispatchEvent.mockClear();
 
@@ -134,10 +175,12 @@ describe('Scheduler Core System', () => {
 
             // Trigger Step 16 (Key B)
             scheduleGlobalEvent(16, 0);
-            expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'key-change',
-                detail: { key: 'B' }
-            }));
+            expect(window.dispatchEvent).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: 'key-change',
+                    detail: { key: 'B' },
+                }),
+            );
         });
     });
 
@@ -150,8 +193,8 @@ describe('Scheduler Core System', () => {
                     freqs: [440, 550, 660],
                     rootMidi: 60,
                     intervals: [0, 4, 7],
-                    beats: 4
-                }
+                    beats: 4,
+                },
             };
             const time = 10.0;
 
@@ -164,7 +207,7 @@ describe('Scheduler Core System', () => {
             expect(playback.drawQueue[0]).toMatchObject({
                 type: 'chord_vis',
                 time: time,
-                index: 1
+                index: 1,
             });
         });
 
@@ -172,7 +215,7 @@ describe('Scheduler Core System', () => {
             const chordData = {
                 stepInChord: 1,
                 chordIndex: 1,
-                chord: { freqs: [] }
+                chord: { freqs: [] },
             };
 
             scheduleChordVisuals(chordData, 10.0);

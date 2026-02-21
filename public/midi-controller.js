@@ -1,5 +1,5 @@
+import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
-import { getState, dispatch } from './state.js';
 
 let midiAccess = null;
 
@@ -22,13 +22,15 @@ const sentBendValues = new Map();
  */
 function handleMIDIMessage(event) {
     const { midi } = getState();
-    if (!midi.enabled) return;
-    
+    if (!midi.enabled) {
+        return;
+    }
+
     const [status, data1, data2] = event.data;
-    const type = status & 0xF0;
+    const type = status & 0xf0;
 
     // CC Messages (0xB0)
-    if (type === 0xB0) {
+    if (type === 0xb0) {
         // Controller 11 (Expression) or 1 (Modulation) maps to Band Intensity
         if (data1 === 11 || data1 === 1) {
             const intensity = data2 / 127;
@@ -42,7 +44,7 @@ function handleMIDIMessage(event) {
  */
 export async function initMIDI() {
     if (!navigator.requestMIDIAccess) {
-        console.warn("Web MIDI API not supported in this browser.");
+        console.warn('Web MIDI API not supported in this browser.');
         return false;
     }
 
@@ -62,7 +64,7 @@ export async function initMIDI() {
         syncMIDIOutputs();
         return true;
     } catch (err) {
-        console.error("Failed to get MIDI access", err);
+        console.error('Failed to get MIDI access', err);
         return false;
     }
 }
@@ -71,7 +73,9 @@ export async function initMIDI() {
  * Updates the state with current list of MIDI outputs.
  */
 function syncMIDIOutputs() {
-    if (!midiAccess) return;
+    if (!midiAccess) {
+        return;
+    }
     const outputs = [];
     for (const output of midiAccess.outputs.values()) {
         outputs.push({ id: output.id, name: output.name });
@@ -88,14 +92,18 @@ function syncMIDIOutputs() {
  */
 function sendMIDINoteOn(channel, note, velocity, time) {
     const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
+    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+        return;
+    }
     const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) return;
+    if (!output) {
+        return;
+    }
 
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
     const status = 0x90 | (channel - 1);
     output.send([status, note, velocity], midiTime);
-    
+
     activeNotes.add(`${channel}_${note}`);
 }
 
@@ -107,9 +115,13 @@ function sendMIDINoteOn(channel, note, velocity, time) {
  */
 function sendMIDINoteOff(channel, note, time) {
     const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
+    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+        return;
+    }
     const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) return;
+    if (!output) {
+        return;
+    }
 
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
     const status = 0x80 | (channel - 1);
@@ -127,38 +139,46 @@ function sendMIDINoteOff(channel, note, time) {
  */
 export function sendMIDICC(channel, controller, value, time) {
     const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
+    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+        return;
+    }
     const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) return;
+    if (!output) {
+        return;
+    }
 
     // Deduplication: Don't resend if value hasn't changed
     const key = `${channel}_${controller}`;
-    if (sentCCValues.get(key) === value) return;
+    if (sentCCValues.get(key) === value) {
+        return;
+    }
     sentCCValues.set(key, value);
 
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
-    const status = 0xB0 | (channel - 1);
+    const status = 0xb0 | (channel - 1);
     output.send([status, controller, value], midiTime);
 }
 
 /**
  * Maps an internal velocity (0.0 to ~1.5) to a MIDI velocity (0-127).
  * Uses a compression curve to ensure high-intensity accents don't just slam into 127.
- * @param {number} internalVel 
+ * @param {number} internalVel
  * @returns {number} 0-127
  */
 export function normalizeMidiVelocity(internalVel) {
     const { midi } = getState();
-    if (internalVel <= 0.01) return 1; // Minimum audibility for non-zero internal
+    if (internalVel <= 0.01) {
+        return 1; // Minimum audibility for non-zero internal
+    }
 
     // We treat 1.5 as the "theoretical maximum" for internal accents.
     // We apply a slight curve (0.8) to boost the "meat" of the signal (0.5-1.0 range)
     // so it sits comfortably in the MIDI 60-100 range.
     const sensitivity = midi.velocitySensitivity || 1.0;
-    const curve = 0.8 / sensitivity; 
-    
-    const normalized = Math.pow(Math.min(1.5, internalVel) / 1.5, curve);
-    
+    const curve = 0.8 / sensitivity;
+
+    const normalized = (Math.min(1.5, internalVel) / 1.5) ** curve;
+
     // DAWs often treat < 20 as "ghost notes" or barely audible.
     // We lift the floor to 20 for better translation.
     return Math.max(20, Math.min(127, Math.floor(normalized * 127)));
@@ -172,21 +192,27 @@ export function normalizeMidiVelocity(internalVel) {
  */
 export function sendMIDIPitchBend(channel, value, time) {
     const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
+    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+        return;
+    }
     const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) return;
+    if (!output) {
+        return;
+    }
 
     // Deduplication
-    if (sentBendValues.get(channel) === value) return;
+    if (sentBendValues.get(channel) === value) {
+        return;
+    }
     sentBendValues.set(channel, value);
 
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
-    const status = 0xE0 | (channel - 1);
-    
+    const status = 0xe0 | (channel - 1);
+
     const normalized = Math.max(0, Math.min(16383, value + 8192));
-    const lsb = normalized & 0x7F;
-    const msb = (normalized >> 7) & 0x7F;
-    
+    const lsb = normalized & 0x7f;
+    const msb = (normalized >> 7) & 0x7f;
+
     output.send([status, lsb, msb], midiTime);
 }
 
@@ -194,11 +220,11 @@ export function sendMIDIPitchBend(channel, value, time) {
  * Convenience helper to send a note with a duration.
  * Includes a small safety gap to ensure Note Offs occur before the next Note On.
  * intelligently handles overlaps by truncating previous notes if they overlap with new ones.
- * @param {number} channel 
- * @param {number} note 
- * @param {number} velocity 
- * @param {number} time 
- * @param {number} duration 
+ * @param {number} channel
+ * @param {number} note
+ * @param {number} velocity
+ * @param {number} time
+ * @param {number} duration
  * @param {boolean|Object} [options=false] - If true, enforces monophony. Or pass object { isMono, bend }
  */
 export function sendMIDINote(channel, note, velocity, time, duration, options = false) {
@@ -213,8 +239,8 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
     if (isMono) {
         for (const activeKey of activeNotes) {
             const [chStr, nStr] = activeKey.split('_');
-            const activeCh = parseInt(chStr);
-            const activeNote = parseInt(nStr);
+            const activeCh = parseInt(chStr, 10);
+            const activeNote = parseInt(nStr, 10);
 
             if (activeCh === channel && activeNote !== note) {
                 const output = midiAccess?.outputs.get(midi.selectedOutputId);
@@ -230,7 +256,12 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
                             const ak = activeKey;
                             setTimeout(() => {
                                 if (activeNotes.has(ak)) {
-                                    out.send([status, activeNote, 0], (cutoffTime - playback.audio.currentTime) * 1000 + performance.now() + midi.latency);
+                                    out.send(
+                                        [status, activeNote, 0],
+                                        (cutoffTime - playback.audio.currentTime) * 1000 +
+                                            performance.now() +
+                                            midi.latency,
+                                    );
                                     activeNotes.delete(ak);
                                 }
                             }, delayToCutoff);
@@ -255,11 +286,11 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
         if (prev.endTime > time) {
             // Cancel the original late Off
             clearTimeout(prev.id);
-            
+
             // Send Off IMMEDIATELY (synchronously) to ensure it arrives before the new On
             // We use the new note's start time minus epsilon as the timestamp
             const cutoffTime = Math.max(now, time - 0.005);
-            
+
             // We manually send the Off here instead of using setTimeout
             // This ensures the driver receives Off -> On sequence
             if (midiAccess && midi.selectedOutputId) {
@@ -268,7 +299,10 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
                     // Calculate MIDI timestamp for cutoff
                     // time param is AudioContext time.
                     // midiTime = (cutoffTime - playback.audio.currentTime) * 1000 + performance.now()
-                    const midiTime = (cutoffTime - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
+                    const midiTime =
+                        (cutoffTime - playback.audio.currentTime) * 1000 +
+                        performance.now() +
+                        midi.latency;
                     const status = 0x80 | (channel - 1);
                     output.send([status, note, 0], midiTime);
                     activeNotes.delete(key);
@@ -287,16 +321,16 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
     // This guarantees retriggering on monophonic synths and prevents "tied" notes.
     // Min duration 20ms, Safety gap 15ms.
     const safeDuration = Math.max(0.02, duration - 0.015);
-    
+
     // Calculate delay relative to now
     const startTime = time;
     const endTime = startTime + safeDuration;
-    
+
     const delaySeconds = endTime - now;
     const delayMs = Math.max(0, delaySeconds * 1000);
 
     const timeoutId = setTimeout(() => {
-        sendMIDINoteOff(channel, note, playback.audio.currentTime); 
+        sendMIDINoteOff(channel, note, playback.audio.currentTime);
         // Only delete if it's THIS timeout (in case we overwrote it, but we cleared before, so it's fine)
         const current = activeNoteOffs.get(key);
         if (current && current.id === timeoutId) {
@@ -312,24 +346,24 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
  * Maps drum instrument names to standard MIDI drum notes (General MIDI).
  */
 const DRUM_MAP = {
-    'Kick': 36,
-    'Snare': 38,
-    'HiHat': 42,
-    'Open': 46,
-    'Crash': 49,
-    'Ride': 51,
-    'Rim': 37,
-    'Clap': 39,
-    'Cowbell': 56,
-    'Shaker': 70,
-    'Clave': 75,
-    'Conga': 63,
-    'Bongo': 60,
-    'Perc': 67,
-    'Guiro': 74,
+    Kick: 36,
+    Snare: 38,
+    HiHat: 42,
+    Open: 46,
+    Crash: 49,
+    Ride: 51,
+    Rim: 37,
+    Clap: 39,
+    Cowbell: 56,
+    Shaker: 70,
+    Clave: 75,
+    Conga: 63,
+    Bongo: 60,
+    Perc: 67,
+    Guiro: 74,
     'High Tom': 50,
     'Mid Tom': 47,
-    'Low Tom': 43
+    'Low Tom': 43,
 };
 
 /**
@@ -337,7 +371,7 @@ const DRUM_MAP = {
  */
 export function sendMIDIDrum(instrumentName, time, velocity, octaveOffset = 0) {
     const { midi } = getState();
-    const note = (DRUM_MAP[instrumentName] || 36) + (octaveOffset * 12);
+    const note = (DRUM_MAP[instrumentName] || 36) + octaveOffset * 12;
     const vel = normalizeMidiVelocity(velocity);
     // Drums are usually short triggers, so we'll send a note off shortly after
     sendMIDINote(midi.drumsChannel, note, vel, time, 0.05);
@@ -350,12 +384,16 @@ export function sendMIDIDrum(instrumentName, time, velocity, octaveOffset = 0) {
  */
 export function sendMIDITransport(type, time) {
     const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) return;
+    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+        return;
+    }
     const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) return;
+    if (!output) {
+        return;
+    }
 
     const midiTime = (time - playback.audio.currentTime) * 1000 + performance.now() + midi.latency;
-    const msg = type === 'start' ? 0xFA : 0xFC;
+    const msg = type === 'start' ? 0xfa : 0xfc;
     output.send([msg], midiTime);
 }
 
@@ -371,32 +409,36 @@ export function panic(resetAll = false) {
     }
     activeNoteOffs.clear();
 
-    if (!midi.selectedOutputId || !midiAccess) return;
+    if (!midi.selectedOutputId || !midiAccess) {
+        return;
+    }
     const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) return;
+    if (!output) {
+        return;
+    }
 
     // 2. Explicitly kill currently active notes
     for (const key of activeNotes) {
         const [chStr, noteStr] = key.split('_');
-        const ch = parseInt(chStr);
-        const note = parseInt(noteStr);
-        
+        const ch = parseInt(chStr, 10);
+        const note = parseInt(noteStr, 10);
+
         const status = 0x80 | (ch - 1);
         output.send([status, note, 0]); // Immediate
     }
     activeNotes.clear();
-    
+
     // Clear caches so next update forces send
     sentCCValues.clear();
     sentBendValues.clear();
 
     // 3. Send All Notes Off / Reset Controllers as backup
     for (let ch = 0; ch < 16; ch++) {
-        output.send([0xB0 | ch, 123, 0]); // All Notes Off
+        output.send([0xb0 | ch, 123, 0]); // All Notes Off
         if (resetAll) {
-            output.send([0xB0 | ch, 121, 0]); // Reset All Controllers
-            output.send([0xB0 | ch, 64, 0]);  // Sustain Off
-            output.send([0xB0 | ch, 1, 0]);   // Mod Wheel Zero
+            output.send([0xb0 | ch, 121, 0]); // Reset All Controllers
+            output.send([0xb0 | ch, 64, 0]); // Sustain Off
+            output.send([0xb0 | ch, 1, 0]); // Mod Wheel Zero
         }
     }
 }

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadFromUrl } from '../../../public/state-hydration.js';
 import { ACTIONS } from '../../../public/types.js';
 
@@ -10,20 +10,20 @@ const { dispatchSpy, mockState } = vi.hoisted(() => {
             arranger: { key: 'C', timeSignature: '4/4', notation: 'roman', sections: [] },
             groove: { genreFeel: 'Rock', lastSmartGenre: 'Rock', instruments: [] },
             playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.3 },
-            chords: { style: 'smart' }
-        }
-    }
+            chords: { style: 'smart' },
+        },
+    };
 });
 
 vi.mock('../../../public/state.js', () => ({
     getState: () => mockState,
     dispatch: dispatchSpy,
     storage: { get: () => ({}) },
-    listeners: new Set()
+    listeners: new Set(),
 }));
 
 vi.mock('../../../public/app-controller.js', () => ({
-    applyTheme: vi.fn()
+    applyTheme: vi.fn(),
 }));
 
 describe('Security: URL Parameter Validation', () => {
@@ -41,8 +41,8 @@ describe('Security: URL Parameter Validation', () => {
             value: {
                 search: '',
                 origin: 'http://localhost',
-                pathname: '/'
-            }
+                pathname: '/',
+            },
         });
     });
 
@@ -85,7 +85,10 @@ describe('Security: URL Parameter Validation', () => {
     it('accepts valid style', () => {
         window.location.search = '?style=jazz';
         loadFromUrl();
-        expect(dispatchSpy).toHaveBeenCalledWith(ACTIONS.SET_STYLE, { module: 'chords', style: 'jazz' });
+        expect(dispatchSpy).toHaveBeenCalledWith(ACTIONS.SET_STYLE, {
+            module: 'chords',
+            style: 'jazz',
+        });
     });
 
     it('rejects invalid genre', () => {

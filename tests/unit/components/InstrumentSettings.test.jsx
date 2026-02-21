@@ -1,15 +1,16 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
 
 vi.mock('../../../public/ui-bridge.js', () => ({
-    useEnsembleState: (selector) => mockUseEnsembleState(selector)
+    useEnsembleState: (selector) => mockUseEnsembleState(selector),
 }));
 
 // Mock state.js
@@ -20,25 +21,25 @@ vi.mock('../../../public/state.js', () => {
             viz: {},
             audio: { currentTime: 0 },
             swing: 30,
-            swingSub: '8th'
+            swingSub: '8th',
         },
-        ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' }
+        ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' },
     };
     return {
         ...mockState,
         getState: () => mockState,
-        dispatch: mockState.dispatch
+        dispatch: mockState.dispatch,
     };
 });
 
 // Mock config
 vi.mock('../../../public/config.js', () => ({
-    MIXER_GAIN_MULTIPLIERS: { drums: 1.0, harmonies: 1.0 }
+    MIXER_GAIN_MULTIPLIERS: { drums: 1.0, harmonies: 1.0 },
 }));
 
 // Mock persistence
 vi.mock('../../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 
 import { InstrumentSettings } from '../../../public/components/InstrumentSettings.jsx';
@@ -58,14 +59,14 @@ describe('InstrumentSettings Component', () => {
 
     it('should render Volume and Reverb sliders for generic module', () => {
         // Mock state for a generic module (e.g. harmony)
-        mockUseEnsembleState.mockImplementation(cb => {
+        mockUseEnsembleState.mockImplementation((cb) => {
             const fullState = {
                 harmony: {
                     volume: 0.8,
                     reverb: 0.2,
-                    complexity: 0.5
+                    complexity: 0.5,
                 },
-                playback: {}
+                playback: {},
             };
             return cb(fullState);
         });
@@ -84,7 +85,7 @@ describe('InstrumentSettings Component', () => {
 
         // Verify value display is present
         const spans = container.querySelectorAll('span');
-        const spanTexts = Array.from(spans).map(s => s.textContent);
+        const spanTexts = Array.from(spans).map((s) => s.textContent);
 
         expect(spanTexts).toContain('80%');
         expect(spanTexts).toContain('20%');
@@ -99,19 +100,19 @@ describe('InstrumentSettings Component', () => {
 
     it('should render Swing and Humanize sliders for groove module', () => {
         // Mock state for groove
-        mockUseEnsembleState.mockImplementation(cb => {
+        mockUseEnsembleState.mockImplementation((cb) => {
             const fullState = {
                 groove: {
                     volume: 0.7,
                     reverb: 0.3,
                     humanize: 40,
                     larsMode: false,
-                    larsIntensity: 0.5
+                    larsIntensity: 0.5,
                 },
                 playback: {
                     swing: 30,
-                    swingSub: '8th'
-                }
+                    swingSub: '8th',
+                },
             };
             return cb(fullState);
         });
@@ -130,7 +131,7 @@ describe('InstrumentSettings Component', () => {
 
         // Verify value display is present
         const spans = container.querySelectorAll('span');
-        const spanTexts = Array.from(spans).map(s => s.textContent);
+        const spanTexts = Array.from(spans).map((s) => s.textContent);
 
         expect(spanTexts).toContain('30%');
         expect(spanTexts).toContain('40%');

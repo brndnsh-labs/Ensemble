@@ -1,18 +1,19 @@
 import { useEffect } from 'preact/hooks';
 import { switchMeasure } from '../instrument-controller.js';
-import { dispatch, getState } from '../state.js';
-const { playback, groove } = getState();
-import { ACTIONS } from '../types.js';
 import { saveCurrentState } from '../persistence.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
 
 export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (e) => {
             const { playback, groove, soloist } = getState();
-            const isTyping = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable;
+            const isTyping =
+                ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) ||
+                e.target.isContentEditable;
 
             // Space: Toggle Play
-            const anyModalOpen = Object.values(playback.modals).some(isOpen => isOpen);
+            const anyModalOpen = Object.values(playback.modals).some((isOpen) => isOpen);
             if (e.key === ' ' && !isTyping && !anyModalOpen) {
                 e.preventDefault();
                 dispatch(ACTIONS.TOGGLE_PLAY, { viz: playback.viz });
@@ -31,9 +32,9 @@ export function GlobalShortcuts() {
                 if (soloist) {
                     soloist.enabled = !soloist.enabled;
                     if (soloist.enabled) {
-                         soloist.isResting = true;
-                         soloist.currentPhraseSteps = 0;
-                         soloist.srdcState = 'Conclusion';
+                        soloist.isResting = true;
+                        soloist.currentPhraseSteps = 0;
+                        soloist.srdcState = 'Conclusion';
                     }
                     // Trigger UI update through a known action
                     dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloist.activeTab });
@@ -44,24 +45,32 @@ export function GlobalShortcuts() {
             // 1-5: Switch Mobile Tabs
             if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping) {
                 const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
-                const btn = btns[parseInt(e.key) - 1];
-                if (btn) btn.click();
+                const btn = btns[parseInt(e.key, 10) - 1];
+                if (btn) {
+                    btn.click();
+                }
             }
 
             // [ ]: Switch Measures
-            if (e.key === '[' && !isTyping) switchMeasure((groove.currentMeasure - 1 + groove.measures) % groove.measures);
-            if (e.key === ']' && !isTyping) switchMeasure((groove.currentMeasure + 1) % groove.measures);
+            if (e.key === '[' && !isTyping) {
+                switchMeasure((groove.currentMeasure - 1 + groove.measures) % groove.measures);
+            }
+            if (e.key === ']' && !isTyping) {
+                switchMeasure((groove.currentMeasure + 1) % groove.measures);
+            }
 
             // Escape: Close Modal / Unmaximize
             if (e.key === 'Escape') {
                 if (document.body.classList.contains('chord-maximized')) {
                     document.body.classList.remove('chord-maximized');
                     const btn = document.getElementById('maximizeChordBtn');
-                    if (btn) btn.textContent = '⛶';
+                    if (btn) {
+                        btn.textContent = '⛶';
+                    }
                 }
 
                 // Close any open modals
-                Object.keys(playback.modals).forEach(key => {
+                Object.keys(playback.modals).forEach((key) => {
                     if (playback.modals[key]) {
                         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });
                     }

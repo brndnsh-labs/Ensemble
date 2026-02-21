@@ -2,15 +2,23 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Unified mock for state and context
 vi.mock('../../../public/state.js', () => {
-    const mockPlayback = { 
-        audio: { 
+    const mockPlayback = {
+        audio: {
             currentTime: 0,
-            createOscillator: () => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn(), frequency: { setValueAtTime: vi.fn() } }),
-            createGain: () => ({ connect: vi.fn(), gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() } })
+            createOscillator: () => ({
+                connect: vi.fn(),
+                start: vi.fn(),
+                stop: vi.fn(),
+                frequency: { setValueAtTime: vi.fn() },
+            }),
+            createGain: () => ({
+                connect: vi.fn(),
+                gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+            }),
         },
         nextNoteTime: 0,
         unswungNextNoteTime: 0,
@@ -18,26 +26,32 @@ vi.mock('../../../public/state.js', () => {
         isPlaying: true,
         drawQueue: [],
         step: 0,
-        bpm: 200, 
+        bpm: 200,
         conductorVelocity: 1.0,
         bandIntensity: 0.5,
         isDrawing: true,
-        masterGain: {}
+        masterGain: {},
     };
-    const mockGroove = { 
-        enabled: true, 
+    const mockGroove = {
+        enabled: true,
         genreFeel: 'Rock',
         humanize: 0,
         instruments: [],
         measures: 1,
         fillActive: false,
-        followPlayback: false
+        followPlayback: false,
     };
     const mockArranger = {
         timeSignature: '4/4',
-        stepMap: [{ start: 0, end: 100000, chord: { freqs: [261.63], rootMidi: 60, intervals: [0], beats: 4 } }],
+        stepMap: [
+            {
+                start: 0,
+                end: 100000,
+                chord: { freqs: [261.63], rootMidi: 60, intervals: [0], beats: 4 },
+            },
+        ],
         totalSteps: 16,
-        measureMap: []
+        measureMap: [],
     };
     const mockBass = { enabled: true, buffer: new Map(), octave: 38 };
     const mockSoloist = { enabled: true, buffer: new Map(), octave: 72 };
@@ -46,7 +60,7 @@ vi.mock('../../../public/state.js', () => {
     const mockMidi = { enabled: false };
     const mockVizState = { enabled: true };
     const mockConductorState = { larsBpmOffset: 0 };
-    
+
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
@@ -57,13 +71,13 @@ vi.mock('../../../public/state.js', () => {
         harmony: mockHarmony,
         midi: mockMidi,
         vizState: mockVizState,
-        conductorState: mockConductorState
+        conductorState: mockConductorState,
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
@@ -72,31 +86,33 @@ vi.mock('../../../public/engine/engine.js', () => ({
     playDrumSound: vi.fn(),
     playNote: vi.fn(),
     playBassNote: vi.fn(),
-    playSoloNote: vi.fn()
+    playSoloNote: vi.fn(),
 }));
 
 vi.mock('../../../public/ui.js', () => ({
-    triggerFlash: vi.fn()
+    triggerFlash: vi.fn(),
 }));
 
 vi.mock('../../../public/worker-client.js', () => ({
     requestBuffer: vi.fn(),
     syncWorker: vi.fn(),
     startWorker: vi.fn(),
-    stopWorker: vi.fn()
+    stopWorker: vi.fn(),
 }));
 
 vi.mock('../../../public/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),
-    conductorState: { larsBpmOffset: 0 }
+    conductorState: { larsBpmOffset: 0 },
 }));
 
-import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { draw } from '../../../public/animation-loop.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { scheduler } from '../../../public/engine/scheduler-core.js';
+import { getState } from '../../../public/state.js';
+
+const { playback, chords, bass, soloist } = getState();
+
 import * as engine from '../../../public/engine/engine.js';
 
 describe('Long-Session Stress & Endurance', () => {
@@ -110,34 +126,36 @@ describe('Long-Session Stress & Endurance', () => {
         bass.buffer.clear();
         soloist.buffer.clear();
         chords.buffer.clear();
-        
+
         global.requestAnimationFrame = vi.fn();
     });
 
     it('should maintain a stable memory footprint over 1000 simulated measures', () => {
-        const stepsToSimulate = 16 * 1000; 
-        const secondsPerStep = 0.25 * (60 / playback.bpm); 
-        
-        vi.spyOn(engine, 'getVisualTime').mockImplementation(() => playback.audio.currentTime - 0.05);
+        const stepsToSimulate = 16 * 1000;
+        const secondsPerStep = 0.25 * (60 / playback.bpm);
+
+        vi.spyOn(engine, 'getVisualTime').mockImplementation(
+            () => playback.audio.currentTime - 0.05,
+        );
 
         for (let i = 0; i < stepsToSimulate; i++) {
             playback.audio.currentTime += secondsPerStep;
-            
+
             bass.buffer.set(playback.step, { freq: 100, durationSteps: 1 });
             soloist.buffer.set(playback.step, [{ freq: 400, durationSteps: 1 }]);
             chords.buffer.set(playback.step, [{ freq: 300, durationSteps: 1 }]);
-            
+
             scheduler();
-            draw(null); 
-            
+            draw(null);
+
             if (i % 100 === 0) {
                 expect(playback.drawQueue.length).toBeLessThan(350);
-                expect(bass.buffer.size).toBeLessThan(10); 
+                expect(bass.buffer.size).toBeLessThan(10);
                 expect(soloist.buffer.size).toBeLessThan(10);
                 expect(chords.buffer.size).toBeLessThan(10);
             }
         }
-        
+
         expect(playback.step).toBeGreaterThanOrEqual(stepsToSimulate);
     });
 });

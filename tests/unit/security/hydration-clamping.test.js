@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { hydrateState } from '../../../public/state-hydration.js';
 
 // Mock the state module
@@ -8,13 +8,21 @@ vi.mock('../../../public/state.js', () => {
     const mockState = {
         arranger: { sections: [], key: 'C', timeSignature: '4/4' },
         playback: { bpm: 100, bandIntensity: 0.5, complexity: 0.5 },
-        groove: { enabled: true, measures: 1, volume: 0.5, reverb: 0.2, swing: 0, humanize: 20, instruments: [] },
+        groove: {
+            enabled: true,
+            measures: 1,
+            volume: 0.5,
+            reverb: 0.2,
+            swing: 0,
+            humanize: 20,
+            instruments: [],
+        },
         chords: { enabled: true, volume: 0.5, reverb: 0.3 },
         bass: { enabled: true, volume: 0.5, reverb: 0.05 },
         soloist: { enabled: false, volume: 0.5, reverb: 0.6 },
         harmony: { enabled: false, volume: 0.4, reverb: 0.4 },
         vizState: { enabled: false },
-        midi: { enabled: false }
+        midi: { enabled: false },
     };
 
     return {
@@ -22,15 +30,15 @@ vi.mock('../../../public/state.js', () => {
         dispatch: vi.fn(),
         storage: {
             get: vi.fn(),
-            save: vi.fn()
+            save: vi.fn(),
         },
         ACTIONS: {
-            SET_MIDI_CONFIG: 'SET_MIDI_CONFIG'
-        }
+            SET_MIDI_CONFIG: 'SET_MIDI_CONFIG',
+        },
     };
 });
 
-import { storage, getState } from '../../../public/state.js';
+import { getState, storage } from '../../../public/state.js';
 
 describe('State Hydration Security (Clamping)', () => {
     beforeEach(() => {
@@ -49,8 +57,8 @@ describe('State Hydration Security (Clamping)', () => {
             sections: [{ id: '1', label: 'A', value: 'I' }], // Valid sections required to trigger hydration
             groove: {
                 measures: 1000, // Malicious value
-                volume: 0.5
-            }
+                volume: 0.5,
+            },
         });
 
         hydrateState();
@@ -64,7 +72,7 @@ describe('State Hydration Security (Clamping)', () => {
             sections: [{ id: '1', label: 'A', value: 'I' }],
             groove: { volume: 999, reverb: -10 },
             bass: { volume: 2.0 },
-            soloist: { reverb: 5.5 }
+            soloist: { reverb: 5.5 },
         });
 
         hydrateState();
@@ -81,8 +89,8 @@ describe('State Hydration Security (Clamping)', () => {
             sections: [{ id: '1', label: 'A', value: 'I' }],
             groove: {
                 swing: 150,
-                humanize: -20
-            }
+                humanize: -20,
+            },
         });
 
         hydrateState();
@@ -96,9 +104,9 @@ describe('State Hydration Security (Clamping)', () => {
         storage.get.mockReturnValue({
             sections: [{ id: '1', label: 'A', value: 'I' }],
             groove: {
-                volume: "50", // String "50" -> should be clamped to 1.0
-                swing: "200"
-            }
+                volume: '50', // String "50" -> should be clamped to 1.0
+                swing: '200',
+            },
         });
 
         hydrateState();

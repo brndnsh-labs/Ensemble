@@ -1,7 +1,12 @@
 /* eslint-disable */
-import { describe, it, expect } from 'vitest';
-import { normalizeKey, getFrequency, midiToNote, getMidi, getStepsPerMeasure, formatUnicodeSymbols, getStepInfo } from '../../public/utils.js';
-import { TIME_SIGNATURES } from '../../public/config.js';
+import { describe, expect, it } from 'vitest';
+import {
+    formatUnicodeSymbols,
+    getFrequency,
+    getMidi,
+    midiToNote,
+    normalizeKey,
+} from '../../public/utils.js';
 
 describe('Utility Functions', () => {
     describe('formatUnicodeSymbols', () => {
@@ -77,7 +82,7 @@ describe('Utility Functions', () => {
             const { compressSections, decompressSections } = await import('../../public/utils.js');
             const sections = [
                 { id: '1', label: 'Verse', value: 'C | F' },
-                { id: '2', label: 'Chorus', value: 'G | C' }
+                { id: '2', label: 'Chorus', value: 'G | C' },
             ];
             const compressed = compressSections(sections);
             expect(typeof compressed).toBe('string');
@@ -101,5 +106,4 @@ describe('Utility Functions', () => {
             expect(decompressed[0].label).toBe('Intro 🎵');
         });
     });
-
 });

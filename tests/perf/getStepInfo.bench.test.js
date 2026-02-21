@@ -1,7 +1,6 @@
-
-import { describe, it, expect } from 'vitest';
-import { getStepInfo } from '../../public/utils.js';
+import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { getStepInfo } from '../../public/utils.js';
 
 describe('getStepInfo Performance', () => {
     // Setup a large measure map simulating a long song with frequent meter changes
@@ -17,7 +16,7 @@ describe('getStepInfo Performance', () => {
         measureMap.push({
             start: currentStep,
             end: currentStep + length,
-            ts: ts
+            ts: ts,
         });
         currentStep += length;
     }

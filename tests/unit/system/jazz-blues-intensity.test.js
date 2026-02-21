@@ -2,20 +2,25 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { conductorState, checkSectionTransition } from '../../../public/conductor.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkSectionTransition, conductorState } from '../../../public/conductor.js';
+import { dispatch, getState } from '../../../public/state.js';
+
+const { arranger, playback, groove } = getState();
+
 import { ACTIONS } from '../../../public/types.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
-    
+
     // Create distinct mock objects
     const mockPlayback = { ...actual.playback };
-    const mockArranger = { 
+    const mockArranger = {
         ...actual.arranger,
-        sections: [{ id: 's1', label: 'Main' }, { id: 's2', label: 'Turnaround' }]
+        sections: [
+            { id: 's1', label: 'Main' },
+            { id: 's2', label: 'Turnaround' },
+        ],
     };
     const mockConductorState = { ...actual.conductorState };
     const mockGroove = { ...actual.groove };
@@ -32,7 +37,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         harmony: mockHarmony,
         chords: mockChords,
         bass: mockBass,
-        soloist: mockSoloist
+        soloist: mockSoloist,
     };
 
     return {
@@ -40,25 +45,27 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         ...mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn((action, payload) => {
-            if (action === 'SET_BAND_INTENSITY') mockPlayback.bandIntensity = payload;
-        })
+            if (action === 'SET_BAND_INTENSITY') {
+                mockPlayback.bandIntensity = payload;
+            }
+        }),
     };
 });
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
         intensitySlider: { value: 0 },
-        densitySelect: { value: 'standard' }
+        densitySelect: { value: 'standard' },
     },
-    triggerFlash: vi.fn()
+    triggerFlash: vi.fn(),
 }));
 
 vi.mock('../../../public/persistence.js', () => ({
-    debounceSaveState: vi.fn()
+    debounceSaveState: vi.fn(),
 }));
 
 vi.mock('../../../public/fills.js', () => ({
-    generateProceduralFill: vi.fn(() => ({}))
+    generateProceduralFill: vi.fn(() => ({})),
 }));
 
 describe('Jazz Blues Intensity Bug', () => {
@@ -81,13 +88,13 @@ describe('Jazz Blues Intensity Bug', () => {
             arranger.stepMap.push({
                 start: i * 16,
                 end: (i + 1) * 16,
-                chord: { sectionId: 's1', sectionLabel: 'Main' }
+                chord: { sectionId: 's1', sectionLabel: 'Main' },
             });
         }
 
         // Check at the start of the last measure (step 176)
         checkSectionTransition(176, 16);
-        
+
         // In 12-bar blues, step 176 should match fillStart (192 - 16 = 176)
         expect(conductorState.formIteration).toBe(1);
         expect(conductorState.target).not.toBe(0.5);
@@ -103,19 +110,19 @@ describe('Jazz Blues Intensity Bug', () => {
             arranger.stepMap.push({
                 start: i * 16,
                 end: (i + 1) * 16,
-                chord: { sectionId: 's1', sectionLabel: 'Main' }
+                chord: { sectionId: 's1', sectionLabel: 'Main' },
             });
         }
         // Bar 12 (Last Bar): Two chords of 8 steps each
         arranger.stepMap.push({
             start: 176,
             end: 184,
-            chord: { sectionId: 's1', sectionLabel: 'Main' }
+            chord: { sectionId: 's1', sectionLabel: 'Main' },
         });
         arranger.stepMap.push({
             start: 184,
             end: 192,
-            chord: { sectionId: 's1', sectionLabel: 'Main' }
+            chord: { sectionId: 's1', sectionLabel: 'Main' },
         });
 
         // We check every step in the last bar to see if it triggers
@@ -127,7 +134,7 @@ describe('Jazz Blues Intensity Bug', () => {
                 break;
             }
         }
-        
+
         expect(triggered).toBe(true);
     });
 
@@ -140,7 +147,7 @@ describe('Jazz Blues Intensity Bug', () => {
         arranger.stepMap = [
             { start: 0, end: 8, chord: { sectionId: 's1', sectionLabel: 'Main' } },
             { start: 8, end: 16, chord: { sectionId: 's2', sectionLabel: 'Turnaround' } },
-            { start: 16, end: 32, chord: { sectionId: 's1', sectionLabel: 'Main' } }
+            { start: 16, end: 32, chord: { sectionId: 's1', sectionLabel: 'Main' } },
         ];
 
         // Check at step 0 (Start of Measure 1)

@@ -1,10 +1,15 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { syncopation: 0, anticipation: 0, layBack: 0 } },
+        playback: {
+            bandIntensity: 0.5,
+            bpm: 120,
+            complexity: 0.5,
+            intent: { syncopation: 0, anticipation: 0, layBack: 0 },
+        },
         groove: { genreFeel: 'Rock', lastDrumPreset: 'Basic Rock' },
         chords: { enabled: true, style: 'smart', density: 'standard', octave: 60 },
         bass: { enabled: true },
@@ -14,38 +19,49 @@ vi.mock('../../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 vi.mock('../../../public/config.js', () => ({
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12], grouping: [2, 2] },
-        '3/4': { beats: 3, stepsPerBeat: 4, subdivision: '16th' }
-    }
+        '4/4': {
+            beats: 4,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12],
+            grouping: [2, 2],
+        },
+        '3/4': { beats: 3, stepsPerBeat: 4, subdivision: '16th' },
+    },
 }));
 
-import { getAccompanimentNotes, compingState, generateCompingPattern } from '../../../public/accompaniment.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import {
+    compingState,
+    generateCompingPattern,
+    getAccompanimentNotes,
+} from '../../../public/accompaniment.js';
+import { getState } from '../../../public/state.js';
+
+const { arranger, playback, chords, bass, groove } = getState();
 
 describe('Accompaniment Engine Logic', () => {
     const mockChord = {
         rootMidi: 60,
-        freqs: [261.63, 329.63, 392.00, 493.88], // Cmaj7
+        freqs: [261.63, 329.63, 392.0, 493.88], // Cmaj7
         quality: 'maj7',
         is7th: true,
-        beats: 4
+        beats: 4,
     };
 
     beforeEach(() => {
         vi.clearAllMocks();
         arranger.progression = [mockChord];
         arranger.timeSignature = '4/4';
-        compingState.lockedUntil = 0; 
+        compingState.lockedUntil = 0;
         compingState.lastChordIndex = -1;
         chords.enabled = true;
         chords.style = 'smart';
@@ -57,40 +73,65 @@ describe('Accompaniment Engine Logic', () => {
 
     describe('Generation & Styles', () => {
         it('should generate notes on the downbeat (step 0) by default', () => {
-            const notes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true, isGroupStart: true });
+            const notes = getAccompanimentNotes(mockChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            });
             expect(notes.length).toBeGreaterThan(0);
-            expect(notes[0].midi).toBe(60); 
+            expect(notes[0].midi).toBe(60);
         });
 
         it('should only play on the start of the chord in "pad" style', () => {
             chords.style = 'pad';
-            expect(getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true }).filter(n => n.midi > 0).length).toBeGreaterThan(0);
-            expect(getAccompanimentNotes(mockChord, 4, 4, 4, { isBeatStart: true }).filter(n => n.midi > 0).length).toBe(0);
+            expect(
+                getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true }).filter(
+                    (n) => n.midi > 0,
+                ).length,
+            ).toBeGreaterThan(0);
+            expect(
+                getAccompanimentNotes(mockChord, 4, 4, 4, { isBeatStart: true }).filter(
+                    (n) => n.midi > 0,
+                ).length,
+            ).toBe(0);
         });
 
         it('should generate CC 64 (Sustain) events on new chords', () => {
             const notes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
-            const sustainEvents = notes[0].ccEvents.filter(e => e.controller === 64);
-            expect(sustainEvents.some(e => e.value === 0)).toBe(true);
-            expect(sustainEvents.some(e => e.value === 127)).toBe(true);
+            const sustainEvents = notes[0].ccEvents.filter((e) => e.controller === 64);
+            expect(sustainEvents.some((e) => e.value === 0)).toBe(true);
+            expect(sustainEvents.some((e) => e.value === 127)).toBe(true);
         });
     });
 
     describe('Genre-specific Logic', () => {
         it('should use short durations for Funk and disable sustain for Reggae', () => {
             groove.genreFeel = 'Funk';
-            const funkNotes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true }).filter(n => n.midi > 0);
-            if (funkNotes.length > 0) expect([0.8, 0.4, 0.35, 0.2, 0.1]).toContain(funkNotes[0].durationSteps);
+            const funkNotes = getAccompanimentNotes(mockChord, 0, 0, 0, {
+                isBeatStart: true,
+            }).filter((n) => n.midi > 0);
+            if (funkNotes.length > 0) {
+                expect([0.8, 0.4, 0.35, 0.2, 0.1]).toContain(funkNotes[0].durationSteps);
+            }
 
             groove.genreFeel = 'Reggae';
             const reggaeNotes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
-            expect(reggaeNotes[0].ccEvents.filter(e => e.controller === 64).every(e => e.value === 0)).toBe(true);
+            expect(
+                reggaeNotes[0].ccEvents
+                    .filter((e) => e.controller === 64)
+                    .every((e) => e.value === 0),
+            ).toBe(true);
         });
 
         it('should perform rootless reduction when bass is enabled', () => {
-            const notesNormal = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true, isGroupStart: true });
+            const notesNormal = getAccompanimentNotes(mockChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            });
             bass.enabled = true;
-            const notesRootless = getAccompanimentNotes(mockChord, 16, 0, 0, { isBeatStart: true, isGroupStart: true });
+            const notesRootless = getAccompanimentNotes(mockChord, 16, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            });
             expect(notesRootless.length).toBeLessThan(notesNormal.length);
         });
     });
@@ -100,16 +141,23 @@ describe('Accompaniment Engine Logic', () => {
             const pattern = generateCompingPattern('Rock', 'balanced', 16);
             expect(pattern).toHaveLength(16);
 
-            const sparse = generateCompingPattern('Rock', 'sparse', 16).filter(n => n === 1).length;
-            const active = generateCompingPattern('Rock', 'active', 16).filter(n => n === 1).length;
+            const sparse = generateCompingPattern('Rock', 'sparse', 16).filter(
+                (n) => n === 1,
+            ).length;
+            const active = generateCompingPattern('Rock', 'active', 16).filter(
+                (n) => n === 1,
+            ).length;
             expect(active).toBeGreaterThanOrEqual(sparse);
         });
 
         it('should generate Jazz Charleston rhythm', () => {
             let foundCharleston = false;
-            for(let i=0; i<100; i++) {
+            for (let i = 0; i < 100; i++) {
                 const p = generateCompingPattern('Jazz', 'balanced', 16);
-                if (p[0] === 1 && p[7] === 1) { foundCharleston = true; break; }
+                if (p[0] === 1 && p[7] === 1) {
+                    foundCharleston = true;
+                    break;
+                }
             }
             expect(foundCharleston).toBe(true);
         });

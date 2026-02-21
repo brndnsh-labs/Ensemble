@@ -21,7 +21,7 @@ describe('ChordAnalyzerLite Performance', () => {
 
         const mockAudioBuffer = {
             getChannelData: () => signal,
-            sampleRate: sampleRate
+            sampleRate: sampleRate,
         };
 
         const start = performance.now();

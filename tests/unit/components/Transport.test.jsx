@@ -1,26 +1,27 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
 
 vi.mock('../../../public/ui-bridge.js', () => ({
-    useEnsembleState: (selector) => mockUseEnsembleState(selector)
+    useEnsembleState: (selector) => mockUseEnsembleState(selector),
 }));
 
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         dispatch: vi.fn(),
         playback: { viz: {} },
-        ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' }
+        ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' },
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
@@ -54,12 +55,12 @@ describe('Transport Component', () => {
     });
 
     it('should display START when not playing', () => {
-        mockUseEnsembleState.mockImplementation(selector => ({
+        mockUseEnsembleState.mockImplementation((_selector) => ({
             isPlaying: false,
             bpm: 120,
             sessionTimer: 5,
             sessionStartTime: 0,
-            songMode: true
+            songMode: true,
         }));
 
         act(() => {
@@ -71,12 +72,12 @@ describe('Transport Component', () => {
     });
 
     it('should display STOP when playing without timer', () => {
-        mockUseEnsembleState.mockImplementation(selector => ({
+        mockUseEnsembleState.mockImplementation((_selector) => ({
             isPlaying: true,
             bpm: 120,
             sessionTimer: 0,
             sessionStartTime: 1000,
-            songMode: true
+            songMode: true,
         }));
 
         act(() => {
@@ -91,12 +92,12 @@ describe('Transport Component', () => {
         const startTime = 10000;
         const sessionTimer = 5; // 5 minutes
 
-        mockUseEnsembleState.mockImplementation(selector => ({
+        mockUseEnsembleState.mockImplementation((_selector) => ({
             isPlaying: true,
             bpm: 120,
             sessionTimer: sessionTimer,
             sessionStartTime: startTime,
-            songMode: true
+            songMode: true,
         }));
 
         // Mock performance.now to return startTime initially

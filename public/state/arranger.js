@@ -47,21 +47,29 @@ export const arranger = {
     history: [],
     lastInteractedSectionId: 's1',
     lastChordPreset: 'Pop (Standard)',
-    isDirty: false
+    isDirty: false,
 };
 
 export function arrangerReducer(action, payload) {
     switch (action) {
         case ACTIONS.RESET_STATE:
             Object.assign(arranger, {
-                sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', color: '#3b82f6', repeat: 1 }],
+                sections: [
+                    {
+                        id: 's1',
+                        label: 'Intro',
+                        value: 'I | V | vi | IV',
+                        color: '#3b82f6',
+                        repeat: 1,
+                    },
+                ],
                 key: 'C',
                 timeSignature: '4/4',
                 notation: 'roman',
                 isMinor: false,
                 isDirty: false,
                 history: [],
-                grouping: null
+                grouping: null,
             });
             return true;
         case ACTIONS.SET_NOTATION:

@@ -1,7 +1,7 @@
-
 import { describe, it } from 'vitest';
-import { getAccompanimentNotes, compingState } from '../../public/accompaniment.js';
+import { compingState, getAccompanimentNotes } from '../../public/accompaniment.js';
 import { getState } from '../../public/state.js';
+
 const { arranger, playback, chords } = getState();
 
 describe('Accompaniment Performance', () => {
@@ -12,13 +12,15 @@ describe('Accompaniment Performance', () => {
         playback.bandIntensity = 0.8;
         playback.complexity = 0.5;
         arranger.timeSignature = '4/4';
-        arranger.progression = [{
-            rootMidi: 60,
-            freqs: [261.63, 329.63, 392.00, 493.88],
-            quality: 'maj7',
-            beats: 4,
-            sectionId: 's1'
-        }];
+        arranger.progression = [
+            {
+                rootMidi: 60,
+                freqs: [261.63, 329.63, 392.0, 493.88],
+                quality: 'maj7',
+                beats: 4,
+                sectionId: 's1',
+            },
+        ];
 
         // Reset comping state
         compingState.lockedUntil = 0;
@@ -39,7 +41,9 @@ describe('Accompaniment Performance', () => {
         const end = performance.now();
         const duration = end - start;
 
-        console.log(`getAccompanimentNotes (${iterations} iterations, Funk style) took ${duration.toFixed(2)}ms`);
+        console.log(
+            `getAccompanimentNotes (${iterations} iterations, Funk style) took ${duration.toFixed(2)}ms`,
+        );
 
         // Sanity check to ensure we actually got something back (implies code ran)
         // We don't check every result, just that it didn't crash.

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // 1. Mock the State with mutable properties using vi.hoisted
 const { soloistState } = vi.hoisted(() => ({
@@ -6,7 +6,7 @@ const { soloistState } = vi.hoisted(() => ({
         bpm: 120,
         bandIntensity: 0.5,
         complexity: 0.5,
-        intent: { anticipation: 0.1, soloistMod: 0 }
+        intent: { anticipation: 0.1, soloistMod: 0 },
     },
     soloistState: {
         enabled: true,
@@ -22,8 +22,8 @@ const { soloistState } = vi.hoisted(() => ({
         lastFreq: 440,
         lastInterval: 0,
         stagnationCount: 0,
-        mode: 'monophonic'
-    }
+        mode: 'monophonic',
+    },
 }));
 
 vi.mock('../../public/state.js', () => {
@@ -43,7 +43,7 @@ vi.mock('../../public/state.js', () => {
             lastFreq: 440,
             pitchHistory: [],
             deviceBuffer: [],
-            sessionSteps: 0
+            sessionSteps: 0,
         },
         groove: { genreFeel: 'Jazz' },
         playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },
@@ -54,27 +54,27 @@ vi.mock('../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 // 2. Mock Config (TIME_SIGNATURES needed)
 vi.mock('../../public/config.js', () => ({
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, stepsPerMeasure: 16 }
+        '4/4': { beats: 4, stepsPerBeat: 4, stepsPerMeasure: 16 },
     },
     // We do NOT mock STYLE_CONFIG as it is internal to soloist.js
 }));
 
 // 3. Mock Utils
 vi.mock('../../public/utils.js', () => ({
-    getFrequency: (midi) => 440 * Math.pow(2, (midi - 69) / 12),
+    getFrequency: (midi) => 440 * 2 ** ((midi - 69) / 12),
     getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
-    calculateTimingOffset: vi.fn(() => 0)
+    calculateTimingOffset: vi.fn(() => 0),
 }));
 
 // 4. Mock Theory Scales
@@ -82,8 +82,8 @@ vi.mock('../../public/theory-scales.js', () => ({
     getScaleForChord: (chord) => {
         // Simple C Mixolydian/Major for testing
         const root = chord.rootMidi % 12;
-        return [0, 2, 4, 5, 7, 9, 10].map(i => (i + root) % 12); // Relative intervals
-    }
+        return [0, 2, 4, 5, 7, 9, 10].map((i) => (i + root) % 12); // Relative intervals
+    },
 }));
 
 import { getSoloistNote } from '../../public/soloist.js';
@@ -107,7 +107,7 @@ function runSimulation(bpm, steps = 256) {
     soloistState.lastFreq = 261.63;
 
     let noteCount = 0;
-    let intervals = [];
+    const intervals = [];
     let lastMidi = 60;
 
     // Fake Chord: C7
@@ -124,7 +124,7 @@ function runSimulation(bpm, steps = 256) {
             60, // Octave
             'bird', // STYLE
             stepInChord,
-            false // isPriming
+            false, // isPriming
         );
 
         if (res) {
@@ -135,21 +135,22 @@ function runSimulation(bpm, steps = 256) {
 
             if (note.midi) {
                 const interval = Math.abs(note.midi - lastMidi);
-                if (interval > 0) intervals.push(interval); // Ignore repeats for interval avg? No, jumps matter.
+                if (interval > 0) {
+                    intervals.push(interval); // Ignore repeats for interval avg? No, jumps matter.
+                }
                 lastMidi = note.midi;
 
                 // Update state manually since we are outside the loop's natural state update cycle?
                 // soloist.js updates soloistState internally (mutates the imported object).
                 // But we need to update lastFreq for the next call if the function relies on it being passed back in.
                 // The function signature is `getSoloistNote(..., prevFreq, ...)`
-                soloistState.lastFreq = 440 * Math.pow(2, (note.midi - 69) / 12);
+                soloistState.lastFreq = 440 * 2 ** ((note.midi - 69) / 12);
             }
         }
     }
 
-    const avgInterval = intervals.length > 0
-        ? intervals.reduce((a, b) => a + b, 0) / intervals.length
-        : 0;
+    const avgInterval =
+        intervals.length > 0 ? intervals.reduce((a, b) => a + b, 0) / intervals.length : 0;
 
     // Density: Notes per step (0 to 1)
     const density = noteCount / steps;
@@ -163,8 +164,12 @@ describe('Bird Soloist Density Analysis', () => {
         const stats200 = runSimulation(200, 1000);
 
         console.log(`\n--- Bird Analysis ---`);
-        console.log(`120 BPM -> Density: ${stats120.density.toFixed(2)}, Avg Interval: ${stats120.avgInterval.toFixed(2)} semitones`);
-        console.log(`200 BPM -> Density: ${stats200.density.toFixed(2)}, Avg Interval: ${stats200.avgInterval.toFixed(2)} semitones`);
+        console.log(
+            `120 BPM -> Density: ${stats120.density.toFixed(2)}, Avg Interval: ${stats120.avgInterval.toFixed(2)} semitones`,
+        );
+        console.log(
+            `200 BPM -> Density: ${stats200.density.toFixed(2)}, Avg Interval: ${stats200.avgInterval.toFixed(2)} semitones`,
+        );
 
         // Assertions for high BPM density reduction and interval control
         // Baseline 120 BPM is around 0.60 density.

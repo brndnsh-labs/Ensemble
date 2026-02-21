@@ -1,10 +1,10 @@
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../public/accompaniment.js';
 import { getBassNote } from '../../public/bass.js';
-import { getScaleForChord } from '../../public/theory-scales.js';
-import { DRUM_PRESETS, CHORD_STYLES, BASS_STYLES, SOLOIST_STYLES } from '../../public/presets.js';
+import { BASS_STYLES, CHORD_STYLES, DRUM_PRESETS, SOLOIST_STYLES } from '../../public/presets.js';
 import { getState } from '../../public/state.js';
+import { getScaleForChord } from '../../public/theory-scales.js';
+
 const { chords, groove } = getState();
 
 // Mock state
@@ -14,12 +14,12 @@ vi.mock('../../public/state.js', () => {
             timeSignature: '4/4',
             progression: [],
             key: 'C',
-            isMinor: false
+            isMinor: false,
         },
         groove: {
             genreFeel: 'Country',
             lastDrumPreset: 'Country (Two-Step)',
-            instruments: []
+            instruments: [],
         },
         chords: { enabled: true, style: 'strum-country' },
         bass: { enabled: true, pocketOffset: 0 },
@@ -28,21 +28,20 @@ vi.mock('../../public/state.js', () => {
         playback: {
             bandIntensity: 0.5,
             complexity: 0.5,
-            intent: { anticipation: 0, layBack: 0 }
+            intent: { anticipation: 0, layBack: 0 },
         },
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 describe('Genre Expansion Integration', () => {
-    
     describe('Definitions', () => {
         it('should have Country (Two-Step) drum preset', () => {
             expect(DRUM_PRESETS['Country (Two-Step)']).toBeDefined();
@@ -56,18 +55,18 @@ describe('Genre Expansion Integration', () => {
         });
 
         it('should have new Chord Styles', () => {
-            expect(CHORD_STYLES.find(s => s.id === 'strum-country')).toBeDefined();
-            expect(CHORD_STYLES.find(s => s.id === 'power-metal')).toBeDefined();
+            expect(CHORD_STYLES.find((s) => s.id === 'strum-country')).toBeDefined();
+            expect(CHORD_STYLES.find((s) => s.id === 'power-metal')).toBeDefined();
         });
 
         it('should have new Bass Styles', () => {
-            expect(BASS_STYLES.find(s => s.id === 'country')).toBeDefined();
-            expect(BASS_STYLES.find(s => s.id === 'metal')).toBeDefined();
+            expect(BASS_STYLES.find((s) => s.id === 'country')).toBeDefined();
+            expect(BASS_STYLES.find((s) => s.id === 'metal')).toBeDefined();
         });
-        
+
         it('should have new Soloist Styles', () => {
-            expect(SOLOIST_STYLES.find(s => s.id === 'country')).toBeDefined();
-            expect(SOLOIST_STYLES.find(s => s.id === 'metal')).toBeDefined();
+            expect(SOLOIST_STYLES.find((s) => s.id === 'country')).toBeDefined();
+            expect(SOLOIST_STYLES.find((s) => s.id === 'metal')).toBeDefined();
         });
     });
 
@@ -75,9 +74,9 @@ describe('Genre Expansion Integration', () => {
         const mockChord = {
             rootMidi: 48, // C3
             quality: 'major',
-            freqs: [130.81, 164.81, 196.00], // C, E, G
+            freqs: [130.81, 164.81, 196.0], // C, E, G
             intervals: [0, 4, 7],
-            beats: 4
+            beats: 4,
         };
 
         beforeEach(() => {
@@ -92,7 +91,7 @@ describe('Genre Expansion Integration', () => {
             // Should be single note (Bass) usually around rootMidi
             // Our logic: notes.push({ midi: note ... })
             // Logic: if isBass (step 0) -> note
-            const bassNote = notes1.find(n => Math.abs(n.midi - 48) < 12); 
+            const bassNote = notes1.find((n) => Math.abs(n.midi - 48) < 12);
             expect(bassNote).toBeDefined();
             expect(bassNote.durationSteps).toBe(2);
 
@@ -109,11 +108,11 @@ describe('Genre Expansion Integration', () => {
             expect(notes2.length).toBeGreaterThanOrEqual(2);
             expect(notes2[0].durationSteps).toBe(2);
         });
-        
+
         it('should use Country scale for soloist', () => {
             const scale = getScaleForChord(mockChord, null, 'country');
             // Country scale logic: Major Pentatonic [0, 2, 4, 7, 9]
-            expect(scale).toContain(2); 
+            expect(scale).toContain(2);
             expect(scale).toContain(4); // Major 3rd
             expect(scale).toContain(9); // 6th
             expect(scale).not.toContain(3); // Pure pentatonic (no blue note at default tension)
@@ -124,9 +123,9 @@ describe('Genre Expansion Integration', () => {
         const mockChord = {
             rootMidi: 48, // C3
             quality: 'minor',
-            freqs: [130.81, 155.56, 196.00], // C, Eb, G
+            freqs: [130.81, 155.56, 196.0], // C, Eb, G
             intervals: [0, 3, 7],
-            beats: 4
+            beats: 4,
         };
 
         beforeEach(() => {
@@ -139,7 +138,7 @@ describe('Genre Expansion Integration', () => {
             const notes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
             // Power chord: Root, 5th, Octave
             expect(notes.length).toBeGreaterThanOrEqual(2);
-            const intervals = notes.map(n => n.midi - 48);
+            const intervals = notes.map((n) => n.midi - 48);
             expect(intervals).toContain(7); // 5th
             // Should use 'Warm' instrument for distortion potential
             expect(notes[0].instrument).toBe('Warm');
@@ -151,7 +150,7 @@ describe('Genre Expansion Integration', () => {
             expect(scale).toContain(3); // Minor 3rd
             expect(scale).toContain(8); // Minor 6th
         });
-        
+
         it('should produce galloping bass logic', () => {
             const bassNote = getBassNote(mockChord, null, 0, 48, 36, 'metal', 0, 0, 0);
             expect(bassNote).not.toBeNull();
@@ -159,5 +158,4 @@ describe('Genre Expansion Integration', () => {
             // 4/4 stepsPerBeat is 4. Subdiv is 2. 0 % 2 === 0.
         });
     });
-
 });

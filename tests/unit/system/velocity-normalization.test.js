@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const capturedMessages = [];
 vi.stubGlobal('postMessage', (msg) => capturedMessages.push(msg));
@@ -10,46 +10,67 @@ vi.stubGlobal('postMessage', (msg) => capturedMessages.push(msg));
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        soloist: { enabled: true, lastFreq: 440, busySteps: 0, sessionSteps: 1000, motifBuffer: [], deviceBuffer: [] },
+        soloist: {
+            enabled: true,
+            lastFreq: 440,
+            busySteps: 0,
+            sessionSteps: 1000,
+            motifBuffer: [],
+            deviceBuffer: [],
+        },
         chords: { enabled: true },
         bass: { enabled: true, lastFreq: 110, pocketOffset: 0 },
-        harmony: { enabled: true, volume: 0.4, complexity: 0.5, motifBuffer: [], buffer: new Map() },
-        playback: { bandIntensity: 1.0, bpm: 120, intent: {}, autoIntensity: false, audio: { currentTime: 0 } },
-        arranger: { 
-            key: 'C', 
-            isMinor: false, 
+        harmony: {
+            enabled: true,
+            volume: 0.4,
+            complexity: 0.5,
+            motifBuffer: [],
+            buffer: new Map(),
+        },
+        playback: {
+            bandIntensity: 1.0,
+            bpm: 120,
+            intent: {},
+            autoIntensity: false,
+            audio: { currentTime: 0 },
+        },
+        arranger: {
+            key: 'C',
+            isMinor: false,
             progression: [],
             totalSteps: 64,
             stepMap: [],
-            timeSignature: '4/4'
+            timeSignature: '4/4',
         },
         groove: { genreFeel: 'Rock', enabled: true, instruments: [], audioBuffers: { noise: {} } },
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 vi.mock('../../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' }
+        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' },
     },
-    REGGAE_RIDDIMS: {}
+    REGGAE_RIDDIMS: {},
 }));
 
 // Mock form analysis
 vi.mock('../../../public/form-analysis.js', () => ({
-    analyzeForm: vi.fn(() => ({ sequence: 'A', sections: [] }))
+    analyzeForm: vi.fn(() => ({ sequence: 'A', sections: [] })),
 }));
 
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../../public/state.js';
+
+const { arranger, playback } = getState();
+
 import { handleExport } from '../../../public/logic-worker.js';
 
 describe('Velocity Normalization & MIDI Limits', () => {
@@ -57,10 +78,16 @@ describe('Velocity Normalization & MIDI Limits', () => {
         vi.useFakeTimers();
         capturedMessages.length = 0;
         playback.bandIntensity = 1.0; // Max intensity
-        
-        const mockChord = { 
-            root: 'C', beats: 4, sectionId: 's1', sectionLabel: 'Verse',
-            freqs: [261.63], intervals: [0], rootMidi: 60, quality: 'major'
+
+        const mockChord = {
+            root: 'C',
+            beats: 4,
+            sectionId: 's1',
+            sectionLabel: 'Verse',
+            freqs: [261.63],
+            intervals: [0],
+            rootMidi: 60,
+            quality: 'major',
         };
         arranger.progression = [{ chord: mockChord, start: 0, end: 16 }];
         arranger.totalSteps = 16;
@@ -74,14 +101,17 @@ describe('Velocity Normalization & MIDI Limits', () => {
     it('should clamp all MIDI velocities to 127 even at maximum intensity', async () => {
         // High intensity + high conductor velocity
         playback.bandIntensity = 1.0;
-        
-        handleExport({ includedTracks: ['chords', 'bass', 'soloist', 'drums'], targetDuration: 0.1 });
-        
+
+        handleExport({
+            includedTracks: ['chords', 'bass', 'soloist', 'drums'],
+            targetDuration: 0.1,
+        });
+
         await vi.runAllTimersAsync();
 
-        const exportMsg = capturedMessages.find(m => m.type === 'exportComplete');
+        const exportMsg = capturedMessages.find((m) => m.type === 'exportComplete');
         expect(exportMsg).toBeDefined();
-        
+
         // We can't easily inspect the MIDI binary blob here without a parser,
         // but we can verify handleExport logic if we mock MidiTrack.
     });

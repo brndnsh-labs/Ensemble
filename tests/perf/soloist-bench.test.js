@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/soloist.js';
 
 // Mock state
@@ -18,11 +18,11 @@ vi.mock('../../public/state.js', () => ({
             stagnationCount: 0,
             lastFreq: 440,
             mode: 'monophonic',
-            tension: 0.5
+            tension: 0.5,
         },
         harmony: { enabled: true, rhythmicMask: 0, complexity: 0.5, intent: { soloistMod: 0 } },
-        arranger: { timeSignature: '4/4', key: 'C', isMinor: false }
-    })
+        arranger: { timeSignature: '4/4', key: 'C', isMinor: false },
+    }),
 }));
 
 describe('Soloist Performance Benchmark', () => {
@@ -41,7 +41,16 @@ describe('Soloist Performance Benchmark', () => {
         const iterations = 50000;
 
         for (let i = 0; i < iterations; i++) {
-            getSoloistNote(currentChord, nextChord, step + i, prevFreq, octave, style, stepInChord, isPriming);
+            getSoloistNote(
+                currentChord,
+                nextChord,
+                step + i,
+                prevFreq,
+                octave,
+                style,
+                stepInChord,
+                isPriming,
+            );
         }
 
         const end = performance.now();

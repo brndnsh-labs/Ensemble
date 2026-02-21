@@ -1,5 +1,4 @@
-
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getFrequency } from '../../public/utils.js';
 
 describe('getFrequency Performance', () => {
@@ -31,12 +30,14 @@ describe('getFrequency Performance', () => {
         const start = performance.now();
 
         for (let i = 0; i < ITERATIONS; i++) {
-             // Cycle through out of range notes
-             const note = outOfRange[i % outOfRange.length];
-             getFrequency(note);
+            // Cycle through out of range notes
+            const note = outOfRange[i % outOfRange.length];
+            getFrequency(note);
         }
 
         const duration = performance.now() - start;
-        console.log(`getFrequency (out-of-range) duration for ${ITERATIONS} lookups: ${duration.toFixed(2)}ms`);
+        console.log(
+            `getFrequency (out-of-range) duration for ${ITERATIONS} lookups: ${duration.toFixed(2)}ms`,
+        );
     });
 });

@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
-import { describe, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, it, vi } from 'vitest';
 import { onSectionUpdate } from '../../public/arranger-controller.js';
 import { getState } from '../../public/state.js';
+
 const { arranger } = getState();
 
 // Mock dependencies to isolate performance of the reorder logic
 vi.mock('../../public/history.js', () => ({ pushHistory: vi.fn() }));
 vi.mock('../../public/chords.js', () => ({
-    validateProgression: vi.fn(cb => cb && cb()),
-    transformRelativeProgression: vi.fn()
+    validateProgression: vi.fn((cb) => cb?.()),
+    transformRelativeProgression: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
@@ -28,7 +29,7 @@ describe('Arranger Reorder Performance', () => {
                 id: `s${i}`,
                 label: `Section ${i}`,
                 value: 'I',
-                repeat: 1
+                repeat: 1,
             });
         }
     });

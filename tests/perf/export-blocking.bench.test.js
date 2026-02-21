@@ -1,5 +1,4 @@
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock postMessage globally before importing logic-worker
 globalThis.postMessage = vi.fn();
@@ -38,13 +37,13 @@ describe('Export Blocking Performance', () => {
         let currentStep = 0;
         for (let i = 0; i < numSections; i++) {
             const sectionStart = currentStep;
-            const sectionEnd = currentStep + (measuresPerSection * stepsPerMeasure);
+            const sectionEnd = currentStep + measuresPerSection * stepsPerMeasure;
 
             arranger.sectionMap.push({
                 start: sectionStart,
                 end: sectionEnd,
                 id: `s${i}`,
-                label: `Section ${i}`
+                label: `Section ${i}`,
             });
 
             for (let m = 0; m < measuresPerSection; m++) {
@@ -55,20 +54,20 @@ describe('Export Blocking Performance', () => {
                 const chord = {
                     rootMidi: 60,
                     quality: 'maj7',
-                    freqs: [261.63, 329.63, 392.00, 493.88], // C E G B
+                    freqs: [261.63, 329.63, 392.0, 493.88], // C E G B
                     intervals: [0, 4, 7, 11],
                     start: chordStart,
                     end: chordEnd,
                     duration: stepsPerMeasure,
                     beats: 4,
                     sectionId: `s${i}`,
-                    sectionLabel: `Section ${i}`
+                    sectionLabel: `Section ${i}`,
                 };
 
                 arranger.stepMap.push({
                     start: chordStart,
                     end: chordEnd,
-                    chord: chord
+                    chord: chord,
                 });
                 arranger.progression.push(chord);
 
@@ -99,7 +98,7 @@ describe('Export Blocking Performance', () => {
             includedTracks: ['chords', 'bass', 'soloist', 'harmonies', 'drums'],
             targetDuration: 3, // 3 minutes
             loopMode: 'time',
-            filename: 'test-export'
+            filename: 'test-export',
         });
 
         const end = performance.now();
@@ -111,7 +110,7 @@ describe('Export Blocking Performance', () => {
         expect(blockingDuration).toBeLessThan(50);
 
         // Wait for completion
-        await new Promise(resolve => {
+        await new Promise((resolve) => {
             const check = () => {
                 const calls = globalThis.postMessage.mock.calls;
                 if (calls.length > 0) {
@@ -136,7 +135,7 @@ describe('Export Blocking Performance', () => {
         expect(lastCall.type).toBe('exportComplete');
 
         // Check if progress messages were sent
-        const progressCalls = calls.filter(c => c[0].type === 'exportProgress');
+        const progressCalls = calls.filter((c) => c[0].type === 'exportProgress');
         expect(progressCalls.length).toBeGreaterThan(0);
         console.log(`Progress updates received: ${progressCalls.length}`);
     });

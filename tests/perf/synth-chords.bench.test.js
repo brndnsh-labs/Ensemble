@@ -1,9 +1,8 @@
-
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock utils
 vi.mock('../../public/utils.js', () => ({
-    safeDisconnect: () => {}
+    safeDisconnect: () => {},
 }));
 
 // Mock state
@@ -19,49 +18,49 @@ vi.mock('../../public/state.js', () => {
                 connect: vi.fn(),
                 start: vi.fn(),
                 stop: vi.fn(),
-                onended: null
+                onended: null,
             })),
             createGain: vi.fn(() => ({
                 gain: {
                     value: 1,
                     setValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
-                    cancelScheduledValues: vi.fn()
+                    cancelScheduledValues: vi.fn(),
                 },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBiquadFilter: vi.fn(() => ({
                 type: '',
                 frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 Q: { setValueAtTime: vi.fn() },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBufferSource: vi.fn(() => ({
                 buffer: null,
                 connect: vi.fn(),
                 start: vi.fn(),
                 stop: vi.fn(),
-                onended: null
+                onended: null,
             })),
-            createPeriodicWave: vi.fn(() => ({}))
+            createPeriodicWave: vi.fn(() => ({})),
         },
         chordsGain: { connect: vi.fn() },
         sustainActive: false,
-        bandIntensity: 0.5
+        bandIntensity: 0.5,
     };
     const mockGroove = { audioBuffers: { noise: {} } };
-    
+
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
         chords: {},
-        harmony: {}
+        harmony: {},
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
@@ -73,7 +72,13 @@ describe('Synth Chords Performance', () => {
         const start = performance.now();
 
         for (let i = 0; i < iterations; i++) {
-            playNote(440, 0, 1.0, { vol: 0.8, index: 0, instrument: 'Piano', muted: false, numVoices: 3 });
+            playNote(440, 0, 1.0, {
+                vol: 0.8,
+                index: 0,
+                instrument: 'Piano',
+                muted: false,
+                numVoices: 3,
+            });
         }
 
         const end = performance.now();

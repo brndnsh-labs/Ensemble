@@ -1,7 +1,7 @@
-import { getState, dispatch } from './state.js';
-import { syncWorker } from './worker-client.js';
 import { saveCurrentState } from './persistence.js';
+import { dispatch, getState } from './state.js';
 import { getStepsPerMeasure } from './utils.js';
+import { syncWorker } from './worker-client.js';
 
 export function applyTheme(theme) {
     const { playback } = getState();
@@ -18,25 +18,31 @@ export function applyTheme(theme) {
 
 export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
     const { playback, arranger } = getState();
-    const newBpm = Math.max(40, Math.min(240, parseInt(val)));
-    const currentBpm = fromDispatch ? (oldBpmParam || playback.bpm) : playback.bpm;
-    
-    if (!fromDispatch && newBpm === currentBpm) return;
-    
+    const newBpm = Math.max(40, Math.min(240, parseInt(val, 10)));
+    const currentBpm = fromDispatch ? oldBpmParam || playback.bpm : playback.bpm;
+
+    if (!fromDispatch && newBpm === currentBpm) {
+        return;
+    }
+
     if (playback.isPlaying && playback.audio) {
         const now = playback.audio.currentTime;
         const ratio = currentBpm / newBpm;
         const noteTimeRemaining = playback.nextNoteTime - now;
-        if (noteTimeRemaining > 0) playback.nextNoteTime = now + (noteTimeRemaining * ratio); // @direct-mutation
-        
+        if (noteTimeRemaining > 0) {
+            playback.nextNoteTime = now + noteTimeRemaining * ratio; // @direct-mutation
+        }
+
         const unswungNextNoteTimeRemaining = playback.unswungNextNoteTime - now;
-        if (unswungNextNoteTimeRemaining > 0) playback.unswungNextNoteTime = now + (unswungNextNoteTimeRemaining * ratio); // @direct-mutation
+        if (unswungNextNoteTimeRemaining > 0) {
+            playback.unswungNextNoteTime = now + unswungNextNoteTimeRemaining * ratio; // @direct-mutation
+        }
     }
-    
+
     if (!fromDispatch) {
         playback.bpm = newBpm; // @direct-mutation
     }
-    
+
     syncWorker();
     saveCurrentState();
     if (!fromDispatch) {
@@ -47,7 +53,8 @@ export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
         const secondsPerBeat = 60.0 / playback.bpm;
         const sixteenth = 0.25 * secondsPerBeat;
         const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
-        const measureTime = playback.unswungNextNoteTime - (playback.step % stepsPerMeasure) * sixteenth;
+        const measureTime =
+            playback.unswungNextNoteTime - (playback.step % stepsPerMeasure) * sixteenth;
         viz.setBeatReference(measureTime);
     }
 }

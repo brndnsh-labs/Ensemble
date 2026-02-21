@@ -2,21 +2,30 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { initPlatform, unlockAudio, lockAudio } from '../../../public/platform.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { audioWatchdog } from '../../../public/audio-recovery.js';
+import {
+    activateWakeLock,
+    initPlatform,
+    lockAudio,
+    unlockAudio,
+} from '../../../public/platform.js';
 
 describe('Audio Recovery & Platform Integrity', () => {
-    
     beforeEach(() => {
         vi.clearAllMocks();
         // Mock Audio constructor
-        global.Audio = vi.fn().mockImplementation(function() {
+        global.Audio = vi.fn().mockImplementation(function () {
             this.play = vi.fn().mockResolvedValue(undefined);
             this.pause = vi.fn();
             this.loop = false;
             this.currentTime = 0;
             return this;
         });
+    });
+
+    afterEach(() => {
+        audioWatchdog.stop();
     });
 
     it('should initialize a silent audio element for background playback', () => {
@@ -27,8 +36,8 @@ describe('Audio Recovery & Platform Integrity', () => {
     it('should play silent audio on unlock to keep AudioContext alive', async () => {
         initPlatform();
         unlockAudio();
-        
-        // We need to access the mock instance. 
+
+        // We need to access the mock instance.
         // Since initPlatform creates it internally, we check the first call's return.
         const audioInstance = global.Audio.mock.results[0].value;
         expect(audioInstance.play).toHaveBeenCalled();
@@ -48,11 +57,9 @@ describe('Audio Recovery & Platform Integrity', () => {
         const originalWakeLock = nav.wakeLock;
         delete nav.wakeLock;
 
-        const { activateWakeLock } = await import('../../../public/platform.js');
-        
         // Should not throw
         await expect(activateWakeLock()).resolves.not.toThrow();
-        
+
         nav.wakeLock = originalWakeLock; // Restore
     });
 });

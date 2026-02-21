@@ -1,5 +1,4 @@
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnifiedVisualizer } from '../../public/visualizer.js';
 
 // Mock Canvas Context
@@ -17,20 +16,31 @@ const mockCtx = {
     drawImage: vi.fn(),
     createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
     measureText: vi.fn(() => ({ width: 10 })),
-    set fillStyle(val) { this._fillStyle = val; this._fillStyleCount++; },
-    get fillStyle() { return this._fillStyle; },
+    set fillStyle(val) {
+        this._fillStyle = val;
+        this._fillStyleCount++;
+    },
+    get fillStyle() {
+        return this._fillStyle;
+    },
     _fillStyle: '#000',
     _fillStyleCount: 0,
-    set strokeStyle(val) { this._strokeStyle = val; },
-    get strokeStyle() { return this._strokeStyle; },
-    set globalAlpha(val) { },
-    get globalAlpha() { return 1; },
-    set lineWidth(val) { },
-    set font(val) { },
-    set textAlign(val) { },
-    set textBaseline(val) { },
-    set lineCap(val) { },
-    set lineJoin(val) { },
+    set strokeStyle(val) {
+        this._strokeStyle = val;
+    },
+    get strokeStyle() {
+        return this._strokeStyle;
+    },
+    set globalAlpha(_val) {},
+    get globalAlpha() {
+        return 1;
+    },
+    set lineWidth(_val) {},
+    set font(_val) {},
+    set textAlign(_val) {},
+    set textBaseline(_val) {},
+    set lineCap(_val) {},
+    set lineJoin(_val) {},
     arc: vi.fn(),
 };
 
@@ -38,24 +48,32 @@ const mockCtx = {
 global.document = {
     getElementById: vi.fn(),
     createElement: vi.fn((tag) => {
-        if (tag === 'canvas') return {
-            getContext: (type) => (type === '2d' ? mockCtx : null),
-            style: {},
-            width: 0,
-            height: 0
-        };
-        if (tag === 'div') return { style: {}, appendChild: vi.fn() };
+        if (tag === 'canvas') {
+            return {
+                getContext: (type) => (type === '2d' ? mockCtx : null),
+                style: {},
+                width: 0,
+                height: 0,
+            };
+        }
+        if (tag === 'div') {
+            return { style: {}, appendChild: vi.fn() };
+        }
         return {};
     }),
     documentElement: {
         getAttribute: vi.fn(),
-        style: { getPropertyValue: vi.fn() }
-    }
+        style: { getPropertyValue: vi.fn() },
+    },
 };
 global.window = {
-    matchMedia: vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    matchMedia: vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+    })),
     devicePixelRatio: 1,
-    getComputedStyle: vi.fn(() => ({ getPropertyValue: vi.fn(() => '#fff') }))
+    getComputedStyle: vi.fn(() => ({ getPropertyValue: vi.fn(() => '#fff') })),
 };
 global.ResizeObserver = class {
     observe() {}
@@ -78,7 +96,7 @@ describe('UnifiedVisualizer Performance', () => {
         const container = {
             appendChild: vi.fn(),
             getBoundingClientRect: () => ({ width: 800, height: 600 }),
-            style: {}
+            style: {},
         };
         document.getElementById.mockReturnValue(container);
 
@@ -100,25 +118,25 @@ describe('UnifiedVisualizer Performance', () => {
             guideLineWhite: '#222',
             separatorColor: '#666',
             chordColors: {
-                root: '#ff0000',   // Red
-                third: '#00ff00',  // Green
-                fifth: '#0000ff',  // Blue
-                seventh: '#ffff00' // Yellow
-            }
+                root: '#ff0000', // Red
+                third: '#00ff00', // Green
+                fifth: '#0000ff', // Blue
+                seventh: '#ffff00', // Yellow
+            },
         };
         viz.intervalColors = [
-            viz.themeCache.chordColors.root,    // 0
+            viz.themeCache.chordColors.root, // 0
             viz.themeCache.chordColors.seventh, // 1
             viz.themeCache.chordColors.seventh, // 2
-            viz.themeCache.chordColors.third,   // 3
-            viz.themeCache.chordColors.third,   // 4
+            viz.themeCache.chordColors.third, // 3
+            viz.themeCache.chordColors.third, // 4
             viz.themeCache.chordColors.seventh, // 5
             viz.themeCache.chordColors.seventh, // 6
-            viz.themeCache.chordColors.fifth,   // 7
+            viz.themeCache.chordColors.fifth, // 7
             viz.themeCache.chordColors.seventh, // 8
             viz.themeCache.chordColors.seventh, // 9
             viz.themeCache.chordColors.seventh, // 10
-            viz.themeCache.chordColors.seventh  // 11
+            viz.themeCache.chordColors.seventh, // 11
         ];
     });
 
@@ -129,7 +147,7 @@ describe('UnifiedVisualizer Performance', () => {
             time: 0,
             duration: 4,
             rootMidi: 60,
-            notes: [60, 64, 67, 71] // Root, 3rd, 5th, 7th -> All different colors
+            notes: [60, 64, 67, 71], // Root, 3rd, 5th, 7th -> All different colors
         };
         viz.pushChord(chordEvent);
 
@@ -196,7 +214,7 @@ describe('UnifiedVisualizer Performance', () => {
             duration: 4,
             rootMidi: 60,
             notes: [60, 64, 67, 70, 74, 81], // C, E, G, Bb, D, A
-            intervals: [0, 4, 7, 10, 2, 9] // Provide intervals to trigger Guide Tones
+            intervals: [0, 4, 7, 10, 2, 9], // Provide intervals to trigger Guide Tones
         });
 
         mockCtx._fillStyleCount = 0;

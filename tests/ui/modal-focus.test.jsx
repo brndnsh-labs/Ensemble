@@ -1,46 +1,47 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { h, render } from 'preact';
 import React from 'preact/compat';
-import { Settings } from '../../public/components/Settings.jsx';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorModal } from '../../public/components/EditorModal.jsx';
+import { Settings } from '../../public/components/Settings.jsx';
 import { Transport } from '../../public/components/Transport.jsx';
 import { dispatch } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies
 vi.mock('../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/app-controller.js', () => ({
     applyTheme: vi.fn(),
-    setBpm: vi.fn()
+    setBpm: vi.fn(),
 }));
 vi.mock('../../public/midi-controller.js', () => ({
     initMIDI: vi.fn(),
-    panic: vi.fn()
+    panic: vi.fn(),
 }));
 vi.mock('../../public/engine/engine.js', () => ({
-    restoreGains: vi.fn()
+    restoreGains: vi.fn(),
 }));
 vi.mock('../../public/engine/scheduler-core.js', () => ({
-    togglePlay: vi.fn()
+    togglePlay: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({
     handleTap: vi.fn(),
-    togglePower: vi.fn()
+    togglePower: vi.fn(),
 }));
 vi.mock('../../public/ui-song-generator-controller.js', () => ({
-    setupSongGeneratorHandlers: vi.fn()
+    setupSongGeneratorHandlers: vi.fn(),
 }));
 
 describe('Modal Accessibility Focus', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         document.body.classList.remove('modal-open');
-        
+
         // Reset state for each test
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
@@ -86,13 +87,13 @@ describe('Modal Accessibility Focus', () => {
             <input type="radio" name="analyzerMode" value="chords" checked>
             <input type="radio" name="analyzerMode" value="melody">
         `;
-        
+
         render(<Transport />, document.getElementById('transportContainer'));
         render(<Settings />, document.getElementById('settingsContainer'));
         render(<EditorModal />, document.getElementById('editorContainer'));
-        
+
         // Wait for Preact to mount and subscribe
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
 
         // Use direct dispatch for editArrangementBtn to avoid complex listener issues in test
         document.getElementById('editArrangementBtn').addEventListener('click', () => {
@@ -107,13 +108,13 @@ describe('Modal Accessibility Focus', () => {
 
     it('should toggle aria-hidden when modal becomes active', async () => {
         const settings = document.getElementById('settingsOverlay');
-        
+
         // Try direct dispatch first to see if bridge is working
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
-        await new Promise(resolve => setTimeout(resolve, 100)); 
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         if (!settings.classList.contains('active')) {
-            console.log("Direct dispatch failed to activate modal in test.");
+            console.log('Direct dispatch failed to activate modal in test.');
         }
 
         expect(settings.classList.contains('active')).toBe(true);
@@ -121,8 +122,8 @@ describe('Modal Accessibility Focus', () => {
 
         // Close
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
-        await new Promise(resolve => setTimeout(resolve, 100)); 
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         expect(document.getElementById('settingsOverlay').classList.contains('active')).toBe(false);
         expect(document.getElementById('settingsOverlay').getAttribute('aria-hidden')).toBe('true');
     });
@@ -130,11 +131,11 @@ describe('Modal Accessibility Focus', () => {
     it('should correctly handle Editor modal toggling', async () => {
         const editor = document.getElementById('editorOverlay');
         expect(editor.getAttribute('aria-hidden')).toBe('true');
-        
+
         const btn = document.getElementById('editArrangementBtn');
         btn.click();
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
         expect(editor.classList.contains('active')).toBe(true);
         expect(editor.getAttribute('aria-hidden')).toBe('false');
     });

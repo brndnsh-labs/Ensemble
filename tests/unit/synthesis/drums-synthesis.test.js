@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
@@ -8,26 +8,30 @@ vi.mock('../../../public/state.js', () => {
             currentTime: 0,
             createOscillator: vi.fn(() => ({
                 type: '',
-                frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                frequency: {
+                    setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                },
                 connect: vi.fn(),
                 start: vi.fn(),
-                stop: vi.fn()
+                stop: vi.fn(),
             })),
             createGain: vi.fn(() => ({
-                gain: { 
-                    value: 1, 
-                    setValueAtTime: vi.fn(), 
-                    exponentialRampToValueAtTime: vi.fn(), 
+                gain: {
+                    value: 1,
+                    setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
-                    cancelScheduledValues: vi.fn()
+                    cancelScheduledValues: vi.fn(),
                 },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBiquadFilter: vi.fn(() => ({
                 type: '',
                 frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 Q: { value: 0, setValueAtTime: vi.fn() },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBufferSource: vi.fn(() => ({
                 buffer: null,
@@ -35,26 +39,26 @@ vi.mock('../../../public/state.js', () => {
                 start: vi.fn(),
                 stop: vi.fn(),
                 onended: null,
-                playbackRate: { value: 1 }
+                playbackRate: { value: 1 },
             })),
             createBuffer: vi.fn(() => ({
-                getChannelData: vi.fn(() => new Float32Array(100))
+                getChannelData: vi.fn(() => new Float32Array(100)),
             })),
-            sampleRate: 44100
+            sampleRate: 44100,
         },
-        drumsGain: { connect: vi.fn() }
+        drumsGain: { connect: vi.fn() },
     };
-    const mockGroove = { 
-        humanize: 20, 
+    const mockGroove = {
+        humanize: 20,
         audioBuffers: { noise: {} },
-        lastHatGain: null 
+        lastHatGain: null,
     };
     const mockHarmony = { enabled: false };
 
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
-        harmony: mockHarmony
+        harmony: mockHarmony,
     };
 
     return {
@@ -67,18 +71,19 @@ vi.mock('../../../public/state.js', () => {
         vizState: {},
         storage: {},
         midi: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
 // Mock utils
 vi.mock('../../../public/utils.js', () => ({
-    safeDisconnect: vi.fn()
+    safeDisconnect: vi.fn(),
 }));
 
 import { playDrumSound } from '../../../public/engine/synth-drums.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../../public/state.js';
+
+const { playback, groove } = getState();
 
 describe('Drum Synthesis', () => {
     beforeEach(() => {
@@ -101,9 +106,9 @@ describe('Drum Synthesis', () => {
         playDrumSound('HiHat', 10, 1.0);
 
         // Should create buffer ONCE (if not cached) and use BufferSource
-        expect(playback.audio.createBuffer).toHaveBeenCalled(); 
+        expect(playback.audio.createBuffer).toHaveBeenCalled();
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
-        
+
         // Should use playbackRate for variation
         const source = playback.audio.createBufferSource.mock.results[0].value;
         expect(source.playbackRate.value).not.toBe(1.0); // Should be jittered
@@ -111,16 +116,16 @@ describe('Drum Synthesis', () => {
 
     it('should implement choking logic when a new HiHat starts', () => {
         const mockPrevGain = {
-            gain: { 
+            gain: {
                 cancelScheduledValues: vi.fn(),
-                setTargetAtTime: vi.fn()
-            }
+                setTargetAtTime: vi.fn(),
+            },
         };
         groove.lastHatGain = mockPrevGain;
 
         playDrumSound('HiHat', 11, 1.0);
 
-        expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11); 
+        expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11);
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.005);
     });
 
@@ -129,7 +134,7 @@ describe('Drum Synthesis', () => {
 
         // Snare creates Tone (2 Oscs) and Wires (Noise)
         const filters = playback.audio.createBiquadFilter.mock.results;
-        const wiresFilter = filters.find(f => f.value.type === 'bandpass');
+        const wiresFilter = filters.find((f) => f.value.type === 'bandpass');
         expect(wiresFilter).toBeDefined();
     });
 

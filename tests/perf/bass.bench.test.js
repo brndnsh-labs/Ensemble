@@ -1,6 +1,5 @@
-
-import { describe, it, expect, vi } from 'vitest';
-import { isBassActive, getBassNote } from '../../public/bass.js';
+import { describe, expect, it, vi } from 'vitest';
+import { getBassNote, isBassActive } from '../../public/bass.js';
 
 const { mockArranger, stepMap, TOTAL_SECTIONS, STEPS_PER_SECTION } = vi.hoisted(() => {
     const stepMap = [];
@@ -15,8 +14,8 @@ const { mockArranger, stepMap, TOTAL_SECTIONS, STEPS_PER_SECTION } = vi.hoisted(
                 rootMidi: 48,
                 quality: 'major',
                 beats: 1,
-                intervals: [0, 4, 7]
-            }
+                intervals: [0, 4, 7],
+            },
         });
     }
     return {
@@ -29,8 +28,8 @@ const { mockArranger, stepMap, TOTAL_SECTIONS, STEPS_PER_SECTION } = vi.hoisted(
             progression: [],
             totalSteps: TOTAL_SECTIONS * STEPS_PER_SECTION,
             timeSignature: '4/4',
-            stepMap: stepMap
-        }
+            stepMap: stepMap,
+        },
     };
 });
 
@@ -44,21 +43,19 @@ vi.mock('../../public/state.js', () => {
             volume: 0.5,
             pocketOffset: 0,
             buffer: new Map(),
-            style: 'smart'
+            style: 'smart',
         },
         soloist: {
             enabled: true,
             busySteps: 0,
             tension: 0,
-            buffer: new Map()
+            buffer: new Map(),
         },
         groove: {
             genreFeel: 'Rock',
             measures: 1,
             lastDrumPreset: 'Standard',
-            instruments: [
-                { name: 'Kick', steps: new Array(16).fill(0), muted: false }
-            ]
+            instruments: [{ name: 'Kick', steps: new Array(16).fill(0), muted: false }],
         },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.3, intent: { soloistMod: 0 } },
         chords: { pianoRoots: true },
@@ -67,20 +64,26 @@ vi.mock('../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 vi.mock('../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12], grouping: [2, 2] }
+        '4/4': {
+            beats: 4,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12],
+            grouping: [2, 2],
+        },
     },
-    REGGAE_RIDDIMS: {}
+    REGGAE_RIDDIMS: {},
 }));
 
 describe('Bass Logic Performance', () => {
@@ -103,7 +106,9 @@ describe('Bass Logic Performance', () => {
         const end = performance.now();
         const duration = end - start;
 
-        console.log(`isBassActive ('bossa', ${ITERATIONS} iterations) took ${duration.toFixed(2)}ms`);
+        console.log(
+            `isBassActive ('bossa', ${ITERATIONS} iterations) took ${duration.toFixed(2)}ms`,
+        );
 
         // Sanity check: bossa pattern is [0, 6, 8, 14] (4 hits per 16 steps)
         // 10,000,000 iterations / 16 steps = 625,000 measures
@@ -118,13 +123,24 @@ describe('Bass Logic Performance', () => {
     const nextChord = stepMap[0].chord;
     const context = {
         sectionStart: stepMap[stepMap.length - 1].start,
-        sectionEnd: stepMap[stepMap.length - 1].end
+        sectionEnd: stepMap[stepMap.length - 1].end,
     };
 
     it('Optimized: Direct Access (With Context)', () => {
         const start = performance.now();
         for (let i = 0; i < ITERATIONS_LOOKUP; i++) {
-            getBassNote(currentChord, nextChord, 0, 440, 48, 'rock', TOTAL_SECTIONS - 1, targetStep, 1, context);
+            getBassNote(
+                currentChord,
+                nextChord,
+                0,
+                440,
+                48,
+                'rock',
+                TOTAL_SECTIONS - 1,
+                targetStep,
+                1,
+                context,
+            );
         }
         const duration = performance.now() - start;
         console.log(`Optimized Access (Run 1): ${duration.toFixed(2)}ms`);
@@ -133,7 +149,17 @@ describe('Bass Logic Performance', () => {
     it('Legacy: Linear Lookup (No Context)', () => {
         const start = performance.now();
         for (let i = 0; i < ITERATIONS_LOOKUP; i++) {
-            getBassNote(currentChord, nextChord, 0, 440, 48, 'rock', TOTAL_SECTIONS - 1, targetStep, 1);
+            getBassNote(
+                currentChord,
+                nextChord,
+                0,
+                440,
+                48,
+                'rock',
+                TOTAL_SECTIONS - 1,
+                targetStep,
+                1,
+            );
         }
         const duration = performance.now() - start;
         console.log(`Legacy Lookup (Run 2): ${duration.toFixed(2)}ms`);

@@ -21,13 +21,13 @@ export const chords = {
     volume: 0.5,
     reverb: 0.3,
     octave: 65,
-    density: 'standard', 
+    density: 'standard',
     pianoRoots: false,
     lastActiveChordIndex: null,
     scheduledChordIndex: null,
     buffer: new Map(),
     rhythmicMask: 0,
-    activeTab: 'smart'
+    activeTab: 'smart',
 };
 
 /**
@@ -55,7 +55,7 @@ export const bass = {
     style: 'smart',
     busySteps: 0,
     activeTab: 'smart',
-    lastBassGain: null
+    lastBassGain: null,
 };
 
 /**
@@ -105,7 +105,7 @@ export const soloist = {
     complexity: 0.5,
     tradeMode: 'manual',
     isWaitingForEntry: false,
-    isYielding: false
+    isYielding: false,
 };
 
 /**
@@ -132,30 +132,63 @@ export const harmony = {
     motifBuffer: [],
     lastMidis: [],
     rhythmicMask: 0,
-    activeTab: 'smart'
+    activeTab: 'smart',
 };
 
 const instrumentStateMap = {
-    cb: chords, chords,
-    bb: bass, bass,
-    sb: soloist, soloist,
-    hb: harmony, harmony
+    cb: chords,
+    chords,
+    bb: bass,
+    bass,
+    sb: soloist,
+    soloist,
+    hb: harmony,
+    harmony,
 };
 
 export function instrumentReducer(action, payload) {
     switch (action) {
         case ACTIONS.RESET_STATE:
             Object.assign(chords, {
-                enabled: true, volume: 0.5, reverb: 0.3, instrument: 'Clean', octave: 65, density: 'standard', pianoRoots: false, activeTab: 'smart'
+                enabled: true,
+                volume: 0.5,
+                reverb: 0.3,
+                instrument: 'Clean',
+                octave: 65,
+                density: 'standard',
+                pianoRoots: false,
+                activeTab: 'smart',
             });
             Object.assign(bass, {
-                enabled: true, volume: 0.45, reverb: 0.05, octave: 38, style: 'smart', activeTab: 'smart'
+                enabled: true,
+                volume: 0.45,
+                reverb: 0.05,
+                octave: 38,
+                style: 'smart',
+                activeTab: 'smart',
             });
             Object.assign(soloist, {
-                enabled: false, preset: 'neo', volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', mode: 'monophonic', complexity: 0.5, tradeMode: 'manual', isWaitingForEntry: false, isYielding: false
+                enabled: false,
+                preset: 'neo',
+                volume: 0.5,
+                reverb: 0.6,
+                octave: 72,
+                style: 'smart',
+                activeTab: 'smart',
+                mode: 'monophonic',
+                complexity: 0.5,
+                tradeMode: 'manual',
+                isWaitingForEntry: false,
+                isYielding: false,
             });
             Object.assign(harmony, {
-                enabled: false, volume: 0.4, reverb: 0.4, octave: 60, style: 'smart', complexity: 0.5, activeTab: 'smart'
+                enabled: false,
+                volume: 0.4,
+                reverb: 0.4,
+                octave: 60,
+                style: 'smart',
+                complexity: 0.5,
+                activeTab: 'smart',
             });
             return true;
         case ACTIONS.SET_STYLE:
@@ -198,19 +231,31 @@ export function instrumentReducer(action, payload) {
             return true;
         case ACTIONS.SET_GENRE_FEEL:
             // When a smart genre is selected, update all instrument styles and switch to smart mode
-            if (payload.chord) Object.assign(chords, { style: payload.chord, activeTab: 'smart' });
-            if (payload.bass) Object.assign(bass, { style: payload.bass, activeTab: 'smart' });
-            if (payload.soloist) Object.assign(soloist, { style: payload.soloist, activeTab: 'smart' });
-            if (payload.harmony) Object.assign(harmony, { style: payload.harmony, activeTab: 'smart' });
+            if (payload.chord) {
+                Object.assign(chords, { style: payload.chord, activeTab: 'smart' });
+            }
+            if (payload.bass) {
+                Object.assign(bass, { style: payload.bass, activeTab: 'smart' });
+            }
+            if (payload.soloist) {
+                Object.assign(soloist, { style: payload.soloist, activeTab: 'smart' });
+            }
+            if (payload.harmony) {
+                Object.assign(harmony, { style: payload.harmony, activeTab: 'smart' });
+            }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (payload.density) Object.assign(chords, { density: payload.density });
-            if (payload.hookProb) Object.assign(soloist, { hookRetentionProb: payload.hookProb });
+            if (payload.density) {
+                Object.assign(chords, { density: payload.density });
+            }
+            if (payload.hookProb) {
+                Object.assign(soloist, { hookRetentionProb: payload.hookProb });
+            }
             return true;
         case ACTIONS.SET_ACTIVE_TAB:
             if (payload.module === 'groove') {
                 // We'll handle this in state.js or groove.js instead to avoid circularity
-                return false; 
+                return false;
             } else if (instrumentStateMap[payload.module]) {
                 Object.assign(instrumentStateMap[payload.module], { activeTab: payload.tab });
             }

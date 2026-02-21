@@ -35,7 +35,7 @@ export const midi = {
     soloistOctave: 0,
     harmonyOctave: 0,
     drumsOctave: 0,
-    velocitySensitivity: 1.0
+    velocitySensitivity: 1.0,
 };
 
 export function midiReducer(action, payload) {

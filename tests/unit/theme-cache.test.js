@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnifiedVisualizer } from '../../public/visualizer.js';
 
 describe('UnifiedVisualizer Theme Cache', () => {
@@ -28,14 +28,14 @@ describe('UnifiedVisualizer Theme Cache', () => {
 
         // Mock ResizeObserver
         global.ResizeObserver = class {
-            observe() { }
-            disconnect() { }
+            observe() {}
+            disconnect() {}
         };
 
         // Mock matchMedia
         Object.defineProperty(window, 'matchMedia', {
             writable: true,
-            value: vi.fn().mockImplementation(query => ({
+            value: vi.fn().mockImplementation((query) => ({
                 matches: false,
                 media: query,
                 onchange: null,
@@ -66,7 +66,7 @@ describe('UnifiedVisualizer Theme Cache', () => {
         document.documentElement.setAttribute('data-theme', 'dark');
 
         // Wait for MutationObserver to fire
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(visualizer.themeCache.bgColor).toBe('#0f172a');
     });
@@ -85,7 +85,7 @@ describe('UnifiedVisualizer Theme Cache', () => {
         // Mock getComputedStyle to return a specific color for a var
         const originalGetComputedStyle = window.getComputedStyle;
         window.getComputedStyle = vi.fn().mockReturnValue({
-            getPropertyValue: (prop) => prop === '--my-color' ? '#123456' : ''
+            getPropertyValue: (prop) => (prop === '--my-color' ? '#123456' : ''),
         });
 
         visualizer.addTrack('test-track', 'var(--my-color)');

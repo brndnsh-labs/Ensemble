@@ -38,19 +38,19 @@ import { ACTIONS } from '../types.js';
 export const groove = {
     enabled: true,
     instruments: [
-        { name: 'Kick',  symbol: '🥁', steps: new Array(128).fill(0), muted: false },
+        { name: 'Kick', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
         { name: 'Snare', symbol: '👏', steps: new Array(128).fill(0), muted: false },
         { name: 'HiHat', symbol: '🎩', steps: new Array(128).fill(0), muted: false },
-        { name: 'Open',  symbol: '📀', steps: new Array(128).fill(0), muted: false },
+        { name: 'Open', symbol: '📀', steps: new Array(128).fill(0), muted: false },
         { name: 'Clave', symbol: '🥢', steps: new Array(128).fill(0), muted: false },
         { name: 'Conga', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
         { name: 'Bongo', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
-        { name: 'Perc',  symbol: '🪇', steps: new Array(128).fill(0), muted: false },
+        { name: 'Perc', symbol: '🪇', steps: new Array(128).fill(0), muted: false },
         { name: 'Shaker', symbol: '🧂', steps: new Array(128).fill(0), muted: false },
         { name: 'Guiro', symbol: '🥖', steps: new Array(128).fill(0), muted: false },
         { name: 'High Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
         { name: 'Mid Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
-        { name: 'Low Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false }
+        { name: 'Low Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
     ],
     volume: 0.5,
     reverb: 0.2,
@@ -83,33 +83,53 @@ export const groove = {
     gridVersion: 0,
     // --- Unified Rhythmic Pocket System ---
     pocket: {
-        globalDrive: 0,      // -1.0 (behind) to 1.0 (ahead)
-        tightness: 0.5,      // 0.0 (loose/jittery) to 1.0 (grid-locked)
-        bassGravity: 0.8,    // 0.0 to 1.0 (how much bass follows Kick)
-        chordGravity: 0.6,   // 0.0 to 1.0 (how much chords follow Bass)
-        soloistGravity: 0.4  // 0.0 to 1.0 (how much soloist follows Snare/Hats)
-    }
+        globalDrive: 0, // -1.0 (behind) to 1.0 (ahead)
+        tightness: 0.5, // 0.0 (loose/jittery) to 1.0 (grid-locked)
+        bassGravity: 0.8, // 0.0 to 1.0 (how much bass follows Kick)
+        chordGravity: 0.6, // 0.0 to 1.0 (how much chords follow Bass)
+        soloistGravity: 0.4, // 0.0 to 1.0 (how much soloist follows Snare/Hats)
+    },
 };
 
 export function grooveReducer(action, payload, playback) {
     switch (action) {
         case ACTIONS.RESET_STATE:
             Object.assign(groove, {
-                enabled: true, volume: 0.5, reverb: 0.2, swing: 0, swingSub: '8th', genreFeel: 'Rock', activeTab: 'smart', lastSmartGenre: 'Rock', measures: 1, currentMeasure: 0
+                enabled: true,
+                volume: 0.5,
+                reverb: 0.2,
+                swing: 0,
+                swingSub: '8th',
+                genreFeel: 'Rock',
+                activeTab: 'smart',
+                lastSmartGenre: 'Rock',
+                measures: 1,
+                currentMeasure: 0,
             });
             Object.assign(groove.pocket, {
-                globalDrive: 0, tightness: 0.5, bassGravity: 0.8, chordGravity: 0.6, soloistGravity: 0.4
+                globalDrive: 0,
+                tightness: 0.5,
+                bassGravity: 0.8,
+                chordGravity: 0.6,
+                soloistGravity: 0.4,
             });
-            groove.instruments.forEach(inst => { inst.steps.fill(0); inst.muted = false; });
+            groove.instruments.forEach((inst) => {
+                inst.steps.fill(0);
+                inst.muted = false;
+            });
             return true;
         case ACTIONS.SET_POCKET_CONFIG:
             Object.assign(groove.pocket, payload);
             return true;
         case ACTIONS.SET_GROOVE_STEPS: {
-            const inst = groove.instruments.find(i => i.name === payload.instrument);
+            const inst = groove.instruments.find((i) => i.name === payload.instrument);
             if (inst) {
                 inst.steps.fill(0);
-                payload.steps.forEach((v, i) => { if (i < 128) inst.steps[i] = v; });
+                payload.steps.forEach((v, i) => {
+                    if (i < 128) {
+                        inst.steps[i] = v;
+                    }
+                });
                 return true;
             }
             return false;
@@ -136,7 +156,9 @@ export function grooveReducer(action, payload, playback) {
             Object.assign(groove, { creativity: !!payload });
             return true;
         case ACTIONS.SET_GROOVE_SEED:
-            if (!groove.sectionSeedMap) groove.sectionSeedMap = {};
+            if (!groove.sectionSeedMap) {
+                groove.sectionSeedMap = {};
+            }
             groove.sectionSeedMap[payload.sectionId] = payload.seed;
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
@@ -149,17 +171,24 @@ export function grooveReducer(action, payload, playback) {
             if (playback.isPlaying) {
                 Object.assign(groove, { pendingGenreFeel: payload });
             } else {
-                const updates = { 
-                    genreFeel: payload.feel, 
-                    pendingGenreFeel: null, 
+                const updates = {
+                    genreFeel: payload.feel,
+                    pendingGenreFeel: null,
                     activeTab: 'smart',
                     // Create a fresh array reference to ensure UI components like SequencerGrid re-render
-                    instruments: groove.instruments.map(inst => ({ ...inst, steps: [...inst.steps] }))
+                    instruments: groove.instruments.map((inst) => ({
+                        ...inst,
+                        steps: [...inst.steps],
+                    })),
                 };
-                if (payload.swing !== undefined) updates.swing = payload.swing;
-                if (payload.sub !== undefined) updates.swingSub = payload.sub;
+                if (payload.swing !== undefined) {
+                    updates.swing = payload.swing;
+                }
+                if (payload.sub !== undefined) {
+                    updates.swingSub = payload.sub;
+                }
                 Object.assign(groove, updates);
-                
+
                 // If a specific drum preset is linked, trigger it
                 if (payload.drum) {
                     import('../instrument-controller.js').then(({ loadDrumPreset }) => {
@@ -180,7 +209,7 @@ export function grooveReducer(action, payload, playback) {
                 fillActive: true,
                 fillStartStep: payload.startStep,
                 fillLength: payload.length,
-                pendingCrash: !!payload.crash
+                pendingCrash: !!payload.crash,
             });
             return true;
         case ACTIONS.STEP_TOGGLE:

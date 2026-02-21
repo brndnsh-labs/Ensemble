@@ -1,10 +1,10 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
-import { useEnsembleState } from '../ui-bridge.js';
+import { useEffect, useState } from 'preact/hooks';
 import { skipWaiting } from '../pwa.js';
+import { useEnsembleState } from '../ui-bridge.js';
 
 export function PWAUpdateBanner() {
-    const updateAvailable = useEnsembleState(s => s.playback.updateAvailable);
+    const updateAvailable = useEnsembleState((s) => s.playback.updateAvailable);
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
@@ -17,12 +17,16 @@ export function PWAUpdateBanner() {
         }
     }, [updateAvailable]);
 
-    if (!updateAvailable) return null;
+    if (!updateAvailable) {
+        return null;
+    }
 
     return (
         <div id="updateBanner" class={`update-banner ${isVisible ? 'show' : ''}`}>
             <span>A new version is available.</span>
-            <button id="updateRefreshBtn" onClick={skipWaiting}>Refresh</button>
+            <button id="updateRefreshBtn" onClick={skipWaiting}>
+                Refresh
+            </button>
         </div>
     );
 }

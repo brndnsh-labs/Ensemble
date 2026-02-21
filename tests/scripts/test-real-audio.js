@@ -1,5 +1,4 @@
-
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
 import { extractForm } from '../../public/form-extractor.js';
 
@@ -8,12 +7,17 @@ const filePath = process.argv[2] || 'tests/resources/12 Bar Blues with bass.m4a'
 async function decodeAudio(path) {
     return new Promise((resolve, reject) => {
         const ffmpeg = spawn('ffmpeg', [
-            '-i', path,
-            '-f', 'f32le',
-            '-acodec', 'pcm_f32le',
-            '-ac', '1',
-            '-ar', '44100',
-            '-'
+            '-i',
+            path,
+            '-f',
+            'f32le',
+            '-acodec',
+            'pcm_f32le',
+            '-ac',
+            '1',
+            '-ar',
+            '44100',
+            '-',
         ]);
 
         const chunks = [];
@@ -21,12 +25,16 @@ async function decodeAudio(path) {
         ffmpeg.on('close', (code) => {
             if (code === 0) {
                 const buffer = Buffer.concat(chunks);
-                const floatArray = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
+                const floatArray = new Float32Array(
+                    buffer.buffer,
+                    buffer.byteOffset,
+                    buffer.length / 4,
+                );
                 resolve({
                     sampleRate: 44100,
                     length: floatArray.length,
                     duration: floatArray.length / 44100,
-                    getChannelData: () => floatArray
+                    getChannelData: () => floatArray,
                 });
             } else {
                 reject(new Error(`FFmpeg exited with code ${code}`));
@@ -50,15 +58,15 @@ async function runTest() {
 
         const form = extractForm(analysis.chords, analysis.pulse);
         console.log(`\nDetected Form for ${filePath}:`);
-        form.forEach(s => console.log(`  ${s.label}: ${s.value} (x${s.repeat})`));
+        form.forEach((s) => console.log(`  ${s.label}: ${s.value} (x${s.repeat})`));
 
         // Sample check of first 4 measures
         for (let i = 0; i < 4; i++) {
-            const measure = analysis.chords.filter(r => r.beat >= i*4 && r.beat < (i+1)*4);
-            console.log(`Measure ${i+1}: ${measure.map(m => m.chord).join(' ')}`);
+            const measure = analysis.chords.filter((r) => r.beat >= i * 4 && r.beat < (i + 1) * 4);
+            console.log(`Measure ${i + 1}: ${measure.map((m) => m.chord).join(' ')}`);
         }
     } catch (err) {
-        console.error("Test failed:", err);
+        console.error('Test failed:', err);
     }
 }
 

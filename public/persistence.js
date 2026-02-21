@@ -3,8 +3,11 @@ import { getState, storage } from './state.js';
 let saveTimeout;
 
 export function saveCurrentState() {
-    const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-    if (saveTimeout) clearTimeout(saveTimeout);
+    const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } =
+        getState();
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+    }
     const data = {
         sections: arranger.sections,
         key: arranger.key,
@@ -23,18 +26,53 @@ export function saveCurrentState() {
         songMode: playback.songMode,
         vizEnabled: vizState.enabled,
         autoIntensity: playback.autoIntensity,
-        chords: { enabled: chords.enabled, style: chords.style, instrument: chords.instrument, octave: chords.octave, density: chords.density, volume: chords.volume, reverb: chords.reverb, pianoRoots: chords.pianoRoots, activeTab: chords.activeTab },
-        bass: { enabled: bass.enabled, style: bass.style, octave: bass.octave, volume: bass.volume, reverb: bass.reverb, activeTab: bass.activeTab },
-        soloist: { enabled: soloist.enabled, style: soloist.style, preset: soloist.preset, octave: soloist.octave, volume: soloist.volume, reverb: soloist.reverb, mode: soloist.mode, activeTab: soloist.activeTab },
-        harmony: { enabled: harmony.enabled, style: harmony.style, octave: harmony.octave, volume: harmony.volume, reverb: harmony.reverb, complexity: harmony.complexity, activeTab: harmony.activeTab },
+        chords: {
+            enabled: chords.enabled,
+            style: chords.style,
+            instrument: chords.instrument,
+            octave: chords.octave,
+            density: chords.density,
+            volume: chords.volume,
+            reverb: chords.reverb,
+            pianoRoots: chords.pianoRoots,
+            activeTab: chords.activeTab,
+        },
+        bass: {
+            enabled: bass.enabled,
+            style: bass.style,
+            octave: bass.octave,
+            volume: bass.volume,
+            reverb: bass.reverb,
+            activeTab: bass.activeTab,
+        },
+        soloist: {
+            enabled: soloist.enabled,
+            style: soloist.style,
+            preset: soloist.preset,
+            octave: soloist.octave,
+            volume: soloist.volume,
+            reverb: soloist.reverb,
+            mode: soloist.mode,
+            activeTab: soloist.activeTab,
+        },
+        harmony: {
+            enabled: harmony.enabled,
+            style: harmony.style,
+            octave: harmony.octave,
+            volume: harmony.volume,
+            reverb: harmony.reverb,
+            complexity: harmony.complexity,
+            activeTab: harmony.activeTab,
+        },
         groove: {
             enabled: groove.enabled,
             volume: groove.volume,
             reverb: groove.reverb,
             swing: groove.swing,
-                        swingSub: groove.swingSub,
-                        followPlayback: groove.followPlayback,
-                        humanize: groove.humanize,            lastDrumPreset: groove.lastDrumPreset,
+            swingSub: groove.swingSub,
+            followPlayback: groove.followPlayback,
+            humanize: groove.humanize,
+            lastDrumPreset: groove.lastDrumPreset,
             genreFeel: groove.genreFeel,
             larsMode: groove.larsMode,
             larsIntensity: groove.larsIntensity,
@@ -43,7 +81,10 @@ export function saveCurrentState() {
             mobileTab: groove.mobileTab,
             creativity: groove.creativity,
             sectionSeedMap: groove.sectionSeedMap,
-            pattern: groove.instruments.map(inst => ({ name: inst.name, steps: [...inst.steps] }))
+            pattern: groove.instruments.map((inst) => ({
+                name: inst.name,
+                steps: [...inst.steps],
+            })),
         },
         midi: {
             enabled: midi.enabled,
@@ -60,12 +101,15 @@ export function saveCurrentState() {
             drumsOctave: midi.drumsOctave,
             latency: midi.latency,
             muteLocal: midi.muteLocal,
-            velocitySensitivity: midi.velocitySensitivity
-        }    };
+            velocitySensitivity: midi.velocitySensitivity,
+        },
+    };
     storage.save('currentState', data);
 }
 
 export function debounceSaveState() {
-    if (saveTimeout) clearTimeout(saveTimeout);
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+    }
     saveTimeout = setTimeout(saveCurrentState, 1000);
 }

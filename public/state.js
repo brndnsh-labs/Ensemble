@@ -1,15 +1,14 @@
-import { ACTIONS } from './types.js';
-
+import { arranger, arrangerReducer } from './state/arranger.js';
+import { groove, grooveReducer } from './state/groove.js';
+import { bass, chords, harmony, instrumentReducer, soloist } from './state/instruments.js';
+import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
-import { arranger, arrangerReducer } from './state/arranger.js';
-import { chords, bass, soloist, harmony, instrumentReducer } from './state/instruments.js';
-import { groove, grooveReducer } from './state/groove.js';
-import { midi, midiReducer } from './state/midi.js';
-import { vizState, vizReducer } from './state/visualizer.js';
+import { vizReducer, vizState } from './state/visualizer.js';
+import { ACTIONS } from './types.js';
 
 // Central State Map for Generic PARAM Updates
-const stateMap = { 
+const stateMap = {
     playback,
     chords,
     bass,
@@ -18,7 +17,7 @@ const stateMap = {
     harmony,
     arranger,
     vizState,
-    midi 
+    midi,
 };
 
 /**
@@ -32,22 +31,14 @@ export function getState() {
 }
 
 // Export individual state slices for dynamic imports
-export {
-    playback,
-    arranger,
-    chords,
-    bass,
-    soloist,
-    harmony,
-    groove,
-    midi,
-    vizState
-};
+export { playback, arranger, chords, bass, soloist, harmony, groove, midi, vizState };
 
 // Persistence Helpers
 export const storage = {
     get: (key) => {
-        if (typeof localStorage === 'undefined') return [];
+        if (typeof localStorage === 'undefined') {
+            return [];
+        }
         try {
             return JSON.parse(localStorage.getItem(`ensemble_${key}`) || '[]');
         } catch (e) {
@@ -56,9 +47,11 @@ export const storage = {
         }
     },
     save: (key, val) => {
-        if (typeof localStorage === 'undefined') return;
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
         localStorage.setItem(`ensemble_${key}`, JSON.stringify(val));
-    }
+    },
 };
 
 // --- Event Bus / State Manager ---
@@ -84,16 +77,28 @@ export function dispatch(action, payload) {
 
     // 2. Delegate to Reducers
     if (!handled) {
-        if (playbackReducer(action, payload)) handled = true;
-        if (arrangerReducer(action, payload)) handled = true;
-        if (instrumentReducer(action, payload)) handled = true;
-        if (grooveReducer(action, payload, playback)) handled = true;
-        if (midiReducer(action, payload)) handled = true;
-        if (vizReducer(action, payload)) handled = true;
+        if (playbackReducer(action, payload)) {
+            handled = true;
+        }
+        if (arrangerReducer(action, payload)) {
+            handled = true;
+        }
+        if (instrumentReducer(action, payload)) {
+            handled = true;
+        }
+        if (grooveReducer(action, payload, playback)) {
+            handled = true;
+        }
+        if (midiReducer(action, payload)) {
+            handled = true;
+        }
+        if (vizReducer(action, payload)) {
+            handled = true;
+        }
     }
 
     // Notify listeners
-    listeners.forEach(listener => listener(action, payload, stateMap));
+    listeners.forEach((listener) => listener(action, payload, stateMap));
 
     // 3. Side Effects (Middleware)
     handleEffects(action, payload, { oldBpm });
@@ -106,7 +111,7 @@ async function handleEffects(action, payload, context = {}) {
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
             const { togglePlay } = await import('./engine/scheduler-core.js');
-            togglePlay(payload?.viz, true); 
+            togglePlay(payload?.viz, true);
             break;
         }
         case ACTIONS.SET_BPM: {

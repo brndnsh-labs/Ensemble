@@ -15,16 +15,19 @@ export function shareProgression() {
         params.set('int', playback.bandIntensity.toFixed(2));
         params.set('comp', playback.complexity.toFixed(2));
         params.set('notation', arranger.notation);
-        const url = window.location.origin + window.location.pathname + '?' + params.toString();
-        
-        navigator.clipboard.writeText(url).then(() => {
-            showToast("Share link copied to clipboard!");
-        }).catch(err => {
-            console.error("Failed to copy URL: ", err);
-            showToast("Failed to copy link. Please copy it from the address bar.");
-        });
+        const url = `${window.location.origin + window.location.pathname}?${params.toString()}`;
+
+        navigator.clipboard
+            .writeText(url)
+            .then(() => {
+                showToast('Share link copied to clipboard!');
+            })
+            .catch((err) => {
+                console.error('Failed to copy URL: ', err);
+                showToast('Failed to copy link. Please copy it from the address bar.');
+            });
     } catch (e) {
-        console.error("Error generating share link:", e);
-        showToast("Error generating share link.");
+        console.error('Error generating share link:', e);
+        showToast('Error generating share link.');
     }
 }

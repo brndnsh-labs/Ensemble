@@ -1,8 +1,16 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sendMIDINote, sendMIDIDrum, sendMIDICC, sendMIDIPitchBend, initMIDI, panic } from '../../../public/midi-controller.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    initMIDI,
+    panic,
+    sendMIDICC,
+    sendMIDIDrum,
+    sendMIDINote,
+    sendMIDIPitchBend,
+} from '../../../public/midi-controller.js';
+import { getState } from '../../../public/state.js';
+
+const { playback, midi } = getState();
 
 describe('MIDI Controller System', () => {
     let mockOutput;
@@ -24,19 +32,19 @@ describe('MIDI Controller System', () => {
             name: 'Mock Output',
             send: vi.fn((data, timestamp) => {
                 sentMessages.push({ data, timestamp });
-            })
+            }),
         };
 
         // Mock MIDI Access
         const mockMidiAccess = {
             inputs: new Map(),
             outputs: new Map([['mock-id', mockOutput]]),
-            onstatechange: null
+            onstatechange: null,
         };
 
         // Stub navigator
         vi.stubGlobal('navigator', {
-            requestMIDIAccess: () => Promise.resolve(mockMidiAccess)
+            requestMIDIAccess: () => Promise.resolve(mockMidiAccess),
         });
 
         // Initialize
@@ -77,9 +85,9 @@ describe('MIDI Controller System', () => {
             const msg2 = calls[1]; // Off 1 (Truncated)
             const msg3 = calls[2]; // On 2
 
-            expect(msg1[0][0] & 0xF0).toBe(0x90);
-            expect(msg2[0][0] & 0xF0).toBe(0x80); // Note Off
-            expect(msg3[0][0] & 0xF0).toBe(0x90); // Note On
+            expect(msg1[0][0] & 0xf0).toBe(0x90);
+            expect(msg2[0][0] & 0xf0).toBe(0x80); // Note Off
+            expect(msg3[0][0] & 0xf0).toBe(0x90); // Note On
 
             // Verify Off 1 timestamp is before or equal to On 2 timestamp
             expect(msg2[1]).toBeLessThan(msg3[1]);
@@ -140,7 +148,7 @@ describe('MIDI Controller System', () => {
             // 1. Send initial value
             sendMIDICC(channel, controller, 64, time);
             expect(mockOutput.send).toHaveBeenCalledTimes(1);
-            expect(mockOutput.send).toHaveBeenLastCalledWith([0xB0, 11, 64], expect.any(Number));
+            expect(mockOutput.send).toHaveBeenLastCalledWith([0xb0, 11, 64], expect.any(Number));
 
             // 2. Send SAME value (should be ignored)
             sendMIDICC(channel, controller, 64, time + 0.1);
@@ -149,12 +157,12 @@ describe('MIDI Controller System', () => {
             // 3. Send NEW value
             sendMIDICC(channel, controller, 65, time + 0.2);
             expect(mockOutput.send).toHaveBeenCalledTimes(2);
-            expect(mockOutput.send).toHaveBeenLastCalledWith([0xB0, 11, 65], expect.any(Number));
+            expect(mockOutput.send).toHaveBeenLastCalledWith([0xb0, 11, 65], expect.any(Number));
 
             // 4. Send DIFFERENT channel/controller same value (should be sent)
             sendMIDICC(2, controller, 65, time + 0.3);
             expect(mockOutput.send).toHaveBeenCalledTimes(3);
-            expect(mockOutput.send).toHaveBeenLastCalledWith([0xB1, 11, 65], expect.any(Number));
+            expect(mockOutput.send).toHaveBeenLastCalledWith([0xb1, 11, 65], expect.any(Number));
         });
 
         it('should only send Pitch Bend message when value changes', () => {
@@ -190,7 +198,7 @@ describe('MIDI Controller System', () => {
             // 3. Send SAME value again (should be sent this time because cache was cleared)
             sendMIDICC(channel, controller, 100, time);
             expect(mockOutput.send).toHaveBeenCalledTimes(callsAfterPanic + 1);
-            expect(mockOutput.send).toHaveBeenLastCalledWith([0xB0, 11, 100], expect.any(Number));
+            expect(mockOutput.send).toHaveBeenLastCalledWith([0xb0, 11, 100], expect.any(Number));
         });
     });
 
@@ -203,7 +211,7 @@ describe('MIDI Controller System', () => {
             const [status, note] = mockOutput.send.mock.calls[0][0];
 
             expect(status).toBe(0x99); // Channel 10 Note On
-            expect(note).toBe(36);     // Kick
+            expect(note).toBe(36); // Kick
         });
 
         it('should send explicit Note Offs for all active notes when panic() is called', () => {
@@ -214,11 +222,11 @@ describe('MIDI Controller System', () => {
 
             panic();
 
-            const messages = mockOutput.send.mock.calls.map(c => c[0]);
+            const messages = mockOutput.send.mock.calls.map((c) => c[0]);
 
             expect(messages).toContainEqual([0x80, 60, 0]);
             expect(messages).toContainEqual([0x81, 62, 0]);
-            expect(messages).toContainEqual([0xB0, 123, 0]); // All Notes Off
+            expect(messages).toContainEqual([0xb0, 123, 0]); // All Notes Off
         });
 
         it('should send Pitch Bend message when bend option is provided', () => {
@@ -231,10 +239,10 @@ describe('MIDI Controller System', () => {
 
             // 1. Pitch Bend (Requested)
             // Value: -4096 + 8192 = 4096. 4096 in 7-bit: LSB=0, MSB=32 (0x20)
-            expect(calls[0][0]).toEqual([0xE0, 0, 0x20]);
+            expect(calls[0][0]).toEqual([0xe0, 0, 0x20]);
 
             // 2. Pitch Bend (Reset)
-            expect(calls[1][0]).toEqual([0xE0, 0, 0x40]);
+            expect(calls[1][0]).toEqual([0xe0, 0, 0x40]);
 
             // 3. Note On
             expect(calls[2][0]).toEqual([0x90, 60, 0.8]);

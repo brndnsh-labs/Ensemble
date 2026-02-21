@@ -5,9 +5,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-    e.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-    );
+    e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
 });
 
 self.addEventListener('message', (event) => {
@@ -19,15 +17,18 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (e) => {
     e.waitUntil(
         caches.keys().then((keys) => {
-            return Promise.all(keys.map((key) => {
-                if (key !== CACHE_NAME) return caches.delete(key);
-            }));
-        })
+            return Promise.all(
+                keys.map((key) => {
+                    if (key !== CACHE_NAME) {
+                        return caches.delete(key);
+                    }
+                    return Promise.resolve();
+                }),
+            );
+        }),
     );
 });
 
 self.addEventListener('fetch', (e) => {
-    e.respondWith(
-        caches.match(e.request).then((response) => response || fetch(e.request))
-    );
+    e.respondWith(caches.match(e.request).then((response) => response || fetch(e.request)));
 });

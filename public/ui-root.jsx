@@ -1,4 +1,4 @@
-import { h, render, Component } from 'preact';
+import { Component, h, render } from 'preact';
 import { App } from './App.jsx';
 
 class ErrorBoundary extends Component {
@@ -8,7 +8,7 @@ class ErrorBoundary extends Component {
     }
     componentDidCatch(error) {
         this.setState({ errored: true });
-        console.error("[UI-Root] Component Crash:", error);
+        console.error('[UI-Root] Component Crash:', error);
     }
     render(props, state) {
         if (state.errored) {
@@ -16,7 +16,9 @@ class ErrorBoundary extends Component {
                 <div style="padding: 2rem; text-align: center; background: #1e293b; color: white; height: 100vh;">
                     <h2>Something went wrong in the UI.</h2>
                     <p>The audio engine may still be running. Try refreshing.</p>
-                    <button onClick={() => window.location.reload()} class="primary-btn">Refresh App</button>
+                    <button onClick={() => window.location.reload()} class="primary-btn">
+                        Refresh App
+                    </button>
                 </div>
             );
         }
@@ -25,14 +27,14 @@ class ErrorBoundary extends Component {
 }
 
 export function mountComponents() {
-    console.log("[UI-Root] Mounting Preact Root...");
-    
+    console.log('[UI-Root] Mounting Preact Root...');
+
     const root = document.body;
 
     render(
         <ErrorBoundary>
             <App />
-        </ErrorBoundary>, 
-        root
+        </ErrorBoundary>,
+        root,
     );
 }

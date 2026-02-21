@@ -1,13 +1,15 @@
 /* eslint-disable */
-import { describe, it, expect, vi } from 'vitest';
-import { getBassNote, isBassActive } from '../../public/bass.js';
-import { dispatch, getState, storage } from '../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { describe, expect, it } from 'vitest';
+import { getBassNote } from '../../public/bass.js';
+import { getState } from '../../public/state.js';
+
+const { arranger, playback, groove } = getState();
+
 import { getStepsPerMeasure } from '../../public/utils.js';
 
 /**
  * GENRE INTEGRITY STRESS TEST
- * Simulates long-duration playback to ensure procedural engines 
+ * Simulates long-duration playback to ensure procedural engines
  * are stable, do not crash, and produce valid numeric output.
  */
 
@@ -17,21 +19,31 @@ describe('Genre Integrity Stability Test', () => {
         arranger.timeSignature = '4/4';
         const spm = getStepsPerMeasure(arranger.timeSignature);
         const totalSteps = measures * spm;
-        
-        const chord = { 
-            rootMidi: 48, 
-            quality: 'major', 
-            intervals: [0, 4, 7, 11], 
+
+        const chord = {
+            rootMidi: 48,
+            quality: 'major',
+            intervals: [0, 4, 7, 11],
             beats: 4,
-            freqs: [130.81, 164.81, 196.00, 246.94]
+            freqs: [130.81, 164.81, 196.0, 246.94],
         };
 
         for (let step = 0; step < totalSteps; step++) {
             const stepInChord = step % spm;
             const beatIndex = stepInChord / 4;
-            
+
             // 1. Verify Bass Stability
-            const bassNote = getBassNote(chord, null, beatIndex, null, 38, 'smart', 0, step, stepInChord);
+            const bassNote = getBassNote(
+                chord,
+                null,
+                beatIndex,
+                null,
+                38,
+                'smart',
+                0,
+                step,
+                stepInChord,
+            );
             if (bassNote) {
                 expect(bassNote.midi, `NaN MIDI in ${genre}`).not.toBeNaN();
                 expect(bassNote.velocity, `Invalid velocity in ${genre}`).toBeGreaterThan(0);
@@ -64,19 +76,40 @@ describe('Genre Integrity Stability Test', () => {
         groove.genreFeel = 'Jazz';
         for (let i = 0; i < 500; i++) {
             playback.bandIntensity = Math.random();
-            const note = getBassNote({ rootMidi: 48, intervals: [0, 4, 7], quality: 'major' }, null, 0, null, 38, 'smart', 0, i, i % 16);
-            if (note) expect(note.velocity).toBeDefined();
+            const note = getBassNote(
+                { rootMidi: 48, intervals: [0, 4, 7], quality: 'major' },
+                null,
+                0,
+                null,
+                38,
+                'smart',
+                0,
+                i,
+                i % 16,
+            );
+            if (note) {
+                expect(note.velocity).toBeDefined();
+            }
         }
     });
 
     it('should remain stable in odd time signatures (7/8)', () => {
         const spm = getStepsPerMeasure('7/8');
         for (let i = 0; i < 100 * spm; i++) {
-            const note = getBassNote({ rootMidi: 48, intervals: [0, 4, 7], quality: 'major' }, null, (i % spm) / 4, null, 38, 'smart', 0, i, i % spm);
-            if (note) expect(note.midi).toBeGreaterThan(0);
+            const note = getBassNote(
+                { rootMidi: 48, intervals: [0, 4, 7], quality: 'major' },
+                null,
+                (i % spm) / 4,
+                null,
+                38,
+                'smart',
+                0,
+                i,
+                i % spm,
+            );
+            if (note) {
+                expect(note.midi).toBeGreaterThan(0);
+            }
         }
     });
 });
-
-
-            

@@ -1,36 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../public/conductor.js';
 import { getState } from '../../public/state.js';
 
 // Mock State
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        playback: { 
-            bandIntensity: 0.5, 
-            autoIntensity: false, 
+        playback: {
+            bandIntensity: 0.5,
+            autoIntensity: false,
             isPlaying: true,
-            sessionTimer: 0
+            sessionTimer: 0,
         },
         arranger: {
             totalSteps: 128,
             sections: [
                 { id: 's1', label: 'A' },
                 { id: 's2', label: 'B' },
-                { id: 's3', label: 'A' }
+                { id: 's3', label: 'A' },
             ],
             stepMap: [
                 { start: 0, end: 32, chord: { sectionId: 's1', sectionLabel: 'A' } },
                 { start: 32, end: 64, chord: { sectionId: 's2', sectionLabel: 'B' } },
-                { start: 64, end: 96, chord: { sectionId: 's3', sectionLabel: 'A' } }
-            ]
+                { start: 64, end: 96, chord: { sectionId: 's3', sectionLabel: 'A' } },
+            ],
         },
-        soloist: { 
-            enabled: true, 
-            tradeMode: 'sections', 
+        soloist: {
+            enabled: true,
+            tradeMode: 'sections',
             activeTab: 'smart',
             isResting: false,
             currentPhraseSteps: 10,
-            srdcState: 'Statement'
+            srdcState: 'Statement',
         },
         groove: { enabled: true, genreFeel: 'Jazz' },
         dispatch: vi.fn((action, payload) => {
@@ -41,16 +41,19 @@ vi.mock('../../public/state.js', () => {
             } else if (action === 'UPDATE_SB') {
                 Object.assign(mockState.soloist, payload);
             }
-        })
+        }),
     };
     return {
         getState: () => mockState,
-        dispatch: mockState.dispatch
+        dispatch: mockState.dispatch,
     };
 });
 
 // Mock dependencies
-vi.mock('../../public/persistence.js', () => ({ debounceSaveState: vi.fn(), saveCurrentState: vi.fn() }));
+vi.mock('../../public/persistence.js', () => ({
+    debounceSaveState: vi.fn(),
+    saveCurrentState: vi.fn(),
+}));
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn(), flushWorker: vi.fn() }));
 vi.mock('../../public/fills.js', () => ({ generateProceduralFill: vi.fn(() => ({})) }));
 vi.mock('../../public/ui.js', () => ({ triggerFlash: vi.fn() }));
@@ -66,29 +69,29 @@ describe('Soloist Trading Logic', () => {
 
     it('should toggle soloist OFF at the first transition', () => {
         const stepsPerMeasure = 16;
-        // Step 31 is the last step of the first measure of the first section? 
+        // Step 31 is the last step of the first measure of the first section?
         // No, checkSectionTransition triggers at the START of a measure if it LEADS into a transition.
-        
+
         // Transition from s1 to s2 happens at step 32.
         // So at step 16 (start of measure 2), we check measureEnd (32).
-        // measureEnd - 1 = 31. Step 31 is in s1. 
+        // measureEnd - 1 = 31. Step 31 is in s1.
         // measureEnd = 32. Step 32 is in s2.
         // s1 !== s2 -> TRIGGER.
-        
+
         checkSectionTransition(16, stepsPerMeasure);
-        
+
         expect(getState().soloist.enabled).toBe(false);
     });
 
     it('should trade across 3 sections correctly', () => {
         const state = getState();
         const stepsPerMeasure = 16;
-        
+
         state.arranger.totalSteps = 96; // 3 sections of 32 steps
         state.arranger.stepMap = [
             { start: 0, end: 32, chord: { sectionId: 's1', sectionLabel: 'A' } },
             { start: 32, end: 64, chord: { sectionId: 's2', sectionLabel: 'B' } },
-            { start: 64, end: 96, chord: { sectionId: 's3', sectionLabel: 'C' } }
+            { start: 64, end: 96, chord: { sectionId: 's3', sectionLabel: 'C' } },
         ];
 
         // Transition 1: A -> B (at step 16 triggers for end at 32)

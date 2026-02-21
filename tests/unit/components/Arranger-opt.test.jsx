@@ -1,15 +1,16 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
 
 vi.mock('../../../public/ui-bridge.js', () => ({
-    useEnsembleState: (selector) => mockUseEnsembleState(selector)
+    useEnsembleState: (selector) => mockUseEnsembleState(selector),
 }));
 
 vi.mock('../../../public/arranger-controller.js', () => ({
@@ -20,7 +21,7 @@ vi.mock('../../../public/arranger-controller.js', () => ({
     addSection: vi.fn(),
     refreshArrangerUI: vi.fn(),
     clearChordPresetHighlight: vi.fn(),
-    validateAndAnalyze: vi.fn()
+    validateAndAnalyze: vi.fn(),
 }));
 
 // Mock SectionCard
@@ -35,17 +36,19 @@ vi.mock('../../../public/components/SectionCard.jsx', () => {
         }
 
         render() {
-             return h('div', {
-                 className: 'section-card',
-                 'data-id': this.props.section.id
-             }, [
-                 h('textarea', {})
-             ]);
+            return h(
+                'div',
+                {
+                    className: 'section-card',
+                    'data-id': this.props.section.id,
+                },
+                [h('textarea', {})],
+            );
         }
     }
 
     return {
-        SectionCard: SectionCardMock
+        SectionCard: SectionCardMock,
     };
 });
 
@@ -68,7 +71,7 @@ describe('Arranger Optimization', () => {
     it('should use ref API instead of querySelector when lastInteractedSectionId changes', async () => {
         const sections = [
             { id: 's1', label: 'A', value: 'C', seamless: false },
-            { id: 's2', label: 'B', value: 'G', seamless: false }
+            { id: 's2', label: 'B', value: 'G', seamless: false },
         ];
 
         // First render with no interaction
@@ -76,8 +79,8 @@ describe('Arranger Optimization', () => {
             const state = {
                 arranger: {
                     sections: sections,
-                    lastInteractedSectionId: null
-                }
+                    lastInteractedSectionId: null,
+                },
             };
             return selector(state);
         });
@@ -94,8 +97,8 @@ describe('Arranger Optimization', () => {
             const state = {
                 arranger: {
                     sections: sections,
-                    lastInteractedSectionId: 's1'
-                }
+                    lastInteractedSectionId: 's1',
+                },
             };
             return selector(state);
         });
@@ -104,7 +107,7 @@ describe('Arranger Optimization', () => {
         await act(async () => {
             render(<Arranger />, container);
             // Wait for setTimeout in Arranger
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise((r) => setTimeout(r, 200));
         });
 
         // Verify querySelector was NOT called

@@ -1,31 +1,33 @@
-import { h, Fragment } from 'preact';
-import React from 'preact/compat';
-import { memo } from 'preact/compat';
-import { useMemo, useEffect, useRef, useCallback, useLayoutEffect } from 'preact/hooks';
-import { useEnsembleState } from '../ui-bridge.js';
-import { getStepsPerMeasure, getStepInfo } from '../utils.js';
+import { Fragment, h } from 'preact';
+import React, { memo } from 'preact/compat';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
-import { ACTIONS } from '../types.js';
 import { clearDrumPresetHighlight } from '../instrument-controller.js';
-import { getState, dispatch } from '../state.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
+import { useEnsembleState } from '../ui-bridge.js';
+import { getStepInfo, getStepsPerMeasure } from '../utils.js';
+
 const { playback: playbackState } = getState();
 
 const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) => {
     // Optimization: Removed per-step subscription to playback state.
     // Visual "playing" state is handled by parent via direct DOM manipulation.
-    
+
     const className = [
         'step',
         value === 1 ? 'active' : '',
         value === 2 ? 'accented' : '',
         stepInfo.isGroupStart ? 'group-marker' : '',
-        stepInfo.isBeatStart ? 'beat-marker' : ''
-    ].filter(Boolean).join(' ');
+        stepInfo.isBeatStart ? 'beat-marker' : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
 
-    const status = value === 1 ? 'active' : (value === 2 ? 'accented' : 'inactive');
+    const status = value === 1 ? 'active' : value === 2 ? 'accented' : 'inactive';
 
     return (
-        <div 
+        <div
             className={className}
             data-inst-idx={instIdx}
             data-step-idx={stepIdx}
@@ -45,17 +47,16 @@ const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) =>
 });
 
 export function SequencerGrid() {
-    const { instruments, measures, timeSignature, gridVersion, isPlaying } = useEnsembleState(s => ({
+    const { instruments, measures, timeSignature, isPlaying } = useEnsembleState((s) => ({
         instruments: s.groove.instruments,
         measures: s.groove.measures,
         timeSignature: s.arranger.timeSignature,
-        gridVersion: s.groove.gridVersion,
-        isPlaying: s.playback.isPlaying
+        isPlaying: s.playback.isPlaying,
     }));
 
     const isDraggingRef = useRef(false);
     const dragTypeRef = useRef(0);
-    const gridRef = useRef(null);
+    const _gridRef = useRef(null);
     const stepCache = useRef(new Map());
 
     const spm = getStepsPerMeasure(timeSignature);
@@ -68,7 +69,9 @@ export function SequencerGrid() {
     }, [totalSteps, ts]);
 
     useEffect(() => {
-        const handleMouseUp = () => { isDraggingRef.current = false; };
+        const handleMouseUp = () => {
+            isDraggingRef.current = false;
+        };
         window.addEventListener('mouseup', handleMouseUp);
         return () => window.removeEventListener('mouseup', handleMouseUp);
     }, []);
@@ -76,7 +79,9 @@ export function SequencerGrid() {
     // Optimization: Cache step elements to avoid thousands of querySelectorAll calls
     useLayoutEffect(() => {
         const grid = document.getElementById('sequencerGrid');
-        if (!grid) return;
+        if (!grid) {
+            return;
+        }
 
         stepCache.current.clear();
         const steps = grid.getElementsByClassName('step');
@@ -84,7 +89,7 @@ export function SequencerGrid() {
         for (let i = 0; i < steps.length; i++) {
             const stepEl = steps[i];
             const idx = parseInt(stepEl.getAttribute('data-step-idx'), 10);
-            if (!isNaN(idx)) {
+            if (!Number.isNaN(idx)) {
                 if (!stepCache.current.has(idx)) {
                     stepCache.current.set(idx, []);
                 }
@@ -143,8 +148,10 @@ export function SequencerGrid() {
     }, [isPlaying, totalSteps]);
 
     const handleToggle = useCallback((e, instIdx, stepIdx) => {
-        if (e.type === 'mouseover' && !isDraggingRef.current) return;
-        
+        if (e.type === 'mouseover' && !isDraggingRef.current) {
+            return;
+        }
+
         // Optimization: Access global state directly to avoid dependency on 'instruments'
         // which changes on every step toggle, preventing full grid re-renders.
         const { groove } = getState();
@@ -153,10 +160,14 @@ export function SequencerGrid() {
         let newType = dragTypeRef.current;
 
         if (e.type === 'mousedown' || e.type === 'keydown') {
-            if (inst.steps[stepIdx] === 0) newType = 1;
-            else if (inst.steps[stepIdx] === 1) newType = 2;
-            else newType = 0;
-            
+            if (inst.steps[stepIdx] === 0) {
+                newType = 1;
+            } else if (inst.steps[stepIdx] === 1) {
+                newType = 2;
+            } else {
+                newType = 0;
+            }
+
             if (e.type === 'mousedown') {
                 dragTypeRef.current = newType;
                 isDraggingRef.current = true;
@@ -178,7 +189,7 @@ export function SequencerGrid() {
         });
     }, []);
 
-    const handleMute = useCallback((inst, instIdx) => {
+    const handleMute = useCallback((inst, _instIdx) => {
         inst.muted = !inst.muted;
         dispatch('MUTE_TOGGLE');
     }, []);
@@ -188,8 +199,8 @@ export function SequencerGrid() {
             {instruments.map((inst, instIdx) => (
                 <div key={inst.name} className="track">
                     <div className="track-header">
-                        <span 
-                            className={`track-symbol ${inst.muted ? 'muted' : ''}`} 
+                        <span
+                            className={`track-symbol ${inst.muted ? 'muted' : ''}`}
                             title={`Audition ${inst.name}`}
                             role="button"
                             tabIndex={0}
@@ -204,7 +215,7 @@ export function SequencerGrid() {
                         >
                             {inst.symbol || inst.name.charAt(0)}
                         </span>
-                        <button 
+                        <button
                             className={`mute-toggle ${inst.muted ? 'active' : ''}`}
                             title={inst.muted ? 'Unmute' : 'Mute'}
                             aria-label={`${inst.muted ? 'Unmute' : 'Mute'} ${inst.name}`}
@@ -214,9 +225,12 @@ export function SequencerGrid() {
                             M
                         </button>
                     </div>
-                    <div className="steps" style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}>
+                    <div
+                        className="steps"
+                        style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}
+                    >
                         {allStepInfos.map((stepInfo, stepIdx) => (
-                            <Step 
+                            <Step
                                 key={stepIdx}
                                 instIdx={instIdx}
                                 stepIdx={stepIdx}
@@ -232,13 +246,21 @@ export function SequencerGrid() {
 
             {/* Label Row */}
             <div className="track label-row">
-                <div className="track-header label-header"></div>
-                <div className="steps" style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}>
+                <div className="track-header label-header" />
+                <div
+                    className="steps"
+                    style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}
+                >
                     {allStepInfos.map((stepInfo, i) => {
                         const isBeatStart = stepInfo.isBeatStart;
-                        const label = isBeatStart ? (stepInfo.beatIndex + 1) : ((i % ts.stepsPerBeat) + 1);
+                        const label = isBeatStart
+                            ? stepInfo.beatIndex + 1
+                            : (i % ts.stepsPerBeat) + 1;
                         return (
-                            <div key={i} className={`step-label ${isBeatStart ? 'beat-start' : ''} ${stepInfo.isGroupStart ? 'group-start' : ''}`}>
+                            <div
+                                key={i}
+                                className={`step-label ${isBeatStart ? 'beat-start' : ''} ${stepInfo.isGroupStart ? 'group-start' : ''}`}
+                            >
                                 {label}
                             </div>
                         );

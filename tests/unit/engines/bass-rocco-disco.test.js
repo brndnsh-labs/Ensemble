@@ -1,5 +1,4 @@
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
 vi.mock('../../../public/state.js', () => {
@@ -11,21 +10,19 @@ vi.mock('../../../public/state.js', () => {
             volume: 0.5,
             pocketOffset: 0,
             buffer: new Map(),
-            style: 'smart'
+            style: 'smart',
         },
         soloist: {
             enabled: true,
             busySteps: 0,
             tension: 0,
-            buffer: new Map()
+            buffer: new Map(),
         },
         groove: {
             genreFeel: 'Funk',
             measures: 1,
             lastDrumPreset: 'Standard',
-            instruments: [
-                { name: 'Kick', steps: new Array(16).fill(0), muted: false }
-            ]
+            instruments: [{ name: 'Kick', steps: new Array(16).fill(0), muted: false }],
         },
         playback: { bandIntensity: 0.8, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         chords: { pianoRoots: true },
@@ -36,33 +33,53 @@ vi.mock('../../../public/state.js', () => {
             progression: new Array(16).fill({}),
             totalSteps: 64,
             timeSignature: '4/4',
-            stepMap: [{ start: 0, end: 64, chord: { sectionId: 's1', rootMidi: 48, quality: '7', beats: 4 } }]
+            stepMap: [
+                {
+                    start: 0,
+                    end: 64,
+                    chord: { sectionId: 's1', rootMidi: 48, quality: '7', beats: 4 },
+                },
+            ],
         },
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 vi.mock('../../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12], grouping: [2, 2] }
+        '4/4': {
+            beats: 4,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12],
+            grouping: [2, 2],
+        },
     },
-    REGGAE_RIDDIMS: {}
+    REGGAE_RIDDIMS: {},
 }));
 
 import { getBassNote, isBassActive } from '../../../public/bass.js';
 import { getState } from '../../../public/state.js';
+
 const { bass, playback } = getState();
 
 describe('Bass Engine - Rocco & Disco', () => {
-    const chordC = { rootMidi: 48, intervals: [0, 4, 7, 10], quality: '7', beats: 4, sectionId: 's1', bassMidi: null };
+    const chordC = {
+        rootMidi: 48,
+        intervals: [0, 4, 7, 10],
+        quality: '7',
+        beats: 4,
+        sectionId: 's1',
+        bassMidi: null,
+    };
 
     beforeEach(() => {
         bass.busySteps = 0;
@@ -71,7 +88,7 @@ describe('Bass Engine - Rocco & Disco', () => {
 
     describe('Rocco Style', () => {
         it('should be active on all 16th steps', () => {
-            for(let i=0; i<4; i++) {
+            for (let i = 0; i < 4; i++) {
                 expect(isBassActive('rocco', i, i)).toBe(true);
             }
         });
@@ -87,11 +104,13 @@ describe('Bass Engine - Rocco & Disco', () => {
             let ghostCount = 0;
             let noteCount = 0;
             // Run many times because it's probabilistic
-            for(let i=0; i<100; i++) {
+            for (let i = 0; i < 100; i++) {
                 const result = getBassNote(chordC, null, 0.25, null, 38, 'rocco', 0, 1, 1);
                 if (result) {
                     noteCount++;
-                    if (result.muted) ghostCount++;
+                    if (result.muted) {
+                        ghostCount++;
+                    }
                 }
             }
             // Should be frequent
@@ -103,7 +122,7 @@ describe('Bass Engine - Rocco & Disco', () => {
 
     describe('Disco Style', () => {
         it('should be active on all 16th steps', () => {
-             for(let i=0; i<4; i++) {
+            for (let i = 0; i < 4; i++) {
                 expect(isBassActive('disco', i, i)).toBe(true);
             }
         });
@@ -112,7 +131,7 @@ describe('Bass Engine - Rocco & Disco', () => {
             const result = getBassNote(chordC, null, 0, null, 36, 'disco', 0, 0, 0);
             expect(result).not.toBeNull();
             // Accept C2 (36) or C3 (48) depending on intensity shift
-            expect([36, 48]).toContain(result.midi); 
+            expect([36, 48]).toContain(result.midi);
         });
 
         it('should play Octave on Upbeat (Step 2)', () => {

@@ -66,7 +66,7 @@ export const playback = {
     nextNoteTime: 0.0,
     unswungNextNoteTime: 0.0,
     scheduleAheadTime: 0.2,
-    step: 0, 
+    step: 0,
     drawQueue: [],
     isCountingIn: false,
     countInBeat: 0,
@@ -88,7 +88,7 @@ export const playback = {
         syncopation: 0.2,
         anticipation: 0.1,
         layBack: 0.0,
-        density: 0.5
+        density: 0.5,
     },
     lastActiveDrumElements: null,
     lastPlayingStep: 0,
@@ -113,8 +113,8 @@ export const playback = {
         export: false,
         templates: false,
         analyzer: false,
-        generateSong: false
-    }
+        generateSong: false,
+    },
 };
 
 export function playbackReducer(action, payload) {
@@ -133,7 +133,7 @@ export function playbackReducer(action, payload) {
                 sessionTimer: 5,
                 applyPresetSettings: false,
                 conductorVelocity: 1.0,
-                updateAvailable: false
+                updateAvailable: false,
             });
             return true;
         case ACTIONS.SET_UPDATE_AVAILABLE:
@@ -149,10 +149,10 @@ export function playbackReducer(action, payload) {
             }
             return true;
         case ACTIONS.SET_BPM:
-            playback.bpm = Math.max(40, Math.min(240, parseInt(payload)));
+            playback.bpm = Math.max(40, Math.min(240, parseInt(payload, 10)));
             return true;
         case ACTIONS.SET_MODAL_OPEN:
-            if (Object.prototype.hasOwnProperty.call(playback.modals, payload.modal)) {
+            if (Object.hasOwn(playback.modals, payload.modal)) {
                 playback.modals[payload.modal] = !!payload.open;
                 return true;
             }
@@ -193,23 +193,31 @@ export function playbackReducer(action, payload) {
         case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
             if (playback.scheduleAheadTime < 0.4) {
                 Object.assign(playback, { scheduleAheadTime: playback.scheduleAheadTime * 2.0 });
-                console.warn(`[Performance] Emergency Lookahead Triggered: ${playback.scheduleAheadTime}s`);
+                console.warn(
+                    `[Performance] Emergency Lookahead Triggered: ${playback.scheduleAheadTime}s`,
+                );
                 setTimeout(() => {
                     Object.assign(playback, { scheduleAheadTime: 0.2 });
-                    console.log("[Performance] Lookahead reset to normal.");
+                    console.log('[Performance] Lookahead reset to normal.');
                 }, 10000);
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (payload.velocity) playback.conductorVelocity = payload.velocity;
-            if (payload.lyricalBias !== undefined) playback.lyricalBias = payload.lyricalBias;
-            if (payload.intent) Object.assign(playback.intent, payload.intent);
+            if (payload.velocity) {
+                playback.conductorVelocity = payload.velocity;
+            }
+            if (payload.lyricalBias !== undefined) {
+                playback.lyricalBias = payload.lyricalBias;
+            }
+            if (payload.intent) {
+                Object.assign(playback.intent, payload.intent);
+            }
             break;
         case ACTIONS.SHOW_TOAST: {
             const id = Math.random().toString(36).substr(2, 9);
             playback.toasts = [...playback.toasts, { id, message: payload }];
             setTimeout(() => {
-                playback.toasts = playback.toasts.filter(t => t.id !== id);
+                playback.toasts = playback.toasts.filter((t) => t.id !== id);
                 // We don't have a direct notify() here, but the standard subscribe mechanism in ui-bridge will pick it up on the next dispatch
                 // or we can dispatch an internal update action
                 import('../state.js').then(({ dispatch }) => dispatch('TOAST_EXPIRED'));

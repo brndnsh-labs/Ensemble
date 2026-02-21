@@ -1,9 +1,9 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { h } from 'preact';
-import { render } from 'preact';
+
+import { h, render } from 'preact';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockState } = vi.hoisted(() => ({
     mockState: {
@@ -14,25 +14,25 @@ const { mockState } = vi.hoisted(() => ({
             fillActive: false,
             lastSmartGenre: 'Rock',
             pendingGenreFeel: null,
-            genreSwitchCountdown: null
+            genreSwitchCountdown: null,
         },
         playback: {
             bandIntensity: 0.5,
             autoIntensity: false,
-            complexity: 0.5
-        }
-    }
+            complexity: 0.5,
+        },
+    },
 }));
 
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => selector(mockState),
-    useDispatch: () => vi.fn()
+    useDispatch: () => vi.fn(),
 }));
 
 // Mock other dependencies
 vi.mock('../../../public/state.js', () => ({
     dispatch: vi.fn(),
-    ACTIONS: {}
+    ACTIONS: {},
 }));
 vi.mock('../../../public/types.js', () => ({ ACTIONS: {} }));
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
@@ -41,9 +41,11 @@ vi.mock('../../../public/instrument-controller.js', () => ({
     togglePower: vi.fn(),
     updateMeasures: vi.fn(),
     cloneMeasure: vi.fn(),
-    saveDrumPreset: vi.fn()
+    saveDrumPreset: vi.fn(),
 }));
-vi.mock('../../../public/components/InstrumentSettings.jsx', () => ({ InstrumentSettings: () => null }));
+vi.mock('../../../public/components/InstrumentSettings.jsx', () => ({
+    InstrumentSettings: () => null,
+}));
 vi.mock('../../../public/components/PresetLibrary.jsx', () => ({ PresetLibrary: () => null }));
 vi.mock('../../../public/components/SequencerGrid.jsx', () => ({ SequencerGrid: () => null }));
 // Also mock presets.js since GenreSelector imports it dynamically

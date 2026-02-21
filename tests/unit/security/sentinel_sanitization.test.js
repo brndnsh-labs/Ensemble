@@ -1,8 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { decompressSections, escapeHTML } from '../../../public/utils.js';
 
 describe('Security: Input Sanitization', () => {
-
     describe('escapeHTML', () => {
         it('should escape backticks', () => {
             const input = '`alert(1)`';
@@ -19,9 +18,7 @@ describe('Security: Input Sanitization', () => {
             // We can't easily use compressSections because it doesn't exist in the test scope easily without mocking
             // But decompressSections just takes base64 encoded JSON
 
-            const maliciousSections = [
-                { l: 'Verse', v: 'C | <script>alert(1)</script> | F' }
-            ];
+            const maliciousSections = [{ l: 'Verse', v: 'C | <script>alert(1)</script> | F' }];
             const json = JSON.stringify(maliciousSections);
             const encoded = btoa(json); // This works in Node/Vitest environment usually
 
@@ -34,9 +31,7 @@ describe('Security: Input Sanitization', () => {
         });
 
         it('should sanitize section labels', () => {
-            const maliciousSections = [
-                { l: 'Verse <img src=x onerror=alert(1)>', v: 'C' }
-            ];
+            const maliciousSections = [{ l: 'Verse <img src=x onerror=alert(1)>', v: 'C' }];
             const json = JSON.stringify(maliciousSections);
             const encoded = btoa(json);
 
@@ -48,9 +43,7 @@ describe('Security: Input Sanitization', () => {
         });
 
         it('should preserve valid text characters like apostrophes and ampersands', () => {
-            const sections = [
-                { l: 'R&B', v: "Don't Stop" }
-            ];
+            const sections = [{ l: 'R&B', v: "Don't Stop" }];
             const json = JSON.stringify(sections);
             const encoded = btoa(json);
 
@@ -59,7 +52,7 @@ describe('Security: Input Sanitization', () => {
 
             expect(value).toBe("Don't Stop");
             // Label is escaped
-            expect(result[0].label).toBe("R&amp;B");
+            expect(result[0].label).toBe('R&amp;B');
         });
     });
 });

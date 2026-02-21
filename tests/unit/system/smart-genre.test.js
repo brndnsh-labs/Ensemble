@@ -1,8 +1,25 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ACTIONS } from '../../../public/types.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dispatch, getState } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove } = getState();
+import { ACTIONS } from '../../../public/types.js';
+
+// Mock dependencies that are dynamically imported to prevent floating promises
+vi.mock('../../../public/instrument-controller.js', () => ({
+    loadDrumPreset: vi.fn(),
+    togglePower: vi.fn(),
+}));
+
+vi.mock('../../../public/app-controller.js', () => ({
+    setBpm: vi.fn(),
+    applyTheme: vi.fn(),
+}));
+
+vi.mock('../../../public/engine/scheduler-core.js', () => ({
+    togglePlay: vi.fn(),
+    scheduler: vi.fn(),
+}));
+
+const { playback, chords, bass, soloist, harmony, groove } = getState();
 
 describe('Smart Genre System', () => {
     beforeEach(() => {
@@ -26,7 +43,7 @@ describe('Smart Genre System', () => {
                 feel: 'Jazz',
                 swing: 60,
                 sub: '8th',
-                genreName: 'Jazz'
+                genreName: 'Jazz',
             });
 
             // Current genre should remain Rock until measure end
@@ -43,7 +60,7 @@ describe('Smart Genre System', () => {
                 feel: 'Funk',
                 swing: 15,
                 sub: '16th',
-                genreName: 'Funk'
+                genreName: 'Funk',
             });
 
             // Should apply immediately
@@ -70,7 +87,7 @@ describe('Smart Genre System', () => {
                 chord: 'funk',
                 bass: 'funk',
                 soloist: 'blues',
-                harmony: 'horns'
+                harmony: 'horns',
             };
 
             dispatch(ACTIONS.SET_GENRE_FEEL, payload);
@@ -102,7 +119,15 @@ describe('Smart Genre System', () => {
             // This simulates what ui-controller.js does when it dispatches SET_GENRE_FEEL
             // and then dispatches SET_STYLE/SET_ACTIVE_TAB sequence
 
-            const JAZZ_CONFIG = { feel: 'Jazz', swing: 60, sub: '8th', drum: 'Jazz', chord: 'jazz', bass: 'quarter', soloist: 'bird' };
+            const JAZZ_CONFIG = {
+                feel: 'Jazz',
+                swing: 60,
+                sub: '8th',
+                drum: 'Jazz',
+                chord: 'jazz',
+                bass: 'quarter',
+                soloist: 'bird',
+            };
 
             dispatch(ACTIONS.SET_GENRE_FEEL, JAZZ_CONFIG);
             dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: JAZZ_CONFIG.chord });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { togglePower } from '../../public/instrument-controller.js';
 import { getState } from '../../public/state.js';
 
@@ -11,7 +11,7 @@ vi.mock('../../public/state.js', () => {
         harmony: { enabled: false },
         groove: { enabled: true },
         vizState: { enabled: true },
-        playback: { step: 0 }
+        playback: { step: 0 },
     };
     return {
         getState: () => mockState,
@@ -19,7 +19,7 @@ vi.mock('../../public/state.js', () => {
             if (action === 'SET_PARAM') {
                 mockState[payload.module][payload.param] = payload.value;
             }
-        })
+        }),
     };
 });
 
@@ -29,7 +29,7 @@ vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn(), flushWork
 vi.mock('../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     killSoloistNote: vi.fn(),
-    killSoloistBus: vi.fn()
+    killSoloistBus: vi.fn(),
 }));
 
 describe('Soloist Power Logic', () => {
@@ -43,7 +43,7 @@ describe('Soloist Power Logic', () => {
     it('should toggle enabled state normally in manual mode', () => {
         togglePower('soloist');
         expect(getState().soloist.enabled).toBe(true);
-        
+
         togglePower('soloist');
         expect(getState().soloist.enabled).toBe(false);
         expect(getState().soloist.tradeMode).toBe('manual');
@@ -56,7 +56,7 @@ describe('Soloist Power Logic', () => {
 
         // Turn OFF
         togglePower('soloist');
-        
+
         expect(state.soloist.enabled).toBe(false);
         // CRITICAL: If it stayed in 'sections', it would appear Yellow.
         // We want it OFF (Gray), so it should reset to 'manual'.

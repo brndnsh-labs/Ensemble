@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
@@ -8,7 +8,13 @@ vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5 },
         chords: { density: 'standard', octave: 60, pianoRoots: true },
-        arranger: { timeSignature: '4/4', key: 'C', isMinor: false, notation: 'roman', sections: [] },
+        arranger: {
+            timeSignature: '4/4',
+            key: 'C',
+            isMinor: false,
+            notation: 'roman',
+            sections: [],
+        },
         groove: { genreFeel: 'Rock' },
         bass: { enabled: true },
         harmony: { enabled: false },
@@ -16,32 +22,64 @@ vi.mock('../../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 vi.mock('../../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
     ENHARMONIC_MAP: { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' },
-    ROMAN_VALS: { 'I': 0, 'II': 2, 'III': 4, 'IV': 5, 'V': 7, 'VI': 9, 'VII': 11 },
+    ROMAN_VALS: { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 },
     NNS_OFFSETS: [0, 2, 4, 5, 7, 9, 11],
-    INTERVAL_TO_ROMAN: { 0: 'I', 1: 'bII', 2: 'II', 3: 'bIII', 4: 'III', 5: 'IV', 6: 'bV', 7: 'V', 8: 'bVI', 9: 'VI', 10: 'bVII', 11: 'VII' },
-    INTERVAL_TO_NNS: { 0: '1', 1: 'b2', 2: '2', 3: 'b3', 4: '3', 5: '4', 6: 'b5', 7: '5', 8: 'b6', 9: '6', 10: 'b7', 11: '7' },
+    INTERVAL_TO_ROMAN: {
+        0: 'I',
+        1: 'bII',
+        2: 'II',
+        3: 'bIII',
+        4: 'III',
+        5: 'IV',
+        6: 'bV',
+        7: 'V',
+        8: 'bVI',
+        9: 'VI',
+        10: 'bVII',
+        11: 'VII',
+    },
+    INTERVAL_TO_NNS: {
+        0: '1',
+        1: 'b2',
+        2: '2',
+        3: 'b3',
+        4: '3',
+        5: '4',
+        6: 'b5',
+        7: '5',
+        8: 'b6',
+        9: '6',
+        10: 'b7',
+        11: '7',
+    },
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' }
-    }
+        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' },
+    },
 }));
 
-import { getChordDetails, getIntervals, transformRelativeProgression, getBestInversion, validateProgression } from '../../../public/chords.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import {
+    getBestInversion,
+    getChordDetails,
+    getIntervals,
+    transformRelativeProgression,
+    validateProgression,
+} from '../../../public/chords.js';
+import { getState } from '../../../public/state.js';
+
+const { arranger, playback, chords, bass, groove } = getState();
 
 describe('Chords & Voicing Logic', () => {
-    
     beforeEach(() => {
         vi.clearAllMocks();
         groove.genreFeel = 'Rock';
@@ -102,7 +140,9 @@ describe('Chords & Voicing Logic', () => {
 
         it('should use "So What" voicing for Neo-Soul minor 7', () => {
             groove.genreFeel = 'Neo-Soul';
-            expect(getIntervals('minor', true, 'standard', 'Neo-Soul', true)).toEqual([5, 10, 15, 19]);
+            expect(getIntervals('minor', true, 'standard', 'Neo-Soul', true)).toEqual([
+                5, 10, 15, 19,
+            ]);
         });
 
         it('should NOT produce a perfect 5th for half-diminished in Rock/Pop', () => {
@@ -122,21 +162,21 @@ describe('Chords & Voicing Logic', () => {
             const voicedF = getBestInversion(65, [0, 4, 7], voicedC);
             // Closest F triad to [55, 60, 64] is [53, 57, 60] or [57, 60, 65]
             // Let's verify voice leading
-            const avgC = voicedC.reduce((a,b)=>a+b,0)/3; // 59.66
-            const avgF = voicedF.reduce((a,b)=>a+b,0)/3;
+            const avgC = voicedC.reduce((a, b) => a + b, 0) / 3; // 59.66
+            const avgF = voicedF.reduce((a, b) => a + b, 0) / 3;
             expect(Math.abs(avgF - avgC)).toBeLessThan(7);
         });
 
         it('should respect range limits and prevent overlapping with bass', () => {
             const voicedLow = getBestInversion(36, [0, 4, 7], []);
-            const avg = voicedLow.reduce((a,b)=>a+b,0)/3;
+            const avg = voicedLow.reduce((a, b) => a + b, 0) / 3;
             expect(avg).toBeGreaterThanOrEqual(43);
         });
 
         it('should maintain spread voicings as a unit', () => {
             const intervals = [0, 7, 16, 19];
             const voiced = getBestInversion(48, intervals, []);
-            const resultIntervals = voiced.map(n => n - voiced[0]);
+            const resultIntervals = voiced.map((n) => n - voiced[0]);
             expect(resultIntervals).toEqual(intervals);
         });
     });
@@ -161,11 +201,13 @@ describe('Chords & Voicing Logic', () => {
 
     describe('Preset Validation (validateProgression)', () => {
         it('should generate correct chords for Minor Blues in C Minor', () => {
-            arranger.sections = [{ id: 's1', label: 'Main', value: "i7 | i7 | iv7 | V7", repeat: 1 }];
+            arranger.sections = [
+                { id: 's1', label: 'Main', value: 'i7 | i7 | iv7 | V7', repeat: 1 },
+            ];
             arranger.key = 'C';
             arranger.isMinor = true;
             validateProgression();
-            
+
             expect(arranger.progression[0].absName).toBe('Cm7');
             expect(arranger.progression[2].absName).toBe('Fm7');
             expect(arranger.progression[3].absName).toBe('G7');

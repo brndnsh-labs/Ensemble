@@ -2,27 +2,30 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { h, render, Fragment } from 'preact';
+
+import { Fragment, h, render } from 'preact';
 import React from 'preact/compat';
-import { ui, renderGrid, renderChordVisualizer } from '../../public/ui.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dispatch, getState, storage } from '../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
-import { ACTIONS } from '../../public/types.js';
+import { renderChordVisualizer, renderGrid, ui } from '../../public/ui.js';
+
+const { arranger, groove } = getState();
+
 import { Arranger } from '../../public/components/Arranger.jsx';
 import { ChordVisualizer } from '../../public/components/ChordVisualizer.jsx';
 import { SequencerGrid } from '../../public/components/SequencerGrid.jsx';
+import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies that we don't need for layout testing
 vi.mock('../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({
     clearDrumPresetHighlight: vi.fn(),
     saveDrumPreset: vi.fn(),
     togglePower: vi.fn(),
     updateMeasures: vi.fn(),
-    cloneMeasure: vi.fn()
+    cloneMeasure: vi.fn(),
 }));
 vi.mock('../../public/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
@@ -32,7 +35,7 @@ vi.mock('../../public/arranger-controller.js', () => ({
     addSection: vi.fn(),
     refreshArrangerUI: vi.fn(),
     clearChordPresetHighlight: vi.fn(),
-    validateAndAnalyze: vi.fn()
+    validateAndAnalyze: vi.fn(),
 }));
 
 describe('UI Layout Integrity', () => {
@@ -53,31 +56,109 @@ describe('UI Layout Integrity', () => {
             <div id="measurePagination"></div>
             <div id="drumBarsSelect"></div>
         `;
-        
+
         // ... (mockIds setup)
         const mockIds = [
-            'tapBtn', 'relKeyBtn', 'transUpBtn', 'transDownBtn',
-            'maximizeChordBtn', 'chordPowerBtn', 'groovePowerBtn', 'bassPowerBtn', 'soloistPowerBtn',
-            'chordPowerBtnDesktop', 'groovePowerBtnDesktop', 'bassPowerBtnDesktop', 'soloistPowerBtnDesktop',
-            'vizPowerBtn', 'addSectionBtn', 'templatesBtn', 'templatesOverlay', 'templateChips', 'closeTemplatesBtn',
-            'activeSectionLabel', 'arrangerActionTrigger', 'arrangerActionMenu', 'randomizeBtn', 'mutateBtn', 'undoBtn',
-            'clearProgBtn', 'saveBtn', 'shareBtn', 'chordPresets', 'userPresetsContainer',
-            'chordStylePresets', 'bassStylePresets', 'soloistStylePresets', 'groupingToggle', 'groupingLabel',
-            'chordReverb', 'bassReverb', 'soloistReverb', 'drumPresets', 'userDrumPresetsContainer',
-            'cloneMeasureBtn', 'autoFollowCheck', 'humanizeSlider', 'saveDrumBtn', 'drumReverb', 'smartDrumPresets',
-            'settingsOverlay', 'settingsBtn', 'themeSelect', 'notationSelect', 'densitySelect', 'pianoRootsCheck',
-            'swingSlider', 'exportMidiBtn', 'settingsExportMidiBtn', 'exportOverlay', 'closeExportBtn', 'confirmExportBtn',
-            'exportChordsCheck', 'exportBassCheck', 'exportSoloistCheck', 'exportDrumsCheck', 'exportDurationInput',
-            'exportDurationContainer', 'exportFilenameInput', 'installAppBtn', 'flashOverlay', 'resetSettingsBtn',
-            'refreshAppBtn', 'editorOverlay', 'editArrangementBtn', 'closeEditorBtn', 'intensitySlider', 'complexitySlider',
-            'intensityValue', 'autoIntensityCheck', 'panel-visualizer', 'chordVolume', 'bassVolume',
-            'soloistVolume', 'drumVolume', 'clearDrumsBtn', 'masterVolume', 'countInCheck', 'metronomeCheck',
+            'tapBtn',
+            'relKeyBtn',
+            'transUpBtn',
+            'transDownBtn',
+            'maximizeChordBtn',
+            'chordPowerBtn',
+            'groovePowerBtn',
+            'bassPowerBtn',
+            'soloistPowerBtn',
+            'chordPowerBtnDesktop',
+            'groovePowerBtnDesktop',
+            'bassPowerBtnDesktop',
+            'soloistPowerBtnDesktop',
+            'vizPowerBtn',
+            'addSectionBtn',
+            'templatesBtn',
+            'templatesOverlay',
+            'templateChips',
+            'closeTemplatesBtn',
+            'activeSectionLabel',
+            'arrangerActionTrigger',
+            'arrangerActionMenu',
+            'randomizeBtn',
+            'mutateBtn',
+            'undoBtn',
+            'clearProgBtn',
+            'saveBtn',
+            'shareBtn',
+            'chordPresets',
+            'userPresetsContainer',
+            'chordStylePresets',
+            'bassStylePresets',
+            'soloistStylePresets',
+            'groupingToggle',
+            'groupingLabel',
+            'chordReverb',
+            'bassReverb',
+            'soloistReverb',
+            'drumPresets',
+            'userDrumPresetsContainer',
+            'cloneMeasureBtn',
+            'autoFollowCheck',
+            'humanizeSlider',
+            'saveDrumBtn',
+            'drumReverb',
+            'smartDrumPresets',
+            'settingsOverlay',
+            'settingsBtn',
+            'themeSelect',
+            'notationSelect',
+            'densitySelect',
+            'pianoRootsCheck',
+            'swingSlider',
+            'exportMidiBtn',
+            'settingsExportMidiBtn',
+            'exportOverlay',
+            'closeExportBtn',
+            'confirmExportBtn',
+            'exportChordsCheck',
+            'exportBassCheck',
+            'exportSoloistCheck',
+            'exportDrumsCheck',
+            'exportDurationInput',
+            'exportDurationContainer',
+            'exportFilenameInput',
+            'installAppBtn',
+            'flashOverlay',
+            'resetSettingsBtn',
+            'refreshAppBtn',
+            'editorOverlay',
+            'editArrangementBtn',
+            'closeEditorBtn',
+            'intensitySlider',
+            'complexitySlider',
+            'intensityValue',
+            'autoIntensityCheck',
+            'panel-visualizer',
+            'chordVolume',
+            'bassVolume',
+            'soloistVolume',
+            'drumVolume',
+            'clearDrumsBtn',
+            'masterVolume',
+            'countInCheck',
+            'metronomeCheck',
             'creativityCheck',
-            'visualFlashCheck', 'hapticCheck', 'applyPresetSettingsCheck', 'swingBaseSelect', 'closeSettingsBtn',
-            'sessionTimerSelect', 'sessionTimerDurationContainer', 'sessionTimerStepper', 'sessionTimerDec', 'sessionTimerInc', 'sessionTimerInput'
+            'visualFlashCheck',
+            'hapticCheck',
+            'applyPresetSettingsCheck',
+            'swingBaseSelect',
+            'closeSettingsBtn',
+            'sessionTimerSelect',
+            'sessionTimerDurationContainer',
+            'sessionTimerStepper',
+            'sessionTimerDec',
+            'sessionTimerInc',
+            'sessionTimerInput',
         ];
-        
-        mockIds.forEach(id => {
+
+        mockIds.forEach((id) => {
             if (!document.getElementById(id)) {
                 const el = document.createElement('div');
                 el.id = id;
@@ -90,21 +171,31 @@ describe('UI Layout Integrity', () => {
         it('should render correct number of chords and measures', async () => {
             arranger.timeSignature = '4/4';
             arranger.progression = [
-                { sectionId: 's1', sectionLabel: 'Intro', beats: 4, display: { roman: { root: 'I', suffix: '' } } },
-                { sectionId: 's1', sectionLabel: 'Intro', beats: 4, display: { roman: { root: 'V', suffix: '' } } }
+                {
+                    sectionId: 's1',
+                    sectionLabel: 'Intro',
+                    beats: 4,
+                    display: { roman: { root: 'I', suffix: '' } },
+                },
+                {
+                    sectionId: 's1',
+                    sectionLabel: 'Intro',
+                    beats: 4,
+                    display: { roman: { root: 'V', suffix: '' } },
+                },
             ];
-            
+
             const container = document.getElementById('chordVisualizer');
             render(<ChordVisualizer />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const cards = document.querySelectorAll('.chord-card');
             expect(cards.length).toBe(2);
-            
+
             const measures = document.querySelectorAll('.measure-box');
             expect(measures.length).toBe(2);
-            
+
             const sections = document.querySelectorAll('.section-block');
             expect(sections.length).toBe(1);
         });
@@ -112,18 +203,28 @@ describe('UI Layout Integrity', () => {
         it('should handle multi-chord measures correctly', async () => {
             arranger.timeSignature = '4/4';
             arranger.progression = [
-                { sectionId: 's1', sectionLabel: 'A', beats: 2, display: { roman: { root: 'I', suffix: '' } } },
-                { sectionId: 's1', sectionLabel: 'A', beats: 2, display: { roman: { root: 'IV', suffix: '' } } }
+                {
+                    sectionId: 's1',
+                    sectionLabel: 'A',
+                    beats: 2,
+                    display: { roman: { root: 'I', suffix: '' } },
+                },
+                {
+                    sectionId: 's1',
+                    sectionLabel: 'A',
+                    beats: 2,
+                    display: { roman: { root: 'IV', suffix: '' } },
+                },
             ];
-            
+
             const container = document.getElementById('chordVisualizer');
             render(<ChordVisualizer />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const measures = document.querySelectorAll('.measure-box');
             expect(measures.length).toBe(1);
-            
+
             const cards = measures[0].querySelectorAll('.chord-card');
             expect(cards.length).toBe(2);
         });
@@ -133,13 +234,13 @@ describe('UI Layout Integrity', () => {
         it('should render the correct number of section cards', async () => {
             arranger.sections = [
                 { id: '1', label: 'A', value: 'I' },
-                { id: '2', label: 'B', value: 'IV' }
+                { id: '2', label: 'B', value: 'IV' },
             ];
-            
+
             const container = document.getElementById('sectionList');
             render(<Arranger />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const cards = document.querySelectorAll('.section-card');
             expect(cards.length).toBe(2);
@@ -149,17 +250,17 @@ describe('UI Layout Integrity', () => {
             arranger.sections = [{ id: '1', label: 'A', value: 'I' }];
             const container = document.getElementById('sectionList');
             render(<Arranger />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
             expect(document.querySelectorAll('.section-card').length).toBe(1);
 
             arranger.sections = [
                 { id: '1', label: 'A', value: 'I' },
-                { id: '2', label: 'B', value: 'IV' }
+                { id: '2', label: 'B', value: 'IV' },
             ];
-            dispatch('DUMMY_ACTION'); 
+            dispatch('DUMMY_ACTION');
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise((resolve) => setTimeout(resolve, 50));
             expect(document.querySelectorAll('.section-card').length).toBe(2);
         });
 
@@ -167,8 +268,8 @@ describe('UI Layout Integrity', () => {
             arranger.sections = [{ id: '1', label: 'Verse', value: 'I' }];
             const container = document.getElementById('sectionList');
             render(<Arranger />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const card = document.querySelector('.section-card');
             expect(card.querySelector('.section-label-input')).not.toBeNull();
@@ -181,15 +282,15 @@ describe('UI Layout Integrity', () => {
         it('should render the correct number of instruments and steps', async () => {
             groove.instruments = [
                 { name: 'Kick', steps: new Array(128).fill(0) },
-                { name: 'Snare', steps: new Array(128).fill(0) }
+                { name: 'Snare', steps: new Array(128).fill(0) },
             ];
             groove.measures = 1;
             arranger.timeSignature = '4/4';
 
             const container = document.getElementById('sequencerGrid');
             render(<SequencerGrid />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const rows = document.querySelectorAll('.track:not(.label-row)');
             expect(rows.length).toBe(2);
@@ -205,8 +306,8 @@ describe('UI Layout Integrity', () => {
 
             const container = document.getElementById('sequencerGrid');
             render(<SequencerGrid />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const steps = document.querySelectorAll('.step');
             expect(steps.length).toBe(32);
@@ -215,16 +316,16 @@ describe('UI Layout Integrity', () => {
         it('should not leak rows when re-rendering', async () => {
             groove.instruments = [
                 { name: 'Kick', steps: new Array(128).fill(0) },
-                { name: 'Snare', steps: new Array(128).fill(0) }
+                { name: 'Snare', steps: new Array(128).fill(0) },
             ];
             groove.measures = 1;
             arranger.timeSignature = '4/4';
 
             const container = document.getElementById('sequencerGrid');
             render(<SequencerGrid />, container);
-            await new Promise(r => setTimeout(r, 0));
+            await new Promise((r) => setTimeout(r, 0));
             render(<SequencerGrid />, container);
-            await new Promise(r => setTimeout(r, 0));
+            await new Promise((r) => setTimeout(r, 0));
 
             const rows = document.querySelectorAll('.track:not(.label-row)');
             expect(rows.length).toBe(2);
@@ -237,8 +338,8 @@ describe('UI Layout Integrity', () => {
 
             const container = document.getElementById('sequencerGrid');
             render(<SequencerGrid />, container);
-            
-            await new Promise(r => setTimeout(r, 0));
+
+            await new Promise((r) => setTimeout(r, 0));
 
             const labelRow = document.querySelector('.label-row');
             expect(labelRow).not.toBeNull();

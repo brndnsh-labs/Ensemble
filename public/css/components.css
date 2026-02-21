@@ -1,4 +1,3 @@
-
 /* Power Button Styles (Restored & Enhanced) */
 .power-btn {
     background: var(--input-bg);
@@ -14,14 +13,16 @@
     font-size: 1rem;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .power-btn.active {
     background-color: var(--success-color);
     border-color: #bef264;
     color: var(--base03);
-    box-shadow: 0 0 15px rgba(133, 153, 0, 0.6), inset 0 1px 2px rgba(255,255,255,0.3);
+    box-shadow:
+        0 0 15px rgba(133, 153, 0, 0.6),
+        inset 0 1px 2px rgba(255, 255, 255, 0.3);
     transform: scale(1.05);
 }
 
@@ -29,7 +30,9 @@
     background-color: var(--yellow);
     border-color: #fde047;
     color: var(--base03);
-    box-shadow: 0 0 12px rgba(181, 137, 0, 0.5), inset 0 1px 2px rgba(255,255,255,0.3);
+    box-shadow:
+        0 0 12px rgba(181, 137, 0, 0.5),
+        inset 0 1px 2px rgba(255, 255, 255, 0.3);
     transform: scale(1.02);
 }
 
@@ -65,7 +68,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     z-index: var(--z-toast);
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -123,7 +126,8 @@
     display: block;
 }
 
-.analyzer-drop-zone:hover, .analyzer-drop-zone.drag-over {
+.analyzer-drop-zone:hover,
+.analyzer-drop-zone.drag-over {
     border-color: var(--accent-color);
     background: rgba(59, 130, 246, 0.05);
 }
@@ -163,7 +167,7 @@
 .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid rgba(255,255,255,0.1);
+    border: 4px solid rgba(255, 255, 255, 0.1);
     border-top-color: var(--accent-color);
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -171,12 +175,14 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .analyzer-results {
     padding: 1rem;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     margin-top: 1rem;
 }
@@ -190,7 +196,7 @@
     position: relative;
     width: 100%;
     height: 120px;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border-color);
@@ -210,7 +216,9 @@
     border-left: 2px solid var(--accent-color);
     border-right: 2px solid var(--accent-color);
     pointer-events: none;
-    transition: left 0.1s ease, width 0.1s ease;
+    transition:
+        left 0.1s ease,
+        width 0.1s ease;
 }
 
 .suggested-sections-list {
@@ -286,7 +294,7 @@
     background: var(--soloist-color);
     color: white;
     border-color: var(--soloist-color);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* Accessibility Focus Styles --- */

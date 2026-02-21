@@ -1,15 +1,15 @@
-import { getState } from './state.js';
-import { showToast } from './ui.js';
-import { validateProgression, transformRelativeProgression } from './chords.js';
-import { flushBuffers } from './instrument-controller.js';
-import { restoreGains } from './engine/engine.js';
-import { syncWorker } from './worker-client.js';
-import { saveCurrentState } from './persistence.js';
-import { generateId, normalizeKey, compressSections } from './utils.js';
-import { pushHistory } from './history.js';
-import { analyzeForm } from './form-analysis.js';
+import { transformRelativeProgression, validateProgression } from './chords.js';
 import { conductorState } from './conductor.js';
 import { KEY_ORDER } from './config.js';
+import { restoreGains } from './engine/engine.js';
+import { analyzeForm } from './form-analysis.js';
+import { pushHistory } from './history.js';
+import { flushBuffers } from './instrument-controller.js';
+import { saveCurrentState } from './persistence.js';
+import { getState } from './state.js';
+import { showToast } from './ui.js';
+import { compressSections, generateId, normalizeKey } from './utils.js';
+import { syncWorker } from './worker-client.js';
 
 export function analyzeFormUI() {
     const form = analyzeForm();
@@ -21,15 +21,20 @@ export function analyzeFormUI() {
 
 export function saveProgression() {
     const { arranger } = getState();
-    const name = prompt("Name your chord progression:", arranger.lastChordPreset || "My Progression");
-    if (!name) return;
+    const name = prompt(
+        'Name your chord progression:',
+        arranger.lastChordPreset || 'My Progression',
+    );
+    if (!name) {
+        return;
+    }
 
     const userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
     const newPreset = {
         name: name.substring(0, 32),
         sections: compressSections(arranger.sections),
         isMinor: arranger.isMinor,
-        timestamp: Date.now()
+        timestamp: Date.now(),
     };
 
     userPresets.push(newPreset);
@@ -60,13 +65,14 @@ export function refreshArrangerUI() {
 export function onSectionUpdate(id, field, value) {
     const { arranger } = getState();
     if (field === 'reorder') {
-        const sectionMap = new Map(arranger.sections.map(s => [s.id, s]));
-        const newSections = value.map(sid => sectionMap.get(sid));
+        const sectionMap = new Map(arranger.sections.map((s) => [s.id, s]));
+        const newSections = value.map((sid) => sectionMap.get(sid));
 
         // Check for changes more efficiently than JSON.stringify
-        const currentIds = arranger.sections.map(s => s.id);
-        const hasChanged = value.length !== currentIds.length ||
-                           value.some((id, index) => id !== currentIds[index]);
+        const currentIds = arranger.sections.map((s) => s.id);
+        const hasChanged =
+            value.length !== currentIds.length ||
+            value.some((id, index) => id !== currentIds[index]);
 
         if (hasChanged) {
             pushHistory();
@@ -75,8 +81,10 @@ export function onSectionUpdate(id, field, value) {
             return;
         }
     } else {
-        const index = arranger.sections.findIndex(s => s.id === id);
-        if (index === -1) return;
+        const index = arranger.sections.findIndex((s) => s.id === id);
+        if (index === -1) {
+            return;
+        }
         const section = arranger.sections[index];
         if (field === 'move') {
             const newIndex = index + value;
@@ -107,15 +115,19 @@ export function onSectionUpdate(id, field, value) {
 
 export function onSectionDelete(id) {
     const { arranger } = getState();
-    if (arranger.sections.length <= 1) return;
-    
-    const section = arranger.sections.find(s => s.id === id);
-    // Prompt if section has content (ignoring the default 'I' for new sections)
-    if (section && section.value && section.value.trim() !== '' && section.value.trim() !== 'I') {
-        if (!confirm(`Delete section "${section.label || 'Untitled'}" and its chords?`)) return;
+    if (arranger.sections.length <= 1) {
+        return;
     }
 
-    arranger.sections = arranger.sections.filter(s => s.id !== id);
+    const section = arranger.sections.find((s) => s.id === id);
+    // Prompt if section has content (ignoring the default 'I' for new sections)
+    if (section?.value && section.value.trim() !== '' && section.value.trim() !== 'I') {
+        if (!confirm(`Delete section "${section.label || 'Untitled'}" and its chords?`)) {
+            return;
+        }
+    }
+
+    arranger.sections = arranger.sections.filter((s) => s.id !== id);
     arranger.isDirty = true;
     clearChordPresetHighlight();
     refreshArrangerUI();
@@ -123,11 +135,13 @@ export function onSectionDelete(id) {
 
 export function onSectionDuplicate(id) {
     const { arranger } = getState();
-    const section = arranger.sections.find(s => s.id === id);
-    if (!section) return;
+    const section = arranger.sections.find((s) => s.id === id);
+    if (!section) {
+        return;
+    }
     pushHistory();
     const newSection = { ...section, id: generateId(), label: `${section.label} (Copy)` };
-    const index = arranger.sections.findIndex(s => s.id === id);
+    const index = arranger.sections.findIndex((s) => s.id === id);
     const newSections = [...arranger.sections];
     newSections.splice(index + 1, 0, newSection);
     arranger.sections = newSections;
@@ -138,7 +152,15 @@ export function onSectionDuplicate(id) {
 
 export function addSection() {
     const { arranger } = getState();
-    arranger.sections = [...arranger.sections, { id: generateId(), label: `Section ${arranger.sections.length + 1}`, value: 'I', repeat: 1 }];
+    arranger.sections = [
+        ...arranger.sections,
+        {
+            id: generateId(),
+            label: `Section ${arranger.sections.length + 1}`,
+            value: 'I',
+            repeat: 1,
+        },
+    ];
     arranger.isDirty = true;
     clearChordPresetHighlight();
     refreshArrangerUI();
@@ -148,28 +170,32 @@ export function transposeKey(delta) {
     const { arranger } = getState();
     // Use arranger.key as the source of truth
     const currentKeyName = arranger.key || 'C';
-    let currentIndex = KEY_ORDER.indexOf(normalizeKey(currentKeyName));
+    const currentIndex = KEY_ORDER.indexOf(normalizeKey(currentKeyName));
     const newKey = KEY_ORDER[(currentIndex + delta + 12) % 12];
 
     arranger.key = newKey;
-    
+
     const isMusicalNotation = (part) => {
-        return part.match(/^(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i) || 
-               part.match(/^[#b\u266F\u266D](III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i);
+        return (
+            part.match(/^(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i) ||
+            part.match(/^[#b\u266F\u266D](III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i)
+        );
     };
 
-    arranger.sections.forEach(section => {
+    arranger.sections.forEach((section) => {
         const parts = section.value.split(/([\s,|,-]+)/);
-        const transposed = parts.map(part => {
+        const transposed = parts.map((part) => {
             const noteMatch = part.match(/^([A-G](?:[#b\u266F\u266D])?)(.*)/i);
             if (noteMatch && !isMusicalNotation(part)) {
                 let rootStr = noteMatch[1];
                 // Normalize Unicode to ASCII for lookup
                 rootStr = rootStr.replace('\u266F', '#').replace('\u266D', 'b');
-                
-                const root = normalizeKey(rootStr.charAt(0).toUpperCase() + rootStr.slice(1).toLowerCase());
+
+                const root = normalizeKey(
+                    rootStr.charAt(0).toUpperCase() + rootStr.slice(1).toLowerCase(),
+                );
                 const rootIndex = KEY_ORDER.indexOf(root);
-                
+
                 if (rootIndex !== -1) {
                     const newRoot = KEY_ORDER[(rootIndex + delta + 12) % 12];
                     return newRoot + noteMatch[2];
@@ -187,7 +213,7 @@ export function transposeKey(delta) {
             }
         }
     });
-    
+
     arranger.isDirty = true;
     clearChordPresetHighlight();
     refreshArrangerUI();
@@ -196,15 +222,15 @@ export function transposeKey(delta) {
 export function switchToRelativeKey() {
     const { arranger } = getState();
     const wasMinor = !!arranger.isMinor;
-    let currentIndex = KEY_ORDER.indexOf(normalizeKey(arranger.key));
+    const currentIndex = KEY_ORDER.indexOf(normalizeKey(arranger.key));
     const shift = wasMinor ? 3 : -3;
     const newKey = KEY_ORDER[(currentIndex + shift + 12) % 12];
-    
+
     arranger.key = newKey;
     arranger.isMinor = !wasMinor;
-    
+
     pushHistory();
-    arranger.sections.forEach(section => {
+    arranger.sections.forEach((section) => {
         section.value = transformRelativeProgression(section.value, shift);
 
         // Also transpose explicit section key if present
@@ -215,8 +241,10 @@ export function switchToRelativeKey() {
             }
         }
     });
-    
+
     arranger.isDirty = true;
     refreshArrangerUI();
-    showToast(`Switched to Relative ${arranger.isMinor ? 'Minor' : 'Major'}: ${newKey}${arranger.isMinor ? 'm' : ''}`);
+    showToast(
+        `Switched to Relative ${arranger.isMinor ? 'Minor' : 'Major'}: ${newKey}${arranger.isMinor ? 'm' : ''}`,
+    );
 }

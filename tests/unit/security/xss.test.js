@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { escapeHTML } from '../../../public/utils.js';
 
 describe('Security Utilities', () => {
     describe('escapeHTML', () => {
         it('should escape basic HTML characters', () => {
             const input = '<div class="test"> & \'single\'</div>';
-            const expected = '&lt;div class=&quot;test&quot;&gt; &amp; &#39;single&#39;&lt;/div&gt;';
+            const expected =
+                '&lt;div class=&quot;test&quot;&gt; &amp; &#39;single&#39;&lt;/div&gt;';
             expect(escapeHTML(input)).toBe(expected);
         });
 

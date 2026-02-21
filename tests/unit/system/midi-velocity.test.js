@@ -1,19 +1,20 @@
 /* eslint-disable */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { normalizeMidiVelocity } from '../../../public/midi-controller.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../../public/state.js';
+
+const { midi } = getState();
 
 describe('MIDI Velocity Mapping', () => {
     it('should boost low velocities significantly', () => {
         midi.velocitySensitivity = 1.0;
-        
+
         // 0.1 Internal (Ghost note)
         // Old: 8
         // New (Curve 0.8): ~20+
         const vLow = normalizeMidiVelocity(0.1);
         expect(vLow).toBeGreaterThanOrEqual(20);
-        
+
         // 0.5 Internal (Soft)
         // Old: 42
         // New: ~55+

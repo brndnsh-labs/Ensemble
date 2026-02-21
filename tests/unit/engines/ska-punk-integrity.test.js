@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getState } from '../../../public/state.js';
-import { getBassNote, isBassActive } from '../../../public/bass.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../../public/accompaniment.js';
-import { getSoloistNote } from '../../../public/soloist.js';
-import { getHarmonyNotes } from '../../../public/harmonies.js';
+import { getBassNote, isBassActive } from '../../../public/bass.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
+import { getHarmonyNotes } from '../../../public/harmonies.js';
+import { getSoloistNote } from '../../../public/soloist.js';
+import { getState } from '../../../public/state.js';
 
 vi.mock('../../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
@@ -32,14 +32,19 @@ describe('Ska-Punk Genre Integrity', () => {
     });
 
     it('should generate offbeat upstrokes for accompaniment', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4, freqs: [261.63, 329.63, 392.00] };
-        
+        const chord = {
+            rootMidi: 60,
+            intervals: [0, 4, 7],
+            beats: 4,
+            freqs: [261.63, 329.63, 392.0],
+        };
+
         // Step 0 (Downbeat): Should be empty (unless forced by 'One' logic, but Ska favors offbeats)
         // Wait, I implemented: if (measureStep === 0 && !isHit && Math.random() < 0.8) isHit = true;
         // So Step 0 might have a hit. Let's check Step 2 (The "And").
         const notesAnd = getAccompanimentNotes(chord, 2, 2, 2, { isBeatStart: false });
         expect(notesAnd.length).toBeGreaterThan(0);
-        
+
         // Step 4 (Beat 2): Should be empty for Ska
         getAccompanimentNotes(chord, 4, 4, 4, { isBeatStart: true });
         // It might have a hit if "forced", but ideally not.
@@ -65,7 +70,7 @@ describe('Ska-Punk Genre Integrity', () => {
             isDownbeat: false,
             isQuarter: false,
             isBackbeat: false,
-            isGroupStart: false
+            isGroupStart: false,
         });
         // Offbeat (step 2) should have velocity boost
         expect(result.velocity).toBeGreaterThan(1.0);
@@ -80,8 +85,13 @@ describe('Ska-Punk Genre Integrity', () => {
 
     it('should handle high tempos (195 BPM) without logic failure', () => {
         playback.bpm = 195;
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4, freqs: [261.63, 329.63, 392.00] };
-        
+        const chord = {
+            rootMidi: 60,
+            intervals: [0, 4, 7],
+            beats: 4,
+            freqs: [261.63, 329.63, 392.0],
+        };
+
         // Check bass note generation at high BPM
         const bassNote = getBassNote(chord, null, 0, null, 48, 'walking-ska', 0, 0, 0);
         expect(bassNote).not.toBeNull();
@@ -97,17 +107,17 @@ describe('Ska-Punk Genre Integrity', () => {
     it('should alternate activity between Soloist and Harmony (Antiphony)', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         playback.bandIntensity = 0.5; // Medium intensity triggers antiphony
-        
+
         // Measure 0 (Step 0): Harmony should be active, Soloist should be suppressed
         const soloistM0 = getSoloistNote(chord, null, 0, null, 5, 'ska', 0, false);
         getHarmonyNotes(chord, null, 0, 0, 'horns', 0);
-        
+
         expect(soloistM0).toBeNull();
-        
+
         // Measure 1 (Step 16): Soloist should be active, Harmony should be suppressed
         getSoloistNote(chord, null, 16, null, 5, 'ska', 0, false);
         const harmonyM1 = getHarmonyNotes(chord, null, 16, 0, 'horns', 0);
-        
+
         expect(harmonyM1).toEqual([]);
     });
 
@@ -116,12 +126,12 @@ describe('Ska-Punk Genre Integrity', () => {
         playback.bandIntensity = 0.7; // High intensity for hook reinforcement
         groove.genreFeel = 'Ska-Punk';
         soloist.enabled = true;
-        
+
         // 1. Prime the hook by simulating a motif replay
         // We set isReplayingMotif to FALSE to test the specific Ska-Punk sharedHookBuffer logic
         soloist.isReplayingMotif = false;
         soloist.sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
-        
+
         // 2. Harmony should now latch to this step even if it's not a standard stab step
         const notes = getHarmonyNotes(chord, null, 0, 0, 'horns', 0, { midi: 72 });
         expect(notes.length).toBeGreaterThan(0);

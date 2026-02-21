@@ -1,11 +1,10 @@
-
-import { describe, it, beforeEach } from 'vitest';
+import { beforeEach, describe, it } from 'vitest';
 import { getChordAtStep } from '../../public/logic-worker.js';
 import { getState } from '../../public/state.js';
+
 const { arranger } = getState();
 
 describe('Worker Search Performance', () => {
-
     // Create a large dataset
     const numSections = 1000;
     const stepsPerSection = 16;
@@ -26,7 +25,7 @@ describe('Worker Search Performance', () => {
                 start: sectionStart,
                 end: sectionEnd,
                 id: `s${i}`,
-                label: `Section ${i}`
+                label: `Section ${i}`,
             });
 
             // 4 chords per section (4 steps each)
@@ -36,7 +35,7 @@ describe('Worker Search Performance', () => {
                 arranger.stepMap.push({
                     start: chordStart,
                     end: chordEnd,
-                    chord: { name: 'C', start: chordStart } // minimal chord object
+                    chord: { name: 'C', start: chordStart }, // minimal chord object
                 });
                 currentStep += 4;
             }
@@ -53,13 +52,15 @@ describe('Worker Search Performance', () => {
 
         const end = performance.now();
         const duration = end - start;
-        console.log(`Sequential scan of ${totalSteps} steps (Map size: ${arranger.stepMap.length}): ${duration.toFixed(2)}ms`);
+        console.log(
+            `Sequential scan of ${totalSteps} steps (Map size: ${arranger.stepMap.length}): ${duration.toFixed(2)}ms`,
+        );
 
         // Also simulate some random access (though sequential is the main use case)
         const randomStart = performance.now();
         for (let k = 0; k < 1000; k++) {
-             const randStep = Math.floor(Math.random() * totalSteps);
-             getChordAtStep(randStep);
+            const randStep = Math.floor(Math.random() * totalSteps);
+            getChordAtStep(randStep);
         }
         const randomEnd = performance.now();
         console.log(`Random access (1000 lookups): ${(randomEnd - randomStart).toFixed(2)}ms`);

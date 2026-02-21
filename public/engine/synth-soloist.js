@@ -1,28 +1,38 @@
 import { getState } from '../state.js';
-import { safeDisconnect, clampFreq } from '../utils.js';
+import { clampFreq, safeDisconnect } from '../utils.js';
 
 export function killSoloistNote() {
     const { playback, soloist } = getState();
     if (soloist.activeVoices && soloist.activeVoices.length > 0) {
-        soloist.activeVoices.forEach(voice => {
+        soloist.activeVoices.forEach((voice) => {
             try {
                 // Cancel gain AND frequency ramps to prevent pitch artifacts
-                if (voice.gain && voice.gain.gain) {
+                if (voice.gain?.gain) {
                     voice.gain.gain.cancelScheduledValues(playback.audio.currentTime);
                     voice.gain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.01);
                 }
-                
+
                 if (voice.nodes) {
-                    voice.nodes.forEach(node => {
+                    voice.nodes.forEach((node) => {
                         try {
-                            if (node.frequency) node.frequency.cancelScheduledValues(playback.audio.currentTime);
-                            if (node.detune) node.detune.cancelScheduledValues(playback.audio.currentTime);
+                            if (node.frequency) {
+                                node.frequency.cancelScheduledValues(playback.audio.currentTime);
+                            }
+                            if (node.detune) {
+                                node.detune.cancelScheduledValues(playback.audio.currentTime);
+                            }
                             // Stop if it's a source node
-                            if (node.stop) node.stop(playback.audio.currentTime + 0.02);
-                        } catch { /* ignore */ }
+                            if (node.stop) {
+                                node.stop(playback.audio.currentTime + 0.02);
+                            }
+                        } catch {
+                            /* ignore */
+                        }
                     });
                 }
-            } catch { /* ignore error */ }
+            } catch {
+                /* ignore error */
+            }
         });
         soloist.activeVoices = [];
     }
@@ -31,47 +41,96 @@ export function killSoloistNote() {
 /**
  * Main entry point for playing a soloist note.
  */
-export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval = 0, style = 'scalar', isLegato = false) {
+export function playSoloNote(
+    freq,
+    time,
+    duration,
+    vol = 0.4,
+    bendStartInterval = 0,
+    style = 'scalar',
+    isLegato = false,
+) {
     const { playback, soloist } = getState();
-    if (!Number.isFinite(freq)) return;
+    if (!Number.isFinite(freq)) {
+        return;
+    }
 
     const preset = soloist.preset || 'neo';
     const ctx = playback.audio;
     const now = ctx.currentTime;
     const playTime = Math.max(time, now);
-    
+
     // Voice Management
     manageVoices(playTime, soloist);
 
     const isPiano = soloist.mode === 'piano';
-    if (isPiano) isLegato = false;
+    if (isPiano) {
+        isLegato = false;
+    }
 
     const gain = ctx.createGain();
     gain.gain.value = 0;
-    
+
     const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-    if (ctx.createStereoPanner) pan.pan.setValueAtTime((Math.random() * 2 - 1) * 0.05, playTime);
+    if (ctx.createStereoPanner) {
+        pan.pan.setValueAtTime((Math.random() * 2 - 1) * 0.05, playTime);
+    }
 
     // Common output chain
     gain.connect(pan);
     pan.connect(playback.soloistGain);
 
-    let voiceObj = { gain, time: playTime, duration, nodes: [], cleanup: [gain, pan] };
-    
+    const voiceObj = { gain, time: playTime, duration, nodes: [], cleanup: [gain, pan] };
+
     // Retrieve last frequency for portamento
     const prevFreq = soloist.lastRenderedFreq || freq;
     soloist.lastRenderedFreq = freq;
 
     switch (preset) {
         case 'neo':
-            playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj, isLegato, prevFreq);
+            playNeoJuno(
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+            );
             break;
         case 'vowel':
-            playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj, isLegato, prevFreq);
+            playVowel(
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+            );
             break;
-        case 'classic':
         default:
-            playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, style, gain, voiceObj, isLegato, prevFreq);
+            playClassic(
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+            );
             break;
     }
 
@@ -79,16 +138,22 @@ export function playSoloNote(freq, time, duration, vol = 0.4, bendStartInterval 
 }
 
 function manageVoices(playTime, soloist) {
-    if (!soloist.activeVoices) soloist.activeVoices = [];
+    if (!soloist.activeVoices) {
+        soloist.activeVoices = [];
+    }
 
     // Clean up finished voices
-    soloist.activeVoices = soloist.activeVoices.filter(v => (v.time + v.duration + 1.0) > playTime);
+    soloist.activeVoices = soloist.activeVoices.filter((v) => v.time + v.duration + 1.0 > playTime);
 
     const VOICE_LIMIT = soloist.mode !== 'monophonic' ? 2 : 1;
-    const isNewGesture = soloist.activeVoices.length > 0 && Math.abs(playTime - soloist.activeVoices[soloist.activeVoices.length-1].time) > 0.001;
-    
+    const isNewGesture =
+        soloist.activeVoices.length > 0 &&
+        Math.abs(playTime - soloist.activeVoices[soloist.activeVoices.length - 1].time) > 0.001;
+
     if (isNewGesture || soloist.activeVoices.length >= VOICE_LIMIT) {
-        const voicesToKill = isNewGesture ? soloist.activeVoices.length : (soloist.activeVoices.length - VOICE_LIMIT + 1);
+        const voicesToKill = isNewGesture
+            ? soloist.activeVoices.length
+            : soloist.activeVoices.length - VOICE_LIMIT + 1;
         for (let i = 0; i < voicesToKill; i++) {
             const oldest = soloist.activeVoices.shift();
             if (oldest) {
@@ -96,11 +161,19 @@ function manageVoices(playTime, soloist) {
                     oldest.gain.gain.cancelScheduledValues(playTime);
                     oldest.gain.gain.setTargetAtTime(0, playTime, 0.01);
                     if (oldest.nodes) {
-                        oldest.nodes.forEach(node => {
-                            try { if (node.stop) node.stop(playTime + 0.05); } catch { /* ignore cleanup errors */ }
+                        oldest.nodes.forEach((node) => {
+                            try {
+                                if (node.stop) {
+                                    node.stop(playTime + 0.05);
+                                }
+                            } catch {
+                                /* ignore cleanup errors */
+                            }
                         });
                     }
-                } catch { /* ignore cleanup errors */ }
+                } catch {
+                    /* ignore cleanup errors */
+                }
             }
         }
     }
@@ -108,15 +181,27 @@ function manageVoices(playTime, soloist) {
 
 // --- PRESET IMPLEMENTATIONS ---
 
-function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj, isLegato, prevFreq) {
+function playClassic(
+    ctx,
+    freq,
+    playTime,
+    duration,
+    vol,
+    bendStartInterval,
+    style,
+    outputGain,
+    voiceObj,
+    isLegato,
+    prevFreq,
+) {
     const { playback, soloist } = getState();
     const intensity = playback.bandIntensity || 0.5;
-    const intensityGain = 0.5 + (intensity * 0.9);
+    const intensityGain = 0.5 + intensity * 0.9;
     const randomizedVol = vol * intensityGain * (0.95 + Math.random() * 0.1);
 
     const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth'; 
-    
+    osc1.type = 'sawtooth';
+
     const osc2 = ctx.createOscillator();
     osc2.type = 'triangle';
     osc2.detune.setValueAtTime(style === 'shred' ? 12 : 6, playTime);
@@ -124,7 +209,18 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     voiceObj.nodes.push(osc1, osc2);
 
     // Pitch Envelope
-    applyPitchEnvelope(osc1, osc2, freq, playTime, duration, bendStartInterval, style, isLegato, prevFreq, soloist.mode === 'piano');
+    applyPitchEnvelope(
+        osc1,
+        osc2,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        isLegato,
+        prevFreq,
+        soloist.mode === 'piano',
+    );
 
     // Vibrato
     if (soloist.mode !== 'piano') {
@@ -139,22 +235,26 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     // Filter
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    const brightnessBase = 1.0 + (intensity * 1.5) + (vol * 1.5);
-    const cutoffBase = style === 'bird' ? freq * 3.5 * brightnessBase : Math.min(freq * 4 * brightnessBase, 12000);
-    
+    const brightnessBase = 1.0 + intensity * 1.5 + vol * 1.5;
+    const cutoffBase =
+        style === 'bird' ? freq * 3.5 * brightnessBase : Math.min(freq * 4 * brightnessBase, 12000);
+
     // Guitar Palm Mute Layer (Low velocity = Muted/Snappy)
     const muteThreshold = intensity < 0.4 ? 0.7 : 0.55;
     const isMuted = soloist.mode === 'guitar' && vol < muteThreshold;
     const isPiano = soloist.mode === 'piano';
-    
+
     filter.frequency.setValueAtTime(clampFreq(cutoffBase), playTime);
     if (isMuted) {
         // Snappy filter decay for palm mutes
         filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.08);
         filter.Q.value = 4; // More 'pop'
     } else {
-        filter.frequency.exponentialRampToValueAtTime(clampFreq(cutoffBase * (style === 'bird' ? 0.7 : 0.6)), playTime + duration);
-        filter.Q.value = isPiano ? 0.7 : (style === 'bird' ? 1.5 : (duration > 0.4 ? 2 : 1));
+        filter.frequency.exponentialRampToValueAtTime(
+            clampFreq(cutoffBase * (style === 'bird' ? 0.7 : 0.6)),
+            playTime + duration,
+        );
+        filter.Q.value = isPiano ? 0.7 : style === 'bird' ? 1.5 : duration > 0.4 ? 2 : 1;
     }
 
     voiceObj.cleanup.push(filter);
@@ -163,7 +263,7 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     const baseAttack = style === 'shred' ? 0.005 : 0.015;
     const attack = isLegato ? 0.005 : Math.min(baseAttack, duration * 0.25);
     let releaseTime = duration * (style === 'minimal' ? 1.5 : 1.1);
-    
+
     if (isMuted) {
         outputGain.gain.setValueAtTime(0, playTime);
         outputGain.gain.setTargetAtTime(randomizedVol, playTime, 0.005); // Faster snap
@@ -196,7 +296,7 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
 
     // Only apply vibrato if note is long enough
     if (duration > 0.15 && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find(n => n.frequency && n.frequency.value < 20); // Find LFO
+        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
         if (vibrato) {
             vibrato.start(playTime);
             vibrato.stop(stopTime);
@@ -206,7 +306,19 @@ function playClassic(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
-function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj, isLegato, prevFreq) {
+function playNeoJuno(
+    ctx,
+    freq,
+    playTime,
+    duration,
+    vol,
+    bendStartInterval,
+    style,
+    outputGain,
+    voiceObj,
+    isLegato,
+    prevFreq,
+) {
     const { soloist } = getState();
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -232,7 +344,18 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     voiceObj.nodes.push(osc1, osc2, lfo1, lfo2);
     voiceObj.cleanup.push(lfo1Gain, lfo2Gain);
 
-    applyPitchEnvelope(osc1, osc2, freq, playTime, duration, bendStartInterval, style, isLegato, prevFreq, soloist.mode === 'piano');
+    applyPitchEnvelope(
+        osc1,
+        osc2,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        isLegato,
+        prevFreq,
+        soloist.mode === 'piano',
+    );
 
     // Filter - Warm Lowpass
     const filter = ctx.createBiquadFilter();
@@ -257,7 +380,7 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc2.start(playTime);
     lfo1.start(playTime);
     lfo2.start(playTime);
-    
+
     const stopTime = playTime + duration + 0.5;
     osc1.stop(stopTime);
     osc2.stop(stopTime);
@@ -267,12 +390,35 @@ function playNeoJuno(ctx, freq, playTime, duration, vol, bendStartInterval, styl
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
-function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style, outputGain, voiceObj, isLegato, prevFreq) {
+function playVowel(
+    ctx,
+    freq,
+    playTime,
+    duration,
+    vol,
+    bendStartInterval,
+    style,
+    outputGain,
+    voiceObj,
+    isLegato,
+    prevFreq,
+) {
     const { soloist } = getState();
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth'; // Rich harmonics for filtering
 
-    applyPitchEnvelope(osc, null, freq, playTime, duration, bendStartInterval, style, isLegato, prevFreq, soloist.mode === 'piano');
+    applyPitchEnvelope(
+        osc,
+        null,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        isLegato,
+        prevFreq,
+        soloist.mode === 'piano',
+    );
     voiceObj.nodes.push(osc);
 
     // Formant Filters (Ah/Oh sound)
@@ -330,11 +476,26 @@ function playVowel(ctx, freq, playTime, duration, vol, bendStartInterval, style,
 
 // --- HELPERS ---
 
-function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, style, isLegato, prevFreq, isPiano = false) {
+function applyPitchEnvelope(
+    osc1,
+    osc2,
+    freq,
+    time,
+    duration,
+    bendInterval,
+    style,
+    isLegato,
+    prevFreq,
+    isPiano = false,
+) {
     if (isPiano) {
         // Strict pitch for piano
-        if (osc1) osc1.frequency.setValueAtTime(freq, time);
-        if (osc2) osc2.frequency.setValueAtTime(freq, time);
+        if (osc1) {
+            osc1.frequency.setValueAtTime(freq, time);
+        }
+        if (osc2) {
+            osc2.frequency.setValueAtTime(freq, time);
+        }
         return;
     }
 
@@ -342,9 +503,9 @@ function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, styl
         // Portamento Glide - Smoother for monophonic lead mode
         const { soloist } = getState();
         // Guitar hammer-ons/pull-offs are faster (0.03s), synths slightly slower
-        const glideTime = soloist.mode === 'monophonic' ? 0.06 : 
-                         (soloist.mode === 'guitar' ? 0.03 : 0.04);
-        
+        const glideTime =
+            soloist.mode === 'monophonic' ? 0.06 : soloist.mode === 'guitar' ? 0.03 : 0.04;
+
         if (osc1) {
             osc1.frequency.setValueAtTime(prevFreq, time);
             osc1.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
@@ -354,11 +515,15 @@ function applyPitchEnvelope(osc1, osc2, freq, time, duration, bendInterval, styl
             osc2.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
         }
     } else if (bendInterval !== 0) {
-        const startFreq = freq * Math.pow(2, -bendInterval / 12);
+        const startFreq = freq * 2 ** (-bendInterval / 12);
         let bendDuration = 0.1;
-        if (style === 'blues') bendDuration = 0.15;
-        else if (style === 'bird') bendDuration = 0.05;
-        else if (style === 'minimal') bendDuration = 0.25;
+        if (style === 'blues') {
+            bendDuration = 0.15;
+        } else if (style === 'bird') {
+            bendDuration = 0.05;
+        } else if (style === 'minimal') {
+            bendDuration = 0.25;
+        }
 
         bendDuration = Math.min(duration * 0.6, bendDuration);
 
@@ -390,9 +555,16 @@ function createVibrato(ctx, freq, time, duration, style) {
     let depthFactor = 0.005;
 
     // Style adjustments
-    if (style === 'blues') { vibSpeed = 4.8; depthFactor = 0.012; }
-    else if (style === 'neo') { vibSpeed = 4.2; depthFactor = 0.015; }
-    else if (style === 'shred') { vibSpeed = 6.5; depthFactor = 0.004; }
+    if (style === 'blues') {
+        vibSpeed = 4.8;
+        depthFactor = 0.012;
+    } else if (style === 'neo') {
+        vibSpeed = 4.2;
+        depthFactor = 0.015;
+    } else if (style === 'shred') {
+        vibSpeed = 6.5;
+        depthFactor = 0.004;
+    }
 
     // Mode-specific differentiation (Lead Synth/Horn/Guitar feel)
     if (soloist.mode === 'monophonic') {
@@ -407,13 +579,16 @@ function createVibrato(ctx, freq, time, duration, style) {
 
     const vibGain = ctx.createGain();
     const isLongNote = duration > 0.4;
-    const vibDelay = 0.15 + (Math.random() * 0.1);
+    const vibDelay = 0.15 + Math.random() * 0.1;
     const finalVibDepth = freq * (isLongNote ? depthFactor : depthFactor * 0.3);
 
     vibGain.gain.setValueAtTime(0, time);
     vibGain.gain.setValueAtTime(0, time + vibDelay);
     // Smoothly ramp in the vibrato
-    vibGain.gain.exponentialRampToValueAtTime(Math.max(0.001, finalVibDepth), time + vibDelay + (isLongNote ? 0.5 : 0.2));
+    vibGain.gain.exponentialRampToValueAtTime(
+        Math.max(0.001, finalVibDepth),
+        time + vibDelay + (isLongNote ? 0.5 : 0.2),
+    );
 
     return { vibrato, vibGain };
 }

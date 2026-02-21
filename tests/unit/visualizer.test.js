@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnifiedVisualizer } from '../../public/visualizer.js';
 
 describe('UnifiedVisualizer', () => {
@@ -13,8 +13,9 @@ describe('UnifiedVisualizer', () => {
 
     beforeEach(() => {
         // Setup DOM
-        document.body.innerHTML = '<div id="viz-container" style="width: 800px; height: 600px;"></div>';
-        
+        document.body.innerHTML =
+            '<div id="viz-container" style="width: 800px; height: 600px;"></div>';
+
         // Mock Context
         mockCtx = {
             fillRect: vi.fn(),
@@ -37,8 +38,8 @@ describe('UnifiedVisualizer', () => {
             font: '',
             textAlign: '',
             textBaseline: '',
-            set lineCap(v) {},
-            set lineJoin(v) {},
+            set lineCap(_v) {},
+            set lineJoin(_v) {},
         };
 
         // Create a REAL canvas element from happy-dom
@@ -47,17 +48,20 @@ describe('UnifiedVisualizer', () => {
         mockCanvas = canvas;
 
         // Mock ResizeObserver with proper spies
-        vi.stubGlobal('ResizeObserver', class {
-            constructor(callback) {
-                this.callback = callback;
-                this.observe = vi.fn();
-                this.unobserve = vi.fn();
-                this.disconnect = vi.fn();
-            }
-        });
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                constructor(callback) {
+                    this.callback = callback;
+                    this.observe = vi.fn();
+                    this.unobserve = vi.fn();
+                    this.disconnect = vi.fn();
+                }
+            },
+        );
 
         // Mock matchMedia
-        window.matchMedia = vi.fn().mockImplementation(query => ({
+        window.matchMedia = vi.fn().mockImplementation((query) => ({
             matches: false,
             media: query,
             onchange: null,
@@ -70,18 +74,22 @@ describe('UnifiedVisualizer', () => {
 
         // Mock getComputedStyle with spy
         getPropertyValueSpy = vi.fn((prop) => {
-             if (prop && prop.startsWith('--')) return '#123456';
-             return '#000000';
+            if (prop?.startsWith('--')) {
+                return '#123456';
+            }
+            return '#000000';
         });
 
         vi.spyOn(window, 'getComputedStyle').mockReturnValue({
-            getPropertyValue: getPropertyValueSpy
+            getPropertyValue: getPropertyValueSpy,
         });
 
         // Use a safer way to mock createElement to avoid recursion
-        const originalCreateElement = document.createElement.bind(document);
+        const _originalCreateElement = document.createElement.bind(document);
         vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
-            if (tagName.toLowerCase() === 'canvas') return mockCanvas;
+            if (tagName.toLowerCase() === 'canvas') {
+                return mockCanvas;
+            }
             // Use the prototype's original method to avoid recursion if vitest wraps the instance method
             return HTMLDocument.prototype.createElement.call(document, tagName);
         });
@@ -91,7 +99,9 @@ describe('UnifiedVisualizer', () => {
     });
 
     afterEach(() => {
-        if (visualizer) visualizer.destroy();
+        if (visualizer) {
+            visualizer.destroy();
+        }
         vi.restoreAllMocks();
     });
 
@@ -104,8 +114,8 @@ describe('UnifiedVisualizer', () => {
 
     it('should correctly handle track additions', () => {
         visualizer.addTrack('bass', '#ff0000');
-        expect(visualizer.tracks['bass']).toBeDefined();
-        expect(visualizer.tracks['bass'].color).toBe('#ff0000');
+        expect(visualizer.tracks.bass).toBeDefined();
+        expect(visualizer.tracks.bass.color).toBe('#ff0000');
         expect(visualizer.infoLayer.children.length).toBe(1);
     });
 
@@ -113,15 +123,15 @@ describe('UnifiedVisualizer', () => {
         visualizer.addTrack('soloist', 'blue');
         const noteEvent = { time: 1.0, midi: 60, duration: 0.5, noteName: 'C', octave: 4 };
         visualizer.pushNote('soloist', noteEvent);
-        
-        expect(visualizer.tracks['soloist'].history.length).toBe(1);
-        expect(visualizer.tracks['soloist'].label.textContent).toBe('C4');
+
+        expect(visualizer.tracks.soloist.history.length).toBe(1);
+        expect(visualizer.tracks.soloist.label.textContent).toBe('C4');
     });
 
     it('should push chords into chord events', () => {
         const chordEvent = { time: 0, notes: [60, 64, 67], rootMidi: 60, intervals: [0, 4, 7] };
         visualizer.pushChord(chordEvent);
-        
+
         expect(visualizer.chordEvents.length).toBe(1);
         expect(visualizer.chordEvents[0].notes).toEqual([60, 64, 67]);
     });
@@ -129,16 +139,16 @@ describe('UnifiedVisualizer', () => {
     it('should truncate notes correctly for monophonic rendering', () => {
         visualizer.addTrack('bass', 'red');
         visualizer.pushNote('bass', { time: 0, midi: 36, duration: 1.0 });
-        
+
         visualizer.truncateNotes('bass', 0.5);
-        expect(visualizer.tracks['bass'].history.at(0).duration).toBe(0.5);
+        expect(visualizer.tracks.bass.history.at(0).duration).toBe(0.5);
     });
 
     it('should execute draw calls during render', () => {
         visualizer.addTrack('bass', 'red');
         visualizer.pushNote('bass', { time: 10, midi: 36, duration: 1.0 });
         visualizer.setBeatReference(0);
-        
+
         visualizer.render(10.5, 120, 4);
 
         // Verify background was drawn
@@ -154,10 +164,10 @@ describe('UnifiedVisualizer', () => {
         visualizer.addTrack('bass', 'red');
         visualizer.pushNote('bass', { time: 0, midi: 36 });
         visualizer.pushChord({ time: 0 });
-        
+
         visualizer.clear();
-        
-        expect(visualizer.tracks['bass'].history.length).toBe(0);
+
+        expect(visualizer.tracks.bass.history.length).toBe(0);
         expect(visualizer.chordEvents.length).toBe(0);
         expect(mockCtx.clearRect).toHaveBeenCalled();
     });
@@ -223,7 +233,7 @@ describe('UnifiedVisualizer', () => {
             document.documentElement.setAttribute('data-theme', 'dark');
 
             // Wait for MutationObserver (async)
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise((resolve) => setTimeout(resolve, 50));
 
             // 3. Should have re-resolved colors
             // Exact count depends on number of colors to resolve (chords x4 + tracks)

@@ -18,6 +18,6 @@ describe('ChordAnalyzerLite identifyChord Performance', () => {
         const duration = end - start;
 
         console.log(`identifyChord x ${iterations}: ${duration.toFixed(2)}ms`);
-        console.log(`Average: ${(duration * 1000 / iterations).toFixed(4)}µs per call`);
+        console.log(`Average: ${((duration * 1000) / iterations).toFixed(4)}µs per call`);
     });
 });

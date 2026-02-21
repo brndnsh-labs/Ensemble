@@ -1,6 +1,6 @@
 :root {
     color-scheme: dark light;
-    
+
     /* Solarized Dark (Default) */
     --base03: #002b36;
     --base02: #073642;
@@ -33,11 +33,11 @@
     --error-color: var(--red);
 
     /* RGB variants for transparency */
-    --chords-color-rgb: 38, 139, 210;    /* blue */
-    --bass-color-rgb: 133, 153, 0;      /* green/success */
-    --soloist-color-rgb: 211, 54, 130;  /* magenta */
+    --chords-color-rgb: 38, 139, 210; /* blue */
+    --bass-color-rgb: 133, 153, 0; /* green/success */
+    --soloist-color-rgb: 211, 54, 130; /* magenta */
     --harmony-color-rgb: 108, 113, 196; /* violet */
-    --groove-color-rgb: 147, 161, 161;  /* base1 */
+    --groove-color-rgb: 147, 161, 161; /* base1 */
 
     --card-bg: #0a404e; /* Slightly lighter than base02 for contrast */
     --card-bg-hover: var(--base01);
@@ -46,7 +46,7 @@
     --select-bg: var(--base03);
     --select-text: var(--base2);
     --select-border: var(--base01);
-    
+
     /* Sequencer Specific */
     --step-bg: rgba(147, 161, 161, 0.15);
     --step-bg-hover: rgba(147, 161, 161, 0.25);
@@ -91,11 +91,11 @@
     --error-color: var(--red);
 
     /* RGB variants for transparency (Light) */
-    --chords-color-rgb: 38, 139, 210;    /* blue */
-    --bass-color-rgb: 133, 153, 0;      /* green/success */
-    --soloist-color-rgb: 211, 54, 130;  /* magenta */
+    --chords-color-rgb: 38, 139, 210; /* blue */
+    --bass-color-rgb: 133, 153, 0; /* green/success */
+    --soloist-color-rgb: 211, 54, 130; /* magenta */
     --harmony-color-rgb: 108, 113, 196; /* violet */
-    --groove-color-rgb: 7, 54, 66;      /* base02 */
+    --groove-color-rgb: 7, 54, 66; /* base02 */
 
     --card-bg: var(--base3);
     --card-bg-hover: var(--base2);

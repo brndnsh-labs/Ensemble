@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
 
 class MockAudioBuffer {
@@ -8,7 +8,9 @@ class MockAudioBuffer {
         this.duration = length / sampleRate;
         this.data = new Float32Array(length);
     }
-    getChannelData() { return this.data; }
+    getChannelData() {
+        return this.data;
+    }
 }
 
 describe('Comprehensive Chord Recognition', () => {
@@ -18,16 +20,18 @@ describe('Comprehensive Chord Recognition', () => {
     const getFreq = (note) => {
         const notes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
         const name = note.slice(0, -1);
-        const octave = parseInt(note.slice(-1));
+        const octave = parseInt(note.slice(-1), 10);
         const index = notes.indexOf(name);
-        return 440 * Math.pow(2, (index + (octave - 4) * 12 - 9) / 12);
+        return 440 * 2 ** ((index + (octave - 4) * 12 - 9) / 12);
     };
 
     const addTone = (data, freq, start, end, vol = 0.3) => {
         const startIdx = Math.floor(start * sampleRate);
         const endIdx = Math.floor(end * sampleRate);
         for (let i = startIdx; i < endIdx; i++) {
-            if (i >= data.length) break;
+            if (i >= data.length) {
+                break;
+            }
             const t = i / sampleRate;
             data[i] += Math.sin(2 * Math.PI * freq * t) * vol;
         }
@@ -36,7 +40,7 @@ describe('Comprehensive Chord Recognition', () => {
     const createChordBuffer = (notesList, duration = 1.0) => {
         const buffer = new MockAudioBuffer({ length: duration * sampleRate, sampleRate });
         const data = buffer.getChannelData(0);
-        notesList.forEach(n => {
+        notesList.forEach((n) => {
             addTone(data, getFreq(n), 0, duration, 0.3);
         });
         return buffer;
@@ -53,7 +57,7 @@ describe('Comprehensive Chord Recognition', () => {
         { type: 'dim', name: 'Cdim', notes: ['C4', 'Eb4', 'Gb4'] },
     ];
 
-    CHORD_TYPES.forEach(c => {
+    CHORD_TYPES.forEach((c) => {
         it(`should identify ${c.name} (${c.type})`, async () => {
             const buffer = createChordBuffer(c.notes);
             const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
@@ -95,19 +99,19 @@ describe('Comprehensive Chord Recognition', () => {
             // "const isStableInversion = [3, 4, 7].includes(interval);"
             // 3=m3, 4=M3, 7=P5.
             // G is m7 (10 semitones). Not in list.
-            
+
             const buffer = createChordBuffer(['G1', 'A3', 'C4', 'E4']);
             const { chords } = await analyzer.analyze(buffer, { bpm: 120 });
-            
+
             // Should be Am7 or Am.
             // If bass G is strong, does it confuse root detection?
             // Root A. Bass G.
             // It might detect as Am7.
             // Or if G is Bass, maybe C/G (C6/G)? A is 6th of C.
             // Let's see what it does.
-            expect(['Am7', 'Am', 'C6/G']).toContain(chords[0].chord); 
+            expect(['Am7', 'Am', 'C6/G']).toContain(chords[0].chord);
         });
-        
+
         it('should identify F/C (2nd Inversion)', async () => {
             // C2 is 36. Inside range.
             const buffer = createChordBuffer(['C2', 'F3', 'A3', 'F4']);

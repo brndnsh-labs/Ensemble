@@ -14,7 +14,7 @@ export const WORKER_MSG = {
     FLUSH: 'flush',
     EXPORT: 'export',
     RESOLUTION: 'resolution',
-    PRIME: 'prime'
+    PRIME: 'prime',
 };
 
 /**
@@ -26,7 +26,7 @@ export const WORKER_RESP = {
     TICK: 'tick',
     EXPORT_COMPLETE: 'exportComplete',
     EXPORT_PROGRESS: 'exportProgress',
-    ERROR: 'error'
+    ERROR: 'error',
 };
 
 /**

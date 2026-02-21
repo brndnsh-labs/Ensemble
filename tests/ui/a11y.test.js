@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 describe('Accessibility (A11y) & Interactive Integrity', () => {
     beforeEach(() => {
@@ -25,30 +25,102 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             <div id="settingsOverlay" class="overlay"></div>
             <button id="settingsBtn" aria-label="Open Settings">Settings</button>
         `;
-        
+
         // Mock remaining UI elements needed for initUI
         const mockIds = [
-            'timeSigSelect', 'keySelect', 'measurePagination', 'drumBarsSelect',
-            'tapBtn', 'relKeyBtn', 'transUpBtn', 'transDownBtn', 'maximizeChordBtn',
-            'chordPowerBtn', 'groovePowerBtn', 'bassPowerBtn', 'soloistPowerBtn',
-            'chordPowerBtnDesktop', 'groovePowerBtnDesktop', 'bassPowerBtnDesktop', 'soloistPowerBtnDesktop',
-            'vizPowerBtn', 'addSectionBtn', 'templatesBtn', 'templatesOverlay', 'templateChips', 'closeTemplatesBtn', 'activeSectionLabel',
-            'arrangerActionTrigger', 'arrangerActionMenu', 'randomizeBtn', 'mutateBtn', 'undoBtn',
-            'clearProgBtn', 'saveBtn', 'shareBtn', 'chordPresets', 'userPresetsContainer',
-            'chordStylePresets', 'bassStylePresets', 'soloistStylePresets', 'groupingToggle', 'groupingLabel',
-            'chordReverb', 'bassReverb', 'soloistReverb', 'drumPresets', 'userDrumPresetsContainer',
-            'cloneMeasureBtn', 'autoFollowCheck', 'humanizeSlider', 'saveDrumBtn', 'drumReverb', 'smartDrumPresets',
-            'settingsBtn', 'themeSelect', 'notationSelect', 'densitySelect', 'pianoRootsCheck',
-            'swingSlider', 'exportMidiBtn', 'settingsExportMidiBtn', 'exportOverlay', 'closeExportBtn', 'confirmExportBtn',
-            'exportChordsCheck', 'exportBassCheck', 'exportSoloistCheck', 'exportDrumsCheck', 'exportDurationInput',
-            'exportDurationContainer', 'exportFilenameInput', 'installAppBtn', 'flashOverlay', 'resetSettingsBtn',
-            'refreshAppBtn', 'editorOverlay', 'editArrangementBtn', 'closeEditorBtn', 'intensitySlider', 'complexitySlider',
-            'intensityValue', 'autoIntensityCheck', 'panel-visualizer', 'clearDrumsBtn', 'masterVolume',
-            'countInCheck', 'metronomeCheck', 'visualFlashCheck', 'hapticCheck', 'applyPresetSettingsCheck', 'swingBaseSelect',
+            'timeSigSelect',
+            'keySelect',
+            'measurePagination',
+            'drumBarsSelect',
+            'tapBtn',
+            'relKeyBtn',
+            'transUpBtn',
+            'transDownBtn',
+            'maximizeChordBtn',
+            'chordPowerBtn',
+            'groovePowerBtn',
+            'bassPowerBtn',
+            'soloistPowerBtn',
+            'chordPowerBtnDesktop',
+            'groovePowerBtnDesktop',
+            'bassPowerBtnDesktop',
+            'soloistPowerBtnDesktop',
+            'vizPowerBtn',
+            'addSectionBtn',
+            'templatesBtn',
+            'templatesOverlay',
+            'templateChips',
+            'closeTemplatesBtn',
+            'activeSectionLabel',
+            'arrangerActionTrigger',
+            'arrangerActionMenu',
+            'randomizeBtn',
+            'mutateBtn',
+            'undoBtn',
+            'clearProgBtn',
+            'saveBtn',
+            'shareBtn',
+            'chordPresets',
+            'userPresetsContainer',
+            'chordStylePresets',
+            'bassStylePresets',
+            'soloistStylePresets',
+            'groupingToggle',
+            'groupingLabel',
+            'chordReverb',
+            'bassReverb',
+            'soloistReverb',
+            'drumPresets',
+            'userDrumPresetsContainer',
+            'cloneMeasureBtn',
+            'autoFollowCheck',
+            'humanizeSlider',
+            'saveDrumBtn',
+            'drumReverb',
+            'smartDrumPresets',
+            'settingsBtn',
+            'themeSelect',
+            'notationSelect',
+            'densitySelect',
+            'pianoRootsCheck',
+            'swingSlider',
+            'exportMidiBtn',
+            'settingsExportMidiBtn',
+            'exportOverlay',
+            'closeExportBtn',
+            'confirmExportBtn',
+            'exportChordsCheck',
+            'exportBassCheck',
+            'exportSoloistCheck',
+            'exportDrumsCheck',
+            'exportDurationInput',
+            'exportDurationContainer',
+            'exportFilenameInput',
+            'installAppBtn',
+            'flashOverlay',
+            'resetSettingsBtn',
+            'refreshAppBtn',
+            'editorOverlay',
+            'editArrangementBtn',
+            'closeEditorBtn',
+            'intensitySlider',
+            'complexitySlider',
+            'intensityValue',
+            'autoIntensityCheck',
+            'panel-visualizer',
+            'clearDrumsBtn',
+            'masterVolume',
+            'countInCheck',
+            'metronomeCheck',
+            'visualFlashCheck',
+            'hapticCheck',
+            'applyPresetSettingsCheck',
+            'swingBaseSelect',
             'creativityCheck',
-            'closeSettingsBtn', 'sessionTimerSelect'
+            'closeSettingsBtn',
+            'sessionTimerSelect',
         ];
-        mockIds.forEach(id => {
+        mockIds.forEach((id) => {
             if (!document.getElementById(id)) {
                 const el = document.createElement('div');
                 el.id = id;
@@ -71,7 +143,7 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
     it('should track active genre via aria-pressed state', () => {
         const jazzBtn = document.querySelector('.genre-btn[data-genre="Jazz"]');
         const rockBtn = document.querySelector('.genre-btn[data-genre="Rock"]');
-        
+
         expect(rockBtn.getAttribute('aria-pressed')).toBe('true');
         expect(jazzBtn.getAttribute('aria-pressed')).toBe('false');
     });
@@ -84,7 +156,7 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
     it('should have volume sliders with descriptive labels', () => {
         const chordVol = document.getElementById('chordVolume');
         const bassVol = document.getElementById('bassVolume');
-        
+
         expect(chordVol.getAttribute('aria-label')).toContain('Piano');
         expect(bassVol.getAttribute('aria-label')).toContain('Bass');
     });

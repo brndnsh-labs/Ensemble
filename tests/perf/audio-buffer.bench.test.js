@@ -36,7 +36,9 @@ describe('Audio Buffer Management Performance', () => {
             if (buffer.length >= TARGET_SAMPLES) {
                 // Simulate analysis access (just reading)
                 const analysisData = buffer.slice(-TARGET_SAMPLES);
-                if (analysisData.length === 0) throw new Error('Buffer slice failed');
+                if (analysisData.length === 0) {
+                    throw new Error('Buffer slice failed');
+                }
 
                 // Keep overlap
                 buffer = buffer.slice(-OVERLAP_SAMPLES);
@@ -45,7 +47,6 @@ describe('Audio Buffer Management Performance', () => {
 
         const endLegacy = performance.now();
         const timeLegacy = endLegacy - startLegacy;
-
 
         // --- OPTIMIZED METHOD (Chunks) ---
         const startOpt = performance.now();
@@ -72,7 +73,9 @@ describe('Audio Buffer Management Performance', () => {
 
                 // Simulate analysis access
                 const analysisData = fullBuffer.slice(-TARGET_SAMPLES);
-                if (analysisData.length === 0) throw new Error('Buffer slice failed');
+                if (analysisData.length === 0) {
+                    throw new Error('Buffer slice failed');
+                }
 
                 // 3. Keep overlap
                 // For simplicity/correctness with "Keep Last X",
@@ -94,7 +97,9 @@ describe('Audio Buffer Management Performance', () => {
         // Assert improvement
         // Use a generous margin (3.0x) to account for noise/JIT variation in shared environments
         if (timeOpt > timeLegacy * 3.0) {
-            throw new Error(`Optimized method was significantly slower! (Legacy: ${timeLegacy.toFixed(2)}ms, Opt: ${timeOpt.toFixed(2)}ms)`);
+            throw new Error(
+                `Optimized method was significantly slower! (Legacy: ${timeLegacy.toFixed(2)}ms, Opt: ${timeOpt.toFixed(2)}ms)`,
+            );
         }
     });
 });

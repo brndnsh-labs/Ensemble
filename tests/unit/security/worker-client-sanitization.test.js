@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WORKER_RESP } from '../../../public/worker-types.js';
 
 // Mock the Worker
@@ -22,11 +22,11 @@ global.URL.revokeObjectURL = vi.fn();
 vi.mock('../../../public/state.js', () => ({
     getState: vi.fn(),
     dispatch: vi.fn(),
-    storage: { get: vi.fn(), save: vi.fn() }
+    storage: { get: vi.fn(), save: vi.fn() },
 }));
 
 // We need to import the module under test AFTER mocking
-import { initWorker, getTimerWorker } from '../../../public/worker-client.js';
+import { getTimerWorker, initWorker } from '../../../public/worker-client.js';
 
 describe('Worker Client Security', () => {
     let worker;
@@ -41,14 +41,17 @@ describe('Worker Client Security', () => {
                 return {
                     href: '',
                     download: '',
-                    click: clickSpy
+                    click: clickSpy,
                 };
             }
             return {};
         });
 
         // Initialize the worker
-        initWorker(() => {}, () => {});
+        initWorker(
+            () => {},
+            () => {},
+        );
         worker = getTimerWorker();
     });
 
@@ -65,8 +68,8 @@ describe('Worker Client Security', () => {
             data: {
                 type: WORKER_RESP.EXPORT_COMPLETE,
                 blob: new Blob(['test'], { type: 'audio/midi' }),
-                filename: maliciousFilename
-            }
+                filename: maliciousFilename,
+            },
         };
 
         // Trigger the handler
@@ -92,8 +95,8 @@ describe('Worker Client Security', () => {
             data: {
                 type: WORKER_RESP.EXPORT_COMPLETE,
                 blob: new Blob(['test'], { type: 'audio/midi' }),
-                filename: validFilename
-            }
+                filename: validFilename,
+            },
         };
 
         worker.onmessage(event);

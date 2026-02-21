@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock Worker
 const mockPostMessage = vi.fn();
@@ -33,9 +33,12 @@ describe('Worker Client', () => {
         // but `getTimerWorker()` exposes it.
 
         // Actually, since `initWorker` is idempotent, we can call it.
-        initWorker(() => {}, () => {});
+        initWorker(
+            () => {},
+            () => {},
+        );
         // Access the internal worker instance via the getter
-        const { getTimerWorker } =  await import('../../public/worker-client.js');
+        const { getTimerWorker } = await import('../../public/worker-client.js');
         worker = getTimerWorker();
     });
 
@@ -47,8 +50,8 @@ describe('Worker Client', () => {
         const progressEvent = {
             data: {
                 type: WORKER_RESP.EXPORT_PROGRESS,
-                progress: 0.5
-            }
+                progress: 0.5,
+            },
         };
         worker.onmessage(progressEvent);
 
@@ -64,8 +67,8 @@ describe('Worker Client', () => {
             data: {
                 type: WORKER_RESP.EXPORT_COMPLETE,
                 blob: new Blob(['test'], { type: 'audio/midi' }),
-                filename: 'test.mid'
-            }
+                filename: 'test.mid',
+            },
         };
         worker.onmessage(completeEvent);
 

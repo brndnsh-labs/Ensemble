@@ -2,9 +2,11 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getState } from '../../../public/state.js';
+
+const { arranger, playback, groove, chords } = getState();
+
 import { shareProgression } from '../../../public/sharing.js';
 import { loadFromUrl } from '../../../public/state-hydration.js';
 
@@ -16,30 +18,33 @@ vi.mock('../../../public/ui.js', () => ({
         notationSelect: { value: 'roman' },
         showToast: vi.fn(),
         updateKeySelectLabels: vi.fn(),
-        updateRelKeyButton: vi.fn()
+        updateRelKeyButton: vi.fn(),
     },
     showToast: vi.fn(),
     updateKeySelectLabels: vi.fn(),
     updateRelKeyButton: vi.fn(),
-    switchInstrumentTab: vi.fn()
+    switchInstrumentTab: vi.fn(),
 }));
 
 import { ui as actualUi } from '../../../public/ui.js';
+
 const mockUi = actualUi;
 
 vi.mock('../../../public/app-controller.js', () => ({
     applyTheme: vi.fn(),
-    setBpm: vi.fn((bpm) => { playback.bpm = parseInt(bpm); })
+    setBpm: vi.fn((bpm) => {
+        playback.bpm = parseInt(bpm, 10);
+    }),
 }));
 
 vi.mock('../../../public/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     flushBuffers: vi.fn(),
-    restoreGains: vi.fn()
+    restoreGains: vi.fn(),
 }));
 
 vi.mock('../../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 
 describe('Sharing & Hydration Round-trip', () => {
@@ -51,14 +56,14 @@ describe('Sharing & Hydration Round-trip', () => {
         arranger.timeSignature = '4/4';
         playback.bpm = 120;
         chords.style = 'smart';
-        
+
         // Mock clipboard
         vi.stubGlobal('navigator', {
             clipboard: {
-                writeText: vi.fn().mockImplementation(() => Promise.resolve())
-            }
+                writeText: vi.fn().mockImplementation(() => Promise.resolve()),
+            },
         });
-        
+
         // Mock window.location
         vi.stubGlobal('location', new URL('http://localhost'));
     });
@@ -68,11 +73,11 @@ describe('Sharing & Hydration Round-trip', () => {
         playback.bandIntensity = 0.85;
         playback.complexity = 0.6;
         shareProgression();
-        
+
         expect(navigator.clipboard.writeText).toHaveBeenCalled();
         const urlString = vi.mocked(navigator.clipboard.writeText).mock.calls[0][0];
         const url = new URL(urlString);
-        
+
         expect(url.searchParams.get('key')).toBe('C');
         expect(url.searchParams.get('bpm')).toBe('120');
         expect(url.searchParams.get('genre')).toBe('Funk');
@@ -88,14 +93,14 @@ describe('Sharing & Hydration Round-trip', () => {
         chords.style = 'jazz';
         groove.genreFeel = 'Jazz';
         playback.bandIntensity = 0.4;
-        
+
         // 2. Generate Share URL
         mockUi.keySelect.value = 'F';
         mockUi.bpmInput.value = '80';
-        
+
         shareProgression();
         const urlString = vi.mocked(navigator.clipboard.writeText).mock.calls[0][0];
-        
+
         // 3. Reset State
         arranger.sections = [];
         arranger.key = 'C';
@@ -103,11 +108,11 @@ describe('Sharing & Hydration Round-trip', () => {
         chords.style = 'smart';
         groove.genreFeel = 'Rock';
         playback.bandIntensity = 0.5;
-        
+
         // 4. Simulate Load from that URL
         vi.stubGlobal('location', new URL(urlString));
-        loadFromUrl(); 
-        
+        loadFromUrl();
+
         // 5. Verify restored state
         expect(arranger.key).toBe('F');
         expect(playback.bpm).toBe(80);

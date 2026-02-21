@@ -1,14 +1,22 @@
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import { subscribe, dispatch as internalDispatch, getState } from './state.js';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { getState, dispatch as internalDispatch, subscribe } from './state.js';
 
 function shallowEqual(objA, objB) {
-    if (Object.is(objA, objB)) return true;
-    if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) return false;
+    if (Object.is(objA, objB)) {
+        return true;
+    }
+    if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+        return false;
+    }
     const keysA = Object.keys(objA);
     const keysB = Object.keys(objB);
-    if (keysA.length !== keysB.length) return false;
+    if (keysA.length !== keysB.length) {
+        return false;
+    }
     for (let i = 0; i < keysA.length; i++) {
-        if (!Object.prototype.hasOwnProperty.call(objB, keysA[i]) || !Object.is(objA[keysA[i]], objB[keysA[i]])) return false;
+        if (!Object.hasOwn(objB, keysA[i]) || !Object.is(objA[keysA[i]], objB[keysA[i]])) {
+            return false;
+        }
     }
     return true;
 }
@@ -25,16 +33,16 @@ export function useEnsembleState(selector) {
     const [slice, setSlice] = useState(() => selector(getState()));
 
     useEffect(() => {
-        const update = (action, payload, updatedStateMap) => {
+        const update = (_action, _payload, updatedStateMap) => {
             const newSlice = selectorRef.current(updatedStateMap);
-            setSlice(prevSlice => {
+            setSlice((prevSlice) => {
                 if (!shallowEqual(prevSlice, newSlice)) {
                     return newSlice;
                 }
                 return prevSlice;
             });
         };
-        
+
         const unsubscribe = subscribe(update);
         return unsubscribe;
     }, []);

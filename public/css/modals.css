@@ -14,7 +14,7 @@
     color: var(--accent-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    border-bottom: none !important; /* Override standard panel h4 */
+    border-bottom: none; /* Override standard panel h4 */
 }
 
 .performance-ending-grid {
@@ -66,7 +66,8 @@ body.modal-open {
     overflow: hidden;
 }
 
-.settings-overlay, .modal-overlay {
+.settings-overlay,
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -76,24 +77,32 @@ body.modal-open {
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: var(--z-modal) !important;
+    z-index: var(--z-modal);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+    transition:
+        opacity 0.2s ease-out,
+        visibility 0.2s ease-out;
 }
 
-.settings-overlay.active, .modal-overlay.active {
-    opacity: 1 !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
+.settings-overlay.active,
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 #generateSongOverlay {
-    z-index: 3000 !important; /* Ensure it is above the arrangement editor (2000) */
+    z-index: 3000; /* Ensure it is above the arrangement editor (2000) */
 }
 
-#settingsOverlay, #editorOverlay, #exportOverlay, #templatesOverlay, #analyzerOverlay, #generateSongOverlay {
+#settingsOverlay,
+#editorOverlay,
+#exportOverlay,
+#templatesOverlay,
+#analyzerOverlay,
+#generateSongOverlay {
     /* Keeping IDs for backwards compatibility if needed, but the classes above handle visibility now */
 }
 
@@ -138,7 +147,7 @@ body.modal-open {
 }
 
 .editor-modal {
-    padding: 0 !important;
+    padding: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -189,8 +198,8 @@ body.modal-open {
 .footer-main-btn {
     flex-grow: 1;
     justify-content: center;
-    padding: 0.5rem !important;
-    font-size: 0.85rem !important;
+    padding: 0.5rem;
+    font-size: 0.85rem;
 }
 
 .section-list {
@@ -219,20 +228,20 @@ body.modal-open {
 }
 
 .template-chip {
-    padding: 0.6rem 1rem !important;
-    font-size: 0.9rem !important;
-    border-radius: 20px !important;
-    background: var(--panel-color) !important;
-    border: 1px solid var(--accent-color) !important;
-    color: var(--text-color) !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    background: var(--panel-color);
+    border: 1px solid var(--accent-color);
+    color: var(--text-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     cursor: pointer;
     font-family: inherit;
 }
 
 .template-chip:hover {
-    background: var(--accent-color) !important;
-    color: white !important;
+    background: var(--accent-color);
+    color: white;
     transform: translateY(-2px);
 }
 
@@ -247,7 +256,7 @@ body.modal-open {
     }
 
     .editor-modal {
-        margin: 0 !important;
+        margin: 0;
         height: 85vh;
     }
 
@@ -271,7 +280,7 @@ body.modal-open {
     }
 
     .section-card {
-        margin: 0 !important;
+        margin: 0;
         height: fit-content;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         padding: 1.5rem;
@@ -282,7 +291,10 @@ body.modal-open {
         font-size: 1.2rem;
     }
 
-    .section-move-btn, .section-duplicate-btn, .section-delete-btn, .section-kebab-btn {
+    .section-move-btn,
+    .section-duplicate-btn,
+    .section-delete-btn,
+    .section-kebab-btn {
         padding: 0.5rem;
         font-size: 1.2rem;
     }
@@ -299,32 +311,31 @@ body.modal-open {
     .footer-main-btn {
         flex-grow: 0;
         min-width: 160px;
-        padding: 0.6rem 1rem !important;
+        padding: 0.6rem 1rem;
     }
 
     #arrangerActionTrigger {
-        display: none !important;
+        display: none;
     }
 
     .arranger-action-container {
-        display: block !important;
+        display: block;
     }
 
     .action-menu-content {
-        display: flex !important;
+        display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem !important;
+        gap: 0.5rem;
     }
 
     .action-menu-content button {
-        justify-content: center !important;
-        padding: 0.5rem 0.75rem !important;
-        font-size: 0.75rem !important;
-        width: auto !important;
+        justify-content: center;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+        width: auto;
         min-width: 100px;
     }
 }
-
 
 .settings-section {
     margin-bottom: 1.5rem;
@@ -352,7 +363,8 @@ body.modal-open {
 }
 
 /* Select and inputs in settings */
-select, input[type="range"] {
+select,
+input[type="range"] {
     accent-color: var(--accent-color);
 }
 
@@ -363,7 +375,7 @@ select, input[type="range"] {
 
 @media (max-width: 600px) {
     .lars-active .control-label {
-        display: none !important; /* Keep hidden on mobile to save space */
+        display: none; /* Keep hidden on mobile to save space */
     }
 }
 
@@ -511,7 +523,7 @@ select, input[type="range"] {
 }
 
 .section-card.linked::before {
-    content: 'LINKED';
+    content: "LINKED";
     position: absolute;
     top: -7px; /* Sit on the border */
     left: 10px;
@@ -523,7 +535,7 @@ select, input[type="range"] {
     border-radius: 3px;
     letter-spacing: 0.08em;
     z-index: var(--z-controls);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* Ensure previous card doesn't hide the connection */
@@ -586,7 +598,7 @@ select, input[type="range"] {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.4rem;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
     z-index: var(--z-floating);
     min-width: 180px;
 }
@@ -660,7 +672,8 @@ select, input[type="range"] {
     outline: none;
 }
 
-.section-key-select, .section-ts-select {
+.section-key-select,
+.section-ts-select {
     height: 28px;
     padding: 0 0.4rem;
     font-size: 0.8rem;

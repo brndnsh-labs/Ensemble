@@ -1,15 +1,16 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
 
 vi.mock('../../../public/ui-bridge.js', () => ({
-    useEnsembleState: (selector) => mockUseEnsembleState(selector)
+    useEnsembleState: (selector) => mockUseEnsembleState(selector),
 }));
 
 vi.mock('../../../public/state.js', () => {
@@ -17,13 +18,13 @@ vi.mock('../../../public/state.js', () => {
         arranger: {
             isMinor: false,
             key: 'C',
-            lastInteractedSectionId: null
-        }
+            lastInteractedSectionId: null,
+        },
     };
     return {
         getState: () => mockState,
         dispatch: vi.fn(),
-        ACTIONS: {}
+        ACTIONS: {},
     };
 });
 
@@ -35,11 +36,11 @@ vi.mock('../../../public/arranger-controller.js', () => ({
     addSection: vi.fn(),
     refreshArrangerUI: vi.fn(),
     clearChordPresetHighlight: vi.fn(),
-    validateAndAnalyze: vi.fn()
+    validateAndAnalyze: vi.fn(),
 }));
 
 vi.mock('../../../public/components/SymbolMenu.jsx', () => ({
-    SymbolMenu: () => <div data-testid="symbol-menu">Menu</div>
+    SymbolMenu: () => <div data-testid="symbol-menu">Menu</div>,
 }));
 
 import { SectionCard } from '../../../public/components/SectionCard.jsx';
@@ -63,12 +64,12 @@ describe('SectionCard Security', () => {
             label: 'Verse 1',
             value: 'C G Am F',
             repeat: 1,
-            seamless: false
+            seamless: false,
         };
 
         mockUseEnsembleState.mockReturnValue({
             isMinor: false,
-            arrangerKey: 'C'
+            arrangerKey: 'C',
         });
 
         act(() => {
@@ -86,12 +87,12 @@ describe('SectionCard Security', () => {
             label: 'Verse 1',
             value: 'C G Am F',
             repeat: 1,
-            seamless: false
+            seamless: false,
         };
 
         mockUseEnsembleState.mockReturnValue({
             isMinor: false,
-            arrangerKey: 'C'
+            arrangerKey: 'C',
         });
 
         act(() => {

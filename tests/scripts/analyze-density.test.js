@@ -1,4 +1,3 @@
-
 import { vi } from 'vitest';
 import { getSoloistNote } from '../../public/soloist.js';
 
@@ -14,7 +13,7 @@ const mockState = {
         pitchHistory: [],
         deviceBuffer: [],
         motifBuffer: [],
-        sessionSteps: 0
+        sessionSteps: 0,
     },
     groove: { genreFeel: 'Jazz' },
     playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
@@ -28,19 +27,21 @@ const mockState = {
 vi.mock('../../public/state.js', () => ({ getState: () => mockState }));
 vi.mock('../../public/config.js', () => ({
     TIME_SIGNATURES: { '4/4': { beats: 4, stepsPerBeat: 4, grouping: [4] } },
-    STYLE_CONFIG: { /* Loaded from actual file if possible, or we rely on defaults/imports in soloist.js if not mocked. 
+    STYLE_CONFIG: {
+        /* Loaded from actual file if possible, or we rely on defaults/imports in soloist.js if not mocked. 
        Wait, soloist.js imports STYLE_CONFIG locally. We can't easily mock an internal const unless we export it or mock the module.
        However, soloist.js defines STYLE_CONFIG internally. We don't need to mock it, we want the REAL config.
        The imports in soloist.js are: utils, state, config, theory-scales.
-    */ }
+    */
+    },
 }));
 vi.mock('../../public/utils.js', () => ({
     getFrequency: () => 440,
     getMidi: () => 60,
-    calculateTimingOffset: vi.fn(() => 0)
+    calculateTimingOffset: vi.fn(() => 0),
 }));
 vi.mock('../../public/theory-scales.js', () => ({
-    getScaleForChord: () => [0, 2, 4, 5, 7, 9, 11]
+    getScaleForChord: () => [0, 2, 4, 5, 7, 9, 11],
 }));
 
 // We need to re-import to apply mocks
@@ -50,7 +51,6 @@ vi.mock('../../public/theory-scales.js', () => ({
 import { describe, it } from 'vitest';
 
 describe('Soloist Density Analysis', () => {
-    
     function runSimulation(style, intensity, measures = 100) {
         // Reset State
         mockState.soloist = {
@@ -63,25 +63,25 @@ describe('Soloist Density Analysis', () => {
             pitchHistory: [],
             deviceBuffer: [],
             motifBuffer: [],
-            sessionSteps: 0
+            sessionSteps: 0,
         };
         mockState.playback.bandIntensity = intensity;
 
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         const totalSteps = measures * 16;
-        
+
         let attacks = 0;
         let activeSteps = 0;
-        let notes = [];
+        const notes = [];
 
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
-            
+
             // We need to simulate the state updates that happen inside the loop or external to it?
             // getSoloistNote modifies state internally (busySteps, isResting, etc.)
-            
+
             const res = getSoloistNote(chord, chord, s, 440, 60, style, stepInMeasure, false);
-            
+
             if (res) {
                 attacks++;
                 activeSteps++; // Count the attack step itself
@@ -93,8 +93,13 @@ describe('Soloist Density Analysis', () => {
 
         const density = (activeSteps / totalSteps) * 100;
         const notesPerMeasure = attacks / measures;
-        
-        return { style, intensity, density: density.toFixed(1) + '%', notesPerMeasure: notesPerMeasure.toFixed(1) };
+
+        return {
+            style,
+            intensity,
+            density: `${density.toFixed(1)}%`,
+            notesPerMeasure: notesPerMeasure.toFixed(1),
+        };
     }
 
     it('Generates Density Report', () => {
@@ -110,7 +115,7 @@ describe('Soloist Density Analysis', () => {
         ];
 
         console.log('\n--- SOLOIST DENSITY REPORT (100 Measures) ---');
-        console.table(scenarios.map(s => runSimulation(s.style, s.intensity)));
+        console.table(scenarios.map((s) => runSimulation(s.style, s.intensity)));
         console.log('---------------------------------------------');
     });
 });

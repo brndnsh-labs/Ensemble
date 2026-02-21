@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 vi.mock('../../../public/state.js', () => {
@@ -13,59 +13,70 @@ vi.mock('../../../public/state.js', () => {
             isMinor: false,
             progression: [],
             stepMap: [], // Added to prevent analyzeForm crashes
-            lastChordPreset: null
+            lastChordPreset: null,
         },
         chords: {},
         playback: {},
         soloist: { enabled: true },
-        harmony: { enabled: false, style: 'smart', octave: 60, volume: 0.4, complexity: 0.5, buffer: new Map() },
+        harmony: {
+            enabled: false,
+            style: 'smart',
+            octave: 60,
+            volume: 0.4,
+            complexity: 0.5,
+            buffer: new Map(),
+        },
         groove: { genreFeel: 'Rock', enabled: true },
         conductorState: {},
         vizState: {},
         midi: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return { ...mockState, getState: () => mockState };
 });
 
 vi.mock('../../../public/form-analysis.js', () => ({
-    analyzeForm: vi.fn(() => ({ sequence: 'A', sections: [] }))
+    analyzeForm: vi.fn(() => ({ sequence: 'A', sections: [] })),
 }));
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
-        keySelect: { value: 'C' }
+        keySelect: { value: 'C' },
     },
     renderSections: vi.fn(),
     renderChordVisualizer: vi.fn(),
     showToast: vi.fn(),
     updateKeySelectLabels: vi.fn(),
-    updateRelKeyButton: vi.fn()
+    updateRelKeyButton: vi.fn(),
 }));
 
 vi.mock('../../../public/chords.js', () => ({
-    validateProgression: vi.fn((chords) => chords && chords()),
+    validateProgression: vi.fn((chords) => chords?.()),
     transformRelativeProgression: vi.fn((val, shift) => {
-        if (val === 'I | V' && shift === -3) return 'bIII | bVII';
-        if (val === 'i | iv' && shift === 3) return 'vi | ii';
+        if (val === 'I | V' && shift === -3) {
+            return 'bIII | bVII';
+        }
+        if (val === 'i | iv' && shift === 3) {
+            return 'vi | ii';
+        }
         return val;
-    })
+    }),
 }));
 
 vi.mock('../../../public/instrument-controller.js', () => ({
-    flushBuffers: vi.fn()
+    flushBuffers: vi.fn(),
 }));
 
 vi.mock('../../../public/worker-client.js', () => ({
-    syncWorker: vi.fn()
+    syncWorker: vi.fn(),
 }));
 
 vi.mock('../../../public/engine/engine.js', () => ({
-    restoreGains: vi.fn()
+    restoreGains: vi.fn(),
 }));
 
 vi.mock('../../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 
 vi.mock('../../../public/utils.js', () => ({
@@ -73,18 +84,26 @@ vi.mock('../../../public/utils.js', () => ({
     normalizeKey: vi.fn((k) => {
         const map = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
         return map[k] || k;
-    })
+    }),
 }));
 
 vi.mock('../../../public/history.js', () => ({
-    pushHistory: vi.fn()
+    pushHistory: vi.fn(),
 }));
 
-import { addSection, onSectionUpdate, onSectionDelete, onSectionDuplicate, transposeKey, switchToRelativeKey } from '../../../public/arranger-controller.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import {
+    addSection,
+    onSectionDelete,
+    onSectionDuplicate,
+    onSectionUpdate,
+    switchToRelativeKey,
+    transposeKey,
+} from '../../../public/arranger-controller.js';
+import { getState } from '../../../public/state.js';
+
+const { arranger } = getState();
+
 import { ui } from '../../../public/ui.js';
-import { transformRelativeProgression } from '../../../public/chords.js';
 
 describe('Arranger Controller', () => {
     beforeEach(() => {
@@ -121,7 +140,10 @@ describe('Arranger Controller', () => {
 
     describe('onSectionDelete', () => {
         it('should delete a section by ID', () => {
-            arranger.sections = [{ id: 's1', label: 'V', value: 'I' }, { id: 's2', label: 'C', value: 'IV' }];
+            arranger.sections = [
+                { id: 's1', label: 'V', value: 'I' },
+                { id: 's2', label: 'C', value: 'IV' },
+            ];
             onSectionDelete('s1');
             expect(arranger.sections).toHaveLength(1);
             expect(arranger.sections[0].id).toBe('s2');
@@ -142,7 +164,7 @@ describe('Arranger Controller', () => {
             expect(arranger.sections[1]).toEqual({
                 id: 'mock-id',
                 label: 'Verse (Copy)',
-                value: 'I'
+                value: 'I',
             });
         });
     });
@@ -151,12 +173,12 @@ describe('Arranger Controller', () => {
         it('should transpose key and section chords', () => {
             arranger.key = 'C';
             arranger.sections = [{ id: 's1', value: 'C | F' }];
-            
+
             // Transpose +2 semitones (C -> D)
             transposeKey(2, vi.fn());
-            
+
             expect(arranger.key).toBe('D');
-            
+
             // 'C | F' should become 'D | G' if they are NOT roman numerals
             expect(arranger.sections[0].value).toBe('D | G');
         });
@@ -164,9 +186,9 @@ describe('Arranger Controller', () => {
         it('should NOT transpose Roman Numerals', () => {
             arranger.key = 'C';
             arranger.sections = [{ id: 's1', value: 'I | IV' }];
-            
+
             transposeKey(2, vi.fn());
-            
+
             expect(arranger.key).toBe('D');
             // Roman numerals stay relative
             expect(arranger.sections[0].value).toBe('I | IV');
@@ -175,10 +197,10 @@ describe('Arranger Controller', () => {
         it('should handle Unicode accidentals (e.g., \u266D, \u266F)', () => {
             arranger.key = 'C';
             arranger.sections = [{ id: 's1', value: 'A\u266Dmaj7 | C\u266Fm7' }];
-            
+
             // Transpose +1 semitone (Ab -> A, C# -> D)
             transposeKey(1, vi.fn());
-            
+
             expect(arranger.sections[0].value).toBe('Amaj7 | Dm7');
         });
     });
@@ -188,9 +210,9 @@ describe('Arranger Controller', () => {
             arranger.key = 'C';
             arranger.isMinor = false;
             arranger.sections = [{ value: 'I | V' }];
-            
+
             switchToRelativeKey(vi.fn());
-            
+
             expect(arranger.key).toBe('A');
             expect(arranger.isMinor).toBe(true);
             expect(arranger.sections[0].value).toBe('bIII | bVII');
@@ -200,9 +222,9 @@ describe('Arranger Controller', () => {
             arranger.key = 'A';
             arranger.isMinor = true;
             arranger.sections = [{ value: 'i | iv' }];
-            
+
             switchToRelativeKey(vi.fn());
-            
+
             expect(arranger.key).toBe('C');
             expect(arranger.isMinor).toBe(false);
             expect(arranger.sections[0].value).toBe('vi | ii');

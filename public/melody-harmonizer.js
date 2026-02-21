@@ -1,4 +1,4 @@
-import { KEY_ORDER, INTERVAL_TO_ROMAN } from './config.js';
+import { INTERVAL_TO_ROMAN, KEY_ORDER } from './config.js';
 import { normalizeKey } from './utils.js';
 
 /**
@@ -9,7 +9,7 @@ export class Harmonizer {
     constructor() {
         // Define strategies with different weights
         this.strategies = {
-            'Consonant': {
+            Consonant: {
                 name: 'Consonant',
                 description: 'Safe, diatonic choices that strictly follow the key.',
                 weights: {
@@ -19,10 +19,10 @@ export class Harmonizer {
                     rootMatch: 3.0,
                     dominantResolution: 5.0,
                     stepwiseMotion: 2.0,
-                    commonProgression: 4.0
-                }
+                    commonProgression: 4.0,
+                },
             },
-            'Balanced': {
+            Balanced: {
                 name: 'Balanced',
                 description: 'A mix of conventional harmony with some colorful choices.',
                 weights: {
@@ -32,10 +32,10 @@ export class Harmonizer {
                     rootMatch: 4.0,
                     dominantResolution: 4.0,
                     stepwiseMotion: 3.0,
-                    commonProgression: 3.0
-                }
+                    commonProgression: 3.0,
+                },
             },
-            'Complex': {
+            Complex: {
                 name: 'Complex',
                 description: 'Prioritizes melody fit and interesting color over key adherence.',
                 weights: {
@@ -45,14 +45,14 @@ export class Harmonizer {
                     rootMatch: 2.0,
                     dominantResolution: 2.0,
                     stepwiseMotion: 1.0,
-                    commonProgression: 1.0
-                }
-            }
+                    commonProgression: 1.0,
+                },
+            },
         };
 
         this.diatonicWeights = {
             major: { 0: 10, 2: 4, 4: 4, 5: 8, 7: 9, 9: 6, 11: 2 }, // I, ii, iii, IV, V, vi, vii
-            minor: { 0: 10, 2: 3, 3: 9, 5: 6, 7: 8, 8: 7, 10: 5 }  // i, ii, III, iv, v, VI, VII
+            minor: { 0: 10, 2: 3, 3: 9, 5: 6, 7: 8, 8: 7, 10: 5 }, // i, ii, III, iv, v, VI, VII
         };
     }
 
@@ -61,7 +61,9 @@ export class Harmonizer {
      * @returns {Array} Array of option objects { name, description, chords, progression }
      */
     generateOptions(melodyLine, key) {
-        if (!melodyLine || melodyLine.length === 0) return [];
+        if (!melodyLine || melodyLine.length === 0) {
+            return [];
+        }
 
         const { rootIndex, isMinor } = this.parseKey(key);
         const measures = Math.ceil(melodyLine.length / 4);
@@ -69,19 +71,19 @@ export class Harmonizer {
         // Pre-calculate prominent notes per measure
         const measureNotes = [];
         for (let m = 0; m < measures; m++) {
-            const measureBeats = melodyLine.slice(m * 4, (m * 4) + 4);
+            const measureBeats = melodyLine.slice(m * 4, m * 4 + 4);
             measureNotes.push(this.getProminentNotes(measureBeats));
         }
 
         const options = [];
 
-        Object.values(this.strategies).forEach(strategy => {
+        Object.values(this.strategies).forEach((strategy) => {
             const result = this.runViterbi(measureNotes, rootIndex, isMinor, strategy);
             options.push({
                 type: strategy.name,
                 description: strategy.description,
                 chords: result,
-                progression: this.formatProgression(result.map(c => c.roman))
+                progression: this.formatProgression(result.map((c) => c.roman)),
             });
         });
 
@@ -94,11 +96,17 @@ export class Harmonizer {
     generateProgression(melodyLine, key, creativity = 0.5) {
         const options = this.generateOptions(melodyLine, key);
 
-        if (options.length === 0) return "I";
+        if (options.length === 0) {
+            return 'I';
+        }
 
         // Map creativity 0.0-1.0 to the 3 options roughly
-        if (creativity < 0.35) return options[0].progression;
-        if (creativity > 0.65) return options[2].progression;
+        if (creativity < 0.35) {
+            return options[0].progression;
+        }
+        if (creativity > 0.65) {
+            return options[2].progression;
+        }
         return options[1].progression;
     }
 
@@ -116,13 +124,13 @@ export class Harmonizer {
             if (b.midi && b.energy > 0) {
                 const pc = Math.round(b.midi) % 12;
                 // Stronger weight for downbeats
-                const weight = (idx === 0 ? 2.5 : (idx === 2 ? 1.5 : 1.0)) * b.energy;
+                const weight = (idx === 0 ? 2.5 : idx === 2 ? 1.5 : 1.0) * b.energy;
                 counts[pc] = (counts[pc] || 0) + weight;
             }
         });
-        
+
         return Object.entries(counts)
-            .map(([pc, weight]) => ({ pc: parseInt(pc), weight }))
+            .map(([pc, weight]) => ({ pc: parseInt(pc, 10), weight }))
             .sort((a, b) => b.weight - a.weight);
     }
 
@@ -131,7 +139,9 @@ export class Harmonizer {
      */
     runViterbi(measureNotes, keyRoot, isMinor, strategy) {
         const T = measureNotes.length;
-        if (T === 0) return [];
+        if (T === 0) {
+            return [];
+        }
 
         // States: 12 roots * 2 qualities (0=Major, 1=Minor)
         // Encoded as: rootIndex * 2 + qualityIndex
@@ -139,20 +149,35 @@ export class Harmonizer {
 
         // DP Tables
         // V[t][state] = max score ending at state at time t
-        const V = Array(T).fill(null).map(() => new Float32Array(numStates).fill(-Infinity));
-        const path = Array(T).fill(null).map(() => new Int16Array(numStates).fill(0));
+        const V = Array(T)
+            .fill(null)
+            .map(() => new Float32Array(numStates).fill(-Infinity));
+        const path = Array(T)
+            .fill(null)
+            .map(() => new Int16Array(numStates).fill(0));
         // Store reasoning for the best path to this state
-        const reasons = Array(T).fill(null).map(() => Array(numStates).fill(null));
+        const reasons = Array(T)
+            .fill(null)
+            .map(() => Array(numStates).fill(null));
 
         // Initialize t=0
         for (let s = 0; s < numStates; s++) {
             const { root, quality } = this.decodeState(s);
-            const emit = this.calculateEmission(measureNotes[0], root, quality, keyRoot, isMinor, strategy);
+            const emit = this.calculateEmission(
+                measureNotes[0],
+                root,
+                quality,
+                keyRoot,
+                isMinor,
+                strategy,
+            );
 
             // Start bias: Prefer Tonic (I or i)
             let startBias = 0;
-            if (root === keyRoot) startBias = 5.0; // Tonic bonus
-            
+            if (root === keyRoot) {
+                startBias = 5.0; // Tonic bonus
+            }
+
             V[0][s] = emit.score + startBias;
             reasons[0][s] = emit.reasons;
         }
@@ -161,18 +186,25 @@ export class Harmonizer {
         for (let t = 1; t < T; t++) {
             for (let s = 0; s < numStates; s++) {
                 const { root, quality } = this.decodeState(s);
-                const emit = this.calculateEmission(measureNotes[t], root, quality, keyRoot, isMinor, strategy);
+                const emit = this.calculateEmission(
+                    measureNotes[t],
+                    root,
+                    quality,
+                    keyRoot,
+                    isMinor,
+                    strategy,
+                );
 
                 let maxScore = -Infinity;
                 let bestPrev = -1;
-                let bestTransReason = "";
+                let bestTransReason = '';
 
                 // Check all previous states
                 for (let prevS = 0; prevS < numStates; prevS++) {
                     const { root: prevRoot } = this.decodeState(prevS);
                     const trans = this.calculateTransition(prevRoot, root, strategy);
 
-                    const score = V[t-1][prevS] + trans.score + emit.score;
+                    const score = V[t - 1][prevS] + trans.score + emit.score;
 
                     if (score > maxScore) {
                         maxScore = score;
@@ -184,7 +216,9 @@ export class Harmonizer {
                 V[t][s] = maxScore;
                 path[t][s] = bestPrev;
                 reasons[t][s] = [...emit.reasons];
-                if (bestTransReason) reasons[t][s].push(bestTransReason);
+                if (bestTransReason) {
+                    reasons[t][s].push(bestTransReason);
+                }
             }
         }
 
@@ -196,10 +230,12 @@ export class Harmonizer {
             // End bias: Prefer resolving to Tonic or Dominant
             const { root } = this.decodeState(s);
             let endBias = 0;
-            if (root === keyRoot) endBias = 3.0;
+            if (root === keyRoot) {
+                endBias = 3.0;
+            }
 
-            if (V[T-1][s] + endBias > bestFinalScore) {
-                bestFinalScore = V[T-1][s] + endBias;
+            if (V[T - 1][s] + endBias > bestFinalScore) {
+                bestFinalScore = V[T - 1][s] + endBias;
                 bestFinalState = s;
             }
         }
@@ -215,7 +251,7 @@ export class Harmonizer {
                 roman: romanInfo.roman,
                 absRoot: root,
                 quality: quality,
-                reasons: reasons[t][currState] || []
+                reasons: reasons[t][currState] || [],
             });
 
             currState = path[t][currState];
@@ -227,7 +263,7 @@ export class Harmonizer {
     decodeState(s) {
         return {
             root: Math.floor(s / 2),
-            quality: s % 2 === 0 ? 'major' : 'minor'
+            quality: s % 2 === 0 ? 'major' : 'minor',
         };
     }
 
@@ -251,9 +287,9 @@ export class Harmonizer {
         // 2. Melody Fit
         const chordTones = this.getChordTones(root, quality);
         let fitScore = 0;
-        let matchedNotes = [];
+        const matchedNotes = [];
 
-        notes.forEach(note => {
+        notes.forEach((note) => {
             if (chordTones.includes(note.pc)) {
                 const boost = note.weight * w.melodyFit;
                 fitScore += boost;
@@ -261,7 +297,7 @@ export class Harmonizer {
                     fitScore += w.rootMatch;
                     matchedNotes.push(this.getNoteName(note.pc));
                 } else if (matchedNotes.length < 2) {
-                     matchedNotes.push(this.getNoteName(note.pc));
+                    matchedNotes.push(this.getNoteName(note.pc));
                 }
             } else {
                 // Clash penalty
@@ -279,7 +315,7 @@ export class Harmonizer {
 
     calculateTransition(prevRoot, currRoot, strategy) {
         let score = 0;
-        let reason = "";
+        let reason = '';
         const w = strategy.weights;
         const motion = (currRoot - prevRoot + 12) % 12;
 
@@ -288,24 +324,20 @@ export class Harmonizer {
             score -= 1.0;
         } else if (motion === 5) {
             score += w.dominantResolution; // V -> I motion (descending 5th / ascending 4th)
-            reason = "Circle of 5ths resolution";
+            reason = 'Circle of 5ths resolution';
         } else if (motion === 7) {
             score += w.commonProgression; // IV -> I motion (ascending 5th)
         } else if (motion === 1 || motion === 2 || motion === 10 || motion === 11) {
             score += w.stepwiseMotion;
-            reason = "Stepwise motion";
+            reason = 'Stepwise motion';
         }
 
         return { score, reason };
     }
 
     getChordTones(root, quality) {
-        const third = (quality === 'minor') ? 3 : 4;
-        return [
-            root, 
-            (root + third) % 12, 
-            (root + 7) % 12
-        ];
+        const third = quality === 'minor' ? 3 : 4;
+        return [root, (root + third) % 12, (root + 7) % 12];
     }
 
     getNoteName(midi) {
@@ -316,7 +348,9 @@ export class Harmonizer {
     convertRootToRoman(absRoot, quality, keyRoot) {
         const interval = (absRoot - keyRoot + 12) % 12;
         let roman = INTERVAL_TO_ROMAN[interval] || 'I';
-        if (quality === 'minor') roman = roman.toLowerCase();
+        if (quality === 'minor') {
+            roman = roman.toLowerCase();
+        }
         return { roman, absRoot };
     }
 
@@ -324,8 +358,10 @@ export class Harmonizer {
         // Post-processing: If "I | . | . | IV", fill in
         const res = [...chords];
         for (let i = 1; i < res.length; i++) {
-            if (res[i] === '.') res[i] = res[i-1];
+            if (res[i] === '.') {
+                res[i] = res[i - 1];
+            }
         }
-        return res.join(" | ");
+        return res.join(' | ');
     }
 }

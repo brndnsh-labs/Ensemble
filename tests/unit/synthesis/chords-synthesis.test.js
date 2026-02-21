@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
@@ -14,44 +14,44 @@ vi.mock('../../../public/state.js', () => {
                 connect: vi.fn(),
                 start: vi.fn(),
                 stop: vi.fn(),
-                onended: null
+                onended: null,
             })),
             createGain: vi.fn(() => ({
-                gain: { 
-                    value: 1, 
-                    setValueAtTime: vi.fn(), 
+                gain: {
+                    value: 1,
+                    setValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
-                    cancelScheduledValues: vi.fn()
+                    cancelScheduledValues: vi.fn(),
                 },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBiquadFilter: vi.fn(() => ({
                 type: '',
                 frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 Q: { setValueAtTime: vi.fn() },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBufferSource: vi.fn(() => ({
                 buffer: null,
                 connect: vi.fn(),
                 start: vi.fn(),
                 stop: vi.fn(),
-                onended: null
+                onended: null,
             })),
-            createPeriodicWave: vi.fn(() => ({}))
+            createPeriodicWave: vi.fn(() => ({})),
         },
         chordsGain: { connect: vi.fn() },
-        sustainActive: false
+        sustainActive: false,
     };
     const mockGroove = { audioBuffers: { noise: {} } };
     const mockChords = { activeTab: 'smart' };
     const mockHarmony = { enabled: false };
-    
+
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
         chords: mockChords,
-        harmony: mockHarmony
+        harmony: mockHarmony,
     };
 
     return {
@@ -63,18 +63,19 @@ vi.mock('../../../public/state.js', () => {
         vizState: {},
         storage: {},
         midi: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
 // Mock utils
 vi.mock('../../../public/utils.js', () => ({
-    safeDisconnect: vi.fn()
+    safeDisconnect: vi.fn(),
 }));
 
-import { playNote, playChordScratch } from '../../../public/engine/synth-chords.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { playChordScratch, playNote } from '../../../public/engine/synth-chords.js';
+import { getState } from '../../../public/state.js';
+
+const { playback } = getState();
 
 describe('Chord Synthesis', () => {
     beforeEach(() => {
@@ -95,7 +96,7 @@ describe('Chord Synthesis', () => {
 
         const osc = playback.audio.createOscillator.mock.results[0].value;
         const startTime = osc.frequency.setValueAtTime.mock.calls[0][1];
-        
+
         // Base time is 10. Index 2 should add approx 0.01 - 0.03s
         expect(startTime).toBeGreaterThan(10.005);
         expect(startTime).toBeLessThan(10.05);

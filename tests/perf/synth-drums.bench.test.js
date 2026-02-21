@@ -1,9 +1,8 @@
-
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock utils
 vi.mock('../../public/utils.js', () => ({
-    safeDisconnect: () => {}
+    safeDisconnect: () => {},
 }));
 
 // Mock state
@@ -13,26 +12,31 @@ vi.mock('../../public/state.js', () => {
             currentTime: 0,
             createOscillator: vi.fn(() => ({
                 type: '',
-                frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                frequency: {
+                    setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                },
                 connect: vi.fn(),
                 start: vi.fn(),
-                stop: vi.fn()
+                stop: vi.fn(),
             })),
-                        createGain: vi.fn(() => ({
-                            gain: { 
-                                value: 1, 
-                                setValueAtTime: vi.fn(), 
-                                exponentialRampToValueAtTime: vi.fn(), 
-                                setTargetAtTime: vi.fn(),
-                                linearRampToValueAtTime: vi.fn(),
-                                cancelScheduledValues: vi.fn()
-                            },
-                            connect: vi.fn()
-                        })),            createBiquadFilter: vi.fn(() => ({
+            createGain: vi.fn(() => ({
+                gain: {
+                    value: 1,
+                    setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                    linearRampToValueAtTime: vi.fn(),
+                    cancelScheduledValues: vi.fn(),
+                },
+                connect: vi.fn(),
+            })),
+            createBiquadFilter: vi.fn(() => ({
                 type: '',
                 frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 Q: { value: 0, setValueAtTime: vi.fn() },
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
             createBufferSource: vi.fn(() => ({
                 buffer: null,
@@ -40,32 +44,32 @@ vi.mock('../../public/state.js', () => {
                 start: vi.fn(),
                 stop: vi.fn(),
                 onended: null,
-                playbackRate: { value: 1 }
+                playbackRate: { value: 1 },
             })),
             createBuffer: vi.fn(() => ({
-                getChannelData: vi.fn(() => new Float32Array(100))
+                getChannelData: vi.fn(() => new Float32Array(100)),
             })),
-            sampleRate: 44100
+            sampleRate: 44100,
         },
-        drumsGain: { connect: vi.fn() }
+        drumsGain: { connect: vi.fn() },
     };
     const mockGroove = {
         humanize: 20,
         audioBuffers: { noise: {} },
-        lastHatGain: null
+        lastHatGain: null,
     };
 
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
         chords: {},
-        harmony: {}
+        harmony: {},
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
@@ -75,7 +79,19 @@ describe('Drum Synth Performance', () => {
     it('measures playDrumSound loop performance', () => {
         const iterations = 1000;
         // Instruments that trigger the specific array check we are optimizing
-        const instruments = ['HiHat', 'Open', 'Crash', 'Shaker', 'Agogo', 'Perc', 'Guiro', 'Clave', 'TomHigh', 'CongaHigh', 'BongoHigh'];
+        const instruments = [
+            'HiHat',
+            'Open',
+            'Crash',
+            'Shaker',
+            'Agogo',
+            'Perc',
+            'Guiro',
+            'Clave',
+            'TomHigh',
+            'CongaHigh',
+            'BongoHigh',
+        ];
 
         const start = performance.now();
 

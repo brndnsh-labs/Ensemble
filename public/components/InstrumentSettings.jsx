@@ -1,44 +1,59 @@
-import { h, Fragment } from 'preact';
-import { useEnsembleState } from '../ui-bridge.js';
-import { ACTIONS } from '../types.js';
+import { Fragment, h } from 'preact';
 import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
+import { useEnsembleState } from '../ui-bridge.js';
+
 const { playback } = getState();
+
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 
 export function InstrumentSettings({ module }) {
-    const state = useEnsembleState(s => {
-        const key = module === 'groove' ? 'groove' : module; 
+    const state = useEnsembleState((s) => {
+        const key = module === 'groove' ? 'groove' : module;
         return s[key];
     });
 
-    if (!state) return null;
+    if (!state) {
+        return null;
+    }
 
-    const moduleName = module === 'groove' ? 'drum' : 
-                      module === 'chords' ? 'chord' :
-                      module === 'harmony' ? 'harmony' : module;
+    const moduleName =
+        module === 'groove'
+            ? 'drum'
+            : module === 'chords'
+              ? 'chord'
+              : module === 'harmony'
+                ? 'harmony'
+                : module;
 
     // Helper to update Volume/Reverb with audio ramping
     const updateAudio = (type, val) => {
         const numVal = parseFloat(val);
         const isReverb = type === 'reverb';
-        
+
         if (state) {
             state[isReverb ? 'reverb' : 'volume'] = numVal;
             saveCurrentState();
         }
 
-        const internalName = module === 'groove' ? 'drums' : 
-                            module === 'harmony' ? 'harmonies' : module;
-        
+        const internalName =
+            module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
+
         const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
-        const multiplier = isReverb ? 1.0 : (MIXER_GAIN_MULTIPLIERS[internalName] || 1.0);
-        
+        const multiplier = isReverb ? 1.0 : MIXER_GAIN_MULTIPLIERS[internalName] || 1.0;
+
         if (playback[gainKey] && playback.audio) {
             const target = Math.max(0.0001, numVal * multiplier);
             playback[gainKey].gain.cancelScheduledValues(playback.audio.currentTime);
-            playback[gainKey].gain.setValueAtTime(playback[gainKey].gain.value, playback.audio.currentTime);
-            playback[gainKey].gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
+            playback[gainKey].gain.setValueAtTime(
+                playback[gainKey].gain.value,
+                playback.audio.currentTime,
+            );
+            playback[gainKey].gain.exponentialRampToValueAtTime(
+                target,
+                playback.audio.currentTime + 0.04,
+            );
         }
     };
 
@@ -47,16 +62,21 @@ export function InstrumentSettings({ module }) {
             {/* Left Column: Instrument Specifics */}
             <div>
                 <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: var(--accent-color);">
-                    {module === 'groove' ? 'Feel & Actions' : 
-                     module === 'chords' || module === 'harmony' ? 'Voicing' : 'Instrument'}
+                    {module === 'groove'
+                        ? 'Feel & Actions'
+                        : module === 'chords' || module === 'harmony'
+                          ? 'Voicing'
+                          : 'Instrument'}
                 </h4>
-                
+
                 {module === 'chords' && (
                     <div style="margin-bottom: 1rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Density</label>
-                        <select 
+                        <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                            Density
+                        </label>
+                        <select
                             id="densitySelect"
-                            value={state.density || 'standard'} 
+                            value={state.density || 'standard'}
                             onChange={(e) => {
                                 dispatch(ACTIONS.SET_CHORD_DENSITY, e.target.value);
                                 saveCurrentState();
@@ -74,23 +94,29 @@ export function InstrumentSettings({ module }) {
                     <div style="margin-bottom: 1rem;">
                         <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
                             <span>Complexity</span>
-                            <span id="harmonyComplexityValue" style="color: var(--accent-color); font-weight: bold;">{Math.round((state.complexity || 0.5) * 100)}%</span>
+                            <span
+                                id="harmonyComplexityValue"
+                                style="color: var(--accent-color); font-weight: bold;"
+                            >
+                                {Math.round((state.complexity || 0.5) * 100)}%
+                            </span>
                         </label>
-                        <input 
+                        <input
                             id="harmonyComplexity"
-                            type="range" 
-                            min="0" 
-                            max="1" 
-                            step="0.05" 
-                            value={state.complexity || 0.5} 
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={state.complexity || 0.5}
                             onInput={(e) => {
                                 state.complexity = parseFloat(e.target.value); // Legacy mutation
                                 if (document.getElementById('harmonyComplexityValue')) {
-                                    document.getElementById('harmonyComplexityValue').textContent = `${Math.round(state.complexity * 100)}%`;
+                                    document.getElementById('harmonyComplexityValue').textContent =
+                                        `${Math.round(state.complexity * 100)}%`;
                                 }
                                 saveCurrentState();
                             }}
-                            aria-label="Harmony Complexity" 
+                            aria-label="Harmony Complexity"
                             aria-valuetext={`${Math.round((state.complexity || 0.5) * 100)}%`}
                         />
                     </div>
@@ -101,29 +127,38 @@ export function InstrumentSettings({ module }) {
                         <div style="margin-bottom: 1rem;">
                             <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
                                 <span>Complexity</span>
-                                <span id="soloistComplexityValue" style="color: var(--accent-color); font-weight: bold;">{Math.round((state.complexity || 0.5) * 100)}%</span>
+                                <span
+                                    id="soloistComplexityValue"
+                                    style="color: var(--accent-color); font-weight: bold;"
+                                >
+                                    {Math.round((state.complexity || 0.5) * 100)}%
+                                </span>
                             </label>
-                            <input 
+                            <input
                                 id="soloistComplexity"
-                                type="range" 
-                                min="0" 
-                                max="1" 
-                                step="0.05" 
-                                value={state.complexity !== undefined ? state.complexity : 0.5} 
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={state.complexity !== undefined ? state.complexity : 0.5}
                                 onInput={(e) => {
-                                    state.complexity = parseFloat(e.target.value); 
+                                    state.complexity = parseFloat(e.target.value);
                                     if (document.getElementById('soloistComplexityValue')) {
-                                        document.getElementById('soloistComplexityValue').textContent = `${Math.round(state.complexity * 100)}%`;
+                                        document.getElementById(
+                                            'soloistComplexityValue',
+                                        ).textContent = `${Math.round(state.complexity * 100)}%`;
                                     }
                                     saveCurrentState();
                                 }}
-                                aria-label="Soloist Complexity" 
+                                aria-label="Soloist Complexity"
                                 aria-valuetext={`${Math.round((state.complexity || 0.5) * 100)}%`}
                             />
                         </div>
 
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Lead Sound</label>
+                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                                Lead Sound
+                            </label>
                             <select
                                 id="soloistPresetSelect"
                                 value={state.preset || 'classic'}
@@ -139,7 +174,9 @@ export function InstrumentSettings({ module }) {
                             </select>
                         </div>
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Phrasing Mode</label>
+                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                                Phrasing Mode
+                            </label>
                             <select
                                 id="soloistModeSelect"
                                 value={state.mode || 'monophonic'}
@@ -157,28 +194,30 @@ export function InstrumentSettings({ module }) {
                     </Fragment>
                 )}
 
-                {module === 'groove' && (
-                    <GrooveControls state={state} />
-                )}
+                {module === 'groove' && <GrooveControls state={state} />}
             </div>
 
             {/* Right Column: Mixer */}
             <div>
-                <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: var(--accent-color);">Mixer</h4>
+                <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: var(--accent-color);">
+                    Mixer
+                </h4>
                 <div style="margin-bottom: 1rem;">
                     <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
                         <span>Volume</span>
-                        <span style="color: var(--accent-color); font-weight: bold;">{Math.round(state.volume * 100)}%</span>
+                        <span style="color: var(--accent-color); font-weight: bold;">
+                            {Math.round(state.volume * 100)}%
+                        </span>
                     </label>
-                    <input 
+                    <input
                         id={`${moduleName}Volume`}
-                        type="range" 
-                        min="0" 
-                        max="1" 
-                        step="0.05" 
-                        value={state.volume} 
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={state.volume}
                         onInput={(e) => updateAudio('volume', e.target.value)}
-                        aria-label={`${module} Volume`} 
+                        aria-label={`${module} Volume`}
                         aria-valuetext={`${Math.round(state.volume * 100)}%`}
                         style="width: 100%;"
                     />
@@ -186,17 +225,19 @@ export function InstrumentSettings({ module }) {
                 <div>
                     <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
                         <span>Reverb</span>
-                        <span style="color: var(--accent-color); font-weight: bold;">{Math.round(state.reverb * 100)}%</span>
+                        <span style="color: var(--accent-color); font-weight: bold;">
+                            {Math.round(state.reverb * 100)}%
+                        </span>
                     </label>
-                    <input 
+                    <input
                         id={`${moduleName}Reverb`}
-                        type="range" 
-                        min="0" 
-                        max="1" 
-                        step="0.05" 
-                        value={state.reverb} 
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={state.reverb}
                         onInput={(e) => updateAudio('reverb', e.target.value)}
-                        aria-label={`${module} Reverb`} 
+                        aria-label={`${module} Reverb`}
                         aria-valuetext={`${Math.round(state.reverb * 100)}%`}
                         style="width: 100%;"
                     />
@@ -207,31 +248,36 @@ export function InstrumentSettings({ module }) {
 }
 
 function GrooveControls({ state }) {
-    const { swing, swingSub } = useEnsembleState(s => s.playback);
-    
+    const { swing, swingSub } = useEnsembleState((s) => s.playback);
+
     return (
         <div>
             <div style="margin-bottom: 1rem;">
-                <label class="control-label" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                <label
+                    class="control-label"
+                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                >
                     <span>Swing</span>
-                    <span style="color: var(--accent-color); font-weight: bold;">{swing || 0}%</span>
+                    <span style="color: var(--accent-color); font-weight: bold;">
+                        {swing || 0}%
+                    </span>
                 </label>
                 <div style="display: flex; gap: 0.4rem; align-items: center;">
-                    <input 
+                    <input
                         id="swingSlider"
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={swing || 0} 
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={swing || 0}
                         onInput={(e) => {
-                            dispatch(ACTIONS.SET_SWING, parseInt(e.target.value));
+                            dispatch(ACTIONS.SET_SWING, parseInt(e.target.value, 10));
                             saveCurrentState();
                         }}
-                        style="flex-grow: 1; height: 4px;" 
-                        aria-label="Swing Amount" 
+                        style="flex-grow: 1; height: 4px;"
+                        aria-label="Swing Amount"
                         aria-valuetext={`${swing || 0}%`}
                     />
-                    <select 
+                    <select
                         id="swingBaseSelect"
                         value={swingSub || '8th'}
                         onChange={(e) => {
@@ -246,58 +292,75 @@ function GrooveControls({ state }) {
                 </div>
             </div>
             <div style="margin-bottom: 1rem;">
-                <label class="control-label" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                <label
+                    class="control-label"
+                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                >
                     <span>Humanize</span>
-                    <span style="color: var(--accent-color); font-weight: bold;">{state.humanize || 0}%</span>
+                    <span style="color: var(--accent-color); font-weight: bold;">
+                        {state.humanize || 0}%
+                    </span>
                 </label>
-                <input 
+                <input
                     id="humanizeSlider"
-                    type="range" 
-                    min="0" 
-                    max="100" 
-                    value={state.humanize || 0} 
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={state.humanize || 0}
                     onInput={(e) => {
-                         state.humanize = parseInt(e.target.value); 
-                         saveCurrentState();
+                        state.humanize = parseInt(e.target.value, 10);
+                        saveCurrentState();
                     }}
-                    style="width: 100%; height: 4px;" 
-                    aria-label="Humanize Amount" 
+                    style="width: 100%; height: 4px;"
+                    aria-label="Humanize Amount"
                     aria-valuetext={`${state.humanize || 0}%`}
                 />
             </div>
             <div style="margin-bottom: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
                 <label style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
                     <span>Lars Mode</span>
-                    <input 
+                    <input
                         id="larsModeCheck"
-                        type="checkbox" 
-                        checked={state.larsMode} 
+                        type="checkbox"
+                        checked={state.larsMode}
                         onChange={(e) => {
                             dispatch(ACTIONS.SET_LARS_MODE, e.target.checked);
                             saveCurrentState();
                         }}
                     />
                 </label>
-                <div id="larsIntensityContainer" style={{ opacity: state.larsMode ? '1' : '0.5', pointerEvents: state.larsMode ? 'auto' : 'none' }}>
+                <div
+                    id="larsIntensityContainer"
+                    style={{
+                        opacity: state.larsMode ? '1' : '0.5',
+                        pointerEvents: state.larsMode ? 'auto' : 'none',
+                    }}
+                >
                     <label style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;">
                         <span>Lars Intensity</span>
-                        <span id="larsIntensityValue" style="color: var(--accent-color); font-weight: bold;">{Math.round(state.larsIntensity * 100)}%</span>
+                        <span
+                            id="larsIntensityValue"
+                            style="color: var(--accent-color); font-weight: bold;"
+                        >
+                            {Math.round(state.larsIntensity * 100)}%
+                        </span>
                     </label>
-                    <input 
+                    <input
                         id="larsIntensitySlider"
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={Math.round(state.larsIntensity * 100)} 
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={Math.round(state.larsIntensity * 100)}
                         onInput={(e) => {
-                            const val = parseInt(e.target.value);
+                            const val = parseInt(e.target.value, 10);
                             dispatch(ACTIONS.SET_LARS_INTENSITY, val / 100);
                             if (document.getElementById('larsIntensityValue')) {
-                                document.getElementById('larsIntensityValue').textContent = `${val}%`;
+                                document.getElementById('larsIntensityValue').textContent =
+                                    `${val}%`;
                             }
                         }}
-                        style="width: 100%; height: 4px;" 
-                        aria-label="Lars Mode Intensity" 
+                        style="width: 100%; height: 4px;"
+                        aria-label="Lars Mode Intensity"
                         aria-valuetext={`${Math.round(state.larsIntensity * 100)}%`}
                     />
                 </div>

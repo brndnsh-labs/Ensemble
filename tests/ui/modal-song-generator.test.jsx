@@ -1,38 +1,39 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { h, render } from 'preact';
 import React from 'preact/compat';
-import { GenerateSongModal } from '../../public/components/GenerateSongModal.jsx';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorModal } from '../../public/components/EditorModal.jsx';
+import { GenerateSongModal } from '../../public/components/GenerateSongModal.jsx';
 import { dispatch } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies
 vi.mock('../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/app-controller.js', () => ({
-    setBpm: vi.fn()
+    setBpm: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({
     togglePower: vi.fn(),
     switchMeasure: vi.fn(),
     updateMeasures: vi.fn(),
-    cloneMeasure: vi.fn()
+    cloneMeasure: vi.fn(),
 }));
 vi.mock('../../public/ui-song-generator-controller.js', () => ({
-    setupSongGeneratorHandlers: vi.fn()
+    setupSongGeneratorHandlers: vi.fn(),
 }));
 
 vi.mock('../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
     const mockState = {
         ...actual,
-        playback: { 
-            ...actual.playback, 
-            modals: { generateSong: false, editor: true } 
+        playback: {
+            ...actual.playback,
+            modals: { generateSong: false, editor: true },
         },
         arranger: { ...actual.arranger, totalSteps: 64 },
     };
@@ -40,7 +41,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
         ...mockState,
         getState: () => mockState,
         dispatch: actual.dispatch,
-        ACTIONS: actual.ACTIONS
+        ACTIONS: actual.ACTIONS,
     };
 });
 
@@ -48,11 +49,13 @@ const waitFor = async (callback, timeout = 1000) => {
     const start = Date.now();
     while (Date.now() - start < timeout) {
         try {
-            if (callback()) return true;
-        } catch (e) {
+            if (callback()) {
+                return true;
+            }
+        } catch (_e) {
             // ignore
         }
-        await new Promise(r => setTimeout(r, 20));
+        await new Promise((r) => setTimeout(r, 20));
     }
     return callback(); // Final try to throw original error if still failing
 };
@@ -63,11 +66,13 @@ describe('Song Generator Modal', () => {
         document.body.classList.remove('modal-open');
 
         // Reset state for all modals
-        ['settings', 'editor', 'generateSong', 'export', 'templates', 'analyzer'].forEach(modal => {
-            dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: false });
-        });
+        ['settings', 'editor', 'generateSong', 'export', 'templates', 'analyzer'].forEach(
+            (modal) => {
+                dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: false });
+            },
+        );
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
-        
+
         // Polyfill requestAnimationFrame for Preact
         global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
 
@@ -114,7 +119,7 @@ describe('Song Generator Modal', () => {
             <input type="radio" name="analyzerMode" value="chords" checked>
             <input type="radio" name="analyzerMode" value="melody">
         `;
-        
+
         render(<GenerateSongModal />, document.getElementById('modalContainer'));
         render(<EditorModal />, document.getElementById('editorContainer'));
     });
@@ -128,28 +133,27 @@ describe('Song Generator Modal', () => {
     it('should open when Random button is clicked', async () => {
         const modal = document.getElementById('generateSongOverlay');
         const btn = document.getElementById('randomizeBtn');
-        
+
         btn.click();
-        
+
         // Wait for Preact state update
         await waitFor(() => modal.classList.contains('active'));
-        
+
         expect(modal.classList.contains('active')).toBe(true);
     });
 
     it('should close when Cancel button is clicked', async () => {
         const modal = document.getElementById('generateSongOverlay');
-        
+
         // Open it first
         document.getElementById('randomizeBtn').click();
         await waitFor(() => modal.classList.contains('active'));
         expect(modal.classList.contains('active')).toBe(true);
-        
+
         const closeBtn = document.getElementById('closeGenerateSongBtn');
         closeBtn.click();
-        
+
         await waitFor(() => !modal.classList.contains('active'));
         expect(modal.classList.contains('active')).toBe(false);
     });
-    
 });

@@ -2,13 +2,13 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { conductorState, checkSectionTransition } from '../../../public/conductor.js';
-import { dispatch, getState, storage } from '../../../public/state.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkSectionTransition, conductorState } from '../../../public/conductor.js';
+import { getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
-    
+
     // Create distinct mock objects
     const mockPlayback = { ...actual.playback };
     const mockArranger = { ...actual.arranger, sections: [] };
@@ -27,32 +27,34 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         harmony: mockHarmony,
         chords: mockChords,
         bass: mockBass,
-        soloist: mockSoloist
+        soloist: mockSoloist,
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn((action, payload) => {
-            if (action === 'SET_BAND_INTENSITY') mockPlayback.bandIntensity = payload;
-        })
+            if (action === 'SET_BAND_INTENSITY') {
+                mockPlayback.bandIntensity = payload;
+            }
+        }),
     };
 });
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
         intensitySlider: { value: 0 },
-        densitySelect: { value: 'standard' }
+        densitySelect: { value: 'standard' },
     },
-    triggerFlash: vi.fn()
+    triggerFlash: vi.fn(),
 }));
 
 vi.mock('../../../public/persistence.js', () => ({
-    debounceSaveState: vi.fn()
+    debounceSaveState: vi.fn(),
 }));
 
 vi.mock('../../../public/fills.js', () => ({
-    generateProceduralFill: vi.fn(() => ({}))
+    generateProceduralFill: vi.fn(() => ({})),
 }));
 
 describe('Time Signature Transitions', () => {
@@ -84,13 +86,13 @@ describe('Time Signature Transitions', () => {
             arranger.stepMap.push({
                 start: i * stepsPerMeasure,
                 end: (i + 1) * stepsPerMeasure,
-                chord: { sectionId: 's1', sectionLabel: 'Main' }
+                chord: { sectionId: 's1', sectionLabel: 'Main' },
             });
         }
 
         // Check at the start of the last measure (step 84)
         checkSectionTransition(84, stepsPerMeasure);
-        
+
         expect(conductorState.formIteration).toBe(1);
         expect(conductorState.target).not.toBe(0.5);
     });
@@ -104,13 +106,13 @@ describe('Time Signature Transitions', () => {
             arranger.stepMap.push({
                 start: i * stepsPerMeasure,
                 end: (i + 1) * stepsPerMeasure,
-                chord: { sectionId: 's1', sectionLabel: 'Main' }
+                chord: { sectionId: 's1', sectionLabel: 'Main' },
             });
         }
 
         // Check at the start of the last measure (step 60)
         checkSectionTransition(60, stepsPerMeasure);
-        
+
         expect(conductorState.formIteration).toBe(1);
         expect(conductorState.target).not.toBe(0.5);
     });
@@ -124,13 +126,13 @@ describe('Time Signature Transitions', () => {
             arranger.stepMap.push({
                 start: i * stepsPerMeasure,
                 end: (i + 1) * stepsPerMeasure,
-                chord: { sectionId: 's1', sectionLabel: 'Main' }
+                chord: { sectionId: 's1', sectionLabel: 'Main' },
             });
         }
 
         // Check at the start of the last measure (step 84)
         checkSectionTransition(84, stepsPerMeasure);
-        
+
         expect(conductorState.formIteration).toBe(1);
         expect(conductorState.target).not.toBe(0.5);
     });

@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
@@ -14,17 +14,33 @@ vi.mock('../../../public/state.js', () => {
         unswungNextNoteTime: 0,
         scheduleAheadTime: 0.2,
         step: 0,
-        drawQueue: []
+        drawQueue: [],
     };
     const mockGroove = { enabled: true, swing: 0, humanize: 0, instruments: [] };
     const mockBass = { enabled: true, buffer: new Map() };
     const mockSoloist = { enabled: true, buffer: new Map() };
     const mockHarmony = { enabled: false, buffer: new Map() };
     const mockChords = { enabled: true, buffer: new Map() };
-    const mockArranger = { totalSteps: 64, stepMap: [], timeSignature: '4/4', measureMap: new Map() };
-    const mockMidi = { enabled: false, selectedOutputId: null, soloistChannel: 3, chordsChannel: 1, bassChannel: 2, drumsChannel: 10, soloistOctave: 0, chordsOctave: 0, bassOctave: 0, drumsOctave: 0 };
+    const mockArranger = {
+        totalSteps: 64,
+        stepMap: [],
+        timeSignature: '4/4',
+        measureMap: new Map(),
+    };
+    const mockMidi = {
+        enabled: false,
+        selectedOutputId: null,
+        soloistChannel: 3,
+        chordsChannel: 1,
+        bassChannel: 2,
+        drumsChannel: 10,
+        soloistOctave: 0,
+        chordsOctave: 0,
+        bassOctave: 0,
+        drumsOctave: 0,
+    };
     const mockVizState = { enabled: false };
-    
+
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
@@ -34,13 +50,13 @@ vi.mock('../../../public/state.js', () => {
         chords: mockChords,
         arranger: mockArranger,
         midi: mockMidi,
-        vizState: mockVizState
+        vizState: mockVizState,
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
@@ -51,13 +67,13 @@ vi.mock('../../../public/worker-client.js', () => ({
     flushWorker: vi.fn(),
     stopWorker: vi.fn(),
     startWorker: vi.fn(),
-    requestResolution: vi.fn()
+    requestResolution: vi.fn(),
 }));
 
 // Mock engine
 vi.mock('../../../public/engine/engine.js', () => ({
     playDrumSound: vi.fn(),
-    initAudio: vi.fn()
+    initAudio: vi.fn(),
 }));
 
 // Mock conductor
@@ -65,21 +81,23 @@ vi.mock('../../../public/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),
-    conductorState: { larsBpmOffset: 0 }
+    conductorState: { larsBpmOffset: 0 },
 }));
 
 // Mock ui
 vi.mock('../../../public/ui.js', () => ({
     ui: {
         metronome: { checked: false },
-        visualFlash: { checked: false }
+        visualFlash: { checked: false },
     },
     triggerFlash: vi.fn(),
-    clearActiveVisuals: vi.fn()
+    clearActiveVisuals: vi.fn(),
 }));
 
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../../public/state.js';
+
+const { playback } = getState();
+
 import { scheduler } from '../../../public/engine/scheduler-core.js';
 
 describe('Main Thread Congestion Resilience', () => {
@@ -96,27 +114,29 @@ describe('Main Thread Congestion Resilience', () => {
         // Simulate normal start
         scheduler();
         const firstStep = playback.step;
-        
+
         // Simulate a 500ms block of the main thread
         // currentTime advances, but scheduler wasn't called.
         playback.audio.currentTime += 0.5;
-        
+
         // Call scheduler again
         scheduler();
-        
+
         // It should have scheduled many more steps to get ahead of currentTime + scheduleAheadTime
-        expect(playback.step).toBeGreaterThan(firstStep); 
-        expect(playback.nextNoteTime).toBeGreaterThanOrEqual(playback.audio.currentTime + playback.scheduleAheadTime);
+        expect(playback.step).toBeGreaterThan(firstStep);
+        expect(playback.nextNoteTime).toBeGreaterThanOrEqual(
+            playback.audio.currentTime + playback.scheduleAheadTime,
+        );
     });
 
     it('should not enter an infinite loop if scheduleAheadTime is large', () => {
         playback.scheduleAheadTime = 1.0; // Large lookahead
         playback.audio.currentTime = 0;
-        
+
         const start = Date.now();
         scheduler();
         const elapsed = Date.now() - start;
-        
+
         expect(elapsed).toBeLessThan(100); // Should finish quickly
         expect(playback.nextNoteTime).toBeGreaterThanOrEqual(1.0);
     });

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
@@ -8,56 +8,72 @@ vi.mock('../../../public/state.js', () => {
         currentTime: 10,
         createOscillator: vi.fn(() => ({
             type: '',
-            frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), value: 0 },
+            frequency: {
+                setValueAtTime: vi.fn(),
+                exponentialRampToValueAtTime: vi.fn(),
+                setTargetAtTime: vi.fn(),
+                value: 0,
+            },
             detune: { setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
             connect: vi.fn(),
             start: vi.fn(),
             stop: vi.fn(),
-            onended: null
+            onended: null,
         })),
         createGain: vi.fn(() => ({
-            gain: { value: 1, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
-            connect: vi.fn()
+            gain: {
+                value: 1,
+                setValueAtTime: vi.fn(),
+                setTargetAtTime: vi.fn(),
+                cancelScheduledValues: vi.fn(),
+                linearRampToValueAtTime: vi.fn(),
+                exponentialRampToValueAtTime: vi.fn(),
+            },
+            connect: vi.fn(),
         })),
         createBiquadFilter: vi.fn(() => ({
             type: '',
             frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
             Q: { value: 0 },
-            connect: vi.fn()
+            connect: vi.fn(),
         })),
         createBufferSource: vi.fn(() => ({
             buffer: null,
-            playbackRate: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+            playbackRate: {
+                value: 1,
+                setValueAtTime: vi.fn(),
+                exponentialRampToValueAtTime: vi.fn(),
+            },
             connect: vi.fn(),
             start: vi.fn(),
             stop: vi.fn(),
-            onended: null
+            onended: null,
         })),
         createDelay: vi.fn(() => ({
             delayTime: { value: 0, setValueAtTime: vi.fn() },
-            connect: vi.fn()
+            connect: vi.fn(),
         })),
         createBuffer: vi.fn(() => ({
             getChannelData: vi.fn(() => new Float32Array(44100 * 4)),
-            duration: 4
+            duration: 4,
         })),
         createStereoPanner: vi.fn(() => ({
             pan: { setValueAtTime: vi.fn(), value: 0 },
-            connect: vi.fn()
-        }))
+            connect: vi.fn(),
+        })),
     };
 
     const mockPlayback = {
         audio: mockAudio,
         soloistGain: { connect: vi.fn() },
-        bandIntensity: 0.5
+        bandIntensity: 0.5,
     };
 
     // We mock soloist state and will mutate it in tests
     const mockSoloist = {
         activeVoices: [],
         mode: 'monophonic',
-        preset: 'classic'
+        preset: 'classic',
     };
 
     const mockStateMap = {
@@ -68,17 +84,17 @@ vi.mock('../../../public/state.js', () => {
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
 // Mock utils
 vi.mock('../../../public/utils.js', () => ({
     safeDisconnect: vi.fn(),
-    clampFreq: vi.fn((f) => f)
+    clampFreq: vi.fn((f) => f),
 }));
 
-import { playSoloNote, killSoloistNote } from '../../../public/engine/synth-soloist.js';
+import { killSoloistNote, playSoloNote } from '../../../public/engine/synth-soloist.js';
 import { getState } from '../../../public/state.js';
 
 describe('Soloist Presets', () => {
@@ -120,7 +136,7 @@ describe('Soloist Presets', () => {
         // 3 Formant filters
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
 
-        const filters = playback.audio.createBiquadFilter.mock.results.map(r => r.value);
+        const filters = playback.audio.createBiquadFilter.mock.results.map((r) => r.value);
         expect(filters[0].frequency.value).toBe(600);
         expect(filters[1].frequency.value).toBe(1000);
         expect(filters[2].frequency.value).toBe(2500);
@@ -132,15 +148,15 @@ describe('Soloist Presets', () => {
 
         const voice = soloist.activeVoices[0];
         const gainNode = voice.gain;
-        const oscillators = voice.nodes.filter(n => n.frequency); // Filter for things with frequency params
+        const oscillators = voice.nodes.filter((n) => n.frequency); // Filter for things with frequency params
 
         killSoloistNote();
 
         expect(gainNode.gain.cancelScheduledValues).toHaveBeenCalled();
         expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, 10, 0.01);
 
-        oscillators.forEach(osc => {
-             expect(osc.stop).toHaveBeenCalled();
+        oscillators.forEach((osc) => {
+            expect(osc.stop).toHaveBeenCalled();
         });
 
         expect(soloist.activeVoices.length).toBe(0);
@@ -157,8 +173,10 @@ describe('Soloist Presets', () => {
 
         expect(firstVoice.gain.gain.setTargetAtTime).toHaveBeenCalled();
         // Check that oscillators are stopped
-        firstVoice.nodes.forEach(node => {
-            if (node.stop) expect(node.stop).toHaveBeenCalled();
+        firstVoice.nodes.forEach((node) => {
+            if (node.stop) {
+                expect(node.stop).toHaveBeenCalled();
+            }
         });
     });
 });

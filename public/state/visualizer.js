@@ -5,7 +5,7 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} enabled - Whether the advanced visualizer is active.
  */
 export const vizState = {
-    enabled: false
+    enabled: false,
 };
 
 export function vizReducer(action, payload) {

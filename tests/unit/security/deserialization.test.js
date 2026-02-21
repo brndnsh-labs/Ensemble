@@ -1,6 +1,6 @@
 /* eslint-disable */
-import { describe, it, expect } from 'vitest';
-import { decompressSections, compressSections } from '../../../public/utils.js';
+import { describe, expect, it } from 'vitest';
+import { decompressSections } from '../../../public/utils.js';
 
 describe('Security: Deserialization', () => {
     it('should handle malformed JSON gracefully', () => {
@@ -16,7 +16,7 @@ describe('Security: Deserialization', () => {
         const payload = JSON.stringify(hugeArray);
         // Emulate the encoding in utils.js
         const bytes = new TextEncoder().encode(payload);
-        const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+        const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
         const encoded = btoa(binString);
 
         const result = decompressSections(encoded);
@@ -28,7 +28,7 @@ describe('Security: Deserialization', () => {
         const malicious = [{ l: '<script>alert(1)</script>', v: 'C' }];
         const payload = JSON.stringify(malicious);
         const bytes = new TextEncoder().encode(payload);
-        const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+        const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
         const encoded = btoa(binString);
 
         const result = decompressSections(encoded);

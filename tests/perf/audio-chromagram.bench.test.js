@@ -17,7 +17,7 @@ describe('ChordAnalyzerLite Chromagram Performance', () => {
             minMidi: 48,
             maxMidi: 88,
             suppressHarmonics: false,
-            step: 4
+            step: 4,
         };
 
         const start = performance.now();
@@ -27,6 +27,8 @@ describe('ChordAnalyzerLite Chromagram Performance', () => {
         }
         const end = performance.now();
 
-        console.log(`calculateChromagram (1000 iter, minMidi: 48, maxMidi: 88) took ${(end - start).toFixed(2)}ms`);
+        console.log(
+            `calculateChromagram (1000 iter, minMidi: 48, maxMidi: 88) took ${(end - start).toFixed(2)}ms`,
+        );
     });
 });

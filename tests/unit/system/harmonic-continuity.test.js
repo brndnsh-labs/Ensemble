@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
@@ -14,18 +14,45 @@ vi.mock('../../../public/state.js', () => {
         unswungNextNoteTime: 0,
         scheduleAheadTime: 0.2,
         step: 0,
-        drawQueue: []
+        drawQueue: [],
     };
-    const mockGroove = { 
-        enabled: true, swing: 0, humanize: 0, instruments: [], 
-        genreFeel: 'Rock', pendingGenreFeel: null 
+    const mockGroove = {
+        enabled: true,
+        swing: 0,
+        humanize: 0,
+        instruments: [],
+        genreFeel: 'Rock',
+        pendingGenreFeel: null,
     };
     const mockChords = { enabled: false, buffer: new Map() };
     const mockBass = { enabled: false, buffer: new Map() };
     const mockSoloist = { enabled: false, buffer: new Map() };
-    const mockHarmony = { enabled: false, style: 'smart', octave: 60, volume: 0.4, complexity: 0.5, buffer: new Map() };
-    const mockArranger = { totalSteps: 64, stepMap: [], timeSignature: '4/4', measureMap: new Map() };
-    const mockMidi = { enabled: false, selectedOutputId: null, soloistChannel: 3, chordsChannel: 1, bassChannel: 2, drumsChannel: 10, soloistOctave: 0, chordsOctave: 0, bassOctave: 0, drumsOctave: 0 };
+    const mockHarmony = {
+        enabled: false,
+        style: 'smart',
+        octave: 60,
+        volume: 0.4,
+        complexity: 0.5,
+        buffer: new Map(),
+    };
+    const mockArranger = {
+        totalSteps: 64,
+        stepMap: [],
+        timeSignature: '4/4',
+        measureMap: new Map(),
+    };
+    const mockMidi = {
+        enabled: false,
+        selectedOutputId: null,
+        soloistChannel: 3,
+        chordsChannel: 1,
+        bassChannel: 2,
+        drumsChannel: 10,
+        soloistOctave: 0,
+        chordsOctave: 0,
+        bassOctave: 0,
+        drumsOctave: 0,
+    };
     const mockVizState = { enabled: false };
 
     const mockStateMap = {
@@ -37,13 +64,13 @@ vi.mock('../../../public/state.js', () => {
         harmony: mockHarmony,
         arranger: mockArranger,
         midi: mockMidi,
-        vizState: mockVizState
+        vizState: mockVizState,
     };
 
     return {
         ...mockStateMap,
         getState: () => mockStateMap,
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
 });
 
@@ -54,7 +81,7 @@ vi.mock('../../../public/worker-client.js', () => ({
     flushWorker: vi.fn(),
     stopWorker: vi.fn(),
     startWorker: vi.fn(),
-    requestResolution: vi.fn()
+    requestResolution: vi.fn(),
 }));
 
 // Mock engine
@@ -62,7 +89,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     playDrumSound: vi.fn(),
     initAudio: vi.fn(),
     killAllNotes: vi.fn(),
-    restoreGains: vi.fn()
+    restoreGains: vi.fn(),
 }));
 
 // Mock conductor
@@ -70,28 +97,30 @@ vi.mock('../../../public/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),
-    conductorState: { larsBpmOffset: 0 }
+    conductorState: { larsBpmOffset: 0 },
 }));
 
 // Mock ui
 vi.mock('../../../public/ui.js', () => ({
     ui: {
         metronome: { checked: false },
-        visualFlash: { checked: false }
+        visualFlash: { checked: false },
     },
     triggerFlash: vi.fn(),
-    clearActiveVisuals: vi.fn()
+    clearActiveVisuals: vi.fn(),
 }));
 
 // Mock instrument-controller
 vi.mock('../../../public/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     flushBuffers: vi.fn(),
-    switchMeasure: vi.fn()
+    switchMeasure: vi.fn(),
 }));
 
-import { dispatch, getState, storage } from '../../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../../public/state.js';
+
+const { playback, groove } = getState();
+
 import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { flushWorker } from '../../../public/worker-client.js';
 
@@ -109,13 +138,13 @@ describe('Harmonic Continuity & Genre Transitions', () => {
     it('should NOT apply a pending genre mid-measure', () => {
         // Set up a pending genre change
         groove.pendingGenreFeel = { feel: 'Jazz' };
-        
+
         // Start at step 1 (not a measure boundary)
         playback.step = 1;
         playback.nextNoteTime = 0.125; // 120BPM, 16th note
-        
+
         scheduler();
-        
+
         // Genre should still be Rock
         expect(groove.genreFeel).toBe('Rock');
         expect(groove.pendingGenreFeel).not.toBeNull();
@@ -123,21 +152,21 @@ describe('Harmonic Continuity & Genre Transitions', () => {
 
     it('should apply a pending genre exactly at Step 0 of a measure', () => {
         groove.pendingGenreFeel = { feel: 'Jazz' };
-        
+
         // Advance to just before next measure (assuming 4/4 = 16 steps)
         playback.step = 15;
         playback.nextNoteTime = 15 * 0.125;
         playback.audio.currentTime = 15 * 0.125;
-        
+
         scheduler();
-        
+
         // The first call to scheduleGlobalEvent in the loop will be step 15.
         // Then it advances to step 16.
         // 16 % 16 === 0, so it should apply the genre.
-        
+
         expect(groove.genreFeel).toBe('Jazz');
         expect(groove.pendingGenreFeel).toBeNull();
-        
+
         // It should have flushed the worker to ensure atomic scale change
         expect(flushWorker).toHaveBeenCalled();
     });

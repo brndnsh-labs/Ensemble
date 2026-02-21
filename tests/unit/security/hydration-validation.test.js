@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { hydrateState } from '../../../public/state-hydration.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as stateModule from '../../../public/state.js';
+import { hydrateState } from '../../../public/state-hydration.js';
 
 // Mock dependencies
 vi.mock('../../../public/state.js', () => {
@@ -13,23 +13,23 @@ vi.mock('../../../public/state.js', () => {
         soloist: {},
         harmony: {},
         midi: {},
-        vizState: {}
+        vizState: {},
     };
     return {
         getState: () => mockState,
         dispatch: vi.fn(),
         storage: {
-            get: vi.fn()
-        }
+            get: vi.fn(),
+        },
     };
 });
 
 vi.mock('../../../public/app-controller.js', () => ({
-    applyTheme: vi.fn()
+    applyTheme: vi.fn(),
 }));
 
 vi.mock('../../../public/midi-controller.js', () => ({
-    initMIDI: vi.fn()
+    initMIDI: vi.fn(),
 }));
 
 describe('Security: State Hydration Validation', () => {
@@ -44,8 +44,8 @@ describe('Security: State Hydration Validation', () => {
             bandIntensity: 100, // logic break risk
             complexity: -5, // logic break risk
             groove: {
-                genreFeel: 'MaliciousScript' // XSS/Logic break risk
-            }
+                genreFeel: 'MaliciousScript', // XSS/Logic break risk
+            },
         };
 
         stateModule.storage.get.mockReturnValue(maliciousState);
@@ -66,7 +66,21 @@ describe('Security: State Hydration Validation', () => {
 
         // Should fallback to default 'Rock' or similar if invalid
         expect(state.groove.genreFeel).not.toBe('MaliciousScript');
-        const validGenres = ['Rock', 'Jazz', 'Funk', 'Disco', 'Hip Hop', 'Blues', 'Neo-Soul', 'Reggae', 'Acoustic', 'Bossa', 'Country', 'Metal', 'Ska-Punk'];
+        const validGenres = [
+            'Rock',
+            'Jazz',
+            'Funk',
+            'Disco',
+            'Hip Hop',
+            'Blues',
+            'Neo-Soul',
+            'Reggae',
+            'Acoustic',
+            'Bossa',
+            'Country',
+            'Metal',
+            'Ska-Punk',
+        ];
         expect(validGenres).toContain(state.groove.genreFeel);
     });
 });

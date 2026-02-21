@@ -1,4 +1,3 @@
-
 /* --- Sequencer Grid --- */
 .sequencer-grid {
     display: flex;
@@ -39,7 +38,7 @@
     left: 0;
     background: var(--panel-color); /* Match or contrast with grid bg */
     z-index: var(--z-controls);
-    box-shadow: 4px 0 8px -2px rgba(0,0,0,0.3); /* Subtle shadow to indicate depth when scrolling */
+    box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.3); /* Subtle shadow to indicate depth when scrolling */
     margin-right: 0.25rem;
 }
 
@@ -115,14 +114,29 @@
     background: var(--step-bg-hover);
 }
 
-.step.beat-marker { border-left: 1px solid rgba(255,255,255,0.15); }
-.step.group-marker { border-left: 1px solid var(--accent-color); }
+.step.beat-marker {
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+.step.group-marker {
+    border-left: 1px solid var(--accent-color);
+}
 
-.step-label.beat-start { color: var(--text-secondary); font-weight: bold; }
-.step-label.group-start { color: var(--accent-color); }
+.step-label.beat-start {
+    color: var(--text-secondary);
+    font-weight: bold;
+}
+.step-label.group-start {
+    color: var(--accent-color);
+}
 
-.step.active { background: var(--accent-color) !important; box-shadow: 0 0 8px var(--accent-color); } 
-.step.accented { background: var(--soloist-color) !important; box-shadow: 0 0 12px var(--soloist-color); } 
+.step.active {
+    background: var(--accent-color);
+    box-shadow: 0 0 8px var(--accent-color);
+}
+.step.accented {
+    background: var(--soloist-color);
+    box-shadow: 0 0 12px var(--soloist-color);
+}
 
 .step.playing {
     outline: 2px solid var(--text-color);

@@ -1,34 +1,40 @@
 import { h } from 'preact';
-import { useEnsembleState, useDispatch } from '../ui-bridge.js';
-import { ACTIONS } from '../types.js';
-import { transposeKey, switchToRelativeKey, validateAndAnalyze } from '../arranger-controller.js';
-import { saveCurrentState } from '../persistence.js';
-import { loadDrumPreset, flushBuffers } from '../instrument-controller.js';
-import { formatUnicodeSymbols } from '../utils.js';
+import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
+import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
+import { saveCurrentState } from '../persistence.js';
+import { ACTIONS } from '../types.js';
+import { useDispatch, useEnsembleState } from '../ui-bridge.js';
+import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
 const GROUPING_OPTIONS = {
-    '5/4': [[3, 2], [2, 3]],
-    '7/8': [[2, 2, 3], [3, 2, 2], [2, 3, 2]],
-    '7/4': [[4, 3], [3, 4]]
+    '5/4': [
+        [3, 2],
+        [2, 3],
+    ],
+    '7/8': [
+        [2, 2, 3],
+        [3, 2, 2],
+        [2, 3, 2],
+    ],
+    '7/4': [
+        [4, 3],
+        [3, 4],
+    ],
 };
 
 export function KeySignatureControls() {
     const dispatch = useDispatch();
-    const { 
-        arrangerKey, 
-        timeSignature, 
-        isMinor, 
-        grouping,
-        lastDrumPreset 
-    } = useEnsembleState(s => ({
-        arrangerKey: s.arranger.key,
-        timeSignature: s.arranger.timeSignature,
-        isMinor: s.arranger.isMinor,
-        grouping: s.arranger.grouping,
-        lastDrumPreset: s.groove.lastDrumPreset
-    }));
+    const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset } = useEnsembleState(
+        (s) => ({
+            arrangerKey: s.arranger.key,
+            timeSignature: s.arranger.timeSignature,
+            isMinor: s.arranger.isMinor,
+            grouping: s.arranger.grouping,
+            lastDrumPreset: s.groove.lastDrumPreset,
+        }),
+    );
 
     const handleKeyChange = (e) => {
         const newKey = e.target.value;
@@ -36,7 +42,7 @@ export function KeySignatureControls() {
             arranger.key = newKey;
             validateAndAnalyze();
             saveCurrentState();
-            dispatch('KEY_CHANGE'); 
+            dispatch('KEY_CHANGE');
         });
     };
 
@@ -45,7 +51,9 @@ export function KeySignatureControls() {
         import('../state.js').then(({ arranger }) => {
             arranger.timeSignature = newTS;
             arranger.grouping = null;
-            if (lastDrumPreset) loadDrumPreset(lastDrumPreset);
+            if (lastDrumPreset) {
+                loadDrumPreset(lastDrumPreset);
+            }
             validateAndAnalyze();
             saveCurrentState();
             dispatch('TIME_SIG_CHANGE');
@@ -54,13 +62,15 @@ export function KeySignatureControls() {
 
     const toggleGrouping = () => {
         const options = GROUPING_OPTIONS[timeSignature];
-        if (!options) return;
+        if (!options) {
+            return;
+        }
 
         import('../state.js').then(({ arranger }) => {
             const current = arranger.grouping || TIME_SIGNATURES[timeSignature].grouping;
-            const currentIndex = options.findIndex(opt => opt.join('+') === current.join('+'));
+            const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
             const nextIndex = (currentIndex + 1) % options.length;
-            
+
             arranger.grouping = options[nextIndex];
             flushBuffers();
             syncWorker();
@@ -74,10 +84,10 @@ export function KeySignatureControls() {
 
     return (
         <div class="key-controls">
-            <button 
-                id="maximizeChordBtn" 
-                title="Maximize" 
-                class="header-btn" 
+            <button
+                id="maximizeChordBtn"
+                title="Maximize"
+                class="header-btn"
                 aria-label="Maximize Chords"
                 onClick={() => {
                     const isMax = document.body.classList.toggle('chord-maximized');
@@ -87,50 +97,64 @@ export function KeySignatureControls() {
                         btn.title = isMax ? 'Exit Maximize' : 'Maximize';
                     }
                 }}
-            >⛶</button>
+            >
+                ⛶
+            </button>
 
             <div class="time-sig-group">
-                <select 
-                    id="timeSigSelect" 
-                    value={timeSignature} 
+                <select
+                    id="timeSigSelect"
+                    value={timeSignature}
                     onChange={handleTimeSigChange}
                     aria-label="Time Signature"
                 >
-                    {timeSignatures.map(ts => (
-                        <option key={ts} value={ts}>{ts}</option>
+                    {timeSignatures.map((ts) => (
+                        <option key={ts} value={ts}>
+                            {ts}
+                        </option>
                     ))}
                 </select>
-                <div id="groupingToggle" style={{ display: (['5/4', '7/8', '7/4'].includes(timeSignature)) ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center' }}>
-                    <button 
-                        id="groupingLabel" 
-                        type="button" 
-                        class="badge-btn" 
-                        title="Click to toggle grouping" 
+                <div
+                    id="groupingToggle"
+                    style={{
+                        display: ['5/4', '7/8', '7/4'].includes(timeSignature) ? 'flex' : 'none',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <button
+                        id="groupingLabel"
+                        type="button"
+                        class="badge-btn"
+                        title="Click to toggle grouping"
                         aria-label="Toggle rhythmic grouping"
                         onClick={toggleGrouping}
                     >
-                        {grouping ? grouping.join('+') : (TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2')}
+                        {grouping
+                            ? grouping.join('+')
+                            : TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2'}
                     </button>
                 </div>
             </div>
 
-            <select 
-                id="keySelect" 
-                value={arrangerKey} 
+            <select
+                id="keySelect"
+                value={arrangerKey}
                 onChange={handleKeyChange}
                 aria-label="Select Key"
             >
-                {keys.map(k => (
+                {keys.map((k) => (
                     <option key={k} value={k}>
-                        {formatUnicodeSymbols(k)}{isMinor ? 'm' : ''}
+                        {formatUnicodeSymbols(k)}
+                        {isMinor ? 'm' : ''}
                     </option>
                 ))}
             </select>
 
-            <button 
-                id="relKeyBtn" 
-                title="Relative Key (Major/Minor)" 
-                class="header-btn rel-key-btn" 
+            <button
+                id="relKeyBtn"
+                title="Relative Key (Major/Minor)"
+                class="header-btn rel-key-btn"
                 aria-label="Relative Key Toggle"
                 onClick={() => {
                     switchToRelativeKey();
@@ -140,27 +164,31 @@ export function KeySignatureControls() {
                 {isMinor ? 'min' : 'maj'}
             </button>
 
-            <button 
-                id="transDownBtn" 
-                title="Transpose Down" 
-                class="header-btn" 
+            <button
+                id="transDownBtn"
+                title="Transpose Down"
+                class="header-btn"
                 aria-label="Transpose Down"
                 onClick={() => {
                     transposeKey(-1);
                     dispatch('TRANSPOSE');
                 }}
-            >♭</button>
+            >
+                ♭
+            </button>
 
-            <button 
-                id="transUpBtn" 
-                title="Transpose Up" 
-                class="header-btn" 
+            <button
+                id="transUpBtn"
+                title="Transpose Up"
+                class="header-btn"
                 aria-label="Transpose Up"
                 onClick={() => {
                     transposeKey(1);
                     dispatch('TRANSPOSE');
                 }}
-            >♯</button>
+            >
+                ♯
+            </button>
         </div>
     );
 }

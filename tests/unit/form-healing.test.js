@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { extractForm } from '../../public/form-extractor.js';
 
 describe('Form Extractor: Consensus Healing', () => {
@@ -7,21 +7,25 @@ describe('Form Extractor: Consensus Healing', () => {
         // Verse 1: C F G C
         // Verse 2: C F Gb C (Gb is a mis-detection of G)
         // Verse 3: C F G C
-        
+
         const pattern1 = ['C', 'F', 'G', 'C'];
         const pattern2 = ['C', 'F', 'Gb', 'C']; // The "noisy" one
         const beatsPerMeasure = 4;
-        
+
         const beatData = [];
         const addPattern = (p, startBeat) => {
             p.forEach((chord, m) => {
                 for (let b = 0; b < beatsPerMeasure; b++) {
-                    beatData.push({ beat: startBeat + m * beatsPerMeasure + b, chord, energy: 0.5 });
+                    beatData.push({
+                        beat: startBeat + m * beatsPerMeasure + b,
+                        chord,
+                        energy: 0.5,
+                    });
                 }
             });
         };
 
-        addPattern(pattern1, 0);  // Verse 1
+        addPattern(pattern1, 0); // Verse 1
         addPattern(pattern2, 16); // Verse 2 (Noisy)
         addPattern(pattern1, 32); // Verse 3
 

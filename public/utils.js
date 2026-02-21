@@ -5,8 +5,8 @@ import { ENHARMONIC_MAP } from './config.js';
  * @param {string} k - The note name to normalize.
  * @returns {string} The normalized note name.
  */
-export function normalizeKey(k) { 
-    return ENHARMONIC_MAP[k] || k; 
+export function normalizeKey(k) {
+    return ENHARMONIC_MAP[k] || k;
 }
 
 /**
@@ -15,8 +15,12 @@ export function normalizeKey(k) {
  * @returns {string}
  */
 export function escapeHTML(str) {
-    if (str === null || str === undefined) return '';
-    if (typeof str !== 'string') return String(str);
+    if (str === null || str === undefined) {
+        return '';
+    }
+    if (typeof str !== 'string') {
+        return String(str);
+    }
 
     return str
         .replace(/&/g, '&amp;')
@@ -34,8 +38,12 @@ export function escapeHTML(str) {
  * @returns {string}
  */
 export function stripDangerousChars(str) {
-    if (!str) return '';
-    if (typeof str !== 'string') return String(str);
+    if (!str) {
+        return '';
+    }
+    if (typeof str !== 'string') {
+        return String(str);
+    }
     // Remove < > " ` (Keep ' and & for text validity, relying on escaping for those)
     return str.replace(/[<>"=`]/g, '');
 }
@@ -43,7 +51,7 @@ export function stripDangerousChars(str) {
 // Pre-calculate frequencies for standard MIDI range (0-127) to avoid expensive Math.pow calls
 const FREQUENCY_CACHE = new Float32Array(128);
 for (let i = 0; i < 128; i++) {
-    FREQUENCY_CACHE[i] = 440 * Math.pow(2, (i - 69) / 12);
+    FREQUENCY_CACHE[i] = 440 * 2 ** ((i - 69) / 12);
 }
 
 /**
@@ -51,14 +59,16 @@ for (let i = 0; i < 128; i++) {
  * @param {number} midi - The MIDI note number.
  * @returns {number} The frequency in Hz.
  */
-export function getFrequency(midi) { 
+export function getFrequency(midi) {
     // Fast path: lookup from cache if within 0-127 and integer
     // Float32Array returns undefined for out-of-bounds or non-integer indices
     const freq = FREQUENCY_CACHE[midi];
-    if (freq !== undefined) return freq;
+    if (freq !== undefined) {
+        return freq;
+    }
 
     // Slow path: calculate for extended range or microtonal values
-    return 440 * Math.pow(2, (midi - 69) / 12); 
+    return 440 * 2 ** ((midi - 69) / 12);
 }
 
 /**
@@ -70,7 +80,7 @@ export function midiToNote(midi) {
     const notes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
     return {
         name: notes[midi % 12],
-        octave: Math.floor(midi / 12) - 1
+        octave: Math.floor(midi / 12) - 1,
     };
 }
 
@@ -80,7 +90,9 @@ export function midiToNote(midi) {
  * @returns {number} The MIDI note number.
  */
 export function getMidi(freq) {
-    if (!freq || freq <= 0) return null;
+    if (!freq || freq <= 0) {
+        return null;
+    }
     return Math.round(12 * Math.log2(freq / 440) + 69);
 }
 
@@ -93,52 +105,70 @@ export function generateId() {
 
 /**
  * Compresses the sections array into a Base64 string, handling Unicode.
- * @param {Array} sections 
+ * @param {Array} sections
  * @returns {string}
  */
 export function compressSections(sections) {
-    const minified = sections.map(s => {
+    const minified = sections.map((s) => {
         const m = { l: s.label, v: s.value };
-        if (s.key) m.k = s.key;
-        if (s.repeat && s.repeat > 1) m.r = s.repeat;
-        if (s.timeSignature) m.t = s.timeSignature;
-        if (s.seamless) m.s = 1;
+        if (s.key) {
+            m.k = s.key;
+        }
+        if (s.repeat && s.repeat > 1) {
+            m.r = s.repeat;
+        }
+        if (s.timeSignature) {
+            m.t = s.timeSignature;
+        }
+        if (s.seamless) {
+            m.s = 1;
+        }
         return m;
     });
     const json = JSON.stringify(minified);
     const bytes = new TextEncoder().encode(json);
-    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
     return btoa(binString);
 }
 
 /**
  * Decompresses the Base64 string back into sections, handling Unicode.
- * @param {string} str 
+ * @param {string} str
  * @returns {Array}
  */
 export function decompressSections(str) {
     try {
-        if (!str || typeof str !== 'string') throw new Error("Invalid input");
+        if (!str || typeof str !== 'string') {
+            throw new Error('Invalid input');
+        }
         // Limit input size to 100KB to prevent memory exhaustion
-        if (str.length > 102400) throw new Error("Payload too large");
+        if (str.length > 102400) {
+            throw new Error('Payload too large');
+        }
 
         const binString = atob(str);
         const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
         const json = new TextDecoder().decode(bytes);
         const minified = JSON.parse(json);
 
-        if (!Array.isArray(minified)) throw new Error("Invalid format: expected array");
+        if (!Array.isArray(minified)) {
+            throw new Error('Invalid format: expected array');
+        }
         // Limit number of sections to prevent DoS
         const safeMinified = minified.slice(0, 500);
 
         return safeMinified.map((s, i) => {
             // Sanitize label to prevent XSS (even though likely handled by UI framework, defense in depth)
-            let safeLabel = escapeHTML(s.l || `Section ${i+1}`);
-            if (safeLabel.length > 100) safeLabel = safeLabel.substring(0, 100);
+            let safeLabel = escapeHTML(s.l || `Section ${i + 1}`);
+            if (safeLabel.length > 100) {
+                safeLabel = safeLabel.substring(0, 100);
+            }
 
             // Clamp value length
             let safeValue = typeof s.v === 'string' ? s.v : '';
-            if (safeValue.length > 1000) safeValue = safeValue.substring(0, 1000);
+            if (safeValue.length > 1000) {
+                safeValue = safeValue.substring(0, 1000);
+            }
 
             safeValue = stripDangerousChars(safeValue);
 
@@ -147,13 +177,13 @@ export function decompressSections(str) {
                 label: safeLabel,
                 value: safeValue,
                 key: typeof s.k === 'string' ? escapeHTML(s.k) : '',
-                repeat: Math.min(Math.max(1, parseInt(s.r) || 1), 64), // Clamp repeats
+                repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
                 timeSignature: typeof s.t === 'string' && s.t.length < 10 ? s.t : '',
-                seamless: !!s.s
+                seamless: !!s.s,
             };
         });
     } catch (e) {
-        console.error("Failed to decompress sections", e);
+        console.error('Failed to decompress sections', e);
         return [{ id: generateId(), label: 'Intro', value: 'I | IV' }];
     }
 }
@@ -164,13 +194,27 @@ export function decompressSections(str) {
  * @returns {number}
  */
 export function getStepsPerMeasure(ts) {
-    if (ts === '2/4') return 8;
-    if (ts === '3/4') return 12;
-    if (ts === '6/8') return 12;
-    if (ts === '7/8') return 14;
-    if (ts === '5/4') return 20;
-    if (ts === '7/4') return 28;
-    if (ts === '12/8') return 24;
+    if (ts === '2/4') {
+        return 8;
+    }
+    if (ts === '3/4') {
+        return 12;
+    }
+    if (ts === '6/8') {
+        return 12;
+    }
+    if (ts === '7/8') {
+        return 14;
+    }
+    if (ts === '5/4') {
+        return 20;
+    }
+    if (ts === '7/4') {
+        return 28;
+    }
+    if (ts === '12/8') {
+        return 24;
+    }
     return 16;
 }
 
@@ -211,7 +255,9 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
             tsName = measure.ts;
             currentTS = allTSConfigs ? allTSConfigs[tsName] : tsConfig;
             mStep = step - measure.start;
-            if (mStep === 0) isMeasureStart = true;
+            if (mStep === 0) {
+                isMeasureStart = true;
+            }
         } else {
             // Fallback for steps beyond the map
             const spm = getStepsPerMeasure(tsName);
@@ -223,10 +269,10 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         mStep = step % spm;
         isMeasureStart = mStep === 0;
     }
-    
+
     const grouping = currentTS.grouping || [currentTS.beats];
     const stepsPerBeat = currentTS.stepsPerBeat;
-    
+
     let accumulatedSteps = 0;
     let isGroupStart = false;
     let groupIndex = -1;
@@ -235,17 +281,19 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
     for (let i = 0; i < grouping.length; i++) {
         const groupBeats = grouping[i];
         const groupSteps = groupBeats * stepsPerBeat;
-        
+
         if (mStep >= accumulatedSteps && mStep < accumulatedSteps + groupSteps) {
             groupIndex = i;
             stepInGroup = mStep - accumulatedSteps;
-            if (stepInGroup === 0) isGroupStart = true;
+            if (stepInGroup === 0) {
+                isGroupStart = true;
+            }
             break;
         }
         accumulatedSteps += groupSteps;
     }
 
-    const isBeatStart = (mStep % stepsPerBeat === 0);
+    const isBeatStart = mStep % stepsPerBeat === 0;
     const beatIndex = Math.floor(mStep / stepsPerBeat);
 
     return {
@@ -256,27 +304,31 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         stepInGroup,
         beatIndex,
         mStep,
-        tsName
+        tsName,
     };
 }
 
 /**
  * Safely disconnects multiple Web Audio nodes.
- * @param {AudioNode[]} nodes 
+ * @param {AudioNode[]} nodes
  */
 export function safeDisconnect(nodes) {
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
         if (node) {
-            try { node.disconnect(); } catch { /* ignore disconnect error */ }
+            try {
+                node.disconnect();
+            } catch {
+                /* ignore disconnect error */
+            }
         }
     });
 }
 
 /**
  * Creates a simple algorithmic reverb impulse response.
- * @param {AudioContext} audioCtx 
- * @param {number} duration 
- * @param {number} decay 
+ * @param {AudioContext} audioCtx
+ * @param {number} duration
+ * @param {number} decay
  * @returns {AudioBuffer}
  */
 export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
@@ -286,7 +338,7 @@ export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
     for (let channel = 0; channel < 2; channel++) {
         const data = impulse.getChannelData(channel);
         for (let i = 0; i < length; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+            data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** decay;
         }
     }
     return impulse;
@@ -298,7 +350,9 @@ export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
  * @returns {string}
  */
 export function formatUnicodeSymbols(str) {
-    if (!str) return str;
+    if (!str) {
+        return str;
+    }
     return str
         .replace(/#/g, '♯')
         .replace(/([A-G])b/g, '$1♭')
@@ -313,13 +367,15 @@ let cachedSoftClipCurve = null;
  * @returns {Float32Array}
  */
 export function createSoftClipCurve() {
-    if (cachedSoftClipCurve) return cachedSoftClipCurve;
+    if (cachedSoftClipCurve) {
+        return cachedSoftClipCurve;
+    }
     const n_samples = 44100;
     const curve = new Float32Array(n_samples);
     for (let i = 0; i < n_samples; ++i) {
         const x = (i * 2) / n_samples - 1;
         // Normalized monotonic cubic: f(x) = (3x - x^3) / 2
-        curve[i] = (3 * x - Math.pow(x, 3)) / 2;
+        curve[i] = (3 * x - x ** 3) / 2;
     }
     cachedSoftClipCurve = curve;
     return curve;
@@ -344,7 +400,9 @@ export function clampFreq(freq, max = 24000) {
  * @returns {number} Offset in seconds.
  */
 export function calculateTimingOffset(instrument, pocket, intensity) {
-    if (!pocket) return 0;
+    if (!pocket) {
+        return 0;
+    }
 
     // 1. Global Drive (The whole band pushes or pulls)
     // Scale: 1.0 drive = -12ms (ahead), -1.0 drive = +12ms (behind)
@@ -353,14 +411,16 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
     // 2. Tightness (Inverse variance)
     // High tightness (1.0) = no random jitter. Low tightness (0.0) = ±8ms jitter.
     const jitter = (1.0 - pocket.tightness) * (Math.random() - 0.5) * 0.016;
-    
+
     let instrumentSpecific = 0;
 
     // 3. Holistic Gravity (Instruments following each other)
     switch (instrument) {
         case 'drums':
             // Drums set the grid reference.
-            if (intensity > 0.8) instrumentSpecific -= 0.005; 
+            if (intensity > 0.8) {
+                instrumentSpecific -= 0.005;
+            }
             break;
         case 'bass':
             // Bass follows Kick. High gravity = perfectly with Kick.
@@ -368,7 +428,7 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
             instrumentSpecific += (1.0 - pocket.bassGravity) * 0.008;
             break;
         case 'chords':
-            // Chords follow Bass. 
+            // Chords follow Bass.
             instrumentSpecific += (1.0 - pocket.chordGravity) * 0.006;
             // Inherit 30% of the bass's expected displacement for cohesion
             instrumentSpecific += (1.0 - pocket.bassGravity) * 0.003;
@@ -380,8 +440,8 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
     }
 
     // 4. Intensity Elasticity: High intensity forces everyone closer to the base drive
-    const elasticity = 0.4 + (intensity * 0.6); // 0.4 to 1.0
+    const elasticity = 0.4 + intensity * 0.6; // 0.4 to 1.0
     const finalOffset = driveBase + (instrumentSpecific + jitter) * (1.1 - elasticity);
-    
+
     return finalOffset;
 }

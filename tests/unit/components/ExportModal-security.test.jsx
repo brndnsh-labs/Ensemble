@@ -1,9 +1,10 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies using vi.hoisted to avoid reference errors
 const { mockUseEnsembleState, mockDispatch, mockExportToMidi } = vi.hoisted(() => {
@@ -11,25 +12,25 @@ const { mockUseEnsembleState, mockDispatch, mockExportToMidi } = vi.hoisted(() =
         mockUseEnsembleState: vi.fn(),
         mockDispatch: vi.fn(),
         mockExportToMidi: vi.fn(),
-    }
+    };
 });
 
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
-    useDispatch: () => mockDispatch
+    useDispatch: () => mockDispatch,
 }));
 
 vi.mock('../../../public/state.js', () => ({
     getState: () => ({
         arranger: { lastChordPreset: 'My Song', key: 'C' },
-        playback: { bpm: 120 }
+        playback: { bpm: 120 },
     }),
     dispatch: mockDispatch,
-    ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' }
+    ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' },
 }));
 
 vi.mock('../../../public/midi-export.js', () => ({
-    exportToMidi: mockExportToMidi
+    exportToMidi: mockExportToMidi,
 }));
 
 import { ExportModal } from '../../../public/components/ExportModal.jsx';

@@ -1,5 +1,4 @@
-
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
@@ -18,7 +17,7 @@ vi.mock('../../public/state.js', () => {
             hookBuffer: [],
             lastFreq: 440,
             pitchHistory: [],
-            deviceBuffer: []
+            deviceBuffer: [],
         },
         groove: { genreFeel: 'Jazz' },
         playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },
@@ -29,40 +28,50 @@ vi.mock('../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 vi.mock('../../public/config.js', () => {
     const STYLE_CONFIG = {
-        scalar: { deviceProb: 0.1, cells: [0], allowedDevices: ['run'], registerSoar: 5, restBase: 0.0, restGrowth: 0, doubleStopProb: 0.1, maxNotesPerPhrase: 16 }
+        scalar: {
+            deviceProb: 0.1,
+            cells: [0],
+            allowedDevices: ['run'],
+            registerSoar: 5,
+            restBase: 0.0,
+            restGrowth: 0,
+            doubleStopProb: 0.1,
+            maxNotesPerPhrase: 16,
+        },
     };
     return {
         STYLE_CONFIG,
         KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
         TIME_SIGNATURES: {
-            '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', grouping: [4] }
-        }
+            '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', grouping: [4] },
+        },
     };
 });
 
 // Mock utils and others
 vi.mock('../../public/utils.js', () => ({
-    getFrequency: (midi) => 440 * Math.pow(2, (midi - 69) / 12),
+    getFrequency: (midi) => 440 * 2 ** ((midi - 69) / 12),
     getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
-    calculateTimingOffset: vi.fn(() => 0)
+    calculateTimingOffset: vi.fn(() => 0),
 }));
 
 vi.mock('../../public/theory-scales.js', () => ({
-    getScaleForChord: () => [0, 2, 4, 5, 7, 9, 11] // C Major scale
+    getScaleForChord: () => [0, 2, 4, 5, 7, 9, 11], // C Major scale
 }));
 
 import { getSoloistNote } from '../../public/soloist.js';
 import { getState } from '../../public/state.js';
+
 const { soloist } = getState();
 
 describe('Soloist Performance Benchmark', () => {

@@ -1,4 +1,3 @@
-
 /* --- Mobile Polish & Tiny Screens --- */
 @media (max-width: 380px) {
     .genre-btn {
@@ -24,7 +23,7 @@
         grid-template-columns: 32px 1fr 1fr 34px 26px 26px;
         gap: 0.15rem;
     }
-    
+
     .header-btn {
         font-size: 0.75rem;
     }
@@ -35,7 +34,7 @@
     input[type="range"] {
         height: 24px; /* Easier to grab on touch */
     }
-    
+
     .panel-header-controls {
         gap: 0.25rem;
     }
@@ -46,7 +45,7 @@
     .app-main-layout {
         display: grid;
         grid-template-columns: 1fr 28rem; /* Main | Fixed Sidebar */
-        grid-template-areas: 
+        grid-template-areas:
             "arranger sidebar"
             "visualizer sidebar";
         gap: 1rem;

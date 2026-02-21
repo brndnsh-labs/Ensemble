@@ -1,11 +1,19 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
-        soloist: { busySteps: 0, tension: 0, mode: 'guitar', sessionSteps: 1000, pitchHistory: [], motifBuffer: [], deviceBuffer: [] },
+        soloist: {
+            busySteps: 0,
+            tension: 0,
+            mode: 'guitar',
+            sessionSteps: 1000,
+            pitchHistory: [],
+            motifBuffer: [],
+            deviceBuffer: [],
+        },
         groove: { genreFeel: 'Country' },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
@@ -14,17 +22,18 @@ vi.mock('../../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
 import { getSoloistNote } from '../../../public/soloist.js';
-import { getScaleForChord } from '../../../public/theory-scales.js';
 import { getState } from '../../../public/state.js';
+import { getScaleForChord } from '../../../public/theory-scales.js';
+
 const { soloist, groove } = getState();
 
 describe('Country Soloist Overhaul', () => {
@@ -70,13 +79,13 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 // We need to trigger the device selection. deviceProb is 0.4.
                 // We call getSoloistNote and check if the result is a double stop with a bend
                 const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
-                
+
                 // countryBend returns an array with bendStartInterval -1 on the first note
-                if (Array.isArray(res) && res.some(n => n.bendStartInterval === -1)) {
+                if (Array.isArray(res) && res.some((n) => n.bendStartInterval === -1)) {
                     triggered = true;
                     break;
                 }
@@ -92,11 +101,15 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
-                
+
                 // chickenPick returns a double stop with duration 1 and velocity >= 1.2
-                if (Array.isArray(res) && res.every(n => n.durationSteps === 1) && res[0].velocity >= 1.2) {
+                if (
+                    Array.isArray(res) &&
+                    res.every((n) => n.durationSteps === 1) &&
+                    res[0].velocity >= 1.2
+                ) {
                     triggered = true;
                     break;
                 }
@@ -112,9 +125,10 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
-                if (soloist.deviceBuffer.length === 3) { // 4 note roll, 1 returned, 3 in buffer
+                if (soloist.deviceBuffer.length === 3) {
+                    // 4 note roll, 1 returned, 3 in buffer
                     triggered = true;
                     break;
                 }
@@ -130,9 +144,14 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
-                if (res && !Array.isArray(res) && soloist.deviceBuffer.length === 1 && res.velocity >= 0.5) {
+                if (
+                    res &&
+                    !Array.isArray(res) &&
+                    soloist.deviceBuffer.length === 1 &&
+                    res.velocity >= 0.5
+                ) {
                     triggered = true;
                     break;
                 }
@@ -150,14 +169,16 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0);
                 if (Array.isArray(res)) {
                     totalDS++;
                     const top = res[0].midi;
                     const bottom = res[1].midi;
                     const diff = Math.abs(top - bottom);
-                    if (diff === 8 || diff === 9) sixths++;
+                    if (diff === 8 || diff === 9) {
+                        sixths++;
+                    }
                 }
             }
             expect(sixths / totalDS).toBeGreaterThan(0.5);
@@ -171,11 +192,13 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0);
                 if (res) {
                     total++;
-                    if (Array.isArray(res)) doubleStops++;
+                    if (Array.isArray(res)) {
+                        doubleStops++;
+                    }
                 }
             }
             // country doubleStopProb is 0.5.
@@ -190,12 +213,14 @@ describe('Country Soloist Overhaul', () => {
                 soloist.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
-                
+
                 const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0);
                 if (res) {
                     const note = Array.isArray(res) ? res[res.length - 1] : res;
                     const interval = (note.midi - chordC.rootMidi + 120) % 12;
-                    if (interval === 2 || interval === 9) colorTones++;
+                    if (interval === 2 || interval === 9) {
+                        colorTones++;
+                    }
                     total++;
                 }
             }

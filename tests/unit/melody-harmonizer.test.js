@@ -1,5 +1,4 @@
-
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { Harmonizer } from '../../public/melody-harmonizer.js';
 
 describe('Melody Harmonizer', () => {
@@ -9,7 +8,7 @@ describe('Melody Harmonizer', () => {
         { beat: 0, midi: 60, energy: 1 }, // C
         { beat: 1, midi: 62, energy: 1 }, // D
         { beat: 2, midi: 64, energy: 1 }, // E
-        { beat: 3, midi: 65, energy: 1 }  // F
+        { beat: 3, midi: 65, energy: 1 }, // F
     ];
 
     it('should generate 3 distinct options', () => {

@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const setupMinimalDOM = () => {
     document.body.innerHTML = `
@@ -165,7 +165,7 @@ vi.mock('../../public/worker-client.js', () => ({
     startWorker: vi.fn(),
     stopWorker: vi.fn(),
     requestBuffer: vi.fn(),
-    flushWorker: vi.fn()
+    flushWorker: vi.fn(),
 }));
 
 vi.mock('../../public/engine/engine.js', () => ({
@@ -185,45 +185,59 @@ vi.mock('../../public/engine/engine.js', () => ({
     killBassNote: vi.fn(),
     killDrumNote: vi.fn(),
     updateSustain: vi.fn(),
-    getVisualTime: () => 0
+    getVisualTime: () => 0,
 }));
 
 vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
     loadSavedState: vi.fn(),
-    debounceSaveState: vi.fn()
+    debounceSaveState: vi.fn(),
 }));
 
-import { dispatch, getState, storage } from '../../public/state.js';
-const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } = getState();
+import { getState } from '../../public/state.js';
+
+const { arranger, playback } = getState();
+
 import { addSection, onSectionUpdate } from '../../public/arranger-controller.js';
-import { togglePlay } from '../../public/engine/scheduler-core.js';
 import { validateProgression } from '../../public/chords.js';
 import { initAudio } from '../../public/engine/engine.js';
+import { togglePlay } from '../../public/engine/scheduler-core.js';
 
 describe('System Smoke Test (E2E Workflow)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         setupMinimalDOM();
-        
+
         arranger.sections = [];
         arranger.progression = [];
         playback.isPlaying = false;
         playback.audio = null;
-        
+
         const mockAudioContext = {
             currentTime: 0,
             state: 'suspended',
             resume: vi.fn(),
             suspend: vi.fn(),
-            createGain: () => ({ gain: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn() }),
-            createOscillator: () => ({ frequency: { value: 440, setValueAtTime: vi.fn() }, connect: vi.fn(), start: vi.fn(), stop: vi.fn() }),
+            createGain: () => ({
+                gain: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+                connect: vi.fn(),
+            }),
+            createOscillator: () => ({
+                frequency: { value: 440, setValueAtTime: vi.fn() },
+                connect: vi.fn(),
+                start: vi.fn(),
+                stop: vi.fn(),
+            }),
             createBufferSource: () => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn() }),
-            createBiquadFilter: () => ({ connect: vi.fn(), frequency: { value: 1000, setValueAtTime: vi.fn() }, Q: { value: 1 } })
+            createBiquadFilter: () => ({
+                connect: vi.fn(),
+                frequency: { value: 1000, setValueAtTime: vi.fn() },
+                Q: { value: 1 },
+            }),
         };
 
         global.AudioContext = vi.fn().mockImplementation(() => mockAudioContext);
-        
+
         vi.mocked(initAudio).mockImplementation(() => {
             playback.audio = mockAudioContext;
         });
@@ -237,13 +251,13 @@ describe('System Smoke Test (E2E Workflow)', () => {
         const sectionId = arranger.sections[0].id;
 
         onSectionUpdate(sectionId, 'value', 'C | G | Am | F');
-        
+
         validateProgression();
         expect(arranger.progression.length).toBeGreaterThan(0);
 
         const mockViz = { setBeatReference: vi.fn(), clear: vi.fn() };
         togglePlay(mockViz);
-        
+
         expect(playback.isPlaying).toBe(true);
         expect(playback.audio).not.toBeNull();
         expect(mockViz.setBeatReference).toHaveBeenCalled();

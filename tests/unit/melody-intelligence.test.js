@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
 
 class MockAudioBuffer {
@@ -8,7 +8,9 @@ class MockAudioBuffer {
         this.duration = length / sampleRate;
         this.data = new Float32Array(length);
     }
-    getChannelData() { return this.data; }
+    getChannelData() {
+        return this.data;
+    }
 }
 
 describe('Melody Analyzer Intelligence', () => {
@@ -19,7 +21,9 @@ describe('Melody Analyzer Intelligence', () => {
         const startIdx = Math.floor(start * sampleRate);
         const endIdx = Math.floor(end * sampleRate);
         for (let i = startIdx; i < endIdx; i++) {
-            if (i >= data.length) break;
+            if (i >= data.length) {
+                break;
+            }
             const t = i / sampleRate;
             const envelope = Math.min(1, (t - start) * 50) * Math.min(1, (end - t) * 50);
             data[i] += Math.sin(2 * Math.PI * freq * t) * vol * envelope;
@@ -39,10 +43,9 @@ describe('Melody Analyzer Intelligence', () => {
 
         const pulse = { bpm: 60, downbeatOffset: 0 };
         const results = await analyzer.extractMelody(buffer, pulse, {
-            keyBias: { root: 0, type: 'major' } // C Major
+            keyBias: { root: 0, type: 'major' }, // C Major
         });
 
         expect(results[0].midi % 12).toBe(11); // Should be B (11) not Bb (10)
     });
-
 });

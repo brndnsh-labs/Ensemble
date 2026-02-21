@@ -1,28 +1,29 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { h, render } from 'preact';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Settings } from '../../public/components/Settings.jsx';
 import { dispatch } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies
 vi.mock('../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn()
+    saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/app-controller.js', () => ({
-    applyTheme: vi.fn()
+    applyTheme: vi.fn(),
 }));
 vi.mock('../../public/midi-controller.js', () => ({
     initMIDI: vi.fn(),
-    panic: vi.fn()
+    panic: vi.fn(),
 }));
 vi.mock('../../public/engine/engine.js', () => ({
-    restoreGains: vi.fn()
+    restoreGains: vi.fn(),
 }));
 vi.mock('../../public/pwa.js', () => ({
-    triggerInstall: vi.fn()
+    triggerInstall: vi.fn(),
 }));
 
 describe('Settings Accessibility', () => {
@@ -36,7 +37,7 @@ describe('Settings Accessibility', () => {
         dispatch(ACTIONS.SET_MIDI_CONFIG, { enabled: true });
 
         render(<Settings />, document.getElementById('settingsContainer'));
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
     it('should have aria-labels on Session Timer stepper buttons', () => {
@@ -53,7 +54,7 @@ describe('Settings Accessibility', () => {
     it('should have aria-labels on MIDI Channel and Octave inputs', () => {
         const channels = ['Chords', 'Bass', 'Soloist', 'Harmony', 'Drums'];
 
-        channels.forEach(ch => {
+        channels.forEach((ch) => {
             const chanInput = document.getElementById(`midi${ch}Channel`);
             const octInput = document.getElementById(`midi${ch}Octave`);
 

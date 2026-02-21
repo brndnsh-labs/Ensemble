@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { storage } from '../../../public/state.js';
 
 describe('Storage Security Resilience', () => {
@@ -8,18 +8,26 @@ describe('Storage Security Resilience', () => {
         let store = {};
         return {
             getItem: (key) => store[key] || null,
-            setItem: (key, value) => { store[key] = value.toString(); },
-            removeItem: (key) => { delete store[key]; },
-            clear: () => { store = {}; },
-            get length() { return Object.keys(store).length; },
-            key: (i) => Object.keys(store)[i] || null
+            setItem: (key, value) => {
+                store[key] = value.toString();
+            },
+            removeItem: (key) => {
+                delete store[key];
+            },
+            clear: () => {
+                store = {};
+            },
+            get length() {
+                return Object.keys(store).length;
+            },
+            key: (i) => Object.keys(store)[i] || null,
         };
     })();
 
     beforeEach(() => {
         Object.defineProperty(window, 'localStorage', {
             value: mockStorage,
-            writable: true
+            writable: true,
         });
         mockStorage.clear();
     });

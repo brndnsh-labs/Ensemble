@@ -1,18 +1,33 @@
 /* eslint-disable */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
     const mockState = {
         soloist: {
-            enabled: true, busySteps: 0, currentPhraseSteps: 0, notesInPhrase: 0,
-            qaState: 'Question', isResting: false, contourSteps: 0,
-            melodicTrend: 'Static', tension: 0, motifBuffer: [], hookBuffer: [],
-            lastFreq: 440, hookRetentionProb: 0.5, mode: 'guitar',
-            sessionSteps: 1000
+            enabled: true,
+            busySteps: 0,
+            currentPhraseSteps: 0,
+            notesInPhrase: 0,
+            qaState: 'Question',
+            isResting: false,
+            contourSteps: 0,
+            melodicTrend: 'Static',
+            tension: 0,
+            motifBuffer: [],
+            hookBuffer: [],
+            lastFreq: 440,
+            hookRetentionProb: 0.5,
+            mode: 'guitar',
+            sessionSteps: 1000,
         },
         chords: { enabled: true, octave: 60, density: 'standard', pianoRoots: true },
-        playback: { bandIntensity: 0.5, bpm: 120, audio: { currentTime: 0 }, intent: { soloistMod: 0, anticipation: 0, syncopation: 0, layBack: 0 } },
+        playback: {
+            bandIntensity: 0.5,
+            bpm: 120,
+            audio: { currentTime: 0 },
+            intent: { soloistMod: 0, anticipation: 0, syncopation: 0, layBack: 0 },
+        },
         arranger: {
             key: 'C',
             isMinor: false,
@@ -20,7 +35,7 @@ vi.mock('../../public/state.js', () => {
             totalSteps: 0,
             stepMap: [],
             timeSignature: '4/4',
-            sections: []
+            sections: [],
         },
         groove: { genreFeel: 'Jazz' },
         bass: { enabled: true },
@@ -28,11 +43,11 @@ vi.mock('../../public/state.js', () => {
         vizState: {},
         midi: {},
         storage: {},
-        dispatch: vi.fn()
+        dispatch: vi.fn(),
     };
     return {
         ...mockState,
-        getState: () => mockState
+        getState: () => mockState,
     };
 });
 
@@ -43,24 +58,45 @@ vi.mock('../../public/config.js', async (importOriginal) => {
         KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
         TIME_SIGNATURES: {
             '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12] },
-            '5/4': { beats: 5, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12, 16], grouping: [3, 2] }
+            '5/4': {
+                beats: 5,
+                stepsPerBeat: 4,
+                subdivision: '16th',
+                pulse: [0, 4, 8, 12, 16],
+                grouping: [3, 2],
+            },
         },
-        ROMAN_VALS: { 'I': 0, 'II': 2, 'III': 4, 'IV': 5, 'V': 7, 'VI': 9, 'VII': 11 },
+        ROMAN_VALS: { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 },
         NNS_OFFSETS: [0, 2, 4, 5, 7, 9, 11],
         INTERVAL_TO_NNS: ['1', 'b2', '2', 'b3', '3', '4', '#4', '5', 'b6', '6', 'b7', '7'],
-        INTERVAL_TO_ROMAN: ['I', 'bII', 'II', 'bIII', 'III', 'IV', '#IV', 'V', 'bVI', 'VI', 'bVII', 'VII']
+        INTERVAL_TO_ROMAN: [
+            'I',
+            'bII',
+            'II',
+            'bIII',
+            'III',
+            'IV',
+            '#IV',
+            'V',
+            'bVI',
+            'VI',
+            'bVII',
+            'VII',
+        ],
     };
 });
 
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 
-import { getScaleForChord } from '../../public/theory-scales.js';
 import { getBassNote } from '../../public/bass.js';
 import { validateProgression } from '../../public/chords.js';
 import { getSoloistNote } from '../../public/soloist.js';
 import { getState } from '../../public/state.js';
+import { getScaleForChord } from '../../public/theory-scales.js';
+
 const { arranger, playback, soloist, groove } = getState();
+
 import { KEY_ORDER } from '../../public/config.js';
 
 // Helper for All The Things You Are
@@ -71,7 +107,6 @@ function getKeyAtOffset(startKey, semitones) {
 }
 
 describe('Standards Compliance Test Suite', () => {
-
     // --- Autumn Leaves ---
     describe('Autumn Leaves', () => {
         const ROMAN_PROG = 'iim7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7alt | vim7';
@@ -103,7 +138,8 @@ describe('Standards Compliance Test Suite', () => {
     // --- Giant Steps ---
     describe('Giant Steps', () => {
         const TEST_KEY = 'B';
-        const BASE_PROG = "Bmaj7 D7 | Gmaj7 Bb7 | Ebmaj7 | Am7 D7 | Gmaj7 Bb7 | Ebmaj7 F#7 | Bmaj7 | Fm7 Bb7 | Ebmaj7 | Am7 D7 | Gmaj7 | C#m7 F#7 | Bmaj7 | Fm7 Bb7 | Ebmaj7 | C#m7 F#7";
+        const BASE_PROG =
+            'Bmaj7 D7 | Gmaj7 Bb7 | Ebmaj7 | Am7 D7 | Gmaj7 Bb7 | Ebmaj7 F#7 | Bmaj7 | Fm7 Bb7 | Ebmaj7 | Am7 D7 | Gmaj7 | C#m7 F#7 | Bmaj7 | Fm7 Bb7 | Ebmaj7 | C#m7 F#7';
 
         beforeEach(() => {
             arranger.key = TEST_KEY;
@@ -121,7 +157,11 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should select Phrygian Dominant when anticipating minor resolutions', () => {
             const v7 = arranger.progression[1];
-            const minorTarget = { rootMidi: v7.rootMidi + 5, quality: 'minor', intervals: [0, 3, 7] };
+            const minorTarget = {
+                rootMidi: v7.rootMidi + 5,
+                quality: 'minor',
+                intervals: [0, 3, 7],
+            };
             expect(getScaleForChord(v7, minorTarget, 'bird')).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
     });
@@ -131,25 +171,44 @@ describe('Standards Compliance Test Suite', () => {
         beforeEach(() => {
             arranger.key = 'Bb';
             arranger.sections = [
-                { id: 'A1', label: "A", key: "Bb", value: "Bbmaj7 | Fm7 Bb7 | Ebmaj7 | Ebm7 Ab7 | Bbmaj7 C7 | Cm7 F7 | Bbmaj7 | Cm7 F7" },
-                { id: 'B1', label: "B (B)", key: "B", value: "C#m7 | F#7 | Bmaj7 | Bmaj7" },
-                { id: 'B2', label: "B (A)", key: "A", value: "Bm7 | E7 | Amaj7 | Amaj7", seamless: true }
+                {
+                    id: 'A1',
+                    label: 'A',
+                    key: 'Bb',
+                    value: 'Bbmaj7 | Fm7 Bb7 | Ebmaj7 | Ebm7 Ab7 | Bbmaj7 C7 | Cm7 F7 | Bbmaj7 | Cm7 F7',
+                },
+                { id: 'B1', label: 'B (B)', key: 'B', value: 'C#m7 | F#7 | Bmaj7 | Bmaj7' },
+                {
+                    id: 'B2',
+                    label: 'B (A)',
+                    key: 'A',
+                    value: 'Bm7 | E7 | Amaj7 | Amaj7',
+                    seamless: true,
+                },
             ];
             validateProgression();
         });
 
         it('should correctly identify the key center for the Bridge modulations', () => {
-            const bChord = arranger.progression.find(c => c.sectionLabel === 'B (B)' && c.quality === 'maj7');
+            const bChord = arranger.progression.find(
+                (c) => c.sectionLabel === 'B (B)' && c.quality === 'maj7',
+            );
             expect(bChord.key).toBe('B');
             const scale = getScaleForChord(bChord, null, 'bird');
-            expect(scale).toContain(0); expect(scale).toContain(4); expect(scale).toContain(11);
+            expect(scale).toContain(0);
+            expect(scale).toContain(4);
+            expect(scale).toContain(11);
         });
 
         it('should shift key center for the A Major modulation', () => {
-            const aSection = arranger.progression.find(c => c.sectionLabel === 'B (A)' && c.quality === 'maj7');
+            const aSection = arranger.progression.find(
+                (c) => c.sectionLabel === 'B (A)' && c.quality === 'maj7',
+            );
             expect(aSection.key).toBe('A');
             const scale = getScaleForChord(aSection, null, 'bird');
-            expect(scale).toContain(0); expect(scale).toContain(4); expect(scale).toContain(11);
+            expect(scale).toContain(0);
+            expect(scale).toContain(4);
+            expect(scale).toContain(11);
         });
     });
 
@@ -158,7 +217,7 @@ describe('Standards Compliance Test Suite', () => {
         beforeEach(() => {
             arranger.key = 'A';
             arranger.isMinor = true;
-            arranger.sections = [{ id: 'Main', label: 'Main', value: "i | bVII | bVI | V" }];
+            arranger.sections = [{ id: 'Main', label: 'Main', value: 'i | bVII | bVI | V' }];
             validateProgression();
             soloist.isResting = false;
             soloist.currentPhraseSteps = 0;
@@ -185,7 +244,13 @@ describe('Standards Compliance Test Suite', () => {
         beforeEach(() => {
             arranger.key = 'F';
             arranger.isMinor = false;
-            arranger.sections = [{ id: 'A', label: 'Chorus', value: "F7 | Bb7 | F7 | F7 | Bb7 | Bb7 | F7 | D7alt | Gm7 | C7 | F7 | C7" }];
+            arranger.sections = [
+                {
+                    id: 'A',
+                    label: 'Chorus',
+                    value: 'F7 | Bb7 | F7 | F7 | Bb7 | Bb7 | F7 | D7alt | Gm7 | C7 | F7 | C7',
+                },
+            ];
             validateProgression();
             soloist.isResting = false;
             soloist.currentPhraseSteps = 0;
@@ -194,7 +259,11 @@ describe('Standards Compliance Test Suite', () => {
         });
 
         it('should prioritize the Blues Scale over Dominant I chords', () => {
-            const scale = getScaleForChord(arranger.progression[0], arranger.progression[1], 'blues');
+            const scale = getScaleForChord(
+                arranger.progression[0],
+                arranger.progression[1],
+                'blues',
+            );
             expect(scale).toContain(3); // b3
             expect(scale).toContain(10); // b7
             expect(scale).toContain(5); // 4
@@ -203,11 +272,21 @@ describe('Standards Compliance Test Suite', () => {
         it('should generate Blue Notes in the solo line', () => {
             let blueNoteCount = 0;
             for (let i = 0; i < 200; i++) {
-                const result = getSoloistNote(arranger.progression[0], null, i % 16, 440, 72, 'blues', i % 16);
+                const result = getSoloistNote(
+                    arranger.progression[0],
+                    null,
+                    i % 16,
+                    440,
+                    72,
+                    'blues',
+                    i % 16,
+                );
                 if (result) {
                     const notes = Array.isArray(result) ? result : [result];
-                    notes.forEach(note => {
-                        if ((note.midi % 12 - 5 + 12) % 12 === 3) blueNoteCount++;
+                    notes.forEach((note) => {
+                        if (((note.midi % 12) - 5 + 12) % 12 === 3) {
+                            blueNoteCount++;
+                        }
                     });
                 }
             }
@@ -222,7 +301,13 @@ describe('Standards Compliance Test Suite', () => {
                 arranger.key = 'C';
                 arranger.isMinor = true;
                 groove.genreFeel = 'Bossa Nova';
-                arranger.sections = [{ id: 'Main', label: 'Main', value: "Cm7 | Cm7 | Fm7 | Fm7 | Dm7b5 | G7alt | Cm7 | Cm7 | Ebm7 | Ab7 | Dbmaj7 | Dbmaj7 | Dm7b5 | G7alt | Cm7 | Dm7b5 G7alt" }];
+                arranger.sections = [
+                    {
+                        id: 'Main',
+                        label: 'Main',
+                        value: 'Cm7 | Cm7 | Fm7 | Fm7 | Dm7b5 | G7alt | Cm7 | Cm7 | Ebm7 | Ab7 | Dbmaj7 | Dbmaj7 | Dm7b5 | G7alt | Cm7 | Dm7b5 G7alt',
+                    },
+                ];
                 validateProgression();
             });
 
@@ -236,8 +321,13 @@ describe('Standards Compliance Test Suite', () => {
 
         describe('So What', () => {
             beforeEach(() => {
-                arranger.key = 'C'; arranger.isMinor = true; groove.genreFeel = 'Jazz';
-                arranger.sections = [{ id: 'A', label: 'A', value: "Dm7 | Dm7" }, { id: 'B', label: 'B', value: "Ebm7" }];
+                arranger.key = 'C';
+                arranger.isMinor = true;
+                groove.genreFeel = 'Jazz';
+                arranger.sections = [
+                    { id: 'A', label: 'A', value: 'Dm7 | Dm7' },
+                    { id: 'B', label: 'B', value: 'Ebm7' },
+                ];
                 validateProgression();
             });
 
@@ -250,13 +340,26 @@ describe('Standards Compliance Test Suite', () => {
 
         describe('Take Five', () => {
             beforeEach(() => {
-                arranger.key = 'Eb'; arranger.isMinor = true; arranger.timeSignature = '5/4'; groove.genreFeel = 'Jazz';
-                arranger.sections = [{ id: 'A', label: 'A', value: "Ebm7 | Bbm7" }];
+                arranger.key = 'Eb';
+                arranger.isMinor = true;
+                arranger.timeSignature = '5/4';
+                groove.genreFeel = 'Jazz';
+                arranger.sections = [{ id: 'A', label: 'A', value: 'Ebm7 | Bbm7' }];
                 validateProgression();
             });
 
             it('should handle 5/4 meter in bass', () => {
-                const note1 = getBassNote(arranger.progression[0], arranger.progression[1], 0, 440, 38, 'quarter', 0, 0, 0);
+                const note1 = getBassNote(
+                    arranger.progression[0],
+                    arranger.progression[1],
+                    0,
+                    440,
+                    38,
+                    'quarter',
+                    0,
+                    0,
+                    0,
+                );
                 expect(note1).not.toBeNull();
                 expect(note1.midi % 12).toBe(arranger.progression[0].rootMidi % 12);
             });
@@ -266,8 +369,10 @@ describe('Standards Compliance Test Suite', () => {
     // --- Neo-Soul ---
     describe('Neo-Soul', () => {
         beforeEach(() => {
-            arranger.key = 'C'; arranger.isMinor = false; groove.genreFeel = 'Neo-Soul';
-            arranger.sections = [{ id: 'Verse', label: 'Verse', value: "IVmaj9/5 | III7#9" }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Neo-Soul';
+            arranger.sections = [{ id: 'Verse', label: 'Verse', value: 'IVmaj9/5 | III7#9' }];
             validateProgression();
         });
 
@@ -278,7 +383,17 @@ describe('Standards Compliance Test Suite', () => {
         });
 
         it('should generate bass line respecting slash note', () => {
-            const result = getBassNote(arranger.progression[0], arranger.progression[1], 0, null, 38, 'neo', 0, 0, 0);
+            const result = getBassNote(
+                arranger.progression[0],
+                arranger.progression[1],
+                0,
+                null,
+                38,
+                'neo',
+                0,
+                0,
+                0,
+            );
             expect(result.midi % 12).toBe(7); // G
         });
     });
@@ -286,8 +401,17 @@ describe('Standards Compliance Test Suite', () => {
     // --- Ornithology ---
     describe('Ornithology', () => {
         beforeEach(() => {
-            arranger.key = 'G'; arranger.isMinor = false; groove.genreFeel = 'Jazz'; playback.bpm = 180;
-            arranger.sections = [{ id: 'A', label: 'A', value: "Gmaj7 | Gmaj7 | Gm7 | C7 | Fmaj7 | Fmaj7 | Fm7 | Bb7" }];
+            arranger.key = 'G';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Jazz';
+            playback.bpm = 180;
+            arranger.sections = [
+                {
+                    id: 'A',
+                    label: 'A',
+                    value: 'Gmaj7 | Gmaj7 | Gm7 | C7 | Fmaj7 | Fmaj7 | Fm7 | Bb7',
+                },
+            ];
             validateProgression();
         });
 
@@ -302,12 +426,27 @@ describe('Standards Compliance Test Suite', () => {
     // --- Donna Lee ---
     describe('Donna Lee', () => {
         beforeEach(() => {
-            arranger.key = 'Ab'; arranger.isMinor = false; groove.genreFeel = 'Jazz'; playback.bpm = 220;
+            arranger.key = 'Ab';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Jazz';
+            playback.bpm = 220;
             arranger.sections = [
-                { id: 'A1', label: "A", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7" },
-                { id: 'B1', label: "B (G)", value: "Imaj7 | VI7 | II7 | II7 | #im7 #IV7 | VIImaj7 | iim7 | V7" },
-                { id: 'A2', label: "A", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | III7 | vi7" },
-                { id: 'C1', label: "C", value: "IVmaj7 | #IVdim7 | Imaj7/V | VI7 | II7 | V7 | Imaj7 | iim7 V7" }
+                {
+                    id: 'A1',
+                    label: 'A',
+                    value: 'Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7',
+                },
+                {
+                    id: 'B1',
+                    label: 'B (G)',
+                    value: 'Imaj7 | VI7 | II7 | II7 | #im7 #IV7 | VIImaj7 | iim7 | V7',
+                },
+                { id: 'A2', label: 'A', value: 'Imaj7 | VI7 | II7 | II7 | iim7 | V7 | III7 | vi7' },
+                {
+                    id: 'C1',
+                    label: 'C',
+                    value: 'IVmaj7 | #IVdim7 | Imaj7/V | VI7 | II7 | V7 | Imaj7 | iim7 V7',
+                },
             ];
             validateProgression();
         });
@@ -318,13 +457,13 @@ describe('Standards Compliance Test Suite', () => {
             expect(getScaleForChord(p[2], p[3], 'bird')).toEqual([0, 2, 4, 6, 7, 9, 10]); // II7 (Bb7) Lydian Dominant
         });
 
-        it( 'should select correct scales for the modulation to G Major (B)', () => {
+        it('should select correct scales for the modulation to G Major (B)', () => {
             const p = arranger.progression;
             // B starts at index 9
             const am7 = p[13]; // #im7
-            const d7 = p[14];  // #IV7
+            const d7 = p[14]; // #IV7
             const gmaj7 = p[15]; // VIImaj7
-            
+
             expect(getScaleForChord(am7, d7, 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Am7 Dorian
             expect(getScaleForChord(d7, gmaj7, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // D7 Mixolydian
             expect(getScaleForChord(gmaj7, null, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Gmaj7 Lydian
@@ -334,9 +473,9 @@ describe('Standards Compliance Test Suite', () => {
             const p = arranger.progression;
             // C starts at index 26
             const dbmaj7 = p[26]; // IVmaj7
-            const ddim7 = p[27];  // #IVdim7
-            const ab_eb = p[28];  // Imaj7/V
-            
+            const ddim7 = p[27]; // #IVdim7
+            const ab_eb = p[28]; // Imaj7/V
+
             expect(getScaleForChord(dbmaj7, ddim7, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Dbmaj7 Lydian
             expect(getScaleForChord(ddim7, ab_eb, 'bird')).toEqual([0, 2, 3, 5, 6, 8, 9, 11]); // Ddim7 Whole-Half
             expect(ab_eb.bassMidi % 12).toBe(3); // Eb bass (V of Ab)
@@ -346,8 +485,10 @@ describe('Standards Compliance Test Suite', () => {
     // --- Royal Road ---
     describe('Royal Road', () => {
         beforeEach(() => {
-            arranger.key = 'C'; arranger.isMinor = false; groove.genreFeel = 'Rock';
-            arranger.sections = [{ id: 'Main', label: 'Main', value: "IVmaj7 | V7 | iii7 | vi7" }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Rock';
+            arranger.sections = [{ id: 'Main', label: 'Main', value: 'IVmaj7 | V7 | iii7 | vi7' }];
             validateProgression();
         });
 
@@ -361,8 +502,15 @@ describe('Standards Compliance Test Suite', () => {
     // --- Stella by Starlight ---
     describe('Stella by Starlight', () => {
         beforeEach(() => {
-            arranger.key = 'Bb'; arranger.isMinor = false;
-            arranger.sections = [{ id: 'A', label: 'A', value: "Em7b5 | A7alt | Cm7 | F7 | Fm7 | Bb7 | Ebmaj7 | Ab7" }];
+            arranger.key = 'Bb';
+            arranger.isMinor = false;
+            arranger.sections = [
+                {
+                    id: 'A',
+                    label: 'A',
+                    value: 'Em7b5 | A7alt | Cm7 | F7 | Fm7 | Bb7 | Ebmaj7 | Ab7',
+                },
+            ];
             validateProgression();
         });
 
@@ -377,10 +525,12 @@ describe('Standards Compliance Test Suite', () => {
     // --- Rhythm Changes ---
     describe('Rhythm Changes', () => {
         beforeEach(() => {
-            arranger.key = 'Bb'; arranger.isMinor = false; groove.genreFeel = 'Jazz';
+            arranger.key = 'Bb';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Jazz';
             arranger.sections = [
-                { label: "A", value: "I vi7 | ii7 V7 | I vi7 | ii7 V7 | I I7 | IV iv7 | I V7 | I" },
-                { label: "B", value: "III7 | III7 | VI7 | VI7 | II7 | II7 | V7 | V7" }
+                { label: 'A', value: 'I vi7 | ii7 V7 | I vi7 | ii7 V7 | I I7 | IV iv7 | I V7 | I' },
+                { label: 'B', value: 'III7 | III7 | VI7 | VI7 | II7 | II7 | V7 | V7' },
             ];
             validateProgression();
         });
@@ -392,7 +542,7 @@ describe('Standards Compliance Test Suite', () => {
         });
 
         it('should handle Bridge secondary dominants', () => {
-            const iii7 = arranger.progression.find(c => c.sectionLabel === 'B');
+            const iii7 = arranger.progression.find((c) => c.sectionLabel === 'B');
             expect(getScaleForChord(iii7, null, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // III7
         });
     });
@@ -401,16 +551,34 @@ describe('Standards Compliance Test Suite', () => {
     describe('All The Things You Are', () => {
         const rootKey = 'Ab';
         const keyA2 = getKeyAtOffset(rootKey, 4);
-        const keyA3 = getKeyAtOffset(rootKey, 7);
-        const keyA4 = getKeyAtOffset(rootKey, 11);
+        const _keyA3 = getKeyAtOffset(rootKey, 7);
+        const _keyA4 = getKeyAtOffset(rootKey, 11);
         const keyB2 = getKeyAtOffset(rootKey, 8);
 
         beforeEach(() => {
-            arranger.key = rootKey; arranger.isMinor = false;
+            arranger.key = rootKey;
+            arranger.isMinor = false;
             arranger.sections = [
-                { id: 'A1', label: `A (${rootKey})`, key: rootKey, value: "vi7 | ii7 | V7 | Imaj7 | IVmaj7" },
-                { id: 'A2', label: `A (${keyA2})`, key: keyA2, value: "ii7 | V7 | Imaj7", seamless: true },
-                { id: 'B2', label: `B (${keyB2})`, key: keyB2, value: "iiø7 | V7 | Imaj7 | V7alt", seamless: true }
+                {
+                    id: 'A1',
+                    label: `A (${rootKey})`,
+                    key: rootKey,
+                    value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7',
+                },
+                {
+                    id: 'A2',
+                    label: `A (${keyA2})`,
+                    key: keyA2,
+                    value: 'ii7 | V7 | Imaj7',
+                    seamless: true,
+                },
+                {
+                    id: 'B2',
+                    label: `B (${keyB2})`,
+                    key: keyB2,
+                    value: 'iiø7 | V7 | Imaj7 | V7alt',
+                    seamless: true,
+                },
             ];
             validateProgression();
         });
@@ -418,14 +586,16 @@ describe('Standards Compliance Test Suite', () => {
         it('should navigate Cycle of Fifths', () => {
             const p = arranger.progression;
             const scaleVi = getScaleForChord(p[0], p[1], 'bird');
-            expect(scaleVi).toContain(3); expect(scaleVi).toContain(10);
+            expect(scaleVi).toContain(3);
+            expect(scaleVi).toContain(10);
         });
 
         it('should handle Bridge modulation', () => {
-            const b2Chords = arranger.progression.filter(c => c.sectionId === 'B2');
-            expect(getScaleForChord(b2Chords[0], b2Chords[1], 'bird')).toEqual([0, 1, 3, 5, 6, 8, 10]); // Locrian
+            const b2Chords = arranger.progression.filter((c) => c.sectionId === 'B2');
+            expect(getScaleForChord(b2Chords[0], b2Chords[1], 'bird')).toEqual([
+                0, 1, 3, 5, 6, 8, 10,
+            ]); // Locrian
             expect(getScaleForChord(b2Chords[3], null, 'bird')).toEqual([0, 1, 3, 4, 6, 8, 10]); // Altered
         });
     });
-
 });
