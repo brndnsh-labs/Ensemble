@@ -249,16 +249,10 @@ function MobileNav({ activeTab }) {
 }
 
 function SoloistSmartTab() {
-    const { complexity, tradeMode, enabled } = useEnsembleState(s => ({
-        complexity: s.soloist.complexity,
+    const { tradeMode, enabled } = useEnsembleState(s => ({
         tradeMode: s.soloist.tradeMode,
         enabled: s.soloist.enabled
     }));
-
-    const onComplexityInput = (e) => {
-        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'complexity', value: parseFloat(e.target.value) });
-        saveCurrentState();
-    };
 
     const setTradeMode = (mode) => {
         dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
@@ -279,23 +273,6 @@ function SoloistSmartTab() {
 
     return (
         <div class="soloist-smart-controls" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.25rem 0;">
-            <div class="setting-item">
-                <label style="display: flex; justify-content: space-between; margin-bottom: 0.4rem; font-size: 0.8rem; color: #94a3b8;">
-                    <span>Complexity</span>
-                    <span style="color: var(--soloist-color); font-weight: bold;">{Math.round((complexity || 0.5) * 100)}%</span>
-                </label>
-                <input 
-                    type="range" 
-                    min="0" 
-                    max="1" 
-                    step="0.05" 
-                    value={complexity || 0.5} 
-                    onInput={onComplexityInput}
-                    style="width: 100%; height: 6px;"
-                    aria-label="Soloist Complexity"
-                />
-            </div>
-
             <div class="trade-mode-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
                     <label style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Trade Mode</label>
