@@ -801,6 +801,18 @@ export const CHORD_PRESETS = [
         settings: { bpm: 160, style: 'jazz' }
     },
     { 
+        name: "Donna Lee", 
+        sections: [
+            { label: "A1", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7" },
+            { label: "A2 (G)", value: "Imaj7 | VI7 | II7 | II7 | #im7 #IV7 | VIImaj7 | iim7 | V7", seamless: true },
+            { label: "A3 (E)", value: "Imaj7 | VI7 | II7 | II7 | bviim7 bIII7 | bVImaj7 | iim7 | V7", seamless: true },
+            { label: "A4", value: "Imaj7 | VI7 | II7 | II7 | iim7 | V7 | Imaj7 | iim7 V7", seamless: true }
+        ],
+        category: "Jazz",
+        isMinor: false,
+        settings: { bpm: 220, style: 'jazz' }
+    },
+    { 
         name: "Rhythm Changes", 
         sections: [
             { label: "A", value: "I vi7 | ii7 V7 | I vi7 | ii7 V7 | I I7 | IV iv7 | I V7 | I" },
