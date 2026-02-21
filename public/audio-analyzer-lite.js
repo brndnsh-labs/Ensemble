@@ -60,15 +60,6 @@ export class ChordAnalyzerLite {
     }
 
     /**
-     * Explicitly clears large pre-calculated tables and buffers to assist GC.
-     */
-    dispose() {
-        this.pitchFrequencies = [];
-        this.keyProfiles = {};
-        this.notes = [];
-    }
-
-    /**
      * Identifies the global key and tuning offset of the audio.
      * Includes a high-res rotation check to handle tuning drift.
      */
