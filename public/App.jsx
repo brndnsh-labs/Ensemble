@@ -132,9 +132,10 @@ function Sidebar({ grooveMobileTab }) {
 }
 
 function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
-    const { activeTab, enabled } = useEnsembleState(s => ({
+    const { activeTab, enabled, tradeMode } = useEnsembleState(s => ({
         activeTab: s[module].activeTab,
-        enabled: s[module].enabled
+        enabled: s[module].enabled,
+        tradeMode: s[module].tradeMode
     }));
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -146,6 +147,8 @@ function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
     };
 
     const headerClass = `${module === 'chords' ? 'chord' : (module === 'harmony' ? 'harmony' : module)}-panel-header`;
+    const isWaiting = module === 'soloist' && !enabled && tradeMode !== 'manual';
+    const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : (isWaiting ? 'waiting' : '')}`;
 
     return (
         <div class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''}`} id={id} data-id={module}>
@@ -170,7 +173,7 @@ function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                     >⋮</button>
                     <button 
-                        class={`power-btn desktop-power-btn ${enabled ? 'active' : ''}`} 
+                        class={powerClass}
                         id={`${module === 'chords' ? 'chord' : module}PowerBtnDesktop`} 
                         aria-label={`Toggle ${title}`}
                         onClick={() => togglePower(module)}
@@ -204,7 +207,13 @@ function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
 
 function MobileNavTab({ tab, activeTab, onSwitch }) {
     const isActive = (activeTab === tab.id) || (activeTab === 'mobile' && tab.id === 'grooves');
-    const { enabled } = useEnsembleState(s => ({ enabled: s[tab.module].enabled }));
+    const { enabled, tradeMode } = useEnsembleState(s => ({ 
+        enabled: s[tab.module].enabled,
+        tradeMode: s[tab.module].tradeMode
+    }));
+
+    const isWaiting = tab.module === 'soloist' && !enabled && tradeMode !== 'manual';
+    const powerClass = `power-btn ${enabled ? 'active' : (isWaiting ? 'waiting' : '')}`;
 
     return (
         <div class={`tab-item ${isActive ? 'active' : ''} tab-${tab.id}`} onClick={() => onSwitch(tab.id)}>
@@ -213,7 +222,7 @@ function MobileNavTab({ tab, activeTab, onSwitch }) {
             >{tab.label}</button>
             <button
                 id={`${tab.module === 'chords' ? 'chord' : tab.module}PowerBtn`}
-                class={`power-btn ${enabled ? 'active' : ''}`}
+                class={powerClass}
                 aria-label={`Toggle ${tab.label}`}
                 onClick={(e) => { e.stopPropagation(); togglePower(tab.module); }}
             >⏻</button>
@@ -259,18 +268,6 @@ function SoloistSmartTab() {
         saveCurrentState();
     };
 
-    const toggleSoloist = () => {
-        const { soloist } = getState();
-        soloist.enabled = !soloist.enabled;
-        if (soloist.enabled) {
-            soloist.isResting = true;
-            soloist.currentPhraseSteps = 0;
-            soloist.srdcState = 'Conclusion';
-        }
-        dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: 'smart' });
-        saveCurrentState();
-    };
-
     return (
         <div class="soloist-smart-controls" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.25rem 0;">
             <div class="trade-mode-group">
@@ -290,23 +287,6 @@ function SoloistSmartTab() {
                     ))}
                 </div>
             </div>
-
-            <button
-                onClick={toggleSoloist}
-                class={`primary-btn ${enabled ? 'active' : ''}`}
-                style={{
-                    width: '100%',
-                    padding: '0.6rem',
-                    fontSize: '0.85rem',
-                    background: enabled ? 'var(--soloist-color)' : 'transparent',
-                    borderColor: 'var(--soloist-color)',
-                    color: enabled ? 'white' : 'var(--soloist-color)',
-                    boxShadow: enabled ? '0 0 15px rgba(var(--soloist-color-rgb), 0.3)' : 'none',
-                    marginTop: '0.2rem'
-                }}
-            >
-                {enabled ? 'BAND IS SOLOING' : 'TAKE THE LEAD'}
-            </button>
         </div>
     );
 }
