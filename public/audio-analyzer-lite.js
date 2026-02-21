@@ -233,6 +233,7 @@ export class ChordAnalyzerLite {
         const step = 4; // Default step
         const numWindowSteps = Math.ceil(samplesPerBeat / step);
         const windowValuesBuffer = new Float32Array(numWindowSteps);
+        const windowedSignalBuffer = new Float32Array(numWindowSteps);
 
         // Pre-calculate window values
         for (let i = 0, idx = 0; i < samplesPerBeat; i += step, idx++) {
@@ -242,7 +243,8 @@ export class ChordAnalyzerLite {
         const sharedBuffers = {
             chroma: chromaBuffer,
             pitchEnergy: pitchEnergyBuffer,
-            windowValues: windowValuesBuffer
+            windowValues: windowValuesBuffer,
+            windowedSignal: windowedSignalBuffer
         };
 
         const fullChromaOptions = {
@@ -522,6 +524,7 @@ export class ChordAnalyzerLite {
         const step = 8;
         const numWindowSteps = Math.ceil(winSize / step);
         const windowValuesBuffer = new Float32Array(numWindowSteps);
+        const windowedSignalBuffer = new Float32Array(numWindowSteps);
 
         // Pre-calculate window values for this winSize
         for (let i = 0, idx = 0; i < winSize; i += step, idx++) {
@@ -537,7 +540,8 @@ export class ChordAnalyzerLite {
             buffers: {
                 chroma: chromaBuffer,
                 pitchEnergy: pitchEnergyBuffer,
-                windowValues: windowValuesBuffer
+                windowValues: windowValuesBuffer,
+                windowedSignal: windowedSignalBuffer
             }
         };
 
@@ -868,6 +872,19 @@ export class ChordAnalyzerLite {
             endIdx = Math.max(0, Math.min(this.pitchFrequencies.length, maxMidi - 24 + 1));
         }
 
+        // Pre-windowing Optimization: Apply window function once, outside the frequency loop.
+        let windowedSignal;
+        if (options.buffers && options.buffers.windowedSignal) {
+            windowedSignal = options.buffers.windowedSignal;
+        } else {
+            const numSteps = Math.ceil(len / step);
+            windowedSignal = new Float32Array(numSteps);
+        }
+
+        for (let i = 0, idx = 0; i < len; i += step, idx++) {
+            windowedSignal[idx] = signal[i] * windowValues[idx];
+        }
+
         for (let pfIdx = startIdx; pfIdx < endIdx; pfIdx++) {
             const p = this.pitchFrequencies[pfIdx];
             
@@ -883,8 +900,7 @@ export class ChordAnalyzerLite {
             let s = 0.0; // sin(0)
 
             for (let i = 0, idx = 0; i < len; i += step, idx++) {
-                const window = windowValues[idx];
-                const sample = signal[i] * window;
+                const sample = windowedSignal[idx];
                 real += sample * c;
                 imag += sample * s;
 
