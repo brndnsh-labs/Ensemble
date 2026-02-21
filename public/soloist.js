@@ -219,6 +219,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 8));
     const effectiveIntensity = Math.min(1.0, intensity + (maturityFactor * 0.05) + (playback.intent.soloistMod || 0));
     const lyricalBias = playback.lyricalBias !== undefined ? playback.lyricalBias : 0.5;
+    const complexity = (soloist.complexity !== undefined) ? soloist.complexity : playback.complexity;
 
     if (!soloist.isResting) soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
 
@@ -503,7 +504,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
              if (pool.length === 0) pool = [RHYTHMIC_CELLS[1], RHYTHMIC_CELLS[2]]; // Fallback to 8ths/quarters
         }
 
-        if (playback.complexity > 0.7 && !config.cells.includes(1)) pool.push(RHYTHMIC_CELLS[1]);
+        if (complexity > 0.7 && !config.cells.includes(1)) pool.push(RHYTHMIC_CELLS[1]);
 
         // Intensity-based filtering
         if (intensity < 0.4 && activeStyle !== 'bird') pool = pool.filter(c => c[1] === 0 && c[3] === 0);
@@ -736,7 +737,7 @@ export function getSoloistNote(currentChord, nextChord, step, prevFreq, octave, 
 
     // --- 6. Melodic Devices ---
     const allowFlash = intensity > 0.5;
-    const deviceBaseProb = config.deviceProb * (0.5 + playback.complexity * 1.0) * (1.2 - lyricalBias);
+    const deviceBaseProb = config.deviceProb * (0.5 + complexity * 1.0) * (1.2 - lyricalBias);
     const isPiano = soloist.mode === 'piano';
     // Certain styles MUST allow double stops even in monophonic mode for authentic character,
     // but ONLY if the configuration (global or local) actually allows them.

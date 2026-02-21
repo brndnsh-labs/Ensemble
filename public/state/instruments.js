@@ -101,7 +101,8 @@ export const soloist = {
     activeTab: 'smart',
     pitchHistory: [],
     stagnationCount: 0,
-    lastInterval: 0
+    lastInterval: 0,
+    complexity: 0.5
 };
 
 /**
@@ -148,7 +149,7 @@ export function instrumentReducer(action, payload) {
                 enabled: true, volume: 0.45, reverb: 0.05, octave: 38, style: 'smart', activeTab: 'smart'
             });
             Object.assign(soloist, {
-                enabled: false, preset: 'neo', volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', mode: 'monophonic'
+                enabled: false, preset: 'neo', volume: 0.5, reverb: 0.6, octave: 72, style: 'smart', activeTab: 'smart', mode: 'monophonic', complexity: 0.5
             });
             Object.assign(harmony, {
                 enabled: false, volume: 0.4, reverb: 0.4, octave: 60, style: 'smart', complexity: 0.5, activeTab: 'smart'

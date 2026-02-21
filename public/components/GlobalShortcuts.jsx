@@ -23,6 +23,21 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
+            // 'S': Toggle Soloist (Trading Fours)
+            if (e.key.toLowerCase() === 's' && !isTyping && !e.metaKey && !e.ctrlKey) {
+                e.preventDefault();
+                if (soloist) {
+                    soloist.enabled = !soloist.enabled;
+                    if (soloist.enabled) {
+                         soloist.isResting = true;
+                         soloist.currentPhraseSteps = 0;
+                         soloist.srdcState = 'Conclusion';
+                    }
+                    // Trigger UI update
+                    dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloist.activeTab });
+                }
+            }
+
             // 1-5: Switch Mobile Tabs
             if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping) {
                 const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
