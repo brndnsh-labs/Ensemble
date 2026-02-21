@@ -322,11 +322,15 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                     Object.assign(sbUpdate, {
                         isWaitingForEntry: true,
                         isResting: true,
+                        isYielding: false,
                         currentPhraseSteps: 0,
                         srdcState: 'Conclusion'
                     });
                 } else {
-                    sbUpdate.isYielding = true;
+                    Object.assign(sbUpdate, {
+                        isYielding: true,
+                        isWaitingForEntry: false
+                    });
                 }
                 
                 dispatch(ACTIONS.UPDATE_SB, sbUpdate);

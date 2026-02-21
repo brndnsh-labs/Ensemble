@@ -94,13 +94,17 @@ describe('Soloist Trading Logic', () => {
         // Transition 1: A -> B (at step 16 triggers for end at 32)
         checkSectionTransition(16, stepsPerMeasure);
         expect(state.soloist.enabled).toBe(false);
+        expect(state.soloist.isYielding).toBe(true);
 
         // Transition 2: B -> C (at step 48 triggers for end at 64)
         checkSectionTransition(48, stepsPerMeasure);
         expect(state.soloist.enabled).toBe(true);
+        expect(state.soloist.isYielding).toBe(false);
+        expect(state.soloist.isWaitingForEntry).toBe(true);
 
         // Transition 3: C -> A (at step 80 triggers for end at 96)
         checkSectionTransition(80, stepsPerMeasure);
         expect(state.soloist.enabled).toBe(false);
+        expect(state.soloist.isYielding).toBe(true);
     });
 });
