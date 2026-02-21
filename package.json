@@ -5,8 +5,9 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "lint": "eslint .",
+    "test": "npm run check-mutations && npm run lint && vitest run",
+    "lint": "eslint . --quiet",
+    "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
     "deploy:test": "./scripts/deploy-test.sh",
     "deploy:prod": "./scripts/deploy-prod.sh"
   },
