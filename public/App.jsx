@@ -241,6 +241,8 @@ function MobileNav({ activeTab }) {
                 { id: 'bass', label: 'Bass', module: 'bass' },
                 { id: 'soloist', label: 'Soloist', module: 'soloist' },
                 { id: 'harmonies', label: 'Harmony', module: 'harmony' }
+            ].map(tab => (
+                <MobileNavTab key={tab.id} tab={tab} activeTab={activeTab} onSwitch={switchMobileTab} />
             ))}
         </div>
     );
