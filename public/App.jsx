@@ -186,9 +186,13 @@ function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
             </div>
 
             <div id={`${module === 'chords' ? 'chord' : module}-tab-smart`} class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}>
-                <div class="smart-status" style={`padding: 0.5rem; background: rgba(var(--${module}-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--${module}-color-rgb), 0.2); text-align: center;`}>
-                    <p style="font-size: 0.8rem; margin: 0;">✨ <strong>Smart Follow</strong> Active</p>
-                </div>
+                {module === 'soloist' ? (
+                    <SoloistSmartTab />
+                ) : (
+                    <div class="smart-status" style={`padding: 0.5rem; background: rgba(var(--${module}-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--${module}-color-rgb), 0.2); text-align: center;`}>
+                        <p style="font-size: 0.8rem; margin: 0;">✨ <strong>Smart Follow</strong> Active</p>
+                    </div>
+                )}
             </div>
 
             <div class={`panel-settings-menu ${isMenuOpen ? 'open' : ''}`}>
@@ -237,9 +241,93 @@ function MobileNav({ activeTab }) {
                 { id: 'bass', label: 'Bass', module: 'bass' },
                 { id: 'soloist', label: 'Soloist', module: 'soloist' },
                 { id: 'harmonies', label: 'Harmony', module: 'harmony' }
-            ].map(tab => (
-                <MobileNavTab key={tab.id} tab={tab} activeTab={activeTab} onSwitch={switchMobileTab} />
             ))}
+        </div>
+    );
+}
+
+function SoloistSmartTab() {
+    const { complexity, tradeMode, enabled } = useEnsembleState(s => ({
+        complexity: s.soloist.complexity,
+        tradeMode: s.soloist.tradeMode,
+        enabled: s.soloist.enabled
+    }));
+
+    const onComplexityInput = (e) => {
+        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'complexity', value: parseFloat(e.target.value) });
+        saveCurrentState();
+    };
+
+    const setTradeMode = (mode) => {
+        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
+        saveCurrentState();
+    };
+
+    const toggleSoloist = () => {
+        const { soloist } = getState();
+        soloist.enabled = !soloist.enabled;
+        if (soloist.enabled) {
+            soloist.isResting = true;
+            soloist.currentPhraseSteps = 0;
+            soloist.srdcState = 'Conclusion';
+        }
+        dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: 'smart' });
+        saveCurrentState();
+    };
+
+    return (
+        <div class="soloist-smart-controls" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.25rem 0;">
+            <div class="setting-item">
+                <label style="display: flex; justify-content: space-between; margin-bottom: 0.4rem; font-size: 0.8rem; color: #94a3b8;">
+                    <span>Complexity</span>
+                    <span style="color: var(--soloist-color); font-weight: bold;">{Math.round((complexity || 0.5) * 100)}%</span>
+                </label>
+                <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05" 
+                    value={complexity || 0.5} 
+                    onInput={onComplexityInput}
+                    style="width: 100%; height: 6px;"
+                    aria-label="Soloist Complexity"
+                />
+            </div>
+
+            <div class="trade-mode-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <label style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Trade Mode</label>
+                    <span style="font-size: 0.7rem; opacity: 0.5; font-style: italic;">{tradeMode === 'manual' ? 'Manual Control' : `Autoswitch: ${tradeMode}`}</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem;">
+                    {['manual', 'sections', 'loops'].map(mode => (
+                        <button 
+                            class={`tab-btn ${tradeMode === mode ? 'active' : ''}`}
+                            style="font-size: 0.65rem; padding: 0.3rem 0.1rem; text-transform: capitalize;"
+                            onClick={() => setTradeMode(mode)}
+                        >
+                            {mode}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <button
+                onClick={toggleSoloist}
+                class={`primary-btn ${enabled ? 'active' : ''}`}
+                style={{
+                    width: '100%',
+                    padding: '0.6rem',
+                    fontSize: '0.85rem',
+                    background: enabled ? 'var(--soloist-color)' : 'transparent',
+                    borderColor: 'var(--soloist-color)',
+                    color: enabled ? 'white' : 'var(--soloist-color)',
+                    boxShadow: enabled ? '0 0 15px rgba(var(--soloist-color-rgb), 0.3)' : 'none',
+                    marginTop: '0.2rem'
+                }}
+            >
+                {enabled ? 'BAND IS SOLOING' : 'TAKE THE LEAD'}
+            </button>
         </div>
     );
 }

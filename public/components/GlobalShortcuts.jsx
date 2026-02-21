@@ -3,10 +3,12 @@ import { switchMeasure } from '../instrument-controller.js';
 import { dispatch, getState } from '../state.js';
 const { playback, groove } = getState();
 import { ACTIONS } from '../types.js';
+import { saveCurrentState } from '../persistence.js';
 
 export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (e) => {
+            const { playback, groove, soloist } = getState();
             const isTyping = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable;
 
             // Space: Toggle Play
@@ -33,8 +35,9 @@ export function GlobalShortcuts() {
                          soloist.currentPhraseSteps = 0;
                          soloist.srdcState = 'Conclusion';
                     }
-                    // Trigger UI update
+                    // Trigger UI update through a known action
                     dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloist.activeTab });
+                    saveCurrentState();
                 }
             }
 

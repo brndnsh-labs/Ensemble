@@ -396,6 +396,18 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                     targetEnergy = Math.max(0.3, Math.min(0.95, targetEnergy + (Math.random() * 0.2 - 0.1)));
                 }
 
+                // --- 3. THE SOLOIST TRADE ---
+                const { soloist: soloistState } = getState();
+                if (soloistState && (soloistState.tradeMode === 'sections' || (soloistState.tradeMode === 'loops' && isLoopEnd))) {
+                    soloistState.enabled = !soloistState.enabled;
+                    if (soloistState.enabled) {
+                        soloistState.isResting = true;
+                        soloistState.currentPhraseSteps = 0;
+                        soloistState.srdcState = 'Conclusion';
+                    }
+                    dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloistState.activeTab });
+                }
+
                 const fillSteps = generateProceduralFill(groove.genreFeel, playback.bandIntensity, stepsPerMeasure);
                 dispatch(ACTIONS.TRIGGER_FILL, { steps: fillSteps, startStep: currentStep, length: stepsPerMeasure, crash: true });
                 

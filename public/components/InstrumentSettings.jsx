@@ -121,42 +121,6 @@ export function InstrumentSettings({ module }) {
                                 aria-valuetext={`${Math.round((state.complexity || 0.5) * 100)}%`}
                             />
                         </div>
-                        
-                        <div style="margin-bottom: 1.5rem; background: rgba(0,0,0,0.1); padding: 0.75rem; border-radius: 6px;">
-                            <label style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8; font-weight: bold;">
-                                <span>Trading Fours</span>
-                                <span style="font-size: 0.7rem; font-weight: normal; opacity: 0.7;">(Press 'S')</span>
-                            </label>
-                            <button
-                                onClick={() => {
-                                    state.enabled = !state.enabled;
-                                    if (state.enabled) {
-                                        state.isResting = true; 
-                                        state.currentPhraseSteps = 0;
-                                        state.srdcState = 'Conclusion';
-                                    }
-                                    saveCurrentState();
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.6rem',
-                                    borderRadius: '4px',
-                                    border: '1px solid var(--accent-color)',
-                                    background: state.enabled ? 'var(--accent-color)' : 'transparent',
-                                    color: state.enabled ? 'white' : 'var(--accent-color)',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                {state.enabled ? 'BAND SOLOING' : 'TAKE THE LEAD'}
-                            </button>
-                            <p style="margin: 0.5rem 0 0; font-size: 0.7rem; color: #64748b; line-height: 1.3;">
-                                {state.enabled 
-                                    ? "The band is taking a solo. Click to trade back." 
-                                    : "You are leading. Click to let the band solo."}
-                            </p>
-                        </div>
 
                         <div style="margin-bottom: 1rem;">
                             <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">Lead Sound</label>
