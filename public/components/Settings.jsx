@@ -49,6 +49,11 @@ export function Settings() {
     }));
     
     const masterVolume = useEnsembleState(s => s.playback.masterVolume);
+    const complexity = useEnsembleState(s => s.playback.complexity);
+
+    let complexityLabel = 'Low';
+    if (complexity > 0.33) complexityLabel = 'Medium';
+    if (complexity > 0.66) complexityLabel = 'High';
 
     const closeSettings = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
@@ -182,6 +187,27 @@ export function Settings() {
                                 aria-label="Master Volume"
                                 aria-valuetext={`${Math.round((masterVolume || 0.5) * 100)}%`}
                             />
+                        </div>
+
+                        <div class="setting-item" style="margin-bottom: 1.5rem;">
+                            <label class="setting-label" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+                                <span>Global Complexity</span>
+                                <span style="color: var(--accent-color); font-weight: bold;">{complexityLabel}</span>
+                            </label>
+                            <input 
+                                id="complexitySlider"
+                                type="range" 
+                                min="0" 
+                                max="100" 
+                                value={Math.round(complexity * 100)} 
+                                onInput={(e) => {
+                                    dispatch(ACTIONS.SET_COMPLEXITY, parseInt(e.target.value) / 100);
+                                }}
+                                style="width: 100%;" 
+                                aria-label="Global Complexity"
+                                aria-valuetext={complexityLabel}
+                            />
+                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Adjusts syncopation and harmonic density for Soloist, Bass, and Harmony engines.</p>
                         </div>
 
                         <div style="margin-bottom: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">

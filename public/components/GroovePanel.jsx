@@ -91,7 +91,7 @@ export function GroovePanel({ isActiveMobile }) {
             <div id="groove-tab-smart" class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}>
                 <GenreSelector />
                 <IntensitySlider />
-                <ComplexitySlider />
+                <CreativityToggle />
             </div>
 
             <div class={`panel-settings-menu grooves-settings-menu ${isMenuOpen ? 'open' : ''}`}>
@@ -141,31 +141,27 @@ function IntensitySlider() {
     );
 }
 
-function ComplexitySlider() {
-    const complexity = useEnsembleState(s => s.playback.complexity);
-
-    let label = 'Low';
-    if (complexity > 0.33) label = 'Medium';
-    if (complexity > 0.66) label = 'High';
+function CreativityToggle() {
+    const creativity = useEnsembleState(s => s.groove.creativity);
 
     return (
         <div class="smart-control-group" style="margin-bottom: 1rem;">
-            <label htmlFor="complexitySlider" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8;">
-                <span>Complexity</span>
-                <span style="color: var(--accent-color); font-weight: bold;">{label}</span>
+            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; cursor: pointer;">
+                <span style="font-size: 0.9rem; color: #94a3b8;">Creativity</span>
+                <input
+                    id="creativityCheck"
+                    type="checkbox"
+                    checked={creativity}
+                    onChange={(e) => {
+                        dispatch(ACTIONS.SET_CREATIVITY, e.target.checked);
+                        syncWorker();
+                        saveCurrentState();
+                    }}
+                />
             </label>
-            <input
-                id="complexitySlider"
-                type="range"
-                min="0"
-                max="100"
-                value={Math.round(complexity * 100)}
-                aria-valuetext={label}
-                onInput={(e) => {
-                    dispatch(ACTIONS.SET_COMPLEXITY, parseInt(e.target.value) / 100);
-                }}
-                style="width: 100%; height: 6px;"
-            />
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                Enables generative variations and musical risks.
+            </p>
         </div>
     );
 }
