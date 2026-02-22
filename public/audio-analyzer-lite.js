@@ -254,11 +254,24 @@ export class ChordAnalyzerLite {
                 0.5 * (1 - Math.cos((2 * Math.PI * i) / (samplesPerBeat - 1)));
         }
 
+        // Pre-calculate trig tables for analysis loop
+        const cosTable = new Float32Array(this.pitchFrequencies.length);
+        const sinTable = new Float32Array(this.pitchFrequencies.length);
+        for (let i = 0; i < this.pitchFrequencies.length; i++) {
+            const p = this.pitchFrequencies[i];
+            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            const delta = step * angleStep;
+            cosTable[i] = Math.cos(delta);
+            sinTable[i] = Math.sin(delta);
+        }
+
         const sharedBuffers = {
             chroma: chromaBuffer,
             pitchEnergy: pitchEnergyBuffer,
             windowValues: windowValuesBuffer,
             windowedSignal: windowedSignalBuffer,
+            cosTable: cosTable,
+            sinTable: sinTable,
         };
 
         const fullChromaOptions = {
@@ -430,6 +443,19 @@ export class ChordAnalyzerLite {
         const minMidi = 48;
         const maxMidi = 84;
 
+        // Pre-calculate trig values for melody extraction loop
+        // extractMelody uses hardcoded step = 4
+        const cosTable = new Float32Array(this.pitchFrequencies.length);
+        const sinTable = new Float32Array(this.pitchFrequencies.length);
+        const step = 4;
+        for (let i = 0; i < this.pitchFrequencies.length; i++) {
+            const p = this.pitchFrequencies[i];
+            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            const delta = step * angleStep;
+            cosTable[i] = Math.cos(delta);
+            sinTable[i] = Math.sin(delta);
+        }
+
         for (let b = 0; b < beats; b++) {
             if (b % 20 === 0) {
                 await yieldToMain();
@@ -458,11 +484,8 @@ export class ChordAnalyzerLite {
 
                 let real = 0;
                 let imag = 0;
-                const angleStep = (2 * Math.PI * p.freq) / sampleRate;
-
-                const delta = 4 * angleStep;
-                const cosDelta = Math.cos(delta);
-                const sinDelta = Math.sin(delta);
+                const cosDelta = cosTable[pfIdx];
+                const sinDelta = sinTable[pfIdx];
                 let c = 1.0;
                 let s = 0.0;
 
@@ -552,6 +575,17 @@ export class ChordAnalyzerLite {
             windowValuesBuffer[idx] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (winSize - 1)));
         }
 
+        // Pre-calculate trig tables for pulse detection loop
+        const cosTable = new Float32Array(this.pitchFrequencies.length);
+        const sinTable = new Float32Array(this.pitchFrequencies.length);
+        for (let i = 0; i < this.pitchFrequencies.length; i++) {
+            const p = this.pitchFrequencies[i];
+            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            const delta = step * angleStep;
+            cosTable[i] = Math.cos(delta);
+            sinTable[i] = Math.sin(delta);
+        }
+
         const calcOptions = {
             step: step,
             skipSharpening: true,
@@ -563,6 +597,8 @@ export class ChordAnalyzerLite {
                 pitchEnergy: pitchEnergyBuffer,
                 windowValues: windowValuesBuffer,
                 windowedSignal: windowedSignalBuffer,
+                cosTable: cosTable,
+                sinTable: sinTable,
             },
         };
 
@@ -951,17 +987,27 @@ export class ChordAnalyzerLite {
             windowedSignal[idx] = signal[i] * windowValues[idx];
         }
 
+        const useTrigCache = options.buffers?.cosTable && options.buffers.sinTable;
+
         for (let pfIdx = startIdx; pfIdx < endIdx; pfIdx++) {
             const p = this.pitchFrequencies[pfIdx];
 
             let real = 0;
             let imag = 0;
-            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            let cosDelta, sinDelta;
 
-            // Optimization: Trigonometric recurrence
-            const delta = step * angleStep;
-            const cosDelta = Math.cos(delta);
-            const sinDelta = Math.sin(delta);
+            if (useTrigCache) {
+                cosDelta = options.buffers.cosTable[pfIdx];
+                sinDelta = options.buffers.sinTable[pfIdx];
+            } else {
+                const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+
+                // Optimization: Trigonometric recurrence
+                const delta = step * angleStep;
+                cosDelta = Math.cos(delta);
+                sinDelta = Math.sin(delta);
+            }
+
             let c = 1.0; // cos(0)
             let s = 0.0; // sin(0)
 
