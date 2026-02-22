@@ -475,6 +475,14 @@ export class UnifiedVisualizer {
         const minTime = currentTime - this.windowSize;
         const yScale = this.yScale;
 
+        // Optimization: Pre-calculate frame constants for X/Y
+        const frameXBase = this.pianoRollWidth + currentTime * this.timeScale;
+        const frameXScale = this.timeScale;
+        // Y = midY - (m - centerMidi) * yScale
+        //   = midY + centerMidi * yScale - m * yScale
+        const frameYBase = this.midY + this.centerMidi * this.yScale;
+        const frameYScale = this.yScale;
+
         // Use cached theme-aware colors
         const { gridColorMeasure, gridColorBeat, playheadColor, outlineColor, chordColors } =
             this.themeCache;
@@ -517,7 +525,7 @@ export class UnifiedVisualizer {
                         }
 
                         const interval = ((m % 12) - rootPC + 12) % 12;
-                        const y = this.getY(m);
+                        const y = frameYBase - m * frameYScale;
                         const colorIdx = INTERVAL_COLOR_INDEX[interval];
 
                         this.activeChordBuffers[colorIdx].push(y);
@@ -714,8 +722,8 @@ export class UnifiedVisualizer {
             const start = Math.max(minTime, ev.time);
             const end = Math.min(currentTime, chordEnd);
 
-            const xStart = this.getX(start, currentTime);
-            const xEnd = this.getX(end, currentTime);
+            const xStart = frameXBase - start * frameXScale;
+            const xEnd = frameXBase - end * frameXScale;
             const x = xEnd;
             const cw = xStart - xEnd;
             const rootPC = ev.rootMidi % 12;
@@ -728,7 +736,7 @@ export class UnifiedVisualizer {
                 // Render in visible octaves (using hoisted range)
                 for (let oct = minOct; oct <= maxOct; oct++) {
                     const m = pc + oct * 12;
-                    const y = Math.round(this.getY(m));
+                    const y = Math.round(frameYBase - m * frameYScale);
                     if (y >= -10 && y <= h + 10) {
                         // Push flat layout: x, y, w, h
                         buffer.push(x, y - yScale / 2, cw, yScale);
@@ -775,14 +783,14 @@ export class UnifiedVisualizer {
             const start = Math.max(minTime, ev.time);
             const end = Math.min(currentTime, chordEnd);
 
-            const xStart = this.getX(start, currentTime);
-            const xEnd = this.getX(end, currentTime);
+            const xStart = frameXBase - start * frameXScale;
+            const xEnd = frameXBase - end * frameXScale;
             const x = xEnd;
             const cw = xStart - xEnd;
             const rootPC = ev.rootMidi % 12;
 
             for (const midi of ev.notes) {
-                const y = Math.round(this.getY(midi));
+                const y = Math.round(frameYBase - midi * frameYScale);
                 const interval = ((midi % 12) - rootPC + 12) % 12;
                 const colorIdx = INTERVAL_COLOR_INDEX[interval];
 
@@ -806,6 +814,10 @@ export class UnifiedVisualizer {
         }
 
         ctx.globalAlpha = 1.0;
+
+        // Optimization: Hoist context properties out of the loop
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
         // 3. Melodic Tracks
         for (const name in this.tracks) {
@@ -841,8 +853,9 @@ export class UnifiedVisualizer {
                         continue;
                     }
 
-                    const x = this.getX(ev.time, currentTime);
-                    const y = Math.round(this.getY(ev.midi));
+                    // Inline getX/getY
+                    const x = frameXBase - ev.time * frameXScale;
+                    const y = Math.round(frameYBase - ev.midi * frameYScale);
                     const intensity = ev.velocity || 1.0;
 
                     ctx.moveTo(x, y - 6 * intensity);
@@ -865,8 +878,9 @@ export class UnifiedVisualizer {
                             continue;
                         }
 
-                        const x = this.getX(ev.time, currentTime);
-                        const y = Math.round(this.getY(ev.midi));
+                        // Inline getX/getY
+                        const x = frameXBase - ev.time * frameXScale;
+                        const y = Math.round(frameYBase - ev.midi * frameYScale);
                         const intensity = ev.velocity || 1.0;
 
                         ctx.moveTo(x, y - 6 * intensity);
@@ -881,88 +895,27 @@ export class UnifiedVisualizer {
             }
 
             // Standard Melodic Tracks (Bass, Soloist, Harmony)
-            const baseWidth = name === 'soloist' ? 4 : 5;
             const color = track.resolvedColor || track.color;
-            const geom = this.geometryBuffer;
-            geom.length = 0;
+
+            // Optimization: Split loop for soloist vs others to avoid per-event branching
             if (name === 'soloist') {
+                const baseWidth = 4;
                 for (let b = 0; b < 4; b++) {
                     this.soloistBuffers[b].length = 0;
                 }
-            }
 
-            // Pass 0: Compute Geometry
-            // Optimization: Calculate coordinates once per frame per track via inline RingBuffer iteration
-            const buffer = track.history.buffer;
-            const capacity = track.history.capacity;
-            const count = track.history.count;
-            const start = track.history.start;
-            const headLength = Math.min(count, capacity - start);
-            let stop = false;
+                const buffer = track.history.buffer;
+                const capacity = track.history.capacity;
+                const count = track.history.count;
+                const start = track.history.start;
+                const headLength = Math.min(count, capacity - start);
+                let stop = false;
 
-            // Loop 1
-            for (let i = 0; i < headLength; i++) {
-                const ev = buffer[start + i];
-                if (ev.time > currentTime) {
-                    stop = true;
-                    break;
-                }
-
-                const noteEnd = ev.time + (ev.duration || 0.25);
-                if (noteEnd < minTime) {
-                    continue;
-                }
-
-                const startT = Math.max(minTime, ev.time);
-                const endT = Math.min(currentTime, noteEnd);
-                const x1 = this.getX(startT, currentTime);
-                const x2 = this.getX(endT, currentTime);
-                const y = Math.round(this.getY(ev.midi));
-
-                if (y >= -10 && y <= h + 10) {
-                    if (name === 'soloist') {
-                        let typeCode = 0; // default
-                        if (ev.noteType === 'arp') {
-                            typeCode = 1;
-                        } else if (ev.noteType === 'target') {
-                            typeCode = 2;
-                        } else if (ev.noteType === 'altered') {
-                            typeCode = 3;
-                        }
-
-                        this.soloistBuffers[typeCode].push(x1, y, x2);
-                    } else {
-                        geom.push(x1, y, x2);
-                    }
-
-                    if (ev.time <= currentTime && noteEnd >= currentTime) {
-                        activeX = x2;
-                        activeY = y;
-                        isActive = true;
-
-                        if (name === 'soloist') {
-                            if (ev.noteType === 'arp') {
-                                activeColor = chordColors.fifth;
-                            } else if (ev.noteType === 'target') {
-                                activeColor = chordColors.root;
-                            } else if (ev.noteType === 'altered') {
-                                activeColor = chordColors.seventh;
-                            } else {
-                                activeColor = color;
-                            }
-                        } else {
-                            activeColor = color;
-                        }
-                    }
-                }
-            }
-
-            // Loop 2
-            if (!stop && headLength < count) {
-                const tailLength = count - headLength;
-                for (let i = 0; i < tailLength; i++) {
-                    const ev = buffer[i];
+                // Soloist Loop 1
+                for (let i = 0; i < headLength; i++) {
+                    const ev = buffer[start + i];
                     if (ev.time > currentTime) {
+                        stop = true;
                         break;
                     }
 
@@ -973,12 +926,62 @@ export class UnifiedVisualizer {
 
                     const startT = Math.max(minTime, ev.time);
                     const endT = Math.min(currentTime, noteEnd);
-                    const x1 = this.getX(startT, currentTime);
-                    const x2 = this.getX(endT, currentTime);
-                    const y = Math.round(this.getY(ev.midi));
+                    // Inline getX/getY
+                    const x1 = frameXBase - startT * frameXScale;
+                    const x2 = frameXBase - endT * frameXScale;
+                    const y = Math.round(frameYBase - ev.midi * frameYScale);
 
                     if (y >= -10 && y <= h + 10) {
-                        if (name === 'soloist') {
+                        let typeCode = 0; // default
+                        if (ev.noteType === 'arp') {
+                            typeCode = 1;
+                        } else if (ev.noteType === 'target') {
+                            typeCode = 2;
+                        } else if (ev.noteType === 'altered') {
+                            typeCode = 3;
+                        }
+
+                        this.soloistBuffers[typeCode].push(x1, y, x2);
+
+                        if (ev.time <= currentTime && noteEnd >= currentTime) {
+                            activeX = x2;
+                            activeY = y;
+                            isActive = true;
+
+                            if (ev.noteType === 'arp') {
+                                activeColor = chordColors.fifth;
+                            } else if (ev.noteType === 'target') {
+                                activeColor = chordColors.root;
+                            } else if (ev.noteType === 'altered') {
+                                activeColor = chordColors.seventh;
+                            } else {
+                                activeColor = color;
+                            }
+                        }
+                    }
+                }
+
+                // Soloist Loop 2
+                if (!stop && headLength < count) {
+                    const tailLength = count - headLength;
+                    for (let i = 0; i < tailLength; i++) {
+                        const ev = buffer[i];
+                        if (ev.time > currentTime) {
+                            break;
+                        }
+
+                        const noteEnd = ev.time + (ev.duration || 0.25);
+                        if (noteEnd < minTime) {
+                            continue;
+                        }
+
+                        const startT = Math.max(minTime, ev.time);
+                        const endT = Math.min(currentTime, noteEnd);
+                        const x1 = frameXBase - startT * frameXScale;
+                        const x2 = frameXBase - endT * frameXScale;
+                        const y = Math.round(frameYBase - ev.midi * frameYScale);
+
+                        if (y >= -10 && y <= h + 10) {
                             let typeCode = 0; // default
                             if (ev.noteType === 'arp') {
                                 typeCode = 1;
@@ -989,16 +992,12 @@ export class UnifiedVisualizer {
                             }
 
                             this.soloistBuffers[typeCode].push(x1, y, x2);
-                        } else {
-                            geom.push(x1, y, x2);
-                        }
 
-                        if (ev.time <= currentTime && noteEnd >= currentTime) {
-                            activeX = x2;
-                            activeY = y;
-                            isActive = true;
+                            if (ev.time <= currentTime && noteEnd >= currentTime) {
+                                activeX = x2;
+                                activeY = y;
+                                isActive = true;
 
-                            if (name === 'soloist') {
                                 if (ev.noteType === 'arp') {
                                     activeColor = chordColors.fifth;
                                 } else if (ev.noteType === 'target') {
@@ -1008,24 +1007,16 @@ export class UnifiedVisualizer {
                                 } else {
                                     activeColor = color;
                                 }
-                            } else {
-                                activeColor = color;
                             }
                         }
                     }
                 }
-            }
 
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            // First pass: Glow/outline for distinctness
-            ctx.strokeStyle = outlineColor;
-            ctx.lineWidth = baseWidth + 2;
-            ctx.beginPath();
-            let hasOutline = false;
-
-            if (name === 'soloist') {
+                // Soloist Rendering
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = baseWidth + 2;
+                ctx.beginPath();
+                let hasOutline = false;
                 for (let b = 0; b < 4; b++) {
                     const buf = this.soloistBuffers[b];
                     if (buf.length > 0) {
@@ -1036,22 +1027,11 @@ export class UnifiedVisualizer {
                         }
                     }
                 }
-            } else {
-                if (geom.length > 0) {
-                    hasOutline = true;
-                    for (let j = 0; j < geom.length; j += 3) {
-                        ctx.moveTo(geom[j], geom[j + 1]);
-                        ctx.lineTo(geom[j + 2], geom[j + 1]);
-                    }
+                if (hasOutline) {
+                    ctx.stroke();
                 }
-            }
-            if (hasOutline) {
-                ctx.stroke();
-            }
 
-            // Second pass: Colored line (Batched)
-            ctx.lineWidth = baseWidth;
-            if (name === 'soloist') {
+                ctx.lineWidth = baseWidth;
                 // Batch 1: Default (0)
                 if (this.soloistBuffers[0].length > 0) {
                     ctx.strokeStyle = color;
@@ -1100,9 +1080,93 @@ export class UnifiedVisualizer {
                     ctx.stroke();
                 }
             } else {
-                // Simple batch for non-soloist tracks
+                // Generic Track (Bass, Harmony)
+                const baseWidth = 5;
+                const geom = this.geometryBuffer;
+                geom.length = 0;
+
+                const buffer = track.history.buffer;
+                const capacity = track.history.capacity;
+                const count = track.history.count;
+                const start = track.history.start;
+                const headLength = Math.min(count, capacity - start);
+                let stop = false;
+
+                // Generic Loop 1
+                for (let i = 0; i < headLength; i++) {
+                    const ev = buffer[start + i];
+                    if (ev.time > currentTime) {
+                        stop = true;
+                        break;
+                    }
+
+                    const noteEnd = ev.time + (ev.duration || 0.25);
+                    if (noteEnd < minTime) {
+                        continue;
+                    }
+
+                    const startT = Math.max(minTime, ev.time);
+                    const endT = Math.min(currentTime, noteEnd);
+                    const x1 = frameXBase - startT * frameXScale;
+                    const x2 = frameXBase - endT * frameXScale;
+                    const y = Math.round(frameYBase - ev.midi * frameYScale);
+
+                    if (y >= -10 && y <= h + 10) {
+                        geom.push(x1, y, x2);
+                        if (ev.time <= currentTime && noteEnd >= currentTime) {
+                            activeX = x2;
+                            activeY = y;
+                            isActive = true;
+                            activeColor = color;
+                        }
+                    }
+                }
+
+                // Generic Loop 2
+                if (!stop && headLength < count) {
+                    const tailLength = count - headLength;
+                    for (let i = 0; i < tailLength; i++) {
+                        const ev = buffer[i];
+                        if (ev.time > currentTime) {
+                            break;
+                        }
+
+                        const noteEnd = ev.time + (ev.duration || 0.25);
+                        if (noteEnd < minTime) {
+                            continue;
+                        }
+
+                        const startT = Math.max(minTime, ev.time);
+                        const endT = Math.min(currentTime, noteEnd);
+                        const x1 = frameXBase - startT * frameXScale;
+                        const x2 = frameXBase - endT * frameXScale;
+                        const y = Math.round(frameYBase - ev.midi * frameYScale);
+
+                        if (y >= -10 && y <= h + 10) {
+                            geom.push(x1, y, x2);
+                            if (ev.time <= currentTime && noteEnd >= currentTime) {
+                                activeX = x2;
+                                activeY = y;
+                                isActive = true;
+                                activeColor = color;
+                            }
+                        }
+                    }
+                }
+
+                // Generic Rendering
                 if (geom.length > 0) {
+                    ctx.strokeStyle = outlineColor;
+                    ctx.lineWidth = baseWidth + 2;
+                    ctx.beginPath();
+                    for (let j = 0; j < geom.length; j += 3) {
+                        ctx.moveTo(geom[j], geom[j + 1]);
+                        ctx.lineTo(geom[j + 2], geom[j + 1]);
+                    }
+                    ctx.stroke();
+
                     ctx.strokeStyle = color;
+                    ctx.lineWidth = baseWidth;
                     ctx.beginPath();
                     for (let j = 0; j < geom.length; j += 3) {
                         ctx.moveTo(geom[j], geom[j + 1]);
