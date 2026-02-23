@@ -1156,22 +1156,19 @@ export class UnifiedVisualizer {
 
                 // Generic Rendering
                 if (geom.length > 0) {
-                    ctx.strokeStyle = outlineColor;
-                    ctx.lineWidth = baseWidth + 2;
+                    // Optimization: Reuse path for outline and color to avoid double iteration and path construction
                     ctx.beginPath();
                     for (let j = 0; j < geom.length; j += 3) {
                         ctx.moveTo(geom[j], geom[j + 1]);
                         ctx.lineTo(geom[j + 2], geom[j + 1]);
                     }
+
+                    ctx.strokeStyle = outlineColor;
+                    ctx.lineWidth = baseWidth + 2;
                     ctx.stroke();
 
                     ctx.strokeStyle = color;
                     ctx.lineWidth = baseWidth;
-                    ctx.beginPath();
-                    for (let j = 0; j < geom.length; j += 3) {
-                        ctx.moveTo(geom[j], geom[j + 1]);
-                        ctx.lineTo(geom[j + 2], geom[j + 1]);
-                    }
                     ctx.stroke();
                 }
             }
