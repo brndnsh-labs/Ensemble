@@ -33,4 +33,35 @@ describe('Preset Data Integrity', () => {
             });
         });
     });
+
+    it('should have at least one non-empty instrument pattern at the top level', () => {
+        // This ensures presets aren't silent by default due to missing top-level definitions
+        const ALL_INSTRUMENTS = [
+            'Kick',
+            'Snare',
+            'HiHat',
+            'Open',
+            'Clave',
+            'Conga',
+            'Bongo',
+            'Perc',
+            'Shaker',
+            'Guiro',
+            'High Tom',
+            'Mid Tom',
+            'Low Tom',
+        ];
+
+        Object.keys(DRUM_PRESETS).forEach((presetName) => {
+            const p = DRUM_PRESETS[presetName];
+            const hasHits = ALL_INSTRUMENTS.some((inst) => {
+                const pattern = p[inst];
+                return Array.isArray(pattern) && pattern.some((v) => v > 0);
+            });
+
+            expect(hasHits, `Preset "${presetName}" is effectively silent at the top level`).toBe(
+                true,
+            );
+        });
+    });
 });
