@@ -129,7 +129,6 @@ export class UnifiedVisualizer {
         this.cNotesBuffer = new Uint8Array(128);
 
         // Optimization: Shared buffer for calculated geometry
-        this.geometryBuffer = [];
         this.soloistBuffers = [[], [], [], []];
 
         // Optimization: Batched rendering buffers
@@ -1082,8 +1081,8 @@ export class UnifiedVisualizer {
             } else {
                 // Generic Track (Bass, Harmony)
                 const baseWidth = 5;
-                const geom = this.geometryBuffer;
-                geom.length = 0;
+                let hasNotes = false;
+                ctx.beginPath();
 
                 const buffer = track.history.buffer;
                 const capacity = track.history.capacity;
@@ -1112,7 +1111,9 @@ export class UnifiedVisualizer {
                     const y = Math.round(frameYBase - ev.midi * frameYScale);
 
                     if (y >= -10 && y <= h + 10) {
-                        geom.push(x1, y, x2);
+                        ctx.moveTo(x1, y);
+                        ctx.lineTo(x2, y);
+                        hasNotes = true;
                         if (ev.time <= currentTime && noteEnd >= currentTime) {
                             activeX = x2;
                             activeY = y;
@@ -1143,7 +1144,9 @@ export class UnifiedVisualizer {
                         const y = Math.round(frameYBase - ev.midi * frameYScale);
 
                         if (y >= -10 && y <= h + 10) {
-                            geom.push(x1, y, x2);
+                            ctx.moveTo(x1, y);
+                            ctx.lineTo(x2, y);
+                            hasNotes = true;
                             if (ev.time <= currentTime && noteEnd >= currentTime) {
                                 activeX = x2;
                                 activeY = y;
@@ -1155,14 +1158,7 @@ export class UnifiedVisualizer {
                 }
 
                 // Generic Rendering
-                if (geom.length > 0) {
-                    // Optimization: Reuse path for outline and color to avoid double iteration and path construction
-                    ctx.beginPath();
-                    for (let j = 0; j < geom.length; j += 3) {
-                        ctx.moveTo(geom[j], geom[j + 1]);
-                        ctx.lineTo(geom[j + 2], geom[j + 1]);
-                    }
-
+                if (hasNotes) {
                     ctx.strokeStyle = outlineColor;
                     ctx.lineWidth = baseWidth + 2;
                     ctx.stroke();
