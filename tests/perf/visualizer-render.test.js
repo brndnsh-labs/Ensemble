@@ -243,4 +243,38 @@ describe('UnifiedVisualizer Performance', () => {
         // Saving 2 changes here.
         // Plus Guide Tones? If we optimize those too.
     });
+
+    it('should optimize generic track rendering by batching path commands', () => {
+        // Setup generic track (bass)
+        viz.addTrack('bass', '#ff0000');
+
+        // Add 3 notes to history (Chronological order is required for optimization to work)
+        viz.pushNote('bass', { time: -2.0, duration: 1.0, midi: 32, velocity: 0.8 }); // Past
+        viz.pushNote('bass', { time: 0.0, duration: 1.0, midi: 36, velocity: 0.8 }); // Active
+        viz.pushNote('bass', { time: 0.4, duration: 0.1, midi: 40, velocity: 0.8 }); // Recent Past
+
+        // Clear mocks
+        mockCtx.moveTo.mockClear();
+        mockCtx.lineTo.mockClear();
+        mockCtx.stroke.mockClear();
+        mockCtx.beginPath.mockClear();
+
+        // Render at time 0.5
+        // All 3 notes are <= 0.5 and within window
+        viz.render(0.5, 120);
+
+        // Logic check:
+        // Current implementation uses 'geom' array and strokes ONCE (outline + color).
+        // It iterates 'geom' array to build path.
+        // So we expect 3 segments * (moveTo + lineTo) = 3 calls each.
+        // PLUS 1 playhead line (moveTo + lineTo).
+        // Total = 4.
+
+        // If implementation is correct, path construction happens inside loop.
+        expect(mockCtx.moveTo).toHaveBeenCalledTimes(4);
+        expect(mockCtx.lineTo).toHaveBeenCalledTimes(4);
+
+        // Outline + Color strokes (2) + Active Note Circle (1) + Playhead (1) = 4 calls total
+        expect(mockCtx.stroke).toHaveBeenCalledTimes(4);
+    });
 });
