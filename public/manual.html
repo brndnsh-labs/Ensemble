@@ -241,7 +241,7 @@
             <ul class="list-detailed">
                 <li><strong>Key & Time Overrides:</strong> Set a specific Key or Time Signature for just that section (e.g., modulate to G Major for the Chorus).</li>
                 <li><strong>Repeat (x):</strong> Loop a section multiple times (e.g., x4) to keep your arrangement compact.</li>
-                <li><strong>Seamless Link (🔗):</strong> Connects a section to the previous one without a drum fill or crash. Essential for creating long, continuous phrases (e.g., an 8-bar verse split into two 4-bar cards).</li>
+                <li><strong>Seamless Link (🔗):</strong> Connects a section to the previous one without a drum fill or crash. Unlinking enables procedural fills at section boundaries. Essential for creating long, continuous phrases.</li>
                 <li><strong>Reorder (▴/▾):</strong> Move sections up or down in the arrangement.</li>
                 <li><strong>Duplicate (⎘):</strong> Clone a section with all its settings.</li>
                 <li><strong>Symbol Menu (⋮):</strong> Quickly insert complex jazz symbols (ø, °, maj7) via the kebab menu.</li>
@@ -332,19 +332,20 @@
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Controls:</strong>
                     <br>• <strong>Complexity:</strong> Adjust note density and syncopation independent of the band. (Located in the Soloist <strong>Settings (⋮)</strong> menu).
                     <br>• <strong>Trade Mode:</strong> Automate call-and-response jamming. Choose <strong>Sections</strong> to alternate soloist state every section change, or <strong>Loops</strong> to alternate every song loop.
+                    <br>• <strong>Antiphonal Phrasing:</strong> In <strong>Ska-Punk</strong> mode, the soloist engages in automatic call-and-response with the horn section (Harmony), taking the lead on odd measures.
                     <br>• <strong>Musical Entry:</strong> The soloist intelligently waits for the start of a measure (the "1") to enter, ensuring phrases always start on a strong beat.
                     <br>• <strong>Status Indicator:</strong> The Soloist power button (⏻) indicates its current state:
                         <br>&nbsp;&nbsp; - <span style="color: var(--green);">Green</span>: Soloist is active and playing.
                         <br>&nbsp;&nbsp; - <span style="color: var(--yellow);">Yellow</span>: Soloist is enabled but waiting for its turn (Trading active).
                         <br>&nbsp;&nbsp; - <span style="color: var(--text-muted);">Off</span>: Soloist is disabled (Manual mode required to reactivate).
                 </p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Devices:</strong> Runs, Double Stops, Enclosures, Quartal Harmony, Banjo Rolls, Slides, Country Bends, Chicken Pick, Grace Slides, Bird Flurry.</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Devices:</strong> Runs, Double Stops, Enclosures, Quartal Harmony, Banjo Rolls, Slides, Country Bends, Chicken Pick, Grace Slides, Bird Flurry, Grace Notes (Piano).</p>
             </div>
 
             <div class="feature-card">
                 <h4 style="color: var(--harmony-color);">Harmony (Horns/Strings)</h4>
                 <p style="font-size: 0.9rem; margin: 0;">Generates background hooks and pads. Features <strong>Motif Memory</strong> for catchy, repeating seeds and <strong>Soloist Awareness</strong> (retreats to pads when the soloist is active).</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Styles:</strong> Horns (Stabs), Strings (Pads), Organ (B3), Modern Synth (Plucks), Contrapuntal.</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Styles:</strong> Horns (Stabs), Strings (Pads), Organ (B3), Modern Synth (Plucks), Disco, Contrapuntal. (Jazz/Funk modes automatically switch to <strong>Comping</strong> style).</p>
             </div>
 
             <div class="feature-card">
@@ -364,7 +365,7 @@
                 <li><strong>Expressive Automation:</strong> Soloist sends <strong>Pitch Bend</strong> (scoops) and <strong>Modulation (CC 1)</strong> based on tension. All tracks send <strong>Expression (CC 11)</strong> mapped to Band Intensity.</li>
                 <li><strong>Panic (Reset):</strong> Double-clicking Stop or toggling MIDI sends a full reset (CC 121) and kills all active voices.</li>
                 <li><strong>Monophony:</strong> Bass and Soloist tracks enforce strict monophony (clean re-attacks) to ensure reliability with hardware and vintage synth patches.</li>
-                <li><strong>Export:</strong> Download a multi-track .mid file for offline editing.</li>
+                <li><strong>Export:</strong> Download a multi-track .mid file containing <strong>Chords</strong>, <strong>Bass</strong>, <strong>Soloist</strong>, <strong>Harmonies</strong>, and <strong>Drums</strong> for offline editing.</li>
             </ul>
         </section>
 
