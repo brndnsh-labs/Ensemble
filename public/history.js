@@ -1,7 +1,4 @@
 import { getState } from './state.js';
-
-const { arranger } = getState();
-
 import { showToast } from './ui.js';
 
 // We need some function references that are usually in main.js
@@ -9,6 +6,7 @@ import { showToast } from './ui.js';
 // Refactoring to use a more event-driven approach later.
 
 export function pushHistory() {
+    const { arranger } = getState();
     arranger.history.push(JSON.stringify(arranger.sections));
     if (arranger.history.length > 20) {
         arranger.history.shift();
@@ -16,6 +14,7 @@ export function pushHistory() {
 }
 
 export function undo(refreshArrangerUI) {
+    const { arranger } = getState();
     if (arranger.history.length === 0) {
         return;
     }

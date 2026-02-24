@@ -188,13 +188,6 @@ export function grooveReducer(action, payload, playback) {
                     updates.swingSub = payload.sub;
                 }
                 Object.assign(groove, updates);
-
-                // If a specific drum preset is linked, trigger it
-                if (payload.drum) {
-                    import('../instrument-controller.js').then(({ loadDrumPreset }) => {
-                        loadDrumPreset(payload.drum);
-                    });
-                }
             }
             return true;
         case ACTIONS.SET_ACTIVE_TAB:

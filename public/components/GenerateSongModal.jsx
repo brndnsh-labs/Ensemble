@@ -1,12 +1,6 @@
 import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { getState } from '../state.js';
-import { ACTIONS } from '../types.js';
-import { useDispatch, useEnsembleState } from '../ui-bridge.js';
-
-const { arranger } = getState();
-
 import {
     clearChordPresetHighlight,
     refreshArrangerUI,
@@ -14,10 +8,14 @@ import {
 } from '../arranger-controller.js';
 import { pushHistory } from '../history.js';
 import { generateSong } from '../song-generator.js';
+import { getState } from '../state.js';
+import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
+import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { normalizeKey } from '../utils.js';
 
 export function GenerateSongModal() {
+    const { arranger } = getState();
     const dispatch = useDispatch();
     const isOpen = useEnsembleState((s) => s.playback.modals.generateSong);
     const overlayRef = useRef(null);

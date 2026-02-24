@@ -31,7 +31,23 @@ export function getState() {
 }
 
 // Export individual state slices for dynamic imports
-export { playback, arranger, chords, bass, soloist, harmony, groove, midi, vizState };
+export {
+    playback,
+    arranger,
+    chords,
+    bass,
+    soloist,
+    harmony,
+    groove,
+    midi,
+    vizState,
+    playbackReducer,
+    arrangerReducer,
+    instrumentReducer,
+    grooveReducer,
+    midiReducer,
+    vizReducer,
+};
 
 // Persistence Helpers
 export const storage = {
@@ -117,6 +133,13 @@ async function handleEffects(action, payload, context = {}) {
         case ACTIONS.SET_BPM: {
             const { setBpm } = await import('./app-controller.js');
             setBpm(payload, payload?.viz, true, context.oldBpm);
+            break;
+        }
+        case ACTIONS.SET_GENRE_FEEL: {
+            if (payload.drum && !playback.isPlaying) {
+                const { loadDrumPreset } = await import('./instrument-controller.js');
+                loadDrumPreset(payload.drum);
+            }
             break;
         }
     }

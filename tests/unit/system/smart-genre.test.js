@@ -4,6 +4,23 @@ import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock dependencies that are dynamically imported to prevent floating promises
+vi.mock('../../../public/state.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        // Wrap dispatch to avoid handleEffects during tests
+        dispatch: vi.fn((action, payload) => {
+            // Only perform state updates, skip handleEffects side-effects
+            actual.playbackReducer(action, payload);
+            actual.arrangerReducer(action, payload);
+            actual.instrumentReducer(action, payload);
+            actual.grooveReducer(action, payload, actual.playback);
+            actual.midiReducer(action, payload);
+            actual.vizReducer(action, payload);
+        }),
+    };
+});
+
 vi.mock('../../../public/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     togglePower: vi.fn(),
@@ -19,10 +36,18 @@ vi.mock('../../../public/engine/scheduler-core.js', () => ({
     scheduler: vi.fn(),
 }));
 
-const { playback, chords, bass, soloist, harmony, groove } = getState();
-
 describe('Smart Genre System', () => {
+    let playback, chords, bass, soloist, harmony, groove;
+
     beforeEach(() => {
+        const state = getState();
+        playback = state.playback;
+        chords = state.chords;
+        bass = state.bass;
+        soloist = state.soloist;
+        harmony = state.harmony;
+        groove = state.groove;
+
         dispatch(ACTIONS.RESET_STATE);
         // Ensure we are not playing to avoid pending state by default
         playback.isPlaying = false;
