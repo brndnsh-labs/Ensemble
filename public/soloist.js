@@ -6,7 +6,6 @@ import { calculateTimingOffset, getFrequency, getMidi } from './utils.js';
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 const HIST_COUNTS = new Float32Array(128);
 const PC_COUNTS = new Float32Array(12);
-const SCALE_LOOKUP = new Int8Array(12);
 
 const RHYTHMIC_CELLS = [
     [1, 1, 1, 1], // 0: 16ths
@@ -837,10 +836,10 @@ export function getSoloistNote(
 
     const scaleIntervals = getScaleForChord(targetChord, null, style);
 
-    // Optimization: Pre-calculate scale intervals lookup table for O(1) access
-    SCALE_LOOKUP.fill(0);
+    // Optimization: Pre-calculate scale intervals lookup table (bitmask) for O(1) access
+    let scaleMask = 0;
     for (let i = 0; i < scaleIntervals.length; i++) {
-        SCALE_LOOKUP[scaleIntervals[i]] = 1;
+        scaleMask |= (1 << scaleIntervals[i]);
     }
 
     const rootMidi = targetChord.rootMidi;
@@ -906,7 +905,7 @@ export function getSoloistNote(
         let weight = 1.0;
 
         // Use pre-calculated interval (0-11) to check against scaleIntervals (also 0-11)
-        if (SCALE_LOOKUP[interval] === 0) {
+        if (!((scaleMask >> interval) & 1)) {
             continue;
         }
 
@@ -1063,7 +1062,7 @@ export function getSoloistNote(
             }
             const pc = ((m % 12) + 12) % 12;
             const interval = (pc - (rootMidi % 12) + 12) % 12;
-            if (SCALE_LOOKUP[interval] === 1 && m !== lastMidi) {
+            if (((scaleMask >> interval) & 1) && m !== lastMidi) {
                 const dist = Math.abs(m - lastMidi);
                 let weight = 1.0;
                 if (dist <= 2) {
@@ -1249,7 +1248,7 @@ export function getSoloistNote(
             let curr = selectedMidi + 3;
             for (let i = 0; i < 4; i++) {
                 let n = curr - 1;
-                while (SCALE_LOOKUP[(n - rootMidi + 120) % 12] === 0 && n > curr - 5) {
+                while (!((scaleMask >> ((n - rootMidi + 120) % 12)) & 1) && n > curr - 5) {
                     n--;
                 }
                 flurry.push({
