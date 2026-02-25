@@ -309,11 +309,15 @@ export function getSoloistNote(
     style,
     stepInChord,
     isPriming,
+    coordination = {},
 ) {
     const { playback, groove, soloist, harmony, arranger } = getState();
     if (!currentChord) {
         return null;
     }
+
+    // --- Coordination Logic ---
+    const bassHit = coordination.bassHit || false;
 
     let targetChord = currentChord;
     let activeStyle = style;
@@ -1411,7 +1415,14 @@ export function getSoloistNote(
 
     const isImportantStep = stepInBeat === 0 || (stepInBeat === 2 && Math.random() < 0.3);
     const baseVelocity = 0.5 + effectiveIntensity * 0.7;
-    const stepVelocity = isImportantStep ? baseVelocity * 1.15 : baseVelocity;
+    let stepVelocity = isImportantStep ? baseVelocity * 1.15 : baseVelocity;
+
+    // --- ENSEMBLE CLARITY: Yield to Bass ---
+    // If we are playing in the lower soloist register and the bass is hitting,
+    // reduce velocity slightly to avoid low-mid mud.
+    if (bassHit && selectedMidi < 60) {
+        stepVelocity *= 0.85;
+    }
 
     // --- Legato Logic ---
     let isLegato = false;
