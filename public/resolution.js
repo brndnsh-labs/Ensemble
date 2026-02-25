@@ -98,6 +98,7 @@ export function generateResolutionNotes(
     bpm = 100,
     groove = {},
     soloist = {},
+    _coordination = {},
 ) {
     const notes = [];
     const genre = groove.genreFeel || 'Rock';

@@ -20,6 +20,18 @@ let bbBufferHead = 0;
 let sbBufferHead = 0;
 let cbBufferHead = 0;
 let hbBufferHead = 0;
+
+// Shared state for multi-way coordination within a single step
+const stepCoordination = {
+    step: -1,
+    bassHit: false,
+    bassMidi: 0,
+    soloistActive: false,
+    soloistMidi: 0,
+    accompanimentHit: false,
+    accompanimentMidis: [],
+};
+
 let lastChordIndex = 0;
 let lastSectionIndex = 0;
 const mainCursor = { index: 0, sectionIndex: 0 };
@@ -405,6 +417,17 @@ class ExportProcessor {
         const stepInfo = getStepInfo(globalStep, this.ts);
         const chordData = getChordAtStep(globalStep, this.exportCursor);
 
+        // Coordination state for export
+        const coordination = {
+            step: globalStep,
+            bassHit: false,
+            bassMidi: 0,
+            soloistActive: false,
+            soloistMidi: 0,
+            accompanimentHit: false,
+            accompanimentMidis: [],
+        };
+
         if (chordData) {
             const { chord, stepInChord } = chordData;
             const nextChordData = getChordAtStep(globalStep + 4, this.exportLookaheadCursor);
@@ -425,56 +448,7 @@ class ExportProcessor {
                 }
             }
 
-            if (this.includedTracks.includes('chords')) {
-                const notes = getAccompanimentNotes(
-                    chord,
-                    globalStep,
-                    stepInChord,
-                    measureStep,
-                    stepInfo,
-                );
-                const numVoices = notes.filter((n) => n.midi > 0).length;
-                const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
-
-                notes.forEach((n) => {
-                    const noteTimeS = stepTimeS + (n.timingOffset || 0);
-                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
-
-                    if (n.midi > 0) {
-                        n.ccEvents.forEach((cc) =>
-                            this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
-                        );
-
-                        let finalVel = n.velocity * polyphonyComp;
-                        if (n.muted) {
-                            finalVel *= 0.3;
-                        }
-                        const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
-
-                        this.chordTrack.noteOn(notePulse, 0, n.midi, midiVel);
-
-                        let endTimeS;
-                        if (n.durationSteps < 1) {
-                            endTimeS = noteTimeS + n.durationSteps * this.sixteenthSec;
-                        } else {
-                            const targetStepIdx = globalStep + Math.round(n.durationSteps);
-                            endTimeS =
-                                this.stepTimes[targetStepIdx] ||
-                                noteTimeS + n.durationSteps * this.sixteenthSec;
-                        }
-                        if (endTimeS - noteTimeS < 0.05) {
-                            endTimeS = noteTimeS + 0.05;
-                        }
-
-                        this.chordTrack.noteOff(this.toPulses(endTimeS), 0, n.midi);
-                    } else if (n.ccEvents.length > 0) {
-                        n.ccEvents.forEach((cc) =>
-                            this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
-                        );
-                    }
-                });
-            }
-
+            // 1. Bass (Moved up for coordination)
             if (
                 this.includedTracks.includes('bass') &&
                 isBassActive(bass.style, globalStep, stepInChord)
@@ -490,7 +464,7 @@ class ExportProcessor {
                     chordData.chordIndex,
                     globalStep,
                     stepInChord,
-                    { sectionStart, sectionEnd },
+                    { sectionStart, sectionEnd, stepCoordination: coordination },
                 );
                 if (res?.midi) {
                     const noteTimeS = stepTimeS + (res.timingOffset || 0);
@@ -520,12 +494,18 @@ class ExportProcessor {
 
                     this.bassTrack.noteOff(this.toPulses(endTimeS), 1, res.midi);
                     bass.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
+
+                    // Register in coordination state
+                    coordination.bassHit = true;
+                    coordination.bassMidi = res.midi;
                 }
             }
 
+            // 2. Soloist
+            let soloResult = null;
             if (this.includedTracks.includes('soloist')) {
                 const { sectionStart, sectionEnd } = chordData;
-                const soloResult = getSoloistNote(
+                soloResult = getSoloistNote(
                     chord,
                     nextChordData?.chord,
                     globalStep,
@@ -534,7 +514,7 @@ class ExportProcessor {
                     soloist.style,
                     stepInChord,
                     false,
-                    { sectionStart, sectionEnd },
+                    { sectionStart, sectionEnd, stepCoordination: coordination },
                 );
                 if (soloResult) {
                     const results = Array.isArray(soloResult) ? soloResult : [soloResult];
@@ -583,31 +563,45 @@ class ExportProcessor {
                             this.soloistTrack.noteOff(this.toPulses(endTimeS), 2, res.midi);
                             if (!res.isDoubleStop) {
                                 soloist.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
+
+                                // Register in coordination state
+                                coordination.soloistActive = true;
+                                coordination.soloistMidi = res.midi;
                             }
                         }
                     });
                 }
+            }
 
-                if (this.includedTracks.includes('harmonies')) {
-                    const harmonyNotes = getHarmonyNotes(
-                        chord,
-                        nextChordData?.chord,
-                        globalStep,
-                        harmony.octave,
-                        harmony.style,
-                        stepInChord,
-                    );
-                    const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
+            // 3. Chords (Accompaniment)
+            if (this.includedTracks.includes('chords')) {
+                const notes = getAccompanimentNotes(
+                    chord,
+                    globalStep,
+                    stepInChord,
+                    measureStep,
+                    stepInfo,
+                    coordination,
+                );
+                const numVoices = notes.filter((n) => n.midi > 0).length;
+                const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
 
-                    harmonyNotes.forEach((n) => {
-                        const noteTimeS = stepTimeS + (n.timingOffset || 0);
-                        const notePulse = Math.max(0, this.toPulses(noteTimeS));
-                        const midiVel = Math.max(
-                            1,
-                            Math.min(127, Math.round(n.velocity * polyphonyComp * 127)),
+                notes.forEach((n) => {
+                    const noteTimeS = stepTimeS + (n.timingOffset || 0);
+                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
+
+                    if (n.midi > 0) {
+                        n.ccEvents.forEach((cc) =>
+                            this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
                         );
 
-                        this.harmonyTrack.noteOn(notePulse, 3, n.midi, midiVel);
+                        let finalVel = n.velocity * polyphonyComp;
+                        if (n.muted) {
+                            finalVel *= 0.3;
+                        }
+                        const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
+
+                        this.chordTrack.noteOn(notePulse, 0, n.midi, midiVel);
 
                         let endTimeS;
                         if (n.durationSteps < 1) {
@@ -618,9 +612,58 @@ class ExportProcessor {
                                 this.stepTimes[targetStepIdx] ||
                                 noteTimeS + n.durationSteps * this.sixteenthSec;
                         }
-                        this.harmonyTrack.noteOff(this.toPulses(endTimeS), 3, n.midi);
-                    });
-                }
+                        if (endTimeS - noteTimeS < 0.05) {
+                            endTimeS = noteTimeS + 0.05;
+                        }
+
+                        this.chordTrack.noteOff(this.toPulses(endTimeS), 0, n.midi);
+
+                        // Register in coordination state
+                        coordination.accompanimentHit = true;
+                        coordination.accompanimentMidis.push(n.midi);
+                    } else if (n.ccEvents.length > 0) {
+                        n.ccEvents.forEach((cc) =>
+                            this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
+                        );
+                    }
+                });
+            }
+
+            // 4. Harmonies
+            if (this.includedTracks.includes('harmonies')) {
+                const harmonyNotes = getHarmonyNotes(
+                    chord,
+                    nextChordData?.chord,
+                    globalStep,
+                    harmony.octave,
+                    harmony.style,
+                    stepInChord,
+                    soloResult,
+                    coordination,
+                );
+                const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
+
+                harmonyNotes.forEach((n) => {
+                    const noteTimeS = stepTimeS + (n.timingOffset || 0);
+                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
+                    const midiVel = Math.max(
+                        1,
+                        Math.min(127, Math.round(n.velocity * polyphonyComp * 127)),
+                    );
+
+                    this.harmonyTrack.noteOn(notePulse, 3, n.midi, midiVel);
+
+                    let endTimeS;
+                    if (n.durationSteps < 1) {
+                        endTimeS = noteTimeS + n.durationSteps * this.sixteenthSec;
+                    } else {
+                        const targetStepIdx = globalStep + Math.round(n.durationSteps);
+                        endTimeS =
+                            this.stepTimes[targetStepIdx] ||
+                            noteTimeS + n.durationSteps * this.sixteenthSec;
+                    }
+                    this.harmonyTrack.noteOff(this.toPulses(endTimeS), 3, n.midi);
+                });
             }
 
             if (this.includedTracks.includes('drums')) {
@@ -1027,6 +1070,15 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         const step = head;
         const chordData = getChordAtStep(step, mainCursor);
 
+        // Reset step coordination for this specific step
+        stepCoordination.step = step;
+        stepCoordination.bassHit = false;
+        stepCoordination.bassMidi = 0;
+        stepCoordination.soloistActive = false;
+        stepCoordination.soloistMidi = 0;
+        stepCoordination.accompanimentHit = false;
+        stepCoordination.accompanimentMidis = [];
+
         // --- Bass ---
         if (bass.enabled && step >= bbBufferHead) {
             if (chordData) {
@@ -1044,7 +1096,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                         chordData.chordIndex,
                         step,
                         stepInChord,
-                        { sectionStart, sectionEnd },
+                        { sectionStart, sectionEnd, stepCoordination },
                     );
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                         if (!bassResult.midi) {
@@ -1055,6 +1107,10 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                         }
                         bass.lastFreq = bassResult.freq; // @worker-mutation
                         notesToMain.push({ ...bassResult, step, module: 'bass' });
+
+                        // Register in coordination state
+                        stepCoordination.bassHit = true;
+                        stepCoordination.bassMidi = bassResult.midi;
                     }
                 }
             }
@@ -1076,7 +1132,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     soloist.style,
                     stepInChord,
                     false,
-                    { sectionStart, sectionEnd },
+                    { sectionStart, sectionEnd, stepCoordination },
                 );
 
                 if (soloResult) {
@@ -1092,6 +1148,10 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                             }
                             if (!res.isDoubleStop) {
                                 soloist.lastFreq = res.freq; // @worker-mutation
+
+                                // Register in coordination state (non-double-stops)
+                                stepCoordination.soloistActive = true;
+                                stepCoordination.soloistMidi = res.midi;
                             }
                             notesToMain.push({ ...res, step, module: 'soloist' });
                         }
@@ -1112,6 +1172,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     stepInChord,
                     step % stepsPerMeasure,
                     stepInfo,
+                    stepCoordination,
                 );
                 for (let i = 0; i < chordNotes.length; i++) {
                     const n = chordNotes[i];
@@ -1119,6 +1180,12 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                         n.freq = getFrequency(n.midi);
                     }
                     notesToMain.push({ ...n, step, module: 'chords' });
+
+                    // Register in coordination state
+                    if (n.midi > 0) {
+                        stepCoordination.accompanimentHit = true;
+                        stepCoordination.accompanimentMidis.push(n.midi);
+                    }
                 }
             }
             cbBufferHead++;
@@ -1137,6 +1204,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     harmony.style,
                     stepInChord,
                     soloResult,
+                    stepCoordination,
                 );
                 for (let i = 0; i < harmonyNotes.length; i++) {
                     const n = harmonyNotes[i];
@@ -1353,6 +1421,16 @@ if (typeof self !== 'undefined') {
 }
 
 export function handleResolution(step, requestTimestamp = null, processStartTime = null) {
+    const coordination = {
+        step,
+        bassHit: false,
+        bassMidi: 0,
+        soloistActive: false,
+        soloistMidi: 0,
+        accompanimentHit: false,
+        accompanimentMidis: [],
+    };
+
     const notesToMain = generateResolutionNotes(
         step,
         arranger,
@@ -1366,6 +1444,7 @@ export function handleResolution(step, requestTimestamp = null, processStartTime
         playback.bpm,
         groove,
         soloist,
+        coordination,
     );
     var workerProcessTime = processStartTime ? performance.now() - processStartTime : 0;
     postMessage({
@@ -1414,6 +1493,16 @@ function handlePrime(steps) {
             const nextChordData = getChordAtStep(s + 4, primeLookaheadCursor);
             const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
 
+            const coordination = {
+                step: s,
+                bassHit: false,
+                bassMidi: 0,
+                soloistActive: false,
+                soloistMidi: 0,
+                accompanimentHit: false,
+                accompanimentMidis: [],
+            };
+
             // 1. Prime Bass (if enabled) to update bass.lastFreq
             if (bass.enabled) {
                 if (isBassActive(bass.style, s, stepInChord)) {
@@ -1429,13 +1518,15 @@ function handlePrime(steps) {
                         chordData.chordIndex,
                         s,
                         stepInChord,
-                        { sectionStart, sectionEnd },
+                        { sectionStart, sectionEnd, stepCoordination: coordination },
                     );
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                         if (!bassResult.freq) {
                             bassResult.freq = 440 * 2 ** ((bassResult.midi - 69) / 12);
                         }
                         bass.lastFreq = bassResult.freq; // @worker-mutation
+                        coordination.bassHit = true;
+                        coordination.bassMidi = bassResult.midi;
                     }
                 }
             }
@@ -1454,7 +1545,7 @@ function handlePrime(steps) {
                 soloist.style,
                 stepInChord,
                 true,
-                { sectionStart, sectionEnd },
+                { sectionStart, sectionEnd, stepCoordination: coordination },
             );
 
             if (soloResult) {
@@ -1466,6 +1557,8 @@ function handlePrime(steps) {
                         }
                         if (!res.isDoubleStop) {
                             soloist.lastFreq = res.freq; // @worker-mutation
+                            coordination.soloistActive = true;
+                            coordination.soloistMidi = res.midi;
                         }
                     }
                 });
