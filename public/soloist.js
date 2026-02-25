@@ -839,7 +839,7 @@ export function getSoloistNote(
     // Optimization: Pre-calculate scale intervals lookup table (bitmask) for O(1) access
     let scaleMask = 0;
     for (let i = 0; i < scaleIntervals.length; i++) {
-        scaleMask |= (1 << scaleIntervals[i]);
+        scaleMask |= 1 << scaleIntervals[i];
     }
 
     const rootMidi = targetChord.rootMidi;
@@ -1062,7 +1062,7 @@ export function getSoloistNote(
             }
             const pc = ((m % 12) + 12) % 12;
             const interval = (pc - (rootMidi % 12) + 12) % 12;
-            if (((scaleMask >> interval) & 1) && m !== lastMidi) {
+            if ((scaleMask >> interval) & 1 && m !== lastMidi) {
                 const dist = Math.abs(m - lastMidi);
                 let weight = 1.0;
                 if (dist <= 2) {

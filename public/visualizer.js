@@ -728,8 +728,8 @@ export class UnifiedVisualizer {
             const rootPC = ev.rootMidi % 12;
 
             for (const interval of ev.intervals) {
-                const pc = (rootPC + interval) % 12;
-                const colorIdx = INTERVAL_COLOR_INDEX[interval];
+                const pc = (((rootPC + interval) % 12) + 12) % 12;
+                const colorIdx = INTERVAL_COLOR_INDEX[((interval % 12) + 12) % 12];
                 const buffer = this.guideToneBuffers[colorIdx];
 
                 // Render in visible octaves (using hoisted range)
