@@ -431,8 +431,10 @@ export function Settings() {
                                         }}
                                     >
                                         <button
+                                            id="sessionTimerDec"
                                             class="stepper-btn"
                                             style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
+                                            aria-label="Decrease song duration"
                                             onClick={() => {
                                                 if (loopLimit > 0) {
                                                     const next = Math.max(1, loopLimit - 1);
@@ -451,14 +453,17 @@ export function Settings() {
                                             -
                                         </button>
                                         <input
+                                            id="sessionTimerInput"
                                             type="number"
                                             value={loopLimit > 0 ? loopLimit : sessionTimer}
                                             readonly
                                             style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;"
                                         />
                                         <button
+                                            id="sessionTimerInc"
                                             class="stepper-btn"
                                             style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
+                                            aria-label="Increase song duration"
                                             onClick={() => {
                                                 if (loopLimit > 0) {
                                                     const next = Math.min(50, loopLimit + 1);

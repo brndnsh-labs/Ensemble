@@ -1129,8 +1129,8 @@ export function getSoloistNote(
         if (playback.bpm > 180 && dist > 3) {
             weight *= 0.05; // Stricter
         }
-        if (playback.bpm > 190 && dist > 2) {
-            weight *= 0.05; // Super strict at 200 BPM (mostly stepwise)
+        if (playback.bpm > 195 && dist > 2) {
+            weight *= 0.01; // Super strict at 200 BPM (mostly stepwise)
         }
 
         if (historyLen > 12) {

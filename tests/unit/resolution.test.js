@@ -30,22 +30,18 @@ describe('Resolution Logic', () => {
         const bpm = 120;
         const step = 64;
 
+        // Rock is the default, which uses BUTTON (1 step)
         const notes = generateResolutionNotes(step, arranger, enabled, bpm);
 
         expect(notes.length).toBeGreaterThan(0);
 
-        // Check for Bass Notes (Standard Major is IV-V-I)
+        // Check for Bass Notes (Rock is BUTTON hit)
         const bassNotes = notes.filter((n) => n.module === 'bass');
-        expect(bassNotes.length).toBeGreaterThanOrEqual(2);
+        expect(bassNotes.length).toBe(1);
 
         // Check timing offsets
         const times = notes.map((n) => n.timingOffset);
         times.forEach((t) => expect(t).toBeDefined());
-
-        // Verify Ritardando: Last note should be significantly later
-        times.sort((a, b) => a - b);
-        const duration = times[times.length - 1];
-        expect(duration).toBeGreaterThan(1.0); // At least a second or so
     });
 
     it('handles minor key resolution correctly', () => {
@@ -68,9 +64,8 @@ describe('Resolution Logic', () => {
 
         const notes = generateResolutionNotes(0, arranger, enabled, 100, groove);
 
-        // Jazz Major should be ii-V-I
-        // Expect at least 3 distinct timing offsets for the chords
+        // Jazz Major should be JAZZ_V_I (2 steps)
         const uniqueTimes = [...new Set(notes.map((n) => n.timingOffset))];
-        expect(uniqueTimes.length).toBeGreaterThanOrEqual(3);
+        expect(uniqueTimes.length).toBe(2);
     });
 });

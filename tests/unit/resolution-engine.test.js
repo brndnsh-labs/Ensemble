@@ -50,36 +50,35 @@ describe('Resolution Engine Profiles', () => {
         return uniqueTimes;
     };
 
-    it('Jazz Profile: Generates 3-step ii-V-I with ritardando', () => {
+    it('Jazz Profile: Generates 2-step V-I with ritardando', () => {
         const notes = generateResolutionNotes(0, mockArranger, enabled, 120, { genreFeel: 'Jazz' });
         const uniqueTimes = getUniqueChordTimes(notes);
 
-        // Should have 3 distinct chords
-        expect(uniqueTimes.length).toBeGreaterThanOrEqual(3);
+        // Should have 2 distinct chords (V and I)
+        expect(uniqueTimes.length).toBe(2);
 
-        // Ritardando check: Interval between 2nd and 3rd chord > Interval between 1st and 2nd
-        if (uniqueTimes.length >= 3) {
+        // Ritardando check: Interval between the two chords should be significant
+        if (uniqueTimes.length === 2) {
             const d1 = uniqueTimes[1] - uniqueTimes[0];
-            const d2 = uniqueTimes[2] - uniqueTimes[1];
-            expect(d2).toBeGreaterThan(d1);
+            expect(d1).toBeGreaterThan(1.0); // At 120BPM, 2 beats * (1 + 1.2 ritardando) = 1.1s
         }
     });
 
-    it('Rock Profile: Generates 3-step bVI-bVII-I (Epic)', () => {
+    it('Rock Profile: Generates 1-step BUTTON hit', () => {
         const notes = generateResolutionNotes(0, mockArranger, enabled, 120, { genreFeel: 'Rock' });
         const uniqueTimes = getUniqueChordTimes(notes);
 
-        // Should be 3 steps now (bVI, bVII, I)
-        expect(uniqueTimes.length).toBeGreaterThanOrEqual(3);
+        // Should be 1 step (BUTTON)
+        expect(uniqueTimes.length).toBe(1);
     });
 
-    it('Blues Profile: Generates Turnaround', () => {
+    it('Blues Profile: Generates 2-step resolution', () => {
         const notes = generateResolutionNotes(0, mockArranger, enabled, 120, {
             genreFeel: 'Blues',
         });
         const uniqueTimes = getUniqueChordTimes(notes);
 
-        // Blues turnaround has 5 steps
-        expect(uniqueTimes.length).toBeGreaterThanOrEqual(4);
+        // Blues now uses STANDARD_V_I (2 steps)
+        expect(uniqueTimes.length).toBe(2);
     });
 });
