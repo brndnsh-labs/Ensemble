@@ -46,3 +46,5 @@ The project has completed the **v2.29 Codebase Health & Standards Audit**, achie
 10. **Test Suite Cleanup**: COMPLETED removal of redundant multi-key integration tests (`autumn-leaves-multikey.test.js`) in favor of centralized harmony logic tests, improving CI cycle time.
 11. **Ska-Punk Smart Genre**: COMPLETED implementation of high-energy Ska-Punk style with upstroke-heavy accompaniment, fast melodic walking bass, and punchy horn section hooks. Optimized for high-BPM stability.
 12. **Unified Infrastructure**: COMPLETED transition from ESLint to Biome for blazing-fast, consolidated linting and formatting. Verified 100% build stability.
+13. **Drum Motif Engine (v2.5)**: COMPLETED implementation of deterministic, measure-based motif system across all genres. Replaced per-step random probability with cohesive rhythmic patterns (e.g., Charleston for Jazz, Linear for Funk, One Drop for Reggae). Added context-aware phrase turnarounds for structural drum fills. Verified with 9 new integrity suites.
+

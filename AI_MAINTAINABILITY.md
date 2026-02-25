@@ -46,3 +46,5 @@ The "Ensemble" codebase is exceptionally well-structured for AI agents. Followin
 3.  **UI Synchronization:** When adding new state properties, ensure they are handled in the appropriate reducer (e.g., `playback.js`) and followed by a `dispatch` call to trigger component re-renders.
 4.  **Legacy Bridging:** If you need to access a DOM element directly (e.g., for legacy Canvas or 3rd party libs), use a `ref` within a component.
 5.  **Hybrid Controller Usage:** Be aware that some complex actions (audio engine start/stop) require importing controllers (e.g., `togglePlay`) rather than just dispatching state actions.
+6.  **Deterministic Engine Patterns:** When improving generative logic (drums, soloist, bass), prioritize **Deterministic Motifs** (using `barIndex` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js` for implementation.
+
