@@ -22,6 +22,7 @@ export function Settings() {
         visualFlash,
         haptic,
         sessionTimer,
+        loopLimit,
         songMode,
         midiEnabled,
         midiMuteLocal,
@@ -38,6 +39,7 @@ export function Settings() {
         visualFlash: state.playback.visualFlash,
         haptic: state.playback.haptic,
         sessionTimer: state.playback.sessionTimer,
+        loopLimit: state.playback.loopLimit,
         songMode: state.playback.songMode,
 
         midiEnabled: state.midi.enabled,
@@ -334,7 +336,7 @@ export function Settings() {
                             class="performance-ending-section"
                             style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 8px;"
                         >
-                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
                                 <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;">
                                     <input
                                         id="sessionTimerCheck"
@@ -349,11 +351,68 @@ export function Settings() {
                                 </label>
 
                                 <div
+                                    class="ending-mode-selector"
+                                    style={{
+                                        display: 'flex',
+                                        gap: '0.5rem',
+                                        opacity: songMode ? '1' : '0.4',
+                                        pointerEvents: songMode ? 'auto' : 'none',
+                                    }}
+                                >
+                                    <button
+                                        class={`chip-btn ${loopLimit === 0 ? 'active' : ''}`}
+                                        onClick={() => {
+                                            dispatch(ACTIONS.SET_PARAM, {
+                                                module: 'playback',
+                                                param: 'loopLimit',
+                                                value: 0,
+                                            });
+                                            saveCurrentState();
+                                        }}
+                                        style={{
+                                            padding: '0.4rem 0.8rem',
+                                            borderRadius: '20px',
+                                            border: '1px solid var(--border-color)',
+                                            background:
+                                                loopLimit === 0 ? 'var(--accent-color)' : 'none',
+                                            color: loopLimit === 0 ? 'white' : 'var(--text-color)',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Timer
+                                    </button>
+                                    <button
+                                        class={`chip-btn ${loopLimit > 0 ? 'active' : ''}`}
+                                        onClick={() => {
+                                            dispatch(ACTIONS.SET_PARAM, {
+                                                module: 'playback',
+                                                param: 'loopLimit',
+                                                value: 3,
+                                            });
+                                            saveCurrentState();
+                                        }}
+                                        style={{
+                                            padding: '0.4rem 0.8rem',
+                                            borderRadius: '20px',
+                                            border: '1px solid var(--border-color)',
+                                            background:
+                                                loopLimit > 0 ? 'var(--accent-color)' : 'none',
+                                            color: loopLimit > 0 ? 'white' : 'var(--text-color)',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Loops
+                                    </button>
+                                </div>
+
+                                <div
                                     id="sessionTimerDurationContainer"
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '0.5rem',
+                                        justifyContent: 'space-between',
                                         opacity: songMode ? '1' : '0.4',
                                         pointerEvents: songMode ? 'auto' : 'none',
                                         transition: 'all 0.2s ease',
@@ -372,33 +431,46 @@ export function Settings() {
                                         }}
                                     >
                                         <button
-                                            id="sessionTimerDec"
                                             class="stepper-btn"
                                             style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
-                                            aria-label="Decrease song duration"
                                             onClick={() => {
-                                                const next = Math.max(1, sessionTimer - 1);
-                                                dispatch(ACTIONS.SET_SESSION_TIMER, next);
+                                                if (loopLimit > 0) {
+                                                    const next = Math.max(1, loopLimit - 1);
+                                                    dispatch(ACTIONS.SET_PARAM, {
+                                                        module: 'playback',
+                                                        param: 'loopLimit',
+                                                        value: next,
+                                                    });
+                                                } else {
+                                                    const next = Math.max(1, sessionTimer - 1);
+                                                    dispatch(ACTIONS.SET_SESSION_TIMER, next);
+                                                }
                                                 saveCurrentState();
                                             }}
                                         >
                                             -
                                         </button>
                                         <input
-                                            id="sessionTimerInput"
                                             type="number"
-                                            value={sessionTimer > 0 ? sessionTimer : 5}
+                                            value={loopLimit > 0 ? loopLimit : sessionTimer}
                                             readonly
                                             style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;"
                                         />
                                         <button
-                                            id="sessionTimerInc"
                                             class="stepper-btn"
                                             style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
-                                            aria-label="Increase song duration"
                                             onClick={() => {
-                                                const next = Math.min(20, sessionTimer + 1);
-                                                dispatch(ACTIONS.SET_SESSION_TIMER, next);
+                                                if (loopLimit > 0) {
+                                                    const next = Math.min(50, loopLimit + 1);
+                                                    dispatch(ACTIONS.SET_PARAM, {
+                                                        module: 'playback',
+                                                        param: 'loopLimit',
+                                                        value: next,
+                                                    });
+                                                } else {
+                                                    const next = Math.min(20, sessionTimer + 1);
+                                                    dispatch(ACTIONS.SET_SESSION_TIMER, next);
+                                                }
                                                 saveCurrentState();
                                             }}
                                         >
@@ -406,16 +478,32 @@ export function Settings() {
                                         </button>
                                     </div>
                                     <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
-                                        Minutes
+                                        {loopLimit > 0 ? 'Choruses' : 'Minutes'}
                                     </span>
                                 </div>
+
+                                {loopLimit > 0 && (
+                                    <div style="font-size: 0.75rem; color: var(--accent-color); font-weight: 500; text-align: right; margin-top: -0.5rem;">
+                                        {(() => {
+                                            const { arranger, playback } = getState();
+                                            const totalSteps = arranger.totalSteps * loopLimit;
+                                            const secPerStep = 60 / playback.bpm / 4;
+                                            const totalSec = totalSteps * secPerStep;
+                                            const mins = Math.floor(totalSec / 60);
+                                            const secs = Math.round(totalSec % 60);
+                                            return `Est. Time: ${mins}:${secs
+                                                .toString()
+                                                .padStart(2, '0')}`;
+                                        })()}
+                                    </div>
+                                )}
                             </div>
                             <p
                                 class="performance-ending-footer"
                                 style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;"
                             >
                                 The band will evolve the energy naturally and perform a resolution
-                                at a logical section boundary once the time expires.
+                                at the end of the final loop once the limit is reached.
                             </p>
                         </div>
                     </div>

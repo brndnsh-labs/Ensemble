@@ -81,6 +81,8 @@ export const playback = {
     sustainActive: false,
     songMode: true,
     sessionTimer: 5,
+    loopLimit: 0,
+    currentLoopCount: 0,
     sessionStartTime: 0,
     stopAtEnd: false,
     isEndingPending: false,
@@ -143,6 +145,7 @@ export function playbackReducer(action, payload) {
             playback.isPlaying = !playback.isPlaying;
             if (playback.isPlaying) {
                 playback.sessionStartTime = performance.now();
+                playback.currentLoopCount = 0;
             }
             if (playback.autoIntensity) {
                 playback.bandIntensity = 0.35;

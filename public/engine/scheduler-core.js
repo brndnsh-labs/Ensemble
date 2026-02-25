@@ -283,8 +283,17 @@ export function scheduler() {
                 }
 
                 // --- Resolution Trigger Logic ---
-                // If ending is pending or stopAtEnd is active, check for appropriate boundary
+                // If ending is pending or stopAtEnd is active, check for appropriate boundary (Next Chorus)
                 if (playback.step > 0 && playback.step % arranger.totalSteps === 0) {
+                    playback.currentLoopCount++;
+
+                    // --- Loop Limit Check ---
+                    if (playback.songMode && playback.loopLimit > 0 && !playback.isEndingPending) {
+                        if (playback.currentLoopCount >= playback.loopLimit) {
+                            dispatch(ACTIONS.SET_ENDING_PENDING, true);
+                        }
+                    }
+
                     if (
                         playback.isEndingPending ||
                         playback.stopAtEnd ||
@@ -629,42 +638,47 @@ function scheduleDrumsFromBuffer(step, time) {
  */
 function scheduleBass(chordData, step, time) {
     const { bass, playback, vizState, midi } = getState();
-    const noteEntry = bass.buffer.get(step);
+    const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
-    if (noteEntry?.freq) {
-        const { freq, durationSteps, velocity, timingOffset, muted } = noteEntry;
-        const { chord } = chordData;
-        const adjustedTime = time + (timingOffset || 0);
-        bass.lastPlayedFreq = freq;
-        const midiNum = getMidi(freq);
-        const { name, octave } = midiToNote(midiNum);
-        const spb = 60.0 / playback.bpm;
-        const duration = (durationSteps || 4) * 0.25 * spb;
-        const finalVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
-        if (vizState.enabled && playback.viz) {
-            playback.viz.truncateNotes('bass', adjustedTime);
-            playback.drawQueue.push({
-                type: 'bass_vis',
-                name,
-                octave,
-                midi: midiNum,
-                time: adjustedTime,
-                chordNotes: chord.freqs.map((f) => getMidi(f)),
-                duration,
-            });
-        }
-        playBassNote(freq, adjustedTime, duration, finalVel, muted);
-        if (!muted) {
-            // Bass is strictly monophonic, so we force Mono mode to kill previous notes
-            sendMIDINote(
-                midi.bassChannel,
-                midiNum + midi.bassOctave * 12,
-                normalizeMidiVelocity(finalVel),
-                adjustedTime,
-                duration,
-                true,
-            );
-        }
+
+    if (notes && notes.length > 0) {
+        notes.forEach((noteEntry) => {
+            if (noteEntry?.freq) {
+                const { freq, durationSteps, velocity, timingOffset, muted } = noteEntry;
+                const { chord } = chordData;
+                const adjustedTime = time + (timingOffset || 0);
+                bass.lastPlayedFreq = freq;
+                const midiNum = getMidi(freq);
+                const { name, octave } = midiToNote(midiNum);
+                const spb = 60.0 / playback.bpm;
+                const duration = (durationSteps || 4) * 0.25 * spb;
+                const finalVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
+                if (vizState.enabled && playback.viz) {
+                    playback.viz.truncateNotes('bass', adjustedTime);
+                    playback.drawQueue.push({
+                        type: 'bass_vis',
+                        name,
+                        octave,
+                        midi: midiNum,
+                        time: adjustedTime,
+                        chordNotes: chord.freqs.map((f) => getMidi(f)),
+                        duration,
+                    });
+                }
+                playBassNote(freq, adjustedTime, duration, finalVel, muted);
+                if (!muted) {
+                    // Bass is strictly monophonic, so we force Mono mode to kill previous notes
+                    sendMIDINote(
+                        midi.bassChannel,
+                        midiNum + midi.bassOctave * 12,
+                        normalizeMidiVelocity(finalVel),
+                        adjustedTime,
+                        duration,
+                        true,
+                    );
+                }
+            }
+        });
     }
 }
 

@@ -42,9 +42,14 @@ function init() {
                 }
 
                 const sbUpdatedSteps = new Set();
+                const bassUpdatedSteps = new Set();
                 notes.forEach((n) => {
                     if (n.module === 'bass') {
-                        bass.buffer.set(n.step, n);
+                        if (!bassUpdatedSteps.has(n.step)) {
+                            bass.buffer.set(n.step, []);
+                            bassUpdatedSteps.add(n.step);
+                        }
+                        bass.buffer.get(n.step).push(n);
                     } else if (n.module === 'soloist') {
                         // ENFORCE MONOPHONIC: If double stops are disabled, skip additional notes for the same step
                         if (!soloist.doubleStops && soloist.buffer.has(n.step)) {
