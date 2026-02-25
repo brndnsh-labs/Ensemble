@@ -443,7 +443,14 @@ function handleSustainEvents(
  * Main entry point for generating accompaniment notes.
  * Returns an array of standardized Note Objects.
  */
-export function getAccompanimentNotes(chord, step, stepInChord, measureStep, stepInfo) {
+export function getAccompanimentNotes(
+    chord,
+    step,
+    stepInChord,
+    measureStep,
+    stepInfo,
+    coordination = {},
+) {
     const { playback, arranger, chords, bass, soloist, groove, harmony } = getState();
     if (!chords.enabled || !chord) {
         return [];
@@ -468,6 +475,10 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
     );
 
     updateRhythmicIntent(step, soloist.enabled && soloist.busySteps > 0, spm, chord.sectionId);
+
+    // --- Coordination Logic (Ensemble Awareness) ---
+    const bassHit = coordination.bassHit || false;
+    const soloistActive = coordination.soloistActive || false;
 
     // --- GENRE LANES ---
 
@@ -794,11 +805,19 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
     // --- STANDARD Pattern Logic ---
     let isHit = compingState.currentCell[measureStep % spm] === 1;
 
-    // Conversational: Listen to Soloist
-    // If soloist is busy, suppress hits to avoid clutter (Call & Response)
-    if (soloist.enabled && soloist.busySteps > 0 && chords.style === 'smart') {
-        if (Math.random() < 0.7) {
-            isHit = false;
+    // --- NEW: Multi-way Coordination ---
+    if (isHit && chords.style === 'smart') {
+        // 1. Yield to Bass: If bass is hitting hard, have a 40% chance to skip or reduce velocity
+        if (bassHit && Math.random() < 0.4) {
+            isHit = false; // Yield the step entirely
+        }
+
+        // 2. Yield to Soloist: If soloist is active, increase the skip probability
+        if (soloistActive) {
+            const skipProb = 0.5 + intensity * 0.3;
+            if (Math.random() < skipProb) {
+                isHit = false;
+            }
         }
     }
 
@@ -927,9 +946,7 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
 
         // --- Frequency Slotting & Soloist Pocket ---
         const soloistMidi = soloist.enabled ? getMidi(soloist.lastFreq) : 0;
-        const bassMidi = bass.enabled ? getMidi(bass.lastFreq) : 0;
         const useClarity = soloistMidi > 72;
-
         if (chords.style === 'smart') {
             // Jazz Shell Lesson: If things are hot and harmony is complex, stick to shells (3 & 7)
             const isComplex =
@@ -984,9 +1001,25 @@ export function getAccompanimentNotes(chord, step, stepInChord, measureStep, ste
                 voicing.sort((a, b) => getMidi(a) - getMidi(b));
 
                 const lowestMidi = getMidi(voicing[0]);
+                const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq) || 0;
+
+                // --- Dynamic Slotting ---
+                // If the bass is high, we MUST shift up.
                 if (lowestMidi <= bassMidi + 12) {
-                    voicing[0] = getFrequency(lowestMidi + 12);
+                    voicing = voicing.map((f) => {
+                        const m = getMidi(f);
+                        if (m <= bassMidi + 12) {
+                            return getFrequency(m + 12);
+                        }
+                        return f;
+                    });
                     voicing.sort((a, b) => getMidi(a) - getMidi(b));
+                }
+
+                // If soloist is high, drop the highest note to leave air
+                const solMidi = coordination.soloistMidi || 0;
+                if (solMidi > 72 && voicing.length > 2) {
+                    voicing.pop(); // Drop the top
                 }
 
                 if (voicing.length > 3) {

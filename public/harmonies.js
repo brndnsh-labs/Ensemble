@@ -163,6 +163,7 @@ export function getHarmonyNotes(
     style,
     stepInChord,
     soloistResult = null,
+    coordination = {},
 ) {
     if (!chord) {
         return [];
@@ -233,6 +234,12 @@ export function getHarmonyNotes(
         return [];
     }
 
+    // -- ENSEMBLE COORDINATION --
+    const bassHit = coordination.bassHit || false;
+    const soloistActive = coordination.soloistActive || false;
+    const accompanimentHit = coordination.accompanimentHit || false;
+    const accMidis = coordination.accompanimentMidis || [];
+
     const notes = [];
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
@@ -288,16 +295,22 @@ export function getHarmonyNotes(
         rhythmicStyle = 'pads';
     }
 
-    if (isSoloistBusy) {
+    // -- COORDINATION: Thin out if others are busy --
+    if (isSoloistBusy || accompanimentHit) {
         intervals = getSafeVoicings(intervals);
         // Thin out if very busy
-        if (soloist.notesInPhrase > 3 || harmony.complexity < 0.4) {
+        if (soloist.notesInPhrase > 3 || accompanimentHit || harmony.complexity < 0.4) {
             const guides = getGuideTones(intervals);
             if (guides.length > 0) {
                 intervals = [0, ...guides];
             } else {
                 intervals = [0, 7];
             }
+        }
+
+        // If BOTH are hitting, drop root, play ONLY guides or extensions
+        if (accompanimentHit && soloistActive && intervals.length > 2) {
+            intervals = getGuideTones(intervals);
         }
     } else {
         if (harmony.complexity < 0.4 || playback.bandIntensity < 0.4) {
@@ -414,9 +427,9 @@ export function getHarmonyNotes(
                     isGhost = true;
                 }
 
-                if (isSoloistBusy) {
-                    needed += 0.2;
-                    if (val > 1 && Math.random() > 0.5) {
+                if (isSoloistBusy || accompanimentHit) {
+                    needed += 0.25;
+                    if (val > 1 && Math.random() > 0.4) {
                         needed = 2.0;
                     }
                 }
@@ -424,30 +437,48 @@ export function getHarmonyNotes(
                 if (playback.bandIntensity >= needed) {
                     shouldPlay = true;
 
-                    // Variable Durations: Downbeats are longer, syncopations are shorter
-                    const isDownbeat = measureStep % 4 === 0;
-                    const isAnticipation = measureStep === 14 || measureStep === 6;
-
-                    if (isDownbeat) {
-                        durationSteps = 3;
-                    } else if (isAnticipation) {
-                        durationSteps = 1.5;
-                    } else {
-                        durationSteps = 1;
+                    // Yield to Accompaniment: 60% chance to drop if accompanist is hitting
+                    if (accompanimentHit && Math.random() < 0.6) {
+                        shouldPlay = false;
                     }
 
-                    // Neo-Soul/Jazz "Lag": Shorter, more detached stabs for a "cooler" feel
-                    if (feel === 'Neo-Soul' || feel === 'Jazz') {
-                        durationSteps *= 0.7;
+                    // Yield to Bass: 30% chance to drop on heavy bass hits
+                    if (shouldPlay && bassHit && Math.random() < 0.3) {
+                        shouldPlay = false;
                     }
-                    if (isGhost) {
-                        durationSteps = 0.5;
+
+                    if (shouldPlay) {
+                        // Variable Durations: Downbeats are longer, syncopations are shorter
+                        const isDownbeat = measureStep % 4 === 0;
+                        const isAnticipation = measureStep === 14 || measureStep === 6;
+
+                        if (isDownbeat) {
+                            durationSteps = 3;
+                        } else if (isAnticipation) {
+                            durationSteps = 1.5;
+                        } else {
+                            durationSteps = 1;
+                        }
+
+                        // Neo-Soul/Jazz "Lag": Shorter, more detached stabs for a "cooler" feel
+                        if (feel === 'Neo-Soul' || feel === 'Jazz') {
+                            durationSteps *= 0.7;
+                        }
+                        if (isGhost) {
+                            durationSteps = 0.5;
+                        }
                     }
                 }
             }
 
             // Call and Response
-            if (!shouldPlay && soloist.enabled && soloist.isResting && soloist.notesInPhrase > 0) {
+            if (
+                !shouldPlay &&
+                soloist.enabled &&
+                soloist.isResting &&
+                soloist.notesInPhrase > 0 &&
+                !accompanimentHit
+            ) {
                 if (Math.random() < 0.3 * harmony.complexity) {
                     shouldPlay = true;
                     durationSteps = 1.5;
@@ -525,6 +556,23 @@ export function getHarmonyNotes(
         if (finalMidi > 100) {
             finalMidi -= 12; // Shift down an octave if too high
         }
+
+        // --- ENSEMBLE CLARITY: Slotting ---
+        // 1. Avoid Accompaniment: If accompaniment is hitting, Harmony shifts UP
+        if (accompanimentHit && accMidis.length > 0) {
+            const avgAccMidi = accMidis.reduce((a, b) => a + b, 0) / accMidis.length;
+            if (finalMidi < avgAccMidi + 7) {
+                finalMidi += 12;
+            }
+        }
+
+        // 2. Avoid Soloist: If soloist is active and high, Harmony shifts DOWN
+        if (soloistActive && coordination.soloistMidi > 84) {
+            if (finalMidi > 72) {
+                finalMidi -= 12;
+            }
+        }
+
         if (finalMidi > 100) {
             continue; // Skip if still too high (rare)
         }
