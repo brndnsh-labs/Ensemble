@@ -52,10 +52,12 @@ describe('Soloist Motif Repetition Repro', () => {
             currentPhraseSteps: 0,
             notesInPhrase: 0,
             qaState: 'Question',
+            srdcState: 'Statement',
             isResting: false,
             pitchHistory: [],
             deviceBuffer: [],
             motifBuffer: [],
+            thematicSeed: [],
             sessionSteps: 0,
             lastFreq: 440,
         };
@@ -90,6 +92,9 @@ describe('Soloist Motif Repetition Repro', () => {
         const runSimulation = (steps) => {
             let replayingCount = 0;
             for (let i = 0; i < steps; i++) {
+                // Keep seed empty to focus on MOTIF replay stale logic
+                mockState.soloist.thematicSeed = [];
+
                 // Adjust random to encourage phrase cycles
                 randomSpy.mockImplementation(() => {
                     if (mockState.soloist.isResting) {
@@ -113,7 +118,7 @@ describe('Soloist Motif Repetition Repro', () => {
                     'scalar',
                     step % 16,
                 );
-                if (mockState.soloist.isReplayingMotif) {
+                if (mockState.soloist.isReplayingMotif || mockState.soloist.isReplayingSeed) {
                     replayingCount++;
                 }
                 step++;

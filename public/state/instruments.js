@@ -87,8 +87,11 @@ export const soloist = {
     currentCell: [1, 0, 1, 0],
     busySteps: 0,
     motifBuffer: [],
+    thematicSeed: [],
+    thematicSeedRoot: 0,
     hookBuffer: [],
     isReplayingMotif: false,
+    isReplayingSeed: false,
     motifReplayIndex: 0,
     hookRetentionProb: 0.4,
     sharedHookBuffer: [], // Shared hooks for band interaction

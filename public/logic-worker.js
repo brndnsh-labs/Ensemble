@@ -1363,8 +1363,11 @@ function processMessage(type, data, startTime) {
                 soloist.deviceBuffer = []; // @worker-mutation
                 bass.busySteps = 0; // @worker-mutation
                 soloist.motifBuffer = [];
+                soloist.thematicSeed = []; // @worker-mutation
+                soloist.thematicSeedRoot = 0; // @worker-mutation
                 soloist.hookBuffer = [];
                 soloist.isReplayingMotif = false; // @worker-mutation
+                soloist.isReplayingSeed = false; // @worker-mutation
                 soloist.sharedHookBuffer = []; // @worker-mutation
                 harmony.motifBuffer = []; // @worker-mutation
                 harmony.lastMidis = []; // @worker-mutation
@@ -1473,8 +1476,11 @@ function handlePrime(steps) {
     bass.busySteps = 0; // @worker-mutation
     soloist.currentPhraseSteps = 0; // @worker-mutation
     soloist.motifBuffer = []; // @worker-mutation
+    soloist.thematicSeed = []; // @worker-mutation
+    soloist.thematicSeedRoot = 0; // @worker-mutation
     soloist.hookBuffer = []; // @worker-mutation
     soloist.isReplayingMotif = false; // @worker-mutation
+    soloist.isReplayingSeed = false; // @worker-mutation
 
     // Local cursors for priming
     const primeCursor = { index: 0, sectionIndex: 0 };

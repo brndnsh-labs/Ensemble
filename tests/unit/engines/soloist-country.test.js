@@ -43,6 +43,7 @@ describe('Country Soloist Overhaul', () => {
     beforeEach(() => {
         soloist.isResting = false;
         soloist.currentPhraseSteps = 1;
+        soloist.srdcState = 'Statement';
         soloist.notesInPhrase = 0;
         soloist.busySteps = 0;
         soloist.deviceBuffer = [];

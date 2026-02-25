@@ -618,11 +618,13 @@ export function getSoloistNote(
                 soloist.sharedHookBuffer = []; // @worker-mutation
             }
 
-            // Motif Decision
+            // Seed vs Motif Decision
             const currentRoot = currentChord.rootMidi % 12;
             const motifRoot = soloist.motifRoot !== undefined ? soloist.motifRoot : currentRoot;
-            const rootDiff = Math.abs(currentRoot - motifRoot);
-            const isSignificantShift = rootDiff > 0 && rootDiff !== 5 && rootDiff !== 7;
+            const isSignificantShift =
+                Math.abs(currentRoot - motifRoot) > 0 &&
+                Math.abs(currentRoot - motifRoot) !== 5 &&
+                Math.abs(currentRoot - motifRoot) !== 7;
             const isStale = (soloist.motifReplayCount || 0) > 3;
             const isOverwhelmed = effectiveIntensity > 0.7 && Math.random() < 0.5;
 
@@ -640,7 +642,22 @@ export function getSoloistNote(
             const isRestatement = soloist.srdcState === 'Restatement';
             const motifProb = isRestatement ? 0.95 : config.motifProb;
 
+            // Higher chance to use the THEMATIC SEED during Restatement or later in the solo
+            const useSeedProb =
+                (isRestatement ? 0.6 : 0.2) +
+                (soloist.sessionSteps > stepsPerMeasure * 16 ? 0.3 : 0);
+
             if (
+                soloist.thematicSeed &&
+                soloist.thematicSeed.length > 0 &&
+                Math.random() < useSeedProb &&
+                !isStale
+            ) {
+                soloist.isReplayingSeed = true; // @worker-mutation
+                soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1; // @worker-mutation
+                soloist.seedOctaveOffset =
+                    Math.random() < 0.2 ? (Math.random() < 0.5 ? 12 : -12) : 0; // @worker-mutation
+            } else if (
                 soloist.motifBuffer &&
                 soloist.motifBuffer.length > 0 &&
                 isInteresting &&
@@ -654,6 +671,7 @@ export function getSoloistNote(
                 soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1; // @worker-mutation
             } else {
                 soloist.isReplayingMotif = false; // @worker-mutation
+                soloist.isReplayingSeed = false; // @worker-mutation
                 soloist.motifBuffer = []; // @worker-mutation
                 soloist.motifRoot = currentRoot; // @worker-mutation
                 soloist.motifReplayCount = 0; // @worker-mutation
@@ -663,6 +681,18 @@ export function getSoloistNote(
         }
     }
     if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < restProb) {
+        // --- Seed Capture ---
+        // If we don't have a thematic seed yet, and we just finished a decent phrase
+        // in the first 8 measures, capture it as the solo's "DNA".
+        if (
+            (!soloist.thematicSeed || soloist.thematicSeed.length === 0) &&
+            soloist.notesInPhrase >= 3 &&
+            soloist.sessionSteps < stepsPerMeasure * 8
+        ) {
+            soloist.thematicSeed = [...soloist.motifBuffer]; // @worker-mutation
+            soloist.thematicSeedRoot = soloist.motifRoot; // @worker-mutation
+        }
+
         soloist.isResting = true;
         soloist.currentPhraseSteps = 0;
         soloist.currentCell = null; // @worker-mutation
@@ -672,7 +702,81 @@ export function getSoloistNote(
         return null;
     }
 
-    // --- 3. Motif Replay ---
+    // --- 3. Seed Replay ---
+    if (soloist.isReplayingSeed && soloist.thematicSeed && soloist.thematicSeed.length > 0) {
+        const seedNote = soloist.thematicSeed.find((n) => {
+            const primary = Array.isArray(n) ? n[0] : n;
+            return primary && primary.phraseStep === soloist.currentPhraseSteps;
+        });
+
+        if (seedNote) {
+            const currentRoot = currentChord.rootMidi % 12;
+            const seedRoot =
+                soloist.thematicSeedRoot !== undefined ? soloist.thematicSeedRoot : currentRoot;
+            const shift = (currentRoot - seedRoot + 12) % 12;
+
+            // Variation: Occasional octave jump for interest
+            const octaveShift =
+                (soloist.seedOctaveOffset || 0) + (shift > 6 ? -12 : shift < -6 ? 12 : 0);
+
+            let res = seedNote;
+            if (Array.isArray(seedNote)) {
+                res = seedNote.map((n) => ({ ...n, midi: n.midi + shift + octaveShift }));
+            } else {
+                res = { ...seedNote, midi: seedNote.midi + shift + octaveShift };
+            }
+
+            let primary = Array.isArray(res) ? res[0] : res;
+            const scaleIntervals = getScaleForChord(currentChord, null, style);
+            const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
+
+            if (!scaleIntervals.includes(relPC)) {
+                const nearest = scaleIntervals.reduce((prev, curr) =>
+                    Math.abs(curr - relPC) < Math.abs(prev - relPC) ? curr : prev,
+                );
+                const nudge = nearest - relPC;
+                if (Array.isArray(res)) {
+                    res = res.map((n) => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
+                } else {
+                    res.midi += nudge;
+                    res.bendStartInterval = 0;
+                }
+                primary = Array.isArray(res) ? res[0] : res;
+            }
+
+            // Stale check on actual played note (transposed)
+            if (historyLen > 12) {
+                const count = historyCounts[primary.midi] || 0;
+                const pcCount = pcCounts[primary.midi % 12] || 0;
+                if (count / historyLen > 0.3 || pcCount / historyLen > 0.4) {
+                    soloist.isReplayingSeed = false; // @worker-mutation
+                    // Fall through to normal generation
+                }
+            }
+
+            if (soloist.isReplayingSeed) {
+                const lastSeedNote = soloist.thematicSeed[soloist.thematicSeed.length - 1];
+                const lastPrimary = Array.isArray(lastSeedNote) ? lastSeedNote[0] : lastSeedNote;
+                if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
+                    soloist.isReplayingSeed = false; // @worker-mutation
+                }
+
+                soloist.busySteps = (primary.durationSteps || 1) - 1; // @worker-mutation
+                return finalizeNote(res);
+            }
+        }
+
+        if (soloist.isReplayingSeed && !seedNote) {
+            const lastSeedNote = soloist.thematicSeed[soloist.thematicSeed.length - 1];
+            const lastPrimary = Array.isArray(lastSeedNote) ? lastSeedNote[0] : lastSeedNote;
+            if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
+                soloist.isReplayingSeed = false; // @worker-mutation
+            }
+            return null;
+        }
+    }
+
+    // --- 4. Motif Replay ---
     if (soloist.isReplayingMotif) {
         const motifNote = soloist.motifBuffer.find((n) => {
             const primary = Array.isArray(n) ? n[0] : n;
@@ -745,7 +849,7 @@ export function getSoloistNote(
         }
     }
 
-    // --- 4. Rhythmic Density ---
+    // --- 5. Rhythmic Density ---
     if (stepInBeat === 0 || !soloist.currentCell) {
         let pool = [...config.cellPool];
 
@@ -823,7 +927,8 @@ export function getSoloistNote(
         return null;
     }
 
-    // --- 5. Pitch Selection ---
+    // --- 6. Pitch Selection ---
+    CANDIDATE_WEIGHTS.fill(0);
     const isLateInChord = stepInChord >= currentChord.beats * stepsPerBeat - 2;
     // Enhanced Anticipation for Voice Leading
     const anticipationWindow = activeStyle === 'bird' ? 4 : 2;
@@ -906,6 +1011,7 @@ export function getSoloistNote(
 
         // Use pre-calculated interval (0-11) to check against scaleIntervals (also 0-11)
         if (!((scaleMask >> interval) & 1)) {
+            CANDIDATE_WEIGHTS[m] = 0;
             continue;
         }
 
@@ -930,7 +1036,7 @@ export function getSoloistNote(
             weight += 15;
         }
         if (activeStyle === 'country' && isPentatonicColor) {
-            weight += 300;
+            weight += 400;
         }
 
         // Stepwise Motion Bonus (Melodic Integrity)
@@ -958,10 +1064,25 @@ export function getSoloistNote(
 
         // SRDC Tension & Resolution Bonuses
         if (soloist.srdcState === 'Departure') {
-            const tensionBonus = 150 * effectiveIntensity;
+            const tensionBonus = 250 * effectiveIntensity;
             // Favor 2nds, #11/b5, b6, and 7ths for tension
             if ([1, 2, 6, 8, 11].includes(interval)) {
                 weight += tensionBonus;
+            }
+        }
+
+        if (soloist.srdcState === 'Conclusion') {
+            const resolutionBonus = 400 * effectiveIntensity;
+            const isChordTone = targetChord.intervals?.some(
+                (i) => ((i % 12) + 12) % 12 === interval,
+            );
+            // Strong preference for Root and 5th for finality
+            if (interval === 0 || interval === 7) {
+                weight += resolutionBonus;
+            }
+            // Preference for other chord tones
+            if (isChordTone) {
+                weight += resolutionBonus * 0.5;
             }
         }
 
@@ -991,7 +1112,10 @@ export function getSoloistNote(
         if (activeStyle === 'reggae' && dist > 2) {
             weight *= 0.01;
         }
-        if (['bird', 'country', 'bossa', 'acoustic'].includes(activeStyle) && dist > 4) {
+        if (['bird', 'bossa', 'acoustic'].includes(activeStyle) && dist > 4) {
+            weight *= 0.1;
+        }
+        if (activeStyle === 'country' && dist > 7) {
             weight *= 0.1;
         }
         if (['blues', 'funk', 'neo', 'disco'].includes(activeStyle) && dist > 6) {
@@ -1071,6 +1195,20 @@ export function getSoloistNote(
                 if (activeStyle === 'reggae' && dist > 4) {
                     weight *= 0.1;
                 }
+
+                if (soloist.srdcState === 'Conclusion') {
+                    const resolutionBonus = 400 * effectiveIntensity;
+                    const isChordTone = targetChord.intervals?.some(
+                        (i) => ((i % 12) + 12) % 12 === interval,
+                    );
+                    if (interval === 0 || interval === 7) {
+                        weight += resolutionBonus;
+                    }
+                    if (isChordTone) {
+                        weight += resolutionBonus * 0.5;
+                    }
+                }
+
                 fallbacks.push({ midi: m, weight });
             }
         }
@@ -1094,7 +1232,7 @@ export function getSoloistNote(
 
     soloist.lastInterval = selectedMidi - lastMidi; // @worker-mutation
 
-    // --- 6. Melodic Devices ---
+    // --- 7. Melodic Devices ---
     const allowFlash = intensity > 0.5;
     const deviceBaseProb = config.deviceProb * (0.5 + complexity * 1.0) * (1.2 - lyricalBias);
     const isPiano = soloist.mode === 'piano';
@@ -1408,7 +1546,7 @@ export function getSoloistNote(
         }
     }
 
-    // --- 7. Dynamic Duration & Bending ---
+    // --- 8. Dynamic Duration & Bending ---
     let durationSteps = 1;
     let bendStartInterval = 0;
 
