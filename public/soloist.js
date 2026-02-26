@@ -71,8 +71,8 @@ const STYLE_CONFIG = {
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
         targetExtensions: [9, 10],
-        deviceProb: 0.3,
-        allowedDevices: ['slide', 'enclosure', 'guitarDouble'],
+        deviceProb: 0.4,
+        allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
         motifProb: 0.5,
         hookProb: 0.3,
     },
@@ -1269,6 +1269,109 @@ export function getSoloistNote(
         const deviceType =
             allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         const devBaseVel = 0.5 + effectiveIntensity * 0.6;
+
+        if (deviceType === 'bluesLick') {
+            const root = targetChord.rootMidi;
+            const relInt = (selectedMidi - root + 120) % 12;
+            let lick = [];
+            const duration = 2; // 8th notes
+
+            // 1. From Root (0)
+            if (relInt === 0) {
+                if (Math.random() < 0.5) {
+                    // Ascending Walk: R -> b3 -> 4 -> #4 -> 5
+                    lick = [
+                        { midi: selectedMidi, durationSteps: duration },
+                        { midi: selectedMidi + 3, durationSteps: duration },
+                        { midi: selectedMidi + 5, durationSteps: duration },
+                        { midi: selectedMidi + 6, durationSteps: duration },
+                        { midi: selectedMidi + 7, durationSteps: duration * 2 },
+                    ];
+                } else {
+                    // Fall to 5: R -> b7 -> 5
+                    lick = [
+                        { midi: selectedMidi, durationSteps: duration },
+                        { midi: selectedMidi - 2, durationSteps: duration },
+                        { midi: selectedMidi - 5, durationSteps: duration * 2 },
+                    ];
+                }
+            }
+            // 2. From b3 (3)
+            else if (relInt === 3) {
+                if (Math.random() < 0.5) {
+                    // Major/Minor Clash: b3 (slide) -> 3 -> 5 -> 6 -> R
+                    lick = [
+                        {
+                            midi: selectedMidi,
+                            durationSteps: duration,
+                            bendStartInterval: 0,
+                            slideTarget: selectedMidi + 1,
+                        }, // b3
+                        { midi: selectedMidi + 1, durationSteps: duration }, // 3 (Major)
+                        { midi: selectedMidi + 4, durationSteps: duration }, // 5
+                        { midi: selectedMidi + 7, durationSteps: duration }, // b7
+                        { midi: selectedMidi + 9, durationSteps: duration * 2 }, // Root
+                    ];
+                } else {
+                    // Resolution: b3 -> R -> b7 -> 5
+                    lick = [
+                        { midi: selectedMidi, durationSteps: duration },
+                        { midi: selectedMidi - 3, durationSteps: duration },
+                        { midi: selectedMidi - 5, durationSteps: duration },
+                        { midi: selectedMidi - 8, durationSteps: duration * 2 },
+                    ];
+                }
+            }
+            // 3. From 4 (5)
+            else if (relInt === 5) {
+                // Chromatic Walkup: 4 -> #4 -> 5 -> b7
+                lick = [
+                    { midi: selectedMidi, durationSteps: duration },
+                    { midi: selectedMidi + 1, durationSteps: duration },
+                    { midi: selectedMidi + 2, durationSteps: duration },
+                    { midi: selectedMidi + 5, durationSteps: duration * 2 },
+                ];
+            }
+            // 4. From 5 (7)
+            else if (relInt === 7) {
+                // Classic Descent: 5 -> 4 -> b3 -> R
+                lick = [
+                    { midi: selectedMidi, durationSteps: duration },
+                    { midi: selectedMidi - 2, durationSteps: duration },
+                    { midi: selectedMidi - 4, durationSteps: duration },
+                    { midi: selectedMidi - 7, durationSteps: duration * 2 },
+                ];
+            }
+            // 5. From b7 (10)
+            else if (relInt === 10) {
+                // Turnaround: b7 -> 5 -> 4 -> b3 -> R
+                lick = [
+                    { midi: selectedMidi, durationSteps: duration },
+                    { midi: selectedMidi - 3, durationSteps: duration },
+                    { midi: selectedMidi - 5, durationSteps: duration },
+                    { midi: selectedMidi - 7, durationSteps: duration },
+                    { midi: selectedMidi - 10, durationSteps: duration * 2 },
+                ];
+            }
+
+            if (lick.length > 0) {
+                const fullLick = lick.map((n, idx) => ({
+                    ...n,
+                    velocity: devBaseVel * (idx === 0 ? 1.15 : 0.9 + Math.random() * 0.15),
+                    style: activeStyle,
+                }));
+
+                soloist.deviceBuffer = fullLick.slice(1); // @worker-mutation
+                const first = fullLick[0];
+                soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
+                return finalizeNote(first);
+            }
+            // Fallback if interval doesn't match a lick starter
+            // Proceed to standard devices or normal note generation?
+            // Since we are inside the "if bluesLick" block which was chosen randomly,
+            // we should probably fallback to a simple slide or standard note to avoid silence/failure.
+            // Let's fallback to 'slide' logic below by not returning here if lick is empty.
+        }
 
         if (deviceType === 'graceNote') {
             // Half-step or scale-step below, very fast
