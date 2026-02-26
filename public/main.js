@@ -13,7 +13,7 @@ import { initWorker, syncWorker } from './worker-client.js';
 let viz;
 
 function init() {
-    const { playback, chords, bass, soloist, harmony, groove } = getState();
+    const { playback, groove } = getState();
     try {
         // --- HYDRATE STATE FIRST ---
         // Ensure state is populated BEFORE the UI mounts so components initialize with correct data.
