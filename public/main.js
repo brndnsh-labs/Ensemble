@@ -27,7 +27,13 @@ function init() {
         // --- WORKER INIT ---
         initWorker(
             () => scheduler(),
-            (notes, requestTimestamp, workerProcessTime) => {
+            (notes, requestTimestamp, workerProcessTime, isResolution) => {
+                const { playback, soloist, bass, harmony, chords, groove } = getState();
+
+                if (playback.resolutionTriggered && !isResolution) {
+                    return;
+                }
+
                 // --- Latency Monitoring ---
                 if (requestTimestamp) {
                     const now = performance.now();

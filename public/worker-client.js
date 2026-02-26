@@ -34,7 +34,12 @@ export function initWorker(onSchedulerRequest, onNotesReceived) {
             }
         } else if (type === WORKER_RESP.NOTES) {
             if (typeof notesReceivedHandler === 'function') {
-                notesReceivedHandler(notes, requestTimestamp, workerProcessTime);
+                notesReceivedHandler(
+                    notes,
+                    requestTimestamp,
+                    workerProcessTime,
+                    e.data.isResolution,
+                );
             }
         } else if (type === WORKER_RESP.EXPORT_PROGRESS) {
             if (typeof exportProgressHandler === 'function') {

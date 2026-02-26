@@ -176,7 +176,16 @@ export function togglePlay(viz, fromDispatch = false) {
 }
 
 function triggerResolution(time) {
-    const { playback } = getState();
+    const { playback, bass, soloist, chords, harmony, groove } = getState();
+
+    // 0. Clear all buffers to prevent "double hits" from pre-fetched notes
+    // The worker might have already sent normal notes for the wrap-around step.
+    bass.buffer.clear();
+    soloist.buffer.clear();
+    chords.buffer.clear();
+    harmony.buffer.clear();
+    groove.buffer.clear();
+
     // 1. Tell worker to generate resolution
     requestResolution(playback.step);
 

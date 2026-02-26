@@ -1453,6 +1453,7 @@ export function handleResolution(step, requestTimestamp = null, processStartTime
     postMessage({
         type: WORKER_RESP.NOTES,
         notes: notesToMain,
+        isResolution: true,
         requestTimestamp,
         workerProcessTime,
     });

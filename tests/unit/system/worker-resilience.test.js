@@ -51,7 +51,7 @@ describe('Worker Resilience & Error Handling', () => {
 
         // Type 'notes' but missing 'notes' array
         worker.onmessage({ data: { type: 'notes' } });
-        expect(onNotes).toHaveBeenCalledWith(undefined, undefined, undefined);
+        expect(onNotes).toHaveBeenCalledWith(undefined, undefined, undefined, undefined);
     });
 
     it('should handle multiple rapid sync calls without worker congestion', () => {
