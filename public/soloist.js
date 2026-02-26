@@ -1036,7 +1036,7 @@ export function getSoloistNote(
             weight += 15;
         }
         if (activeStyle === 'country' && isPentatonicColor) {
-            weight += 400;
+            weight += 600;
         }
 
         // Stepwise Motion Bonus (Melodic Integrity)
