@@ -1,5 +1,4 @@
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../../public/soloist.js';
 import { getState } from '../../../public/state.js';
 
@@ -21,7 +20,13 @@ describe('Soloist Blues Logic', () => {
 
     beforeEach(() => {
         mockState = {
-            playback: { bandIntensity: 0.8, bpm: 100, sessionTimer: 0, intent: {}, complexity: 0.5 },
+            playback: {
+                bandIntensity: 0.8,
+                bpm: 100,
+                sessionTimer: 0,
+                intent: {},
+                complexity: 0.5,
+            },
             groove: { genreFeel: 'Blues', pocket: 0 },
             soloist: {
                 mode: 'guitar',
