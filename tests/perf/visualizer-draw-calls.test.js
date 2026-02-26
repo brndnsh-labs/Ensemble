@@ -16,6 +16,7 @@ describe('UnifiedVisualizer Optimization Check', () => {
         mockCtx = {
             scale: vi.fn(),
             fillRect: vi.fn(),
+            rect: vi.fn(),
             clearRect: vi.fn(),
             beginPath: vi.fn(),
             moveTo: vi.fn(),

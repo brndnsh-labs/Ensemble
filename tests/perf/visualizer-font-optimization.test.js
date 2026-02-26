@@ -23,6 +23,7 @@ describe('UnifiedVisualizer Font Optimization', () => {
         mockCtx = {
             scale: vi.fn(),
             fillRect: vi.fn(),
+            rect: vi.fn(),
             clearRect: vi.fn(),
             beginPath: vi.fn(),
             moveTo: vi.fn(),

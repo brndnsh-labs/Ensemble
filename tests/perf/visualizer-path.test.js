@@ -6,6 +6,7 @@ const mockCtx = {
     canvas: { width: 100, height: 100 },
     scale: vi.fn(),
     fillRect: vi.fn(),
+    rect: vi.fn(),
     fillText: vi.fn(),
     stroke: vi.fn(),
     beginPath: vi.fn(),

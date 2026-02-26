@@ -16,6 +16,7 @@ describe('UnifiedVisualizer Render Benchmark', () => {
         mockCtx = {
             scale: () => {},
             fillRect: () => {},
+            rect: () => {},
             clearRect: () => {},
             beginPath: () => {},
             moveTo: () => {},

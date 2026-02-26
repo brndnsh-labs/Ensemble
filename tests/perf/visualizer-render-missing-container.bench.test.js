@@ -21,6 +21,7 @@ describe('UnifiedVisualizer Missing Container Benchmark', () => {
         mockCtx = {
             scale: () => {},
             fillRect: () => {},
+            rect: () => {},
             clearRect: () => {},
             beginPath: () => {},
             moveTo: () => {},

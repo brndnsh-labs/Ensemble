@@ -19,6 +19,7 @@ describe('UnifiedVisualizer', () => {
         // Mock Context
         mockCtx = {
             fillRect: vi.fn(),
+            rect: vi.fn(),
             beginPath: vi.fn(),
             moveTo: vi.fn(),
             lineTo: vi.fn(),
