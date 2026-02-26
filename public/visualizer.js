@@ -544,10 +544,13 @@ export class UnifiedVisualizer {
                 continue;
             }
 
+            // Optimization: Batch fillRect calls into a single path to reduce draw call overhead
             ctx.fillStyle = this.categoryColors[i];
+            ctx.beginPath();
             for (let j = 0; j < buffer.length; j++) {
-                ctx.fillRect(0, buffer[j] - yScale / 2, this.pianoRollWidth, yScale);
+                ctx.rect(0, buffer[j] - yScale / 2, this.pianoRollWidth, yScale);
             }
+            ctx.fill();
         }
 
         // Active Tracks (Direct Draw)
@@ -751,10 +754,13 @@ export class UnifiedVisualizer {
                 continue;
             }
 
+            // Optimization: Batch fillRect calls into a single path
             ctx.fillStyle = this.categoryColors[i];
+            ctx.beginPath();
             for (let j = 0; j < buffer.length; j += 4) {
-                ctx.fillRect(buffer[j], buffer[j + 1], buffer[j + 2], buffer[j + 3]);
+                ctx.rect(buffer[j], buffer[j + 1], buffer[j + 2], buffer[j + 3]);
             }
+            ctx.fill();
         }
 
         // 2. Chords - Pass 2: Active Notes (Batched alpha change)
@@ -806,10 +812,13 @@ export class UnifiedVisualizer {
                 continue;
             }
 
+            // Optimization: Batch fillRect calls into a single path
             ctx.fillStyle = this.categoryColors[i];
+            ctx.beginPath();
             for (let j = 0; j < buffer.length; j += 4) {
-                ctx.fillRect(buffer[j], buffer[j + 1], buffer[j + 2], buffer[j + 3]);
+                ctx.rect(buffer[j], buffer[j + 1], buffer[j + 2], buffer[j + 3]);
             }
+            ctx.fill();
         }
 
         ctx.globalAlpha = 1.0;
