@@ -1011,7 +1011,10 @@ export class ChordAnalyzerLite {
             let c = 1.0; // cos(0)
             let s = 0.0; // sin(0)
 
-            for (let i = 0, idx = 0; i < len; i += step, idx++) {
+            const wsLen = windowedSignal.length;
+            // Optimization: Iterate over the windowed buffer directly using a single index.
+            // This avoids the 'i' loop variable and step increment in the hot path.
+            for (let idx = 0; idx < wsLen; idx++) {
                 const sample = windowedSignal[idx];
                 real += sample * c;
                 imag += sample * s;
