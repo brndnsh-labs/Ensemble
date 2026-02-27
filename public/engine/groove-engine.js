@@ -626,6 +626,18 @@ export function applyGrooveOverrides({
                 velocity = 0.3;
                 instTimeOffset += 0.005;
             }
+
+            // Motif 3: Busy/Syncopated
+            if (activeMotif === 3) {
+                if (loopStep === 14 && Math.random() < 0.6) {
+                    shouldPlay = true;
+                    velocity = 0.7; // Strong pickup to the next bar
+                }
+                if (loopStep === 10 && Math.random() < 0.3) {
+                    shouldPlay = true;
+                    velocity = 0.4; // Light ghost note on "and" of 3
+                }
+            }
         }
     }
 
@@ -812,21 +824,35 @@ export function applyGrooveOverrides({
     }
 
     // --- GENRE-AUTHENTIC ENTROPY (Creativity Mode) ---
+    const entropyMultiplier = ['Blues', 'Rock', 'Disco', 'Acoustic'].includes(groove.genreFeel)
+        ? 0.08
+        : 0.15;
+
     if (
         groove.creativity &&
         !inst.muted &&
         !shouldPlay &&
-        Math.random() < playback.bandIntensity * 0.15
+        Math.random() < playback.bandIntensity * entropyMultiplier
     ) {
         // Only add entropy on non-primary steps to avoid clashing with the "core" of the genre
         const isSyncopated = loopStep % 2 === 1;
         const isHeavySync = loopStep % 4 === 2;
 
-        if (inst.name === 'Snare' && isSyncopated) {
+        // Block snare hits on steps immediately after the backbeat (5 and 13) for certain genres
+        // to maintain a strong, authoritative pulse.
+        const isBackbeatAdjacent = [5, 13].includes(loopStep);
+        const blockAdjacentSnare =
+            ['Blues', 'Rock', 'Disco', 'Acoustic'].includes(groove.genreFeel) && isBackbeatAdjacent;
+
+        if (inst.name === 'Snare' && isSyncopated && !blockAdjacentSnare) {
             shouldPlay = true;
             velocity = 0.1 + Math.random() * 0.15;
             soundName = playback.bandIntensity < 0.4 ? 'Sidestick' : 'Snare';
-        } else if ((inst.name === 'HiHat' || inst.name === 'Open') && isHeavySync) {
+        } else if (
+            (inst.name === 'HiHat' || inst.name === 'Open') &&
+            isHeavySync &&
+            !['Blues', 'Rock', 'Disco', 'Acoustic'].includes(groove.genreFeel)
+        ) {
             shouldPlay = true;
             velocity = 0.2 + Math.random() * 0.2;
             soundName = 'HiHat';
@@ -1187,16 +1213,16 @@ export function getDrumMotif(barIndex, genreFeel, creativity, complexity) {
             return 0;
         }
 
-        if (seed < 0.5) {
-            return 0;
+        if (seed < 0.6) {
+            return 0; // Standard Shuffle (More common)
         }
-        if (seed < 0.75) {
-            return 1;
+        if (seed < 0.85) {
+            return 2; // Slow 12/8
         }
-        if (seed < 0.9) {
-            return 2;
+        if (creativity && seed > 0.95) {
+            return 1; // Rare Straight 8ths
         }
-        return 3;
+        return 3; // Busy/Syncopated
     }
 
     if (genreFeel === 'Ska-Punk') {
