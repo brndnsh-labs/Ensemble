@@ -1185,16 +1185,16 @@ export function getDrumMotif(barIndex, genreFeel, creativity, complexity) {
             return 0;
         }
 
-        if (seed < 0.4) {
-            return 0;
+        if (seed < 0.85) {
+            return 0; // One Drop (Dominant)
         }
-        if (seed < 0.7) {
-            return 1;
+        if (seed < 0.92) {
+            return 1; // Steppers
         }
-        if (seed < 0.9) {
-            return 2;
+        if (seed < 0.97) {
+            return 2; // Rockers
         }
-        return 3;
+        return 3; // Dub / Syncopated
     }
 
     if (genreFeel === 'Blues') {
