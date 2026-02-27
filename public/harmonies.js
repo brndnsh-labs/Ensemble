@@ -278,11 +278,12 @@ export function getHarmonyNotes(
     let rhythmicStyle = config.rhythmicStyle;
 
     if (rhythmicStyle === 'auto') {
-        const isPadGenre = feel === 'Rock' || feel === 'Acoustic' || feel === 'Neo-Soul';
+        const isPadGenre = feel === 'Rock' || feel === 'Acoustic';
         rhythmicStyle = isPadGenre ? 'pads' : 'stabs';
     }
 
-    if (feel === 'Jazz' || feel === 'Funk') {
+    // Force rhythmic stabs for comping-heavy genres
+    if (['Jazz', 'Funk', 'Bossa Nova', 'Neo-Soul', 'Reggae', 'Ska'].includes(feel)) {
         rhythmicStyle = 'stabs';
     }
 
@@ -290,8 +291,8 @@ export function getHarmonyNotes(
     let intervals = chord.intervals || [0, 4, 7];
     const isSoloistBusy = soloist.enabled && !soloist.isResting;
 
-    // RHYTHMIC VARIANCE: Only force pads at very high intensity OR if the style is explicitly strings
-    if (isSoloistBusy && (playback.bandIntensity > 0.85 || activeStyle === 'strings')) {
+    // RHYTHMIC VARIANCE: Transition to pads only at extreme intensity if soloist is shredding
+    if (isSoloistBusy && playback.bandIntensity > 0.9 && activeStyle === 'strings') {
         rhythmicStyle = 'pads';
     }
 
