@@ -658,9 +658,9 @@ export function getSoloistNote(
                 // Limit octave jumps at high BPMs to prevent erratic interval averages
                 const allowOctaveJump = playback.bpm < 160 && Math.random() < 0.2;
                 soloist.seedOctaveOffset = allowOctaveJump
-                    ? Math.random() < 0.5
+                    ? (Math.random() < 0.5
                         ? 12
-                        : -12
+                        : -12)
                     : 0; // @worker-mutation
             } else if (
                 soloist.motifBuffer &&
