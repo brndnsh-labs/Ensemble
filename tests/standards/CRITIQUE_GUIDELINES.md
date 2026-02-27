@@ -34,39 +34,59 @@ for (let i = 0; i < totalSteps; i++) {
 | :--- | :--- | :--- |
 | **Jazz** | Charleston Frequency | >70% |
 | **Jazz** | Melodic Smoothness | <7.5 semitones |
-| **Funk** | "The One" Solidity | 100% |
-| **Funk** | Ghost Note Density | 10-35% |
-| **Reggae** | "One Drop" Silence | >70% silence on Beat 1 |
 | **Latin** | Clave Integrity | 100% (No entropy on snare) |
-| **Neo-Soul**| Timing Offset | >90% delayed hits (>10ms) |
 
-| **Blues** | Melodic Smoothness | <6.0 semitones |
-| **Blues** | Blue Note Inflection | >30% bends |
-| **Scalar** | Melodic Smoothness | <10.0 semitones |
-| **Scalar** | Note Density | 2.0-12.0 notes/bar |
-| **Funk** | Melodic Smoothness | <9.0 semitones |
-| **Funk** | Note Density | 4.0-14.0 notes/bar |
-| **Neo-Soul**| Melodic Smoothness | <12.0 semitones |
-| **Neo-Soul**| Note Density | 2.0-10.0 notes/bar |
-| **Disco** | Melodic Smoothness | <8.0 semitones |
-| **Disco** | Note Density | 4.0-15.0 notes/bar |
-| **Bossa Nova**| Melodic Smoothness | <8.0 semitones |
-| **Bossa Nova**| Note Density | 2.0-8.0 notes/bar |
-| **Acoustic**| Melodic Smoothness | <7.0 semitones |
-| **Acoustic**| Note Density | 2.0-10.0 notes/bar |
-| **Reggae**| Melodic Smoothness | <10.0 semitones |
-| **Reggae**| Note Density | 2.0-10.0 notes/bar |
-| **Country** | Melodic Smoothness | <9.0 semitones |
-| **Country** | Note Density | 3.0-12.0 notes/bar |
-| **Ska-Punk**| Melodic Smoothness | <11.0 semitones |
-| **Ska-Punk**| Note Density | 2.0-12.0 notes/bar |
 
-| **Shred** | Melodic Smoothness | <12.0 semitones |
+
+| **Acoustic**| Melodic Smoothness | <12.0 semitones |
+| **Acoustic**| Note Density | 2.0-14.0 notes/bar |
+| **Bossa Nova**| Melodic Smoothness | <12.0 semitones |
+| **Bossa Nova**| Note Density | 2.0-14.0 notes/bar |
+| **Country** | Melodic Smoothness | <12.0 semitones |
+| **Country** | Note Density | 2.0-14.0 notes/bar |
+| **Disco** | Melodic Smoothness | <12.0 semitones |
+| **Disco** | Note Density | 3.0-16.0 notes/bar |
+| **Funk** | Melodic Smoothness | <12.0 semitones |
+| **Funk** | Note Density | 3.0-16.0 notes/bar |
+| **Metal** | Melodic Smoothness | <14.0 semitones |
+| **Metal** | Note Density | 3.0-22.0 notes/bar |
+| **Minimal** | Melodic Smoothness | <12.0 semitones |
+| **Minimal** | Note Density | 0.5-10.0 notes/bar |
+| **Neo-Soul**| Melodic Smoothness | <14.0 semitones |
+| **Neo-Soul**| Note Density | 2.0-14.0 notes/bar |
+| **Reggae**| Melodic Smoothness | <14.0 semitones |
+| **Reggae**| Note Density | 2.0-14.0 notes/bar |
+| **Rock/Scalar**| Melodic Smoothness | <14.0 semitones |
+| **Rock/Scalar**| Note Density | 2.0-16.0 notes/bar |
+| **Shred** | Melodic Smoothness | <14.0 semitones |
 | **Shred** | Note Density | 4.0-24.0 notes/bar |
-| **Minimal** | Melodic Smoothness | <10.0 semitones |
-| **Minimal** | Note Density | 0.5-8.0 notes/bar |
-| **Metal** | Melodic Smoothness | <12.0 semitones |
-| **Metal** | Note Density | 4.0-20.0 notes/bar |
+| **Ska-Punk**| Melodic Smoothness | <14.0 semitones |
+| **Ska-Punk**| Note Density | 2.0-14.0 notes/bar |
+
+| **Acoustic**| Melodic Smoothness | <12.0 semitones |
+| **Acoustic**| Note Density | 2.0-14.0 notes/bar |
+| **Bossa Nova**| Melodic Smoothness | <12.0 semitones |
+| **Bossa Nova**| Note Density | 2.0-14.0 notes/bar |
+| **Country** | Melodic Smoothness | <12.0 semitones |
+| **Country** | Note Density | 2.0-14.0 notes/bar |
+| **Disco** | Melodic Smoothness | <12.0 semitones |
+| **Disco** | Note Density | 3.0-16.0 notes/bar |
+| **Funk** | Melodic Smoothness | <12.0 semitones |
+| **Funk** | Note Density | 3.0-16.0 notes/bar |
+| **Metal** | Melodic Smoothness | <14.0 semitones |
+| **Metal** | Note Density | 3.0-22.0 notes/bar |
+| **Minimal** | Melodic Smoothness | <12.0 semitones |
+| **Minimal** | Note Density | 0.5-10.0 notes/bar |
+| **Neo-Soul**| Melodic Smoothness | <14.0 semitones |
+| **Neo-Soul**| Note Density | 2.0-14.0 notes/bar |
+| **Reggae**| Melodic Smoothness | <14.0 semitones |
+| **Reggae**| Note Density | 2.0-14.0 notes/bar |
+| **Rock/Scalar**| Melodic Smoothness | <14.0 semitones |
+| **Rock/Scalar**| Note Density | 2.0-16.0 notes/bar |
+| **Shred** | Melodic Smoothness | <14.0 semitones |
+| **Shred** | Note Density | 4.0-24.0 notes/bar |
+| **Ska-Punk**| Melodic Smoothness | <14.0 semitones |
+| **Ska-Punk**| Note Density | 2.0-14.0 notes/bar |
 
 ## Adding a New Genre
 

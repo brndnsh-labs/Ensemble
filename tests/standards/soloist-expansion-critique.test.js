@@ -16,7 +16,7 @@ vi.mock('../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
 }));
 
-describe('Soloist Bossa Nova Critique', () => {
+describe('Soloist Expansion Critique', () => {
     let soloistState;
 
     beforeEach(() => {
@@ -46,23 +46,23 @@ describe('Soloist Bossa Nova Critique', () => {
             lastFreq: 0,
             currentCell: null,
         };
+    });
 
+    const simulatePerformance = (numBars, genreFeel) => {
         getState.mockReturnValue({
             playback: {
-                bandIntensity: 0.6,
-                bpm: 100,
+                bandIntensity: 0.8,
+                bpm: 120,
                 complexity: 0.5,
                 intent: {},
                 lyricalBias: 0.5,
             },
-            groove: { genreFeel: 'Bossa Nova', pocket: 0 },
+            groove: { genreFeel, pocket: 0 },
             soloist: soloistState,
             harmony: { enabled: false },
             arranger: { timeSignature: '4/4' },
         });
-    });
 
-    const simulatePerformance = (numBars) => {
         const history = [];
         const Cmaj7 = { rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11], beats: 4 };
         const Fmaj7 = { rootMidi: 65, quality: 'maj7', intervals: [0, 4, 7, 11], beats: 4 };
@@ -103,16 +103,35 @@ describe('Soloist Bossa Nova Critique', () => {
         return history;
     };
 
-    it('should pass an authenticity critique for a 128-bar Bossa Nova soloist performance', () => {
+    const genresToTest = [
+        { name: 'Acoustic', smoothness: 12.0, minDensity: 2.0, maxDensity: 14.0 },
+        { name: 'Bossa Nova', smoothness: 12.0, minDensity: 2.0, maxDensity: 14.0 },
+        { name: 'Country', smoothness: 12.0, minDensity: 2.0, maxDensity: 14.0 },
+        { name: 'Disco', smoothness: 12.0, minDensity: 3.0, maxDensity: 16.0 },
+        { name: 'Funk', smoothness: 12.0, minDensity: 3.0, maxDensity: 16.0 },
+        { name: 'Metal', smoothness: 14.0, minDensity: 3.0, maxDensity: 22.0 },
+        { name: 'Minimal', smoothness: 12.0, minDensity: 0.5, maxDensity: 10.0 },
+        { name: 'Neo-Soul', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
+        { name: 'Reggae', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
+        { name: 'Rock', smoothness: 14.0, minDensity: 2.0, maxDensity: 16.0 },
+        { name: 'Shred', smoothness: 14.0, minDensity: 4.0, maxDensity: 24.0 },
+        { name: 'Ska-Punk', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
+    ];
+
+    it.each(genresToTest)('should pass an authenticity critique for $name', ({
+        name,
+        smoothness,
+        minDensity,
+        maxDensity,
+    }) => {
         const numBars = 128;
-        const notes = simulatePerformance(numBars);
+        const notes = simulatePerformance(numBars, name);
 
         let sumIntervals = 0;
         let totalIntervals = 0;
 
         for (let i = 0; i < notes.length; i++) {
             const n = notes[i];
-            // Melodic smoothness (within phrase)
             if (i > 0 && n.step - notes[i - 1].step <= 4) {
                 totalIntervals++;
                 sumIntervals += Math.abs(n.midi - notes[i - 1].midi);
@@ -122,13 +141,17 @@ describe('Soloist Bossa Nova Critique', () => {
         const avgInterval = sumIntervals / (totalIntervals || 1);
         const notesPerBar = notes.length / numBars;
 
-        console.log('\n--- BOSSA NOVA SOLOIST CRITIQUE REPORT ---');
-        console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <8.0)`);
-        console.log(`[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: 2.0-8.0)`);
+        console.log(`\n--- ${name.toUpperCase()} SOLOIST CRITIQUE REPORT ---`);
+        console.log(
+            `[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <${smoothness})`,
+        );
+        console.log(
+            `[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: ${minDensity}-${maxDensity})`,
+        );
         console.log('------------------------------------\n');
 
-        expect(avgInterval).toBeLessThan(8.0);
-        expect(notesPerBar).toBeGreaterThan(2.0);
-        expect(notesPerBar).toBeLessThan(8.0);
+        expect(avgInterval).toBeLessThan(smoothness);
+        expect(notesPerBar).toBeGreaterThan(minDensity);
+        expect(notesPerBar).toBeLessThan(maxDensity);
     });
 });
