@@ -192,19 +192,19 @@ export function applyGrooveOverrides({
                 if (loopStep === 4 || loopStep === 12) {
                     shouldPlay = true; // Backbeats
                 }
-                if (stepVal === 0 && loopStep === 7 && drumComplexity > 0.4) {
+                if (stepVal === 0 && loopStep === 7 && Math.random() < 0.3) {
                     // "a" of 2 ghost
                     shouldPlay = true;
-                    velocity = 0.3;
+                    velocity = 0.25;
                 }
             } else if (activeMotif === 1) {
                 // Motif 1: The Funky Drummer (Ghost Note Heavy)
                 if (loopStep === 4 || loopStep === 12) {
                     shouldPlay = true; // Backbeats
-                } else if ([3, 7, 10, 11].includes(loopStep)) {
-                    // Classic ghost note placements (e of 1, a of 2, e/and of 3)
+                } else if ([3, 7, 10, 11].includes(loopStep) && Math.random() < 0.4) {
+                    // Classic ghost note placements
                     shouldPlay = true;
-                    velocity = 0.2 + Math.random() * 0.15;
+                    velocity = 0.15 + Math.random() * 0.1;
                 }
             } else if (activeMotif === 2) {
                 // Motif 2: Displaced Backbeats ("Cold Sweat")
@@ -217,19 +217,19 @@ export function applyGrooveOverrides({
                     velocity = 1.1;
                 }
                 // Ghost notes
-                if ([7, 9].includes(loopStep)) {
+                if ([7, 9].includes(loopStep) && Math.random() < 0.3) {
                     shouldPlay = true;
-                    velocity = 0.25;
+                    velocity = 0.2;
                 }
             } else if (activeMotif === 3) {
                 // Motif 3: Busy Linear (Garibaldi style)
                 if (loopStep === 4 || loopStep === 12) {
                     shouldPlay = true;
                     velocity = 1.15; // Popping accents
-                } else if ([2, 5, 9, 14].includes(loopStep)) {
+                } else if ([2, 5, 9, 14].includes(loopStep) && Math.random() < 0.35) {
                     // Highly syncopated inner ghosts
                     shouldPlay = true;
-                    velocity = 0.35;
+                    velocity = 0.25;
                 }
             }
 
