@@ -653,6 +653,19 @@ export function getAccompanimentNotes(
             });
             return notes;
         }
+        if (ccEvents.length > 0) {
+            return [
+                {
+                    midi: 0,
+                    velocity: 0,
+                    durationSteps: 0,
+                    ccEvents,
+                    instrument: 'Piano',
+                    muted: true,
+                },
+            ];
+        }
+        return [];
     }
 
     if (genre === 'Reggae') {
