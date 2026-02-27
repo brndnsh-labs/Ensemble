@@ -40,47 +40,57 @@ vi.mock('../../../public/config.js', () => {
             cells: [0],
             allowedDevices: ['enclosure'],
             registerSoar: 5,
-            restBase: 0.1,
-            restGrowth: 0,
+            restBase: 0.35,
+            restGrowth: 0.08,
             doubleStopProb: 0.1,
+            motifProb: 0.4,
+            hookProb: 0.2,
         },
         shred: {
             deviceProb: 1.0,
             cells: [0],
             allowedDevices: ['run'],
             registerSoar: 5,
-            restBase: 0.1,
-            restGrowth: 0,
+            restBase: 0.25,
+            restGrowth: 0.05,
             doubleStopProb: 0.05,
+            motifProb: 0.3,
+            hookProb: 0.1,
         },
         blues: {
             deviceProb: 1.0,
             cells: [0],
             allowedDevices: ['slide'],
             registerSoar: 5,
-            restBase: 0.1,
-            restGrowth: 0,
+            restBase: 0.4,
+            restGrowth: 0.1,
             doubleStopProb: 0.35,
+            motifProb: 0.5,
+            hookProb: 0.3,
         },
         scalar: {
             deviceProb: 1.0,
             cells: [0],
             allowedDevices: ['run'],
             registerSoar: 5,
-            restBase: 0.1,
-            restGrowth: 0,
+            restBase: 0.35,
+            restGrowth: 0.08,
             doubleStopProb: 0.1,
             maxNotesPerPhrase: 16,
+            motifProb: 0.4,
+            hookProb: 0.2,
         },
         bird: {
             deviceProb: 1.0,
             cells: [0],
             allowedDevices: ['run'],
             registerSoar: 15,
-            restBase: 0.1,
-            restGrowth: 0,
+            restBase: 0.3,
+            restGrowth: 0.05,
             doubleStopProb: 0.05,
             maxNotesPerPhrase: 48,
+            motifProb: 0.4,
+            hookProb: 0.2,
         },
     };
     return {
@@ -141,7 +151,8 @@ describe('Soloist Engine Logic', () => {
                     rests++;
                 }
             }
-            expect(rests).toBeGreaterThan(0);
+            // With restBase 0.35, we expect a decent amount of rests even if budget is high
+            expect(rests).toBeGreaterThan(15);
         });
     });
 

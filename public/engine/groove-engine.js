@@ -204,7 +204,7 @@ export function applyGrooveOverrides({
                 } else if ([3, 7, 10, 11].includes(loopStep)) {
                     // Classic ghost note placements
                     shouldPlay = true;
-                    velocity = 0.08 + Math.random() * 0.1;
+                    velocity = 0.06 + Math.random() * 0.1;
                 }
             } else if (activeMotif === 2) {
                 // Motif 2: Displaced Backbeats ("Cold Sweat")
@@ -229,7 +229,7 @@ export function applyGrooveOverrides({
                 } else if ([2, 5, 9, 14].includes(loopStep)) {
                     // Highly syncopated inner ghosts
                     shouldPlay = true;
-                    velocity = 0.12;
+                    velocity = 0.1;
                 }
             }
 

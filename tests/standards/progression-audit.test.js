@@ -205,7 +205,7 @@ describe('Progression Audit: Verifying All Library Presets', () => {
                         // Harmonic integrity check: Is the pitch in the selected scale?
                         // Round interval to handle micro-bends (e.g. 2.5 for bluesy b3)
                         const rawInterval = (note.midi - currentChord.rootMidi + 120) % 12;
-                        const interval = Math.round(rawInterval);
+                        const interval = Math.round(rawInterval) % 12;
                         const isExpressive =
                             [
                                 'rock',

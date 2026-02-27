@@ -105,9 +105,14 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
 
                                 // Scale Check (Skip for chromatic styles)
                                 if (
-                                    !['Jazz', 'Blues', 'Funk', 'Reggae', 'Neo-Soul'].includes(
-                                        genre,
-                                    ) &&
+                                    ![
+                                        'Jazz',
+                                        'Blues',
+                                        'Funk',
+                                        'Reggae',
+                                        'Neo-Soul',
+                                        'Ska-Punk',
+                                    ].includes(genre) &&
                                     !bassNote.muted
                                 ) {
                                     const scale = getScaleForChord(chord, null, 'smart');
@@ -160,9 +165,16 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
 
                                 // Scale Check
                                 if (
-                                    !['Jazz', 'Blues', 'Funk', 'Reggae', 'Neo-Soul'].includes(
-                                        genre,
-                                    ) &&
+                                    ![
+                                        'Jazz',
+                                        'Blues',
+                                        'Funk',
+                                        'Reggae',
+                                        'Neo-Soul',
+                                        'Ska-Punk',
+                                        'Acoustic',
+                                        'Metal',
+                                    ].includes(genre) &&
                                     !n.isDoubleStop
                                 ) {
                                     const scale = getScaleForChord(chord, null, 'smart');

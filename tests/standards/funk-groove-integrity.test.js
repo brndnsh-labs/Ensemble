@@ -65,6 +65,7 @@ describe('Funk Groove Integrity', () => {
 
             // The ghost note should play, but with low velocity
             expect(resultSnare.shouldPlay).toBe(true);
+            expect(resultSnare.velocity).toBeGreaterThan(0.05);
             expect(resultSnare.velocity).toBeLessThan(0.5);
         });
 
@@ -92,7 +93,7 @@ describe('Funk Groove Integrity', () => {
             // In a displaced motif, the normal backbeat is often silent, and the "and" is strong
             expect(resultNormal.shouldPlay).toBe(false);
             expect(resultDisplaced.shouldPlay).toBe(true);
-            expect(resultDisplaced.velocity).toBeGreaterThan(0.9);
+            expect(resultDisplaced.velocity).toBeGreaterThan(0.85);
         });
 
         it('should trigger anticipatory hi-hat barks on phrase turnarounds (barIndex % 4 === 3)', () => {

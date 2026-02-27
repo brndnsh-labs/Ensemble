@@ -1071,7 +1071,7 @@ export function getSoloistNote(
             weight += 100;
         }
         if (activeStyle === 'blues' || activeStyle === 'acoustic') {
-            weight += 100;
+            weight += 125;
         }
         if (activeStyle === 'reggae') {
             weight += 250; // Very strong stepwise preference for Reggae
@@ -1316,6 +1316,8 @@ export function getSoloistNote(
             allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         const devBaseVel = 0.5 + effectiveIntensity * 0.6;
 
+        let deviceBuffer = [];
+
         if (deviceType === 'bluesLick') {
             const root = targetChord.rootMidi;
             const relInt = (selectedMidi - root + 120) % 12;
@@ -1401,47 +1403,53 @@ export function getSoloistNote(
             }
 
             if (lick.length > 0) {
-                const fullLick = lick.map((n, idx) => ({
+                // Melodic Continuity: Nudge entire lick to the octave nearest to lastMidi
+                const lickStart = lick[0].midi;
+                const octaveShift = Math.round((lastMidi - lickStart) / 12) * 12;
+
+                deviceBuffer = lick.map((n, idx) => ({
                     ...n,
+                    midi: Math.max(minMidi, Math.min(maxMidi, n.midi + octaveShift)),
                     velocity: devBaseVel * (idx === 0 ? 1.15 : 0.9 + Math.random() * 0.15),
                     style: activeStyle,
                 }));
-
-                soloist.deviceBuffer = fullLick.slice(1); // @worker-mutation
-                const first = fullLick[0];
-                soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
-                return finalizeNote(first);
             }
-            // Fallback if interval doesn't match a lick starter
-            // Proceed to standard devices or normal note generation?
-            // Since we are inside the "if bluesLick" block which was chosen randomly,
-            // we should probably fallback to a simple slide or standard note to avoid silence/failure.
-            // Let's fallback to 'slide' logic below by not returning here if lick is empty.
+        }
+
+        if (deviceType === 'graceNote') {
+            // ... (rest of device logic remains similar, but using deviceBuffer)
+        }
+
+        // Finalize device buffer and return
+        if (deviceBuffer.length > 0) {
+            soloist.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
+            const first = deviceBuffer[0];
+            soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
+            soloist.currentCell = null; // @worker-mutation
+            return finalizeNote(first);
         }
 
         if (deviceType === 'graceNote') {
             // Half-step or scale-step below, very fast
-            const res = {
-                midi: selectedMidi - 1,
-                velocity: devBaseVel * 0.8,
-                durationSteps: 1,
-                style: activeStyle,
-            };
-            soloist.deviceBuffer = [
+            deviceBuffer = [
+                {
+                    midi: selectedMidi - 1,
+                    velocity: devBaseVel * 0.8,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
                 {
                     midi: selectedMidi,
                     velocity: devBaseVel * 1.1,
                     durationSteps: 2,
                     style: activeStyle,
                 },
-            ]; // @worker-mutation
-            soloist.busySteps = 0; // @worker-mutation
-            return finalizeNote(res);
+            ];
         }
         if (deviceType === 'banjoRoll') {
             // Arpeggiated 16th notes using chord tones + 2nd/6th
             const root = targetChord.rootMidi;
-            const rollPitches = [0, 2, 4, 7, 9].map((i) => root + 60 + i); // Use a standard octave
+            const rollPitches = [0, 4, 7, 9].map((i) => root + i);
             const roll = [];
             for (let i = 0; i < 4; i++) {
                 const midi = rollPitches[i % rollPitches.length];
@@ -1452,78 +1460,73 @@ export function getSoloistNote(
                     style: activeStyle,
                 });
             }
-            soloist.deviceBuffer = roll; // @worker-mutation
-            const first = soloist.deviceBuffer.shift();
-            soloist.busySteps = 0; // @worker-mutation
-            return finalizeNote(first);
+            deviceBuffer = roll;
         }
         if (deviceType === 'graceSlide') {
             // Half-step slide into a chord tone (usually minor 3rd to major 3rd)
             const targetMidi = selectedMidi;
-            const res = {
-                midi: targetMidi - 1,
-                velocity: devBaseVel * 1.1,
-                durationSteps: 1,
-                style: activeStyle,
-                bendStartInterval: 0,
-            };
-            soloist.deviceBuffer = [
+            deviceBuffer = [
+                {
+                    midi: targetMidi - 1,
+                    velocity: devBaseVel * 1.1,
+                    durationSteps: 1,
+                    style: activeStyle,
+                    bendStartInterval: 0,
+                },
                 {
                     midi: targetMidi,
                     velocity: devBaseVel * 1.2,
                     durationSteps: 2,
                     style: activeStyle,
                 },
-            ]; // @worker-mutation
-            soloist.busySteps = 0; // @worker-mutation
-            return finalizeNote(res);
+            ];
         }
         if (deviceType === 'countryBend' && isPolyphonic && !isPiano) {
             // Pedal Steel style: Hold one note, bend the other into a chord tone
             const topNote =
                 selectedMidi + ([3, 4, 7].includes((selectedMidi - rootMidi + 12) % 12) ? 0 : 2);
             const bottomNote = selectedMidi - 5;
-            const res = [
-                {
-                    midi: topNote,
-                    velocity: devBaseVel * 1.2,
-                    durationSteps: 4,
-                    style: activeStyle,
-                    bendStartInterval: -1,
-                    isDoubleStop: true,
-                },
-                {
-                    midi: bottomNote,
-                    velocity: devBaseVel * 0.9,
-                    durationSteps: 4,
-                    style: activeStyle,
-                    isDoubleStop: false,
-                },
+            deviceBuffer = [
+                [
+                    {
+                        midi: topNote,
+                        velocity: devBaseVel * 1.2,
+                        durationSteps: 4,
+                        style: activeStyle,
+                        bendStartInterval: -1,
+                        isDoubleStop: true,
+                    },
+                    {
+                        midi: bottomNote,
+                        velocity: devBaseVel * 0.9,
+                        durationSteps: 4,
+                        style: activeStyle,
+                        isDoubleStop: false,
+                    },
+                ],
             ];
-            soloist.busySteps = 3; // @worker-mutation
-            return finalizeNote(res);
         }
         if (deviceType === 'chickenPick') {
             // Snappy, short rhythmic hits, often a double stop
             const dsInt = Math.random() < 0.5 ? 3 : 4;
-            const res = [
-                {
-                    midi: selectedMidi + dsInt,
-                    velocity: 1.25,
-                    durationSteps: 1,
-                    style: activeStyle,
-                    isDoubleStop: true,
-                },
-                {
-                    midi: selectedMidi,
-                    velocity: 1.2,
-                    durationSteps: 1,
-                    style: activeStyle,
-                    isDoubleStop: false,
-                },
+            deviceBuffer = [
+                [
+                    {
+                        midi: selectedMidi + dsInt,
+                        velocity: 1.25,
+                        durationSteps: 1,
+                        style: activeStyle,
+                        isDoubleStop: true,
+                    },
+                    {
+                        midi: selectedMidi,
+                        velocity: 1.2,
+                        durationSteps: 1,
+                        style: activeStyle,
+                        isDoubleStop: false,
+                    },
+                ],
             ];
-            soloist.busySteps = 0; // @worker-mutation
-            return finalizeNote(res);
         }
         if (deviceType === 'birdFlurry') {
             // Throttle flurry at high BPM
@@ -1546,13 +1549,16 @@ export function getSoloistNote(
                 });
                 curr = n;
             }
-            soloist.deviceBuffer = flurry; // @worker-mutation
-            const first = soloist.deviceBuffer.shift();
-            soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
-            return finalizeNote(first);
+            deviceBuffer = flurry;
         }
         if (deviceType === 'run' || deviceType === 'enclosure') {
-            soloist.deviceBuffer = [
+            deviceBuffer = [
+                {
+                    midi: selectedMidi + (deviceType === 'run' ? -2 : 1),
+                    velocity: devBaseVel * 0.9,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
                 {
                     midi: selectedMidi - 1,
                     velocity: devBaseVel * 1.1,
@@ -1565,15 +1571,7 @@ export function getSoloistNote(
                     durationSteps: 1,
                     style: activeStyle,
                 },
-            ]; // @worker-mutation
-            const res = {
-                midi: selectedMidi + (deviceType === 'run' ? -2 : 1),
-                velocity: devBaseVel * 0.9,
-                durationSteps: 1,
-                style: activeStyle,
-            };
-            soloist.busySteps = (res.durationSteps || 1) - 1; // @worker-mutation
-            return finalizeNote(res);
+            ];
         }
         if (deviceType === 'slide') {
             // Favor sliding from below, but guitar/jazz often slide from above
@@ -1581,22 +1579,46 @@ export function getSoloistNote(
                 (soloist.mode === 'guitar' || activeStyle === 'bird') && Math.random() < 0.3
                     ? 1
                     : -1;
-            soloist.deviceBuffer = [
+            deviceBuffer = [
+                {
+                    midi: selectedMidi + dir,
+                    velocity: devBaseVel * 0.95,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
                 {
                     midi: selectedMidi,
                     velocity: devBaseVel * 1.15,
                     durationSteps: 1,
                     style: activeStyle,
                 },
-            ]; // @worker-mutation
-            const res = {
-                midi: selectedMidi + dir,
-                velocity: devBaseVel * 0.95,
-                durationSteps: 1,
-                style: activeStyle,
-            };
-            soloist.busySteps = (res.durationSteps || 1) - 1; // @worker-mutation
-            return finalizeNote(res);
+            ];
+        }
+
+        // --- Finalize and Smooth Device Buffer ---
+        if (deviceBuffer.length > 0) {
+            // Melodic Continuity: Nudge entire buffer to the octave nearest to lastMidi
+            // unless we're just starting a phrase
+            const firstNote = Array.isArray(deviceBuffer[0]) ? deviceBuffer[0][0] : deviceBuffer[0];
+            const startMidi = firstNote.midi;
+            const targetMidi = soloist.isResting ? dynamicCenter : lastMidi;
+            const octaveShift = Math.round((targetMidi - startMidi) / 12) * 12;
+
+            const finalBuffer = deviceBuffer.map((n) => {
+                const notes = Array.isArray(n) ? n : [n];
+                const shifted = notes.map((note) => ({
+                    ...note,
+                    midi: Math.max(minMidi, Math.min(maxMidi, note.midi + octaveShift)),
+                }));
+                return shifted.length === 1 ? shifted[0] : shifted;
+            });
+
+            soloist.deviceBuffer = finalBuffer.slice(1); // @worker-mutation
+            const first = finalBuffer[0];
+            soloist.busySteps =
+                (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
+            soloist.currentCell = null; // @worker-mutation
+            return finalizeNote(first);
         }
         if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
             const dsInt = activeStyle === 'blues' || activeStyle === 'scalar' ? 5 : 4;
