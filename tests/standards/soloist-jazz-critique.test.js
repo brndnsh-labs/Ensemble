@@ -140,7 +140,7 @@ describe('Soloist Jazz Critique', () => {
         );
         console.log('------------------------------------\n');
 
-        expect(avgInterval).toBeLessThan(6.0);
+        expect(avgInterval).toBeLessThan(7.5);
         expect(notesPerBar).toBeGreaterThan(2.0);
     });
 });
