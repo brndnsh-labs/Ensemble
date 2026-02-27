@@ -33,7 +33,10 @@ export function InstrumentSettings({ module }) {
         const isReverb = type === 'reverb';
 
         if (state) {
-            state[isReverb ? 'reverb' : 'volume'] = numVal;
+            dispatch(isReverb ? ACTIONS.SET_REVERB : ACTIONS.SET_VOLUME, {
+                module,
+                value: numVal,
+            });
             saveCurrentState();
         }
 
@@ -109,11 +112,12 @@ export function InstrumentSettings({ module }) {
                             step="0.05"
                             value={state.complexity || 0.5}
                             onInput={(e) => {
-                                state.complexity = parseFloat(e.target.value); // Legacy mutation
-                                if (document.getElementById('harmonyComplexityValue')) {
-                                    document.getElementById('harmonyComplexityValue').textContent =
-                                        `${Math.round(state.complexity * 100)}%`;
-                                }
+                                const val = parseFloat(e.target.value);
+                                dispatch(ACTIONS.SET_PARAM, {
+                                    module: 'harmony',
+                                    param: 'complexity',
+                                    value: val,
+                                });
                                 saveCurrentState();
                             }}
                             aria-label="Harmony Complexity"
@@ -142,12 +146,12 @@ export function InstrumentSettings({ module }) {
                                 step="0.05"
                                 value={state.complexity !== undefined ? state.complexity : 0.5}
                                 onInput={(e) => {
-                                    state.complexity = parseFloat(e.target.value);
-                                    if (document.getElementById('soloistComplexityValue')) {
-                                        document.getElementById(
-                                            'soloistComplexityValue',
-                                        ).textContent = `${Math.round(state.complexity * 100)}%`;
-                                    }
+                                    const val = parseFloat(e.target.value);
+                                    dispatch(ACTIONS.SET_PARAM, {
+                                        module: 'soloist',
+                                        param: 'complexity',
+                                        value: val,
+                                    });
                                     saveCurrentState();
                                 }}
                                 aria-label="Soloist Complexity"
@@ -248,7 +252,10 @@ export function InstrumentSettings({ module }) {
 }
 
 function GrooveControls({ state }) {
-    const { swing, swingSub } = useEnsembleState((s) => s.playback);
+    const { swing, swingSub } = useEnsembleState((s) => ({
+        swing: s.groove.swing,
+        swingSub: s.groove.swingSub,
+    }));
 
     return (
         <div>
@@ -308,7 +315,7 @@ function GrooveControls({ state }) {
                     max="100"
                     value={state.humanize || 0}
                     onInput={(e) => {
-                        state.humanize = parseInt(e.target.value, 10);
+                        dispatch(ACTIONS.SET_HUMANIZE, parseInt(e.target.value, 10));
                         saveCurrentState();
                     }}
                     style="width: 100%; height: 4px;"
@@ -354,10 +361,7 @@ function GrooveControls({ state }) {
                         onInput={(e) => {
                             const val = parseInt(e.target.value, 10);
                             dispatch(ACTIONS.SET_LARS_INTENSITY, val / 100);
-                            if (document.getElementById('larsIntensityValue')) {
-                                document.getElementById('larsIntensityValue').textContent =
-                                    `${val}%`;
-                            }
+                            saveCurrentState();
                         }}
                         style="width: 100%; height: 4px;"
                         aria-label="Lars Mode Intensity"

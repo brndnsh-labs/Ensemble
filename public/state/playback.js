@@ -109,6 +109,7 @@ export const playback = {
     updateAvailable: false,
     resolutionTriggered: false,
     isScheduling: false,
+    stateVersion: 0,
     modals: {
         settings: false,
         editor: false,

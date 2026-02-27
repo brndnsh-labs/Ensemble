@@ -7,7 +7,7 @@ import { ACTIONS } from '../types.js';
 export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (e) => {
-            const { playback, groove, soloist } = getState();
+            const { playback, groove } = getState();
             const isTyping =
                 ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) ||
                 e.target.isContentEditable;
@@ -29,17 +29,9 @@ export function GlobalShortcuts() {
             // 'S': Toggle Soloist (Trading Fours)
             if (e.key.toLowerCase() === 's' && !isTyping && !e.metaKey && !e.ctrlKey) {
                 e.preventDefault();
-                if (soloist) {
-                    soloist.enabled = !soloist.enabled;
-                    if (soloist.enabled) {
-                        soloist.isResting = true;
-                        soloist.currentPhraseSteps = 0;
-                        soloist.srdcState = 'Conclusion';
-                    }
-                    // Trigger UI update through a known action
-                    dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'soloist', tab: soloist.activeTab });
-                    saveCurrentState();
-                }
+                import('../instrument-controller.js').then(({ togglePower }) => {
+                    togglePower('soloist');
+                });
             }
 
             // 1-5: Switch Mobile Tabs

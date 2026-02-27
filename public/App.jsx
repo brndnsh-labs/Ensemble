@@ -1,9 +1,10 @@
 import { Fragment, h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Arranger } from './components/Arranger.jsx';
 import { ChordVisualizer } from './components/ChordVisualizer.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { GroovePanel } from './components/GroovePanel.jsx';
+import { InstrumentPanel } from './components/InstrumentPanel.jsx';
 import { InstrumentSettings } from './components/InstrumentSettings.jsx';
 import { KeySignatureControls } from './components/KeySignatureControls.jsx';
 import { Modals } from './components/Modals.jsx';
@@ -167,108 +168,6 @@ function Sidebar({ grooveMobileTab }) {
     );
 }
 
-function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
-    const { activeTab, enabled, tradeMode } = useEnsembleState((s) => ({
-        activeTab: s[module].activeTab,
-        enabled: s[module].enabled,
-        tradeMode: s[module].tradeMode,
-    }));
-
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    const switchTab = (tab) => {
-        dispatch(ACTIONS.SET_ACTIVE_TAB, { module, tab });
-        syncWorker();
-        saveCurrentState();
-    };
-
-    const headerClass = `${module === 'chords' ? 'chord' : module === 'harmony' ? 'harmony' : module}-panel-header`;
-    const isWaiting = module === 'soloist' && !enabled && tradeMode !== 'manual';
-    const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''}`;
-
-    return (
-        <div
-            class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''}`}
-            id={id}
-            data-id={module}
-        >
-            <div class={`panel-header ${headerClass}`}>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <h2>{title}</h2>
-                </div>
-                <div class="instrument-tabs">
-                    <button
-                        class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
-                        onClick={() => switchTab('classic')}
-                    >
-                        Classic
-                    </button>
-                    <button
-                        class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
-                        onClick={() => switchTab('smart')}
-                    >
-                        Smart
-                    </button>
-                </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button
-                        class={`panel-menu-btn ${isMenuOpen ? 'active' : ''}`}
-                        aria-label="Settings"
-                        onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    >
-                        ⋮
-                    </button>
-                    <button
-                        class={powerClass}
-                        id={`${module === 'chords' ? 'chord' : module}PowerBtnDesktop`}
-                        aria-label={`Toggle ${title}`}
-                        onClick={() => togglePower(module)}
-                    >
-                        ⏻
-                    </button>
-                </div>
-            </div>
-
-            <div
-                id={`${module === 'chords' ? 'chord' : module}-tab-classic`}
-                class={`instrument-tab-content ${activeTab === 'classic' ? 'active' : ''}`}
-            >
-                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8;">
-                    Style
-                </label>
-                <div
-                    id={`${module === 'harmony' ? 'harmony' : module}StylePresets`}
-                    class="presets-container"
-                >
-                    <StyleSelector module={module} styles={styles} />
-                </div>
-            </div>
-
-            <div
-                id={`${module === 'chords' ? 'chord' : module}-tab-smart`}
-                class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
-            >
-                {module === 'soloist' ? (
-                    <SoloistSmartTab />
-                ) : (
-                    <div
-                        class="smart-status"
-                        style={`padding: 0.5rem; background: rgba(var(--${module}-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--${module}-color-rgb), 0.2); text-align: center;`}
-                    >
-                        <p style="font-size: 0.8rem; margin: 0;">
-                            ✨ <strong>Smart Follow</strong> Active
-                        </p>
-                    </div>
-                )}
-            </div>
-
-            <div class={`panel-settings-menu ${isMenuOpen ? 'open' : ''}`}>
-                <InstrumentSettings module={module} />
-            </div>
-        </div>
-    );
-}
-
 function MobileNavTab({ tab, activeTab, onSwitch }) {
     const isActive = activeTab === tab.id || (activeTab === 'mobile' && tab.id === 'grooves');
     const { enabled, tradeMode } = useEnsembleState((s) => ({
@@ -328,46 +227,6 @@ function MobileNav({ activeTab }) {
                     onSwitch={switchMobileTab}
                 />
             ))}
-        </div>
-    );
-}
-
-function SoloistSmartTab() {
-    const { tradeMode } = useEnsembleState((s) => ({
-        tradeMode: s.soloist.tradeMode,
-    }));
-
-    const setTradeMode = (mode) => {
-        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
-        saveCurrentState();
-    };
-
-    return (
-        <div
-            class="soloist-smart-controls"
-            style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.25rem 0;"
-        >
-            <div class="trade-mode-group">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                    <label style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Trade Mode
-                    </label>
-                    <span style="font-size: 0.7rem; opacity: 0.5; font-style: italic;">
-                        {tradeMode === 'manual' ? 'Manual Control' : `Autoswitch: ${tradeMode}`}
-                    </span>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem;">
-                    {['manual', 'sections', 'loops'].map((mode) => (
-                        <button
-                            class={`mini-toggle-btn ${tradeMode === mode ? 'active' : ''}`}
-                            style="text-transform: capitalize;"
-                            onClick={() => setTradeMode(mode)}
-                        >
-                            {mode}
-                        </button>
-                    ))}
-                </div>
-            </div>
         </div>
     );
 }

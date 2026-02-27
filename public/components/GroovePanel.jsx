@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
     cloneMeasure,
     saveDrumPreset,
@@ -24,6 +24,24 @@ export function GroovePanel({ isActiveMobile }) {
     }));
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (!isMenuOpen) {
+            return;
+        }
+
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setIsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isMenuOpen]);
 
     const switchTab = (tab) => {
         dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab });
@@ -55,7 +73,7 @@ export function GroovePanel({ isActiveMobile }) {
                         Smart
                     </button>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;" ref={menuRef}>
                     <button
                         class={`panel-menu-btn ${isMenuOpen ? 'active' : ''}`}
                         aria-label="Settings"
@@ -63,6 +81,11 @@ export function GroovePanel({ isActiveMobile }) {
                     >
                         ⋮
                     </button>
+                    <div
+                        class={`panel-settings-menu grooves-settings-menu ${isMenuOpen ? 'open' : ''}`}
+                    >
+                        <InstrumentSettings module="groove" />
+                    </div>
                     <button
                         class={`power-btn desktop-power-btn ${enabled ? 'active' : ''}`}
                         id="groovePowerBtnDesktop"
@@ -134,10 +157,6 @@ export function GroovePanel({ isActiveMobile }) {
                 <GenreSelector />
                 <IntensitySlider />
                 <CreativityToggle />
-            </div>
-
-            <div class={`panel-settings-menu grooves-settings-menu ${isMenuOpen ? 'open' : ''}`}>
-                <InstrumentSettings module="groove" />
             </div>
         </div>
     );

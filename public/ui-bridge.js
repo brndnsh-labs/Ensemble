@@ -31,14 +31,22 @@ export function useEnsembleState(selector) {
     selectorRef.current = selector;
 
     const [slice, setSlice] = useState(() => selector(getState()));
+    const [, forceUpdate] = useState(0);
 
     useEffect(() => {
         const update = (_action, _payload, updatedStateMap) => {
             const newSlice = selectorRef.current(updatedStateMap);
+            const stateVersion = updatedStateMap.playback.stateVersion;
+
             setSlice((prevSlice) => {
+                // If we have a version change, we MUST force an update even if shallowEqual passes
+                // because the underlying object might have been mutated in-place.
                 if (!shallowEqual(prevSlice, newSlice)) {
                     return newSlice;
                 }
+                // If the slice is an object, it might have been mutated in-place.
+                // We use stateVersion to force a re-render.
+                forceUpdate(stateVersion);
                 return prevSlice;
             });
         };

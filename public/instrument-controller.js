@@ -30,15 +30,16 @@ export function switchMeasure(idx) {
     if (groove.currentMeasure === idx) {
         return;
     }
-    groove.currentMeasure = idx; // @worker-mutation
-    dispatch('MEASURE_SWITCH');
+    dispatch(ACTIONS.SET_ACTIVE_MEASURE, idx);
 }
 
 export function updateMeasures(val) {
+    const numVal = parseInt(val, 10);
+    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: numVal });
+
     const { groove } = getState();
-    groove.measures = parseInt(val, 10); // @worker-mutation
-    if (groove.currentMeasure >= groove.measures) {
-        groove.currentMeasure = 0; // @worker-mutation
+    if (groove.currentMeasure >= numVal) {
+        dispatch(ACTIONS.SET_ACTIVE_MEASURE, 0);
     }
     saveCurrentState();
 }

@@ -113,6 +113,9 @@ export function dispatch(action, payload) {
         }
     }
 
+    // Always increment version on dispatch to force UI updates for in-place mutations
+    playback.stateVersion++;
+
     // Notify listeners
     listeners.forEach((listener) => listener(action, payload, stateMap));
 

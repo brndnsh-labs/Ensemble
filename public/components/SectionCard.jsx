@@ -14,6 +14,24 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const textareaRef = useRef(null);
     const rootRef = useRef(null);
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (!isMenuOpen) {
+            return;
+        }
+
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setIsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isMenuOpen]);
 
     useImperativeHandle(ref, () => ({
         scrollIntoView: (options) => {
@@ -238,7 +256,7 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
                             ⎘
                         </button>
 
-                        <div style="position: relative; display: inline-block;">
+                        <div style="position: relative; display: inline-block;" ref={menuRef}>
                             <button
                                 class="section-kebab-btn"
                                 title="Insert Symbol"

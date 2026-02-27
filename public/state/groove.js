@@ -134,6 +134,9 @@ export function grooveReducer(action, payload, playback) {
             }
             return false;
         }
+        case ACTIONS.SET_ACTIVE_MEASURE:
+            Object.assign(groove, { currentMeasure: parseInt(payload, 10) });
+            return true;
         case ACTIONS.SET_SWING:
             Object.assign(groove, { swing: payload });
             return true;
@@ -143,6 +146,26 @@ export function grooveReducer(action, payload, playback) {
         case ACTIONS.SET_HUMANIZE:
             Object.assign(groove, { humanize: payload });
             return true;
+        case ACTIONS.SET_VOLUME:
+            if (
+                payload.module === 'groove' ||
+                payload.module === 'drum' ||
+                payload.module === 'drums'
+            ) {
+                Object.assign(groove, { volume: payload.value });
+                return true;
+            }
+            return false;
+        case ACTIONS.SET_REVERB:
+            if (
+                payload.module === 'groove' ||
+                payload.module === 'drum' ||
+                payload.module === 'drums'
+            ) {
+                Object.assign(groove, { reverb: payload.value });
+                return true;
+            }
+            return false;
         case ACTIONS.SET_FOLLOW_PLAYBACK:
             Object.assign(groove, { followPlayback: payload });
             return true;

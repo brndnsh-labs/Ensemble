@@ -108,11 +108,10 @@ describe('InstrumentSettings Component', () => {
                     humanize: 40,
                     larsMode: false,
                     larsIntensity: 0.5,
-                },
-                playback: {
                     swing: 30,
                     swingSub: '8th',
                 },
+                playback: {},
             };
             return cb(fullState);
         });
