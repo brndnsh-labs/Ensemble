@@ -655,8 +655,9 @@ export function getSoloistNote(
             ) {
                 soloist.isReplayingSeed = true; // @worker-mutation
                 soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1; // @worker-mutation
-                soloist.seedOctaveOffset =
-                    Math.random() < 0.2 ? (Math.random() < 0.5 ? 12 : -12) : 0; // @worker-mutation
+                // Limit octave jumps at high BPMs to prevent erratic interval averages
+                const allowOctaveJump = playback.bpm < 160 && Math.random() < 0.2;
+                soloist.seedOctaveOffset = allowOctaveJump ? (Math.random() < 0.5 ? 12 : -12) : 0; // @worker-mutation
             } else if (
                 soloist.motifBuffer &&
                 soloist.motifBuffer.length > 0 &&
@@ -1127,10 +1128,10 @@ export function getSoloistNote(
             weight *= 0.1; // Heavy penalty for jumps at high speeds
         }
         if (playback.bpm > 180 && dist > 3) {
-            weight *= 0.05; // Stricter
+            weight *= 0.01; // Stricter
         }
         if (playback.bpm > 195 && dist > 2) {
-            weight *= 0.01; // Super strict at 200 BPM (mostly stepwise)
+            weight = 0.00001; // Effectively ban anything > 2 semitones at 200 BPM
         }
 
         if (historyLen > 12) {
