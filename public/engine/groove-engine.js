@@ -914,64 +914,61 @@ export function applyGrooveOverrides({
         if (groove.genreFeel === 'Disco' && inst.name === 'Open') {
             velocity *= 1.15;
         }
+    }
 
-        // --- Ska-Punk Procedural Overrides ---
-        if (groove.genreFeel === 'Ska-Punk' && !inst.muted) {
-            const barIndex = Math.floor(step / 16);
-            const activeMotif = getDrumMotif(
-                barIndex,
-                'Ska-Punk',
-                groove.creativity,
-                drumComplexity,
-            );
-            const isTurnaround = groove.creativity && barIndex % 4 === 3;
+    // --- Ska-Punk Procedural Overrides ---
+    if (groove.genreFeel === 'Ska-Punk' && !inst.muted) {
+        const barIndex = Math.floor(step / 16);
+        const activeMotif = getDrumMotif(barIndex, 'Ska-Punk', groove.creativity, drumComplexity);
+        const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
-            instTimeOffset -= 0.005; // Fast energetic push
+        instTimeOffset -= 0.005; // Fast energetic push
 
-            if (inst.name === 'HiHat' || inst.name === 'Open') {
-                shouldPlay = false;
-                // Upbeat focus
-                if (loopStep % 4 === 2) {
-                    shouldPlay = true;
-                    velocity = 1.35; // Loud offbeats
-                    if (playback.bandIntensity > 0.6 && Math.random() < 0.3) {
-                        soundName = 'Open';
-                    }
-                } else if (activeMotif === 1 && loopStep % 2 === 0) {
-                    // Double-time punk hats on 8ths
-                    shouldPlay = true;
-                    velocity = 0.85;
+        if (inst.name === 'HiHat' || inst.name === 'Open') {
+            shouldPlay = false;
+            // Upbeat focus
+            if (loopStep % 4 === 2) {
+                shouldPlay = true;
+                velocity = 1.35; // Loud offbeats
+                if (playback.bandIntensity > 0.6 && Math.random() < 0.3) {
+                    soundName = 'Open';
                 }
-            } else if (inst.name === 'Kick') {
-                shouldPlay = false;
-                if (activeMotif === 1) {
-                    // Double-time: Kick on 1, 2, 3, 4
-                    if (loopStep % 4 === 0) {
-                        shouldPlay = true;
-                    }
-                } else {
-                    // Standard driving: 1, & of 2, 3
-                    if ([0, 6, 8].includes(loopStep)) {
-                        shouldPlay = true;
-                    }
-                }
-                if (shouldPlay) {
-                    velocity = 1.2;
-                }
-            } else if (inst.name === 'Snare') {
-                shouldPlay = false;
-                if (isTurnaround && loopStep > 12) {
+            } else if (activeMotif === 1 && loopStep % 2 === 0) {
+                // Double-time punk hats on 8ths
+                shouldPlay = true;
+                velocity = 0.85;
+            }
+        } else if (inst.name === 'Kick') {
+            shouldPlay = false;
+            if (activeMotif === 1) {
+                // Double-time: Kick on 1, 2, 3, 4
+                if (loopStep % 4 === 0) {
                     shouldPlay = true;
-                    velocity = 1.1; // Turnaround roll
-                } else {
-                    if (loopStep === 4 || loopStep === 12) {
-                        shouldPlay = true;
-                        velocity = 1.15;
-                    }
+                }
+            } else {
+                // Standard driving: 1, & of 2, 3
+                if ([0, 6, 8].includes(loopStep)) {
+                    shouldPlay = true;
+                }
+            }
+            if (shouldPlay) {
+                velocity = 1.2;
+            }
+        } else if (inst.name === 'Snare') {
+            shouldPlay = false;
+            if (isTurnaround && loopStep > 12) {
+                shouldPlay = true;
+                velocity = 1.1; // Turnaround roll
+            } else {
+                if (loopStep === 4 || loopStep === 12) {
+                    shouldPlay = true;
+                    velocity = 1.15;
                 }
             }
         }
+    }
 
+    if (shouldPlay && !inst.muted) {
         if (
             inst.name === 'HiHat' &&
             groove.genreFeel !== 'Jazz' &&
