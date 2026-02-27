@@ -1130,9 +1130,6 @@ export function getSoloistNote(
         if (playback.bpm > 180 && dist > 3) {
             weight *= 0.01; // Stricter
         }
-        if (playback.bpm > 195 && dist > 2) {
-            weight = 0.00001; // Effectively ban anything > 2 semitones at 200 BPM
-        }
 
         if (historyLen > 12) {
             const count = historyCounts[m] || 0;
@@ -1154,6 +1151,12 @@ export function getSoloistNote(
         }
 
         weight = Math.max(0.01, weight);
+
+        // Absolute hard ban on large intervals at very high BPM (after min weight clamp)
+        if (playback.bpm > 195 && dist > 2) {
+            weight = 0;
+        }
+
         CANDIDATE_WEIGHTS[m] = weight;
         totalWeight += weight;
     }
