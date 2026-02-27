@@ -356,6 +356,16 @@ export function getSoloistNote(
         65 + intensity * 25 + (isDeparture ? 8 * srdcIntensity : 0),
     );
 
+    // --- Range & Continuity Logic ---
+    // Moved to top to support Seed/Motif replay clamping consistently
+    const dynamicCenter = centerMidi;
+    const lastMidi = prevFreq && !soloist.isResting ? getMidi(prevFreq) : Math.round(dynamicCenter);
+
+    // Reggae and Minimal should be more constrained in range
+    const rangeLimit = activeStyle === 'reggae' || activeStyle === 'minimal' ? 12 : 14;
+    const minMidi = Math.max(MIN_GUITAR_MIDI, Math.min(dynamicCenter - 12, lastMidi - rangeLimit));
+    const maxMidi = Math.min(MAX_GUITAR_MIDI, Math.max(dynamicCenter + 12, lastMidi + rangeLimit));
+
     if (!isPriming) {
         soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
     }
@@ -727,6 +737,16 @@ export function getSoloistNote(
                 res = { ...seedNote, midi: seedNote.midi + shift + octaveShift };
             }
 
+            // Clamp to Melodic Range
+            if (Array.isArray(res)) {
+                res = res.map((n) => ({
+                    ...n,
+                    midi: Math.max(minMidi, Math.min(maxMidi, n.midi)),
+                }));
+            } else {
+                res.midi = Math.max(minMidi, Math.min(maxMidi, res.midi));
+            }
+
             let primary = Array.isArray(res) ? res[0] : res;
             const scaleIntervals = getScaleForChord(currentChord, null, style);
             const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
@@ -795,6 +815,16 @@ export function getSoloistNote(
                 res = motifNote.map((n) => ({ ...n, midi: n.midi + shift + octaveShift }));
             } else {
                 res = { ...motifNote, midi: motifNote.midi + shift + octaveShift };
+            }
+
+            // Clamp to Melodic Range
+            if (Array.isArray(res)) {
+                res = res.map((n) => ({
+                    ...n,
+                    midi: Math.max(minMidi, Math.min(maxMidi, n.midi)),
+                }));
+            } else {
+                res.midi = Math.max(minMidi, Math.min(maxMidi, res.midi));
             }
 
             let primary = Array.isArray(res) ? res[0] : res;
@@ -953,14 +983,6 @@ export function getSoloistNote(
     // Instead check intervals directly against scaleIntervals and targetChord.intervals.
     // Note: chordTones check logic updated to use targetChord instead of currentChord for consistency during anticipation.
 
-    const dynamicCenter = centerMidi;
-    const lastMidi = prevFreq && !soloist.isResting ? getMidi(prevFreq) : Math.round(dynamicCenter);
-
-    // Reggae and Minimal should be more constrained in range
-    const rangeLimit = activeStyle === 'reggae' || activeStyle === 'minimal' ? 12 : 14;
-    const minMidi = Math.max(MIN_GUITAR_MIDI, Math.min(dynamicCenter - 12, lastMidi - rangeLimit));
-    const maxMidi = Math.min(MAX_GUITAR_MIDI, Math.max(dynamicCenter + 12, lastMidi + rangeLimit));
-
     let totalWeight = 0;
     CANDIDATE_WEIGHTS.fill(0);
     const lastInterval = soloist.lastInterval || 0;
@@ -1037,21 +1059,22 @@ export function getSoloistNote(
             weight += 15;
         }
         if (activeStyle === 'country' && isPentatonicColor) {
-            weight += 600;
+            weight += 800;
         }
 
         // Stepwise Motion Bonus (Melodic Integrity)
+        const isSmoothStyle = ['blues', 'jazz', 'bird', 'acoustic', 'reggae'].includes(activeStyle);
         if (dist > 0 && dist <= 2 && activeStyle !== 'country') {
-            weight += 50;
+            weight += isSmoothStyle ? 100 : 50;
         }
         if (activeStyle === 'bird' || activeStyle === 'bossa') {
-            weight += 150;
+            weight += 100;
         }
         if (activeStyle === 'blues' || activeStyle === 'acoustic') {
             weight += 100;
         }
         if (activeStyle === 'reggae') {
-            weight += 200; // Very strong stepwise preference for Reggae
+            weight += 250; // Very strong stepwise preference for Reggae
         }
 
         // Voice Leading Bonus
@@ -1063,9 +1086,17 @@ export function getSoloistNote(
             }
         }
 
+        // --- Distance Scaling for Bonuses ---
+        // We damp bonuses for notes that are far away to prevent "teleportation"
+        // Adaptive: Only apply damping to styles that need strict smoothness
+        let distDamping = 1.0;
+        if (isSmoothStyle) {
+            distDamping = dist > 4 ? 1.0 / (1.0 + (dist - 4) * 0.05) : 1.0;
+        }
+
         // SRDC Tension & Resolution Bonuses
         if (soloist.srdcState === 'Departure') {
-            const tensionBonus = 250 * effectiveIntensity;
+            const tensionBonus = 250 * effectiveIntensity * distDamping;
             // Favor 2nds, #11/b5, b6, and 7ths for tension
             if ([1, 2, 6, 8, 11].includes(interval)) {
                 weight += tensionBonus;
@@ -1073,7 +1104,7 @@ export function getSoloistNote(
         }
 
         if (soloist.srdcState === 'Conclusion') {
-            const resolutionBonus = 400 * effectiveIntensity;
+            const resolutionBonus = 400 * effectiveIntensity * distDamping;
             const isChordTone = targetChord.intervals?.some(
                 (i) => ((i % 12) + 12) % 12 === interval,
             );
@@ -1088,7 +1119,8 @@ export function getSoloistNote(
         }
 
         if (soloist.qaState === 'Answer') {
-            const qaBonus = (activeStyle === 'minimal' ? 100 : 250) * effectiveIntensity;
+            const qaBonus =
+                (activeStyle === 'minimal' ? 100 : 250) * effectiveIntensity * distDamping;
             if (isRoot) {
                 weight += qaBonus;
             }
@@ -1099,7 +1131,11 @@ export function getSoloistNote(
 
         // Check if interval matches target chord tones (handling extended intervals > 12)
         if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
-            weight += 20;
+            weight += (isSmoothStyle ? 400 : 100) * distDamping;
+        }
+
+        if (activeStyle === 'country' && isPentatonicColor) {
+            weight += 1000;
         }
 
         // Penalties (Multiplicative)
@@ -1108,6 +1144,12 @@ export function getSoloistNote(
             if (isStagnant) {
                 weight = 0;
             }
+        }
+
+        // Continuous interval penalty to keep lines smooth (Exponential for large leaps)
+        if (dist > 2 && isSmoothStyle) {
+            const penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.85 : 0.6;
+            weight *= penaltyBase ** (dist - 2);
         }
 
         if (activeStyle === 'reggae' && dist > 2) {

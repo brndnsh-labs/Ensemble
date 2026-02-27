@@ -203,7 +203,9 @@ describe('Progression Audit: Verifying All Library Presets', () => {
                         expect(typeof note.velocity).toBe('number');
 
                         // Harmonic integrity check: Is the pitch in the selected scale?
-                        const interval = (note.midi - currentChord.rootMidi + 120) % 12;
+                        // Round interval to handle micro-bends (e.g. 2.5 for bluesy b3)
+                        const rawInterval = (note.midi - currentChord.rootMidi + 120) % 12;
+                        const interval = Math.round(rawInterval);
                         const isExpressive =
                             [
                                 'rock',
