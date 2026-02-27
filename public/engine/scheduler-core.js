@@ -102,6 +102,8 @@ export function togglePlay(viz, fromDispatch = false) {
         chords.scheduledChordIndex = null;
         playback.resolutionTriggered = false;
         playback.isScheduling = false;
+        dispatch(ACTIONS.SET_ENDING_PENDING, false);
+        dispatch(ACTIONS.SET_STOP_AT_END, false);
         if (activeViz) {
             activeViz.clear();
         }
@@ -255,7 +257,7 @@ function scheduleResolution(time) {
  */
 export function scheduler() {
     const { playback, groove, arranger } = getState();
-    if (playback.isScheduling) {
+    if (playback.isScheduling || !playback.isPlaying) {
         return;
     }
     playback.isScheduling = true;
