@@ -1131,7 +1131,7 @@ export function getSoloistNote(
             weight *= 0.01; // Stricter
         }
         if (playback.bpm > 195 && dist > 2) {
-            weight *= 0.005; // Super strict at 200 BPM (mostly stepwise)
+            weight = 0.00001; // Effectively ban anything > 2 semitones at 200 BPM
         }
 
         if (historyLen > 12) {
