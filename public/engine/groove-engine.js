@@ -651,42 +651,37 @@ export function applyGrooveOverrides({
             if (isTurnaround && loopStep > 7) {
                 shouldPlay = false; // Drop hi-hat for the fill
             } else {
-                if (shouldPlay) {
-                    if (loopStep % 4 === 0) {
-                        velocity *= 1.05; // Downbeat emphasis
-                    } else if (loopStep % 4 === 2) {
-                        velocity *= 0.85; // Upbeat ghosting
-                    }
+                // Explicit Rock Pulse (Eighth notes)
+                if (loopStep % 2 === 0) {
+                    shouldPlay = true;
+                    velocity = loopStep % 4 === 0 ? 1.05 : 0.85;
 
                     if (playback.bandIntensity > 0.7) {
                         soundName = 'Open';
                         velocity *= 1.1;
+                    } else {
+                        soundName = 'HiHat'; // Force closed at low intensity
                     }
                 }
             }
         } else if (inst.name === 'Kick') {
             shouldPlay = false;
-            if (activeMotif === 0) {
-                // Standard Money Beat
-                if (loopStep === 0 || loopStep === 8) {
-                    shouldPlay = true;
-                }
-                if (loopStep === 10 && playback.bandIntensity > 0.4 && Math.random() < 0.25) {
-                    shouldPlay = true; // occasional "and of 3"
-                }
+            // Always ground the 1 and 3 in Rock
+            if (loopStep === 0 || loopStep === 8) {
+                shouldPlay = true;
             } else if (activeMotif === 1) {
                 // Syncopated Kick
-                if (loopStep === 0 || loopStep === 6 || loopStep === 10) {
+                if (loopStep === 6 || loopStep === 10) {
                     shouldPlay = true;
                 }
             } else if (activeMotif === 2) {
                 // The "Push"
-                if (loopStep === 0 || loopStep === 10) {
+                if (loopStep === 10) {
                     shouldPlay = true;
                 }
             } else if (activeMotif === 3) {
                 // Heavy Syncopation
-                if (loopStep === 0 || loopStep === 6 || loopStep === 10 || loopStep === 14) {
+                if (loopStep === 6 || loopStep === 10 || loopStep === 14) {
                     shouldPlay = true;
                 }
             }
@@ -697,27 +692,27 @@ export function applyGrooveOverrides({
         } else if (inst.name === 'Snare') {
             shouldPlay = false;
 
+            // Always preserve backbeat even during turnaround fills
+            if (loopStep === 4 || loopStep === 12) {
+                shouldPlay = true;
+            }
+
             if (isTurnaround && loopStep > 7) {
-                // Turnaround Fill
-                if ([8, 10, 12, 14].includes(loopStep) && Math.random() < 0.8) {
+                // Turnaround Fill (Extra notes)
+                if ([8, 10, 14].includes(loopStep) && Math.random() < 0.4) {
                     shouldPlay = true;
-                    velocity = 0.9 + Math.random() * 0.2;
+                    velocity = 0.8 + Math.random() * 0.2;
                 }
             } else {
-                // Standard Backbeat
-                if (loopStep === 4 || loopStep === 12) {
-                    shouldPlay = true;
-                }
-
                 // Ghosting
                 if (!shouldPlay && (loopStep === 7 || loopStep === 9)) {
                     if (
-                        playback.bandIntensity > 0.35 &&
+                        playback.bandIntensity > 0.4 &&
                         playback.bandIntensity < 0.75 &&
-                        Math.random() < 0.15
+                        Math.random() < 0.08
                     ) {
                         shouldPlay = true;
-                        velocity = 0.35;
+                        velocity = 0.25;
                     }
                 }
             }
