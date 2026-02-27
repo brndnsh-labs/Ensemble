@@ -839,7 +839,14 @@ export function applyGrooveOverrides({
         const blockAdjacentSnare =
             ['Blues', 'Rock', 'Disco', 'Acoustic'].includes(groove.genreFeel) && isBackbeatAdjacent;
 
-        if (inst.name === 'Snare' && isSyncopated && !blockAdjacentSnare) {
+        const isLatin =
+            groove.genreFeel === 'Bossa Nova' ||
+            groove.genreFeel === 'Latin' ||
+            ['Bossa Nova', 'Latin/Salsa', 'Afro-Cuban 6/8', 'Samba'].includes(
+                groove.lastDrumPreset,
+            );
+
+        if (inst.name === 'Snare' && isSyncopated && !blockAdjacentSnare && !isLatin) {
             shouldPlay = true;
             velocity = 0.1 + Math.random() * 0.15;
             soundName = playback.bandIntensity < 0.4 ? 'Sidestick' : 'Snare';
