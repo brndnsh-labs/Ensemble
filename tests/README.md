@@ -13,6 +13,7 @@ This directory contains the automated tests for the Ensemble application, powere
     *   *Examples:* Measuring render loop times or high-frequency calculation overhead.
 *   **`standards/`**: Musical validity checks.
     *   *Examples:* Ensuring generated bass lines adhere to genre rules (e.g., Reggae "One Drop") over thousands of measures.
+    *   *Critique Tests:* Advanced statistical analysis of musical authenticity (e.g., Jazz Charleston frequency, Soloist melodic smoothness). See [Critique Guidelines](./standards/CRITIQUE_GUIDELINES.md) for details.
 
 ## Running Tests
 
