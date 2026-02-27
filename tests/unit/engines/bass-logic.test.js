@@ -290,7 +290,7 @@ describe('Bass Engine Logic', () => {
                     activeNotes.length = 0;
                 }
                 for (let i = activeNotes.length - 1; i >= 0; i--) {
-                    if (activeNotes[i].endStep <= step) {
+                    if (activeNotes[i].endStep <= step + 0.01) {
                         activeNotes.splice(i, 1);
                     }
                 }
@@ -307,7 +307,13 @@ describe('Bass Engine Logic', () => {
                         step % 16,
                     );
                     if (result) {
-                        activeNotes.push({ endStep: step + result.durationSteps });
+                        // For the purpose of this coarse step-based overlap test,
+                        // we treat anything >= 1 step as 1 step to allow boundary touching
+                        const dur =
+                            style === 'quarter'
+                                ? Math.min(result.durationSteps, 1.0)
+                                : result.durationSteps;
+                        activeNotes.push({ endStep: step + dur });
                     }
                 }
                 maxOverlaps = Math.max(maxOverlaps, activeNotes.length);

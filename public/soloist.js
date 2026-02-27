@@ -1104,7 +1104,8 @@ export function getSoloistNote(
         }
 
         if (soloist.srdcState === 'Conclusion') {
-            const resolutionBonus = 400 * effectiveIntensity * distDamping;
+            const baseRes = isSmoothStyle ? 500 : 400;
+            const resolutionBonus = baseRes * effectiveIntensity * distDamping;
             const isChordTone = targetChord.intervals?.some(
                 (i) => ((i % 12) + 12) % 12 === interval,
             );

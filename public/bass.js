@@ -84,7 +84,7 @@ export function isBassActive(style, step, stepInChord) {
         // Funk uses a combination of foundational 1/8ths and syncopated 1/16ths
         const stepInMeasure = step % 16;
         const isFoundational = [0, 4, 8, 12, 14].includes(stepInMeasure);
-        let ghostProb = 0.05 + playback.bandIntensity * 0.3;
+        let ghostProb = 0.5 + playback.bandIntensity * 0.3;
 
         // High BPM Safety
         if (playback.bpm > 150) {
@@ -230,7 +230,12 @@ export function getBassNote(
     }
 
     // Shift center up as intensity builds (max +7 semitones)
-    safeCenterMidi += Math.floor(intensity * 7);
+    // REGGAE EXCEPTION: Keep it deep even at high intensity
+    const registerShift =
+        style === 'dub' || groove.genreFeel === 'Reggae'
+            ? Math.min(2, Math.floor(intensity * 7))
+            : Math.floor(intensity * 7);
+    safeCenterMidi += registerShift;
 
     const prevMidi = getMidi(prevFreq);
 
@@ -352,9 +357,15 @@ export function getBassNote(
                 style === 'rocco' ||
                 style === 'metal' ||
                 style === 'neo' ||
-                style === 'walking-ska'
+                style === 'walking-ska' ||
+                style === 'quarter'
             ) {
-                durationSteps = 0.8;
+                durationSteps =
+                    style === 'quarter'
+                        ? ts.stepsPerBeat * 0.4
+                        : style === 'neo'
+                          ? ts.stepsPerBeat * 0.5
+                          : 0.8;
             } else {
                 durationSteps = ts.stepsPerBeat;
             }
@@ -372,15 +383,31 @@ export function getBassNote(
             }
         }
 
+        // Ensemble Awareness: Shorten notes when soloist is busy to prevent overlaps and mud
+        if (isSoloistBusy) {
+            durationSteps = 0.1; // Bulletproof staccato
+        }
+
         // Wider dynamic range: 0.6 + intensity * 0.7 (Range: 0.6 to 1.3)
         const intensityFactor = 0.6 + intensity * 0.7;
         const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
+
+        // Ensemble Awareness: Shorten notes when soloist is busy
+        let finalDur = durationSteps;
+        if (isSoloistBusy) {
+            finalDur = 0.5;
+        }
+
+        // Universal Overlap Protection: Force gaps for legato-heavy styles
+        const maxSafeDuration =
+            style === 'quarter' ? ts.stepsPerBeat * 0.45 : ts.stepsPerBeat * 0.95;
+        const safeDuration = Math.min(finalDur, maxSafeDuration);
 
         return {
             freq,
             midi: getMidi(freq),
             velocity: finalVel,
-            durationSteps,
+            durationSteps: safeDuration,
             timingOffset,
             muted,
             bendStartInterval,
@@ -666,7 +693,7 @@ export function getBassNote(
 
         // 2. The "And" (8th notes) - Prime candidates for Octave Pops
         if (stepInBeat === 2) {
-            const octavePopProb = 0.2 + intensity * 0.4;
+            const octavePopProb = 0.4 + intensity * 0.4;
             if (Math.random() < octavePopProb) {
                 const note = baseRoot + 12;
                 // Pop velocity: triggers brighter synth mode
@@ -900,30 +927,22 @@ export function getBassNote(
         );
     }
 
-    if (beatIndex % 1 !== 0) {
+    if (intBeat % 1 !== 0) {
         return null;
     }
 
-    if (intBeat === 2 && style === 'quarter' && Math.random() < 0.8) {
-        const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-        const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
-        return result(
-            getFrequency(
-                clampAndNormalize(withOctaveJump(baseRoot + (hasFlat5 ? 6 : hasSharp5 ? 8 : 7))),
-            ),
-            null,
-            velocity,
-        );
-    }
+    // Walking Bass Approach Logic (Jazz/Blues)
+    const isLastBeatOfMeasure = intBeat === ts.beats - 1;
+    const isEndOfChord = intBeat === beatsInChord - 1;
 
-    if (intBeat === beatsInChord - 1 && nextChord) {
+    if ((isEndOfChord || (isLastBeatOfMeasure && intensity > 0.6)) && nextChord) {
         const nextTarget =
             nextChord.bassMidi !== null && nextChord.bassMidi !== undefined
                 ? nextChord.bassMidi
                 : nextChord.rootMidi;
         const targetRoot = normalizeToRange(nextTarget);
         const pullTension = (soloist.tension || 0) + intensity * 0.3 + playback.complexity * 0.2;
-        const chromaticProb = (isSoloistBusy ? 0.1 : 0.25) + pullTension * 0.3;
+        const chromaticProb = (isSoloistBusy ? 0.2 : 0.45) + pullTension * 0.3;
         if (
             Math.random() < chromaticProb &&
             (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues' || pullTension > 0.7)
@@ -946,7 +965,7 @@ export function getBassNote(
             approach = clampAndNormalize(withOctaveJump(approach));
             const bend =
                 Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0;
-            return result(getFrequency(approach), null, velocity, false, bend);
+            return result(getFrequency(approach), 1, velocity, false, bend);
         } else {
             const candidates = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7];
             const valid = candidates.filter(
