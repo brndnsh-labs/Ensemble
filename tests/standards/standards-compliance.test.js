@@ -242,6 +242,7 @@ describe('Standards Compliance Test Suite', () => {
     // --- Blues Improvisation ---
     describe('Blues Improvisation', () => {
         beforeEach(() => {
+            playback.currentLoopCount = 3;
             arranger.key = 'F';
             arranger.isMinor = false;
             arranger.sections = [

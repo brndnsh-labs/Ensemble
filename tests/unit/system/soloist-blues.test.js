@@ -46,6 +46,7 @@ describe('Soloist Blues Logic', () => {
     });
 
     it('should generate blues licks (long phrases) when style is blues', () => {
+        mockState.playback.currentLoopCount = 3;
         const C7 = { rootMidi: 60, quality: '7', intervals: [0, 4, 7, 10], beats: 4 };
 
         let lickFound = false;

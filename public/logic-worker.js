@@ -323,6 +323,7 @@ class ExportProcessor {
         if (modStep === 0 && step > 0) {
             this.exportConductor.loopCount++;
             this.exportConductor.formIteration++;
+            playback.currentLoopCount = this.exportConductor.loopCount; // @worker-mutation
         }
 
         const entry = arranger.stepMap.find((e) => modStep >= e.start && modStep < e.end);

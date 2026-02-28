@@ -361,6 +361,7 @@ describe('Soloist Engine Logic', () => {
             const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5); // Fixed randomness for phrased rest checks
 
             // Conservative start
+            getState().playback.currentLoopCount = 0;
             soloist.sessionSteps = 0;
             soloist.busySteps = 0;
             let noteCountStart = 0;
@@ -372,6 +373,7 @@ describe('Soloist Engine Logic', () => {
             }
 
             // Matured start
+            getState().playback.currentLoopCount = 3;
             soloist.sessionSteps = 10000;
             soloist.busySteps = 0;
             let noteCountLate = 0;
@@ -389,6 +391,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Structural Awareness', () => {
         it('should be more likely to rest approaching the section boundary', () => {
+            getState().playback.currentLoopCount = 3;
             const sectionInfo = { sectionStart: 0, sectionEnd: 64 };
             const chord = { rootMidi: 60, quality: 'major', intervals: [0, 4, 7], beats: 4 };
             const spy = vi.spyOn(Math, 'random').mockReturnValue(0.6); // Threshold for rest checks
@@ -420,6 +423,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Motif & Bend Integrity', () => {
         it('should generate positive bendStartInterval for scoops (starting below target)', () => {
+            getState().playback.currentLoopCount = 3;
             const chord = { rootMidi: 60, quality: 'major', intervals: [0, 4, 7], beats: 4 };
             let scoops = 0;
             for (let i = 0; i < 500; i++) {
@@ -466,6 +470,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Double Stop Generation', () => {
         it('should return an array of notes when double stops are triggered', () => {
+            getState().playback.currentLoopCount = 3;
             soloist.mode = 'guitar';
             let arrayFound = false;
             for (let i = 0; i < 2000; i++) {
@@ -483,6 +488,7 @@ describe('Soloist Engine Logic', () => {
 
     describe('Melodic Variety & Repetition', () => {
         it('should not get stuck on F4 (65) in Standard Pop progression', () => {
+            getState().playback.currentLoopCount = 3;
             // C | G | Am | F
             const prog = [
                 { rootMidi: 60, intervals: [0, 4, 7], quality: 'major' }, // C

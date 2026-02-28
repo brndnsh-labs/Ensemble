@@ -77,6 +77,7 @@ describe('Soloist Mode Differentiation Logic', () => {
 
     it('should generate specific fretboard-friendly intervals in guitar mode', () => {
         state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 3; // ensure fully warmed up
         vi.spyOn(Math, 'random').mockRestore(); // Use real random for the loop
 
         let note = null;
@@ -103,6 +104,7 @@ describe('Soloist Mode Differentiation Logic', () => {
 
     it('should generate 3-note block chords in piano mode', () => {
         state.soloist.mode = 'piano';
+        state.playback.currentLoopCount = 3;
         vi.spyOn(Math, 'random').mockRestore();
 
         let note = null;
@@ -128,6 +130,7 @@ describe('Soloist Mode Differentiation Logic', () => {
 
     it('should generate quartal voicings for piano in neo style', () => {
         state.soloist.mode = 'piano';
+        state.playback.currentLoopCount = 3;
         vi.spyOn(Math, 'random').mockRestore();
 
         let note = null;
@@ -150,6 +153,7 @@ describe('Soloist Mode Differentiation Logic', () => {
 
     it('should trigger a graceNote device in piano mode', () => {
         state.soloist.mode = 'piano';
+        state.playback.currentLoopCount = 3;
         state.playback.bandIntensity = 0.7; // Ensure allowFlash is true
         vi.spyOn(Math, 'random').mockRestore();
 
@@ -172,6 +176,7 @@ describe('Soloist Mode Differentiation Logic', () => {
 
     it('should use Hendrix-style intervals for guitar in blues style', () => {
         state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 3;
         vi.spyOn(Math, 'random').mockRestore();
 
         let attempts = 0;

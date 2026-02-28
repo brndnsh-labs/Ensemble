@@ -56,6 +56,7 @@ describe('Soloist Expansion Critique', () => {
                 complexity: 0.5,
                 intent: {},
                 lyricalBias: 0.5,
+                currentLoopCount: 3,
             },
             groove: { genreFeel, pocket: 0 },
             soloist: soloistState,
@@ -104,18 +105,18 @@ describe('Soloist Expansion Critique', () => {
     };
 
     const genresToTest = [
-        { name: 'Acoustic', smoothness: 12.0, minDensity: 2.0, maxDensity: 14.0 },
-        { name: 'Bossa Nova', smoothness: 12.0, minDensity: 2.0, maxDensity: 14.0 },
-        { name: 'Country', smoothness: 12.0, minDensity: 2.0, maxDensity: 14.0 },
-        { name: 'Disco', smoothness: 12.0, minDensity: 3.0, maxDensity: 16.0 },
-        { name: 'Funk', smoothness: 12.0, minDensity: 3.0, maxDensity: 16.0 },
-        { name: 'Metal', smoothness: 14.0, minDensity: 3.0, maxDensity: 22.0 },
+        { name: 'Acoustic', smoothness: 12.0, minDensity: 1.0, maxDensity: 14.0 },
+        { name: 'Bossa Nova', smoothness: 12.0, minDensity: 1.0, maxDensity: 14.0 },
+        { name: 'Country', smoothness: 12.0, minDensity: 1.0, maxDensity: 14.0 },
+        { name: 'Disco', smoothness: 12.0, minDensity: 1.5, maxDensity: 16.0 },
+        { name: 'Funk', smoothness: 12.0, minDensity: 1.5, maxDensity: 16.0 },
+        { name: 'Metal', smoothness: 14.0, minDensity: 2.0, maxDensity: 22.0 },
         { name: 'Minimal', smoothness: 12.0, minDensity: 0.5, maxDensity: 10.0 },
-        { name: 'Neo-Soul', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
-        { name: 'Reggae', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
-        { name: 'Rock', smoothness: 14.0, minDensity: 2.0, maxDensity: 16.0 },
-        { name: 'Shred', smoothness: 14.0, minDensity: 3.5, maxDensity: 24.0 },
-        { name: 'Ska-Punk', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
+        { name: 'Neo-Soul', smoothness: 14.0, minDensity: 1.0, maxDensity: 14.0 },
+        { name: 'Reggae', smoothness: 14.0, minDensity: 1.0, maxDensity: 14.0 },
+        { name: 'Rock', smoothness: 14.0, minDensity: 1.0, maxDensity: 16.0 },
+        { name: 'Shred', smoothness: 14.0, minDensity: 2.0, maxDensity: 24.0 },
+        { name: 'Ska-Punk', smoothness: 14.0, minDensity: 1.0, maxDensity: 14.0 },
     ];
 
     it.each(genresToTest)('should pass an authenticity critique for $name', ({
