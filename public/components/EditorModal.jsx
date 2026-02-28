@@ -128,6 +128,12 @@ export function EditorModal() {
         shareProgression();
     };
 
+    const handleClearLeadSeed = () => {
+        setIsMenuOpen(false);
+        dispatch(ACTIONS.CLEAR_LEAD_SHEET);
+        syncWorker();
+    };
+
     const handleReharmonize = async () => {
         setIsMenuOpen(false);
         if (!hasLeadSheet) {
@@ -289,6 +295,15 @@ export function EditorModal() {
                                     onClick={handleReharmonize}
                                 >
                                     🎹 <span>Re-harmonize</span>
+                                </button>
+                            )}
+                            {hasLeadSheet && (
+                                <button
+                                    id="clearLeadSeedBtn"
+                                    title="Clear Lead Seed"
+                                    onClick={handleClearLeadSeed}
+                                >
+                                    🚫 <span>Clear Lead Seed</span>
                                 </button>
                             )}
 

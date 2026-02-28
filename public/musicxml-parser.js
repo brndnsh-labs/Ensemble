@@ -219,16 +219,18 @@ export function parseMusicXML(xmlString) {
 
         // Break into sections of 8 measures (or just 1 big section if simple)
         if (currentChords.length === 8 || measureIndex === measures.length - 1) {
-            currentSection.value = currentChords.join(' | ');
-            sections.push({ ...currentSection });
+            if (currentChords.length > 0) {
+                currentSection.value = currentChords.join(' | ');
+                sections.push({ ...currentSection });
 
-            // Reset for next section
-            currentSection.id = `s${Date.now()}${measureIndex}`;
-            currentSection.label = String.fromCharCode(currentSection.label.charCodeAt(0) + 1);
-            if (currentSection.label > 'Z') {
-                currentSection.label = 'A';
+                // Reset for next section
+                currentSection.id = `s${Date.now()}${measureIndex}`;
+                currentSection.label = String.fromCharCode(currentSection.label.charCodeAt(0) + 1);
+                if (currentSection.label > 'Z') {
+                    currentSection.label = 'A';
+                }
+                currentChords = [];
             }
-            currentChords = [];
         }
 
         currentGlobalStep += getStepsPerMeasure(currentTimeSignature);

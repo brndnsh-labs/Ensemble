@@ -184,6 +184,7 @@ export function hydrateState() {
                       ? 'guitar'
                       : 'monophonic',
                 activeTab: savedState.soloist.activeTab || 'smart',
+                leadSheetMelody: savedState.soloist.leadSheetMelody || [],
             });
         }
         if (savedState.harmony) {

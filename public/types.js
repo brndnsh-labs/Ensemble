@@ -4,6 +4,7 @@
 
 export const ACTIONS = {
     IMPORT_MUSICXML: 'IMPORT_MUSICXML',
+    CLEAR_LEAD_SHEET: 'CLEAR_LEAD_SHEET',
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',

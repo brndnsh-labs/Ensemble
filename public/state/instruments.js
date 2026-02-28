@@ -177,6 +177,12 @@ export function instrumentReducer(action, payload) {
             });
             break;
         }
+        case ACTIONS.CLEAR_LEAD_SHEET:
+            Object.assign(soloist, {
+                leadSheetMelody: [],
+                style: soloist.lastSmartStyle || 'smart',
+            });
+            break;
         case ACTIONS.RESET_STATE:
             Object.assign(chords, {
                 enabled: true,
