@@ -101,18 +101,18 @@ describe('Lead Seed - MusicXML Parser', () => {
 
         expect(result.leadSheetMelody).toHaveLength(3);
 
-        // First note (D4) at global step 14
+        // First note (D4) at global step -2 (pick-up)
         expect(result.leadSheetMelody[0]).toMatchObject({
             midi: 62, // D4
-            globalStep: 14,
+            globalStep: -2,
             durationSteps: 2,
         });
 
-        // Measure 2 starts at global step 16
-        // First note (G4) at step 16
+        // Measure 2 (Gmaj7) starts at global step 0
+        // First note (G4) at step 0
         expect(result.leadSheetMelody[1]).toMatchObject({
             midi: 67, // G4
-            globalStep: 16,
+            globalStep: 0,
             durationSteps: 2,
         });
     });
@@ -122,17 +122,17 @@ describe('Lead Seed - MusicXML Parser', () => {
 
         // Night and Day uses 6 divisions per quarter note
         // Measure 1: Rest (half) = 12 divisions = 8 steps (4 steps per quarter)
-        // First note starts at step 8.
+        // Measure 2 starts at Step 0. Measure 1 is Step -16. Note is at beat 3 (-8 steps)
 
         expect(result.sections).toHaveLength(1);
         expect(result.sections[0].value).toContain('Dm7'); // min7 was replaced by m7
 
         expect(result.leadSheetMelody).toHaveLength(4);
 
-        // First note (G4) at global step 8
+        // First note (G4) at global step -8
         expect(result.leadSheetMelody[0]).toMatchObject({
             midi: 67,
-            globalStep: 8,
+            globalStep: -8,
             durationSteps: 4, // quarter note = 4 steps
         });
     });

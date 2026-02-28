@@ -46,21 +46,21 @@ export function parseMusicXML(xmlString) {
     let _currentTimeSignature = '4/4';
     let hasChords = false;
 
-    // First, find which measure is labeled "1" (Step 0)
-    let firstMeasureIndex = -1;
+    // First, find which measure actually starts the chords (Step 0)
+    let firstChordMeasureIndex = -1;
     for (let i = 0; i < measures.length; i++) {
-        if (measures[i].getAttribute('number') === '1') {
-            firstMeasureIndex = i;
+        if (measures[i].querySelector('harmony')) {
+            firstChordMeasureIndex = i;
             break;
         }
     }
 
-    // If no measure "1" found, assume measure 0 is step 0
-    if (firstMeasureIndex === -1) {
-        firstMeasureIndex = 0;
+    // If no chords found, assume measure 0 is step 0
+    if (firstChordMeasureIndex === -1) {
+        firstChordMeasureIndex = 0;
     }
 
-    // Calculate the global step for each measure relative to firstMeasureIndex
+    // Calculate the global step for each measure relative to firstChordMeasureIndex
     // We need to account for time signature changes if they occur before Step 0
     const measureStepOffsets = new Array(measures.length).fill(0);
     let runningStep = 0;
@@ -80,7 +80,7 @@ export function parseMusicXML(xmlString) {
         runningStep += getStepsPerMeasure(scanTS);
     });
 
-    const stepZeroOffset = measureStepOffsets[firstMeasureIndex];
+    const stepZeroOffset = measureStepOffsets[firstChordMeasureIndex];
 
     const currentSection = {
         id: `s${Date.now()}`,

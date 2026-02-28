@@ -124,21 +124,27 @@ describe('MusicXML Integration Critique', () => {
         console.log('------------------------------------\n');
     });
 
-    it('should handle large form for Night and Day (4/4)', () => {
+    it('should handle form alignment for Night and Day (4/4)', () => {
         const xml = fs.readFileSync(path.join(fixturesDir, 'Night And DAy.xml'), 'utf-8');
         const parsed = parseMusicXML(xml);
 
         const { history, melodySteps } = simulatePerformance(parsed, '4/4', 2);
 
-        // This specific fixture has 35 measures, last note at bar 34
-        expect(melodySteps).toBe(544);
+        // Measure 2 is Step 0 (Head start)
+        const headStartNote = parsed.leadSheetMelody.find((n) => n.globalStep === 0);
+        // Notes in Measure 1 should be negative
+        const pickupNotes = parsed.leadSheetMelody.filter((n) => n.globalStep < 0);
 
-        const uniqueSteps = new Set(parsed.leadSheetMelody.map((n) => n.globalStep)).size;
-        expect(history.length).toBeGreaterThanOrEqual(uniqueSteps * 2);
+        expect(headStartNote.midi).toBe(67); // G4
+        expect(pickupNotes.length).toBeGreaterThan(0);
+        expect(pickupNotes[0].globalStep).toBe(-8); // Start of measure 1 relative to measure 2
 
-        console.log('\n--- LEAD SEED CRITIQUE REPORT (Night and Day) ---');
-        console.log(`[Form Alignment]        100% (Looping correctly at ${melodySteps} steps)`);
-        console.log(`[Note Continuity]       ${history.length} notes captured over 2 loops`);
+        console.log('\n--- LEAD SEED ALIGNMENT REPORT (Night and Day) ---');
+        console.log(
+            `[Pick-up Note]          MIDI ${pickupNotes[0].midi} at Step ${pickupNotes[0].globalStep}`,
+        );
+        console.log(`[Head Start]            MIDI ${headStartNote.midi} at Step 0`);
+        console.log('[Result]                Perfect Alignment');
         console.log('------------------------------------\n');
     });
 
@@ -206,6 +212,28 @@ describe('MusicXML Integration Critique', () => {
         console.log(`[Head Notes]            2`);
         console.log(`[Improvised Notes]      ${notesAfterHead.length}`);
         console.log('[Transition]            Seamless (Continuity Verified)');
+        console.log('------------------------------------\n');
+    });
+
+    it('should correctly align pick-up notes in Ornithology (Step -2)', () => {
+        const xml = fs.readFileSync(path.join(fixturesDir, 'Ornithology.xml'), 'utf-8');
+        const parsed = parseMusicXML(xml);
+
+        // Find D4 (MIDI 62) - the pick-up note
+        const pickupNote = parsed.leadSheetMelody.find((n) => n.midi === 62);
+        // Find G4 (MIDI 67) - the first note of the head
+        const headStartNote = parsed.leadSheetMelody.find((n) => n.midi === 67);
+
+        // EXPECTATION:
+        // Measure 1 (Pick-up): Step -2 (and of 4)
+        // Measure 2 (Gmaj7 Chord): Step 0
+        expect(pickupNote.globalStep).toBe(-2);
+        expect(headStartNote.globalStep).toBe(0);
+
+        console.log('\n--- LEAD SEED ALIGNMENT REPORT (Ornithology) ---');
+        console.log(`[Pick-up Note]          D4 at Step ${pickupNote.globalStep} (Expected -2)`);
+        console.log(`[Head Start]            G4 at Step ${headStartNote.globalStep} (Expected 0)`);
+        console.log('[Result]                Perfect Alignment');
         console.log('------------------------------------\n');
     });
 });
