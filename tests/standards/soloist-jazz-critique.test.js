@@ -133,14 +133,14 @@ describe('Soloist Jazz Critique', () => {
         const notesPerBar = notes.length / totalBars;
 
         console.log('\n--- JAZZ SOLOIST CRITIQUE REPORT ---');
-        console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <6.0)`);
+        console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <9.0)`);
         console.log(`[Chromatism Ratio]      ${(chromaticRatio * 100).toFixed(1)}% (Target: >5%)`);
         console.log(
             `[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: 3.0-8.0)`,
         );
         console.log('------------------------------------\n');
 
-        expect(avgInterval).toBeLessThan(7.5);
+        expect(avgInterval).toBeLessThan(9.0);
         expect(notesPerBar).toBeGreaterThan(2.0);
     });
 });

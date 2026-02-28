@@ -1,0 +1,1264 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Lead Seed - MusicXML Fixtures > should correctly parse Night And DAy.xml fixture 1`] = `
+{
+  "hasChords": true,
+  "leadSheetMelody": [
+    {
+      "durationSteps": 4,
+      "globalStep": 8,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 12,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 14,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 16,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 32,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 40,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 42.666666666666664,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 45.33333333333333,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 48,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 64,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 72,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 76,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 78,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 80,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 84,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 88,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 92,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 96,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 100,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 104,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 106.66666666666667,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 109.33333333333333,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 112,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 128,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 136,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 142,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 144,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 148,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 152,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 156,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 160,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 168,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 170,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 174,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 176,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 180,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 184,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 188,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 192,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 196,
+      "midi": 61,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 198,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 200,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 204,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 208,
+      "midi": 57,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 212,
+      "midi": 56,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 214,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 216,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 224,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 232,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 236,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 238,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 240,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 256,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 264,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 268,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 270,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 272,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 280,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 284,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 288,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 304,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 312,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 314.6666666666667,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 317.3333333333333,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 320,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 324,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 326,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 328,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 336,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 344,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 350,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 352,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 354,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 358,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 360,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 364,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 366,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 368,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 370,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 374,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 376,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 378.6666666666667,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2.6666666666666665,
+      "globalStep": 381.3333333333333,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 384,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 388,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 390,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 392,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 400,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 408,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 414,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 416,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 420,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 424,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 428,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 432,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 440,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 442,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 446,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 448,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 452,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 456,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 460,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 464,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 466,
+      "midi": 61,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 468,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 470,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 472,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 474,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 476,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 480,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 484,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 486,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 488,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 496,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 504,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 508,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 510,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 512,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 536,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 540,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 542,
+      "midi": 67,
+    },
+  ],
+  "sections": [
+    {
+      "color": "#3b82f6",
+      "id": "s1772280000000",
+      "label": "A",
+      "repeat": 1,
+      "value": "% | Dm7 | G7 | Cmaj7 | Cmaj7 | Dm7 | G7 | Cmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s17722800000007",
+      "label": "B",
+      "repeat": 1,
+      "value": "Cmaj7 | F#m7 | Fm7 | Em7 | Ebdim7 | Dm7 | G7 | Cmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000015",
+      "label": "C",
+      "repeat": 1,
+      "value": "Cmaj7 | Bb7 | Ebmaj7 | Ebmaj7 | Cmaj7 | Cmaj7 | Ebmaj7 | Ebmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000023",
+      "label": "D",
+      "repeat": 1,
+      "value": "Cmaj7 | Cmaj7 | F#m7 | Fm7 | Em7 | Ebdim7 | Dm7 | G7 Dm7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000031",
+      "label": "E",
+      "repeat": 1,
+      "value": "Cmaj7 | D7 G7",
+    },
+  ],
+  "xmlKey": "C",
+}
+`;
+
+exports[`Lead Seed - MusicXML Fixtures > should correctly parse Ornithology.xml fixture 1`] = `
+{
+  "hasChords": true,
+  "leadSheetMelody": [
+    {
+      "durationSteps": 2,
+      "globalStep": 14,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 16,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 18,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 20,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 22,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 24,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 26,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 28,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 30,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 32,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 34,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 46,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 48,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 50,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 52,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 54,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 56,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 58,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 62,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 64,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 66,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 68,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 70,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 72,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 78,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 80,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 82,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 86,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 88,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 90,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 92,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 94,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 110,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 112,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 116,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 118,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 120,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 122,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 124,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 126,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 128,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 132,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 134,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 142,
+      "midi": 73,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 144,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 148,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 150,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 152,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 154,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 156,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 158,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 160,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 164,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 166,
+      "midi": 66,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 174,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 176,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 178,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 180,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 182,
+      "midi": 58,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 184,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 186,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 188,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 190,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 202,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 204,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 206,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 208,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 214,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 216,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 218,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 222,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 224,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 226,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 228,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 230,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 232,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 236,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 238,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 240,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 246,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 248,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 250,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 254,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 256,
+      "midi": 66,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 258,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 260,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 262,
+      "midi": 75,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 264,
+      "midi": 75,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 268,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 270,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 272,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 274,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 276,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 278,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 280,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 282,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 284,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 286,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 302,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 304,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 306,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 308,
+      "midi": 78,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 310,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 312,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 314,
+      "midi": 73,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 316,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 318,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 320,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 322,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 324,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 326,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 328,
+      "midi": 75,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 330,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 332,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 334,
+      "midi": 66,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 336,
+      "midi": 67,
+    },
+  ],
+  "sections": [
+    {
+      "color": "#3b82f6",
+      "id": "s1772280000000",
+      "label": "A",
+      "repeat": 1,
+      "value": "% | Gmaj7 | Gmaj7 | Gm7 C7 | Gm7 C7 | Fmaj7 | Fmaj | Fm7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s17722800000007",
+      "label": "B",
+      "repeat": 1,
+      "value": "Bb7 | Eb7 | Am7 D7 | Gm7 | D7 | Bm7 | E7 | Am7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000015",
+      "label": "C",
+      "repeat": 1,
+      "value": "D7 | G7 | D7 | Bm7 Bbm7 | Am7 Abm7 | G | Am7 D7",
+    },
+  ],
+  "xmlKey": "G",
+}
+`;

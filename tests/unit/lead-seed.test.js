@@ -2,15 +2,23 @@
  * @vitest-environment happy-dom
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseMusicXML, reharmonizeMelody } from '../../public/musicxml-parser.js';
 import { getSoloistNote } from '../../public/soloist.js';
+import { arranger, arrangerReducer } from '../../public/state/arranger.js';
+import { instrumentReducer, soloist } from '../../public/state/instruments.js';
+import { ACTIONS } from '../../public/types.js';
 
 // Mock state.js to return whatever we need for soloist tests
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
     dispatch: vi.fn(),
 }));
+
+// Mock Date.now for stable snapshot IDs
+vi.setSystemTime(new Date('2026-02-28T12:00:00Z'));
 
 import { getState } from '../../public/state.js';
 
@@ -290,5 +298,170 @@ describe('Lead Seed - Soloist Integration', () => {
         // Step 16: Should trigger the note again (0 % 16 = 0)
         const note16 = getSoloistNote(currentChord, null, 16, null, 64, 'lead_sheet', 0, false);
         expect(note16.midi).toBe(60);
+    });
+});
+
+describe('Lead Seed - Import Refinements', () => {
+    it('should extract xmlKey from MusicXML', () => {
+        const EB_XML = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<score-partwise version="3.1">
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <key><fifths>-3</fifths></key>
+      </attributes>
+      <note><pitch><step>E</step><alter>-1</alter><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+        const result = parseMusicXML(EB_XML);
+        expect(result.xmlKey).toBe('Eb');
+        expect(result.hasChords).toBe(false);
+    });
+
+    it('should not overwrite arranger sections if hasChords is false', () => {
+        // Reset state
+        arrangerReducer(ACTIONS.RESET_STATE);
+        const originalSections = [...arranger.sections];
+
+        const payload = {
+            hasChords: false,
+            sections: [{ id: 'new', value: 'G | C' }],
+            leadSheetMelody: [],
+        };
+
+        arrangerReducer(ACTIONS.IMPORT_MUSICXML, payload);
+        expect(arranger.sections).toEqual(originalSections);
+        expect(arranger.isDirty).toBe(true);
+    });
+
+    it('should transpose imported melody to match current arrangement key', () => {
+        // Set arrangement key to D
+        arrangerReducer(ACTIONS.RESET_STATE);
+        arranger.key = 'D'; // D is index 2
+
+        const payload = {
+            xmlKey: 'C', // C is index 0
+            leadSheetMelody: [{ midi: 60, globalStep: 0 }],
+        };
+
+        // Interval should be 2 - 0 = +2
+        instrumentReducer(ACTIONS.IMPORT_MUSICXML, payload);
+
+        expect(soloist.leadSheetMelody[0].midi).toBe(62);
+        expect(soloist.style).toBe('lead_sheet');
+    });
+
+    it('should transpose imported melody down if current key is lower', () => {
+        // Set arrangement key to Bb
+        arrangerReducer(ACTIONS.RESET_STATE);
+        arranger.key = 'Bb'; // Bb is index 10
+
+        const payload = {
+            xmlKey: 'C', // C is index 0
+            leadSheetMelody: [{ midi: 60, globalStep: 0 }],
+        };
+
+        // Interval should be 10 - 0 = +10 (or -2 if normalized, but let's check current implementation)
+        // KEY_ORDER: C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B
+        // currentIdx = 10, xmlIdx = 0. Interval = 10.
+        // 60 + 10 = 70.
+        instrumentReducer(ACTIONS.IMPORT_MUSICXML, payload);
+
+        expect(soloist.leadSheetMelody[0].midi).toBe(70);
+    });
+});
+
+describe('Lead Seed - Advanced Parsing', () => {
+    it('should handle multiple chords per measure', () => {
+        const MULTI_CHORD_XML = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<score-partwise version="3.1">
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony><root><root-step>G</root-step></root><kind text="min7">minor-seventh</kind></harmony>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>8</duration></note>
+      <harmony><root><root-step>C</root-step></root><kind text="7">dominant</kind></harmony>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>8</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+        const result = parseMusicXML(MULTI_CHORD_XML);
+        // Should be joined by a space
+        expect(result.sections[0].value).toBe('Gm7 C7');
+    });
+
+    it('should handle chromatic chord roots (sharps and flats)', () => {
+        const CHROMATIC_CHORD_XML = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<score-partwise version="3.1">
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <harmony><root><root-step>F</root-step><root-alter>1</root-alter></root><kind text="min7">minor-seventh</kind></harmony>
+      <note><duration>8</duration></note>
+      <harmony><root><root-step>E</root-step><root-alter>-1</root-alter></root><kind text="maj7">major-seventh</kind></harmony>
+      <note><duration>8</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+        const result = parseMusicXML(CHROMATIC_CHORD_XML);
+        expect(result.sections[0].value).toBe('F#m7 Ebmaj7');
+    });
+
+    it('should handle forward and backup tags for rhythmic mapping', () => {
+        const RHYTHMIC_MAPPING_XML = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<score-partwise version="3.1">
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+      <forward><duration>4</duration></forward>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>
+      <backup><duration>12</duration></backup>
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+  </part>
+</score-partwise>`;
+        const result = parseMusicXML(RHYTHMIC_MAPPING_XML);
+        // C4 (step 0)
+        // Forward 4 (current step 4)
+        // E4 (step 8)
+        // Backup 12 (current step 12 - 12 = 0)
+        // G4 (step 0)
+        expect(result.leadSheetMelody.find((n) => n.midi === 60).globalStep).toBe(0); // C4
+        expect(result.leadSheetMelody.find((n) => n.midi === 64).globalStep).toBe(8); // E4
+        expect(result.leadSheetMelody.find((n) => n.midi === 67).globalStep).toBe(0); // G4
+    });
+});
+
+describe('Lead Seed - MusicXML Fixtures', () => {
+    const fixturesDir = path.join(__dirname, '../fixtures/musicxml');
+
+    it('should correctly parse Night And DAy.xml fixture', () => {
+        const xml = fs.readFileSync(path.join(fixturesDir, 'Night And DAy.xml'), 'utf-8');
+        const result = parseMusicXML(xml);
+
+        // Sanity checks before snapshot
+        expect(result.xmlKey).toBe('C');
+        expect(result.hasChords).toBe(true);
+        expect(result.sections.length).toBeGreaterThan(0);
+        expect(result.leadSheetMelody.length).toBeGreaterThan(100); // 48 bars of complex jazz
+
+        // Use snapshot to catch regressions in parsing logic
+        expect(result).toMatchSnapshot();
+    });
+
+    it('should correctly parse Ornithology.xml fixture', () => {
+        const xml = fs.readFileSync(path.join(fixturesDir, 'Ornithology.xml'), 'utf-8');
+        const result = parseMusicXML(xml);
+
+        // Sanity checks
+        expect(result.xmlKey).toBe('G');
+        expect(result.hasChords).toBe(true);
+        expect(result.sections.length).toBeGreaterThan(0);
+        expect(result.leadSheetMelody.length).toBeGreaterThan(50);
+
+        expect(result).toMatchSnapshot();
     });
 });
