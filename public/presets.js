@@ -1298,7 +1298,7 @@ export const CHORD_PRESETS = [
         ],
         category: 'Jazz',
         isMinor: false,
-        settings: { bpm: 110, style: 'jazz' },
+        settings: { bpm: 110, style: 'jazz', timeSignature: '6/8' },
     },
     {
         name: 'Alternative Loop',

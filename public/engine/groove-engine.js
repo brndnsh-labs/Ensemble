@@ -418,7 +418,8 @@ export function applyGrooveOverrides({
         if (inst.name === 'Open') {
             shouldPlay = false;
             // Standard Ride Pattern: 1, 2, 2-a, 3, 4, 4-a
-            const rideSteps = [0, 4, 6, 8, 12, 14];
+            // In 6/8 (12 steps), we use a steady eighth note pulse
+            const rideSteps = stepsPerBar === 12 ? [0, 2, 4, 6, 8, 10] : [0, 4, 6, 8, 12, 14];
 
             if (isTurnaround && loopStep > 7) {
                 // Turnaround: Drop the ride on beat 3 and 4 to let the snare fill breathe
@@ -457,16 +458,18 @@ export function applyGrooveOverrides({
                 shouldPlay = false;
             }
         } else if (inst.name === 'HiHat') {
-            // Foot pedal on 2 and 4
+            // Foot pedal on 2 and 4 (in 4/4) or on the dotted quarter beats (in 6/8)
             shouldPlay = false;
-            if (loopStep === 4 || loopStep === 12) {
+            const pedalSteps = stepsPerBar === 12 ? [6] : [4, 12];
+            if (pedalSteps.includes(loopStep)) {
                 shouldPlay = true;
                 velocity = 0.8 + playback.bandIntensity * 0.2;
             }
         } else if (inst.name === 'Kick') {
             shouldPlay = false;
-            // 1. Feathering (The heartbeat) - low velocity on quarters
-            if (loopStep % 4 === 0) {
+            // 1. Feathering (The heartbeat) - low velocity on primary beats
+            const heartbeatSteps = stepsPerBar === 12 ? [0, 6] : [0, 4, 8, 12];
+            if (heartbeatSteps.includes(loopStep)) {
                 shouldPlay = true;
                 velocity = 0.3 + playback.bandIntensity * 0.15;
             }
