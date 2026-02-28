@@ -159,6 +159,7 @@ export function syncWorker(action, payload) {
                 volume: soloist.volume,
                 mode: soloist.mode,
                 sessionSteps: soloist.sessionSteps,
+                leadSheetMelody: soloist.leadSheetMelody,
             },
             harmony: {
                 style: harmony.style,
@@ -259,6 +260,22 @@ export function syncWorker(action, payload) {
                 break;
             case 'SET_BPM':
                 data.playback = { bpm: playback.bpm };
+                break;
+            case 'IMPORT_MUSICXML':
+                data.arranger = {
+                    progression: arranger.progression,
+                    stepMap: arranger.stepMap,
+                    sectionMap: arranger.sectionMap,
+                    totalSteps: arranger.totalSteps,
+                    key: arranger.key,
+                    isMinor: arranger.isMinor,
+                    timeSignature: arranger.timeSignature,
+                };
+                data.soloist = {
+                    leadSheetMelody: soloist.leadSheetMelody,
+                    style: soloist.style,
+                    enabled: soloist.enabled,
+                };
                 break;
             case 'SET_SESSION_TIMER':
                 data.playback = { sessionTimer: payload };

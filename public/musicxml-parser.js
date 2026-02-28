@@ -2,7 +2,7 @@
  * MusicXML Parser for Ensemble
  */
 
-import { getMidi } from './utils.js';
+import { getStepsPerMeasure } from './utils.js';
 
 export function parseMusicXML(xmlString) {
     const parser = new DOMParser();
@@ -18,6 +18,7 @@ export function parseMusicXML(xmlString) {
     const sections = [];
     const leadSheetMelody = [];
     let currentGlobalStep = 0;
+    let currentTimeSignature = '4/4';
 
     const currentSection = {
         id: `s${Date.now()}`,
@@ -31,6 +32,16 @@ export function parseMusicXML(xmlString) {
     measures.forEach((measureNode, measureIndex) => {
         let measureStep = 0;
         const measureChords = [];
+
+        // Check for time signature in attributes
+        const timeNode = measureNode.querySelector('attributes > time');
+        if (timeNode) {
+            const beats = timeNode.querySelector('beats')?.textContent;
+            const beatType = timeNode.querySelector('beat-type')?.textContent;
+            if (beats && beatType) {
+                currentTimeSignature = `${beats}/${beatType}`;
+            }
+        }
 
         // In Ensemble, standard is 16 steps per 4/4 measure (4 steps per beat)
         // 1 quarter note = 4 steps.
@@ -88,8 +99,11 @@ export function parseMusicXML(xmlString) {
 
                 // Clean up format to match Ensemble expectations if needed
                 let chordString = `${root}${alter}${kind}`;
-                // Optional: Map some common MusicXML text to Ensemble formats
+                // Map common MusicXML text to Ensemble formats
                 chordString = chordString
+                    .replace(/min7/g, 'm7')
+                    .replace(/maj7/g, 'maj7')
+                    .replace(/min/g, 'm')
                     .replace(/mi7/g, 'm7')
                     .replace(/ma7/g, 'maj7')
                     .replace(/mi/g, 'm');
@@ -189,7 +203,7 @@ export function parseMusicXML(xmlString) {
             currentChords = [];
         }
 
-        currentGlobalStep += 16; // Assume 4/4 = 16 steps per measure
+        currentGlobalStep += getStepsPerMeasure(currentTimeSignature);
     });
 
     return {
