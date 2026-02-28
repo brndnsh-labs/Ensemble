@@ -109,6 +109,7 @@ export const soloist = {
     tradeMode: 'manual',
     isWaitingForEntry: false,
     isYielding: false,
+    leadSheetMelody: [],
 };
 
 /**
@@ -151,6 +152,13 @@ const instrumentStateMap = {
 
 export function instrumentReducer(action, payload) {
     switch (action) {
+        case ACTIONS.IMPORT_MUSICXML:
+            Object.assign(soloist, {
+                leadSheetMelody: payload.leadSheetMelody,
+                style: 'lead_sheet',
+                enabled: true,
+            });
+            break;
         case ACTIONS.RESET_STATE:
             Object.assign(chords, {
                 enabled: true,

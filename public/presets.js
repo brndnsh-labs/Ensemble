@@ -947,6 +947,7 @@ export const BASS_STYLES = [
 ];
 
 export const SOLOIST_STYLES = [
+    { id: 'lead_sheet', name: 'Lead Sheet', category: 'Special' },
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'scalar', name: 'Scalar', category: 'Basic' },
     { id: 'country', name: 'Country', category: 'Country/Folk' },

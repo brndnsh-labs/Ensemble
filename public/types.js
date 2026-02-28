@@ -3,6 +3,7 @@
  */
 
 export const ACTIONS = {
+    IMPORT_MUSICXML: 'IMPORT_MUSICXML',
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',

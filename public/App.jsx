@@ -15,6 +15,7 @@ import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
 import { APP_VERSION } from './config.js';
 import { togglePower } from './instrument-controller.js';
+import { parseMusicXML } from './musicxml-parser.js';
 import { saveCurrentState } from './persistence.js';
 import { BASS_STYLES, CHORD_STYLES, HARMONY_STYLES, SOLOIST_STYLES } from './presets.js';
 import { triggerInstall } from './pwa.js';
@@ -62,6 +63,26 @@ function ArrangerPanel() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
     };
 
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const parsed = parseMusicXML(event.target.result);
+                dispatch(ACTIONS.IMPORT_MUSICXML, parsed);
+                // The reducer already sets the style to lead_sheet and enables it
+            } catch (err) {
+                console.error('Failed to parse MusicXML', err);
+                // Optionally show a toast error here if showToast is imported, but it's not imported in App.jsx currently
+            }
+        };
+        reader.readAsText(file);
+    };
+
     return (
         <div class="panel dashboard-panel active-mobile" id="panel-arranger" data-id="arranger">
             <div class="panel-header chord-panel-header">
@@ -69,6 +90,20 @@ function ArrangerPanel() {
                     <h2>Arranger</h2>
                 </div>
                 <div class="panel-header-controls">
+                    <input
+                        type="file"
+                        id="xml-upload"
+                        accept=".xml,.mxl,.musicxml"
+                        style="display:none;"
+                        onChange={handleFileUpload}
+                    />
+                    <button
+                        class="icon-btn tooltip"
+                        aria-label="Import MusicXML"
+                        onClick={() => document.getElementById('xml-upload').click()}
+                    >
+                        📥
+                    </button>
                     <KeySignatureControls />
                 </div>
             </div>
