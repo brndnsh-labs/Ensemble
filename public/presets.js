@@ -1289,12 +1289,12 @@ export const CHORD_PRESETS = [
     {
         name: 'All Blues',
         sections: [
-            { label: 'Vamp', value: 'G7 | G7 | G7 | G7', timeSignature: '6/8', repeat: 2 },
             {
                 label: 'Head',
                 value: 'G7 | G7 | G7 | G7 | C7 | C7 | G7 | G7 | D7#9 | Eb7#9 D7alt | G7 | G7',
                 timeSignature: '6/8',
             },
+            { label: 'Vamp', value: 'G7 | G7 | G7 | G7', timeSignature: '6/8', repeat: 2 },
         ],
         category: 'Jazz',
         isMinor: false,
