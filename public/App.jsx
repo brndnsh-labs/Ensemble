@@ -15,7 +15,6 @@ import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
 import { APP_VERSION } from './config.js';
 import { togglePower } from './instrument-controller.js';
-import { parseMusicXML, reharmonizeMelody } from './musicxml-parser.js';
 import { saveCurrentState } from './persistence.js';
 import { BASS_STYLES, CHORD_STYLES, HARMONY_STYLES, SOLOIST_STYLES } from './presets.js';
 import { triggerInstall } from './pwa.js';
@@ -59,51 +58,13 @@ function Header() {
 }
 
 function ArrangerPanel() {
-    const { soloistStyle, hasLeadSheet, leadSheetMelody, currentKey, totalSteps } =
-        useEnsembleState((s) => ({
-            soloistStyle: s.soloist.style,
-            hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
-            leadSheetMelody: s.soloist.leadSheetMelody,
-            currentKey: s.arranger.key,
-            totalSteps: s.arranger.totalSteps,
-        }));
+    const { soloistStyle, hasLeadSheet } = useEnsembleState((s) => ({
+        soloistStyle: s.soloist.style,
+        hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
+    }));
 
     const openEditor = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
-    };
-
-    const handleReharmonize = async () => {
-        if (!hasLeadSheet) {
-            return;
-        }
-        const newSections = reharmonizeMelody(leadSheetMelody, currentKey, totalSteps);
-        if (newSections) {
-            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
-            // Re-validate to update the stepMap/progression
-            const { validateProgression } = await import('./chords.js');
-            validateProgression();
-            syncWorker();
-        }
-    };
-
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) {
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const parsed = parseMusicXML(event.target.result);
-                dispatch(ACTIONS.IMPORT_MUSICXML, parsed);
-                // The reducer already sets the style to lead_sheet and enables it
-            } catch (err) {
-                console.error('Failed to parse MusicXML', err);
-                // Optionally show a toast error here if showToast is imported, but it's not imported in App.jsx currently
-            }
-        };
-        reader.readAsText(file);
     };
 
     return (
@@ -122,32 +83,8 @@ function ArrangerPanel() {
                             🎵 Lead Sheet Active
                         </span>
                     )}
-                    {hasLeadSheet && (
-                        <button
-                            class="icon-btn tooltip"
-                            aria-label="Re-harmonize melody"
-                            onClick={handleReharmonize}
-                            style="font-size: 0.9rem; margin-left: 4px;"
-                        >
-                            ✨
-                        </button>
-                    )}
                 </div>
                 <div class="panel-header-controls">
-                    <input
-                        type="file"
-                        id="xml-upload"
-                        accept=".xml,.mxl,.musicxml"
-                        style="display:none;"
-                        onChange={handleFileUpload}
-                    />
-                    <button
-                        class="icon-btn tooltip"
-                        aria-label="Import MusicXML"
-                        onClick={() => document.getElementById('xml-upload').click()}
-                    >
-                        📥
-                    </button>
                     <KeySignatureControls />
                 </div>
             </div>
