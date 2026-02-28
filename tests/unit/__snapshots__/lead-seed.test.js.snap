@@ -1,5 +1,387 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Lead Seed - MusicXML Fixtures > should correctly parse AllBlues.xml fixture 1`] = `
+{
+  "hasChords": true,
+  "leadSheetMelody": [
+    {
+      "durationSteps": 3,
+      "globalStep": 0,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 3,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 4,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 5,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 6,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 9,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 10,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 11,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 12,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 15,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 16,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 17,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 18,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 21,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 22,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 23,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 24,
+      "midi": 79,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 28,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 32,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 34,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 36,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 40,
+      "midi": 86,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 44,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 46,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 36,
+      "midi": 79,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 40,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 44,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 46,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 48,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 52,
+      "midi": 86,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 56,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 58,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 48,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 54,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 58,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 59,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 60,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 61,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 62,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 66,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 70,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 71,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 72,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 73,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 74,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 78,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 82,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 83,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 84,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 90,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 96,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 100,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 102,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 106,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 108,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 112,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 114,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 118,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 119,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 12,
+      "globalStep": 120,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 132,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 138,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 142,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 143,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 12,
+      "globalStep": 144,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 12,
+      "globalStep": 156,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 168,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 174,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 180,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 186,
+      "midi": 67,
+    },
+  ],
+  "sections": [
+    {
+      "color": "#3b82f6",
+      "id": "s1772280000000",
+      "label": "A",
+      "repeat": 1,
+      "value": "G7 | % | % | % | G7 | G7 | G7 | %",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s17722800000007",
+      "label": "B",
+      "repeat": 1,
+      "value": "C7 | C7 | G7 | G7 | D7 | Eb7 D7 | G7 | G7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000015",
+      "label": "C",
+      "repeat": 1,
+      "value": "G7 | % | % | % | %",
+    },
+  ],
+  "xmlKey": "G",
+}
+`;
+
 exports[`Lead Seed - MusicXML Fixtures > should correctly parse Night And DAy.xml fixture 1`] = `
 {
   "hasChords": true,

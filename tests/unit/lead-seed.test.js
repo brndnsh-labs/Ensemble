@@ -464,4 +464,18 @@ describe('Lead Seed - MusicXML Fixtures', () => {
 
         expect(result).toMatchSnapshot();
     });
+
+    it('should correctly parse AllBlues.xml fixture', () => {
+        const xml = fs.readFileSync(path.join(fixturesDir, 'AllBlues.xml'), 'utf-8');
+        const result = parseMusicXML(xml);
+
+        // All Blues is in G (1 sharp)
+        expect(result.xmlKey).toBe('G');
+        expect(result.hasChords).toBe(true);
+        // Should detect 6/8 if we check currentTimeSignature in parser (but we don't return it yet)
+        expect(result.sections.length).toBeGreaterThan(0);
+        expect(result.leadSheetMelody.length).toBeGreaterThan(50);
+
+        expect(result).toMatchSnapshot();
+    });
 });
