@@ -125,17 +125,17 @@ const STYLE_CONFIG = {
         hookProb: 0.5,
     },
     bird: {
-        restBase: 0.15,
-        restGrowth: 0.03,
-        cells: [0, 1, 7, 3],
+        restBase: 0.25,
+        restGrowth: 0.08,
+        cells: [1, 7, 8, 14, 2, 6],
         registerSoar: 5,
         tensionScale: 0.7,
         timingJitter: 12,
-        maxNotesPerPhrase: 48,
+        maxNotesPerPhrase: 16,
         doubleStopProb: 0.05,
         anticipationProb: 0.6,
         targetExtensions: [2, 5, 6, 9],
-        deviceProb: 0.6,
+        deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry'],
         motifProb: 0.2,
         hookProb: 0.1,
@@ -659,7 +659,23 @@ export function getSoloistNote(
             }
         }
 
-        const startProb = 0.3 + effectiveIntensity * 0.4;
+        // --- Realistic Phrase Starts (Pickup vs Downbeat) ---
+        // Instead of starting on any random step, heavily bias starts towards musically logical places:
+        // 1. Downbeat of a measure (Beat 1)
+        // 2. Pickup note (Beat 4, or Beat 4 "and")
+        // 3. Very low probability for other random mid-measure starts
+
+        const isDownbeat = measureStep === 0;
+        const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
+
+        let startProb = 0.05; // Low base probability for random mid-measure starts
+
+        if (isDownbeat) {
+            startProb = 0.6 + effectiveIntensity * 0.3; // High chance to start on '1'
+        } else if (isPickupZone) {
+            startProb = 0.4 + effectiveIntensity * 0.4; // Good chance to play a pickup
+        }
+
         // Assertive entry: Force start on the '1' if we just enabled or traded in
         const isAssertiveEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
@@ -998,8 +1014,8 @@ export function getSoloistNote(
             }
         }
 
-        // Pickup Logic: If initializing mid-beat, ensure we pick a cell that plays on the current step
-        if (stepInBeat > 0) {
+        // Start Step Logic: When picking a new phrase cell, ensure it actually triggers on the start step
+        if (soloist.currentPhraseSteps === 0 || stepInBeat > 0) {
             const playable = pool.filter((c) => c[stepInBeat] === 1);
             if (playable.length > 0) {
                 pool = playable;

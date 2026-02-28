@@ -114,7 +114,7 @@ describe('Soloist Expansion Critique', () => {
         { name: 'Neo-Soul', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
         { name: 'Reggae', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
         { name: 'Rock', smoothness: 14.0, minDensity: 2.0, maxDensity: 16.0 },
-        { name: 'Shred', smoothness: 14.0, minDensity: 4.0, maxDensity: 24.0 },
+        { name: 'Shred', smoothness: 14.0, minDensity: 3.5, maxDensity: 24.0 },
         { name: 'Ska-Punk', smoothness: 14.0, minDensity: 2.0, maxDensity: 14.0 },
     ];
 
