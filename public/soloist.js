@@ -407,9 +407,16 @@ export function getSoloistNote(
         maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 2048);
     }
 
-    const warmupFactor = isPriming
-        ? 1.0
-        : Math.min(1.0, soloist.sessionSteps / (stepsPerMeasure * 8));
+    // Warmup Factor: We want a sparse start for the first loop, building up
+    // and maxing out around the start of the 3rd loop (loopCount >= 2).
+    // We blend loopCount and step progress to make it smooth.
+    let loopProgress = 0;
+    if (arranger && arranger.totalSteps > 0) {
+        // Calculate progress through the current loop (0.0 to 1.0)
+        loopProgress = (step % arranger.totalSteps) / arranger.totalSteps;
+    }
+    const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
+    const warmupFactor = isPriming ? 1.0 : Math.min(1.0, smoothLoopCount / 2.0); // Hits 1.0 right at the start of loop 3 (index 2)
     const effectiveIntensity = Math.min(
         1.0,
         intensity + maturityFactor * 0.05 + (playback.intent.soloistMod || 0),
@@ -583,7 +590,6 @@ export function getSoloistNote(
     const phraseBars = soloist.currentPhraseSteps / stepsPerMeasure;
     let restProb =
         config.restBase * (3.0 - effectiveIntensity * 2.0) + phraseBars * config.restGrowth;
-    restProb += (1.0 - warmupFactor) * 0.4; // Conservative start
 
     // Apply lyrical bias: Higher bias = more rests, shorter phrases
     restProb += lyricalBias * 0.2;
@@ -676,6 +682,8 @@ export function getSoloistNote(
             startProb = 0.4 + effectiveIntensity * 0.4; // Good chance to play a pickup
         }
 
+        // (Removed early loop extra sparsity constraint)
+
         // Assertive entry: Force start on the '1' if we just enabled or traded in
         const isAssertiveEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
@@ -766,11 +774,12 @@ export function getSoloistNote(
     if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < restProb) {
         // --- Seed Capture ---
         // If we don't have a thematic seed yet, and we just finished a decent phrase
-        // in the first 8 measures, capture it as the solo's "DNA".
+        // in the first 16 measures, capture it as the solo's "DNA".
+        // Extended from 8 to 16 since early loops are more sparse now.
         if (
             (!soloist.thematicSeed || soloist.thematicSeed.length === 0) &&
             soloist.notesInPhrase >= 3 &&
-            soloist.sessionSteps < stepsPerMeasure * 8
+            soloist.sessionSteps < stepsPerMeasure * 16
         ) {
             soloist.thematicSeed = [...soloist.motifBuffer]; // @worker-mutation
             soloist.thematicSeedRoot = soloist.motifRoot; // @worker-mutation
@@ -1368,7 +1377,11 @@ export function getSoloistNote(
 
     // --- 7. Melodic Devices ---
     const allowFlash = intensity > 0.5;
-    const deviceBaseProb = config.deviceProb * (0.5 + complexity * 1.0) * (1.2 - lyricalBias);
+    const deviceBaseProb =
+        config.deviceProb *
+        (0.5 + complexity * 1.0) *
+        (1.2 - lyricalBias) *
+        (0.2 + effectiveIntensity * 0.8);
     const isPiano = soloist.mode === 'piano';
     // Certain styles MUST allow double stops even in monophonic mode for authentic character,
     // but ONLY if the configuration (global or local) actually allows them.
@@ -1736,6 +1749,7 @@ export function getSoloistNote(
         (config.doubleStopProb + maturityFactor * 0.2) *
         (stepInBeat === 2 ? 1.2 : 0.6) *
         warmupFactor *
+        (0.4 + effectiveIntensity * 0.6) *
         (soloist.doubleStopProb ?? 1.0);
 
     if (isPolyphonic && Math.random() < dsChance) {

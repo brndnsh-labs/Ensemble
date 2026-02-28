@@ -95,6 +95,7 @@ describe('Country Soloist Overhaul', () => {
         });
 
         it('should trigger chickenPick device', () => {
+            getState().playback.currentLoopCount = 3;
             let triggered = false;
             for (let i = 0; i < 1000; i++) {
                 soloist.deviceBuffer = [];
@@ -186,6 +187,7 @@ describe('Country Soloist Overhaul', () => {
         });
 
         it('should have high double stop probability', () => {
+            getState().playback.currentLoopCount = 3;
             let doubleStops = 0;
             let total = 0;
             for (let i = 0; i < 2000; i++) {
