@@ -128,7 +128,7 @@ describe('MusicXML Integration Critique', () => {
         const xml = fs.readFileSync(path.join(fixturesDir, 'Night And DAy.xml'), 'utf-8');
         const parsed = parseMusicXML(xml);
 
-        const { history, melodySteps } = simulatePerformance(parsed, '4/4', 2);
+        simulatePerformance(parsed, '4/4', 2);
 
         // Measure 2 is Step 0 (Head start)
         const headStartNote = parsed.leadSheetMelody.find((n) => n.globalStep === 0);
