@@ -110,6 +110,7 @@ describe('Soloist Expansion Critique', () => {
         { name: 'Country', smoothness: 12.0, minDensity: 1.0, maxDensity: 14.0 },
         { name: 'Disco', smoothness: 12.0, minDensity: 1.5, maxDensity: 16.0 },
         { name: 'Funk', smoothness: 12.0, minDensity: 1.5, maxDensity: 16.0 },
+        { name: 'Hip Hop', smoothness: 14.0, minDensity: 1.0, maxDensity: 14.0 },
         { name: 'Metal', smoothness: 14.0, minDensity: 2.0, maxDensity: 22.0 },
         { name: 'Minimal', smoothness: 12.0, minDensity: 0.5, maxDensity: 10.0 },
         { name: 'Neo-Soul', smoothness: 14.0, minDensity: 1.0, maxDensity: 14.0 },

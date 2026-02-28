@@ -48,6 +48,8 @@ for (let i = 0; i < totalSteps; i++) {
 | **Disco** | Note Density | 3.0-16.0 notes/bar |
 | **Funk** | Melodic Smoothness | <12.0 semitones |
 | **Funk** | Note Density | 3.0-16.0 notes/bar |
+| **Hip Hop** | Melodic Smoothness | <14.0 semitones |
+| **Hip Hop** | Note Density | 2.0-14.0 notes/bar |
 | **Metal** | Melodic Smoothness | <14.0 semitones |
 | **Metal** | Note Density | 3.0-22.0 notes/bar |
 | **Minimal** | Melodic Smoothness | <12.0 semitones |
