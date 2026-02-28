@@ -1142,6 +1142,21 @@ export function getSoloistNote(
             }
         }
 
+        // --- Lead Sheet Melodic Anchoring ---
+        if (activeStyle === 'lead_sheet' && soloist.leadSheetMelody?.length > 0) {
+            const isThemePC = soloist.leadSheetMelody.some((n) => n.midi % 12 === pc);
+            if (isThemePC) {
+                weight += 200; // Strong preference for thematic pitch classes
+            }
+
+            // Register damping: Prefer notes near the theme's center
+            const avgMidi = soloist.leadSheetMelody[0]?.midi || 60; // Simple estimate
+            const distToCenter = Math.abs(m - avgMidi);
+            if (distToCenter <= 7) {
+                weight += 100;
+            }
+        }
+
         // --- Distance Scaling for Bonuses ---
         // We damp bonuses for notes that are far away to prevent "teleportation"
         // Adaptive: Only apply damping to styles that need strict smoothness

@@ -23,6 +23,7 @@ import {
     unlockAudio,
 } from '../platform.js';
 import { DRUM_PRESETS } from '../presets.js';
+import { getSoloistNote } from '../soloist.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
@@ -419,6 +420,36 @@ function scheduleCountIn(beat, time) {
     };
     osc.start(time);
     osc.stop(time + 0.1);
+
+    // --- Soloist Pick-up Support ---
+    const pickupStep = (beat - ts.beats) * ts.stepsPerBeat;
+    const soloistNote = getSoloistNote(
+        { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] }, // C Major dummy
+        { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] },
+        pickupStep,
+        0,
+        64,
+        'lead_sheet',
+        0,
+        false,
+    );
+
+    if (soloistNote) {
+        sendMIDINote(
+            'Soloist',
+            soloistNote.midi,
+            soloistNote.velocity,
+            time,
+            soloistNote.duration || 0.25,
+        );
+        playback.drawQueue.push({
+            type: 'note',
+            track: 'soloist',
+            midi: soloistNote.midi,
+            time: time,
+            velocity: soloistNote.velocity,
+        });
+    }
 }
 
 function advanceGlobalStep() {

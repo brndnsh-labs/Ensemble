@@ -43,9 +43,44 @@ export function parseMusicXML(xmlString) {
     const measures = doc.querySelectorAll('measure');
     const sections = [];
     const leadSheetMelody = [];
-    let currentGlobalStep = 0;
-    let currentTimeSignature = '4/4';
+    let _currentTimeSignature = '4/4';
     let hasChords = false;
+
+    // First, find which measure is labeled "1" (Step 0)
+    let firstMeasureIndex = -1;
+    for (let i = 0; i < measures.length; i++) {
+        if (measures[i].getAttribute('number') === '1') {
+            firstMeasureIndex = i;
+            break;
+        }
+    }
+
+    // If no measure "1" found, assume measure 0 is step 0
+    if (firstMeasureIndex === -1) {
+        firstMeasureIndex = 0;
+    }
+
+    // Calculate the global step for each measure relative to firstMeasureIndex
+    // We need to account for time signature changes if they occur before Step 0
+    const measureStepOffsets = new Array(measures.length).fill(0);
+    let runningStep = 0;
+
+    // Scan for time signature changes to accurately map steps
+    let scanTS = '4/4';
+    measures.forEach((m, i) => {
+        const timeNode = m.querySelector('attributes > time');
+        if (timeNode) {
+            const beats = timeNode.querySelector('beats')?.textContent;
+            const beatType = timeNode.querySelector('beat-type')?.textContent;
+            if (beats && beatType) {
+                scanTS = `${beats}/${beatType}`;
+            }
+        }
+        measureStepOffsets[i] = runningStep;
+        runningStep += getStepsPerMeasure(scanTS);
+    });
+
+    const stepZeroOffset = measureStepOffsets[firstMeasureIndex];
 
     const currentSection = {
         id: `s${Date.now()}`,
@@ -58,6 +93,7 @@ export function parseMusicXML(xmlString) {
 
     measures.forEach((measureNode, measureIndex) => {
         let measureStep = 0;
+        const currentGlobalStep = measureStepOffsets[measureIndex] - stepZeroOffset;
         const measureChords = [];
 
         // Check for time signature in attributes
@@ -66,7 +102,7 @@ export function parseMusicXML(xmlString) {
             const beats = timeNode.querySelector('beats')?.textContent;
             const beatType = timeNode.querySelector('beat-type')?.textContent;
             if (beats && beatType) {
-                currentTimeSignature = `${beats}/${beatType}`;
+                _currentTimeSignature = `${beats}/${beatType}`;
             }
         }
 
@@ -210,30 +246,39 @@ export function parseMusicXML(xmlString) {
 
         if (measureChords.length === 0 && currentChords.length === 0) {
             // If no chords in measure and we haven't started, default to % or empty
-            currentChords.push('%');
+            // But only if we are at or after Step 0
+            if (currentGlobalStep >= 0) {
+                currentChords.push('%');
+            }
         } else if (measureChords.length > 0) {
             currentChords.push(measureChords.join(' '));
         } else {
-            currentChords.push('%');
-        }
-
-        // Break into sections of 8 measures (or just 1 big section if simple)
-        if (currentChords.length === 8 || measureIndex === measures.length - 1) {
-            if (currentChords.length > 0) {
-                currentSection.value = currentChords.join(' | ');
-                sections.push({ ...currentSection });
-
-                // Reset for next section
-                currentSection.id = `s${Date.now()}${measureIndex}`;
-                currentSection.label = String.fromCharCode(currentSection.label.charCodeAt(0) + 1);
-                if (currentSection.label > 'Z') {
-                    currentSection.label = 'A';
-                }
-                currentChords = [];
+            // After start, empty measure is %
+            if (currentGlobalStep >= 0) {
+                currentChords.push('%');
             }
         }
 
-        currentGlobalStep += getStepsPerMeasure(currentTimeSignature);
+        // Break into sections of 8 measures (or just 1 big section if simple)
+        // Only start creating sections from Step 0 onwards
+        if (currentGlobalStep >= 0) {
+            if (currentChords.length === 8 || measureIndex === measures.length - 1) {
+                if (currentChords.length > 0) {
+                    currentSection.value = currentChords.join(' | ');
+                    sections.push({ ...currentSection });
+
+                    // Reset for next section
+                    currentSection.id = `s${Date.now()}${measureIndex}`;
+                    currentSection.label = String.fromCharCode(
+                        currentSection.label.charCodeAt(0) + 1,
+                    );
+                    if (currentSection.label > 'Z') {
+                        currentSection.label = 'A';
+                    }
+                    currentChords = [];
+                }
+            }
+        }
     });
 
     return {
