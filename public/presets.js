@@ -1265,6 +1265,28 @@ export const CHORD_PRESETS = [
         settings: { bpm: 140, style: 'bossa' },
     },
     {
+        name: 'Night and Day',
+        sections: [
+            { label: 'Verse (A)', value: 'iim7 | V7 | Imaj7 | Imaj7', repeat: 2 },
+            {
+                label: 'Verse (B)',
+                value: '#ivm7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7 | Imaj7 | Imaj7',
+            },
+            {
+                label: 'Verse (B2)',
+                value: '#ivm7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7 | Imaj7 | bVII7',
+            },
+            { label: 'Bridge', value: 'bIIImaj7 | bIIImaj7 | Imaj7 | Imaj7', repeat: 2 },
+            {
+                label: 'Outro',
+                value: '#ivm7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7 | Imaj7 | Imaj7',
+            },
+        ],
+        category: 'Jazz',
+        isMinor: false,
+        settings: { bpm: 130, style: 'jazz' },
+    },
+    {
         name: 'Alternative Loop',
         sections: [{ label: 'Loop', value: 'I | I | III | III | IV | IV | iv | iv' }],
         category: 'Pop/Rock',
