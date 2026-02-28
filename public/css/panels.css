@@ -222,6 +222,17 @@
     padding-top: 0.25rem;
 }
 
+.menu-click-away {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--z-mobile-nav) - 1);
+    background: transparent;
+    cursor: default;
+}
+
 /* Mobile Visibility Logic */
 @media (max-width: 900px) {
     .instrument-panel {

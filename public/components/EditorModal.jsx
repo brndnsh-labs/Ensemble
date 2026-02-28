@@ -50,23 +50,6 @@ export function EditorModal() {
         }
     }, [isOpen]);
 
-    useEffect(() => {
-        if (!isMenuOpen) {
-            return;
-        }
-
-        const handleClickOutside = (e) => {
-            const menu = document.getElementById('arrangerActionMenu');
-            const trigger = document.getElementById('arrangerActionTrigger');
-            if (menu && !menu.contains(e.target) && e.target !== trigger) {
-                setIsMenuOpen(false);
-            }
-        };
-
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [isMenuOpen]);
-
     const _handleAction = (fn) => {
         setIsMenuOpen(false);
         fn();
@@ -240,6 +223,9 @@ export function EditorModal() {
                     </div>
 
                     <div class="arranger-action-container">
+                        {isMenuOpen && (
+                            <div class="menu-click-away" onClick={() => setIsMenuOpen(false)} />
+                        )}
                         <div
                             id="arrangerActionMenu"
                             class={`action-menu-content ${isMenuOpen ? 'open' : ''}`}
