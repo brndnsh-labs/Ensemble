@@ -74,7 +74,7 @@ export function parseMusicXML(xmlString) {
         // 1 quarter note = 4 steps.
         // divisions = divisions per quarter note.
         // So steps = (duration / divisions) * 4
-        const durationToSteps = (duration) => (duration / divisions) * 4;
+        const durationToSteps = (duration) => Math.round((duration / divisions) * 4);
 
         measureNode.childNodes.forEach((node) => {
             if (node.nodeName === 'harmony') {
@@ -183,7 +183,7 @@ export function parseMusicXML(xmlString) {
 
                         leadSheetMelody.push({
                             midi,
-                            globalStep: currentGlobalStep + measureStep,
+                            globalStep: Math.round(currentGlobalStep + measureStep),
                             durationSteps: steps,
                         });
                     }
