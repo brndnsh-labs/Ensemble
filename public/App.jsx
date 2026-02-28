@@ -15,7 +15,7 @@ import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
 import { APP_VERSION } from './config.js';
 import { togglePower } from './instrument-controller.js';
-import { parseMusicXML } from './musicxml-parser.js';
+import { parseMusicXML, reharmonizeMelody } from './musicxml-parser.js';
 import { saveCurrentState } from './persistence.js';
 import { BASS_STYLES, CHORD_STYLES, HARMONY_STYLES, SOLOIST_STYLES } from './presets.js';
 import { triggerInstall } from './pwa.js';
@@ -59,13 +59,31 @@ function Header() {
 }
 
 function ArrangerPanel() {
-    const { soloistStyle, hasLeadSheet } = useEnsembleState((s) => ({
-        soloistStyle: s.soloist.style,
-        hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
-    }));
+    const { soloistStyle, hasLeadSheet, leadSheetMelody, currentKey, totalSteps } =
+        useEnsembleState((s) => ({
+            soloistStyle: s.soloist.style,
+            hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
+            leadSheetMelody: s.soloist.leadSheetMelody,
+            currentKey: s.arranger.key,
+            totalSteps: s.arranger.totalSteps,
+        }));
 
     const openEditor = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
+    };
+
+    const handleReharmonize = async () => {
+        if (!hasLeadSheet) {
+            return;
+        }
+        const newSections = reharmonizeMelody(leadSheetMelody, currentKey, totalSteps);
+        if (newSections) {
+            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
+            // Re-validate to update the stepMap/progression
+            const { validateProgression } = await import('./chords.js');
+            validateProgression();
+            syncWorker();
+        }
     };
 
     const handleFileUpload = (e) => {
@@ -103,6 +121,16 @@ function ArrangerPanel() {
                         >
                             🎵 Lead Sheet Active
                         </span>
+                    )}
+                    {hasLeadSheet && (
+                        <button
+                            class="icon-btn tooltip"
+                            aria-label="Re-harmonize melody"
+                            onClick={handleReharmonize}
+                            style="font-size: 0.9rem; margin-left: 4px;"
+                        >
+                            ✨
+                        </button>
                     )}
                 </div>
                 <div class="panel-header-controls">

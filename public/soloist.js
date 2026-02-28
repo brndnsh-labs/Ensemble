@@ -285,6 +285,20 @@ for (const key in STYLE_CONFIG) {
 }
 
 /**
+ * Checks for a lead sheet melody note at the given step.
+ * @param {Array} melody - The leadSheetMelody array.
+ * @param {number} step - The global step to check.
+ * @returns {Object|null} The note if found, otherwise null.
+ */
+export function getMelodyAtStep(melody, step) {
+    if (!melody || melody.length === 0) {
+        return null;
+    }
+    // Simple linear find for now, can be optimized if needed
+    return melody.find((n) => n.globalStep === step);
+}
+
+/**
  * Generates a soloist note (or notes for double stops) for a specific step.
  * Implements phrasing logic, rhythmic cell selection, melodic contour resolution,
  * and probabilistic melodic devices (runs, enclosures, flurry).

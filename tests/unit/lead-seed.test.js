@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseMusicXML } from '../../public/musicxml-parser.js';
+import { parseMusicXML, reharmonizeMelody } from '../../public/musicxml-parser.js';
 import { getSoloistNote } from '../../public/soloist.js';
 
 // Mock state.js to return whatever we need for soloist tests
@@ -215,6 +215,19 @@ describe('Lead Seed - MusicXML Parser', () => {
             midi: 69,
             globalStep: 20,
         });
+    });
+
+    it('should reharmonize a melody using the Harmonizer', () => {
+        const leadSheetMelody = [
+            { midi: 60, globalStep: 0 }, // C
+            { midi: 64, globalStep: 4 }, // E
+            { midi: 67, globalStep: 8 }, // G
+        ];
+
+        const sections = reharmonizeMelody(leadSheetMelody, 'C', 16);
+
+        expect(sections).toHaveLength(1);
+        expect(sections[0].value).toContain('I'); // Consonant strategy should pick I for C major melody
     });
 });
 

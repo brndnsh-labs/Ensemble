@@ -2,6 +2,7 @@
  * MusicXML Parser for Ensemble
  */
 
+import { Harmonizer } from './melody-harmonizer.js';
 import { getStepsPerMeasure } from './utils.js';
 
 export function parseMusicXML(xmlString) {
@@ -210,4 +211,58 @@ export function parseMusicXML(xmlString) {
         sections,
         leadSheetMelody,
     };
+}
+
+/**
+ * Re-harmonizes a melody by analyzing the notes and suggesting chords.
+ * @param {Array} leadSheetMelody - Array of melody notes.
+ * @param {string} key - Current song key.
+ * @param {number} totalSteps - Total steps in the arrangement.
+ * @returns {Array} Updated sections array.
+ */
+export function reharmonizeMelody(leadSheetMelody, key, totalSteps) {
+    if (!leadSheetMelody || leadSheetMelody.length === 0) {
+        return null;
+    }
+
+    const harmonizer = new Harmonizer();
+    // Convert leadSheetMelody to the format expected by the harmonizer (per beat)
+    // Harmonizer expects an array where each index is a beat, containing {midi, energy}
+    // We assume 4 steps per beat.
+    const numBeats = Math.ceil(totalSteps / 4);
+    const melodyByBeat = new Array(numBeats).fill(null).map(() => ({ midi: 0, energy: 0 }));
+
+    leadSheetMelody.forEach((n) => {
+        const beatIdx = Math.floor(n.globalStep / 4);
+        if (beatIdx < numBeats) {
+            // Take the first note or highest midi for the beat
+            if (n.midi > melodyByBeat[beatIdx].midi) {
+                melodyByBeat[beatIdx] = {
+                    midi: n.midi,
+                    energy: 1.0,
+                };
+            }
+        }
+    });
+
+    // Harmonizer.generateProgression expects melodyLine as array of {midi, energy}
+    const progressionStr = harmonizer.generateProgression(melodyByBeat, key, 0.5);
+
+    // Split the progression into measures
+    const measures = progressionStr.split(' | ');
+    const sections = [];
+    const sectionSize = 8;
+
+    for (let i = 0; i < measures.length; i += sectionSize) {
+        const sectionMeasures = measures.slice(i, i + sectionSize);
+        sections.push({
+            id: `reharm-${Date.now()}-${i}`,
+            label: String.fromCharCode(65 + Math.floor(i / sectionSize)), // A, B, C...
+            value: sectionMeasures.join(' | '),
+            color: '#3b82f6',
+            repeat: 1,
+        });
+    }
+
+    return sections;
 }
