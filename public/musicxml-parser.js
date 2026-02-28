@@ -15,11 +15,37 @@ export function parseMusicXML(xmlString) {
         divisions = parseInt(divisionsNode.textContent, 10);
     }
 
+    // Extract Key Signature
+    let xmlKey = 'C';
+    const fifthsNode = doc.querySelector('fifths');
+    if (fifthsNode) {
+        const fifths = parseInt(fifthsNode.textContent, 10);
+        const keys = {
+            0: 'C',
+            1: 'G',
+            2: 'D',
+            3: 'A',
+            4: 'E',
+            5: 'B',
+            6: 'F#',
+            7: 'C#',
+            '-1': 'F',
+            '-2': 'Bb',
+            '-3': 'Eb',
+            '-4': 'Ab',
+            '-5': 'Db',
+            '-6': 'Gb',
+            '-7': 'Cb',
+        };
+        xmlKey = keys[fifths] || 'C';
+    }
+
     const measures = doc.querySelectorAll('measure');
     const sections = [];
     const leadSheetMelody = [];
     let currentGlobalStep = 0;
     let currentTimeSignature = '4/4';
+    let hasChords = false;
 
     const currentSection = {
         id: `s${Date.now()}`,
@@ -52,6 +78,7 @@ export function parseMusicXML(xmlString) {
 
         measureNode.childNodes.forEach((node) => {
             if (node.nodeName === 'harmony') {
+                hasChords = true;
                 let root = '';
                 let kind = '';
                 let alter = '';
@@ -210,6 +237,8 @@ export function parseMusicXML(xmlString) {
     return {
         sections,
         leadSheetMelody,
+        hasChords,
+        xmlKey,
     };
 }
 

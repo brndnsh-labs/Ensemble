@@ -53,11 +53,15 @@ export const arranger = {
 export function arrangerReducer(action, payload) {
     switch (action) {
         case ACTIONS.IMPORT_MUSICXML:
-            Object.assign(arranger, {
-                sections: payload.sections,
-                isDirty: true,
-                notation: 'literal',
-            });
+            if (payload.hasChords) {
+                Object.assign(arranger, {
+                    sections: payload.sections,
+                    isDirty: true,
+                    notation: 'literal',
+                });
+            } else {
+                arranger.isDirty = true;
+            }
             break;
         case ACTIONS.RESET_STATE:
             Object.assign(arranger, {

@@ -1,4 +1,6 @@
+import { KEY_ORDER } from '../config.js';
 import { ACTIONS } from '../types.js';
+import { arranger } from './arranger.js';
 
 /**
  * @typedef {Object} ChordState
@@ -152,13 +154,29 @@ const instrumentStateMap = {
 
 export function instrumentReducer(action, payload) {
     switch (action) {
-        case ACTIONS.IMPORT_MUSICXML:
+        case ACTIONS.IMPORT_MUSICXML: {
+            const currentKey = arranger.key;
+            const xmlKey = payload.xmlKey || 'C';
+
+            let transposedMelody = payload.leadSheetMelody;
+            const currentIdx = KEY_ORDER.indexOf(currentKey);
+            const xmlIdx = KEY_ORDER.indexOf(xmlKey);
+
+            if (currentIdx !== -1 && xmlIdx !== -1 && currentIdx !== xmlIdx) {
+                const interval = currentIdx - xmlIdx;
+                transposedMelody = payload.leadSheetMelody.map((n) => ({
+                    ...n,
+                    midi: n.midi + interval,
+                }));
+            }
+
             Object.assign(soloist, {
-                leadSheetMelody: payload.leadSheetMelody,
+                leadSheetMelody: transposedMelody,
                 style: 'lead_sheet',
                 enabled: true,
             });
             break;
+        }
         case ACTIONS.RESET_STATE:
             Object.assign(chords, {
                 enabled: true,
