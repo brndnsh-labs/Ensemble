@@ -91,6 +91,13 @@ export function PresetLibrary({ type }) {
                         param: 'timeSignature',
                         value: item.settings.timeSignature,
                     });
+                } else {
+                    // Default back to 4/4 if not specified in preset
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'arranger',
+                        param: 'timeSignature',
+                        value: '4/4',
+                    });
                 }
             }
 
