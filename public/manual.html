@@ -276,6 +276,16 @@
                     <li><strong>Rapid Prototyping:</strong> Combine your custom motifs with procedural generation to finish songs in seconds.</li>
                 </ul>
             </div>
+
+            <div class="feature-card">
+                <h4>📥 MusicXML Import (Lead Seed)</h4>
+                <p style="font-size: 0.9rem; margin: 0;">Import professional lead sheets or custom melodies using standard <code>.xml</code> or <code>.musicxml</code> files. Access this via the Arrangement Editor menu (⋮).</p>
+                <ul class="list-detailed" style="margin-top: 0.5rem; margin-bottom: 0.5rem;">
+                    <li><strong>Non-Destructive Import:</strong> If your XML only contains a melody, Ensemble will preserve your existing chord progression.</li>
+                    <li><strong>Auto-Transposition:</strong> The engine automatically transposes the imported melody to align with your song's current key.</li>
+                    <li><strong>✨ Re-harmonization:</strong> After importing a melody, use the "Re-harmonize" action to generate a brand new progression that follows your melody's contour and energy.</li>
+                </ul>
+            </div>
         </section>
 
         <section id="workbench">
@@ -328,8 +338,9 @@
             <div class="feature-card">
                 <h4 style="color: var(--soloist-color);">Soloist</h4>
                 <p style="font-size: 0.9rem; margin: 0;">Phrasing-aware improvisation. Uses "Loop-Back" logic to listen to the band's context.</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Styles:</strong> Scalar, Country, Shreddy, Metal, Blues, Neo-Soul, Minimal, Bird (Jazz), Disco, and Ska Horns. (Smart mode adapts to Funk, Bossa, etc.)</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Styles:</strong> Scalar, Country, Shreddy, Metal, Blues, Neo-Soul, Minimal, Bird (Jazz), Disco, Ska Horns, and <strong>Lead Sheet</strong>. (Smart mode adapts to Funk, Bossa, etc.)</p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;"><strong>Controls:</strong>
+                    <br>• <strong>Lead Sheet Mode:</strong> When active, the soloist plays the exact melody notes imported from a MusicXML file. It respects the band's dynamics and intensity while maintaining melodic accuracy.
                     <br>• <strong>Complexity:</strong> Adjust note density and syncopation independent of the band. (Located in the Soloist <strong>Settings (⋮)</strong> menu).
                     <br>• <strong>Trade Mode:</strong> Automate call-and-response jamming. Choose <strong>Sections</strong> to alternate soloist state every section change, or <strong>Loops</strong> to alternate every song loop.
                     <br>• <strong>Antiphonal Phrasing:</strong> In <strong>Ska-Punk</strong> mode, the soloist engages in automatic call-and-response with the horn section (Harmony), taking the lead on odd measures.
