@@ -5,91 +5,135 @@ import { TIME_SIGNATURES } from '../config.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
-const ChordCard = memo(({ chord, isActive, totalMeasures, isMaximized, notation }) => {
-    const disp = chord.display ? chord.display[notation] : null;
+const ChordCard = memo(
+    ({ chord, isActive, totalMeasures, isMaximized, notation, leadSheetMelody, soloistStyle }) => {
+        const disp = chord.display ? chord.display[notation] : null;
 
-    const cardRef = useRef(null);
+        const cardRef = useRef(null);
 
-    useEffect(() => {
-        if (!cardRef.current) {
-            return;
-        }
-        const card = cardRef.current;
-        const charCount = disp
-            ? disp.root.length + disp.suffix.length + (disp.bass ? disp.bass.length + 1 : 0)
-            : chord.absName?.length || 0;
+        useEffect(() => {
+            if (!cardRef.current) {
+                return;
+            }
+            const card = cardRef.current;
+            const charCount = disp
+                ? disp.root.length + disp.suffix.length + (disp.bass ? disp.bass.length + 1 : 0)
+                : chord.absName?.length || 0;
 
-        let scale = 1.0;
-        if (isMaximized) {
-            if (totalMeasures > 24) {
+            let scale = 1.0;
+            if (isMaximized) {
+                if (totalMeasures > 24) {
+                    scale *= 0.9;
+                }
+                if (totalMeasures > 32) {
+                    scale *= 0.8;
+                }
+                if (totalMeasures > 48) {
+                    scale *= 0.7;
+                }
+            }
+            if (charCount > 7) {
                 scale *= 0.9;
             }
-            if (totalMeasures > 32) {
+            if (charCount > 10) {
                 scale *= 0.8;
             }
-            if (totalMeasures > 48) {
-                scale *= 0.7;
+
+            // Note: measure chord count scaling is harder without measure context here,
+            // but we can pass it if needed.
+
+            if (scale < 1.0) {
+                card.style.setProperty('--font-scale', scale.toFixed(2));
+            } else {
+                card.style.removeProperty('--font-scale');
             }
-        }
-        if (charCount > 7) {
-            scale *= 0.9;
-        }
-        if (charCount > 10) {
-            scale *= 0.8;
-        }
+        }, [disp, chord.absName, isMaximized, totalMeasures]);
 
-        // Note: measure chord count scaling is harder without measure context here,
-        // but we can pass it if needed.
+        const handleClick = (e) => {
+            e.stopPropagation();
+            if (window.previewChord) {
+                window.previewChord(chord.globalIndex);
+            }
+        };
 
-        if (scale < 1.0) {
-            card.style.setProperty('--font-scale', scale.toFixed(2));
-        } else {
-            card.style.removeProperty('--font-scale');
-        }
-    }, [disp, chord.absName, isMaximized, totalMeasures]);
+        const classNames = [
+            'chord-card',
+            chord.isMinor ? 'minor' : '',
+            chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
+            isActive ? 'active' : '',
+        ]
+            .filter(Boolean)
+            .join(' ');
 
-    const handleClick = (e) => {
-        e.stopPropagation();
-        if (window.previewChord) {
-            window.previewChord(chord.globalIndex);
-        }
-    };
+        // --- Melody Sparkline Logic ---
+        const sparklineNotes = useMemo(() => {
+            if (
+                soloistStyle !== 'lead_sheet' ||
+                !leadSheetMelody ||
+                leadSheetMelody.length === 0 ||
+                chord.start === undefined
+            ) {
+                return [];
+            }
 
-    const classNames = [
-        'chord-card',
-        chord.isMinor ? 'minor' : '',
-        chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
-        isActive ? 'active' : '',
-    ]
-        .filter(Boolean)
-        .join(' ');
+            // Filter notes for this specific chord's step range
+            return leadSheetMelody.filter(
+                (n) => n.globalStep >= chord.start && n.globalStep < chord.end,
+            );
+        }, [leadSheetMelody, soloistStyle, chord.start, chord.end]);
 
-    return (
-        <div className={classNames} ref={cardRef} onClick={handleClick}>
-            {disp ? (
-                <Fragment>
-                    <span className="root">{formatUnicodeSymbols(disp.root)}</span>
-                    <span className="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
-                    {disp.bass && (
-                        <span className="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>
-                    )}
-                </Fragment>
-            ) : (
-                formatUnicodeSymbols(chord.absName) || '...'
-            )}
-        </div>
-    );
-});
+        return (
+            <div className={classNames} ref={cardRef} onClick={handleClick}>
+                {disp ? (
+                    <Fragment>
+                        <span className="root">{formatUnicodeSymbols(disp.root)}</span>
+                        <span className="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
+                        {disp.bass && (
+                            <span className="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>
+                        )}
+                    </Fragment>
+                ) : (
+                    formatUnicodeSymbols(chord.absName) || '...'
+                )}
+
+                {sparklineNotes.length > 0 && (
+                    <div className="sparkline-container">
+                        {sparklineNotes.map((n, i) => {
+                            // Normalize MIDI 48-84 to 0-100% height
+                            const height = Math.min(100, Math.max(15, ((n.midi - 48) / 36) * 100));
+                            return (
+                                <div
+                                    key={i}
+                                    className="sparkline-bar"
+                                    style={`height: ${height}%`}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    },
+);
 
 export function ChordVisualizer() {
-    const { progression, timeSignature, lastActiveChordIndex, sectionsState, notation } =
-        useEnsembleState((s) => ({
-            progression: s.arranger.progression,
-            timeSignature: s.arranger.timeSignature,
-            lastActiveChordIndex: s.chords.lastActiveChordIndex,
-            sectionsState: s.arranger.sections,
-            notation: s.arranger.notation || 'roman',
-        }));
+    const {
+        progression,
+        timeSignature,
+        lastActiveChordIndex,
+        sectionsState,
+        notation,
+        leadSheetMelody,
+        soloistStyle,
+    } = useEnsembleState((s) => ({
+        progression: s.arranger.progression,
+        timeSignature: s.arranger.timeSignature,
+        lastActiveChordIndex: s.chords.lastActiveChordIndex,
+        sectionsState: s.arranger.sections,
+        notation: s.arranger.notation || 'roman',
+        leadSheetMelody: s.soloist.leadSheetMelody,
+        soloistStyle: s.soloist.style,
+    }));
 
     const isMaximized = document.body.classList.contains('chord-maximized');
     const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
@@ -99,6 +143,7 @@ export function ChordVisualizer() {
         let currentBlock = null;
         let currentMeasure = null;
         let currentMeasureBeats = 0;
+        let currentStep = 0;
 
         progression.forEach((chord, i) => {
             const sectionData = sectionsState.find((s) => s.id === chord.sectionId);
@@ -139,7 +184,14 @@ export function ChordVisualizer() {
                 currentMeasureBeats = 0;
             }
 
-            currentMeasure.chords.push({ ...chord, globalIndex: i });
+            const durationSteps = Math.round(chord.beats * ts.stepsPerBeat);
+            currentMeasure.chords.push({
+                ...chord,
+                globalIndex: i,
+                start: currentStep,
+                end: currentStep + durationSteps,
+            });
+            currentStep += durationSteps;
             currentMeasureBeats += chord.beats;
         });
         return blocks;
@@ -214,6 +266,8 @@ export function ChordVisualizer() {
                                         totalMeasures={totalMeasures}
                                         isMaximized={isMaximized}
                                         notation={notation}
+                                        leadSheetMelody={leadSheetMelody}
+                                        soloistStyle={soloistStyle}
                                     />
                                 ))}
                             </div>

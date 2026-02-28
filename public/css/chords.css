@@ -343,3 +343,32 @@
 .chord-maximized #editArrangementBtn {
     display: none;
 }
+
+/* Melody Sparkline Styles */
+.sparkline-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    padding: 0 4px 2px 4px;
+    pointer-events: none;
+    opacity: 0.6;
+    overflow: hidden;
+}
+
+.sparkline-bar {
+    flex-grow: 1;
+    background: var(--soloist-color);
+    border-radius: 1px;
+    min-width: 2px;
+    transition: height 0.2s ease;
+}
+
+.chord-card.active .sparkline-bar {
+    background: white;
+    opacity: 0.8;
+}

@@ -59,6 +59,11 @@ function Header() {
 }
 
 function ArrangerPanel() {
+    const { soloistStyle, hasLeadSheet } = useEnsembleState((s) => ({
+        soloistStyle: s.soloist.style,
+        hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
+    }));
+
     const openEditor = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
     };
@@ -86,8 +91,19 @@ function ArrangerPanel() {
     return (
         <div class="panel dashboard-panel active-mobile" id="panel-arranger" data-id="arranger">
             <div class="panel-header chord-panel-header">
-                <div class="panel-title-group">
+                <div
+                    class="panel-title-group"
+                    style="display: flex; align-items: center; gap: 0.75rem;"
+                >
                     <h2>Arranger</h2>
+                    {soloistStyle === 'lead_sheet' && hasLeadSheet && (
+                        <span
+                            class="badge"
+                            style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; gap: 4px; white-space: nowrap;"
+                        >
+                            🎵 Lead Sheet Active
+                        </span>
+                    )}
                 </div>
                 <div class="panel-header-controls">
                     <input
