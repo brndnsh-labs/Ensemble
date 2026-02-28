@@ -441,7 +441,7 @@ export class ChordAnalyzerLite {
 
         const workingSignal = signal.subarray(startSample);
         const beats = Math.floor(workingSignal.length / samplesPerBeat);
-        const melodyLine = [];
+        const rawMelody = [];
 
         // Key Bias logic
         const keyBias = options.keyBias || null;
@@ -455,7 +455,6 @@ export class ChordAnalyzerLite {
         const maxMidi = 84;
 
         // Pre-calculate trig values for melody extraction loop
-        // extractMelody uses hardcoded step = 4
         const cosTable = new Float32Array(this.pitchFrequencies.length);
         const sinTable = new Float32Array(this.pitchFrequencies.length);
         const step = 4;
@@ -466,6 +465,8 @@ export class ChordAnalyzerLite {
             cosTable[i] = Math.cos(delta);
             sinTable[i] = Math.sin(delta);
         }
+
+        let lastMidi = 60; // Middle C anchor
 
         for (let b = 0; b < beats; b++) {
             if (b % 20 === 0) {
@@ -485,7 +486,7 @@ export class ChordAnalyzerLite {
             }
             const rms = Math.sqrt(sum / wLen);
             if (rms < 0.01) {
-                melodyLine.push({ beat: b, midi: null, energy: 0 });
+                rawMelody.push({ beat: b, midi: null, energy: 0 });
                 continue;
             }
 
@@ -519,13 +520,29 @@ export class ChordAnalyzerLite {
 
                 const energy = real * real + imag * imag;
 
-                // --- Diatonic Gravity ---
+                // --- 1. Diatonic Gravity ---
                 let score = energy;
                 if (scale) {
                     const relativePitch = (p.midi - keyBias.root + 12) % 12;
                     if (scale.includes(relativePitch)) {
-                        score *= 1.35; // 30% boost for notes in the detected key
+                        score *= 1.4; // Boost for notes in the detected key
                     }
+                }
+
+                // --- 2. Anchor Tone Weighting (Downbeats) ---
+                const beatsPerMeasure = pulseData.beatsPerMeasure || 4;
+                const beatInMeasure = b % beatsPerMeasure;
+                if (beatInMeasure === 0) {
+                    score *= 1.5; // Strongest anchor on Beat 1
+                } else if (beatInMeasure === 2 && beatsPerMeasure === 4) {
+                    score *= 1.25; // Secondary anchor on Beat 3
+                }
+
+                // --- 3. Melodic Continuity (Soloist-Inspired) ---
+                // Penalize large leaps from the previous detected MIDI note
+                const dist = Math.abs(p.midi - lastMidi);
+                if (dist > 2) {
+                    score *= Math.max(0.1, 1.0 - (dist - 2) * 0.1);
                 }
 
                 if (score > maxScore) {
@@ -537,14 +554,54 @@ export class ChordAnalyzerLite {
             // Normalize energy score using the raw energy of the winner
             const normalizedEnergy = Math.min(1.0, maxScore / 130);
 
-            melodyLine.push({
+            rawMelody.push({
                 beat: b,
                 midi: bestMidi,
                 energy: normalizedEnergy,
             });
+
+            if (bestMidi !== -1) {
+                lastMidi = bestMidi;
+            }
         }
 
-        return melodyLine;
+        // --- SECOND PASS: Structural Smoothing ---
+        const smoothedMelody = [];
+        for (let i = 0; i < rawMelody.length; i++) {
+            const prev = rawMelody[i - 1];
+            const curr = rawMelody[i];
+            const next = rawMelody[i + 1];
+
+            // 1. Remove isolated "jitter" notes surrounded by silence
+            if (prev && next && curr.midi !== null && prev.midi === null && next.midi === null) {
+                smoothedMelody.push({ ...curr, midi: null, energy: 0 });
+            }
+            // 2. Correction for oscillating jitter (A B A -> A A A) or outliers
+            else if (
+                prev &&
+                next &&
+                curr.midi !== null &&
+                prev.midi !== null &&
+                next.midi !== null
+            ) {
+                const distPrev = Math.abs(curr.midi - prev.midi);
+                const distNext = Math.abs(curr.midi - next.midi);
+
+                // If it's a sudden leap and return (Outlier Blip)
+                if (distPrev > 7 && distNext > 7 && prev.midi === next.midi) {
+                    smoothedMelody.push({ ...curr, midi: prev.midi });
+                } else if (prev.midi === next.midi && curr.midi !== prev.midi) {
+                    // Standard jitter (A B A where B is close but different)
+                    smoothedMelody.push({ ...curr, midi: prev.midi });
+                } else {
+                    smoothedMelody.push(curr);
+                }
+            } else {
+                smoothedMelody.push(curr);
+            }
+        }
+
+        return smoothedMelody;
     }
 
     /**

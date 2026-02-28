@@ -12,6 +12,9 @@ export function AnalyzerModal() {
     const dispatch = useDispatch();
     const isOpen = useEnsembleState((s) => s.playback.modals.analyzer);
     const arrangerKey = useEnsembleState((s) => s.arranger.key);
+    const bandIntensity = useEnsembleState((s) => s.playback.bandIntensity);
+    const sessionTimer = useEnsembleState((s) => s.playback.sessionTimer);
+    const sessionStartTime = useEnsembleState((s) => s.playback.sessionStartTime);
     const overlayRef = useRef(null);
 
     useEffect(() => {
@@ -28,6 +31,7 @@ export function AnalyzerModal() {
     // View States: 'idle', 'live', 'trim', 'processing', 'results'
     const [view, setView] = useState('idle');
     const [mode, setMode] = useState('chords'); // 'chords' | 'melody'
+    const [strategyMode, setStrategyMode] = useState('balanced'); // 'consonant' | 'balanced' | 'complex' | 'auto'
     const [forceKey, setForceKey] = useState(false);
     const [stagedChords, setStagedChords] = useState([]);
     const [currentStableChord, setCurrentStableChord] = useState(null);
@@ -38,6 +42,7 @@ export function AnalyzerModal() {
     const [audioBuffer, setAudioBuffer] = useState(null);
     const [progress, setProgress] = useState(0);
     const [analysisData, setAnalysisData] = useState(null);
+    const [selectedOptionIdx, setSelectedOptionIdx] = useState(0);
 
     // Audio / Analysis Refs
     const audioCtxRef = useRef(null);
@@ -185,6 +190,52 @@ export function AnalyzerModal() {
                 const keyStr =
                     analyzerRef.current.notes[keyRes.root] + (keyRes.type === 'minor' ? 'm' : '');
                 setDetectedKey(keyStr);
+
+                // --- Harmonizer Auto-Strategy Bridge ---
+                if (harmonizerRef.current) {
+                    let effectiveStrategy = strategyMode;
+                    if (strategyMode === 'auto') {
+                        const elapsedMins = (performance.now() - sessionStartTime) / 60000;
+                        const progress =
+                            sessionTimer > 0 ? Math.min(1.0, elapsedMins / sessionTimer) : 0;
+
+                        if (bandIntensity > 0.8 || progress > 0.8) {
+                            effectiveStrategy = 'complex';
+                        } else if (bandIntensity < 0.4 || progress < 0.25) {
+                            effectiveStrategy = 'consonant';
+                        } else {
+                            effectiveStrategy = 'balanced';
+                        }
+                    }
+
+                    const pulse = { bpm: 120, downbeatOffset: 0 }; // Live dummy pulse
+                    analyzerRef.current
+                        .extractMelody(new Float32Array(buffer), pulse, { keyBias: keyRes })
+                        .then((melodyLine) => {
+                            const options = harmonizerRef.current.generateOptions(
+                                melodyLine,
+                                keyStr,
+                            );
+                            const match = options.find(
+                                (o) => o.type.toLowerCase() === effectiveStrategy.toLowerCase(),
+                            );
+                            if (match && match.chords.length > 0) {
+                                const bestChord = match.chords[0].roman;
+
+                                // Update stability for the harmonized chord
+                                if (bestChord === stabilityRef.current.lastChord) {
+                                    stabilityRef.current.counter++;
+                                } else {
+                                    stabilityRef.current.counter = 0;
+                                    stabilityRef.current.lastChord = bestChord;
+                                }
+
+                                if (stabilityRef.current.counter >= STABILITY_THRESHOLD) {
+                                    setCurrentStableChord(bestChord);
+                                }
+                            }
+                        });
+                }
             }
         } else {
             const chroma = analyzerRef.current.calculateChromagram(buffer, sampleRate, {
@@ -194,7 +245,7 @@ export function AnalyzerModal() {
             detected = analyzerRef.current.identifyChord(chroma);
         }
 
-        if (detected && detected !== 'Rest') {
+        if (mode !== 'melody' && detected && detected !== 'Rest') {
             if (detected === stabilityRef.current.lastChord) {
                 stabilityRef.current.counter++;
             } else {
@@ -205,7 +256,7 @@ export function AnalyzerModal() {
             if (stabilityRef.current.counter >= STABILITY_THRESHOLD) {
                 setCurrentStableChord(detected);
             }
-        } else {
+        } else if (mode !== 'melody') {
             stabilityRef.current.counter = 0;
             stabilityRef.current.lastChord = null;
         }
@@ -263,23 +314,43 @@ export function AnalyzerModal() {
 
         try {
             const { ChordAnalyzerLite } = await import('../audio-analyzer-lite.js');
-            const { extractForm } = await import('../form-extractor.js');
             const analyzer = new ChordAnalyzerLite();
-
-            setProgress(50);
-            const result = await analyzer.analyze(audioBuffer, {
-                startTime: trimRange.start,
-                endTime: trimRange.end,
-                onProgress: (p) => setProgress(20 + p * 0.6),
+            const pulse = await analyzer.identifyPulse(audioBuffer, {
+                onProgress: (p) => setProgress(20 + p * 0.1),
             });
-            setProgress(80);
 
-            const sections = extractForm(result.chords, result.pulse);
-            setAnalysisData({
-                summary: `Detected ${sections.length} sections`,
-                bpm: Math.round(result.pulse.bpm),
-                sections: sections,
-            });
+            if (mode === 'melody') {
+                const { Harmonizer } = await import('../melody-harmonizer.js');
+                const harmonizer = new Harmonizer();
+                setProgress(40);
+                const melodyLine = await analyzer.extractMelody(audioBuffer, pulse, {
+                    onProgress: (p) => setProgress(40 + p * 0.4),
+                });
+                setProgress(80);
+                const options = harmonizer.generateOptions(melodyLine, arrangerKey);
+                setAnalysisData({
+                    summary: `Harmonized ${Math.ceil(melodyLine.length / 4)} measures`,
+                    bpm: Math.round(pulse.bpm),
+                    options: options,
+                    mode: 'melody',
+                });
+            } else {
+                const { extractForm } = await import('../form-extractor.js');
+                setProgress(40);
+                const result = await analyzer.analyze(audioBuffer, {
+                    startTime: trimRange.start,
+                    endTime: trimRange.end,
+                    onProgress: (p) => setProgress(40 + p * 0.4),
+                });
+                setProgress(80);
+                const sections = extractForm(result.chords, result.pulse);
+                setAnalysisData({
+                    summary: `Detected ${sections.length} sections`,
+                    bpm: Math.round(result.pulse.bpm),
+                    sections: sections,
+                    mode: 'chords',
+                });
+            }
             setView('results');
         } catch (err) {
             console.error('[Analyzer] Analysis Error:', err);
@@ -294,15 +365,31 @@ export function AnalyzerModal() {
         }
         pushHistory();
 
-        const newSections = analysisData.sections.map((s) => ({
-            id: generateId(),
-            label: s.label,
-            value: s.value,
-            repeat: s.repeat,
-            key: '',
-            timeSignature: '',
-            seamless: false,
-        }));
+        let newSections = [];
+        if (analysisData.mode === 'melody') {
+            const opt = analysisData.options[selectedOptionIdx];
+            newSections = [
+                {
+                    id: generateId(),
+                    label: `Harmonized (${opt.type})`,
+                    value: opt.progression,
+                    repeat: 1,
+                    key: '',
+                    timeSignature: '',
+                    seamless: false,
+                },
+            ];
+        } else {
+            newSections = analysisData.sections.map((s) => ({
+                id: generateId(),
+                label: s.label,
+                value: s.value,
+                repeat: s.repeat,
+                key: '',
+                timeSignature: '',
+                seamless: false,
+            }));
+        }
 
         import('../state.js').then(({ arranger }) => {
             if (replaceExisting) {
@@ -487,6 +574,42 @@ export function AnalyzerModal() {
                             </span>
                         </label>
                     </div>
+
+                    {mode === 'melody' && (
+                        <div
+                            class="harmonizer-strategy-switch"
+                            style="display: flex; gap: 4px; margin: 0.5rem 0 1rem 0; background: rgba(0,0,0,0.1); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color); overflow-x: auto;"
+                        >
+                            {['Consonant', 'Balanced', 'Complex', 'Auto'].map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => setStrategyMode(s.toLowerCase())}
+                                    style={{
+                                        flex: 1,
+                                        padding: '6px 8px',
+                                        fontSize: '0.75rem',
+                                        borderRadius: '4px',
+                                        border: 'none',
+                                        background:
+                                            strategyMode === s.toLowerCase()
+                                                ? s === 'Auto'
+                                                    ? 'var(--accent-color)'
+                                                    : 'var(--border-color)'
+                                                : 'transparent',
+                                        color:
+                                            strategyMode === s.toLowerCase()
+                                                ? 'white'
+                                                : 'var(--text-secondary)',
+                                        fontWeight: s === 'Auto' ? 'bold' : 'normal',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {s === 'Auto' ? '✨ Auto' : s}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {view === 'idle' && (
                         <Fragment>
@@ -755,11 +878,81 @@ export function AnalyzerModal() {
                             </div>
 
                             <div class="suggested-sections-container">
-                                {analysisData.sections.map((s, idx) => (
-                                    <div key={idx} class="section-preview-chip">
-                                        <strong>{s.label}:</strong> {s.value}
+                                {analysisData.mode === 'melody' ? (
+                                    <div class="harmonizer-options-list">
+                                        <label class="setting-label">
+                                            Select Harmonization Strategy:
+                                        </label>
+                                        {analysisData.options.map((opt, idx) => (
+                                            <div
+                                                key={idx}
+                                                class={`harmonizer-option-card ${selectedOptionIdx === idx ? 'active' : ''}`}
+                                                onClick={() => setSelectedOptionIdx(idx)}
+                                                style={{
+                                                    padding: '12px',
+                                                    margin: '8px 0',
+                                                    borderRadius: '8px',
+                                                    background:
+                                                        selectedOptionIdx === idx
+                                                            ? 'rgba(59, 130, 246, 0.2)'
+                                                            : 'rgba(255,255,255,0.05)',
+                                                    border: `2px solid ${selectedOptionIdx === idx ? 'var(--accent-color)' : 'transparent'}`,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                            >
+                                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                                    <div style="flex: 1;">
+                                                        <div style="font-weight: bold; font-size: 1rem; color: var(--accent-color);">
+                                                            {opt.type}
+                                                        </div>
+                                                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
+                                                            {opt.description}
+                                                        </div>
+                                                        <div style="font-family: monospace; font-size: 1.1rem; letter-spacing: 0.05em; color: white;">
+                                                            {formatUnicodeSymbols(opt.progression)}
+                                                        </div>
+
+                                                        {selectedOptionIdx === idx &&
+                                                            opt.chords && (
+                                                                <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-wrap: wrap; gap: 4px;">
+                                                                    {opt.chords.map((c, cIdx) => (
+                                                                        <div
+                                                                            key={cIdx}
+                                                                            style="text-align: center; background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px; min-width: 60px;"
+                                                                        >
+                                                                            <div style="font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted);">
+                                                                                {c.structuralState.slice(
+                                                                                    0,
+                                                                                    4,
+                                                                                )}
+                                                                            </div>
+                                                                            <div style="font-weight: bold; font-size: 0.85rem;">
+                                                                                {formatUnicodeSymbols(
+                                                                                    c.roman,
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                    {selectedOptionIdx === idx && (
+                                                        <div style="color: var(--accent-color); font-size: 1.2rem;">
+                                                            ✓
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                ) : (
+                                    analysisData.sections.map((s, idx) => (
+                                        <div key={idx} class="section-preview-chip">
+                                            <strong>{s.label}:</strong> {s.value}
+                                        </div>
+                                    ))
+                                )}
                             </div>
 
                             <div
