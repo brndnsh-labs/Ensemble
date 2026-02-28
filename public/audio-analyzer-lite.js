@@ -303,7 +303,13 @@ export class ChordAnalyzerLite {
             const window = signal.subarray(start, end);
 
             // Calculate relative energy for this beat
-            const energy = Math.sqrt(window.reduce((sum, x) => sum + x * x, 0) / window.length);
+            let sum = 0;
+            const wLen = window.length;
+            for (let i = 0; i < wLen; i++) {
+                const x = window[i];
+                sum += x * x;
+            }
+            const energy = Math.sqrt(sum / wLen);
 
             // 1. Full Chromagram (for quality)
             // We raise minMidi to 48 (C3) to ignore the walking bass range for chord quality detection.
@@ -367,7 +373,12 @@ export class ChordAnalyzerLite {
             });
 
             // Average energy in the same window
-            const avgEnergy = window.reduce((a, b) => a + b.energy, 0) / window.length;
+            let energySum = 0;
+            const wLen = window.length;
+            for (let j = 0; j < wLen; j++) {
+                energySum += window[j].energy;
+            }
+            const avgEnergy = energySum / wLen;
 
             // Pick the winner
             const consensus = Object.entries(counts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
@@ -466,7 +477,13 @@ export class ChordAnalyzerLite {
             const window = workingSignal.subarray(start, end);
 
             // Calculate energy for this beat to ignore silence
-            const rms = Math.sqrt(window.reduce((sum, x) => sum + x * x, 0) / window.length);
+            let sum = 0;
+            const wLen = window.length;
+            for (let i = 0; i < wLen; i++) {
+                const x = window[i];
+                sum += x * x;
+            }
+            const rms = Math.sqrt(sum / wLen);
             if (rms < 0.01) {
                 melodyLine.push({ beat: b, midi: null, energy: 0 });
                 continue;
@@ -1188,7 +1205,10 @@ export class ChordAnalyzerLite {
             }
         }
 
-        const energy = chroma.reduce((a, b) => a + b, 0);
+        let energy = 0;
+        for (let i = 0; i < chroma.length; i++) {
+            energy += chroma[i];
+        }
         if (energy < 0.05) {
             return 'Rest';
         }
@@ -1200,7 +1220,10 @@ export class ChordAnalyzerLite {
         // 3. Slash Chord Detection (Inversions)
         if (options.bassNote && options.bassNote !== this.notes[bestChordData.root]) {
             // Check if bass note is strong relative to total energy
-            const totalEnergy = chroma.reduce((a, b) => a + b, 0);
+            let totalEnergy = 0;
+            for (let i = 0; i < chroma.length; i++) {
+                totalEnergy += chroma[i];
+            }
             const bassIdx = this.notes.indexOf(options.bassNote);
 
             let bassEnergy = chroma[bassIdx];
