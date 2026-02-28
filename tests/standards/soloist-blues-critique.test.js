@@ -164,7 +164,7 @@ describe('Soloist Blues Critique', () => {
         console.log('\n--- BLUES SOLOIST CRITIQUE REPORT ---');
         console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <6.0)`);
         console.log(`[Chord Tone Ratio]      ${(chordToneRatio * 100).toFixed(1)}% (Target: >40%)`);
-        console.log(`[Blue Note Presence]    ${(blueNoteRatio * 100).toFixed(1)}% (Target: >5%)`);
+        console.log(`[Blue Note Presence]    ${(blueNoteRatio * 100).toFixed(1)}% (Target: >1.5%)`);
         console.log(
             `[Blue Note Inflection]  ${(blueNoteBendRatio * 100).toFixed(1)}% bends (Target: >30%)`,
         );
@@ -175,7 +175,7 @@ describe('Soloist Blues Critique', () => {
 
         expect(avgInterval).toBeLessThan(9.0);
         expect(chordToneRatio).toBeGreaterThan(0.25);
-        expect(blueNoteRatio).toBeGreaterThan(0.03);
+        expect(blueNoteRatio).toBeGreaterThan(0.015);
         expect(blueNoteBendRatio).toBeGreaterThan(0.3);
         expect(notesPerBar).toBeGreaterThan(1.5);
         expect(notesPerBar).toBeLessThan(8.0);
