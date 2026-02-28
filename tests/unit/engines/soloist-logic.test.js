@@ -164,6 +164,9 @@ describe('Soloist Engine Logic', () => {
                 { style: 'shred', label: 'Run' },
             ];
 
+            // Some devices like Quartal/GuitarDouble require polyphonic mode
+            soloist.mode = 'polyphonic';
+
             deviceTests.forEach((t) => {
                 let triggered = false;
                 for (let i = 0; i < 500; i++) {
