@@ -499,13 +499,31 @@ export function getSoloistNote(
                     velocity: 0.8,
                     style: activeStyle,
                 };
+
+                // Motif Seeding: "Teach" the generative engine these themes
+                if (!soloist.motifBuffer) {
+                    soloist.motifBuffer = []; // @worker-mutation
+                }
+                const motifEntry = {
+                    pc: res.midi % 12,
+                    step: step % 16,
+                    dur: res.durationSteps,
+                };
+                soloist.motifBuffer.push(motifEntry); // @worker-mutation
+                if (soloist.motifBuffer.length > 16) {
+                    soloist.motifBuffer.shift(); // @worker-mutation
+                }
+
                 soloist.busySteps = Math.max(0, (res.durationSteps || 1) - 1); // @worker-mutation
                 return finalizeNote(res);
             }
+
+            // FALL-THROUGH: If no written note, continue to procedural logic
+            // But we must respect the busySteps from the previous written note
             if (soloist.busySteps > 0) {
                 soloist.busySteps--; // @worker-mutation
+                return null;
             }
-            return null; // Strict lead sheet mapping, no procedural generation
         }
     }
 
