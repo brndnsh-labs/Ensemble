@@ -166,7 +166,14 @@ export function PresetLibrary({ type }) {
         window.dispatchEvent(new Event('storage_sync'));
     };
 
-    const sorted = [...presets].sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+    const sorted = [...presets].sort((a, b) => {
+        const catA = a.category || '';
+        const catB = b.category || '';
+        if (catA !== catB) {
+            return catA.localeCompare(catB);
+        }
+        return (a.name || '').localeCompare(b.name || '');
+    });
 
     return (
         <Fragment>
