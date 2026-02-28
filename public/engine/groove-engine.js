@@ -1,4 +1,5 @@
 import { getState } from '../state.js';
+import { getStepsPerMeasure } from '../utils.js';
 
 /**
  * Applies procedural groove logic based on the active genre and band intensity.
@@ -21,7 +22,13 @@ export function applyGrooveOverrides({
     let velocity = stepVal === 2 ? 1.25 : 0.9;
     let shouldPlay = stepVal > 0;
     let soundName = inst.name;
-    const loopStep = step % 16;
+    const state = getState();
+    const arrangerState = state?.arranger || { timeSignature: '4/4' };
+    const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
+    const loopStep = step % stepsPerBar;
+
+    // Correctly identify backbeat only for 4/4
+    const isBackbeat44 = arrangerState.timeSignature === '4/4' && isBackbeat;
 
     // Creativity drives the internal complexity of the drum engine
     const drumComplexity = groove.creativity ? 0.8 : 0.3;
@@ -39,7 +46,7 @@ export function applyGrooveOverrides({
 
     // --- Neo-Soul / Hip Hop Procedural Overrides ---
     if ((groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Neo-Soul', groove.creativity, drumComplexity);
 
         // Universal "Drunken" displacement
@@ -107,7 +114,7 @@ export function applyGrooveOverrides({
 
     // --- Acoustic / Percussive Overrides ---
     if (groove.genreFeel === 'Acoustic' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Acoustic', groove.creativity, drumComplexity);
 
         if (inst.name === 'Snare') {
@@ -154,7 +161,7 @@ export function applyGrooveOverrides({
 
     // --- Funk Procedural Overrides ---
     if (groove.genreFeel === 'Funk' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Funk', groove.creativity, drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
@@ -279,7 +286,7 @@ export function applyGrooveOverrides({
 
     // --- Disco Procedural Overrides ---
     if (groove.genreFeel === 'Disco' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Disco', groove.creativity, drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
@@ -349,7 +356,7 @@ export function applyGrooveOverrides({
 
     // --- Reggae Procedural Overrides ---
     if (groove.genreFeel === 'Reggae' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Reggae', groove.creativity, drumComplexity);
 
         if (inst.name === 'Kick') {
@@ -404,7 +411,7 @@ export function applyGrooveOverrides({
     // --- Jazz Procedural Overrides ---
     if (groove.genreFeel === 'Jazz' && !inst.muted) {
         const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Jazz', groove.creativity, drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
@@ -579,7 +586,7 @@ export function applyGrooveOverrides({
 
     // --- Blues Procedural Overrides ---
     if (groove.genreFeel === 'Blues' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Blues', groove.creativity, drumComplexity);
 
         if (inst.name === 'HiHat' || inst.name === 'Open') {
@@ -643,7 +650,7 @@ export function applyGrooveOverrides({
 
     // --- Rock Procedural Overrides ---
     if (groove.genreFeel === 'Rock' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Rock', groove.creativity, drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
@@ -742,7 +749,7 @@ export function applyGrooveOverrides({
         groove.lastSmartGenre === 'Bossa';
 
     if (isLatinStyle && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Bossa Nova', groove.creativity, drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
@@ -918,7 +925,7 @@ export function applyGrooveOverrides({
 
     // --- Ska-Punk Procedural Overrides ---
     if (groove.genreFeel === 'Ska-Punk' && !inst.muted) {
-        const barIndex = Math.floor(step / 16);
+        const barIndex = Math.floor(step / stepsPerBar);
         const activeMotif = getDrumMotif(barIndex, 'Ska-Punk', groove.creativity, drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
@@ -981,7 +988,7 @@ export function applyGrooveOverrides({
         if (inst.name === 'Kick') {
             velocity *= isDownbeat ? 1.15 : isGroupStart ? 1.1 : isQuarter ? 1.05 : 0.9;
         } else if (inst.name === 'Snare') {
-            velocity *= isBackbeat ? 1.1 : 0.9;
+            velocity *= isBackbeat44 ? 1.1 : 0.9;
         } else if (inst.name === 'HiHat' || inst.name === 'Open') {
             if (groove.genreFeel === 'Ska-Punk') {
                 // Ska-Punk has its own velocity logic for offbeat emphasis
