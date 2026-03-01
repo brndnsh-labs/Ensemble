@@ -436,7 +436,10 @@ export function getSoloistNote(
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, smoothLoopCount / 2.0); // Hits 1.0 right at the start of loop 3 (index 2)
     const effectiveIntensity = Math.min(
         1.0,
-        intensity + maturityFactor * 0.05 + (playback.intent.soloistMod || 0),
+        intensity +
+            maturityFactor * 0.05 +
+            smoothLoopCount * 0.01 +
+            (playback.intent.soloistMod || 0),
     );
     const lyricalBias = playback.lyricalBias !== undefined ? playback.lyricalBias : 0.5;
     const complexity = soloist.complexity !== undefined ? soloist.complexity : playback.complexity;
@@ -552,6 +555,12 @@ export function getSoloistNote(
     }
 
     // --- 1. Busy/Device Handling ---
+    if (soloist.embellishmentBuffer && soloist.embellishmentBuffer.length > 0) {
+        const embNote = soloist.embellishmentBuffer.shift();
+        const primaryNote = Array.isArray(embNote) ? embNote[0] : embNote;
+        soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        return finalizeNote(embNote);
+    }
     if (soloist.deviceBuffer && soloist.deviceBuffer.length > 0) {
         const devNote = soloist.deviceBuffer.shift();
         const primaryNote = Array.isArray(devNote) ? devNote[0] : devNote;
@@ -691,12 +700,12 @@ export function getSoloistNote(
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
 
-        let startProb = 0.05; // Low base probability for random mid-measure starts
+        let startProb = (0.05 + effectiveIntensity * 0.1) * (0.5 + warmupFactor * 0.5); // Scaled base prob
 
         if (isDownbeat) {
-            startProb = 0.6 + effectiveIntensity * 0.3; // High chance to start on '1'
+            startProb = (0.6 + effectiveIntensity * 0.3) * (0.4 + warmupFactor * 0.6); // High chance to start on '1'
         } else if (isPickupZone) {
-            startProb = 0.4 + effectiveIntensity * 0.4; // Good chance to play a pickup
+            startProb = (0.4 + effectiveIntensity * 0.4) * (0.3 + warmupFactor * 0.7); // Good chance to play a pickup
         }
 
         // (Removed early loop extra sparsity constraint)
@@ -732,7 +741,8 @@ export function getSoloistNote(
                 Math.abs(currentRoot - motifRoot) > 0 &&
                 Math.abs(currentRoot - motifRoot) !== 5 &&
                 Math.abs(currentRoot - motifRoot) !== 7;
-            const isStale = (soloist.motifReplayCount || 0) > 3;
+            const isStale =
+                (soloist.motifReplayCount || 0) > 3 + Math.floor(effectiveIntensity * 4);
             const isOverwhelmed = effectiveIntensity > 0.7 && Math.random() < 0.5;
 
             let distinctPitchesCount = 0;
@@ -1011,6 +1021,20 @@ export function getSoloistNote(
             pool.push(RHYTHMIC_CELLS[1]);
         }
 
+        // Intensity/Maturity Expansion: Inject busy cells at high climax
+        if (effectiveIntensity > 0.8 || maturityFactor > 0.9) {
+            // Add 16ths (0), Gallops (3), and 16th Offbeats (10)
+            if (!pool.includes(RHYTHMIC_CELLS[0])) {
+                pool.push(RHYTHMIC_CELLS[0]);
+            }
+            if (!pool.includes(RHYTHMIC_CELLS[3])) {
+                pool.push(RHYTHMIC_CELLS[3]);
+            }
+            if (!pool.includes(RHYTHMIC_CELLS[10])) {
+                pool.push(RHYTHMIC_CELLS[10]);
+            }
+        }
+
         // Intensity-based filtering
         if (intensity < 0.4 && activeStyle !== 'bird') {
             pool = pool.filter((c) => c[1] === 0 && c[3] === 0);
@@ -1053,6 +1077,29 @@ export function getSoloistNote(
     if (soloist.currentCell && soloist.currentCell[stepInBeat] === 1) {
         /* hit */
     } else {
+        // --- Embellishment: Approach Note Filling ---
+        // Fill rests during a phrase with melodic motion at high intensity
+        const fillerProb = Math.max(0, (effectiveIntensity - 0.75) * 2.0);
+        if (!soloist.isResting && Math.random() < fillerProb) {
+            const scaleIntervals = getScaleForChord(targetChord, null, style);
+            const neighborDir = Math.random() > 0.5 ? 1 : -1;
+            let neighborMidi = lastMidi;
+            let neighborPC = (neighborMidi + neighborDir + 120) % 12;
+            let tries = 0;
+            while (!scaleIntervals.includes(neighborPC) && tries < 3) {
+                neighborMidi += neighborDir;
+                neighborPC = (neighborMidi + 120) % 12;
+                tries++;
+            }
+            const fillerNote = {
+                midi: neighborMidi,
+                durationSteps: 1,
+                velocity: 0.7,
+                style: activeStyle,
+                isLegato: true,
+            };
+            return finalizeNote(fillerNote);
+        }
         return null;
     }
 
@@ -1928,8 +1975,41 @@ export function getSoloistNote(
         isDoubleStop: false,
         isLegato,
     };
-    if (durationSteps > 1) {
-        soloist.busySteps = durationSteps - 1; // @worker-mutation
+
+    // --- Unified Embellishment: Rhythmic Diminution ---
+    // Splitting longer notes into runs based on intensity and loop progress
+    const embellishmentProb = Math.max(
+        0,
+        (effectiveIntensity - 0.5) * 1.5 +
+            (soloist.motifReplayCount || 0) * 0.1 +
+            smoothLoopCount * 0.05,
+    );
+    if (durationSteps > 1 && Math.random() < embellishmentProb * 0.8) {
+        result.durationSteps = 1;
+        if (!soloist.embellishmentBuffer) {
+            soloist.embellishmentBuffer = []; // @worker-mutation
+        }
+        const scaleIntervals = getScaleForChord(targetChord, null, style);
+        const neighborDir = Math.random() > 0.5 ? 1 : -1;
+        let neighborMidi = selectedMidi;
+        let neighborPC = (neighborMidi + neighborDir + 120) % 12;
+        let tries = 0;
+        while (!scaleIntervals.includes(neighborPC) && tries < 3) {
+            neighborMidi += neighborDir;
+            neighborPC = (neighborMidi + 120) % 12;
+            tries++;
+        }
+        soloist.embellishmentBuffer.push({
+            midi: neighborMidi,
+            durationSteps: durationSteps - 1,
+            velocity: 0.8 * result.velocity,
+            style: activeStyle,
+            isLegato: true,
+        }); // @worker-mutation
+    }
+
+    if (result.durationSteps > 1) {
+        soloist.busySteps = result.durationSteps - 1; // @worker-mutation
     }
 
     const finalResult =
