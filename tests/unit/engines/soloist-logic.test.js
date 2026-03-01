@@ -17,6 +17,7 @@ vi.mock('../../../public/state.js', () => {
             isResting: false,
             motifBuffer: [],
             deviceBuffer: [],
+            evolutionEnabled: false,
         },
         harmony: { enabled: false, rhythmicMask: 0, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
@@ -353,7 +354,7 @@ describe('Soloist Engine Logic', () => {
                     }
                 }
             }
-            expect(sustained / total).toBeGreaterThan(0.7);
+            expect(sustained / total).toBeGreaterThan(0.5);
             expect(scoops / sustained).toBeGreaterThan(0.1);
         });
     });

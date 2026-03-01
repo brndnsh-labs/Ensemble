@@ -433,6 +433,7 @@ export function getSoloistNote(
         loopProgress = (step % arranger.totalSteps) / arranger.totalSteps;
     }
     const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
+    const evoEnabled = soloist.evolutionEnabled !== false;
     const warmupFactor = isPriming ? 1.0 : Math.min(1.0, smoothLoopCount / 2.0); // Hits 1.0 right at the start of loop 3 (index 2)
     const effectiveIntensity = Math.min(
         1.0,
@@ -700,12 +701,15 @@ export function getSoloistNote(
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
 
-        let startProb = (0.05 + effectiveIntensity * 0.1) * (0.5 + warmupFactor * 0.5); // Scaled base prob
+        let startProb =
+            (0.05 + effectiveIntensity * 0.1) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
 
         if (isDownbeat) {
-            startProb = (0.6 + effectiveIntensity * 0.3) * (0.4 + warmupFactor * 0.6); // High chance to start on '1'
+            startProb =
+                (0.6 + effectiveIntensity * 0.3) * (0.4 + (evoEnabled ? warmupFactor : 1.0) * 0.6); // High chance to start on '1'
         } else if (isPickupZone) {
-            startProb = (0.4 + effectiveIntensity * 0.4) * (0.3 + warmupFactor * 0.7); // Good chance to play a pickup
+            startProb =
+                (0.4 + effectiveIntensity * 0.4) * (0.3 + (evoEnabled ? warmupFactor : 1.0) * 0.7); // Good chance to play a pickup
         }
 
         // (Removed early loop extra sparsity constraint)
@@ -742,8 +746,9 @@ export function getSoloistNote(
                 Math.abs(currentRoot - motifRoot) !== 5 &&
                 Math.abs(currentRoot - motifRoot) !== 7;
             const isStale =
+                evoEnabled &&
                 (soloist.motifReplayCount || 0) > 3 + Math.floor(effectiveIntensity * 4);
-            const isOverwhelmed = effectiveIntensity > 0.7 && Math.random() < 0.5;
+            const isOverwhelmed = evoEnabled && effectiveIntensity > 0.7 && Math.random() < 0.5;
 
             let distinctPitchesCount = 0;
             let pitchRange = 0;
@@ -1079,7 +1084,7 @@ export function getSoloistNote(
     } else {
         // --- Embellishment: Approach Note Filling ---
         // Fill rests during a phrase with melodic motion at high intensity
-        const fillerProb = Math.max(0, (effectiveIntensity - 0.75) * 2.0);
+        const fillerProb = evoEnabled ? Math.max(0, (effectiveIntensity - 0.75) * 2.0) : 0;
         if (!soloist.isResting && Math.random() < fillerProb) {
             const scaleIntervals = getScaleForChord(targetChord, null, style);
             const neighborDir = Math.random() > 0.5 ? 1 : -1;
@@ -1978,12 +1983,15 @@ export function getSoloistNote(
 
     // --- Unified Embellishment: Rhythmic Diminution ---
     // Splitting longer notes into runs based on intensity and loop progress
-    const embellishmentProb = Math.max(
-        0,
-        (effectiveIntensity - 0.5) * 1.5 +
-            (soloist.motifReplayCount || 0) * 0.1 +
-            smoothLoopCount * 0.05,
-    );
+    const embellishmentProb = evoEnabled
+        ? Math.max(
+              0,
+              (effectiveIntensity - 0.5) * 1.5 +
+                  (soloist.motifReplayCount || 0) * 0.1 +
+                  smoothLoopCount * 0.05,
+          )
+        : 0;
+
     if (durationSteps > 1 && Math.random() < embellishmentProb * 0.8) {
         result.durationSteps = 1;
         if (!soloist.embellishmentBuffer) {
