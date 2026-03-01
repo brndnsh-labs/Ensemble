@@ -49,9 +49,9 @@ export function playDrumSound(name, time, velocity = 1.0) {
     }
     mixState.recentHits++;
 
-    // Density Ducking: If more than 8 hits are scheduled in a short window (~2 bars of 16ths),
+    // Density Ducking: If more than 18 hits are scheduled in a short window (~2 bars of 16ths),
     // we start ducking to keep integrated loudness consistent.
-    const densityThreshold = 12;
+    const densityThreshold = 18;
     mixState.densityDuck = Math.max(
         0.75,
         1.0 - Math.max(0, mixState.recentHits - densityThreshold) * 0.015,
@@ -72,9 +72,11 @@ export function playDrumSound(name, time, velocity = 1.0) {
         : playback.audio.createGain();
     let panValue = 0;
     if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
-        panValue = 0.2; // Right
+        panValue = 0.35; // Pushed further right
+    } else if (name === 'Snare' || name === 'Sidestick') {
+        panValue = -0.1; // Slight left lean for snare
     } else if (name.includes('Tom') || name.includes('Conga') || name.includes('Bongo')) {
-        panValue = (Math.random() * 2 - 1) * 0.1; // Slight spread
+        panValue = (Math.random() * 2 - 1) * 0.25; // Wider spread
     }
     if (playback.audio.createStereoPanner) {
         panner.pan.setValueAtTime(panValue, playTime);
@@ -130,8 +132,8 @@ export function playDrumSound(name, time, velocity = 1.0) {
         shellGain.gain.setValueAtTime(0, playTime);
         shell.type = 'sine';
         shell.frequency.setValueAtTime(52 * rr(), playTime);
-        shellGain.gain.setTargetAtTime(vol * 0.8, playTime, 0.005);
-        shellGain.gain.setTargetAtTime(0, playTime + 0.03, 0.05);
+        shellGain.gain.setTargetAtTime(vol * 1.0, playTime, 0.005); // Increased from 0.8
+        shellGain.gain.setTargetAtTime(0, playTime + 0.03, 0.07); // Extended from 0.05
 
         // Connections
         beater.connect(beaterGain);
@@ -284,8 +286,8 @@ export function playDrumSound(name, time, velocity = 1.0) {
         noiseFilter.Q.value = 1.2;
         noiseFilter.Q.setValueAtTime(1.2, playTime);
 
-        noiseGain.gain.setTargetAtTime(vol, playTime, 0.001);
-        noiseGain.gain.setTargetAtTime(0, playTime + 0.01, 0.08);
+        noiseGain.gain.setTargetAtTime(vol * 1.25, playTime, 0.001); // Increased from vol
+        noiseGain.gain.setTargetAtTime(0, playTime + 0.01, 0.08); // Reverted from 0.12 back to 0.08
         noise.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
         noiseGain.connect(panner);

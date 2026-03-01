@@ -74,7 +74,7 @@ export const MIXER_GAIN_MULTIPLIERS = {
     bass: 0.32, // Tucked from 0.35
     soloist: 0.38, // Primary melodic focus
     harmonies: 0.22, // Supportive background
-    drums: 0.45, // Supportive rhythm
+    drums: 0.52, // Supportive rhythm
 };
 
 export const REGGAE_RIDDIMS = {
