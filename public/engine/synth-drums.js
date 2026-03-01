@@ -335,7 +335,7 @@ export function playDrumSound(name, time, velocity = 1.0) {
 
         const hpFilter = playback.audio.createBiquadFilter();
         hpFilter.type = 'highpass';
-        hpFilter.frequency.setValueAtTime(7000, playTime);
+        hpFilter.frequency.setValueAtTime(4800, playTime); // Lowered from 7000Hz for more body
 
         // 5. Envelope & Gain
         const gain = playback.audio.createGain();
