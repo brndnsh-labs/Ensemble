@@ -10,13 +10,13 @@ import {
 
 describe('Utility Functions', () => {
     describe('formatUnicodeSymbols', () => {
-        it('should convert # to ♯', () => {
+        it('should convert ASCII sharp (#) to Unicode sharp (♯) in chord strings', () => {
             expect(formatUnicodeSymbols('C#')).toBe('C♯');
             expect(formatUnicodeSymbols('F#m7')).toBe('F♯m7');
             expect(formatUnicodeSymbols('#IV')).toBe('♯IV');
         });
 
-        it('should convert b to ♭ for notes and suffixes', () => {
+        it('should convert ASCII flat (b) to Unicode flat (♭) in chord notes and suffixes', () => {
             expect(formatUnicodeSymbols('Bb')).toBe('B♭');
             expect(formatUnicodeSymbols('Ebmaj7')).toBe('E♭maj7');
             expect(formatUnicodeSymbols('bII')).toBe('♭II');
@@ -25,19 +25,19 @@ describe('Utility Functions', () => {
             expect(formatUnicodeSymbols('7b9')).toBe('7♭9');
         });
 
-        it('should not convert b in quality names like halfdim or maj', () => {
+        it('should NOT convert "b" character in chord quality names like "halfdim" or "maj"', () => {
             expect(formatUnicodeSymbols('halfdim')).toBe('halfdim');
             expect(formatUnicodeSymbols('maj7')).toBe('maj7');
         });
 
-        it('should handle bass notes with slashes', () => {
+        it('should correctly convert flat/sharp symbols in slash chords (e.g., Ab/Gb)', () => {
             expect(formatUnicodeSymbols('Ab/Gb')).toBe('A♭/G♭');
             expect(formatUnicodeSymbols('C/E')).toBe('C/E');
         });
     });
 
     describe('normalizeKey', () => {
-        it('should normalize C# to Db', () => {
+        it('should normalize C# to its enharmonic equivalent Db for consistent internal key representation', () => {
             expect(normalizeKey('C#')).toBe('Db');
         });
 
@@ -48,17 +48,17 @@ describe('Utility Functions', () => {
     });
 
     describe('getFrequency', () => {
-        it('should return 440 for MIDI 69', () => {
+        it('should return 440Hz for MIDI note 69 (A4)', () => {
             expect(getFrequency(69)).toBe(440);
         });
 
-        it('should return 261.63 for MIDI 60 (Middle C)', () => {
+        it('should return approximately 261.63Hz for MIDI note 60 (Middle C)', () => {
             expect(getFrequency(60)).toBeCloseTo(261.63, 2);
         });
     });
 
     describe('midiToNote', () => {
-        it('should return C4 for MIDI 60', () => {
+        it('should return note name "C" and octave 4 for MIDI note 60', () => {
             expect(midiToNote(60)).toEqual({ name: 'C', octave: 4 });
         });
 
@@ -68,7 +68,7 @@ describe('Utility Functions', () => {
     });
 
     describe('getMidi', () => {
-        it('should return 69 for 440Hz', () => {
+        it('should return MIDI note 69 for frequency 440Hz', () => {
             expect(getMidi(440)).toBe(69);
         });
 
@@ -78,7 +78,7 @@ describe('Utility Functions', () => {
     });
 
     describe('Compression/Decompression', () => {
-        it('should compress and decompress sections correctly', async () => {
+        it('should correctly compress an array of sections into a base64 string and decompress it back to the original object structure', async () => {
             const { compressSections, decompressSections } = await import('../../public/utils.js');
             const sections = [
                 { id: '1', label: 'Verse', value: 'C | F' },
@@ -98,7 +98,7 @@ describe('Utility Functions', () => {
             expect(decompressed[0].id).not.toBe('1');
         });
 
-        it('should handle unicode characters', async () => {
+        it('should correctly preserve Unicode characters (like emojis) during section compression/decompression cycle', async () => {
             const { compressSections, decompressSections } = await import('../../public/utils.js');
             const sections = [{ id: '1', label: 'Intro 🎵', value: 'Cm7' }];
             const compressed = compressSections(sections);

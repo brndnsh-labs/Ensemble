@@ -104,7 +104,7 @@ describe('Time Signature Logic', () => {
 
         const tsConfig = TIME_SIGNATURES['4/4'];
 
-        it('should find the first measure', () => {
+        it('should find and return metadata for the first measure in a multi-measure map', () => {
             const result = getStepInfo(0, tsConfig, measureMap, TIME_SIGNATURES);
             expect(result.tsName).toBe('4/4');
             expect(result.isMeasureStart).toBe(true);
@@ -114,7 +114,7 @@ describe('Time Signature Logic', () => {
             expect(result2.isMeasureStart).toBe(false);
         });
 
-        it('should find the middle measure (3/4)', () => {
+        it('should find and return metadata for a middle measure with a different time signature (3/4)', () => {
             // Step 16 is the start of the 2nd measure (3/4)
             const result = getStepInfo(16, tsConfig, measureMap, TIME_SIGNATURES);
             expect(result.tsName).toBe('3/4');
@@ -128,7 +128,7 @@ describe('Time Signature Logic', () => {
             expect(resultEnd.mStep).toBe(11);
         });
 
-        it('should find the last measure', () => {
+        it('should find and return metadata for the final measure in the map', () => {
             const result = getStepInfo(28, tsConfig, measureMap, TIME_SIGNATURES);
             expect(result.tsName).toBe('4/4');
             expect(result.isMeasureStart).toBe(true);
@@ -137,7 +137,7 @@ describe('Time Signature Logic', () => {
             expect(resultEnd.tsName).toBe('4/4');
         });
 
-        it('should fallback correctly if step is out of bounds', () => {
+        it('should fallback to provided tsConfig when step is beyond measure map boundaries', () => {
             // Step 44 is beyond the map (end is exclusive)
             const result = getStepInfo(44, tsConfig, measureMap, TIME_SIGNATURES);
 
