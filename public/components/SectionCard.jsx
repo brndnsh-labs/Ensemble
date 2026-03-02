@@ -46,9 +46,12 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
         },
     }));
 
-    const { isMinor } = useEnsembleState((s) => ({
+    const { isMinor, mutatedSectionId } = useEnsembleState((s) => ({
         isMinor: s.arranger.isMinor,
+        mutatedSectionId: s.arranger.mutatedSectionId,
     }));
+
+    const isMutated = mutatedSectionId === section.id;
 
     const handleDragStart = (e) => {
         e.dataTransfer.setData('text/plain', section.id);
@@ -290,7 +293,7 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
 
             <textarea
                 ref={textareaRef}
-                class="section-prog-input"
+                class={`section-prog-input ${isMutated ? 'mutated' : ''}`}
                 value={section.value}
                 aria-label="Chord Progression"
                 maxLength={1000}

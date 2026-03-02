@@ -168,7 +168,25 @@ export function EditorModal() {
             return;
         }
         pushHistory();
-        section.value = mutateProgression(section.value);
+        const { value } = mutateProgression(section.value);
+        section.value = value;
+
+        // Visual feedback
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'arranger',
+            param: 'mutatedSectionId',
+            value: targetId,
+        });
+
+        // Clear highlight after animation duration
+        setTimeout(() => {
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'arranger',
+                param: 'mutatedSectionId',
+                value: null,
+            });
+        }, 1000);
+
         clearChordPresetHighlight();
         refreshArrangerUI();
     };

@@ -82,8 +82,8 @@ body.modal-open {
     visibility: hidden;
     pointer-events: none;
     transition:
-        opacity 0.2s ease-out,
-        visibility 0.2s ease-out;
+        opacity var(--anim-normal) var(--anim-ease),
+        visibility var(--anim-normal) var(--anim-ease);
 }
 
 .settings-overlay.active,
@@ -93,19 +93,13 @@ body.modal-open {
     pointer-events: auto;
 }
 
-#generateSongOverlay {
-    z-index: 3000; /* Ensure it is above the arrangement editor (2000) */
+.settings-overlay.closing,
+.modal-overlay.closing {
+    opacity: 0;
+    pointer-events: none;
 }
 
-#settingsOverlay,
-#editorOverlay,
-#exportOverlay,
-#templatesOverlay,
-#analyzerOverlay,
-#generateSongOverlay {
-    /* Keeping IDs for backwards compatibility if needed, but the classes above handle visibility now */
-}
-
+/* Modal Content Animations */
 .settings-content {
     background: var(--panel-color);
     padding: 2rem;
@@ -119,6 +113,35 @@ body.modal-open {
     color: var(--text-color);
     display: flex;
     flex-direction: column;
+
+    /* Default Entrance */
+    animation: modal-in var(--anim-normal) var(--anim-ease) forwards;
+}
+
+.closing .settings-content {
+    animation: modal-out var(--anim-normal) var(--anim-ease) forwards;
+}
+
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modal-out {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
 }
 
 /* Settings Grid for Desktop */
@@ -394,9 +417,23 @@ input[type="range"] {
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 1rem;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all var(--anim-normal) var(--anim-ease);
     position: relative;
     overflow: visible;
+
+    /* Entrance Animation */
+    animation: fade-in-up var(--anim-normal) var(--anim-ease) forwards;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .section-card:hover {
@@ -615,7 +652,31 @@ input[type="range"] {
     font-size: 1.1rem;
     min-height: 60px;
     resize: vertical;
+    transition:
+        border-color var(--anim-normal),
+        box-shadow var(--anim-normal);
 }
+
+.section-prog-input.mutated {
+    animation: mutated-pulse 1s var(--anim-ease);
+}
+
+@keyframes mutated-pulse {
+    0% {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 0 var(--accent-color-alpha);
+    }
+    50% {
+        border-color: var(--accent-hover);
+        box-shadow: 0 0 0 10px transparent;
+        background: rgba(var(--chords-color-rgb), 0.1);
+    }
+    100% {
+        border-color: var(--border-color);
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
 .section-prog-input:focus {
     outline: none;
     border-color: var(--accent-color);

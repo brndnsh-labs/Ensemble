@@ -47,6 +47,7 @@ export const arranger = {
     history: [],
     lastInteractedSectionId: 's1',
     lastChordPreset: 'Pop (Standard)',
+    mutatedSectionId: null,
     isDirty: false,
 };
 

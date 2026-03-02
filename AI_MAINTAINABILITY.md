@@ -48,3 +48,11 @@ The "Ensemble" codebase is exceptionally well-structured for AI agents. Followin
 5.  **Hybrid Controller Usage:** Be aware that some complex actions (audio engine start/stop) require importing controllers (e.g., `togglePlay`) rather than just dispatching state actions.
 6.  **Deterministic Engine Patterns:** When improving generative logic (drums, soloist, bass), prioritize **Deterministic Motifs** (using `barIndex` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js` for implementation.
 
+#### 7. UI Animations & Transitions (New Standard)
+*   **Animation Tokens:** Always use CSS variables from `variables.css` (`--anim-normal`, `--anim-ease`, etc.) instead of hardcoded values to ensure consistency.
+*   **Lifecycle Pattern:** Components that require exit animations (like modals and toasts) must use a lifecycle wrapper (e.g., `AnimatedModalWrapper` in `Modals.jsx`). This involves:
+    1.  Maintaining a `shouldRender` state that stays true during the animation phase.
+    2.  Applying a `.closing` class to trigger CSS exit animations.
+    3.  Using a `setTimeout` (matching the CSS duration) to unmount the component after the animation completes.
+*   **Performance:** Keep animations subtle (under 400ms) and use GPU-accelerated properties (`opacity`, `transform`) to ensure 60fps on mobile devices. Avoid animating layout properties like `height` or `margin`.
+

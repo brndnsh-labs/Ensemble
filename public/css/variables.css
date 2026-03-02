@@ -74,6 +74,13 @@
     --z-toast: 3000;
     --z-maximized: 10000;
     --z-maximized-header: 10001;
+
+    /* Animation Timing */
+    --anim-fast: 0.15s;
+    --anim-normal: 0.25s;
+    --anim-slow: 0.4s;
+    --anim-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --anim-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 [data-theme="light"] {

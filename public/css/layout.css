@@ -152,7 +152,7 @@ h1 {
     border-radius: 6px;
     font-weight: bold;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--anim-fast) var(--anim-ease);
     font-size: 1rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     min-width: 100px; /* Prevent width shifting between START/STOP */

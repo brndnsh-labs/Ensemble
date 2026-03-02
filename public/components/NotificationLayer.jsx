@@ -1,7 +1,26 @@
 import { Fragment, h } from 'preact';
-import React from 'preact/compat';
+import React, { useEffect, useState } from 'preact/compat';
 import { useEnsembleState } from '../ui-bridge.js';
 import { PWAUpdateBanner } from './PWAUpdateBanner.jsx';
+
+/**
+ * ToastItem handles the animation lifecycle for an individual toast.
+ */
+function ToastItem({ message }) {
+    const [isClosing, setIsClosing] = useState(false);
+
+    useEffect(() => {
+        // We know the toast will be unmounted by the state manager after 2s.
+        // We trigger the closing animation slightly before that.
+        const timer = setTimeout(() => {
+            setIsClosing(true);
+        }, 1700); // Start exit animation before unmount (2000ms - 300ms)
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    return <div class={`toast ${isClosing ? 'closing' : ''}`}>{message}</div>;
+}
 
 export function NotificationLayer() {
     const { toasts, flashIntensity } = useEnsembleState((s) => ({
@@ -39,15 +58,14 @@ export function NotificationLayer() {
                     transform: 'translateX(-50%)',
                     zIndex: 10000,
                     display: 'flex',
-                    flexDirection: 'column',
+                    flexDirection: 'column-reverse', // Newest at bottom
                     gap: '0.5rem',
                     pointerEvents: 'none',
+                    alignItems: 'center',
                 }}
             >
                 {toasts.map((toast) => (
-                    <div key={toast.id} class="toast show" style={{ pointerEvents: 'auto' }}>
-                        {toast.message}
-                    </div>
+                    <ToastItem key={toast.id} message={toast.message} />
                 ))}
             </div>
         </Fragment>

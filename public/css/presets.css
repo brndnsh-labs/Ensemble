@@ -11,9 +11,12 @@
     background: var(--input-bg);
     border-radius: 12px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--anim-normal) var(--anim-ease);
     border: 1px solid var(--border-color);
     color: var(--text-color);
+
+    /* Entrance */
+    animation: fade-in-up var(--anim-normal) var(--anim-ease) both;
 }
 
 .preset-chip:hover {

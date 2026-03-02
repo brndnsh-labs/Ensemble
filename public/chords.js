@@ -209,12 +209,13 @@ export function getBestInversion(
 
 /**
  * Mutates an existing progression string by subtly changing one or more chords.
+ * @returns {{ value: string, mutatedIndex: number }}
  */
 export function mutateProgression(progressionStr) {
-    const parts = progressionStr.split('|').map((p) => p.trim());
-    if (parts.length === 0) {
-        return progressionStr;
+    if (!progressionStr || !progressionStr.trim()) {
+        return { value: progressionStr, mutatedIndex: -1 };
     }
+    const parts = progressionStr.split('|').map((p) => p.trim());
 
     // Pick 1 random index to mutate
     const mutatedParts = [...parts];
@@ -249,7 +250,7 @@ export function mutateProgression(progressionStr) {
         }
     }
 
-    return mutatedParts.join(' | ');
+    return { value: mutatedParts.join(' | '), mutatedIndex: idx };
 }
 
 /**

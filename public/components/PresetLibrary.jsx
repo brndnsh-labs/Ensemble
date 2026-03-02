@@ -185,13 +185,16 @@ export function PresetLibrary({ type }) {
     return (
         <Fragment>
             <div className="presets-container">
-                {sorted.map((item) => (
+                {sorted.map((item, idx) => (
                     <button
                         key={item.id || item.name}
                         className={`preset-chip ${type}-preset-chip ${activeId === (item.id || item.name) ? 'active' : ''}`}
                         onClick={() => handleSelect(item)}
                         data-id={item.id || item.name}
                         data-category={item.category || 'Other'}
+                        style={{
+                            animationDelay: `${Math.min(idx * 0.03, 0.6)}s`,
+                        }}
                     >
                         {formatUnicodeSymbols(item.name)}
                     </button>
@@ -215,6 +218,9 @@ export function PresetLibrary({ type }) {
                                 key={`user-${idx}`}
                                 className={`preset-chip user-preset-chip ${type}-preset-chip ${activeId === item.name ? 'active' : ''}`}
                                 onClick={() => handleSelect(item, true)}
+                                style={{
+                                    animationDelay: `${Math.min(idx * 0.05, 0.6)}s`,
+                                }}
                             >
                                 {item.name}
                                 <span
