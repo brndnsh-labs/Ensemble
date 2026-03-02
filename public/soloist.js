@@ -1227,9 +1227,6 @@ export function getSoloistNote(
         if (isGuideTone) {
             weight += 30;
         }
-        if (activeStyle === 'blues' && isBlueNote) {
-            weight += 250; // Authentic emphasis on Blue Notes
-        }
         if (isRoot) {
             weight += 15;
         }
@@ -1282,6 +1279,10 @@ export function getSoloistNote(
         let distDamping = 1.0;
         if (isSmoothStyle) {
             distDamping = dist > 4 ? 1.0 / (1.0 + (dist - 4) * 0.05) : 1.0;
+        }
+
+        if (activeStyle === 'blues' && isBlueNote) {
+            weight += 250 * distDamping; // Authentic emphasis on Blue Notes, smoothed
         }
 
         // SRDC Tension & Resolution Bonuses
