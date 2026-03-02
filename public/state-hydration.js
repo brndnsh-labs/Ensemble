@@ -109,6 +109,11 @@ export function hydrateState() {
         if (savedState.timeSignature && TIME_SIGNATURES[savedState.timeSignature]) {
             validatedTS = savedState.timeSignature;
         }
+
+        const validNotations = ['roman', 'name', 'nns'];
+        const validatedNotation = validNotations.includes(savedState.notation)
+            ? savedState.notation
+            : 'roman';
         // ---------------------------
 
         Object.assign(arranger, {
@@ -116,7 +121,7 @@ export function hydrateState() {
             key: validatedKey,
             timeSignature: validatedTS,
             isMinor: savedState.isMinor || false,
-            notation: savedState.notation || 'roman',
+            notation: validatedNotation,
             lastChordPreset: savedState.lastChordPreset || 'Pop (Standard)',
         });
 
@@ -356,7 +361,7 @@ export function loadFromUrl() {
 
     if (params.get('notation')) {
         const not = params.get('notation');
-        if (['roman', 'nns', 'key', 'chord'].includes(not)) {
+        if (['roman', 'name', 'nns'].includes(not)) {
             arranger.notation = not;
         }
     }

@@ -104,15 +104,15 @@ describe('Security: URL Parameter Validation', () => {
     });
 
     it('rejects invalid notation', () => {
-        window.location.search = '?notation=hack';
+        window.location.search = '?notation=literal'; // Now invalid
         loadFromUrl();
         expect(mockState.arranger.notation).toBe('roman');
     });
 
     it('accepts valid notation', () => {
-        window.location.search = '?notation=nns';
+        window.location.search = '?notation=name';
         loadFromUrl();
-        expect(mockState.arranger.notation).toBe('nns');
+        expect(mockState.arranger.notation).toBe('name');
     });
 
     it('sanitizes prog parameter', () => {

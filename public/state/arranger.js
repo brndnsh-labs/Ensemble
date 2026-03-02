@@ -57,7 +57,7 @@ export function arrangerReducer(action, payload) {
                 Object.assign(arranger, {
                     sections: payload.sections,
                     isDirty: true,
-                    notation: 'literal',
+                    notation: 'name',
                 });
             } else {
                 arranger.isDirty = true;
