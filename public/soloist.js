@@ -1222,9 +1222,13 @@ export function getSoloistNote(
         const isGuideTone = [3, 4, 10, 11].includes(interval);
         const isRoot = interval === 0;
         const isPentatonicColor = [2, 9].includes(interval);
+        const isBlueNote = [3, 6].includes(interval);
 
         if (isGuideTone) {
             weight += 30;
+        }
+        if (activeStyle === 'blues' && isBlueNote) {
+            weight += 250; // Authentic emphasis on Blue Notes
         }
         if (isRoot) {
             weight += 15;
