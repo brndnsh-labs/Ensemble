@@ -381,7 +381,16 @@ export class ChordAnalyzerLite {
             const avgEnergy = energySum / wLen;
 
             // Pick the winner
-            const consensus = Object.entries(counts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+            // Optimization: Replace Object.entries().reduce() with a simple for-in loop to avoid
+            // intermediate array allocations and callback overhead per beat in the smoothing loop.
+            let consensus = null;
+            let maxCount = -1;
+            for (const chordKey in counts) {
+                if (counts[chordKey] > maxCount) {
+                    maxCount = counts[chordKey];
+                    consensus = chordKey;
+                }
+            }
 
             if (consensus !== lastConsensus || (i === 0 && smoothed.length === 0)) {
                 smoothed.push({
