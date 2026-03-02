@@ -997,6 +997,27 @@ export function getSoloistNote(
     if (stepInBeat === 0 || !soloist.currentCell) {
         let pool = [...config.cellPool];
 
+        // Lyrical/Syllable Seeding
+        const currentSection = arranger.sectionMap
+            ? arranger.sectionMap.find((s) => step >= s.start && step < s.end)
+            : null;
+        let syllableCount = 0;
+        if (currentSection?.syllables) {
+            const relativeStep = step - currentSection.start;
+            const measureIndex = Math.floor(relativeStep / stepsPerMeasure);
+            syllableCount = currentSection.syllables[measureIndex] || 0;
+        }
+
+        if (syllableCount > 0) {
+            const syllablePool = pool.filter((c) => {
+                const hits = c.reduce((a, b) => a + b, 0);
+                return Math.abs(hits - syllableCount) <= 1; // Allow +/- 1 for variety
+            });
+            if (syllablePool.length > 0) {
+                pool = syllablePool;
+            }
+        }
+
         // SRDC Density Filtering: Departure is busier, Conclusion is sparse
         if (soloist.srdcState === 'Departure') {
             const busyPool = pool.filter((c) => c.reduce((a, b) => a + b, 0) >= 3);

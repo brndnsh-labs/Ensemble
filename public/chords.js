@@ -1192,6 +1192,7 @@ export function updateProgressionCache() {
             start: sectionStart,
             end: sectionStart + totalSectionSteps,
             label: section.label,
+            syllables: section.syllables,
         });
         sectionAcc += totalSectionSteps;
 

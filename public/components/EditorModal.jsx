@@ -16,10 +16,12 @@ import {
     saveProgression,
     validateAndAnalyze,
 } from '../arranger-controller.js';
-import { mutateProgression } from '../chords.js';
+import { mutateProgression, transformRelativeProgression } from '../chords.js';
+import { KEY_ORDER } from '../config.js';
 import { pushHistory, undo } from '../history.js';
 import { shareProgression } from '../sharing.js';
 import { ACTIONS } from '../types.js';
+import { showToast } from '../ui.js';
 import { generateId } from '../utils.js';
 
 export function EditorModal() {
@@ -33,6 +35,73 @@ export function EditorModal() {
         }),
     );
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isImportMode, setIsImportMode] = useState(false);
+    const [tabText, setTabText] = useState('');
+
+    const handleImportTab = () => {
+        setIsMenuOpen(false);
+        setIsImportMode(true);
+    };
+
+    const handleConfirmImport = async () => {
+        if (!tabText.trim()) {
+            setIsImportMode(false);
+            return;
+        }
+
+        try {
+            const { parseTab, detectKey } = await import('../tab-parser.js');
+            const { sections: parsedSections, capo } = parseTab(tabText);
+
+            if (parsedSections.length > 0) {
+                pushHistory();
+
+                let finalSections = parsedSections;
+                let detected = detectKey(parsedSections);
+
+                // Handle Capo Transposition
+                if (capo > 0) {
+                    finalSections = parsedSections.map((s) => ({
+                        ...s,
+                        value: transformRelativeProgression(s.value, capo),
+                    }));
+
+                    if (detected && detected.confidence > 0.4) {
+                        const oldIdx = KEY_ORDER.indexOf(detected.key);
+                        const newIdx = (oldIdx + capo) % 12;
+                        detected = { ...detected, key: KEY_ORDER[newIdx] };
+                    }
+                }
+
+                // Smart Key Detection
+                if (detected && detected.confidence > 0.4) {
+                    arranger.key = detected.key;
+                    arranger.isMinor = detected.isMinor;
+                    showToast(
+                        `Imported ${finalSections.length} sections.${
+                            capo > 0 ? ` (Transposed Capo ${capo})` : ''
+                        } Key: ${detected.key} ${detected.isMinor ? 'Minor' : 'Major'}`,
+                    );
+                } else {
+                    showToast(
+                        `Imported ${finalSections.length} sections.${
+                            capo > 0 ? ` (Transposed Capo ${capo})` : ''
+                        }`,
+                    );
+                }
+
+                dispatch(ACTIONS.SET_ARRANGEMENT, finalSections);
+                setIsImportMode(false);
+                setTabText('');
+                refreshArrangerUI();
+            } else {
+                showToast('No valid chords found in tab.');
+            }
+        } catch (err) {
+            console.error('[Editor] Import Error:', err);
+            showToast('Failed to parse tab.');
+        }
+    };
     const overlayRef = useRef(null);
 
     const closeEditor = () => {
@@ -182,7 +251,7 @@ export function EditorModal() {
         >
             <div class="settings-content editor-modal" onClick={(e) => e.stopPropagation()}>
                 <div class="modal-header">
-                    <h2>Arrangement Editor</h2>
+                    <h2>{isImportMode ? 'Import Tab' : 'Arrangement Editor'}</h2>
                     <input
                         type="file"
                         id="xml-upload-editor"
@@ -197,7 +266,41 @@ export function EditorModal() {
 
                 <div class="editor-scroll-area">
                     <div id="sectionList" class="section-list">
-                        <Arranger />
+                        {isImportMode ? (
+                            <div class="import-tab-view">
+                                <p class="import-help">
+                                    Paste Ultimate Guitar tabs or text charts below. Chords and
+                                    lyrics will be parsed into song sections.
+                                </p>
+                                <textarea
+                                    id="tabPasteArea"
+                                    placeholder="[Intro]
+Em  C  G  D"
+                                    value={tabText}
+                                    onInput={(e) => setTabText(e.target.value)}
+                                    autoFocus
+                                />
+                                <div class="import-mode-actions">
+                                    <button
+                                        class="primary-btn import-confirm-btn"
+                                        onClick={handleConfirmImport}
+                                    >
+                                        🚀 Parse & Import
+                                    </button>
+                                    <button
+                                        class="secondary-btn"
+                                        onClick={() => {
+                                            setIsImportMode(false);
+                                            setTabText('');
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <Arranger />
+                        )}
                     </div>
                 </div>
 
@@ -237,6 +340,13 @@ export function EditorModal() {
                             class={`action-menu-content ${isMenuOpen ? 'open' : ''}`}
                         >
                             <div class="menu-section-header">Structure</div>
+                            <button
+                                id="importTabBtn"
+                                title="Import from Text/Tab"
+                                onClick={handleImportTab}
+                            >
+                                📥 <span>Import Tab</span>
+                            </button>
                             <button
                                 id="templatesBtn"
                                 title="Song Templates"
