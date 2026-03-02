@@ -534,4 +534,39 @@ describe('Soloist Engine Logic', () => {
             expect(f4Count / totalNotes).toBeLessThan(0.4);
         });
     });
+
+    describe('Edge Cases', () => {
+        it('should initialize a rhythmic cell even mid-beat (pickup logic)', () => {
+            const chordC = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+            // Force start in resting state
+            soloist.isResting = true;
+            soloist.currentPhraseSteps = 0;
+
+            // Force Math.random to return 0.0 so startProb check passes
+            const spy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
+
+            getSoloistNote(chordC, null, 3, 440, 60, 'scalar', 3);
+
+            expect(soloist.currentCell).not.toBeNull();
+
+            // The cell MUST have a hit on index 3 if our filtering worked
+            if (soloist.currentCell) {
+                expect(soloist.currentCell[3]).toBe(1);
+            }
+            spy.mockRestore();
+        });
+
+        it('should calculate voice leading without crashing for non-bird styles', () => {
+            const chordC = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+            const chordF = { rootMidi: 65, intervals: [0, 4, 7], beats: 4 };
+
+            // Approaching change: stepInChord = 14 (Last 2 steps of 16-step bar)
+            // style 'scalar' previously skipped voice leading logic
+
+            const res = getSoloistNote(chordC, chordF, 14, 440, 60, 'scalar', 14);
+
+            // We just ensure it runs. Result might be null if it rests, but logic path is exercised.
+            expect(res === null || typeof res === 'object').toBe(true);
+        });
+    });
 });

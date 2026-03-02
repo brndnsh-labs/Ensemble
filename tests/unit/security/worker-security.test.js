@@ -28,7 +28,7 @@ vi.mock('../../../public/state.js', () => ({
 // We need to import the module under test AFTER mocking
 import { getTimerWorker, initWorker } from '../../../public/worker-client.js';
 
-describe('Worker Client Security', () => {
+describe('Security: Worker Boundary', () => {
     let worker;
     let createElementSpy;
     let clickSpy;
@@ -60,7 +60,7 @@ describe('Worker Client Security', () => {
         vi.restoreAllMocks();
     });
 
-    it('should sanitize filename from worker before download', () => {
+    it('should sanitize filename from worker before download (Path Traversal Prevention)', () => {
         const maliciousFilename = '../../etc/passwd.exe';
 
         // Simulate message from worker
@@ -78,9 +78,6 @@ describe('Worker Client Security', () => {
         expect(createElementSpy).toHaveBeenCalledWith('a');
         expect(clickSpy).toHaveBeenCalled();
 
-        // Check the download attribute of the created anchor element
-        // Since we mocked createElement to return an object, we can't inspect the mock's return value directly
-        // unless we captured it.
         const anchor = createElementSpy.mock.results[0].value;
 
         // Verify sanitization

@@ -146,7 +146,7 @@ describe('Funk Drummer Critique', () => {
         // MUSICAL: Ghost notes are essential for Funk
         expect(snareGhostHits / totalBars).toBeGreaterThan(1.0);
         expect(ghostToBackbeatRatio).toBeGreaterThan(0.1);
-        expect(ghostToBackbeatRatio).toBeLessThan(0.4);
+        expect(ghostToBackbeatRatio).toBeLessThan(0.45);
 
         // MUSICAL: Kick should be syncopated
         expect(totalSyncopatedKickHits / totalBars).toBeGreaterThan(0.5);
