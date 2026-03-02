@@ -94,6 +94,7 @@ import { validateProgression } from '../../public/chords.js';
 import { getSoloistNote } from '../../public/soloist.js';
 import { getState } from '../../public/state.js';
 import { getScaleForChord } from '../../public/theory-scales.js';
+import { getFrequency } from '../../public/utils.js';
 
 const { arranger, playback, soloist, groove } = getState();
 
@@ -272,18 +273,20 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should generate Blue Notes in the solo line', () => {
             let blueNoteCount = 0;
-            for (let i = 0; i < 200; i++) {
+            let lastFreq = 440;
+            for (let i = 0; i < 400; i++) {
                 const result = getSoloistNote(
                     arranger.progression[0],
                     null,
                     i % 16,
-                    440,
+                    lastFreq,
                     72,
                     'blues',
                     i % 16,
                 );
                 if (result) {
                     const notes = Array.isArray(result) ? result : [result];
+                    lastFreq = getFrequency(notes[0].midi);
                     notes.forEach((note) => {
                         if (((note.midi % 12) - 5 + 12) % 12 === 3) {
                             blueNoteCount++;
