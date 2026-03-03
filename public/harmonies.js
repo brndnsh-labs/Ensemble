@@ -298,6 +298,14 @@ export function getHarmonyNotes(
 
     // -- COORDINATION: Thin out if others are busy --
     if (isSoloistBusy || accompanimentHit) {
+        // Back off entirely if soloist is actively playing notes
+        if (isSoloistBusy && (soloist.notesInPhrase > 1 || playback.bandIntensity < 0.8)) {
+            // Drop out almost entirely when soloist is active to prevent stepping on toes
+            if (Math.random() < 0.85) {
+                return [];
+            }
+        }
+
         intervals = getSafeVoicings(intervals);
         // Thin out if very busy
         if (soloist.notesInPhrase > 3 || accompanimentHit || harmony.complexity < 0.4) {
@@ -310,7 +318,7 @@ export function getHarmonyNotes(
         }
 
         // If BOTH are hitting, drop root, play ONLY guides or extensions
-        if (accompanimentHit && soloistActive && intervals.length > 2) {
+        if (accompanimentHit && isSoloistBusy && intervals.length > 2) {
             intervals = getGuideTones(intervals);
         }
     } else {

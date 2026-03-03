@@ -434,7 +434,8 @@ export function getSoloistNote(
     }
     const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
     const evoEnabled = soloist.evolutionEnabled !== false;
-    const warmupFactor = isPriming ? 1.0 : Math.min(1.0, smoothLoopCount / 2.0); // Hits 1.0 right at the start of loop 3 (index 2)
+    // Raise the floor of warmupFactor so the soloist isn't quite as sparse initially
+    const warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.4 + (smoothLoopCount / 2.0) * 0.6); // Hits 1.0 right at the start of loop 3 (index 2)
     const effectiveIntensity = Math.min(
         1.0,
         intensity +
@@ -653,12 +654,7 @@ export function getSoloistNote(
 
     // Phrase interlocking
     if (harmony.enabled && harmony.rhythmicMask > 0) {
-        const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-        const measureStep = step % (ts.beats * ts.stepsPerBeat);
-        const hasHarmonyHit = (harmony.rhythmicMask >> measureStep) & 1;
-        if (hasHarmonyHit && !soloist.isResting) {
-            restProb += 0.2 * harmony.complexity;
-        }
+        // Adjusted logic: soloist and harmony stepped on each other too much. Removing this restProb modifier.
     }
     restProb = Math.max(0.05, restProb - maturityFactor * 0.15);
     if (soloist.notesInPhrase >= effectiveMaxNotes) {

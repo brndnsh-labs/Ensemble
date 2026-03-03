@@ -132,6 +132,8 @@ describe('Harmony Engine Logic', () => {
             soloist.isResting = false;
             soloist.notesInPhrase = 5; // Busy
 
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+
             const chord = { rootMidi: 60, intervals: [0, 4, 7, 14, 18], sectionId: 's1', beats: 4 }; // 9, #11
 
             getHarmonyNotes(chord, null, 0, 60, 'smart', 0);
@@ -140,6 +142,8 @@ describe('Harmony Engine Logic', () => {
             expect(requested).not.toContain(14); // 9th
             expect(requested).not.toContain(18); // #11
             expect(requested).toContain(0);
+
+            randomSpy.mockRestore();
         });
     });
 
@@ -244,6 +248,8 @@ describe('Harmony Engine Logic', () => {
             soloist.notesInPhrase = 10;
             playback.bandIntensity = 0.5; // Moderate intensity
 
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+
             const res = getHarmonyNotes(chordC, null, 0, 60, 'smart', 0);
             expect(res.length).toBeGreaterThan(0);
             // In new logic, downbeat duration is 3 (less than 4-step pad)
@@ -256,6 +262,7 @@ describe('Harmony Engine Logic', () => {
                 // If it does play, it should be very short
                 expect(offbeatRes[0].durationSteps).toBeLessThan(2);
             }
+            randomSpy.mockRestore();
         });
     });
 
