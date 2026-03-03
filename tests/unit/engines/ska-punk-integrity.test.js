@@ -133,8 +133,14 @@ describe('Ska-Punk Genre Integrity', () => {
         soloist.sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
 
         // 2. Harmony should now latch to this step even if it's not a standard stab step
+        // Bypass the 85% dropout by mocking Math.random
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
         const notes = getHarmonyNotes(chord, null, 0, 0, 'horns', 0, { midi: 72 });
+
         expect(notes.length).toBeGreaterThan(0);
         expect(notes[0].isLatched).toBe(true);
+
+        randomSpy.mockRestore();
     });
 });
