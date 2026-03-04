@@ -36,6 +36,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.6,
         timingJitter: 8,
         maxNotesPerPhrase: 16,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.1,
         targetExtensions: [2, 9],
@@ -52,6 +53,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.3,
         timingJitter: 4,
         maxNotesPerPhrase: 32,
+        minNotesPerPhrase: 8,
         doubleStopProb: 0.05,
         anticipationProb: 0.05,
         targetExtensions: [2],
@@ -68,6 +70,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.8,
         timingJitter: 25,
         maxNotesPerPhrase: 5,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
         targetExtensions: [9, 10],
@@ -84,6 +87,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.7,
         timingJitter: 25,
         maxNotesPerPhrase: 12,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.15,
         anticipationProb: 0.45,
         targetExtensions: [2, 6, 9, 11],
@@ -100,6 +104,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.4,
         timingJitter: 5,
         maxNotesPerPhrase: 16,
+        minNotesPerPhrase: 3,
         doubleStopProb: 0.15,
         anticipationProb: 0.2,
         targetExtensions: [9, 13],
@@ -116,6 +121,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.6,
         timingJitter: 20,
         maxNotesPerPhrase: 8,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.3,
         targetExtensions: [2, 9, 11],
@@ -132,6 +138,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.95,
         timingJitter: 35,
         maxNotesPerPhrase: 3,
+        minNotesPerPhrase: 1,
         doubleStopProb: 0.0,
         anticipationProb: 0.25,
         targetExtensions: [2, 9, 11],
@@ -148,6 +155,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.9,
         timingJitter: 12,
         maxNotesPerPhrase: 48,
+        minNotesPerPhrase: 4,
         doubleStopProb: 0.15,
         anticipationProb: 0.8, // Play over the changes heavily
         targetExtensions: [2, 5, 6, 9],
@@ -164,6 +172,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.5,
         timingJitter: 8,
         maxNotesPerPhrase: 12,
+        minNotesPerPhrase: 3,
         doubleStopProb: 0.05,
         anticipationProb: 0.2,
         targetExtensions: [2, 9],
@@ -180,6 +189,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.7,
         timingJitter: 15,
         maxNotesPerPhrase: 12,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.08,
         anticipationProb: 0.35,
         targetExtensions: [2, 6, 9],
@@ -196,6 +206,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.5,
         timingJitter: 4,
         maxNotesPerPhrase: 16,
+        minNotesPerPhrase: 3,
         doubleStopProb: 0.5,
         anticipationProb: 0.2,
         targetExtensions: [2, 4, 9],
@@ -219,6 +230,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.4,
         timingJitter: 2,
         maxNotesPerPhrase: 32,
+        minNotesPerPhrase: 6,
         doubleStopProb: 0.05,
         anticipationProb: 0.05,
         targetExtensions: [2, 7],
@@ -235,6 +247,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.6,
         timingJitter: 20,
         maxNotesPerPhrase: 10,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.2,
         anticipationProb: 0.1,
         targetExtensions: [2, 6, 9],
@@ -251,6 +264,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.4,
         timingJitter: 15,
         maxNotesPerPhrase: 8,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.15,
         targetExtensions: [2, 9],
@@ -267,6 +281,7 @@ const STYLE_CONFIG = {
         tensionScale: 0.5,
         timingJitter: 5,
         maxNotesPerPhrase: 8,
+        minNotesPerPhrase: 2,
         doubleStopProb: 0.2,
         anticipationProb: 0.1,
         targetExtensions: [2, 9],
@@ -688,8 +703,9 @@ export function getSoloistNote(
 
     restProb = activeStyle === 'bird' ? 0.05 : Math.max(0.05, restProb - maturityFactor * 0.15);
 
-    // SAFETY: Ensure Bird style doesn't rest immediately after starting (minimum 4 notes per phrase if possible)
-    if (activeStyle === 'bird' && soloist.notesInPhrase < 4) {
+    // SAFETY: Ensure minimum notes per phrase are played before resting
+    const minNotes = config.minNotesPerPhrase || 2;
+    if (soloist.notesInPhrase < minNotes) {
         restProb = 0;
     }
 
@@ -1259,15 +1275,15 @@ export function getSoloistNote(
 
         const isScaleTone = (scaleMask >> interval) & 1;
         if (!isScaleTone) {
-            // Bird style: Allow chromatic passing tones/neighbors even if not in scale
-            if (activeStyle === 'bird' && dist === 1) {
-                weight = 80;
+            // Allow chromatic passing tones/neighbors for specific styles
+            const allowsChromatic = ['bird', 'blues', 'neo', 'bossa'].includes(activeStyle);
+            if (allowsChromatic && dist === 1) {
+                weight = activeStyle === 'bird' ? 80 : 40; // Moderated for non-jazz styles
             } else {
                 CANDIDATE_WEIGHTS[m] = 0;
                 continue;
             }
         }
-
         // Bonuses
         if (
             isResolvingSkip &&
