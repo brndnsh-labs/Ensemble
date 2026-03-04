@@ -9,3 +9,7 @@
 ## 2024-05-24 - [Audio Signal Iteration Performance]
 **Learning:** In highly iterated, performance-critical audio signal loops (like parsing dense `Float32Array` buffers), `Array.prototype.reduce` incurs significant per-element callback overhead, especially in V8.
 **Action:** Replace `reduce` with standard `for` loops in hot paths to massively reduce execution time (observed ~10-15x speedup for simple aggregations like RMS energy).
+
+## 2025-05-25 - [Array Reduce in Filter Closures]
+**Learning:** In hot loops, filtering arrays containing arrays (like rhythmic cells) using `.reduce()` inside the `.filter()` callback introduces significant overhead due to intermediate allocations and callback execution per element in V8. While pre-calculating and attaching a `.hits` property to constant array objects seemed theoretically faster, it degraded performance compared to the original `.reduce()`. Replacing `.reduce()` with a simple inline `for` loop within the `.filter()` closure provided the best performance (~6% faster execution).
+**Action:** Replace `.reduce()` calls inside frequently executed array methods (like `.filter()`) with inline `for` loops in performance-critical paths. Be wary of attaching new properties to constant arrays in V8, as it might de-optimize them.

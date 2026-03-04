@@ -1076,7 +1076,10 @@ export function getSoloistNote(
 
         if (syllableCount > 0) {
             const syllablePool = pool.filter((c) => {
-                const hits = c.reduce((a, b) => a + b, 0);
+                let hits = 0;
+                for (let j = 0; j < c.length; j++) {
+                    hits += c[j];
+                }
                 return Math.abs(hits - syllableCount) <= 1; // Allow +/- 1 for variety
             });
             if (syllablePool.length > 0) {
@@ -1086,12 +1089,24 @@ export function getSoloistNote(
 
         // SRDC Density Filtering: Departure is busier, Conclusion is sparse
         if (soloist.srdcState === 'Departure') {
-            const busyPool = pool.filter((c) => c.reduce((a, b) => a + b, 0) >= 3);
+            const busyPool = pool.filter((c) => {
+                let h = 0;
+                for (let j = 0; j < c.length; j++) {
+                    h += c[j];
+                }
+                return h >= 3;
+            });
             if (busyPool.length > 0) {
                 pool = busyPool;
             }
         } else if (soloist.srdcState === 'Conclusion') {
-            const sparsePool = pool.filter((c) => c.reduce((a, b) => a + b, 0) <= 2);
+            const sparsePool = pool.filter((c) => {
+                let h = 0;
+                for (let j = 0; j < c.length; j++) {
+                    h += c[j];
+                }
+                return h <= 2;
+            });
             if (sparsePool.length > 0) {
                 pool = sparsePool;
             }
