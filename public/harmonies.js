@@ -300,8 +300,9 @@ export function getHarmonyNotes(
     if (isSoloistBusy || accompanimentHit) {
         // Back off entirely if soloist is actively playing notes
         if (isSoloistBusy && (soloist.notesInPhrase > 1 || playback.bandIntensity < 0.8)) {
-            // Drop out almost entirely when soloist is active to prevent stepping on toes
-            if (Math.random() < 0.85) {
+            // Drop out occasionally when soloist is active to prevent stepping on toes,
+            // but not so much that it feels like the harmony is 'scared' of the soloist.
+            if (Math.random() < 0.6) {
                 return [];
             }
         }

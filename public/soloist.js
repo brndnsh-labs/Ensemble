@@ -687,6 +687,12 @@ export function getSoloistNote(
     }
 
     restProb = activeStyle === 'bird' ? 0.05 : Math.max(0.05, restProb - maturityFactor * 0.15);
+
+    // SAFETY: Ensure Bird style doesn't rest immediately after starting (minimum 4 notes per phrase if possible)
+    if (activeStyle === 'bird' && soloist.notesInPhrase < 4) {
+        restProb = 0;
+    }
+
     if (soloist.notesInPhrase >= effectiveMaxNotes) {
         restProb += activeStyle === 'bird' ? 0.1 : 0.4;
     }
@@ -738,6 +744,12 @@ export function getSoloistNote(
         } else if (isPickupZone) {
             startProb =
                 (0.4 + effectiveIntensity * 0.4) * (0.3 + (evoEnabled ? warmupFactor : 1.0) * 0.7); // Good chance to play a pickup
+        }
+
+        // SAFETY: If we have been resting for more than 4 measures, force re-entry
+        const restBars = soloist.currentPhraseSteps / stepsPerMeasure;
+        if (restBars > 4.0) {
+            startProb = Math.max(startProb, 0.5 + (restBars - 4.0) * 0.2);
         }
 
         // (Removed early loop extra sparsity constraint)
