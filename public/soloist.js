@@ -1235,13 +1235,18 @@ export function getSoloistNote(
         const interval = (pc - (rootMidi % 12) + 12) % 12;
         let weight = 1.0;
 
-        // Use pre-calculated interval (0-11) to check against scaleIntervals (also 0-11)
-        if (!((scaleMask >> interval) & 1)) {
-            CANDIDATE_WEIGHTS[m] = 0;
-            continue;
-        }
-
         const dist = Math.abs(m - lastMidi);
+
+        const isScaleTone = (scaleMask >> interval) & 1;
+        if (!isScaleTone) {
+            // Bird style: Allow chromatic passing tones/neighbors even if not in scale
+            if (activeStyle === 'bird' && dist === 1) {
+                weight = 80;
+            } else {
+                CANDIDATE_WEIGHTS[m] = 0;
+                continue;
+            }
+        }
 
         // Bonuses
         if (
@@ -1268,8 +1273,20 @@ export function getSoloistNote(
 
         // Stepwise Motion Bonus (Melodic Integrity)
         const isSmoothStyle = ['blues', 'jazz', 'bird', 'acoustic', 'reggae'].includes(activeStyle);
-        if (dist > 0 && dist <= 2 && activeStyle !== 'country') {
-            weight += isSmoothStyle ? 100 : 50;
+        if (dist > 0 && dist <= 4 && activeStyle !== 'country') {
+            if (activeStyle === 'bird') {
+                if (dist === 1) {
+                    weight += 400; // Extra chromatic preference for Bird style
+                } else if (dist === 2) {
+                    weight += 10; // Very small bonus for whole-steps
+                } else if (dist === 3) {
+                    weight += 80; // Bonus for minor thirds (common in bebop skips)
+                }
+            } else {
+                if (dist <= 2) {
+                    weight += isSmoothStyle ? 100 : 50;
+                }
+            }
         }
         if (activeStyle === 'bird' || activeStyle === 'bossa') {
             weight += 100;
@@ -1364,7 +1381,11 @@ export function getSoloistNote(
 
         // Penalties (Multiplicative)
         if (dist === 0) {
-            weight *= 0.0001; // Force a move
+            if (activeStyle === 'bird') {
+                weight *= 0.65; // Allow repeated notes more for Parker rhythmic style
+            } else {
+                weight *= 0.0001; // Force a move
+            }
             if (isStagnant && activeStyle !== 'bird') {
                 weight = 0;
             }
@@ -1982,7 +2003,7 @@ export function getSoloistNote(
     }
 
     if (activeStyle === 'bird') {
-        durationSteps = 1;
+        durationSteps = Math.random() < 0.9 - (effectiveIntensity - 0.5) * 0.3 ? 2 : 1;
     } else if (intensity < 0.4 && activeStyle !== 'bird') {
         durationSteps = Math.random() < 0.6 ? 4 : 8;
     } else if (
@@ -2043,7 +2064,7 @@ export function getSoloistNote(
 
     // --- Unified Embellishment: Rhythmic Diminution ---
     // Splitting longer notes into runs based on intensity and loop progress
-    const embellishmentProb = evoEnabled
+    let embellishmentProb = evoEnabled
         ? Math.max(
               0,
               (effectiveIntensity - 0.5) * 1.5 +
@@ -2051,6 +2072,11 @@ export function getSoloistNote(
                   smoothLoopCount * 0.05,
           )
         : 0;
+
+    // Bird style is already dense via cells, reduce auto-embellishment to keep 8th note flow
+    if (activeStyle === 'bird') {
+        embellishmentProb *= 0.3;
+    }
 
     if (durationSteps > 1 && Math.random() < embellishmentProb * 0.8) {
         result.durationSteps = 1;

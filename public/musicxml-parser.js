@@ -40,7 +40,9 @@ export function parseMusicXML(xmlString) {
         xmlKey = keys[fifths] || 'C';
     }
 
-    const measures = doc.querySelectorAll('measure');
+    const parts = doc.querySelectorAll('part');
+    const firstPart = parts.length > 0 ? parts[0] : doc;
+    const measures = firstPart.querySelectorAll('measure');
     const sections = [];
     const leadSheetMelody = [];
     let _currentTimeSignature = '4/4';
