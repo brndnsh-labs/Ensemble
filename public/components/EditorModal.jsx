@@ -361,6 +361,7 @@ Em  C  G  D"
                             <button
                                 id="importTabBtn"
                                 title="Import from Text/Tab"
+                                aria-label="Import Tab (from Text)"
                                 onClick={handleImportTab}
                             >
                                 📥 <span>Import Tab</span>
@@ -368,6 +369,7 @@ Em  C  G  D"
                             <button
                                 id="templatesBtn"
                                 title="Song Templates"
+                                aria-label="Templates (Song Templates)"
                                 onClick={handleTemplates}
                             >
                                 📋 <span>Templates</span>
@@ -375,7 +377,7 @@ Em  C  G  D"
                             <button
                                 id="randomizeBtn"
                                 title="Randomize Progression"
-                                aria-label="Randomize Progression"
+                                aria-label="Randomize (Progression)"
                                 onClick={handleRandomize}
                             >
                                 🎲 <span>Randomize</span>
@@ -383,7 +385,7 @@ Em  C  G  D"
                             <button
                                 id="clearProgBtn"
                                 title="Clear Progression"
-                                aria-label="Clear Progression"
+                                aria-label="Clear All (Progression)"
                                 onClick={handleClear}
                             >
                                 🗑️ <span>Clear All</span>
@@ -394,6 +396,7 @@ Em  C  G  D"
                             <button
                                 id="importLeadSeedBtn"
                                 title="Import Lead Seed (MusicXML)"
+                                aria-label="Import XML (Lead Seed from MusicXML)"
                                 onClick={() => {
                                     setIsMenuOpen(false);
                                     document.getElementById('xml-upload-editor').click();
@@ -404,6 +407,7 @@ Em  C  G  D"
                             <button
                                 id="analyzeAudioBtn"
                                 title="Analyze Audio / Harmonize Melody"
+                                aria-label="Analyze (Audio / Harmonize Melody)"
                                 onClick={handleAnalyze}
                             >
                                 👂 <span>Analyze</span>
@@ -411,7 +415,7 @@ Em  C  G  D"
                             <button
                                 id="mutateBtn"
                                 title="Mutate Progression"
-                                aria-label="Mutate Progression"
+                                aria-label="Mutate (Progression)"
                                 onClick={handleMutate}
                             >
                                 ✨ <span>Mutate</span>
@@ -420,6 +424,7 @@ Em  C  G  D"
                                 <button
                                     id="reharmonizeMelodyBtn"
                                     title="Re-harmonize Lead Seed"
+                                    aria-label="Re-harmonize (Lead Seed)"
                                     onClick={handleReharmonize}
                                 >
                                     🎹 <span>Re-harmonize</span>
@@ -429,6 +434,7 @@ Em  C  G  D"
                                 <button
                                     id="clearLeadSeedBtn"
                                     title="Clear Lead Seed"
+                                    aria-label="Clear Lead Seed"
                                     onClick={handleClearLeadSeed}
                                 >
                                     🚫 <span>Clear Lead Seed</span>
@@ -440,7 +446,7 @@ Em  C  G  D"
                             <button
                                 id="undoBtn"
                                 title="Undo Last Change"
-                                aria-label="Undo Last Change"
+                                aria-label="Undo (Last Change)"
                                 onClick={handleUndo}
                             >
                                 ↩️ <span>Undo</span>
@@ -448,7 +454,7 @@ Em  C  G  D"
                             <button
                                 id="saveBtn"
                                 title="Save to Library"
-                                aria-label="Save Progression"
+                                aria-label="Save (to Library)"
                                 onClick={handleSave}
                             >
                                 💾 <span>Save</span>
@@ -456,7 +462,7 @@ Em  C  G  D"
                             <button
                                 id="shareBtn"
                                 title="Share Progression"
-                                aria-label="Share Progression"
+                                aria-label="Share (Progression)"
                                 onClick={handleShare}
                             >
                                 🔗 <span>Share</span>
