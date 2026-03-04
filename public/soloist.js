@@ -141,18 +141,18 @@ const STYLE_CONFIG = {
         hookProb: 0.5,
     },
     bird: {
-        restBase: 0.25,
-        restGrowth: 0.08,
-        cells: [1, 7, 8, 14, 2, 6],
-        registerSoar: 5,
-        tensionScale: 0.7,
+        restBase: 0.05, // Highly dense to match transcription
+        restGrowth: 0.01,
+        cells: [1, 7, 8, 0, 5, 6, 15], // 16ths, Syncopated 8ths, bebop cells, ties
+        registerSoar: 8,
+        tensionScale: 0.9,
         timingJitter: 12,
-        maxNotesPerPhrase: 16,
-        doubleStopProb: 0.05,
-        anticipationProb: 0.6,
+        maxNotesPerPhrase: 48,
+        doubleStopProb: 0.15,
+        anticipationProb: 0.8, // Play over the changes heavily
         targetExtensions: [2, 5, 6, 9],
         deviceProb: 0.4,
-        allowedDevices: ['enclosure', 'run', 'birdFlurry'],
+        allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble'],
         motifProb: 0.2,
         hookProb: 0.1,
     },
@@ -346,21 +346,87 @@ export function getSoloistNote(
         return null;
     }
 
-    // --- Coordination Logic ---
-    const bassHit = coordination.bassHit || false;
-
-    let targetChord = currentChord;
     let activeStyle = style;
     if (activeStyle === 'smart') {
         activeStyle = GENRE_STYLE_MAPPING[groove.genreFeel] || 'scalar';
     }
+
+    const intensity = playback.bandIntensity || 0.5;
+
+    /**
+     * Internal helper to finalize a note, updating history and session tracking.
+     */
+    const finalizeNote = (res) => {
+        if (!res) {
+            return null;
+        }
+        const primary = Array.isArray(res) ? res[0] : res;
+
+        // --- Holistic Pocket Implementation ---
+        const timingOffset = calculateTimingOffset(
+            'soloist',
+            groove.pocket,
+            playback.bandIntensity || 0.5,
+        );
+        primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
+
+        // Update Global Pitch History
+        if (soloist.pitchHistory) {
+            soloist.pitchHistory.push(primary.midi);
+            if (soloist.pitchHistory.length > 128) {
+                soloist.pitchHistory.shift();
+            }
+        }
+
+        // Update session tracking for continuity
+        if (!primary.isDoubleStop) {
+            soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
+        }
+        soloist.notesInPhrase++; // @worker-mutation
+
+        // --- Blues Micro-Bend Inflections ---
+        if (activeStyle === 'blues' && !soloist.isReplayingMotif) {
+            const pc = primary.midi % 12;
+            const rootPC = currentChord.rootMidi % 12;
+            const relativeInterval = (pc - rootPC + 12) % 12;
+
+            // Blue Notes: b3 (3) and b5 (6)
+            if (
+                (relativeInterval === 3 || relativeInterval === 6) &&
+                primary.bendStartInterval === 0
+            ) {
+                // Procedural "curl" or "scoop"
+                // Quarter-tone approximation using small bendStartInterval (-0.5 or +0.5)
+                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
+            }
+        }
+
+        // -- Shared Hook Logic --
+        // If in Ska-Punk mode and replaying a motif, sync to shared buffer for band reinforcement
+        if (groove.genreFeel === 'Ska-Punk' && soloist.isReplayingMotif) {
+            if (!soloist.sharedHookBuffer) {
+                soloist.sharedHookBuffer = []; // @worker-mutation
+            }
+            // Use a sliding window of the last few notes for reinforcement
+            soloist.sharedHookBuffer.push({ step, res });
+            if (soloist.sharedHookBuffer.length > 16) {
+                soloist.sharedHookBuffer.shift();
+            }
+        }
+
+        return res;
+    };
+
+    // --- Coordination Logic ---
+    const bassHit = coordination.bassHit || false;
+
+    let targetChord = currentChord;
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
     const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
     const measureStep = step % stepsPerMeasure;
     const stepInBeat = measureStep % stepsPerBeat;
-    const intensity = playback.bandIntensity || 0.5;
 
     // --- Dynamic Register Control & Soar Lift ---
     // registerSoar adds extra melodic "lift" at high intensity to prevent sticking.
@@ -435,84 +501,39 @@ export function getSoloistNote(
     const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
     const evoEnabled = soloist.evolutionEnabled !== false;
     // Raise the floor of warmupFactor so the soloist isn't quite as sparse initially
-    const warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.4 + (smoothLoopCount / 2.0) * 0.6); // Hits 1.0 right at the start of loop 3 (index 2)
-    const effectiveIntensity = Math.min(
-        1.0,
-        intensity +
-            maturityFactor * 0.05 +
-            smoothLoopCount * 0.01 +
-            (playback.intent.soloistMod || 0),
-    );
-    const lyricalBias = playback.lyricalBias !== undefined ? playback.lyricalBias : 0.5;
-    const complexity = soloist.complexity !== undefined ? soloist.complexity : playback.complexity;
+    let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.4 + (smoothLoopCount / 2.0) * 0.6); // Hits 1.0 right at the start of loop 3 (index 2)
+    if (activeStyle === 'bird') {
+        warmupFactor = 1.0;
+    }
+    if (activeStyle === 'bird') {
+        warmupFactor = 1.0;
+    }
+    const effectiveIntensity =
+        activeStyle === 'bird'
+            ? 1.0
+            : Math.min(
+                  1.0,
+                  intensity +
+                      maturityFactor * 0.05 +
+                      smoothLoopCount * 0.01 +
+                      (playback.intent.soloistMod || 0),
+              );
+    const lyricalBias =
+        activeStyle === 'bird'
+            ? 0.0
+            : playback.lyricalBias !== undefined
+              ? playback.lyricalBias
+              : 0.5;
+    const complexity =
+        activeStyle === 'bird'
+            ? 1.0
+            : soloist.complexity !== undefined
+              ? soloist.complexity
+              : playback.complexity;
 
     if (!soloist.isResting) {
         soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
     }
-
-    /**
-     * Internal helper to finalize a note, updating history and session tracking.
-     */
-    const finalizeNote = (res) => {
-        if (!res) {
-            return null;
-        }
-        const primary = Array.isArray(res) ? res[0] : res;
-
-        // --- Holistic Pocket Implementation ---
-        const timingOffset = calculateTimingOffset(
-            'soloist',
-            groove.pocket,
-            playback.bandIntensity || 0.5,
-        );
-        primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
-
-        // Update Global Pitch History
-        if (soloist.pitchHistory) {
-            soloist.pitchHistory.push(primary.midi);
-            if (soloist.pitchHistory.length > 128) {
-                soloist.pitchHistory.shift();
-            }
-        }
-
-        // Update session tracking for continuity
-        if (!primary.isDoubleStop) {
-            soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
-        }
-        soloist.notesInPhrase++; // @worker-mutation
-
-        // --- Blues Micro-Bend Inflections ---
-        if (activeStyle === 'blues' && !soloist.isReplayingMotif) {
-            const pc = primary.midi % 12;
-            const rootPC = targetChord.rootMidi % 12;
-            const relativeInterval = (pc - rootPC + 12) % 12;
-
-            // Blue Notes: b3 (3) and b5 (6)
-            if (
-                (relativeInterval === 3 || relativeInterval === 6) &&
-                primary.bendStartInterval === 0
-            ) {
-                // Procedural "curl" or "scoop"
-                // Quarter-tone approximation using small bendStartInterval (-0.5 or +0.5)
-                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
-            }
-        }
-
-        // -- Shared Hook Logic --
-        // If in Ska-Punk mode and replaying a motif, sync to shared buffer for band reinforcement
-        if (groove.genreFeel === 'Ska-Punk' && soloist.isReplayingMotif) {
-            if (!soloist.sharedHookBuffer) {
-                soloist.sharedHookBuffer = []; // @worker-mutation
-            }
-            // Use a sliding window of the last few notes for reinforcement
-            soloist.sharedHookBuffer.push({ step, res });
-            if (soloist.sharedHookBuffer.length > 16) {
-                soloist.sharedHookBuffer.shift();
-            }
-        }
-
-        return res;
-    };
 
     // --- 0. Lead Sheet Melody ---
     if (activeStyle === 'lead_sheet') {
@@ -656,9 +677,10 @@ export function getSoloistNote(
     if (harmony.enabled && harmony.rhythmicMask > 0) {
         // Adjusted logic: soloist and harmony stepped on each other too much. Removing this restProb modifier.
     }
-    restProb = Math.max(0.05, restProb - maturityFactor * 0.15);
+
+    restProb = activeStyle === 'bird' ? 0.05 : Math.max(0.05, restProb - maturityFactor * 0.15);
     if (soloist.notesInPhrase >= effectiveMaxNotes) {
-        restProb += 0.4;
+        restProb += activeStyle === 'bird' ? 0.1 : 0.4;
     }
 
     // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
@@ -700,7 +722,9 @@ export function getSoloistNote(
         let startProb =
             (0.05 + effectiveIntensity * 0.1) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
 
-        if (isDownbeat) {
+        if (activeStyle === 'bird') {
+            startProb = 1.0;
+        } else if (isDownbeat) {
             startProb =
                 (0.6 + effectiveIntensity * 0.3) * (0.4 + (evoEnabled ? warmupFactor : 1.0) * 0.6); // High chance to start on '1'
         } else if (isPickupZone) {
@@ -799,7 +823,12 @@ export function getSoloistNote(
             return null;
         }
     }
-    if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < restProb) {
+    let breakProb = restProb;
+    if (activeStyle === 'bird') {
+        breakProb = soloist.notesInPhrase >= effectiveMaxNotes ? 0.4 : 0.05;
+    }
+
+    if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < breakProb) {
         // --- Seed Capture ---
         // If we don't have a thematic seed yet, and we just finished a decent phrase
         // in the first 16 measures, capture it as the solo's "DNA".
@@ -990,7 +1019,12 @@ export function getSoloistNote(
     }
 
     // --- 5. Rhythmic Density ---
-    if (stepInBeat === 0 || !soloist.currentCell) {
+
+    if (
+        stepInBeat === 0 ||
+        !soloist.currentCell ||
+        (activeStyle === 'bird' && stepInBeat % 2 === 0)
+    ) {
         let pool = [...config.cellPool];
 
         // Lyrical/Syllable Seeding
@@ -1028,7 +1062,7 @@ export function getSoloistNote(
         }
 
         // Lyrical Bias: Remove busy 16th-based patterns if lyrical
-        if (lyricalBias > 0.6) {
+        if (lyricalBias > 0.6 && activeStyle !== 'bird') {
             pool = pool.filter((c) => {
                 const idx = RHYTHMIC_CELLS.indexOf(c);
                 // Indices for 16ths and gallops
@@ -1069,11 +1103,9 @@ export function getSoloistNote(
 
         // High BPM Filtering: Reduce busy 16th patterns
         if ((activeStyle === 'bird' || activeStyle === 'ska') && playback.bpm > 160) {
-            // Remove 0 (16ths), 3 (Gallop), 7 (Bebop), 10 (16th Off), 14, 15, 16
-            // Keep 1 (8ths), 2 (Quarters), 6 (Sync 8ths), 8 (Offbeat 8ths)
-            pool = pool.filter(
-                (c) => ![0, 3, 7, 10, 14, 15, 16].includes(RHYTHMIC_CELLS.indexOf(c)),
-            );
+            // Remove 0 (16ths), 3 (Gallop), 10 (16th Off), 14, 15, 16
+            // Keep 1 (8ths), 2 (Quarters), 6 (Sync 8ths), 8 (Offbeat 8ths), 7 (Bebop)
+            pool = pool.filter((c) => ![0, 3, 10, 14, 15, 16].includes(RHYTHMIC_CELLS.indexOf(c)));
 
             // Ensure we have something left
             if (pool.length === 0) {
@@ -1081,7 +1113,7 @@ export function getSoloistNote(
             }
 
             // Add quarters for breathing room if really fast
-            if (playback.bpm > 180) {
+            if (playback.bpm > 200 && activeStyle !== 'bird') {
                 pool.push(RHYTHMIC_CELLS[2]);
             }
         }
@@ -1102,7 +1134,11 @@ export function getSoloistNote(
         // --- Embellishment: Approach Note Filling ---
         // Fill rests during a phrase with melodic motion at high intensity
         const fillerProb = evoEnabled ? Math.max(0, (effectiveIntensity - 0.75) * 2.0) : 0;
-        if (!soloist.isResting && Math.random() < fillerProb) {
+
+        if (
+            !soloist.isResting &&
+            (Math.random() < fillerProb || (activeStyle === 'bird' && Math.random() < 0.8))
+        ) {
             const scaleIntervals = getScaleForChord(targetChord, null, style);
             const neighborDir = Math.random() > 0.5 ? 1 : -1;
             let neighborMidi = lastMidi;
@@ -1116,7 +1152,7 @@ export function getSoloistNote(
             const fillerNote = {
                 midi: neighborMidi,
                 durationSteps: 1,
-                velocity: 0.7,
+                velocity: 0.7 * (0.5 + effectiveIntensity * 0.5),
                 style: activeStyle,
                 isLegato: true,
             };
@@ -1329,7 +1365,7 @@ export function getSoloistNote(
         // Penalties (Multiplicative)
         if (dist === 0) {
             weight *= 0.0001; // Force a move
-            if (isStagnant) {
+            if (isStagnant && activeStyle !== 'bird') {
                 weight = 0;
             }
         }
@@ -1945,7 +1981,9 @@ export function getSoloistNote(
         }
     }
 
-    if (intensity < 0.4 && activeStyle !== 'bird') {
+    if (activeStyle === 'bird') {
+        durationSteps = 1;
+    } else if (intensity < 0.4 && activeStyle !== 'bird') {
         durationSteps = Math.random() < 0.6 ? 4 : 8;
     } else if (
         isImportantStep &&

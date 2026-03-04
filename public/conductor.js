@@ -77,7 +77,7 @@ export function applyConductor() {
     // Soloist Fatigue Regulation
     // If the soloist has played many notes recently, boost lyricalBias to force rests
     const recentDensity = (soloist.notesInPhrase || 0) / 16; // 16 is a high-water mark for a phrase
-    if (recentDensity > 0.6) {
+    if (recentDensity > 0.6 && soloist.style !== 'bird') {
         lyricalBias = Math.max(lyricalBias, recentDensity * 0.8);
     }
 

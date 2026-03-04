@@ -53,7 +53,8 @@ describe('Soloist Jazz Critique', () => {
                 bpm: 140,
                 complexity: 0.7,
                 intent: {},
-                lyricalBias: 0.3,
+                lyricalBias: 0.1,
+                currentLoopCount: 4,
             },
             groove: { genreFeel: 'Jazz', pocket: 0 },
             soloist: soloistState,
@@ -81,7 +82,7 @@ describe('Soloist Jazz Critique', () => {
                     bar * 16 + step,
                     lastFreq,
                     64,
-                    'jazz',
+                    'bird',
                     step,
                     false,
                 );
@@ -136,11 +137,13 @@ describe('Soloist Jazz Critique', () => {
         console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <9.0)`);
         console.log(`[Chromatism Ratio]      ${(chromaticRatio * 100).toFixed(1)}% (Target: >5%)`);
         console.log(
-            `[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: 3.0-8.0)`,
+            `[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: 8.0-16.0)`,
         );
         console.log('------------------------------------\n');
 
         expect(avgInterval).toBeLessThan(9.0);
-        expect(notesPerBar).toBeGreaterThan(2.0);
+        // Kenny Dorham transcription shows ~13 notes per bar. Let's aim for 8-16.
+        expect(notesPerBar).toBeGreaterThan(8.0);
+        expect(notesPerBar).toBeLessThanOrEqual(16.0);
     });
 });
