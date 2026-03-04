@@ -599,9 +599,15 @@ export function getSoloistNote(
     // If we are yielding (pending stop), and we are currently resting,
     // it means we finished our last phrase. Stop completely.
     if (soloist.isYielding && soloist.isResting) {
-        // We can't set enabled=false here easily as it's a global state,
-        // but we can stop generating notes. The main thread will sync later.
-        return null;
+        // SAFETY: If we have been yielding for more than 4 measures, and we are in a long section,
+        // force a re-entry attempt to prevent permanent silence bugs.
+        const yieldProgress = soloist.currentPhraseSteps / stepsPerMeasure;
+        if (yieldProgress > 4.0 && Math.random() < 0.1) {
+            soloist.isYielding = false; // @worker-mutation
+            soloist.isResting = true; // Still resting, but allowed to start now
+        } else {
+            return null;
+        }
     }
 
     // --- 2. Phrasing & History Analysis ---
@@ -641,10 +647,12 @@ export function getSoloistNote(
         config.restBase * (3.0 - effectiveIntensity * 2.0) + phraseBars * config.restGrowth;
 
     // Apply lyrical bias: Higher bias = more rests, shorter phrases
-    restProb += lyricalBias * 0.2;
+    // BIRD EXCEPTION: Bird style is inherently 'busy', don't let lyricalBias silence it completely
+    const effectiveLyricalBias = activeStyle === 'bird' ? lyricalBias * 0.25 : lyricalBias;
+    restProb += effectiveLyricalBias * 0.2;
     const effectiveMaxNotes = Math.max(
         2,
-        Math.round(config.maxNotesPerPhrase * (1.5 - lyricalBias)),
+        Math.round(config.maxNotesPerPhrase * (1.5 - effectiveLyricalBias)),
     );
 
     // Low intensity damping (Continuous)
@@ -2003,7 +2011,9 @@ export function getSoloistNote(
     }
 
     if (activeStyle === 'bird') {
-        durationSteps = Math.random() < 0.9 - (effectiveIntensity - 0.5) * 0.3 ? 2 : 1;
+        // Tune bird to start more melodic (8th notes) at low intensity or during warmup
+        const birdEighthProb = 0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2;
+        durationSteps = Math.random() < birdEighthProb ? 2 : 1;
     } else if (intensity < 0.4 && activeStyle !== 'bird') {
         durationSteps = Math.random() < 0.6 ? 4 : 8;
     } else if (
