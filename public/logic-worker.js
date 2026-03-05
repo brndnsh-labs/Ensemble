@@ -1359,12 +1359,18 @@ function processMessage(type, data, startTime) {
                 safeSync(harmony, data.harmony, 'harmony');
                 safeSync(groove, data.groove, 'groove');
                 if (data.groove?.instruments) {
-                    data.groove.instruments.forEach((di) => {
-                        const inst = groove.instruments.find((i) => i.name === di.name);
+                    const instrumentMap = new Map();
+                    for (let i = 0; i < groove.instruments.length; i++) {
+                        instrumentMap.set(groove.instruments[i].name, groove.instruments[i]);
+                    }
+
+                    for (let i = 0; i < data.groove.instruments.length; i++) {
+                        const di = data.groove.instruments[i];
+                        const inst = instrumentMap.get(di.name);
                         if (inst) {
                             inst.steps = di.steps;
                         }
-                    });
+                    }
                 }
                 if (data.playback) {
                     Object.assign(playback, data.playback);
@@ -1396,13 +1402,19 @@ function processMessage(type, data, startTime) {
                     safeSync(groove, syncData.groove, 'groove');
 
                     if (syncData.groove?.instruments) {
-                        syncData.groove.instruments.forEach((di) => {
-                            const inst = groove.instruments.find((i) => i.name === di.name);
+                        const instrumentMap = new Map();
+                        for (let i = 0; i < groove.instruments.length; i++) {
+                            instrumentMap.set(groove.instruments[i].name, groove.instruments[i]);
+                        }
+
+                        for (let i = 0; i < syncData.groove.instruments.length; i++) {
+                            const di = syncData.groove.instruments[i];
+                            const inst = instrumentMap.get(di.name);
                             if (inst) {
                                 inst.steps = di.steps;
                                 inst.muted = di.muted;
                             }
-                        });
+                        }
                     }
                     if (syncData.playback) {
                         Object.assign(playback, syncData.playback);
