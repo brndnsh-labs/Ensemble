@@ -323,7 +323,7 @@ export function getSoloistNote(
     currentChord,
     nextChord,
     step,
-    prevFreq,
+    _prevFreq,
     _octave,
     style,
     stepInChord,
@@ -349,7 +349,25 @@ export function getSoloistNote(
         if (!res) {
             return null;
         }
-        const primary = Array.isArray(res) ? res[0] : res;
+        // Melody note is ALWAYS the last one in the array (for double stops) or the object itself
+        const primary = Array.isArray(res) ? res[res.length - 1] : res;
+
+        // --- Universal Melodic Integrity Guard ---
+        // If the primary note repeats the last one, force a move for non-Jazz styles.
+        if (primary.midi === lastMidi && activeStyle !== 'bird') {
+            const scaleIntervals = getScaleForChord(targetChord, null, activeStyle);
+            const neighborDir = Math.random() > 0.5 ? 1 : -1;
+            let forcedMidi = primary.midi + neighborDir;
+            let tries = 0;
+            // Search for nearest scale tone that is NOT lastMidi
+            while (!scaleIntervals.includes(((forcedMidi % 12) + 12) % 12) && tries < 12) {
+                forcedMidi += neighborDir;
+                tries++;
+            }
+            primary.midi = Math.max(minMidi, Math.min(maxMidi, forcedMidi));
+        }
+
+        soloist.lastMidiPlayed = primary.midi; // @worker-mutation
 
         // --- Holistic Pocket Implementation ---
         const timingOffset = calculateTimingOffset(
@@ -443,9 +461,9 @@ export function getSoloistNote(
     );
 
     // --- Range & Continuity Logic ---
-    // Moved to top to support Seed/Motif replay clamping consistently
     const dynamicCenter = centerMidi;
-    const lastMidi = prevFreq && !soloist.isResting ? getMidi(prevFreq) : Math.round(dynamicCenter);
+    // lastMidi should be the ACTUAL last pitch played (from absolute state)
+    const lastMidi = soloist.lastMidiPlayed || Math.round(dynamicCenter);
 
     // Reggae and Minimal should be more constrained in range
     const rangeLimit = activeStyle === 'reggae' || activeStyle === 'minimal' ? 12 : 14;
@@ -1389,106 +1407,91 @@ export function getSoloistNote(
             weight += 1000;
         }
 
-        // Penalties (Multiplicative)
+        // Stepwise Bonus: Reward movement of 1-2 semitones for melodic flow
+        if (dist >= 1 && dist <= 2) {
+            let stepwiseBonus = 200; // Increased from 150
+            if (activeStyle === 'neo' || activeStyle === 'bossa') {
+                stepwiseBonus = 400;
+            }
+            if (activeStyle === 'reggae') {
+                stepwiseBonus = 600;
+            }
+            weight += stepwiseBonus;
+        }
+
+        // --- Multiplicative Penalties (Applied Last) ---
+
+        // 1. Repeated Note Penalty: High priority suppression
         if (dist === 0) {
             if (activeStyle === 'bird') {
-                // BEBOP HEAD IMPROVEMENT: Parker uses repeated notes (15%) for rhythmic emphasis
-                const headRepeatedMultiplier = headFactor > 0.5 ? 1.5 : 1.0;
-                weight *= 0.65 * headRepeatedMultiplier; // Allow repeated notes more for Parker rhythmic style
+                // Jazz allows some repetition for rhythm, but keep it tight
+                const headRepeatedMultiplier = headFactor > 0.5 ? 2.0 : 1.0;
+                weight *= 0.05 * headRepeatedMultiplier; // Reduced from 0.1
             } else {
-                weight *= 0.0001; // Force a move
+                weight *= 0.0000001; // Near-total ban
             }
             if (isStagnant && activeStyle !== 'bird') {
                 weight = 0;
             }
         }
 
-        // Stepwise Bonus: Reward movement of 1-2 semitones for melodic flow
-        if (dist >= 1 && dist <= 2) {
-            let stepwiseBonus = 200; // Increased from 150
-            if (activeStyle === 'neo' || activeStyle === 'bossa') stepwiseBonus = 400;
-            if (activeStyle === 'reggae') stepwiseBonus = 600;
-            weight += stepwiseBonus;
-        }
-
-        // Octave Jump Penalty: Heavily discourage jumping more than 12 semitones 
-        // unless it's a specific melodic device.
+        // 2. Octave Jump Penalty: Discourage teleportation
         if (dist > 12) {
-            weight *= 0.05;
+            weight *= 0.01; // 99% reduction for jumps > octave
         } else if (dist > 7) {
-            // Moderated penalty for large jumps within an octave
-            weight *= 0.4;
+            weight *= 0.2; // 80% reduction for large jumps within octave
         }
 
-        // Melodic Contour: Slightly favor changing direction if the last move was large
+        // 3. Melodic Contour: Favor direction changes after large moves
         if (lastInterval > 4 && m < lastMidi) {
-            weight *= 1.2;
+            weight *= 1.5;
         }
         if (lastInterval < -4 && m > lastMidi) {
-            weight *= 1.2;
+            weight *= 1.5;
         }
 
-        // Continuous interval penalty to keep lines smooth (Exponential for large leaps)
+        // 4. Smoothness: Exponential penalty for skips in smooth styles
         if (dist > 2 && isSmoothStyle) {
-            let penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.85 : 0.6;
-            // NEO-SOUL/FUNK SMOOTHNESS: Stricter penalty for jumping
+            let penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.8 : 0.5;
             if (activeStyle === 'neo' || activeStyle === 'funk') {
-                penaltyBase = 0.45;
+                penaltyBase = 0.4;
             }
-            // BEBOP HEAD IMPROVEMENT: Favor stepwise motion (44%) even more during the head
             if (activeStyle === 'bird' && headFactor > 0.5) {
                 penaltyBase *= 0.8;
             }
             weight *= penaltyBase ** (dist - 2);
         }
 
-        if (activeStyle === 'reggae' && dist > 2) {
-            weight *= 0.01;
-        }
-        if (['bird', 'bossa', 'acoustic'].includes(activeStyle) && dist > 4) {
-            weight *= 0.1;
-        }
-        if (activeStyle === 'country' && dist > 7) {
-            weight *= 0.1;
-        }
-        if (['blues', 'funk', 'neo', 'disco'].includes(activeStyle) && dist > 6) {
-            weight *= 0.2;
-        }
-
-        // High BPM Interval Control (Prevent erratic jumps)
+        // 5. High BPM Safety
         if (playback.bpm > 160 && dist > 4) {
-            weight *= 0.1; // Heavy penalty for jumps at high speeds
+            weight *= 0.1;
         }
-        if (playback.bpm > 180 && dist > 3) {
-            weight *= 0.01; // Stricter
+        if (playback.bpm > 185 && dist > 2) {
+            weight *= 0.05;
         }
 
+        // 6. History Magnets: Prevent overuse of specific pitches/notes
         if (historyLen > 12) {
             const count = historyCounts[m] || 0;
             const pcCount = pcCounts[pc] || 0;
             const pct = count / historyLen;
             const pcPct = pcCount / historyLen;
-            if (pct > 0.35 || pcPct > 0.45) {
-                weight = 0; // Hard ban magnets
+            if (pct > 0.4 || pcPct > 0.5) {
+                weight *= 0.01; // Strong penalty instead of hard ban
             } else if (pct > 0.2 || pcPct > 0.3) {
-                weight *= 0.01;
+                weight *= 0.1; // Moderate penalty
             }
         }
-        if (isStagnant && dist < 3) {
-            weight *= 0.01;
+
+        // 7. Genre Hard Constraints
+        if (activeStyle === 'reggae' && dist > 4) {
+            weight = 0;
         }
-        const dCenter = Math.abs(m - dynamicCenter);
-        if (dCenter > 7) {
-            weight *= Math.max(0.01, 1.0 - (dCenter - 7) * 0.1);
+        if (['bird', 'bossa', 'acoustic'].includes(activeStyle) && dist > 7) {
+            weight *= 0.05;
         }
 
         weight = Math.max(0.01, weight);
-
-        // Absolute hard ban on large intervals at very high BPM (after min weight clamp)
-        if (playback.bpm > 195 && dist > 2) {
-            weight = 0;
-        }
-
         CANDIDATE_WEIGHTS[m] = weight;
         totalWeight += weight;
     }
