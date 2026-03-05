@@ -217,6 +217,83 @@ describe('Soloist Smart Genre Statistics', () => {
         console.log('=====================================================================\n');
     });
 
+    it('Analyzes Jazz Phrase Distribution (Run-on detection)', () => {
+        mockState.groove.genreFeel = 'Jazz';
+        mockState.playback.bandIntensity = 0.8;
+        mockState.playback.complexity = 0.8;
+        mockState.playback.currentLoopCount = 2; // Full solo mode
+
+        mockState.soloist = {
+            enabled: true,
+            isResting: true,
+            pitchHistory: [],
+            deviceBuffer: [],
+            motifBuffer: [],
+            sessionSteps: 0,
+        };
+
+        const phraseLengths = [];
+        const restGaps = [];
+        let currentPhraseNotes = 0;
+        let currentRestSteps = 0;
+        let wasResting = true;
+
+        const totalMeasures = 128;
+        for (let s = 0; s < totalMeasures * 16; s++) {
+            const res = getSoloistNote(
+                { rootMidi: 60, intervals: [0, 4, 7] },
+                null,
+                s,
+                440,
+                60,
+                'smart',
+                s % 16,
+                false,
+            );
+
+            const isRestingNow = mockState.soloist.isResting;
+
+            if (isRestingNow) {
+                currentRestSteps++;
+                if (!wasResting && currentPhraseNotes > 0) {
+                    phraseLengths.push(currentPhraseNotes);
+                    currentPhraseNotes = 0;
+                }
+            } else {
+                if (wasResting) {
+                    if (currentRestSteps > 0) {
+                        restGaps.push(currentRestSteps);
+                    }
+                    currentRestSteps = 0;
+                }
+                if (res) {
+                    const notes = Array.isArray(res) ? res : [res];
+                    currentPhraseNotes += notes.length;
+                }
+            }
+            wasResting = isRestingNow;
+        }
+
+        console.log('\n================ JAZZ PHRASE DISTRIBUTION (128 Bars) ================');
+        console.log(
+            `Avg Phrase Length: ${(phraseLengths.reduce((a, b) => a + b, 0) / phraseLengths.length).toFixed(1)} notes`,
+        );
+        console.log(`Max Phrase Length: ${Math.max(...phraseLengths)} notes`);
+        console.log(
+            `Avg Rest Gap: ${(restGaps.reduce((a, b) => a + b, 0) / restGaps.length).toFixed(1)} steps`,
+        );
+        console.log(`Max Rest Gap: ${Math.max(...restGaps)} steps`);
+
+        const runOnPhrases = phraseLengths.filter((len) => len > 32).length;
+        const shortBreaths = restGaps.filter((gap) => gap < 4).length;
+        const longGaps = restGaps.filter((gap) => gap > 16).length;
+
+        console.log(`Run-on Phrases (>32 notes): ${runOnPhrases}`);
+        console.log(`Micro-breaths (<1 beat): ${shortBreaths}`);
+        console.log(`Long Gaps (>1 measure): ${longGaps}`);
+        console.log('=====================================================================\n');
+    });
+
     it('Generates Statistical Analysis for all Smart Genres', () => {
         const genres = Object.keys(SMART_GENRES);
 

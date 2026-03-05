@@ -659,7 +659,7 @@ export function getSoloistNote(
 
     const phraseBars = soloist.currentPhraseSteps / stepsPerMeasure;
 
-    const effectiveLyricalBias = activeStyle === 'bird' ? lyricalBias * 0.25 : lyricalBias;
+    const effectiveLyricalBias = activeStyle === 'bird' ? lyricalBias * 0.6 : lyricalBias;
     const effectiveMaxNotes = Math.max(
         2,
         Math.round(config.maxNotesPerPhrase * (1.5 - effectiveLyricalBias)),
@@ -669,6 +669,11 @@ export function getSoloistNote(
     // Scales more aggressively. At intensity 1.0, restBase is multiplied by 0.5. At 0.0, by 2.0.
     const intensityDamping = 2.0 - effectiveIntensity * 1.5;
     let restProb = config.restBase * intensityDamping + phraseBars * config.restGrowth;
+
+    // Bird style needs extra rest pressure as phrases get very long
+    if (activeStyle === 'bird' && phraseBars > 1.0) {
+        restProb += (phraseBars - 1.0) * (0.3 + Math.random() * 0.2);
+    }
 
     // Apply lyrical bias: Higher bias = more rests, shorter phrases
     restProb += effectiveLyricalBias * 0.2;
@@ -709,6 +714,7 @@ export function getSoloistNote(
         activeStyle === 'bird' || activeStyle === 'shred' || activeStyle === 'ska';
 
     if (soloist.isResting) {
+        soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
         if (isSuppressedByAntiphony) {
             return null;
         }
@@ -743,7 +749,7 @@ export function getSoloistNote(
         } else if (activeStyle === 'bird' || isAssertiveReentry) {
             // BEBOP HEAD IMPROVEMENT: Parker (Ornithology) heavily favors pickups (66%)
             if (activeStyle === 'bird' && headFactor > 0.5 && isPickupZone) {
-                startProb = 0.95;
+                startProb = 0.8 + Math.random() * 0.15; // Slightly varied pickup chance
             } else {
                 startProb = 1.0;
             }
@@ -765,6 +771,7 @@ export function getSoloistNote(
 
         if (isInitialEntry || Math.random() < startProb) {
             soloist.isResting = false; // @worker-mutation
+            soloist.isPhraseActive = true; // @worker-mutation
             soloist.currentPhraseSteps = 0; // @worker-mutation
             soloist.notesInPhrase = 0; // @worker-mutation
 
@@ -849,10 +856,12 @@ export function getSoloistNote(
             return null;
         }
     }
-    let breakProb = restProb;
-    if (activeStyle === 'bird') {
-        breakProb = soloist.notesInPhrase >= effectiveMaxNotes ? 0.4 : 0.05;
+
+    if (soloist.currentPhraseSteps < 0) {
+        soloist.currentPhraseSteps++; // @worker-mutation
+        return null;
     }
+    const breakProb = restProb;
 
     if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < breakProb) {
         // --- Seed Capture ---
@@ -868,12 +877,27 @@ export function getSoloistNote(
             soloist.thematicSeedRoot = soloist.motifRoot; // @worker-mutation
         }
 
-        soloist.isResting = true;
-        soloist.currentPhraseSteps = 0;
+        soloist.isResting = true; // @worker-mutation
+        soloist.isPhraseActive = false; // @worker-mutation
+        soloist.notesInPhrase = 0; // @worker-mutation
+
+        // DYNAMIC BREATH: Instead of immediate potential re-entry,
+        // set currentPhraseSteps to a negative value to force a minimum rest duration.
+        // This simulates the soloist actually taking a breath.
+        const breathIntensity = (1.2 - effectiveIntensity) * 8; // 1.6 to 8 steps
+        const lyricalBreath = lyricalBias * 8; // 0 to 8 steps
+        const breathSteps = Math.floor(Math.random() * (breathIntensity + lyricalBreath)) + 1;
+
+        soloist.currentPhraseSteps = -breathSteps; // @worker-mutation
         soloist.currentCell = null; // @worker-mutation
         if (soloist.sharedHookBuffer) {
             soloist.sharedHookBuffer = []; // @worker-mutation
         }
+        return null;
+    }
+
+    if (soloist.currentPhraseSteps < 0) {
+        soloist.currentPhraseSteps++; // @worker-mutation
         return null;
     }
 
