@@ -135,6 +135,7 @@ export function Settings() {
     };
 
     const isOpen = useEnsembleState((s) => s.playback.modals.settings);
+    const playback = useEnsembleState((s) => s.playback);
     const overlayRef = useRef(null);
 
     useEffect(() => {
@@ -753,6 +754,33 @@ export function Settings() {
                                 <span>🔄</span> Force Refresh
                             </button>
                         </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Advanced</h3>
+                        <label class="setting-item toggle">
+                            <div>
+                                <span class="label">Debug Soloist</span>
+                                <span class="setting-description">
+                                    Enable chain-of-thought logging for the Soloist engine. Helpful
+                                    for troubleshooting silence or strange behavior. Logs will
+                                    appear in the browser console.
+                                </span>
+                            </div>
+                            <input
+                                type="checkbox"
+                                id="debugSoloistToggle"
+                                checked={playback.debugSoloist}
+                                onChange={(e) =>
+                                    dispatch(ACTIONS.SET_PARAM, {
+                                        module: 'playback',
+                                        param: 'debugSoloist',
+                                        value: e.target.checked,
+                                    })
+                                }
+                            />
+                            <span class="toggle-slider" />
+                        </label>
                     </div>
 
                     <div
