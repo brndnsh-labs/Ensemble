@@ -1772,19 +1772,6 @@ export function getSoloistNote(
         }
 
         if (deviceType === 'graceNote') {
-            // ... (rest of device logic remains similar, but using deviceBuffer)
-        }
-
-        // Finalize device buffer and return
-        if (deviceBuffer.length > 0) {
-            soloist.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
-            const first = deviceBuffer[0];
-            soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
-            soloist.currentCell = null; // @worker-mutation
-            return finalizeNote(first);
-        }
-
-        if (deviceType === 'graceNote') {
             // Half-step or scale-step below, very fast
             deviceBuffer = [
                 {

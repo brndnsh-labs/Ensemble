@@ -142,7 +142,7 @@ describe('Soloist Mode Differentiation Logic', () => {
                 false,
                 { bypassRhythm: true },
             );
-            if (Array.isArray(note)) {
+            if (Array.isArray(note) && note.length === 2) {
                 break;
             }
             attempts++;
@@ -179,7 +179,7 @@ describe('Soloist Mode Differentiation Logic', () => {
                 false,
                 { bypassRhythm: true },
             );
-            if (Array.isArray(note)) {
+            if (Array.isArray(note) && note.length === 3) {
                 break;
             }
             attempts++;
