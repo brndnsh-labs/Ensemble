@@ -401,7 +401,7 @@ describe('Soloist Engine Logic', () => {
     describe('Session Maturity', () => {
         it('should become more active as session maturity increases', () => {
             const chord = { rootMidi: 60, quality: 'major', intervals: [0, 4, 7], beats: 4 };
-            const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5); // Fixed randomness for phrased rest checks
+            const spy = vi.spyOn(Math, 'random').mockReturnValue(0.8); // Fixed randomness for phrased rest checks
 
             // Conservative start
             getState().playback.currentLoopCount = 0;

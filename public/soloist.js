@@ -446,7 +446,7 @@ export function getSoloistNote(
 
     const srdcRegisterOffset = (isDeparture ? 6 : isConclusion ? -4 : 0) * srdcIntensity;
     const soarValue = (config.registerSoar || 8) * (isDeparture ? 1.0 + 0.25 * srdcIntensity : 1.0);
-    const soarOffset = intensity > 0.5 || isDeparture ? (intensity - 0.4) * soarValue : 0;
+    const soarOffset = (isDeparture ? 0.2 : 0) + Math.max(0, (intensity - 0.4) * soarValue);
 
     // Absolute melodic ceiling to prevent piercing whistle tones
     const ABSOLUTE_MAX_MIDI = 96; // C7 (Top of Soprano range)
@@ -477,24 +477,27 @@ export function getSoloistNote(
     let maturityFactor = 0;
 
     // --- Song Arc Logic ---
-    // If a session timer is active, use the song progress to drive maturity/intensity
+    // If a session timer is active, use the song progress to drive maturity/intensity.
+    // Calculate elapsed time based on step and BPM for cross-thread consistency.
+    const elapsedMins = step / (stepsPerBeat * (playback.bpm || 120) * 60);
+
     if (playback.sessionTimer > 0 && playback.sessionStartTime > 0) {
-        const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
         const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
 
         // Arc: Warmup -> Development -> Climax -> Cooldown
-        if (progress < 0.15) {
-            maturityFactor = (progress / 0.15) * 0.2; // 0.0 -> 0.2
-        } else if (progress < 0.65) {
-            maturityFactor = 0.2 + ((progress - 0.15) / 0.5) * 0.6; // 0.2 -> 0.8
+        // Shortened warmup and raised floors to prevent "janky" starts
+        if (progress < 0.1) {
+            maturityFactor = 0.15 + (progress / 0.1) * 0.15; // 0.15 -> 0.30
+        } else if (progress < 0.6) {
+            maturityFactor = 0.3 + ((progress - 0.1) / 0.5) * 0.55; // 0.30 -> 0.85
         } else if (progress < 0.85) {
-            maturityFactor = 0.8 + ((progress - 0.65) / 0.2) * 0.2; // 0.8 -> 1.0
+            maturityFactor = 0.85 + ((progress - 0.6) / 0.25) * 0.15; // 0.85 -> 1.0
         } else {
-            maturityFactor = 1.0 - ((progress - 0.85) / 0.15) * 0.8; // 1.0 -> 0.2 (Cooldown)
+            maturityFactor = 1.0 - ((progress - 0.85) / 0.15) * 0.7; // 1.0 -> 0.3 (Cooldown)
         }
     } else {
         // Fallback: Linear ramp based on steps (but slower/capped)
-        maturityFactor = Math.min(1.0, (soloist.sessionSteps || 0) / 2048);
+        maturityFactor = 0.15 + Math.min(0.85, (soloist.sessionSteps || 0) / 2048);
     }
 
     // Warmup Factor: We want a sparse start for the first loop, building up
@@ -511,19 +514,22 @@ export function getSoloistNote(
 
     const evoEnabled = soloist.evolutionEnabled !== false;
     // Raise the floor of warmupFactor so the soloist isn't quite as sparse initially
-    let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.7 + (smoothLoopCount / 2.0) * 0.3); // Hits 1.0 right at the start of loop 3 (index 2)
+    let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.85 + (smoothLoopCount / 2.0) * 0.15); // Hits 1.0 right at the start of loop 3 (index 2)
     if (activeStyle === 'bird') {
         warmupFactor = 1.0;
     }
     const effectiveIntensity =
         activeStyle === 'bird'
             ? 1.0
-            : Math.min(
-                  1.0,
-                  intensity +
-                      maturityFactor * 0.05 +
-                      smoothLoopCount * 0.01 +
-                      (playback.intent.soloistMod || 0),
+            : Math.max(
+                  0,
+                  Math.min(
+                      1.0,
+                      intensity +
+                          maturityFactor * 0.05 +
+                          smoothLoopCount * 0.01 +
+                          (playback.intent.soloistMod || 0),
+                  ),
               );
     const lyricalBias =
         activeStyle === 'bird'
@@ -606,6 +612,9 @@ export function getSoloistNote(
     // If we are yielding (pending stop), and we are currently resting,
     // it means we finished our last phrase. Stop completely.
     if (soloist.isYielding && soloist.isResting) {
+        // Increment steps even when yielding so safety checks eventually trigger
+        soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
+
         // SAFETY: If we have been yielding for more than 4 measures, and we are in a long section,
         // force a re-entry attempt to prevent permanent silence bugs.
         const yieldProgress = soloist.currentPhraseSteps / stepsPerMeasure;
@@ -686,9 +695,10 @@ export function getSoloistNote(
             ? Math.max(0.02, restProb)
             : Math.max(0.05, restProb - maturityFactor * 0.15);
 
-    // SAFETY: Ensure minimum notes per phrase are played before resting
+    // SAFETY: Ensure minimum notes per phrase are played before resting,
+    // BUT allow resting if the phrase has gone on for a long time without notes (Liveness protection)
     const minNotes = config.minNotesPerPhrase || 2;
-    if (soloist.notesInPhrase < minNotes) {
+    if (soloist.notesInPhrase < minNotes && phraseBars < 1.5) {
         restProb = 0;
     }
 
@@ -735,13 +745,17 @@ export function getSoloistNote(
         // EMERGENCY RE-ENTRY: Force break-out if rested for > 1.5 measures in high energy styles
         // Ensure non-high-energy styles also re-enter after slightly longer
         const isEmergencyReentry =
-            (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.5;
+            (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.0;
+
+        if (isEmergencyReentry && step % 16 === 0) {
+            // console.log(`[Soloist] Emergency Re-entry Triggered: restBars=${restBars.toFixed(2)}`);
+        }
 
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
 
         let startProb =
-            (0.1 + effectiveIntensity * 0.2) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
+            (0.15 + effectiveIntensity * 0.25) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Boosted floor
 
         if (isEmergencyReentry) {
             startProb = 1.0;
@@ -777,7 +791,12 @@ export function getSoloistNote(
         // Assertive entry: Force start on the '1' if we just enabled or traded in
         const isInitialEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
-        if (coordination.bypassRhythm || isInitialEntry || Math.random() < startProb) {
+        if (
+            coordination.bypassRhythm ||
+            isInitialEntry ||
+            Math.random() < startProb ||
+            isEmergencyReentry
+        ) {
             soloist.isResting = false; // @worker-mutation
             soloist.isPhraseActive = true; // @worker-mutation
             soloist.currentPhraseSteps = 0; // @worker-mutation
@@ -809,7 +828,8 @@ export function getSoloistNote(
             const isStale =
                 evoEnabled &&
                 (soloist.motifReplayCount || 0) > 3 + Math.floor(effectiveIntensity * 4);
-            const isOverwhelmed = evoEnabled && effectiveIntensity > 0.7 && Math.random() < 0.5;
+            const isOverwhelmed =
+                evoEnabled && Math.random() < Math.max(0, (effectiveIntensity - 0.4) * 0.8);
 
             let distinctPitchesCount = 0;
             let pitchRange = 0;
@@ -1120,6 +1140,11 @@ export function getSoloistNote(
 
     let attackProb = baseAttackProb * intensityScale * lyricalDamping;
 
+    // Liveness Boost: If we just started a phrase, be more eager to play the first note
+    if (soloist.notesInPhrase === 0) {
+        attackProb *= 1.5;
+    }
+
     // Reactive Alignment: Boost attacks on drum hits for high-energy styles
     if (activeStyle === 'funk' || activeStyle === 'scalar' || activeStyle === 'shred') {
         if (kickHit) {
@@ -1134,12 +1159,8 @@ export function getSoloistNote(
     attackProb = Math.min(1.0, attackProb);
 
     // Reactive Interlocking: In Jazz/Bossa, slightly favor gaps on heavy downbeats if intense
-    if (
-        (activeStyle === 'bird' || activeStyle === 'bossa') &&
-        measureStep === 0 &&
-        intensity > 0.6
-    ) {
-        attackProb *= 0.7;
+    if ((activeStyle === 'bird' || activeStyle === 'bossa') && measureStep === 0) {
+        attackProb *= 1.0 - Math.max(0, (intensity - 0.4) * 0.5);
     }
 
     // Session Maturity: Slight density boost over long sessions
@@ -1175,10 +1196,21 @@ export function getSoloistNote(
     // Minimum Gap Protection: Prevent mechanical 'machine-gun' fire
     // For Jazz/Bird, we allow 16th streams, but for Minimal/Acoustic, we force space.
     let minGap = 1;
+    // Burst logic: Higher chance at high intensity, but still possible at medium.
+    const isBurst = Math.random() < effectiveIntensity * 0.3;
+
     if (activeStyle === 'minimal' || activeStyle === 'acoustic') {
         minGap = 4;
-    } else if (intensity < 0.4) {
-        minGap = 2;
+    } else if (!isBurst) {
+        // Continuous rhythmic scaling: As intensity and lyricalBias change,
+        // the chance to force an 8th note (minGap = 2) scales smoothly.
+        const melodicProb = Math.max(
+            0,
+            0.8 - effectiveIntensity + (effectiveLyricalBias || 0) * 0.2,
+        );
+        if (Math.random() < melodicProb) {
+            minGap = 2;
+        }
     }
 
     const stepsSinceLastAttack =
@@ -1440,6 +1472,13 @@ export function getSoloistNote(
             weight += (isSmoothStyle ? 400 : 100 + headChordBonus) * distDamping;
         }
 
+        // --- Target Extensions (Sophistication Bonus) ---
+        // As intensity increases, the soloist gradually favors the style's defined tensions.
+        if (config.targetExtensions?.includes(interval)) {
+            const extensionBonus = 150 * effectiveIntensity * distDamping;
+            weight += extensionBonus;
+        }
+
         // Lyrical Head Bonus: Favor 1, 3, 5, 7 during the Head loop even more
         if (headFactor > 0.3 && [0, 4, 7, 11, 3, 10].includes(interval)) {
             weight += 600 * headFactor; // Adjusted from 1000
@@ -1618,7 +1657,6 @@ export function getSoloistNote(
     soloist.lastInterval = selectedMidi - lastMidi; // @worker-mutation
 
     // --- 7. Melodic Devices ---
-    const allowFlash = intensity > 0.5;
     const deviceBaseProb =
         config.deviceProb *
         (0.5 + complexity * 1.0) *
@@ -1641,7 +1679,6 @@ export function getSoloistNote(
     }
 
     if (
-        allowFlash &&
         stepInBeat === 0 &&
         Math.random() < deviceBaseProb * 0.7 * warmupFactor * bpmDeviceThrottle
     ) {
@@ -2070,16 +2107,23 @@ export function getSoloistNote(
         const birdEighthProb =
             0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2 + headFactor * 0.5;
         durationSteps = Math.random() < Math.min(1.0, birdEighthProb) ? 2 : 1;
-    } else if (intensity < 0.4 && activeStyle !== 'bird') {
-        durationSteps = Math.random() < 0.6 ? 4 : 8;
     } else {
-        // Standard style-based durations
-        if (activeStyle === 'funk' || activeStyle === 'disco' || activeStyle === 'ska') {
-            durationSteps = Math.random() < 0.7 ? 1 : 2;
-        } else if (activeStyle === 'neo' || activeStyle === 'bossa') {
-            durationSteps = Math.random() < 0.6 ? 4 : 2;
-        } else if (activeStyle === 'minimal') {
-            durationSteps = Math.random() < 0.8 ? 8 : 4;
+        // Continuous duration scaling
+        const longNoteProb = Math.max(
+            0,
+            0.8 - effectiveIntensity + (effectiveLyricalBias || 0) * 0.2,
+        );
+        if (!isBurst && Math.random() < longNoteProb) {
+            durationSteps = Math.random() < 0.6 ? 4 : 8;
+        } else {
+            // Standard style-based durations
+            if (activeStyle === 'funk' || activeStyle === 'disco' || activeStyle === 'ska') {
+                durationSteps = Math.random() < 0.7 ? 1 : 2;
+            } else if (activeStyle === 'neo' || activeStyle === 'bossa') {
+                durationSteps = Math.random() < 0.6 ? 4 : 2;
+            } else if (activeStyle === 'minimal') {
+                durationSteps = Math.random() < 0.8 ? 8 : 4;
+            }
         }
     }
 
@@ -2132,28 +2176,23 @@ export function getSoloistNote(
         }
     }
 
-    if (activeStyle === 'bird') {
-        // Tune bird to start more melodic (8th notes) at low intensity or during warmup
-        // NEW: Force 8th notes during the "Head" (first loop) to establish melody
-        const birdEighthProb =
-            0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2 + headFactor * 0.5;
-        durationSteps = Math.random() < Math.min(1.0, birdEighthProb) ? 2 : 1;
-    } else if (intensity < 0.4 && activeStyle !== 'bird') {
-        durationSteps = Math.random() < 0.6 ? 4 : 8;
-    } else if (
-        isImportantStep &&
-        (activeStyle === 'neo' ||
-            activeStyle === 'blues' ||
-            activeStyle === 'minimal' ||
-            activeStyle === 'bossa')
-    ) {
-        durationSteps = Math.random() < 0.4 + maturityFactor * 0.2 ? 8 : 4;
-    } else if (
-        activeStyle === 'scalar' &&
-        stepInBeat === 0 &&
-        Math.random() < 0.15 + maturityFactor * 0.1
-    ) {
-        durationSteps = 4;
+    // Secondary duration overrides
+    if (!isBurst) {
+        if (
+            isImportantStep &&
+            (activeStyle === 'neo' ||
+                activeStyle === 'blues' ||
+                activeStyle === 'minimal' ||
+                activeStyle === 'bossa')
+        ) {
+            durationSteps = Math.random() < 0.4 + maturityFactor * 0.2 ? 8 : 4;
+        } else if (
+            activeStyle === 'scalar' &&
+            stepInBeat === 0 &&
+            Math.random() < 0.15 + maturityFactor * 0.1
+        ) {
+            durationSteps = 4;
+        }
     }
 
     const pc = selectedMidi % 12;
