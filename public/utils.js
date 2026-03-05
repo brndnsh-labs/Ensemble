@@ -9,6 +9,13 @@ export function normalizeKey(k) {
     return ENHARMONIC_MAP[k] || k;
 }
 
+const REGEX_AMP = /&/g;
+const REGEX_LT = /</g;
+const REGEX_GT = />/g;
+const REGEX_QUOT = /"/g;
+const REGEX_APOS = /'/g;
+const REGEX_BACKTICK = /`/g;
+
 /**
  * Escapes unsafe HTML characters to prevent XSS.
  * @param {string} str
@@ -23,13 +30,15 @@ export function escapeHTML(str) {
     }
 
     return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/`/g, '&#96;');
+        .replace(REGEX_AMP, '&amp;')
+        .replace(REGEX_LT, '&lt;')
+        .replace(REGEX_GT, '&gt;')
+        .replace(REGEX_QUOT, '&quot;')
+        .replace(REGEX_APOS, '&#39;')
+        .replace(REGEX_BACKTICK, '&#96;');
 }
+
+const REGEX_DANGEROUS = /[<>"=`]/g;
 
 /**
  * Strips dangerous characters from musical input strings to prevent XSS.
@@ -45,7 +54,7 @@ export function stripDangerousChars(str) {
         return String(str);
     }
     // Remove < > " ` (Keep ' and & for text validity, relying on escaping for those)
-    return str.replace(/[<>"=`]/g, '');
+    return str.replace(REGEX_DANGEROUS, '');
 }
 
 // Pre-calculate frequencies for standard MIDI range (0-127) to avoid expensive Math.pow calls
@@ -344,6 +353,10 @@ export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
     return impulse;
 }
 
+const REGEX_SHARP = /#/g;
+const REGEX_FLAT1 = /([A-G])b/g;
+const REGEX_FLAT2 = /b(?=[0-9IVivm\-/])/g;
+
 /**
  * Replaces ASCII # and b with Unicode ♯ and ♭ for display.
  * @param {string} str - The string to format.
@@ -353,10 +366,7 @@ export function formatUnicodeSymbols(str) {
     if (!str) {
         return str;
     }
-    return str
-        .replace(/#/g, '♯')
-        .replace(/([A-G])b/g, '$1♭')
-        .replace(/b(?=[0-9IVivm\-/])/g, '♭');
+    return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
 }
 
 let cachedSoftClipCurve = null;
@@ -375,7 +385,7 @@ export function createSoftClipCurve() {
     for (let i = 0; i < n_samples; ++i) {
         const x = (i * 2) / n_samples - 1;
         // Normalized monotonic cubic: f(x) = (3x - x^3) / 2
-        curve[i] = (3 * x - x ** 3) / 2;
+        curve[i] = (3 * x - x * x * x) / 2;
     }
     cachedSoftClipCurve = curve;
     return curve;
