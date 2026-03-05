@@ -7,35 +7,14 @@ const CANDIDATE_WEIGHTS = new Float32Array(128);
 const HIST_COUNTS = new Float32Array(128);
 const PC_COUNTS = new Float32Array(12);
 
-const RHYTHMIC_CELLS = [
-    [1, 1, 1, 1], // 0: 16ths
-    [1, 0, 1, 0], // 1: 8ths
-    [1, 0, 0, 0], // 2: Quarter
-    [1, 1, 1, 0], // 3: Gallop
-    [1, 0, 1, 1], // 4: Reverse gallop
-    [0, 1, 1, 1], // 5: Offbeat start
-    [1, 0, 0, 1], // 6: Syncopated
-    [1, 1, 0, 1], // 7: Bebop-esque 1
-    [0, 1, 1, 0], // 8: Offbeat syncopation
-    [1, 0, 1, 1], // 9: Syncopated 2
-    [0, 1, 0, 1], // 10: Pure offbeats (16th offbeats)
-    [1, 0, 0, 0, 0, 0, 0, 0], // 11: Half note (if 8 steps used)
-    [0, 0, 1, 0], // 12: Single Offbeat 8th (the "And")
-    [1, 0, 1, 0, 1, 0], // 13: Triplet-esque (Feel)
-    [0, 1, 0, 0], // 14: Single Syncopated 16th (the "e")
-    [1, 0, 0, 1, 0, 0, 1, 0], // 15: 3-3-2 Syncopation (Dotted 8ths)
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 16: 16th triplets (if 12 steps used)
-];
-
 const STYLE_CONFIG = {
     scalar: {
-        restBase: 0.25,
+        restBase: 0.1,
         restGrowth: 0.07,
-        cells: [2, 11, 1, 6],
         registerSoar: 10,
         tensionScale: 0.6,
         timingJitter: 8,
-        maxNotesPerPhrase: 16,
+        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.1,
@@ -46,13 +25,12 @@ const STYLE_CONFIG = {
         hookProb: 0.1,
     },
     shred: {
-        restBase: 0.1,
+        restBase: 0.05,
         restGrowth: 0.02,
-        cells: [1, 3, 4, 7, 0],
         registerSoar: 16,
         tensionScale: 0.3,
         timingJitter: 4,
-        maxNotesPerPhrase: 32,
+        maxNotesPerPhrase: 64,
         minNotesPerPhrase: 8,
         doubleStopProb: 0.05,
         anticipationProb: 0.05,
@@ -63,13 +41,12 @@ const STYLE_CONFIG = {
         hookProb: 0.05,
     },
     blues: {
-        restBase: 0.6,
+        restBase: 0.15,
         restGrowth: 0.15,
-        cells: [2, 11, 0, 12, 6],
         registerSoar: 4,
         tensionScale: 0.8,
         timingJitter: 25,
-        maxNotesPerPhrase: 5,
+        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
@@ -80,13 +57,12 @@ const STYLE_CONFIG = {
         hookProb: 0.3,
     },
     neo: {
-        restBase: 0.35,
+        restBase: 0.12,
         restGrowth: 0.08,
-        cells: [11, 2, 6, 10, 12, 14],
         registerSoar: 6,
         tensionScale: 0.7,
         timingJitter: 25,
-        maxNotesPerPhrase: 12,
+        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.15,
         anticipationProb: 0.45,
@@ -97,13 +73,12 @@ const STYLE_CONFIG = {
         hookProb: 0.2,
     },
     funk: {
-        restBase: 0.35,
+        restBase: 0.1,
         restGrowth: 0.08,
-        cells: [1, 10, 14, 0, 6],
         registerSoar: 5,
         tensionScale: 0.4,
         timingJitter: 5,
-        maxNotesPerPhrase: 16,
+        maxNotesPerPhrase: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.15,
         anticipationProb: 0.2,
@@ -114,13 +89,12 @@ const STYLE_CONFIG = {
         hookProb: 0.15,
     },
     hiphop: {
-        restBase: 0.45,
+        restBase: 0.15,
         restGrowth: 0.08,
-        cells: [1, 6, 10, 12, 14],
         registerSoar: 4,
         tensionScale: 0.6,
         timingJitter: 20,
-        maxNotesPerPhrase: 8,
+        maxNotesPerPhrase: 16,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.3,
@@ -131,13 +105,12 @@ const STYLE_CONFIG = {
         hookProb: 0.2,
     },
     minimal: {
-        restBase: 0.75,
+        restBase: 0.3, // Significantly reduced from 0.75
         restGrowth: 0.15,
-        cells: [11, 2, 12, 14],
         registerSoar: 6,
         tensionScale: 0.95,
         timingJitter: 35,
-        maxNotesPerPhrase: 3,
+        maxNotesPerPhrase: 8,
         minNotesPerPhrase: 1,
         doubleStopProb: 0.0,
         anticipationProb: 0.25,
@@ -148,9 +121,8 @@ const STYLE_CONFIG = {
         hookProb: 0.5,
     },
     bird: {
-        restBase: 0.05, // Highly dense to match transcription
+        restBase: 0.05, // Already very low
         restGrowth: 0.01,
-        cells: [1, 7, 8, 0, 5, 6, 15], // 16ths, Syncopated 8ths, bebop cells, ties
         registerSoar: 8,
         tensionScale: 0.9,
         timingJitter: 12,
@@ -165,13 +137,12 @@ const STYLE_CONFIG = {
         hookProb: 0.1,
     },
     disco: {
-        restBase: 0.25,
+        restBase: 0.1,
         restGrowth: 0.06,
-        cells: [0, 2, 5, 10],
         registerSoar: 8,
         tensionScale: 0.5,
         timingJitter: 8,
-        maxNotesPerPhrase: 12,
+        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.05,
         anticipationProb: 0.2,
@@ -182,13 +153,12 @@ const STYLE_CONFIG = {
         hookProb: 0.2,
     },
     bossa: {
-        restBase: 0.35,
+        restBase: 0.12,
         restGrowth: 0.08,
-        cells: [11, 2, 0, 6, 8],
         registerSoar: 4,
         tensionScale: 0.7,
         timingJitter: 15,
-        maxNotesPerPhrase: 12,
+        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.08,
         anticipationProb: 0.35,
@@ -199,13 +169,12 @@ const STYLE_CONFIG = {
         hookProb: 0.25,
     },
     country: {
-        restBase: 0.12,
+        restBase: 0.08,
         restGrowth: 0.08,
-        cells: [1, 3, 4, 12, 14, 6],
         registerSoar: 6,
         tensionScale: 0.5,
         timingJitter: 4,
-        maxNotesPerPhrase: 16,
+        maxNotesPerPhrase: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.5,
         anticipationProb: 0.2,
@@ -225,7 +194,6 @@ const STYLE_CONFIG = {
     metal: {
         restBase: 0.1,
         restGrowth: 0.05,
-        cells: [1, 3, 0],
         registerSoar: 14,
         tensionScale: 0.4,
         timingJitter: 2,
@@ -240,13 +208,12 @@ const STYLE_CONFIG = {
         hookProb: 0.05,
     },
     reggae: {
-        restBase: 0.35,
-        restGrowth: 0.1,
-        cells: [2, 6, 12, 14],
+        restBase: 0.12,
+        restGrowth: 0.08,
         registerSoar: 3,
         tensionScale: 0.6,
         timingJitter: 20,
-        maxNotesPerPhrase: 10,
+        maxNotesPerPhrase: 16,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.2,
         anticipationProb: 0.1,
@@ -257,13 +224,12 @@ const STYLE_CONFIG = {
         hookProb: 0.4,
     },
     acoustic: {
-        restBase: 0.5,
-        restGrowth: 0.12,
-        cells: [2, 11, 1, 13],
+        restBase: 0.15,
+        restGrowth: 0.1,
         registerSoar: 4,
         tensionScale: 0.4,
         timingJitter: 15,
-        maxNotesPerPhrase: 8,
+        maxNotesPerPhrase: 12,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.15,
@@ -274,13 +240,12 @@ const STYLE_CONFIG = {
         hookProb: 0.3,
     },
     ska: {
-        restBase: 0.2,
+        restBase: 0.1,
         restGrowth: 0.05,
-        cells: [15, 6, 8, 10, 1], // Syncopated 8ths, ties, straight 8ths/16ths
         registerSoar: 10,
         tensionScale: 0.5,
         timingJitter: 5,
-        maxNotesPerPhrase: 24,
+        maxNotesPerPhrase: 32,
         minNotesPerPhrase: 4,
         doubleStopProb: 0.2,
         anticipationProb: 0.3, // Higher anticipation for the "push" feel
@@ -290,6 +255,21 @@ const STYLE_CONFIG = {
         motifProb: 0.4,
         hookProb: 0.2,
     },
+};
+
+const STYLE_EMPHASIS = {
+    scalar: [1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2, 1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2],
+    bird: [0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0], // Offbeat push
+    shred: [1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9],
+    funk: [1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4, 1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4],
+    blues: [1.0, 0.2, 0.6, 0.9, 0.8, 0.2, 0.6, 0.9, 1.0, 0.2, 0.6, 0.9, 0.8, 0.2, 0.6, 0.9],
+    neo: [1.0, 0.1, 0.3, 0.8, 0.8, 0.1, 0.3, 0.8, 1.0, 0.1, 0.3, 0.8, 0.8, 0.1, 0.3, 0.8],
+    minimal: [1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0],
+    disco: [1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2],
+    bossa: [1.0, 0.1, 0.5, 0.1, 0.8, 0.1, 0.5, 0.1, 1.0, 0.1, 0.5, 0.1, 0.8, 0.1, 0.5, 0.1],
+    country: [1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2, 1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2],
+    metal: [1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8],
+    ska: [0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1],
 };
 
 const GENRE_STYLE_MAPPING = {
@@ -309,12 +289,6 @@ const GENRE_STYLE_MAPPING = {
     'Ska-Punk': 'ska',
     Ska: 'ska',
 };
-
-// Optimization: Pre-calculate rhythmic cell pools for each style
-for (const key in STYLE_CONFIG) {
-    const conf = STYLE_CONFIG[key];
-    conf.cellPool = RHYTHMIC_CELLS.filter((_, idx) => conf.cells.includes(idx));
-}
 
 /**
  * Checks for a lead sheet melody note at the given step.
@@ -1068,157 +1042,98 @@ export function getSoloistNote(
         }
     }
 
-    // --- 5. Rhythmic Density ---
+    // --- 5. Rhythmic Density (Groove DNA Model) ---
 
-    if (
-        stepInBeat === 0 ||
-        !soloist.currentCell ||
-        (activeStyle === 'bird' && stepInBeat % 2 === 0)
-    ) {
-        let pool = [...config.cellPool];
+    const stepCoord = coordination.stepCoordination || {};
+    const kickHit = stepCoord.kickHit || false;
+    const snareHit = stepCoord.snareHit || false;
 
-        // Lyrical/Syllable Seeding
-        const currentSection = arranger.sectionMap
-            ? arranger.sectionMap.find((s) => step >= s.start && step < s.end)
-            : null;
-        let syllableCount = 0;
-        if (currentSection?.syllables) {
-            const relativeStep = step - currentSection.start;
-            const measureIndex = Math.floor(relativeStep / stepsPerMeasure);
-            syllableCount = currentSection.syllables[measureIndex] || 0;
-        }
+    // Base Probability from Emphasis Map
+    const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
+    let baseAttackProb = emphasisMap[measureStep % 16];
 
-        if (syllableCount > 0) {
-            const syllablePool = pool.filter((c) => {
-                let hits = 0;
-                for (let j = 0; j < c.length; j++) {
-                    hits += c[j];
-                }
-                return Math.abs(hits - syllableCount) <= 1; // Allow +/- 1 for variety
-            });
-            if (syllablePool.length > 0) {
-                pool = syllablePool;
-            }
-        }
-
-        // SRDC Density Filtering: Departure is busier, Conclusion is sparse
-        if (soloist.srdcState === 'Departure') {
-            const busyPool = pool.filter((c) => {
-                let h = 0;
-                for (let j = 0; j < c.length; j++) {
-                    h += c[j];
-                }
-                return h >= 3;
-            });
-            if (busyPool.length > 0) {
-                pool = busyPool;
-            }
-        } else if (soloist.srdcState === 'Conclusion') {
-            const sparsePool = pool.filter((c) => {
-                let h = 0;
-                for (let j = 0; j < c.length; j++) {
-                    h += c[j];
-                }
-                return h <= 2;
-            });
-            if (sparsePool.length > 0) {
-                pool = sparsePool;
-            }
-        }
-
-        // Lyrical Bias: Remove busy 16th-based patterns if lyrical
-        if (lyricalBias > 0.6 && activeStyle !== 'bird') {
-            pool = pool.filter((c) => {
-                const idx = RHYTHMIC_CELLS.indexOf(c);
-                // Indices for 16ths and gallops
-                return ![0, 3, 4, 7, 10, 16].includes(idx);
-            });
-            if (pool.length === 0) {
-                pool = [RHYTHMIC_CELLS[1], RHYTHMIC_CELLS[2]]; // Fallback to 8ths/quarters
-            }
-        }
-
-        if (complexity > 0.7 && !config.cells.includes(1)) {
-            pool.push(RHYTHMIC_CELLS[1]);
-        }
-
-        // Lyrical Head Mode: Remove busy cells (16ths, gallops) during the first loop
-        if (headFactor > 0.5) {
-            pool = pool.filter((c) => {
-                const idx = RHYTHMIC_CELLS.indexOf(c);
-                return ![0, 3, 10, 14, 15, 16].includes(idx); // Remove 16th-heavy and syncopated cells
-            });
-
-            // Ensure Bebop/Swing cells are present for authentic Jazz Head feel
-            if (activeStyle === 'bird') {
-                if (!pool.includes(RHYTHMIC_CELLS[7])) {
-                    pool.push(RHYTHMIC_CELLS[7]);
-                }
-                if (!pool.includes(RHYTHMIC_CELLS[8])) {
-                    pool.push(RHYTHMIC_CELLS[8]);
-                }
-                if (!pool.includes(RHYTHMIC_CELLS[12])) {
-                    pool.push(RHYTHMIC_CELLS[12]);
-                }
-            }
-
-            if (pool.length === 0) {
-                pool = [RHYTHMIC_CELLS[1], RHYTHMIC_CELLS[2]]; // Fallback to 8ths/quarters
-            }
-        }
-
-        // Intensity/Maturity Expansion: Inject busy cells at high climax
-        if ((effectiveIntensity > 0.8 || maturityFactor > 0.9) && headFactor < 0.2) {
-            // Add 16ths (0), Gallops (3), and 16th Offbeats (10)
-            if (!pool.includes(RHYTHMIC_CELLS[0])) {
-                pool.push(RHYTHMIC_CELLS[0]);
-            }
-            if (!pool.includes(RHYTHMIC_CELLS[3])) {
-                pool.push(RHYTHMIC_CELLS[3]);
-            }
-            if (!pool.includes(RHYTHMIC_CELLS[10])) {
-                pool.push(RHYTHMIC_CELLS[10]);
-            }
-        }
-
-        // Intensity-based filtering
-        if (intensity < 0.4 && activeStyle !== 'bird') {
-            pool = pool.filter((c) => c[1] === 0 && c[3] === 0);
-        }
-
-        // Very low intensity: Restrict to quarter notes (no 8th notes) for non-busy styles
-        if (intensity < 0.25 && activeStyle !== 'bird') {
-            pool = pool.filter((c) => c[2] === 0);
-        }
-
-        // High BPM Filtering: Reduce busy 16th patterns
-        if ((activeStyle === 'bird' || activeStyle === 'ska') && playback.bpm > 160) {
-            // Remove 0 (16ths), 3 (Gallop), 10 (16th Off), 14, 15, 16
-            // Keep 1 (8ths), 2 (Quarters), 6 (Sync 8ths), 8 (Offbeat 8ths), 7 (Bebop)
-            pool = pool.filter((c) => ![0, 3, 10, 14, 15, 16].includes(RHYTHMIC_CELLS.indexOf(c)));
-
-            // Ensure we have something left
-            if (pool.length === 0) {
-                pool = [RHYTHMIC_CELLS[1]]; // Fallback to 8ths
-            }
-
-            // Add quarters for breathing room if really fast
-            if (playback.bpm > 200 && activeStyle !== 'bird') {
-                pool.push(RHYTHMIC_CELLS[2]);
-            }
-        }
-
-        // Start Step Logic: When picking a new phrase cell, ensure it actually triggers on the start step
-        if (soloist.currentPhraseSteps === 0 || stepInBeat > 0) {
-            const playable = pool.filter((c) => c[stepInBeat] === 1);
-            if (playable.length > 0) {
-                pool = playable;
-            }
-        }
-
-        soloist.currentCell = pool[Math.floor(Math.random() * pool.length)]; // @worker-mutation
+    // Syllable Pressure: Align with lyrical density if provided
+    const currentSection = arranger.sectionMap
+        ? arranger.sectionMap.find((s) => step >= s.start && step < s.end)
+        : null;
+    let syllableCount = 0;
+    if (currentSection?.syllables) {
+        const relativeStep = step - currentSection.start;
+        const measureIndex = Math.floor(relativeStep / stepsPerMeasure);
+        syllableCount = currentSection.syllables[measureIndex] || 0;
     }
-    if (soloist.currentCell && soloist.currentCell[stepInBeat] === 1) {
+
+    if (syllableCount > 0) {
+        // Boost/Scale probability to aim for syllableCount attacks per measure
+        const targetDensity = syllableCount / 16;
+        baseAttackProb = baseAttackProb * 0.5 + targetDensity * 0.5;
+    }
+
+    // Reactive Alignment (Option 1): Boost attacks on drum hits for high-energy styles
+    if (activeStyle === 'funk' || activeStyle === 'rock' || activeStyle === 'shred') {
+        if (kickHit) {
+            baseAttackProb += 0.3;
+        }
+        if (snareHit) {
+            baseAttackProb += 0.25;
+        }
+    }
+
+    // Reactive Interlocking: In Jazz/Bossa, slightly favor gaps on heavy downbeats if intense
+    if (activeStyle === 'bird' && measureStep === 0 && intensity > 0.6) {
+        baseAttackProb *= 0.7;
+    }
+
+    // Density Scaling
+    // Linearize intensity response: 0.3 to 3.5 multiplier
+    // NEW: Inject warmupFactor and maturityFactor into the density pressure
+    const intensityScale = (0.2 + effectiveIntensity * 3.0) * (0.5 + warmupFactor * 0.5);
+    const lyricalDamping = 1.0 - (effectiveLyricalBias || 0) * 0.7;
+
+    let attackProb = baseAttackProb * intensityScale * lyricalDamping;
+
+    // Session Maturity: Slight density boost over long sessions
+    attackProb *= 0.9 + maturityFactor * 0.2;
+
+    // Phrase Climax Boost (SRDC)
+    if (soloist.srdcState === 'Departure') {
+        attackProb *= 1.35;
+    } else if (soloist.srdcState === 'Conclusion') {
+        attackProb *= 0.6;
+    }
+
+    // Head Mode Sparsity
+    if (headFactor > 0.5) {
+        attackProb *= 0.7;
+    }
+
+    // High BPM Damping
+    if (playback.bpm > 180) {
+        attackProb *= 0.8;
+    }
+
+    // Minimum Gap Protection: Prevent mechanical 'machine-gun' fire
+    // For Jazz/Bird, we allow 16th streams, but for Minimal/Acoustic, we force space.
+    let minGap = 1;
+    if (activeStyle === 'minimal' || activeStyle === 'acoustic') {
+        minGap = 4;
+    } else if (intensity < 0.4) {
+        minGap = 2;
+    }
+
+    const stepsSinceLastAttack =
+        soloist.lastAttackStep === undefined ? 999 : step - soloist.lastAttackStep;
+    if (stepsSinceLastAttack < minGap) {
+        attackProb = 0;
+    }
+
+    let isHit = false;
+    if (coordination.bypassRhythm || Math.random() < attackProb) {
+        soloist.lastAttackStep = step; // @worker-mutation
+        isHit = true;
+    }
+
+    if (isHit) {
         /* hit */
     } else {
         // --- Embellishment: Approach Note Filling ---
@@ -2069,8 +1984,34 @@ export function getSoloistNote(
     }
 
     // --- 8. Dynamic Duration & Bending ---
-    let durationSteps = 1;
+    let durationSteps = 2;
     let bendStartInterval = 0;
+
+    if (activeStyle === 'bird') {
+        // Tune bird to start more melodic (8th notes) at low intensity or during warmup
+        const birdEighthProb =
+            0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2 + headFactor * 0.5;
+        durationSteps = Math.random() < Math.min(1.0, birdEighthProb) ? 2 : 1;
+    } else if (intensity < 0.4 && activeStyle !== 'bird') {
+        durationSteps = Math.random() < 0.6 ? 4 : 8;
+    } else {
+        // Standard style-based durations
+        if (activeStyle === 'funk' || activeStyle === 'disco' || activeStyle === 'ska') {
+            durationSteps = Math.random() < 0.7 ? 1 : 2;
+        } else if (activeStyle === 'neo' || activeStyle === 'bossa') {
+            durationSteps = Math.random() < 0.6 ? 4 : 2;
+        } else if (activeStyle === 'minimal') {
+            durationSteps = Math.random() < 0.8 ? 8 : 4;
+        }
+    }
+
+    // Lyrical Head: Increase durations for Loop 1 to sound like a written melody
+    if (headFactor > 0.5) {
+        durationSteps = Math.max(durationSteps, 2); // Floor at 8th note
+        if (Math.random() < 0.3 * headFactor) {
+            durationSteps *= 2; // Occasional longer notes
+        }
+    }
 
     const isImportantStep = stepInBeat === 0 || (stepInBeat === 2 && Math.random() < 0.3);
     const baseVelocity = 0.5 + effectiveIntensity * 0.7;

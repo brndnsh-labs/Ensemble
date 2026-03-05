@@ -427,7 +427,39 @@ class ExportProcessor {
             soloistMidi: 0,
             accompanimentHit: false,
             accompanimentMidis: [],
+            kickHit: false,
+            snareHit: false,
         };
+
+        // Pre-calculate Drum Hits for Coordination
+        if (this.includedTracks.includes('drums')) {
+            const modStepGroove = globalStep % (groove.measures * this.stepsPerMeasure);
+            const seedIdx =
+                groove.sectionSeedMap && chordData?.sectionId
+                    ? groove.sectionSeedMap[chordData.sectionId] || 0
+                    : 0;
+            const preset = DRUM_PRESETS[groove.lastDrumPreset];
+
+            const checkHit = (instName) => {
+                const inst = groove.instruments.find((i) => i.name === instName);
+                if (!inst || inst.muted) {
+                    return false;
+                }
+                let val = 0;
+                if (preset?.variations?.[seedIdx]) {
+                    const varInst = preset.variations[seedIdx][instName];
+                    if (varInst) {
+                        val = varInst[modStepGroove];
+                    }
+                } else {
+                    val = inst.steps[modStepGroove];
+                }
+                return val > 0;
+            };
+
+            coordination.kickHit = checkHit('Kick');
+            coordination.snareHit = checkHit('Snare');
+        }
 
         if (chordData) {
             const { chord, stepInChord } = chordData;
@@ -1509,6 +1541,8 @@ function handlePrime(steps) {
                 soloistMidi: 0,
                 accompanimentHit: false,
                 accompanimentMidis: [],
+                kickHit: false,
+                snareHit: false,
             };
 
             // 1. Prime Bass (if enabled) to update bass.lastFreq

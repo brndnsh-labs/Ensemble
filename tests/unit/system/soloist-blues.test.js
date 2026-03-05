@@ -33,9 +33,12 @@ describe('Soloist Blues Logic', () => {
                 srdcState: 'Statement',
                 qaState: 'Question',
                 isResting: false,
+                isPhraseActive: true,
+                lastAttackStep: -100,
                 currentPhraseSteps: 10,
                 notesInPhrase: 2,
                 deviceBuffer: [],
+                motifBuffer: [],
                 busySteps: 0,
                 pitchHistory: [],
             },
@@ -54,19 +57,22 @@ describe('Soloist Blues Logic', () => {
 
         // We try many times to trigger the probabilistic device generation
         while (!lickFound && attempts < 1000) {
-            attempts++;
-            // Reset buffer
+            // Reset state
             mockState.soloist.deviceBuffer = [];
             mockState.soloist.busySteps = 0;
+            mockState.soloist.isResting = false;
+            mockState.soloist.currentPhraseSteps = 0;
+            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.lastAttackStep = -100;
 
             // Call getSoloistNote
-            // step 0 (downbeat) to maximize device chance
-            getSoloistNote(C7, null, 0, 60, 4, 'blues', 0, false);
+            // Use attempts * 4 to ensure step % 16 == 0 regularly
+            getSoloistNote(C7, null, attempts * 4, 60, 4, 'blues', 0, false);
 
-            // Blues licks we plan to add will have at least 3 notes (buffer length >= 2)
             if (mockState.soloist.deviceBuffer.length >= 2) {
                 lickFound = true;
             }
+            attempts++;
         }
 
         expect(lickFound).toBe(true);

@@ -275,14 +275,19 @@ describe('Standards Compliance Test Suite', () => {
             let blueNoteCount = 0;
             let lastFreq = 440;
             for (let i = 0; i < 400; i++) {
+                soloist.isResting = false;
+                soloist.busySteps = 0;
+                soloist.lastAttackStep = -100;
                 const result = getSoloistNote(
                     arranger.progression[0],
                     null,
-                    i % 16,
+                    i * 4,
                     lastFreq,
                     72,
                     'blues',
-                    i % 16,
+                    0,
+                    false,
+                    { bypassRhythm: true },
                 );
                 if (result) {
                     const notes = Array.isArray(result) ? result : [result];

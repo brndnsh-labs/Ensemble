@@ -25,12 +25,14 @@
     - Redesign `STYLE_CONFIG.ska` for "Sax Solo" energy: `restBase: 0.15`, `maxNotesPerPhrase: 24`, and use "Straight" cells (0, 1, 2).
     - Remove the hard-coded antiphony suppression for the soloist.
 
-### F. Bebop Phrasing Nuance (Ornithology)
-- **Symptom:** Even with "Head Mode," Bebop melodies felt a bit generic.
-- **Analysis Finding:** Charlie Parker's melody for "Ornithology" features 66% pickup starts, 44% stepwise motion, and 15% repeated notes.
-- **Fix:**
-    - **Jazz Pickup Bias:** Boosted `startProb` to 95% in the Pickup Zone during the Head for Jazz style.
-    - **Interval Refinement:** Increased stepwise preference and allowed more repeated notes (50% increase) specifically during the Head loop to match transcription tendencies.
+### G. Rhythmic Rigidity (Grid-First vs Groove-First)
+- **Symptom:** Soloist felt disconnected from the rhythm section, sounding mechanical and "on-the-grid."
+- **Root Cause:** Phrasing was driven by fixed 4-step `RHYTHMIC_CELLS` that were chosen in isolation from the drums and bass.
+- **Fix (The Rhythmic Overhaul):**
+    - **Groove DNA Maps:** Replaced fixed cells with 16-step **STYLE_EMPHASIS** maps for every genre (e.g., Jazz offbeats, Ska skank).
+    - **Reactive Alignment:** Soloist now "listens" to the drummer. Attack probability is boosted (+30%) when a Kick or Snare hit is detected in high-energy styles.
+    - **Reactive Interlocking:** Jazz/Bossa soloists now "duck" slightly on heavy downbeats to create a more sophisticated, syncopated feel.
+    - **Probabilistic Generation:** Moved to a per-step probability model with `minGap` protection to prevent machine-gun fire and ensure natural spacing.
 
 ## 2. Refined Implementation Plan
 
@@ -45,20 +47,25 @@
 - [x] **Device Probability Audit:** (Applied)
 
 ### Phase 3: Lyrical Head Mode (COMPLETED)
-- [x] **Implement Head Detection:** Use `smoothLoopCount`.
-- [x] ** Melodic Bias:** Reduce Jazz filler and increase lyrical bias during Loop 1.
-- [x] **Chord Tone Weighting:** Ensure intentional melody generation.
-- [x] **Bebop Head Nuance:** Applied Ornithology-based pickup and interval weighting.
+- [x] **Implement Head Detection:** (Applied)
+- [x] **Melodic Bias:** (Applied)
+- [x] **Chord Tone Weighting:** (Applied)
+- [x] **Bebop Head Nuance:** (Applied)
 
-### Phase 4: Validation (COMPLETED)
+### Phase 4: Rhythmic Overhaul (COMPLETED)
+- [x] **Groove DNA Maps:** (Applied)
+- [x] **Reactive Coordination:** (Applied)
+- [x] **Per-Step Probability Model:** (Applied)
+
+### Phase 5: Validation (COMPLETED)
 - [x] Run `analyze-soloist-stats.test.js` and verify stats.
-- [x] Verify Head vs Solo density delta (>60% difference for Jazz).
+- [x] Verify reactive alignment via `soloist-reactive-rhythm.test.js`.
 
 ## 3. Final Results
-- **Jazz (Bird):** Now plays a recognizable, intentional "Head" (8.3 notes/m) with Charlie Parker-style pickup phrasing before ramping into full speed (13.3 notes/m).
-- **Ska-Punk:** Revamped lead character with 60% growth from intro to solo.
-- **Linearization:** All genres respond predictably to the Intensity slider.
-- **MIDI Quality:** Slides are now expressive Pitch Bends rather than clunky chromatic notes.
+- **Jazz (Bird):** Authentic Bebop arc. Starts with an intentional "Head" (Parker-style phrasing), ramping into a continuous, swinging improvised solo that interlocks with the rhythm section.
+- **Ska-Punk:** High-energy lead character that locks in with the skank and the drum backbeat.
+- **MIDI Quality:** Professional-grade Pitch Bend slides and expressive velocity fluctuations.
+- **Dynamic Response:** All genres respond linearly and predictably to the Intensity and Lyrical Bias sliders.
 
 ---
 **Branch:** `feature/soloist-tuning-audit`

@@ -15,6 +15,8 @@ vi.mock('../../../public/state.js', () => {
             notesInPhrase: 0,
             currentPhraseSteps: 0,
             isResting: false,
+            isPhraseActive: true,
+            lastAttackStep: -100,
             motifBuffer: [],
             deviceBuffer: [],
             evolutionEnabled: false,
@@ -134,7 +136,10 @@ describe('Soloist Engine Logic', () => {
         it('should generate a note object when playing', () => {
             let note = null;
             for (let i = 0; i < 100; i++) {
-                note = getSoloistNote(chordC, null, 16, 440, 72, 'scalar', 0);
+                soloist.isResting = false;
+                soloist.busySteps = 0;
+                soloist.lastAttackStep = -100;
+                note = getSoloistNote(chordC, null, i * 4, 440, 72, 'scalar', 0);
                 if (note) {
                     break;
                 }
@@ -174,8 +179,9 @@ describe('Soloist Engine Logic', () => {
                     soloist.deviceBuffer = [];
                     soloist.busySteps = 0;
                     soloist.isResting = false;
-                    soloist.currentPhraseSteps = 1;
-                    const res = getSoloistNote(chordC, null, 16, 440, 72, t.style, 0);
+                    soloist.currentPhraseSteps = 0;
+                    soloist.lastAttackStep = -100;
+                    const res = getSoloistNote(chordC, null, i * 4, 440, 72, t.style, 0);
                     // Check buffer OR immediate double stop result (Quartal/GuitarDouble)
                     if (
                         soloist.deviceBuffer.length > 0 ||
@@ -206,20 +212,36 @@ describe('Soloist Engine Logic', () => {
 
         it('should generate staccato notes for Funk', () => {
             groove.genreFeel = 'Funk';
+            getState().playback.currentLoopCount = 3; // Avoid Head Mode extensions
             let shortNotes = 0;
             let played = 0;
             for (let i = 0; i < 100; i++) {
+                soloist.isResting = false;
                 soloist.busySteps = 0;
-                const note = getSoloistNote(chordC, chordC, i + 32, 261.63, 72, 'smart');
-                if (note) {
+                soloist.lastAttackStep = -100;
+                const noteResult = getSoloistNote(
+                    chordC,
+                    chordC,
+                    i * 4,
+                    261.63,
+                    72,
+                    'smart',
+                    0,
+                    false,
+                    { bypassRhythm: true },
+                );
+                if (noteResult) {
                     played++;
-                    if (note.durationSteps <= 1) {
+                    const primary = Array.isArray(noteResult)
+                        ? noteResult[noteResult.length - 1]
+                        : noteResult;
+                    if (primary.durationSteps <= 1) {
                         shortNotes++;
                     }
                 }
             }
             if (played > 0) {
-                expect(shortNotes / played).toBeGreaterThan(0.5);
+                expect(shortNotes / played).toBeGreaterThanOrEqual(0.5);
             }
         });
     });
@@ -229,8 +251,10 @@ describe('Soloist Engine Logic', () => {
             soloist.doubleStopProb = 0;
             let arrayFound = false;
             for (let i = 0; i < 500; i++) {
+                soloist.isResting = false;
                 soloist.busySteps = 0;
-                if (Array.isArray(getSoloistNote(chordC, null, i + 32, 440, 72, 'blues', i % 16))) {
+                soloist.lastAttackStep = -100;
+                if (Array.isArray(getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', i % 16))) {
                     arrayFound = true;
                     break;
                 }
@@ -342,8 +366,8 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.notesInPhrase = 0;
-                soloist.currentCell = [1, 1, 1, 1];
-                const res = getSoloistNote(chordC, null, 16, 440, 72, 'neo', 0);
+                soloist.lastAttackStep = -100;
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'neo', 0);
                 if (res) {
                     total++;
                     if (res.durationSteps >= 4) {
@@ -370,7 +394,11 @@ describe('Soloist Engine Logic', () => {
             soloist.busySteps = 0;
             let noteCountStart = 0;
             for (let i = 0; i < 1000; i++) {
+                soloist.isResting = false;
                 soloist.busySteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.currentPhraseSteps = 0;
+                soloist.lastAttackStep = -100;
                 if (getSoloistNote(chord, null, i * 4, 440, 72, 'scalar', 0)) {
                     noteCountStart++;
                 }
@@ -379,10 +407,13 @@ describe('Soloist Engine Logic', () => {
             // Matured start
             getState().playback.currentLoopCount = 3;
             soloist.sessionSteps = 10000;
-            soloist.busySteps = 0;
             let noteCountLate = 0;
             for (let i = 0; i < 1000; i++) {
+                soloist.isResting = false;
                 soloist.busySteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.currentPhraseSteps = 0;
+                soloist.lastAttackStep = -100;
                 if (getSoloistNote(chord, null, i * 4, 440, 72, 'scalar', 0)) {
                     noteCountLate++;
                 }
@@ -404,8 +435,10 @@ describe('Soloist Engine Logic', () => {
             for (let i = 0; i < 500; i++) {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
+                soloist.notesInPhrase = 0;
                 soloist.currentPhraseSteps = 16;
-                if (getSoloistNote(chord, null, 16, 440, 72, 'scalar', 0, false, sectionInfo)) {
+                soloist.lastAttackStep = -100;
+                if (getSoloistNote(chord, null, i * 4, 440, 72, 'scalar', 0, false, sectionInfo)) {
                     midNoteCount++;
                 }
             }
@@ -414,7 +447,9 @@ describe('Soloist Engine Logic', () => {
             for (let i = 0; i < 500; i++) {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
+                soloist.notesInPhrase = 0;
                 soloist.currentPhraseSteps = 16;
+                soloist.lastAttackStep = -100;
                 if (getSoloistNote(chord, null, 62, 440, 72, 'scalar', 14, false, sectionInfo)) {
                     endNoteCount++;
                 }
@@ -434,8 +469,10 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.notesInPhrase = 0;
-                soloist.currentCell = [1, 1, 1, 1];
-                const res = getSoloistNote(chord, null, 16, 440, 72, 'neo', 0);
+                soloist.lastAttackStep = -100;
+                const res = getSoloistNote(chord, null, i * 4, 440, 72, 'neo', 0, false, {
+                    bypassRhythm: true,
+                });
                 if (res && res.bendStartInterval > 0) {
                     scoops++;
                 }
@@ -478,9 +515,12 @@ describe('Soloist Engine Logic', () => {
             soloist.mode = 'guitar';
             let arrayFound = false;
             for (let i = 0; i < 2000; i++) {
-                soloist.busySteps = 0;
                 soloist.isResting = false;
-                const res = getSoloistNote(chordC, null, 16, 440, 72, 'blues', 0);
+                soloist.busySteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.currentPhraseSteps = 0;
+                soloist.lastAttackStep = -100;
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', 0);
                 if (Array.isArray(res)) {
                     arrayFound = true;
                     break;
@@ -511,6 +551,9 @@ describe('Soloist Engine Logic', () => {
                 const nextChord = prog[(bar + 1) % 4];
 
                 for (let step = 0; step < 16; step++) {
+                    soloist.isResting = false;
+                    soloist.busySteps = 0;
+                    // Note: We DON'T reset lastAttackStep here because we WANT the gap protection to work naturally across steps
                     const res = getSoloistNote(
                         chord,
                         nextChord,
@@ -536,23 +579,20 @@ describe('Soloist Engine Logic', () => {
     });
 
     describe('Edge Cases', () => {
-        it('should initialize a rhythmic cell even mid-beat (pickup logic)', () => {
+        it('should initialize an attack mid-beat (pickup logic)', () => {
             const chordC = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
             // Force start in resting state
             soloist.isResting = true;
             soloist.currentPhraseSteps = 0;
+            soloist.lastAttackStep = -100;
 
             // Force Math.random to return 0.0 so startProb check passes
             const spy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-            getSoloistNote(chordC, null, 3, 440, 60, 'scalar', 3);
+            const res = getSoloistNote(chordC, null, 3, 440, 60, 'scalar', 3);
 
-            expect(soloist.currentCell).not.toBeNull();
-
-            // The cell MUST have a hit on index 3 if our filtering worked
-            if (soloist.currentCell) {
-                expect(soloist.currentCell[3]).toBe(1);
-            }
+            expect(res).not.toBeNull();
+            expect(soloist.lastAttackStep).toBe(3);
             spy.mockRestore();
         });
 

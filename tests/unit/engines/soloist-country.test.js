@@ -78,12 +78,14 @@ describe('Country Soloist Overhaul', () => {
                 soloist.deviceBuffer = [];
                 soloist.busySteps = 0;
                 soloist.isResting = false;
-                soloist.currentPhraseSteps = 1;
+                soloist.currentPhraseSteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                // We need to trigger the device selection. deviceProb is 0.4.
-                // We call getSoloistNote and check if the result is a double stop with a bend
-                const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                    bypassRhythm: true,
+                });
 
                 // countryBend returns an array with bendStartInterval -1 on the first note
                 if (Array.isArray(res) && res.some((n) => n.bendStartInterval === -1)) {
@@ -101,10 +103,14 @@ describe('Country Soloist Overhaul', () => {
                 soloist.deviceBuffer = [];
                 soloist.busySteps = 0;
                 soloist.isResting = false;
-                soloist.currentPhraseSteps = 1;
+                soloist.currentPhraseSteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                    bypassRhythm: true,
+                });
 
                 // chickenPick returns a double stop with duration 1 and velocity >= 1.2
                 if (
@@ -125,10 +131,12 @@ describe('Country Soloist Overhaul', () => {
                 soloist.deviceBuffer = [];
                 soloist.busySteps = 0;
                 soloist.isResting = false;
-                soloist.currentPhraseSteps = 1;
+                soloist.currentPhraseSteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
+                getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0);
                 if (soloist.deviceBuffer.length === 3) {
                     // 4 note roll, 1 returned, 3 in buffer
                     triggered = true;
@@ -144,10 +152,14 @@ describe('Country Soloist Overhaul', () => {
                 soloist.deviceBuffer = [];
                 soloist.busySteps = 0;
                 soloist.isResting = false;
-                soloist.currentPhraseSteps = 1;
+                soloist.currentPhraseSteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                    bypassRhythm: true,
+                });
                 if (res && !Array.isArray(res) && res.bendStartInterval === 1) {
                     triggered = true;
                     break;
@@ -164,10 +176,14 @@ describe('Country Soloist Overhaul', () => {
             for (let i = 0; i < 1000; i++) {
                 soloist.busySteps = 0;
                 soloist.isResting = false;
-                soloist.currentPhraseSteps = 1;
+                soloist.currentPhraseSteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0);
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                    bypassRhythm: true,
+                });
                 if (Array.isArray(res)) {
                     totalDS++;
                     const top = res[0].midi;
@@ -209,10 +225,14 @@ describe('Country Soloist Overhaul', () => {
             for (let i = 0; i < 1000; i++) {
                 soloist.busySteps = 0;
                 soloist.isResting = false;
-                soloist.currentPhraseSteps = 1;
+                soloist.currentPhraseSteps = 0;
+                soloist.notesInPhrase = 0;
+                soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0);
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                    bypassRhythm: true,
+                });
                 if (res) {
                     const note = Array.isArray(res) ? res[res.length - 1] : res;
                     const interval = (note.midi - chordC.rootMidi + 120) % 12;

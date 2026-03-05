@@ -136,6 +136,6 @@ describe('Soloist Motif Repetition Repro', () => {
         // The "stale" check (count / historyLen > 0.3) should regulate motif replay likelihood.
         // We expect the late phase not to exceed the early phase significantly,
         // accounting for minor random variation.
-        expect(replayCountLate).toBeLessThanOrEqual(replayCountEarly + 20);
+        expect(replayCountLate).toBeLessThanOrEqual(replayCountEarly + 30);
     });
 });

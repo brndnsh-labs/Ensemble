@@ -7,10 +7,10 @@ vi.mock('../../public/state.js', () => {
     const mockState = {
         playback: {
             intent: { soloistMod: 0 },
-            bandIntensity: 0.5,
+            bandIntensity: 1.0,
             bpm: 120,
             sessionTimer: 0,
-            complexity: 0.5,
+            complexity: 1.0,
         },
         soloist: {
             enabled: true,
@@ -22,8 +22,11 @@ vi.mock('../../public/state.js', () => {
             motifBuffer: [],
             pitchHistory: [],
             deviceBuffer: [],
-            sessionSteps: 100,
+            sessionSteps: 2048,
             mode: 'monophonic',
+            lastAttackStep: -100,
+            isPhraseActive: true,
+            doubleStopProb: 10.0, // Force double stops for tests
         },
         groove: { genreFeel: 'Jazz' },
         arranger: { timeSignature: '4/4' },
@@ -35,6 +38,49 @@ vi.mock('../../public/state.js', () => {
         dispatch: vi.fn(),
     };
 });
+
+// Mock STYLE_CONFIG for stable testing
+vi.mock('../../public/config.js', () => ({
+    STYLE_CONFIG: {
+        scalar: {
+            doubleStopProb: 1.0,
+            deviceProb: 0.0,
+            targetExtensions: [2, 9],
+            maxNotesPerPhrase: 100,
+            restBase: 0.0,
+            restGrowth: 0.0,
+        },
+        neo: {
+            doubleStopProb: 1.0,
+            deviceProb: 0.0,
+            targetExtensions: [2, 9],
+            maxNotesPerPhrase: 100,
+            restBase: 0.0,
+            restGrowth: 0.0,
+        },
+        blues: {
+            doubleStopProb: 1.0,
+            deviceProb: 0.0,
+            targetExtensions: [2, 9],
+            maxNotesPerPhrase: 100,
+            restBase: 0.0,
+            restGrowth: 0.0,
+        },
+        bird: {
+            doubleStopProb: 0.0,
+            deviceProb: 1.0,
+            allowedDevices: ['run', 'graceNote'],
+            targetExtensions: [2, 9],
+            maxNotesPerPhrase: 100,
+            restBase: 0.0,
+            restGrowth: 0.0,
+        },
+    },
+    TIME_SIGNATURES: {
+        '4/4': { beats: 4, stepsPerBeat: 4 },
+    },
+    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
+}));
 
 // Mock Theory Scales
 vi.mock('../../public/theory-scales.js', () => ({
@@ -84,7 +130,18 @@ describe('Soloist Mode Differentiation Logic', () => {
         let attempts = 0;
         // Try up to 1000 times to get a double stop (usually takes ~10-20)
         while (attempts < 1000) {
-            note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'scalar', 0, false);
+            state.soloist.busySteps = 0;
+            note = getSoloistNote(
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'scalar',
+                0,
+                false,
+                { bypassRhythm: true },
+            );
             if (Array.isArray(note)) {
                 break;
             }
@@ -110,7 +167,18 @@ describe('Soloist Mode Differentiation Logic', () => {
         let note = null;
         let attempts = 0;
         while (attempts < 1000) {
-            note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'scalar', 0, false);
+            state.soloist.busySteps = 0;
+            note = getSoloistNote(
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'scalar',
+                0,
+                false,
+                { bypassRhythm: true },
+            );
             if (Array.isArray(note)) {
                 break;
             }
@@ -133,11 +201,22 @@ describe('Soloist Mode Differentiation Logic', () => {
         state.playback.currentLoopCount = 3;
         vi.spyOn(Math, 'random').mockRestore();
 
-        let note = null;
+        const _note = null;
         let attempts = 0;
         let foundQuartal = false;
         while (attempts < 1000) {
-            note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'neo', 0, false);
+            state.soloist.busySteps = 0;
+            const note = getSoloistNote(
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'neo',
+                0,
+                false,
+                { bypassRhythm: true },
+            );
             if (Array.isArray(note)) {
                 const melody = note[note.length - 1];
                 const extra = note[0];
@@ -162,8 +241,19 @@ describe('Soloist Mode Differentiation Logic', () => {
         let attempts = 0;
         let foundGraceNote = false;
         while (attempts < 5000) {
+            state.soloist.busySteps = 0;
             // Devices usually only happen at stepInBeat === 0
-            const note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'scalar', 0, false);
+            const note = getSoloistNote(
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'bird',
+                0,
+                false,
+                { bypassRhythm: true },
+            );
             // Devices often return a single note initially (the grace note) and buffer the rest
             if (note && !Array.isArray(note) && state.soloist.deviceBuffer.length > 0) {
                 foundGraceNote = true;
@@ -182,7 +272,18 @@ describe('Soloist Mode Differentiation Logic', () => {
         let attempts = 0;
         let foundHendrixInt = false;
         while (attempts < 1000) {
-            const note = getSoloistNote(currentChord, null, 0, 261.63, 60, 'blues', 0, false);
+            state.soloist.busySteps = 0;
+            const note = getSoloistNote(
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'blues',
+                0,
+                false,
+                { bypassRhythm: true },
+            );
             if (Array.isArray(note)) {
                 const melody = note[note.length - 1];
                 const extra = note[0];

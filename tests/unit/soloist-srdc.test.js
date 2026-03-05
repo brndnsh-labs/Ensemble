@@ -10,6 +10,8 @@ const mockState = {
         qaState: 'Question',
         srdcState: 'Conclusion',
         isResting: true,
+        isPhraseActive: false,
+        lastAttackStep: -100,
         pitchHistory: [],
         deviceBuffer: [],
         motifBuffer: [],
@@ -67,6 +69,7 @@ describe('Soloist SRDC State Machine', () => {
         // 1. Conclusion -> Statement
         mockState.soloist.srdcState = 'Conclusion';
         mockState.soloist.isResting = true;
+        mockState.soloist.busySteps = 0;
         getSoloistNote(chordC, null, 0, 440, 60, 'scalar', 0);
         expect(mockState.soloist.srdcState).toBe('Statement');
         expect(mockState.soloist.qaState).toBe('Question');
@@ -74,6 +77,7 @@ describe('Soloist SRDC State Machine', () => {
         // End phrase manually
         mockState.soloist.isResting = true;
         mockState.soloist.currentPhraseSteps = 0;
+        mockState.soloist.busySteps = 0;
 
         // 2. Statement -> Restatement
         getSoloistNote(chordC, null, 16, 440, 60, 'scalar', 0);
@@ -82,6 +86,7 @@ describe('Soloist SRDC State Machine', () => {
 
         mockState.soloist.isResting = true;
         mockState.soloist.currentPhraseSteps = 0;
+        mockState.soloist.busySteps = 0;
 
         // 3. Restatement -> Departure
         getSoloistNote(chordC, null, 32, 440, 60, 'scalar', 0);
@@ -90,6 +95,7 @@ describe('Soloist SRDC State Machine', () => {
 
         mockState.soloist.isResting = true;
         mockState.soloist.currentPhraseSteps = 0;
+        mockState.soloist.busySteps = 0;
 
         // 4. Departure -> Conclusion
         getSoloistNote(chordC, null, 48, 440, 60, 'scalar', 0);
