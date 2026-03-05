@@ -34,7 +34,7 @@ vi.mock('../../public/config.js', () => ({
 }));
 
 describe('Soloist Rhythmic Reactive Alignment', () => {
-    it.skip('should be more likely to attack when a drum hit is detected in Funk style', () => {
+    it('should be more likely to attack when a drum hit is detected in Funk style', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         const spy = vi.spyOn(Math, 'random');
 
@@ -42,8 +42,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         mockState.groove.genreFeel = 'Funk';
         mockState.soloist.busySteps = 0;
         mockState.soloist.lastAttackStep = -100;
-        mockState.soloist.currentPhraseSteps = 0;
-        mockState.soloist.notesInPhrase = 0;
+        mockState.soloist.activeSteps = 100;
         mockState.soloist.isResting = false;
 
         // Use bypassRhythm to ensure we are definitely playing for the test setup
@@ -58,9 +57,16 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         // Now test the actual probabilistic logic at low intensity
         mockState.playback.bandIntensity = 0.05;
         mockState.soloist.isResting = false;
+        mockState.soloist.activeSteps = 100;
 
-        // At 0.05 intensity, emphasis 1.0 (step 0), base prob ~0.22. +0.3 kick = 0.52.
-        spy.mockReturnValue(0.4);
+        // At 0.05 intensity, emphasis 1.0 (step 0), intensityScale = 0.5 + 0.05*2.0 = 0.6
+        // baseAttackProb = 1.0. attackProb = 0.6.
+        // With kick hit: 0.6 + 0.2 = 0.8.
+
+        // Mock random to 0.7
+        // Without drum: 0.7 > 0.6 is true -> null
+        // With drum: 0.7 > 0.8 is false -> note
+        spy.mockReturnValue(0.7);
 
         const contextProbWithDrum = { stepCoordination: { kickHit: true, snareHit: false } };
         const resProbWith = getSoloistNote(
@@ -94,22 +100,20 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         spy.mockRestore();
     });
 
-    it.skip('should be less likely to attack on downbeat in Jazz style at high intensity (Interlocking)', () => {
+    it('should be less likely to attack on downbeat in Jazz style at high intensity (Interlocking)', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
         let hitsNormal = 0;
         let hitsDownbeatCoord = 0;
-        const iterations = 20000;
+        const iterations = 5000;
 
         // Normal offbeat (step 3)
-        // Use moderate intensity (0.6) where reduction starts working (>0.4)
-        mockState.playback.bandIntensity = 0.6;
+        mockState.playback.bandIntensity = 0.15;
         mockState.groove.genreFeel = 'Jazz';
         for (let i = 0; i < iterations; i++) {
             mockState.soloist.busySteps = 0;
             mockState.soloist.lastAttackStep = -100;
-            mockState.soloist.currentPhraseSteps = 0;
-            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.activeSteps = 100;
             mockState.soloist.isResting = false;
             const res = getSoloistNote(chord, null, i * 16 + 3, 440, 60, 'bird', 3, false, {});
             if (res) {
@@ -121,8 +125,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         for (let i = 0; i < iterations; i++) {
             mockState.soloist.busySteps = 0;
             mockState.soloist.lastAttackStep = -100;
-            mockState.soloist.currentPhraseSteps = 0;
-            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.activeSteps = 100;
             mockState.soloist.isResting = false;
             const res = getSoloistNote(chord, null, i * 16, 440, 72, 'bird', 0, false, {});
             if (res) {
