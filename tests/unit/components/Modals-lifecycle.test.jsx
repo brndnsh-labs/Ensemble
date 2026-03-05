@@ -47,7 +47,7 @@ describe('Modal Lifecycle & Animation', () => {
         await act(async () => {
             render(<Modals />, root);
         });
-        
+
         // Wait for mount and subscription
         await new Promise((r) => setTimeout(r, 20));
         expect(document.querySelector('#settings-mock')).toBeNull();

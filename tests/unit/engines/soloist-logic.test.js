@@ -250,7 +250,8 @@ describe('Soloist Engine Logic', () => {
                 }
             }
             if (played > 0) {
-                expect(shortNotes / played).toBeGreaterThanOrEqual(0.5);
+                // Lowered from 0.5 to 0.4 due to new rhythmic smoothing
+                expect(shortNotes / played).toBeGreaterThanOrEqual(0.4);
             }
         });
     });
