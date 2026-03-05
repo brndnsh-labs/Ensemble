@@ -2,6 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { h, render } from 'preact';
+import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Modals } from '../../../public/components/Modals.jsx';
 import { dispatch, getState } from '../../../public/state.js';
@@ -43,30 +44,37 @@ describe('Modal Lifecycle & Animation', () => {
         const root = document.getElementById('app');
 
         // 1. Initially no modals
-        render(<Modals />, root);
+        await act(async () => {
+            render(<Modals />, root);
+        });
+        
         // Wait for mount and subscription
         await new Promise((r) => setTimeout(r, 20));
         expect(document.querySelector('#settings-mock')).toBeNull();
 
         // 2. Open Settings
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
+        await act(async () => {
+            dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
+        });
 
-        // Give Preact time to catch the state change and render
-        await new Promise((r) => setTimeout(r, 50));
+        // Give Preact and Suspense time to catch the state change and render
+        await new Promise((r) => setTimeout(r, 100));
 
         expect(document.querySelector('#settings-mock')).not.toBeNull();
         expect(document.querySelector('.closing')).toBeNull();
 
         // 3. Close Settings
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
-        await new Promise((r) => setTimeout(r, 20));
+        await act(async () => {
+            dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
+        });
+        await new Promise((r) => setTimeout(r, 50));
 
         // Should STILL be in DOM with "closing" class (AnimatedModalWrapper keeps it for 300ms)
         expect(document.querySelector('#settings-mock')).not.toBeNull();
         expect(document.querySelector('.closing')).not.toBeNull();
 
         // 4. Advance time past the 300ms animation buffer
-        await new Promise((r) => setTimeout(r, 350));
+        await new Promise((r) => setTimeout(r, 400));
 
         // Should be completely unmounted now
         expect(document.querySelector('#settings-mock')).toBeNull();

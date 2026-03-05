@@ -11,7 +11,12 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 *   `ui-controller.js`: Orchestrates top-level legacy events and bridges components with non-reactive DOM elements.
 *   `ui.js`: Exports a registry of DOM elements used by secondary controllers and legacy logic.
 *   `types.js`: Centralized `ACTIONS` constants for the state dispatch system.
-...
+*   **Engine Architecture**:
+    *   `soloist.js`: Core engine for melodic generation and SRDC state orchestration.
+    *   `soloist-config.js`: Centralized style definitions (`STYLE_CONFIG`) and emphasis maps.
+    *   `soloist-devices.js`: Procedural embellishment algorithms (Runs, Enclosures, Licks).
+    *   `bass.js` / `accompaniment.js`: Specialized engines for groove and comping.
+    *   `logic-worker.js`: Background thread orchestrator for all real-time generative logic.
 *   **State Access**: Read state through the `useEnsembleState` hook in components, or the exported state objects in engine code. **NEVER** modify state objects directly in components. Use `dispatch(ACTIONS.ACTION_TYPE, payload)` from `state.js` using constants from `types.js` to trigger updates.
 *   **Precision Timing**: Use `playback.audio.currentTime` for all audio scheduling. Visual events should be pushed to `playback.drawQueue` for synchronization in `requestAnimationFrame` loop.
 *   **Worker Sync**: State updates that affect engine logic (genre, intensity, chords) are automatically synced to the worker via the `subscribe` mechanism in `main.js`. Use `syncWorker(action, payload)` for explicit delta-based updates.
