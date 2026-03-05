@@ -175,6 +175,8 @@ export function InstrumentSettings({ module }) {
                                 <option value="classic">Classic Sawtooth</option>
                                 <option value="neo">Neo-Juno</option>
                                 <option value="vowel">Vowel Lead</option>
+                                <option value="trumpet">Trumpet</option>
+                                <option value="saxophone">Saxophone</option>
                             </select>
                         </div>
                         <div style="margin-bottom: 1rem;">
