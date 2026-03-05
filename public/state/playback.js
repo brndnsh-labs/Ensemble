@@ -34,6 +34,7 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} sustainActive - Whether the global sustain pedal is "pressed".
  * @property {boolean} songMode - Whether "Song Mode" (intelligent evolution and endings) is active.
  * @property {number} sessionTimer - Session timer in minutes (0 = infinite).
+ * @property {boolean} debugSoloist - Whether debug logging for the soloist is active.
  * @property {number} sessionStartTime - The performance.now() timestamp when playback started.
  * @property {boolean} stopAtEnd - Whether to stop at the end of the current progression/loop.
  * @property {boolean} isEndingPending - Whether the resolution sequence is about to trigger.
@@ -81,6 +82,7 @@ export const playback = {
     sustainActive: false,
     songMode: true,
     sessionTimer: 5,
+    debugSoloist: false,
     loopLimit: 0,
     currentLoopCount: 0,
     sessionStartTime: 0,

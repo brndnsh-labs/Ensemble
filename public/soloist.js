@@ -65,6 +65,12 @@ export function getSoloistNote(
 
     const intensity = playback.bandIntensity || 0.5;
 
+    const logDebug = (msg) => {
+        if (playback.debugSoloist) {
+            console.log(`[Soloist Debug] Step ${step}: ${msg}`);
+        }
+    };
+
     /**
      * Internal helper to finalize a note, updating history and session tracking.
      */
@@ -338,24 +344,42 @@ export function getSoloistNote(
         // Increment steps even when yielding so safety checks eventually trigger
         soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
 
-        // SAFETY: If we have been yielding for more than 4 measures, and we are in a long section,
-        // force a re-entry attempt to prevent permanent silence bugs.
+        // SAFETY: If we have been yielding for an extended period, force a re-entry attempt
+        // to prevent permanent silence bugs.
         const yieldProgress = soloist.currentPhraseSteps / stepsPerMeasure;
-        if (yieldProgress > 4.0 && Math.random() < 0.1) {
-            soloist.isYielding = false; // @worker-mutation
-            soloist.isResting = true; // Still resting, but allowed to start now
+
+        if (soloist.tradeMode === 'manual' && soloist.enabled) {
+            if (yieldProgress > 2.0) {
+                logDebug(
+                    `Stuck yielding for ${yieldProgress.toFixed(2)} measures in manual mode. Forcing re-entry.`,
+                );
+                soloist.isYielding = false; // @worker-mutation
+                soloist.isResting = true; // @worker-mutation (Still resting, but allowed to start now)
+            } else {
+                return null;
+            }
         } else {
-            return null;
+            // For trading modes, use the original, more lenient 4.0 measure threshold and 10% chance
+            // to avoid interfering with natural long trades.
+            if (yieldProgress > 4.0 && Math.random() < 0.1) {
+                logDebug(
+                    `Stuck yielding for ${yieldProgress.toFixed(2)} measures in trading mode. Forcing re-entry.`,
+                );
+                soloist.isYielding = false; // @worker-mutation
+                soloist.isResting = true; // @worker-mutation
+            } else {
+                return null;
+            }
         }
     }
 
     // --- 2. Phrasing & History Analysis ---
     if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
-        soloist.currentPhraseSteps = 0;
-        soloist.notesInPhrase = 0;
-        soloist.qaState = 'Question';
-        soloist.srdcState = 'Conclusion';
-        soloist.isResting = true;
+        soloist.currentPhraseSteps = 0; // @worker-mutation
+        soloist.notesInPhrase = 0; // @worker-mutation
+        soloist.qaState = 'Question'; // @worker-mutation
+        soloist.srdcState = 'Conclusion'; // @worker-mutation
+        soloist.isResting = true; // @worker-mutation
         soloist.currentCell = null; // @worker-mutation
         if (!soloist.pitchHistory) {
             soloist.pitchHistory = []; // @worker-mutation
@@ -471,7 +495,9 @@ export function getSoloistNote(
             (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.0;
 
         if (isEmergencyReentry && step % 16 === 0) {
-            // console.log(`[Soloist] Emergency Re-entry Triggered: restBars=${restBars.toFixed(2)}`);
+            logDebug(
+                `Emergency Re-entry Triggered: restBars=${restBars.toFixed(2)}, isHighEnergy=${isHighEnergyStyle}, intensity=${intensity.toFixed(2)}`,
+            );
         }
 
         const isDownbeat = measureStep === 0;
@@ -514,12 +540,18 @@ export function getSoloistNote(
         // Assertive entry: Force start on the '1' if we just enabled or traded in
         const isInitialEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
-        if (
+        const shouldStart =
             coordination.bypassRhythm ||
             isInitialEntry ||
             Math.random() < startProb ||
-            isEmergencyReentry
-        ) {
+            isEmergencyReentry;
+
+        if (shouldStart) {
+            if (!coordination.bypassRhythm && startProb < 1.0) {
+                logDebug(
+                    `Starting phrase. (isInitial=${isInitialEntry}, startProb=${startProb.toFixed(2)}, restBars=${restBars.toFixed(2)})`,
+                );
+            }
             soloist.isResting = false; // @worker-mutation
             soloist.isPhraseActive = true; // @worker-mutation
             soloist.currentPhraseSteps = 0; // @worker-mutation
@@ -628,7 +660,6 @@ export function getSoloistNote(
 
         soloist.isResting = true; // @worker-mutation
         soloist.isPhraseActive = false; // @worker-mutation
-        soloist.notesInPhrase = 0; // @worker-mutation
 
         // DYNAMIC BREATH: Instead of immediate potential re-entry,
         // set currentPhraseSteps to a negative value to force a minimum rest duration.
@@ -637,6 +668,11 @@ export function getSoloistNote(
         const lyricalBreath = lyricalBias * 4; // 0 to 4 steps
         const breathSteps = Math.floor(Math.random() * (breathIntensity + lyricalBreath)) + 1;
 
+        logDebug(
+            `Taking a breath for ${breathSteps} steps. (phrase was ${soloist.notesInPhrase} notes)`,
+        );
+
+        soloist.notesInPhrase = 0; // @worker-mutation
         soloist.currentPhraseSteps = -breathSteps; // @worker-mutation
         soloist.currentCell = null; // @worker-mutation
         if (soloist.sharedHookBuffer) {
