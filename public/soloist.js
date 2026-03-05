@@ -177,11 +177,35 @@ export function getSoloistNote(
         }
     }
 
+    // --- Form Awareness & Phrasing States ---
+    const remainingSteps = coordination.sectionEnd - step;
+    const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
+
+    // Evaluate transition state at the downbeat of the final measure
+    if (isFinalMeasure && measureStep === 0) {
+        soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
+        logDebug(`Selected transition state: ${soloist.transitionState}`);
+    } else if (!isFinalMeasure && step !== coordination.sectionStart) {
+        // Only reset if we are past the downbeat, so we can use it to resolve on step 0
+        soloist.transitionState = null; // @worker-mutation
+    }
+
     // --- 2. Simplified Phrasing State Machine ---
     if (soloist.isResting === undefined) {
         soloist.isResting = true; // @worker-mutation
         soloist.restSteps = stepsPerMeasure; // @worker-mutation
         soloist.activeSteps = 0; // @worker-mutation
+    }
+
+    // If we're in 'rest' transition, enforce silence starting from beat 3 or 4
+    if (isFinalMeasure && soloist.transitionState === 'rest') {
+        const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
+        // Force rest on beat 3 (or 4 if beats == 4 and random is low)
+        const restBeatStart = tsConfig.beats >= 4 && Math.random() < 0.5 ? 3 : 2;
+        if (beatInMeasure >= restBeatStart) {
+            soloist.isResting = true; // @worker-mutation
+            soloist.restSteps = remainingSteps; // @worker-mutation stay resting until next section
+        }
     }
 
     if (soloist.isResting) {
@@ -192,12 +216,22 @@ export function getSoloistNote(
             // Find a good rhythmic entry point (e.g. downbeat or strong 8th)
             const isGoodEntry =
                 stepInBeat === 0 || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
-            if (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure) {
+            // Don't break out if we are in the 'rest' transition late in the measure
+            const preventBreakout =
+                isFinalMeasure &&
+                soloist.transitionState === 'rest' &&
+                Math.floor(measureStep / stepsPerBeat) >= 2;
+
+            if (
+                !preventBreakout &&
+                (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure)
+            ) {
                 soloist.isResting = false; // @worker-mutation
                 soloist.notesInPhrase = 0; // @worker-mutation
                 // Calculate new active duration based on intensity and config
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
                 soloist.activeSteps = Math.floor(
+                    // @worker-mutation
                     baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
                 ); // @worker-mutation
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
@@ -219,10 +253,11 @@ export function getSoloistNote(
             const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
 
             soloist.restSteps = Math.floor(
+                // @worker-mutation
                 stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
             ); // @worker-mutation
             if (soloist.restSteps < 4) {
-                soloist.restSteps = 4; // minimum breath
+                soloist.restSteps = 4; // @worker-mutation minimum breath
             }
             logDebug(
                 `Resting for ~${soloist.restSteps} steps (Fatigue: ${fatigueMultiplier.toFixed(2)}x)`,
@@ -232,6 +267,10 @@ export function getSoloistNote(
     }
 
     // --- 3. Rhythmic Density ---
+    // Resolve on Downbeat
+    const isSectionDownbeat =
+        step === coordination.sectionStart && soloist.transitionState === 'lead_in';
+
     const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
     const baseAttackProb = emphasisMap[measureStep % 16];
 
@@ -240,6 +279,11 @@ export function getSoloistNote(
 
     const intensityScale = 0.5 + intensity * 2.0;
     let attackProb = baseAttackProb * intensityScale * warmUpScale;
+
+    // Increase rhythmic density for 'lead_in'
+    if (isFinalMeasure && soloist.transitionState === 'lead_in') {
+        attackProb *= 1.5; // Bump probability up significantly
+    }
 
     const stepCoord = coordination.stepCoordination || {};
     if (stepCoord.kickHit) {
@@ -253,6 +297,12 @@ export function getSoloistNote(
         attackProb = 1.0;
     }
 
+    // Force attack on downbeat resolution
+    if (isSectionDownbeat) {
+        attackProb = 1.0;
+        soloist.transitionState = null; // @worker-mutation (reset after resolution)
+    }
+
     if (Math.random() > attackProb) {
         return null;
     }
@@ -262,6 +312,17 @@ export function getSoloistNote(
 
     // --- 4. Pitch Selection ---
     CANDIDATE_WEIGHTS.fill(0);
+
+    // Harmonic Anticipation: Shift scale to upcoming chord 1 eighth-note (2 steps) before downbeat
+    if (
+        isFinalMeasure &&
+        soloist.transitionState === 'lead_in' &&
+        remainingSteps <= 2 &&
+        coordination.stepCoordination?.upcomingSectionFirstChord
+    ) {
+        targetChord = coordination.stepCoordination.upcomingSectionFirstChord;
+    }
+
     const scaleIntervals = getScaleForChord(targetChord, null, style);
     let scaleMask = 0;
     for (let i = 0; i < scaleIntervals.length; i++) {
@@ -310,6 +371,33 @@ export function getSoloistNote(
         // Reward chord tones
         if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
             weight += 150;
+        }
+
+        // Target Note Resolution
+        // When leading in, we target the upcoming chord. On the downbeat, the 'upcoming chord' IS the current targetChord.
+        const resolutionChord = isSectionDownbeat
+            ? targetChord
+            : coordination.stepCoordination?.upcomingSectionFirstChord;
+
+        if (
+            (isFinalMeasure || isSectionDownbeat) &&
+            (soloist.transitionState === 'lead_in' || isSectionDownbeat) &&
+            resolutionChord
+        ) {
+            const upcomingRoot = resolutionChord.rootMidi;
+            // The 3rd interval is typically the second element in intervals array
+            const upcoming3rd =
+                resolutionChord.intervals.length > 1 ? resolutionChord.intervals[1] : 4;
+            const upcomingInterval = (pc - (upcomingRoot % 12) + 12) % 12;
+
+            // Walk toward target note (Root or 3rd) of the upcoming chord
+            if (upcomingInterval === 0 || upcomingInterval === upcoming3rd % 12) {
+                if (isSectionDownbeat) {
+                    weight += 500; // Force resolution on downbeat
+                } else {
+                    weight += 100 + (stepsPerMeasure - remainingSteps) * 10; // Stronger pull as we get closer
+                }
+            }
         }
 
         // Melodic Smoothing Jump Penalty: Discourage large leaps (> 5th)
