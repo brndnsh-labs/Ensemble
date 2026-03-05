@@ -17,7 +17,13 @@ const mockState = {
         motifBuffer: [],
     },
     groove: { genreFeel: 'Jazz' },
-    playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
+    playback: {
+        bandIntensity: 0.5,
+        bpm: 120,
+        complexity: 0.5,
+        intent: { soloistMod: 0 },
+        currentLoopCount: 1,
+    },
     arranger: { timeSignature: '4/4' },
     chords: {},
     bass: {},
@@ -109,6 +115,7 @@ describe('Soloist SRDC State Machine', () => {
         const chordC = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         const spy = vi.spyOn(Math, 'random');
 
+        mockState.soloist.sessionSteps = 100; // Bypass initial entry logic
         // 1. Prime a motif in Statement phase
         mockState.soloist.srdcState = 'Conclusion';
         mockState.soloist.isResting = true;
