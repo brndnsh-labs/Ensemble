@@ -278,6 +278,15 @@ export function getSoloistNote(
             weight += 40;
         }
 
+        // Intensity-Based Register Ceiling: Reserve high octaves for high intensity
+        if (m >= 84 && intensity < 0.75) {
+            // Hard penalty for 6th octave (C6+) unless intensity is high
+            weight *= 0.05;
+        } else if (m >= 72 && intensity < 0.35) {
+            // Soft penalty for 5th octave (C5+) at very low intensity
+            weight *= 0.2;
+        }
+
         CANDIDATE_WEIGHTS[m] = weight;
         totalWeight += weight;
     }
