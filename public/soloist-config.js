@@ -1,5 +1,6 @@
 export const STYLE_CONFIG = {
     scalar: {
+        genreGravityOffset: 0,
         restBase: 0.1,
         tensionScale: 0.6,
         timingJitter: 8,
@@ -12,6 +13,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run', 'slide', 'guitarDouble'],
     },
     shred: {
+        genreGravityOffset: 0,
         restBase: 0.05,
         tensionScale: 0.3,
         timingJitter: 4,
@@ -24,6 +26,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run', 'guitarDouble'],
     },
     blues: {
+        genreGravityOffset: 0,
         restBase: 0.15,
         tensionScale: 0.8,
         timingJitter: 25,
@@ -36,6 +39,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
     },
     neo: {
+        genreGravityOffset: 0.015,
         restBase: 0.12,
         tensionScale: 0.7,
         timingJitter: 25,
@@ -48,6 +52,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['quartal', 'slide', 'guitarDouble'],
     },
     funk: {
+        genreGravityOffset: -0.005,
         restBase: 0.1,
         tensionScale: 0.4,
         timingJitter: 5,
@@ -60,6 +65,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['slide', 'run'],
     },
     hiphop: {
+        genreGravityOffset: 0.015,
         restBase: 0.15,
         tensionScale: 0.6,
         timingJitter: 20,
@@ -72,6 +78,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['bluesLick', 'slide', 'quartal'],
     },
     minimal: {
+        genreGravityOffset: 0,
         restBase: 0.3,
         tensionScale: 0.95,
         timingJitter: 35,
@@ -84,6 +91,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['slide', 'enclosure'],
     },
     bird: {
+        genreGravityOffset: 0,
         restBase: 0.05,
         tensionScale: 0.9,
         timingJitter: 12,
@@ -96,6 +104,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
     },
     disco: {
+        genreGravityOffset: 0,
         restBase: 0.1,
         tensionScale: 0.5,
         timingJitter: 8,
@@ -108,6 +117,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run'],
     },
     bossa: {
+        genreGravityOffset: 0,
         restBase: 0.12,
         tensionScale: 0.7,
         timingJitter: 15,
@@ -120,6 +130,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['enclosure', 'slide', 'guitarDouble'],
     },
     country: {
+        genreGravityOffset: 0,
         restBase: 0.08,
         tensionScale: 0.5,
         timingJitter: 4,
@@ -139,6 +150,7 @@ export const STYLE_CONFIG = {
         ],
     },
     metal: {
+        genreGravityOffset: 0,
         restBase: 0.1,
         tensionScale: 0.4,
         timingJitter: 2,
@@ -151,6 +163,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run'],
     },
     reggae: {
+        genreGravityOffset: 0,
         restBase: 0.12,
         tensionScale: 0.6,
         timingJitter: 20,
@@ -163,6 +176,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['guitarDouble'],
     },
     acoustic: {
+        genreGravityOffset: 0,
         restBase: 0.15,
         tensionScale: 0.4,
         timingJitter: 15,
@@ -175,6 +189,7 @@ export const STYLE_CONFIG = {
         allowedDevices: ['slide', 'run'],
     },
     ska: {
+        genreGravityOffset: -0.005,
         restBase: 0.1,
         tensionScale: 0.5,
         timingJitter: 5,
