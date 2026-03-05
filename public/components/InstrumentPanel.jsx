@@ -60,12 +60,14 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 <div class="instrument-tabs">
                     <button
                         class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
+                        aria-pressed={activeTab === 'classic'}
                         onClick={() => switchTab('classic')}
                     >
                         Classic
                     </button>
                     <button
                         class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
+                        aria-pressed={activeTab === 'smart'}
                         onClick={() => switchTab('smart')}
                     >
                         Smart
@@ -74,7 +76,9 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 <div style="display: flex; gap: 0.5rem; align-items: center;" ref={menuRef}>
                     <button
                         class={`panel-menu-btn ${isMenuOpen ? 'active' : ''}`}
-                        aria-label="Settings"
+                        aria-label={`${title} Settings`}
+                        aria-expanded={isMenuOpen}
+                        aria-haspopup="true"
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                     >
                         ⋮
