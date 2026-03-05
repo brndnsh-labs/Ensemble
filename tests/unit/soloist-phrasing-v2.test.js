@@ -112,4 +112,32 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
 
         randomSpy.mockRestore();
     });
+
+    it('should continue decrementing restSteps while in resting state', () => {
+        const localState = createMockState();
+        vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+
+        localState.soloist.isResting = true;
+        localState.soloist.restSteps = 10;
+
+        getSoloistNote(chord, null, 100, 440, 72, 'funk', 4, false);
+
+        expect(localState.soloist.restSteps).toBe(9);
+    });
+
+    it('should maintain liveness even with extreme intensity modifiers', () => {
+        const localState = createMockState();
+        vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+
+        // Test heavy negative modifier robustness (from old liveness test)
+        localState.playback.bandIntensity = 0.05;
+        // The engine should clamp or handle low probability without crashing
+        for (let i = 0; i < 32; i++) {
+            const res = getSoloistNote(chord, null, i, 440, 72, 'funk', i % 16, false);
+            expect(res).toBeDefined(); // Can be null, but shouldn't throw
+        }
+        expect(localState.soloist.sessionSteps).toBeGreaterThan(0);
+    });
 });
