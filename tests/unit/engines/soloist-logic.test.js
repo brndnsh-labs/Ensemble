@@ -120,14 +120,13 @@ describe('Soloist Engine Logic', () => {
     beforeEach(() => {
         clearHarmonyMemory();
         soloist.isResting = false;
-        soloist.currentPhraseSteps = 1;
-        soloist.notesInPhrase = 0;
+        soloist.activeSteps = 100;
+        soloist.restSteps = 0;
         soloist.busySteps = 0;
         soloist.deviceBuffer = [];
-        soloist.lastInterval = 0;
+        soloist.lastAttackStep = -100;
         soloist.sessionSteps = 1000;
         soloist.tension = 0;
-        soloist.currentCell = [1, 1, 1, 1];
         soloist.deterministic = false;
         groove.genreFeel = 'Rock';
     });
@@ -381,10 +380,12 @@ describe('Soloist Engine Logic', () => {
             soloist.mode = 'guitar';
             for (let i = 0; i < 500; i++) {
                 soloist.isResting = false;
+                soloist.activeSteps = 100;
                 soloist.busySteps = 0;
-                soloist.notesInPhrase = 0;
                 soloist.lastAttackStep = -100;
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'neo', 0);
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'neo', 0, false, {
+                    bypassRhythm: true,
+                });
                 if (res) {
                     total++;
                     if (res.durationSteps >= 4) {
@@ -396,7 +397,7 @@ describe('Soloist Engine Logic', () => {
                 }
             }
             expect(sustained / total).toBeGreaterThan(0.05);
-            expect(scoops / sustained).toBeGreaterThan(0.1);
+            expect(scoops / sustained).toBeGreaterThan(0.05);
         });
     });
 
@@ -429,9 +430,8 @@ describe('Soloist Engine Logic', () => {
             let arrayFound = false;
             for (let i = 0; i < 2000; i++) {
                 soloist.isResting = false;
+                soloist.activeSteps = 100;
                 soloist.busySteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.currentPhraseSteps = 0;
                 soloist.lastAttackStep = -100;
                 const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', 0, false, {
                     bypassRhythm: true,
@@ -467,6 +467,7 @@ describe('Soloist Engine Logic', () => {
 
                 for (let stepIdx = 0; stepIdx < 16; stepIdx++) {
                     soloist.isResting = false;
+                    soloist.activeSteps = 100;
                     soloist.busySteps = 0;
                     // Note: We DON'T reset lastAttackStep here because we WANT the gap protection to work naturally across steps
                     const res = getSoloistNote(

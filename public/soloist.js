@@ -270,6 +270,11 @@ export function getSoloistNote(
             weight += 150;
         }
 
+        // Melodic Smoothing Jump Penalty: Discourage large leaps (> 5th)
+        if (dist > 7) {
+            weight *= 0.4;
+        }
+
         // Register Centering Force: Stronger penalty for drifting too far from dynamic center
         const distFromCenter = Math.abs(m - dynamicCenter);
         if (distFromCenter <= 7) {
