@@ -1515,6 +1515,7 @@ function handlePrime(steps) {
     soloist.hookBuffer = []; // @worker-mutation
     soloist.isReplayingMotif = false; // @worker-mutation
     soloist.isReplayingSeed = false; // @worker-mutation
+    soloist.lastAttackStep = -100; // @worker-mutation
 
     // Local cursors for priming
     const primeCursor = { index: 0, sectionIndex: 0 };

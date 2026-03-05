@@ -258,7 +258,7 @@ const STYLE_CONFIG = {
 };
 
 const STYLE_EMPHASIS = {
-    scalar: [1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2, 1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2],
+    scalar: [1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3, 1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3],
     bird: [0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0], // Offbeat push
     shred: [1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9],
     funk: [1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4, 1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4],
@@ -529,8 +529,8 @@ export function getSoloistNote(
         activeStyle === 'bird'
             ? 0.6 * headFactor // Jazz starts VERY lyrical (the "Head") and transitions to shred (0.0)
             : playback.lyricalBias !== undefined
-              ? Math.min(1.0, playback.lyricalBias + 0.3 * headFactor)
-              : 0.5 + 0.3 * headFactor;
+              ? Math.min(1.0, playback.lyricalBias + 0.15 * headFactor)
+              : 0.5 + 0.15 * headFactor;
     const complexity =
         activeStyle === 'bird'
             ? 1.0
@@ -706,6 +706,11 @@ export function getSoloistNote(
         activeStyle === 'bird' || activeStyle === 'shred' || activeStyle === 'ska';
 
     if (soloist.isResting) {
+        if (soloist.currentPhraseSteps < 0) {
+            soloist.currentPhraseSteps++; // @worker-mutation
+            return null;
+        }
+
         soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
         if (isSuppressedByAntiphony) {
             return null;
@@ -849,10 +854,6 @@ export function getSoloistNote(
         }
     }
 
-    if (soloist.currentPhraseSteps < 0) {
-        soloist.currentPhraseSteps++; // @worker-mutation
-        return null;
-    }
     const breakProb = restProb;
 
     if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < breakProb) {
@@ -885,11 +886,6 @@ export function getSoloistNote(
         if (soloist.sharedHookBuffer) {
             soloist.sharedHookBuffer = []; // @worker-mutation
         }
-        return null;
-    }
-
-    if (soloist.currentPhraseSteps < 0) {
-        soloist.currentPhraseSteps++; // @worker-mutation
         return null;
     }
 
@@ -1088,7 +1084,7 @@ export function getSoloistNote(
     }
 
     // Reactive Alignment (Option 1): Boost attacks on drum hits for high-energy styles
-    if (activeStyle === 'funk' || activeStyle === 'rock' || activeStyle === 'shred') {
+    if (activeStyle === 'funk' || activeStyle === 'scalar' || activeStyle === 'shred') {
         if (kickHit) {
             baseAttackProb += 0.3;
         }
