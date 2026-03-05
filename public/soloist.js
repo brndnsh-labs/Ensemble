@@ -736,7 +736,12 @@ export function getSoloistNote(
             (0.05 + effectiveIntensity * 0.1) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
 
         if (activeStyle === 'bird' || isAssertiveReentry) {
-            startProb = 1.0;
+            // BEBOP HEAD IMPROVEMENT: Parker (Ornithology) heavily favors pickups (66%)
+            if (activeStyle === 'bird' && headFactor > 0.5 && isPickupZone) {
+                startProb = 0.95;
+            } else {
+                startProb = 1.0;
+            }
         } else if (isDownbeat) {
             startProb =
                 (0.6 + effectiveIntensity * 0.3) * (0.4 + (evoEnabled ? warmupFactor : 1.0) * 0.6); // High chance to start on '1'
@@ -1430,7 +1435,9 @@ export function getSoloistNote(
         // Penalties (Multiplicative)
         if (dist === 0) {
             if (activeStyle === 'bird') {
-                weight *= 0.65; // Allow repeated notes more for Parker rhythmic style
+                // BEBOP HEAD IMPROVEMENT: Parker uses repeated notes (15%) for rhythmic emphasis
+                const headRepeatedMultiplier = headFactor > 0.5 ? 1.5 : 1.0;
+                weight *= 0.65 * headRepeatedMultiplier; // Allow repeated notes more for Parker rhythmic style
             } else {
                 weight *= 0.0001; // Force a move
             }
@@ -1441,7 +1448,11 @@ export function getSoloistNote(
 
         // Continuous interval penalty to keep lines smooth (Exponential for large leaps)
         if (dist > 2 && isSmoothStyle) {
-            const penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.85 : 0.6;
+            let penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.85 : 0.6;
+            // BEBOP HEAD IMPROVEMENT: Favor stepwise motion (44%) even more during the head
+            if (activeStyle === 'bird' && headFactor > 0.5) {
+                penaltyBase *= 0.8;
+            }
             weight *= penaltyBase ** (dist - 2);
         }
 

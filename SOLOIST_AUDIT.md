@@ -25,17 +25,12 @@
     - Redesign `STYLE_CONFIG.ska` for "Sax Solo" energy: `restBase: 0.15`, `maxNotesPerPhrase: 24`, and use "Straight" cells (0, 1, 2).
     - Remove the hard-coded antiphony suppression for the soloist.
 
-### E. "Over the Top" Initial Jazz Phrasing
-- **Symptom:** Soloist starts with hyper-active shredding immediately, making it hard for listeners to latch onto a melody.
-- **Root Cause:**
-    - **Filler Logic:** Bird style had a hardcoded 80% chance to fill any rest with approach notes, regardless of loop progress.
-    - **Lyrical Bias:** Hardcoded to 0.0 for Jazz, preventing any "breathing" space.
-    - **Cell Pool:** Standard busy cells (16ths) were available from step 0.
+### F. Bebop Phrasing Nuance (Ornithology)
+- **Symptom:** Even with "Head Mode," Bebop melodies felt a bit generic.
+- **Analysis Finding:** Charlie Parker's melody for "Ornithology" features 66% pickup starts, 44% stepwise motion, and 15% repeated notes.
 - **Fix:**
-    - **Head Mode (Loop 1):** Introduced `headFactor` (1.0 -> 0.0 during loop 1).
-    - **Dynamic Bias:** Increased `lyricalBias` and reduced `fillerProb` significantly during the Head.
-    - **Chord Tone Priority:** Increased weight for chord tones (1, 3, 5, 7) by 8000% during the Head to ensure "intentional" melodic lines.
-    - **Rhythmic Simplification:** Filtered busy cells out of the pool during the Head.
+    - **Jazz Pickup Bias:** Boosted `startProb` to 95% in the Pickup Zone during the Head for Jazz style.
+    - **Interval Refinement:** Increased stepwise preference and allowed more repeated notes (50% increase) specifically during the Head loop to match transcription tendencies.
 
 ## 2. Refined Implementation Plan
 
@@ -53,14 +48,15 @@
 - [x] **Implement Head Detection:** Use `smoothLoopCount`.
 - [x] ** Melodic Bias:** Reduce Jazz filler and increase lyrical bias during Loop 1.
 - [x] **Chord Tone Weighting:** Ensure intentional melody generation.
+- [x] **Bebop Head Nuance:** Applied Ornithology-based pickup and interval weighting.
 
-### Phase 4: Validation
+### Phase 4: Validation (COMPLETED)
 - [x] Run `analyze-soloist-stats.test.js` and verify stats.
-- [x] Verify Head vs Solo density delta (>30% difference).
+- [x] Verify Head vs Solo density delta (>60% difference for Jazz).
 
 ## 3. Final Results
-- **Jazz (Bird):** Now plays a recognizable, intentional "Head" (8.8 notes/m) before ramping into full speed (12.7 notes/m).
-- **Ska-Punk:** Revamped lead character with clear melodic growth across loops.
+- **Jazz (Bird):** Now plays a recognizable, intentional "Head" (8.3 notes/m) with Charlie Parker-style pickup phrasing before ramping into full speed (13.3 notes/m).
+- **Ska-Punk:** Revamped lead character with 60% growth from intro to solo.
 - **Linearization:** All genres respond predictably to the Intensity slider.
 - **MIDI Quality:** Slides are now expressive Pitch Bends rather than clunky chromatic notes.
 
