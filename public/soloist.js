@@ -228,6 +228,10 @@ export function getSoloistNote(
     const rootMidi = targetChord.rootMidi;
     let totalWeight = 0;
 
+    // Register Centering: Shift center up with intensity
+    const baseCenter = 64; // E4
+    const dynamicCenter = baseCenter + intensity * 12;
+
     // Confine search to nearby notes
     const searchMin = Math.max(minMidi, lastMidi - 14);
     const searchMax = Math.min(maxMidi, lastMidi + 14);
@@ -264,6 +268,14 @@ export function getSoloistNote(
         // Reward chord tones
         if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
             weight += 150;
+        }
+
+        // Register Centering Force: Stronger penalty for drifting too far from dynamic center
+        const distFromCenter = Math.abs(m - dynamicCenter);
+        if (distFromCenter <= 7) {
+            weight += 100;
+        } else if (distFromCenter <= 14) {
+            weight += 40;
         }
 
         CANDIDATE_WEIGHTS[m] = weight;
