@@ -483,7 +483,21 @@ class ExportProcessor {
             accompanimentMidis: [],
             kickHit: false,
             snareHit: false,
+            upcomingSectionFirstChord: null,
         };
+
+        if (chordData) {
+            const { sectionEnd } = chordData;
+            const remainingSteps = sectionEnd - globalStep;
+            const stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
+
+            if (remainingSteps <= stepsPerMeasure) {
+                const nextSectionChordData = getChordAtStep(sectionEnd, this.exportLookaheadCursor);
+                if (nextSectionChordData?.chord) {
+                    coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
+                }
+            }
+        }
 
         // Pre-calculate Drum Hits for Coordination
         if (this.includedTracks.includes('drums')) {
@@ -1159,6 +1173,22 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
 
         // Reset step coordination for this specific step
         stepCoordination.step = step;
+        stepCoordination.upcomingSectionFirstChord = null;
+
+        if (chordData) {
+            const { sectionEnd } = chordData;
+            const remainingSteps = sectionEnd - step;
+            const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+            const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
+
+            // Look ahead to the next section if we are within 1 measure of the end
+            if (remainingSteps <= stepsPerMeasure) {
+                const nextSectionChordData = getChordAtStep(sectionEnd, lookaheadCursor);
+                if (nextSectionChordData?.chord) {
+                    stepCoordination.upcomingSectionFirstChord = nextSectionChordData.chord;
+                }
+            }
+        }
         stepCoordination.bassHit = false;
         stepCoordination.bassMidi = 0;
         stepCoordination.soloistActive = false;
@@ -1572,12 +1602,24 @@ function handlePrime(steps) {
                 accompanimentMidis: [],
                 kickHit: false,
                 snareHit: false,
+                upcomingSectionFirstChord: null,
             };
+
+            const { sectionEnd } = chordData;
+            const remainingSteps = sectionEnd - s;
+            const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
+
+            if (remainingSteps <= stepsPerMeasure) {
+                const nextSectionChordData = getChordAtStep(sectionEnd, primeLookaheadCursor);
+                if (nextSectionChordData?.chord) {
+                    coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
+                }
+            }
 
             // 1. Prime Bass (if enabled) to update bass.lastFreq
             if (bass.enabled) {
                 if (isBassActive(bass.style, s, stepInChord)) {
-                    const { sectionStart, sectionEnd } = chordData;
+                    const { sectionStart } = chordData;
                     const centerMidi = bass.octave;
                     const bassResult = getBassNote(
                         chord,
@@ -1603,7 +1645,7 @@ function handlePrime(steps) {
             }
 
             // 2. Prime Soloist
-            const { sectionStart, sectionEnd } = chordData;
+            const { sectionStart } = chordData;
 
             const soloResult = getSoloistNote(
                 chord,
