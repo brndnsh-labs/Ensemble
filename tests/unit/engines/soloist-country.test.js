@@ -148,12 +148,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.pitchHistory = [];
 
                 const res = getSoloistNote(chordC, null, 16, 440, 72, 'country', 0);
-                if (
-                    res &&
-                    !Array.isArray(res) &&
-                    soloist.deviceBuffer.length === 1 &&
-                    res.velocity >= 0.5
-                ) {
+                if (res && !Array.isArray(res) && res.bendStartInterval === 1) {
                     triggered = true;
                     break;
                 }

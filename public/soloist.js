@@ -142,8 +142,8 @@ const STYLE_CONFIG = {
         doubleStopProb: 0.0,
         anticipationProb: 0.25,
         targetExtensions: [2, 9, 11],
-        deviceProb: 0.25,
-        allowedDevices: ['slide'],
+        deviceProb: 0.15,
+        allowedDevices: ['slide', 'enclosure'],
         motifProb: 0.7,
         hookProb: 0.5,
     },
@@ -160,7 +160,7 @@ const STYLE_CONFIG = {
         anticipationProb: 0.8, // Play over the changes heavily
         targetExtensions: [2, 5, 6, 9],
         deviceProb: 0.4,
-        allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble'],
+        allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
         motifProb: 0.2,
         hookProb: 0.1,
     },
@@ -268,27 +268,27 @@ const STYLE_CONFIG = {
         doubleStopProb: 0.1,
         anticipationProb: 0.15,
         targetExtensions: [2, 9],
-        deviceProb: 0.2,
-        allowedDevices: ['slide'],
+        deviceProb: 0.1,
+        allowedDevices: ['slide', 'run'],
         motifProb: 0.5,
         hookProb: 0.3,
     },
     ska: {
-        restBase: 0.6,
-        restGrowth: 0.2,
-        cells: [1, 6, 8, 10, 14, 15, 16],
+        restBase: 0.2,
+        restGrowth: 0.05,
+        cells: [15, 6, 8, 10, 1], // Syncopated 8ths, ties, straight 8ths/16ths
         registerSoar: 10,
         tensionScale: 0.5,
         timingJitter: 5,
-        maxNotesPerPhrase: 8,
-        minNotesPerPhrase: 2,
+        maxNotesPerPhrase: 24,
+        minNotesPerPhrase: 4,
         doubleStopProb: 0.2,
-        anticipationProb: 0.1,
-        targetExtensions: [2, 9],
-        deviceProb: 0.15,
-        allowedDevices: ['run', 'slide', 'guitarDouble'],
-        motifProb: 0.5,
-        hookProb: 0.3,
+        anticipationProb: 0.3, // Higher anticipation for the "push" feel
+        targetExtensions: [2, 4, 9], // Major / Lydian / Mixolydian feel
+        deviceProb: 0.35,
+        allowedDevices: ['run', 'slide', 'guitarDouble', 'enclosure', 'chromaticFall'],
+        motifProb: 0.4,
+        hookProb: 0.2,
     },
 };
 
@@ -356,7 +356,7 @@ export function getSoloistNote(
     isPriming,
     coordination = {},
 ) {
-    const { playback, groove, soloist, harmony, arranger } = getState();
+    const { playback, groove, soloist, arranger } = getState();
     if (!currentChord) {
         return null;
     }
@@ -520,9 +520,6 @@ export function getSoloistNote(
     if (activeStyle === 'bird') {
         warmupFactor = 1.0;
     }
-    if (activeStyle === 'bird') {
-        warmupFactor = 1.0;
-    }
     const effectiveIntensity =
         activeStyle === 'bird'
             ? 1.0
@@ -658,50 +655,36 @@ export function getSoloistNote(
     }
 
     const phraseBars = soloist.currentPhraseSteps / stepsPerMeasure;
-    let restProb =
-        config.restBase * (3.0 - effectiveIntensity * 2.0) + phraseBars * config.restGrowth;
 
-    // Apply lyrical bias: Higher bias = more rests, shorter phrases
-    // BIRD EXCEPTION: Bird style is inherently 'busy', don't let lyricalBias silence it completely
     const effectiveLyricalBias = activeStyle === 'bird' ? lyricalBias * 0.25 : lyricalBias;
-    restProb += effectiveLyricalBias * 0.2;
     const effectiveMaxNotes = Math.max(
         2,
         Math.round(config.maxNotesPerPhrase * (1.5 - effectiveLyricalBias)),
     );
 
-    // Low intensity damping (Continuous)
-    // Avoids abrupt jumps at the 0.35 threshold by using a smooth interpolation.
-    if (intensity < 0.5) {
-        const dampingAmount = Math.max(0, (0.5 - intensity) * 1.5);
-        if (activeStyle === 'bird') {
-            // Bird should stay busy but still has a slight intensity floor
-            // But NOT at extreme BPMs where density is already high
-            if (playback.bpm < 185) {
-                restProb -= intensity * 0.1;
-            }
-        } else {
-            restProb += dampingAmount;
-        }
-    }
+    // Intensity Linearization: Lower the floor of restBase as intensity increases
+    // Scales more aggressively. At intensity 1.0, restBase is multiplied by 0.5. At 0.0, by 2.0.
+    const intensityDamping = 2.0 - effectiveIntensity * 1.5;
+    let restProb = config.restBase * intensityDamping + phraseBars * config.restGrowth;
+
+    // Apply lyrical bias: Higher bias = more rests, shorter phrases
+    restProb += effectiveLyricalBias * 0.2;
+
+    // Session Maturity: Reduce rest probability over time to simulate a warming up soloist
+    restProb -= maturityFactor * 0.15 + smoothLoopCount * 0.02;
 
     // High BPM Damping (Anti-Shred Safety)
     if (playback.bpm > 150) {
         restProb += 0.15;
-        if (playback.bpm > 180) {
-            restProb += 0.15;
-        }
-        if (activeStyle === 'bird' && playback.bpm > 185) {
-            restProb += 0.25; // Extra damping for Bird at 200 BPM
+        if (playback.bpm > 185) {
+            restProb += activeStyle === 'bird' ? 0.25 : 0.15;
         }
     }
 
-    // Phrase interlocking
-    if (harmony.enabled && harmony.rhythmicMask > 0) {
-        // Adjusted logic: soloist and harmony stepped on each other too much. Removing this restProb modifier.
-    }
-
-    restProb = activeStyle === 'bird' ? 0.05 : Math.max(0.05, restProb - maturityFactor * 0.15);
+    restProb =
+        activeStyle === 'bird'
+            ? Math.max(0.02, restProb)
+            : Math.max(0.05, restProb - maturityFactor * 0.15);
 
     // SAFETY: Ensure minimum notes per phrase are played before resting
     const minNotes = config.minNotesPerPhrase || 2;
@@ -714,16 +697,13 @@ export function getSoloistNote(
     }
 
     // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
-    let isSuppressedByAntiphony = false;
-    if (groove.genreFeel === 'Ska-Punk' && effectiveIntensity < 0.7 && !soloist.isReplayingMotif) {
-        const measureIdx = Math.floor(step / stepsPerMeasure);
-        // Soloist plays on odd measures (1, 3, 5...) -> Call
-        // Harmony plays on even measures (0, 2, 4...) -> Response
-        if (measureIdx % 2 === 0) {
-            isSuppressedByAntiphony = true;
-            restProb = 1.0; // Force rest
-        }
-    }
+    // Removed: Soloist should be its own thing in Ska-Punk, not suppressed by the horn section.
+    const isSuppressedByAntiphony = false;
+
+    // High Intensity Re-entry Logic (Anti-Dead-Air)
+    const restBars = soloist.currentPhraseSteps / stepsPerMeasure;
+    const isHighEnergyStyle =
+        activeStyle === 'bird' || activeStyle === 'shred' || activeStyle === 'ska';
 
     if (soloist.isResting) {
         if (isSuppressedByAntiphony) {
@@ -731,7 +711,6 @@ export function getSoloistNote(
         }
 
         // --- Musical Entry Improvement ---
-        // If we are waiting for a clean entry, only allow starting on the downbeat of a measure.
         if (soloist.isWaitingForEntry) {
             if (measureStep === 0) {
                 soloist.isWaitingForEntry = false; // @worker-mutation
@@ -740,11 +719,12 @@ export function getSoloistNote(
             }
         }
 
-        // --- Realistic Phrase Starts (Pickup vs Downbeat) ---
-        // Instead of starting on any random step, heavily bias starts towards musically logical places:
-        // 1. Downbeat of a measure (Beat 1)
-        // 2. Pickup note (Beat 4, or Beat 4 "and")
-        // 3. Very low probability for other random mid-measure starts
+        // --- Assertive Re-entry ---
+        // If we are a high energy style and we've rested for more than 1/2 measure,
+        // allow re-entry on any 8th note division if intensity is high.
+        const is8thNote = measureStep % (stepsPerBeat / 2) === 0;
+        const isAssertiveReentry =
+            isHighEnergyStyle && intensity > 0.7 && restBars > 0.5 && is8thNote;
 
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
@@ -752,7 +732,7 @@ export function getSoloistNote(
         let startProb =
             (0.05 + effectiveIntensity * 0.1) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
 
-        if (activeStyle === 'bird') {
+        if (activeStyle === 'bird' || isAssertiveReentry) {
             startProb = 1.0;
         } else if (isDownbeat) {
             startProb =
@@ -763,17 +743,14 @@ export function getSoloistNote(
         }
 
         // SAFETY: If we have been resting for more than 4 measures, force re-entry
-        const restBars = soloist.currentPhraseSteps / stepsPerMeasure;
         if (restBars > 4.0) {
             startProb = Math.max(startProb, 0.5 + (restBars - 4.0) * 0.2);
         }
 
-        // (Removed early loop extra sparsity constraint)
-
         // Assertive entry: Force start on the '1' if we just enabled or traded in
-        const isAssertiveEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
+        const isInitialEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
-        if (isAssertiveEntry || Math.random() < startProb) {
+        if (isInitialEntry || Math.random() < startProb) {
             soloist.isResting = false;
             soloist.currentPhraseSteps = 0;
             soloist.notesInPhrase = 0; // @worker-mutation
@@ -1650,12 +1627,10 @@ export function getSoloistNote(
                     // Major/Minor Clash: b3 (slide) -> 3 -> 5 -> 6 -> R
                     lick = [
                         {
-                            midi: selectedMidi,
+                            midi: selectedMidi + 1,
                             durationSteps: duration,
-                            bendStartInterval: 0,
-                            slideTarget: selectedMidi + 1,
-                        }, // b3
-                        { midi: selectedMidi + 1, durationSteps: duration }, // 3 (Major)
+                            bendStartInterval: 1, // Slide up from b3 to 3
+                        }, // 3 (Major)
                         { midi: selectedMidi + 4, durationSteps: duration }, // 5
                         { midi: selectedMidi + 7, durationSteps: duration }, // b7
                         { midi: selectedMidi + 9, durationSteps: duration * 2 }, // Root
@@ -1716,6 +1691,19 @@ export function getSoloistNote(
             }
         }
 
+        if (deviceType === 'chromaticFall') {
+            const steps = Math.floor(Math.random() * 3) + 3; // 3-5 steps
+            const duration = 1; // 16ths
+            for (let i = 0; i < steps; i++) {
+                deviceBuffer.push({
+                    midi: Math.max(minMidi, selectedMidi - i),
+                    durationSteps: duration,
+                    velocity: devBaseVel * (1.1 - i * 0.1),
+                    style: activeStyle,
+                });
+            }
+        }
+
         if (deviceType === 'graceNote') {
             // ... (rest of device logic remains similar, but using deviceBuffer)
         }
@@ -1764,20 +1752,13 @@ export function getSoloistNote(
         }
         if (deviceType === 'graceSlide') {
             // Half-step slide into a chord tone (usually minor 3rd to major 3rd)
-            const targetMidi = selectedMidi;
             deviceBuffer = [
                 {
-                    midi: targetMidi - 1,
-                    velocity: devBaseVel * 1.1,
-                    durationSteps: 1,
-                    style: activeStyle,
-                    bendStartInterval: 0,
-                },
-                {
-                    midi: targetMidi,
+                    midi: selectedMidi,
                     velocity: devBaseVel * 1.2,
                     durationSteps: 2,
                     style: activeStyle,
+                    bendStartInterval: 1, // Slide up from -1 semitone
                 },
             ];
         }
@@ -1881,16 +1862,11 @@ export function getSoloistNote(
                     : -1;
             deviceBuffer = [
                 {
-                    midi: selectedMidi + dir,
-                    velocity: devBaseVel * 0.95,
-                    durationSteps: 1,
-                    style: activeStyle,
-                },
-                {
                     midi: selectedMidi,
                     velocity: devBaseVel * 1.15,
-                    durationSteps: 1,
+                    durationSteps: 2,
                     style: activeStyle,
+                    bendStartInterval: -dir, // dir -1 -> slide UP (bend 1), dir 1 -> slide DOWN (bend -1)
                 },
             ];
         }

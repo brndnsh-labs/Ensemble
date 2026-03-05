@@ -12,15 +12,27 @@ if (!fs.existsSync(filePath)) {
     process.exit(1);
 }
 
+const targetPartName = process.argv[3]; // e.g., "GUITAR SOLO"
+
 const xmlString = fs.readFileSync(filePath, 'utf-8');
 const parsed = parseMusicXML(xmlString);
 
-if (!parsed.leadSheetMelody || parsed.leadSheetMelody.length === 0) {
-    console.error('No melody found in MusicXML');
-    process.exit(1);
-}
+let melody = [];
 
-const melody = parsed.leadSheetMelody.sort((a, b) => a.globalStep - b.globalStep);
+if (targetPartName) {
+    const part = parsed.parts.find((p) => p.name === targetPartName);
+    if (!part || !part.notes || part.notes.length === 0) {
+        console.error(`Part not found or empty: ${targetPartName}`);
+        process.exit(1);
+    }
+    melody = part.notes.sort((a, b) => a.globalStep - b.globalStep);
+} else {
+    if (!parsed.leadSheetMelody || parsed.leadSheetMelody.length === 0) {
+        console.error('No melody found in MusicXML');
+        process.exit(1);
+    }
+    melody = parsed.leadSheetMelody.sort((a, b) => a.globalStep - b.globalStep);
+}
 
 // Filter out duplicates (often caused by Staff 1 + TAB Staff 2 being identical in some MusicXMLs)
 const uniqueMelody = [];
