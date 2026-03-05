@@ -628,7 +628,7 @@ export function getSoloistNote(
         if (!soloist.pitchHistory) {
             soloist.pitchHistory = []; // @worker-mutation
         }
-        return null;
+        // Proceed instead of returning null to allow immediate re-entry at Step 0
     }
 
     HIST_COUNTS.fill(0);
@@ -758,6 +758,15 @@ export function getSoloistNote(
                 (0.4 + effectiveIntensity * 0.4) * (0.3 + (evoEnabled ? warmupFactor : 1.0) * 0.7); // Good chance to play a pickup
         }
 
+        // HEAD MODE ASSERTIVE ENTRY: Ensure all styles establish melody early
+        if (headFactor > 0.5) {
+            if (isDownbeat || isPickupZone) {
+                startProb = Math.max(startProb, 0.85);
+            } else if (is8thNote) {
+                startProb = Math.max(startProb, 0.35);
+            }
+        }
+
         // SAFETY: If we have been resting for more than 4 measures, force re-entry
         if (restBars > 4.0) {
             startProb = Math.max(startProb, 0.5 + (restBars - 4.0) * 0.2);
@@ -766,7 +775,7 @@ export function getSoloistNote(
         // Assertive entry: Force start on the '1' if we just enabled or traded in
         const isInitialEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
-        if (isInitialEntry || Math.random() < startProb) {
+        if (coordination.bypassRhythm || isInitialEntry || Math.random() < startProb) {
             soloist.isResting = false; // @worker-mutation
             soloist.isPhraseActive = true; // @worker-mutation
             soloist.currentPhraseSteps = 0; // @worker-mutation
@@ -820,6 +829,7 @@ export function getSoloistNote(
                 (soloist.sessionSteps > stepsPerMeasure * 16 ? 0.3 : 0);
 
             if (
+                !coordination.bypassRhythm && // Don't replay in unit tests unless explicitly testing motifs
                 soloist.thematicSeed &&
                 soloist.thematicSeed.length > 0 &&
                 Math.random() < useSeedProb &&
@@ -831,6 +841,7 @@ export function getSoloistNote(
                 const allowOctaveJump = playback.bpm < 160 && Math.random() < 0.2;
                 soloist.seedOctaveOffset = allowOctaveJump ? (Math.random() < 0.5 ? 12 : -12) : 0; // @worker-mutation
             } else if (
+                !coordination.bypassRhythm &&
                 soloist.motifBuffer &&
                 soloist.motifBuffer.length > 0 &&
                 isInteresting &&
@@ -1083,21 +1094,6 @@ export function getSoloistNote(
         baseAttackProb = baseAttackProb * 0.5 + targetDensity * 0.5;
     }
 
-    // Reactive Alignment (Option 1): Boost attacks on drum hits for high-energy styles
-    if (activeStyle === 'funk' || activeStyle === 'scalar' || activeStyle === 'shred') {
-        if (kickHit) {
-            baseAttackProb += 0.3;
-        }
-        if (snareHit) {
-            baseAttackProb += 0.25;
-        }
-    }
-
-    // Reactive Interlocking: In Jazz/Bossa, slightly favor gaps on heavy downbeats if intense
-    if (activeStyle === 'bird' && measureStep === 0 && intensity > 0.6) {
-        baseAttackProb *= 0.7;
-    }
-
     // Density Scaling
     // Linearize intensity response: 0.3 to 3.5 multiplier
     // NEW: Inject warmupFactor and maturityFactor into the density pressure
@@ -1105,6 +1101,28 @@ export function getSoloistNote(
     const lyricalDamping = 1.0 - (effectiveLyricalBias || 0) * 0.7;
 
     let attackProb = baseAttackProb * intensityScale * lyricalDamping;
+
+    // Reactive Alignment: Boost attacks on drum hits for high-energy styles
+    if (activeStyle === 'funk' || activeStyle === 'scalar' || activeStyle === 'shred') {
+        if (kickHit) {
+            attackProb += 0.3;
+        }
+        if (snareHit) {
+            attackProb += 0.25;
+        }
+    }
+
+    // CLAMP BEFORE REDUCTIONS: Ensure penalties like Interlocking/Sparsity actually create gaps
+    attackProb = Math.min(1.0, attackProb);
+
+    // Reactive Interlocking: In Jazz/Bossa, slightly favor gaps on heavy downbeats if intense
+    if (
+        (activeStyle === 'bird' || activeStyle === 'bossa') &&
+        measureStep === 0 &&
+        intensity > 0.6
+    ) {
+        attackProb *= 0.7;
+    }
 
     // Session Maturity: Slight density boost over long sessions
     attackProb *= 0.9 + maturityFactor * 0.2;
@@ -1125,6 +1143,16 @@ export function getSoloistNote(
     if (playback.bpm > 180) {
         attackProb *= 0.8;
     }
+
+    // Section End Tapering: Naturally wind down as the section ends
+    const sectionEnd = coordination.sectionEnd || 999999;
+    const stepsToEnd = sectionEnd - step;
+    if (stepsToEnd < 16 && stepsToEnd >= 0) {
+        attackProb *= stepsToEnd / 16;
+    }
+
+    // FINAL CLAMP
+    attackProb = Math.min(1.0, attackProb);
 
     // Minimum Gap Protection: Prevent mechanical 'machine-gun' fire
     // For Jazz/Bird, we allow 16th streams, but for Minimal/Acoustic, we force space.

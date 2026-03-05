@@ -14,6 +14,7 @@ const { mockState } = vi.hoisted(() => ({
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 100,
+            lastAttackStep: -100,
         },
         groove: { genreFeel: 'Funk' },
         playback: { bandIntensity: 0.8, complexity: 0.8, bpm: 120, intent: {} },
@@ -32,12 +33,19 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         let hitsWithDrum = 0;
         let hitsWithoutDrum = 0;
-        const iterations = 5000;
+        const iterations = 10000;
+
+        // Use a moderate intensity to avoid saturation
+        mockState.playback.bandIntensity = 0.4;
+        mockState.groove.genreFeel = 'Funk';
 
         // Run with drum hits
         for (let i = 0; i < iterations; i++) {
             mockState.soloist.busySteps = 0;
-            mockState.soloist.lastAttackStep = -10;
+            mockState.soloist.lastAttackStep = -100;
+            mockState.soloist.currentPhraseSteps = 0;
+            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.isResting = false;
             const context = { stepCoordination: { kickHit: true, snareHit: false } };
             const res = getSoloistNote(chord, null, 0, 440, 60, 'funk', 0, false, context);
             if (res) {
@@ -48,7 +56,10 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         // Run without drum hits
         for (let i = 0; i < iterations; i++) {
             mockState.soloist.busySteps = 0;
-            mockState.soloist.lastAttackStep = -10;
+            mockState.soloist.lastAttackStep = -100;
+            mockState.soloist.currentPhraseSteps = 0;
+            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.isResting = false;
             const context = { stepCoordination: { kickHit: false, snareHit: false } };
             const res = getSoloistNote(chord, null, 0, 440, 60, 'funk', 0, false, context);
             if (res) {
@@ -65,25 +76,32 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         let hitsNormal = 0;
         let hitsDownbeatCoord = 0;
-        const iterations = 5000;
+        const iterations = 20000;
 
         // Normal offbeat (step 3)
+        // Use intensity just above threshold to avoid saturation
+        mockState.playback.bandIntensity = 0.61;
+        mockState.groove.genreFeel = 'Jazz';
         for (let i = 0; i < iterations; i++) {
             mockState.soloist.busySteps = 0;
-            mockState.soloist.lastAttackStep = -10;
-            const res = getSoloistNote(chord, null, 3, 440, 60, 'bird', 3, false, {});
+            mockState.soloist.lastAttackStep = -100;
+            mockState.soloist.currentPhraseSteps = 0;
+            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.isResting = false;
+            const res = getSoloistNote(chord, null, i * 4 + 3, 440, 60, 'bird', 3, false, {});
             if (res) {
                 hitsNormal++;
             }
         }
 
         // Downbeat (step 0) at high intensity
-        mockState.playback.bandIntensity = 0.9;
-        mockState.groove.genreFeel = 'Jazz';
         for (let i = 0; i < iterations; i++) {
             mockState.soloist.busySteps = 0;
-            mockState.soloist.lastAttackStep = -10;
-            const res = getSoloistNote(chord, null, 0, 440, 60, 'bird', 0, false, {});
+            mockState.soloist.lastAttackStep = -100;
+            mockState.soloist.currentPhraseSteps = 0;
+            mockState.soloist.notesInPhrase = 0;
+            mockState.soloist.isResting = false;
+            const res = getSoloistNote(chord, null, i * 4, 440, 72, 'bird', 0, false, {});
             if (res) {
                 hitsDownbeatCoord++;
             }

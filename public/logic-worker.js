@@ -1513,9 +1513,10 @@ function handlePrime(steps) {
     soloist.thematicSeed = []; // @worker-mutation
     soloist.thematicSeedRoot = 0; // @worker-mutation
     soloist.hookBuffer = []; // @worker-mutation
-    soloist.isReplayingMotif = false; // @worker-mutation
     soloist.isReplayingSeed = false; // @worker-mutation
     soloist.lastAttackStep = -100; // @worker-mutation
+    soloist.sessionSteps = 0; // @worker-mutation
+    soloist.isPhraseActive = false; // @worker-mutation
 
     // Local cursors for priming
     const primeCursor = { index: 0, sectionIndex: 0 };
@@ -1576,8 +1577,6 @@ function handlePrime(steps) {
 
             // 2. Prime Soloist
             const { sectionStart, sectionEnd } = chordData;
-            // Manually increment sessionSteps for priming logic
-            soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
 
             const soloResult = getSoloistNote(
                 chord,
