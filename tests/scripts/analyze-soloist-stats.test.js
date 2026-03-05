@@ -294,6 +294,72 @@ describe('Soloist Smart Genre Statistics', () => {
         console.log('=====================================================================\n');
     });
 
+    it('Performs Expert Melodic Analysis for core genres', () => {
+        const testGenres = ['Jazz', 'Funk', 'Blues', 'Ska-Punk', 'Neo-Soul'];
+        const totalMeasures = 128;
+
+        const results = testGenres.map(genre => {
+            mockState.groove.genreFeel = genre;
+            mockState.playback.bandIntensity = 0.8;
+            mockState.playback.complexity = 0.8;
+            mockState.playback.currentLoopCount = 2;
+            mockState.soloist = { enabled: true, isResting: true, pitchHistory: [], deviceBuffer: [], motifBuffer: [], sessionSteps: 0 };
+
+            let lastMidi = 60;
+            const intervals = [];
+            const phraseEndMidis = [];
+            let totalStepsPlayed = 0;
+            let upMoves = 0;
+            let downMoves = 0;
+            const pitchSet = new Set();
+
+            for (let s = 0; s < totalMeasures * 16; s++) {
+                const wasResting = mockState.soloist.isResting;
+                const res = getSoloistNote({rootMidi: 60, intervals: [0, 4, 7]}, null, s, 440, 60, 'smart', s % 16, false);
+                
+                if (res) {
+                    const note = Array.isArray(res) ? res[res.length - 1] : res;
+                    const diff = note.midi - lastMidi;
+                    if (diff > 0) upMoves++;
+                    if (diff < 0) downMoves++;
+                    if (Math.abs(diff) > 0) intervals.push(Math.abs(diff));
+                    pitchSet.add(note.midi);
+                    lastMidi = note.midi;
+                    totalStepsPlayed++;
+                }
+
+                // Phrase end detection
+                if (!wasResting && mockState.soloist.isResting) {
+                    phraseEndMidis.push(lastMidi);
+                }
+            }
+
+            const avgInterval = intervals.length > 0 ? intervals.reduce((a,b)=>a+b,0)/intervals.length : 0;
+            const sortedPitches = Array.from(pitchSet).sort((a,b)=>a-b);
+            const range = sortedPitches.length > 0 ? sortedPitches[sortedPitches.length-1] - sortedPitches[0] : 0;
+            const upPct = (upMoves / (upMoves + downMoves)) * 100;
+            const largeLeaps = intervals.filter(i => i > 12).length;
+            
+            // Resolution analysis (Scale degree of phrase ends)
+            const endingDegrees = phraseEndMidis.map(m => (m - 60 + 120) % 12);
+            const rootEnds = endingDegrees.filter(d => d === 0).length;
+            const guideEnds = endingDegrees.filter(d => [3, 4, 7, 10, 11].includes(d)).length;
+
+            return {
+                Genre: genre,
+                'Avg Interval': avgInterval.toFixed(1),
+                'Pitch Range': `${range} st`,
+                'Upward Bias': `${upPct.toFixed(0)}%`,
+                'Octave Jumps': `${((largeLeaps / intervals.length) * 100).toFixed(0)}%`,
+                'Root Endings': `${((rootEnds / phraseEndMidis.length) * 100).toFixed(0)}%`,
+            };
+        });
+
+        console.log('\n================ EXPERT MELODIC ANALYSIS (128 Bars) ================');
+        console.table(results);
+        console.log('=====================================================================\n');
+    });
+
     it('Generates Statistical Analysis for all Smart Genres', () => {
         const genres = Object.keys(SMART_GENRES);
 

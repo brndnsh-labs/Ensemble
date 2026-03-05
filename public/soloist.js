@@ -1403,9 +1403,38 @@ export function getSoloistNote(
             }
         }
 
+        // Stepwise Bonus: Reward movement of 1-2 semitones for melodic flow
+        if (dist >= 1 && dist <= 2) {
+            let stepwiseBonus = 200; // Increased from 150
+            if (activeStyle === 'neo' || activeStyle === 'bossa') stepwiseBonus = 400;
+            if (activeStyle === 'reggae') stepwiseBonus = 600;
+            weight += stepwiseBonus;
+        }
+
+        // Octave Jump Penalty: Heavily discourage jumping more than 12 semitones 
+        // unless it's a specific melodic device.
+        if (dist > 12) {
+            weight *= 0.05;
+        } else if (dist > 7) {
+            // Moderated penalty for large jumps within an octave
+            weight *= 0.4;
+        }
+
+        // Melodic Contour: Slightly favor changing direction if the last move was large
+        if (lastInterval > 4 && m < lastMidi) {
+            weight *= 1.2;
+        }
+        if (lastInterval < -4 && m > lastMidi) {
+            weight *= 1.2;
+        }
+
         // Continuous interval penalty to keep lines smooth (Exponential for large leaps)
         if (dist > 2 && isSmoothStyle) {
             let penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.85 : 0.6;
+            // NEO-SOUL/FUNK SMOOTHNESS: Stricter penalty for jumping
+            if (activeStyle === 'neo' || activeStyle === 'funk') {
+                penaltyBase = 0.45;
+            }
             // BEBOP HEAD IMPROVEMENT: Favor stepwise motion (44%) even more during the head
             if (activeStyle === 'bird' && headFactor > 0.5) {
                 penaltyBase *= 0.8;
