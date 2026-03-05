@@ -124,6 +124,36 @@ export function playSoloNote(
                 prevFreq,
             );
             break;
+        case 'trumpet':
+            playTrumpet(
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+            );
+            break;
+        case 'saxophone':
+            playSaxophone(
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+            );
+            break;
         default:
             playClassic(
                 ctx,
@@ -187,6 +217,179 @@ function manageVoices(playTime, soloist) {
 }
 
 // --- PRESET IMPLEMENTATIONS ---
+
+function playTrumpet(
+    ctx,
+    freq,
+    playTime,
+    duration,
+    vol,
+    bendStartInterval,
+    style,
+    outputGain,
+    voiceObj,
+    isLegato,
+    prevFreq,
+) {
+    const { soloist } = getState();
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sawtooth';
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'square';
+
+    voiceObj.nodes.push(osc1, osc2);
+
+    applyPitchEnvelope(
+        osc1,
+        osc2,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        isLegato,
+        prevFreq,
+        soloist.mode === 'piano',
+    );
+
+    if (soloist.mode !== 'piano') {
+        const { vibrato, vibGain } = createVibrato(ctx, freq, playTime, duration, style);
+        vibrato.connect(vibGain);
+        vibGain.connect(osc1.frequency);
+        vibGain.connect(osc2.frequency);
+        voiceObj.nodes.push(vibrato);
+        voiceObj.cleanup.push(vibGain);
+    }
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+
+    // Brass swell
+    filter.frequency.setValueAtTime(clampFreq(freq * 1.5), playTime);
+    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 5), playTime + 0.06);
+    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2.5), playTime + 0.15);
+
+    filter.Q.value = 1.5;
+
+    voiceObj.cleanup.push(filter);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(outputGain);
+
+    const attack = isLegato ? 0.005 : 0.02;
+
+    outputGain.gain.setValueAtTime(0, playTime);
+    outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack); // slightly boosted to cut through
+    outputGain.gain.setTargetAtTime(vol * 0.9, playTime + 0.1, 0.05); // decay to sustain
+    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1); // release
+
+    osc1.start(playTime);
+    osc2.start(playTime);
+
+    const stopTime = playTime + duration + 0.2;
+    osc1.stop(stopTime);
+    osc2.stop(stopTime);
+
+    // Only apply vibrato if note is long enough
+    if (duration > 0.15 && soloist.mode !== 'piano') {
+        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
+        if (vibrato) {
+            vibrato.start(playTime);
+            vibrato.stop(stopTime);
+        }
+    }
+
+    osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
+}
+
+function playSaxophone(
+    ctx,
+    freq,
+    playTime,
+    duration,
+    vol,
+    bendStartInterval,
+    style,
+    outputGain,
+    voiceObj,
+    isLegato,
+    prevFreq,
+) {
+    const { soloist } = getState();
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sawtooth';
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'triangle';
+
+    voiceObj.nodes.push(osc1, osc2);
+
+    applyPitchEnvelope(
+        osc1,
+        osc2,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        isLegato,
+        prevFreq,
+        soloist.mode === 'piano',
+    );
+
+    if (soloist.mode !== 'piano') {
+        const { vibrato, vibGain } = createVibrato(ctx, freq, playTime, duration, style);
+        vibrato.connect(vibGain);
+        vibGain.connect(osc1.frequency);
+        vibGain.connect(osc2.frequency);
+        voiceObj.nodes.push(vibrato);
+        voiceObj.cleanup.push(vibGain);
+    }
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+
+    // Static or slight sweep for sax formant
+    filter.frequency.setValueAtTime(clampFreq(freq * 2.0), playTime);
+    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2.5), playTime + 0.05);
+
+    filter.Q.value = 4.0;
+
+    voiceObj.cleanup.push(filter);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(outputGain);
+
+    const attack = isLegato ? 0.005 : 0.05;
+
+    outputGain.gain.setValueAtTime(0, playTime);
+    // Bandpass significantly drops overall amplitude, compensate with 2.5x
+    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, attack);
+    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1); // release
+
+    osc1.start(playTime);
+    osc2.start(playTime);
+
+    const stopTime = playTime + duration + 0.2;
+    osc1.stop(stopTime);
+    osc2.stop(stopTime);
+
+    // Only apply vibrato if note is long enough
+    if (duration > 0.15 && soloist.mode !== 'piano') {
+        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
+        if (vibrato) {
+            vibrato.start(playTime);
+            vibrato.stop(stopTime);
+        }
+    }
+
+    osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
+}
 
 function playClassic(
     ctx,
