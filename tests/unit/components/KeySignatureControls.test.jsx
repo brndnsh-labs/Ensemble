@@ -72,11 +72,15 @@ vi.mock('../../../public/state.js', () => ({
     arranger: mockArranger,
 }));
 
-import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../../../public/arranger-controller.js';
+import {
+    switchToRelativeKey,
+    transposeKey,
+    validateAndAnalyze,
+} from '../../../public/arranger-controller.js';
+import { KeySignatureControls } from '../../../public/components/KeySignatureControls.jsx';
 import { flushBuffers, loadDrumPreset } from '../../../public/instrument-controller.js';
 import { saveCurrentState } from '../../../public/persistence.js';
 import { syncWorker } from '../../../public/worker-client.js';
-import { KeySignatureControls } from '../../../public/components/KeySignatureControls.jsx';
 
 describe('KeySignatureControls Component', () => {
     let container;
@@ -177,7 +181,7 @@ describe('KeySignatureControls Component', () => {
         mockUseEnsembleState.mockImplementation((selector) => {
             return selector({
                 arranger: { key: 'C', timeSignature: '4/4', isMinor: false, grouping: null },
-                groove: { lastDrumPreset: 'Jazz Kit' }
+                groove: { lastDrumPreset: 'Jazz Kit' },
             });
         });
 
@@ -202,7 +206,7 @@ describe('KeySignatureControls Component', () => {
         mockUseEnsembleState.mockImplementation((selector) => {
             return selector({
                 arranger: { key: 'C', timeSignature: '5/4', isMinor: false, grouping: [3, 2] },
-                groove: { lastDrumPreset: null }
+                groove: { lastDrumPreset: null },
             });
         });
 
@@ -238,7 +242,7 @@ describe('KeySignatureControls Component', () => {
         mockUseEnsembleState.mockImplementation((selector) => {
             return selector({
                 arranger: { key: 'C', timeSignature: '4/4', isMinor: false, grouping: null },
-                groove: { lastDrumPreset: null }
+                groove: { lastDrumPreset: null },
             });
         });
 
@@ -247,7 +251,8 @@ describe('KeySignatureControls Component', () => {
         });
 
         const groupingLabel = container.querySelector('#groupingLabel');
-        if (groupingLabel) { // Note: button might be in DOM but display:none
+        if (groupingLabel) {
+            // Note: button might be in DOM but display:none
             await act(async () => {
                 groupingLabel.dispatchEvent(new Event('click', { bubbles: true }));
                 await new Promise((resolve) => setTimeout(resolve, 0));
