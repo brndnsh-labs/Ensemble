@@ -1135,7 +1135,7 @@ export function validateProgression(renderCallback) {
 /**
  * Caches progression metadata to avoid redundant calculations in the scheduler.
  */
-export function updateProgressionCache() {
+function updateProgressionCache() {
     const { arranger } = getState();
     if (!arranger.progression.length) {
         Object.assign(arranger, {
