@@ -63,6 +63,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         localState.playback.bandIntensity = 0.05;
         localState.soloist.busySteps = 0;
         localState.soloist.activeSteps = 999999;
+        localState.soloist.sessionSteps = 64; // Bypass warm-up scaling
 
         // Force random to 0.7 for all calls
         randomSpy.mockReturnValue(0.7);

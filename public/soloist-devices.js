@@ -362,6 +362,15 @@ export function generateExtraNotes(ctx) {
                     count++;
                 }
             }
+            // Fallback for piano if no chord tones found nearby
+            if (count === 0) {
+                const dsInt = [3, 4, 5, 7][Math.floor(Math.random() * 4)];
+                extraNotes.push({
+                    midi: selectedMidi - dsInt,
+                    velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
+                    isDoubleStop: true,
+                });
+            }
         }
     } else if (activeStyle === 'country') {
         const dsInt = [8, 9][Math.floor(Math.random() * 2)];

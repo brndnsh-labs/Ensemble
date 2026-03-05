@@ -94,16 +94,14 @@ describe('Soloist Phrasing Analysis', () => {
         mockState.soloist = {
             enabled: true,
             busySteps: 0,
-            currentPhraseSteps: 0,
+            activeSteps: 0,
+            restSteps: 0,
             notesInPhrase: 0,
-            qaState: 'Question',
-            srdcState: 'Statement',
             isResting: true,
-            isPhraseActive: false,
             pitchHistory: [],
             deviceBuffer: [],
             motifBuffer: [],
-            sessionSteps: 0,
+            sessionSteps: 64, // Bypass warmup
         };
         mockState.playback.bandIntensity = intensity;
         mockState.playback.complexity = intensity;
@@ -142,7 +140,19 @@ describe('Soloist Phrasing Analysis', () => {
             }
 
             const wasResting = mockState.soloist.isResting;
-            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure, false);
+            // Force wakeup at start
+            const coordination = s === 0 ? { bypassRhythm: true } : {};
+            const res = getSoloistNote(
+                chord,
+                chord,
+                s,
+                440,
+                60,
+                'smart',
+                stepInMeasure,
+                false,
+                coordination,
+            );
             const isResting = mockState.soloist.isResting;
 
             if (!isResting) {
@@ -179,7 +189,7 @@ describe('Soloist Phrasing Analysis', () => {
     }
 
     it('Measures phrasing statistics for Blues @ 106 BPM', () => {
-        const stats = runSimulation(128, 0.7);
+        const stats = runSimulation(128, 0.4);
 
         const playingRatio = (stats.stepsPlaying / stats.totalSteps) * 100;
         const avgNotesPerPhrase =

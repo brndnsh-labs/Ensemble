@@ -46,15 +46,10 @@ describe('Soloist Liveness & Consistency', () => {
         mockState.playback.intent.soloistMod = 0;
     });
 
-    it('should calculate session progress deterministically using step and BPM', () => {
+    it('should calculate session progress and produce notes at high step counts', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
-        // At 100 BPM, 4/4 time: 16 steps = 1 measure = 4 beats = 4/100 minutes = 0.04 mins.
-        // After 10 measures (160 steps), elapsed should be 0.4 mins.
-        // With a 5 min timer, progress should be 0.4 / 5 = 0.08 (Warmup phase).
-
-        // We can't easily "spy" on the local maturityFactor, but we can verify it doesn't crash
-        // and produces notes at extreme step counts without relying on performance.now().
+        // We verify it doesn't crash and produces notes at extreme step counts.
         const res = getSoloistNote(chord, null, 1600, 440, 72, 'smart', 0, false);
         expect(res).toBeDefined();
     });

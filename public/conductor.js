@@ -60,10 +60,10 @@ export function applyConductor() {
     // Song Arc: Smooth interpolation instead of hard jumps
     if (playback.songMode && playback.sessionTimer > 0) {
         if (progress < 0.3) {
-            // Warmup: 0.9 down to 0.5
+            // Initial Phase: 0.9 down to 0.5
             lyricalBias = 0.9 - (progress / 0.3) * 0.4;
         } else if (progress < 0.7) {
-            // Development: 0.5 down to 0.2
+            // Building Phase: 0.5 down to 0.2
             lyricalBias = 0.5 - ((progress - 0.3) / 0.4) * 0.3;
         } else if (progress < 0.9) {
             // Peak: 0.2
@@ -72,13 +72,6 @@ export function applyConductor() {
             // Resolution: 0.2 up to 0.95
             lyricalBias = 0.2 + ((progress - 0.9) / 0.1) * 0.75;
         }
-    }
-
-    // Soloist Fatigue Regulation
-    // If the soloist has played many notes recently, boost lyricalBias to force rests
-    const recentDensity = (soloist.notesInPhrase || 0) / 16; // 16 is a high-water mark for a phrase
-    if (recentDensity > 0.6 && soloist.style !== 'bird') {
-        lyricalBias = Math.max(lyricalBias, recentDensity * 0.8);
     }
 
     // Section Overrides (Smoothed)
@@ -420,11 +413,11 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                     const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
 
                     if (progress < 0.15) {
-                        // Warmup (0-15%)
+                        // Initial (0-15%)
                         macroFloor = 0.2;
                         macroCeiling = 0.45;
                     } else if (progress < 0.4) {
-                        // Development (15-40%)
+                        // Building (15-40%)
                         macroFloor = 0.4;
                         macroCeiling = 0.7;
                     } else if (progress < 0.65) {

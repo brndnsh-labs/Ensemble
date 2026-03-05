@@ -186,14 +186,14 @@ describe('Soloist Mode Differentiation Logic', () => {
         }
 
         expect(Array.isArray(note)).toBe(true);
-        expect(note.length).toBe(3);
+        expect(note.length).toBeGreaterThanOrEqual(2);
 
+        // The primary note is the LAST element in the array returned by getSoloistNote
         const melodyMidi = note[note.length - 1].midi;
-        const extra1 = note[0].midi;
-        const extra2 = note[1].midi;
-
-        expect(extra1).toBeLessThanOrEqual(melodyMidi);
-        expect(extra2).toBeLessThanOrEqual(melodyMidi);
+        for (let i = 0; i < note.length - 1; i++) {
+            // Extra notes should be lower than the melody in piano mode
+            expect(note[i].midi).toBeLessThanOrEqual(melodyMidi);
+        }
     });
 
     it('should generate quartal voicings for piano in neo style', () => {

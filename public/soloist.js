@@ -169,6 +169,7 @@ export function getSoloistNote(
                 stepInBeat === 0 || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
             if (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure) {
                 soloist.isResting = false; // @worker-mutation
+                soloist.notesInPhrase = 0; // @worker-mutation
                 // Calculate new active duration based on intensity and config
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
                 soloist.activeSteps = Math.floor(
@@ -180,17 +181,27 @@ export function getSoloistNote(
         return null;
     } else {
         soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
-        if (soloist.activeSteps <= 0 && !coordination.bypassRhythm) {
+
+        // Structural Awareness: Defer rest until a strong rhythmic boundary (end of measure or beat 4)
+        const isStrongResolution = measureStep === 15 || (measureStep === 13 && intensity > 0.5);
+
+        if (soloist.activeSteps <= 0 && isStrongResolution && !coordination.bypassRhythm) {
             soloist.isResting = true; // @worker-mutation
             // Calculate rest duration based inversely on intensity
             const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
+
+            // Phrase-Density Fatigue: Longer rests after busy phrases
+            const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
+
             soloist.restSteps = Math.floor(
-                stepsPerMeasure * restMultiplier * (0.5 + Math.random() * 1.5),
+                stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
             ); // @worker-mutation
             if (soloist.restSteps < 4) {
                 soloist.restSteps = 4; // minimum breath
             }
-            logDebug(`Resting for ~${soloist.restSteps} steps`);
+            logDebug(
+                `Resting for ~${soloist.restSteps} steps (Fatigue: ${fatigueMultiplier.toFixed(2)}x)`,
+            );
             return null;
         }
     }
@@ -199,8 +210,11 @@ export function getSoloistNote(
     const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
     const baseAttackProb = emphasisMap[measureStep % 16];
 
+    // Session Warm-Up: Ramp density from 50% to 100% over first 64 steps
+    const warmUpScale = Math.min(1.0, 0.5 + ((soloist.sessionSteps || 0) / 64) * 0.5);
+
     const intensityScale = 0.5 + intensity * 2.0;
-    let attackProb = baseAttackProb * intensityScale;
+    let attackProb = baseAttackProb * intensityScale * warmUpScale;
 
     const stepCoord = coordination.stepCoordination || {};
     if (stepCoord.kickHit) {
@@ -217,6 +231,9 @@ export function getSoloistNote(
     if (Math.random() > attackProb) {
         return null;
     }
+
+    // Increment heat for density fatigue
+    soloist.notesInPhrase = (soloist.notesInPhrase || 0) + 1; // @worker-mutation
 
     // --- 4. Pitch Selection ---
     CANDIDATE_WEIGHTS.fill(0);
@@ -318,7 +335,10 @@ export function getSoloistNote(
     // --- 5. Melodic Devices ---
     const deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const isPiano = soloist.mode === 'piano';
-    const isPolyphonic = (soloist.doubleStopProb ?? 1.0) > 0 && config.doubleStopProb > 0;
+    const isPolyphonic =
+        soloist.mode !== 'monophonic' &&
+        (soloist.doubleStopProb ?? 1.0) > 0 &&
+        config.doubleStopProb > 0;
 
     if (stepInBeat === 0 && Math.random() < deviceBaseProb) {
         let allowed = [...(config.allowedDevices || [])];
