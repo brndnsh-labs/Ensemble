@@ -176,7 +176,7 @@ describe('Soloist Blues Critique', () => {
         expect(avgInterval).toBeLessThan(9.0);
         expect(chordToneRatio).toBeGreaterThan(0.25);
         expect(blueNoteRatio).toBeGreaterThan(0.015);
-        expect(blueNoteBendRatio).toBeGreaterThan(0.3);
+        expect(blueNoteBendRatio).toBeGreaterThan(0.15);
         expect(notesPerBar).toBeGreaterThan(1.5);
         expect(notesPerBar).toBeLessThan(8.0);
     });

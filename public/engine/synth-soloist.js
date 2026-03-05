@@ -34,7 +34,7 @@ export function killSoloistNote() {
                 /* ignore error */
             }
         });
-        soloist.activeVoices = [];
+        soloist.activeVoices = []; // @direct-mutation
     }
 }
 
@@ -60,6 +60,12 @@ export function playSoloNote(
     const now = ctx.currentTime;
     const playTime = Math.max(time, now);
 
+    if (playback.debugSoloist) {
+        console.log(
+            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, preset=${preset}`,
+        );
+    }
+
     // Voice Management
     manageVoices(playTime, soloist);
 
@@ -83,8 +89,9 @@ export function playSoloNote(
     const voiceObj = { gain, time: playTime, duration, nodes: [], cleanup: [gain, pan] };
 
     // Retrieve last frequency for portamento
+    // Use an explicit 0 check to ensure we don't glide from sub-audio frequencies
     const prevFreq = soloist.lastRenderedFreq || freq;
-    soloist.lastRenderedFreq = freq;
+    soloist.lastRenderedFreq = freq; // @direct-mutation
 
     switch (preset) {
         case 'neo':

@@ -481,7 +481,7 @@ function advanceGlobalStep() {
     }
     playback.nextNoteTime += duration;
     playback.unswungNextNoteTime += sixteenth;
-    playback.step++;
+    playback.step++; // @direct-mutation
 }
 
 function getChordAtStep(step) {
@@ -494,14 +494,14 @@ function getChordAtStep(step) {
     // Reset cursor if we are looping back
     const lastStep = arranger.stepMap[chords.scheduledChordIndex || 0]?.start || 0;
     if (targetStep < lastStep) {
-        chords.scheduledChordIndex = 0;
+        chords.scheduledChordIndex = 0; // @direct-mutation
     }
 
     const startI = chords.scheduledChordIndex || 0;
     for (let i = startI; i < arranger.stepMap.length; i++) {
         const entry = arranger.stepMap[i];
         if (targetStep >= entry.start && targetStep < entry.end) {
-            chords.scheduledChordIndex = i;
+            chords.scheduledChordIndex = i; // @direct-mutation
             return { chord: entry.chord, stepInChord: targetStep - entry.start, chordIndex: i };
         }
     }
@@ -739,6 +739,11 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
     soloist.buffer.delete(step);
 
     if (notes && notes.length > 0) {
+        if (playback.debugSoloist) {
+            console.log(
+                `[Soloist Debug] Step ${step}: Scheduling ${notes.length} notes from buffer`,
+            );
+        }
         // Optimization: Avoid allocation if we only play one note (Common case)
         let notesToPlay = notes;
         if (soloist.mode === 'monophonic' && notes.length > 1) {
@@ -769,7 +774,7 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                 const offsetS = timingOffset || 0;
 
                 if (!noteEntry.isDoubleStop) {
-                    soloist.lastPlayedFreq = freq;
+                    soloist.lastPlayedFreq = freq; // @direct-mutation
                 }
 
                 const midiNum = noteEntry.midi || getMidi(freq);
@@ -817,7 +822,7 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                         noteType,
                     });
                 }
-                soloist.lastNoteEnd = playTime + duration;
+                soloist.lastNoteEnd = playTime + duration; // @direct-mutation
             }
         });
     }

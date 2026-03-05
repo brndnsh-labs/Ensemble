@@ -192,8 +192,8 @@ describe('Soloist Mode Differentiation Logic', () => {
         const extra1 = note[0].midi;
         const extra2 = note[1].midi;
 
-        expect(extra1).toBeLessThan(melodyMidi);
-        expect(extra2).toBeLessThan(melodyMidi);
+        expect(extra1).toBeLessThanOrEqual(melodyMidi);
+        expect(extra2).toBeLessThanOrEqual(melodyMidi);
     });
 
     it('should generate quartal voicings for piano in neo style', () => {

@@ -7,41 +7,17 @@ import {
 } from './soloist-devices.js';
 import { getState } from './state.js';
 import { getScaleForChord } from './theory-scales.js';
-import { calculateTimingOffset, getFrequency, getMidi } from './utils.js';
+import { calculateTimingOffset, getFrequency } from './utils.js';
 
 const CANDIDATE_WEIGHTS = new Float32Array(128);
-const HIST_COUNTS = new Float32Array(128);
-const PC_COUNTS = new Float32Array(12);
 
-/**
- * Checks for a lead sheet melody note at the given step.
- * @param {Array} melody - The leadSheetMelody array.
- * @param {number} step - The global step to check.
- * @returns {Object|null} The note if found, otherwise null.
- */
 export function getMelodyAtStep(melody, step) {
     if (!melody || melody.length === 0) {
         return null;
     }
-    // Simple linear find for now, can be optimized if needed
     return melody.find((n) => n.globalStep === step);
 }
 
-/**
- * Generates a soloist note (or notes for double stops) for a specific step.
- * Implements phrasing logic, rhythmic cell selection, melodic contour resolution,
- * and probabilistic melodic devices (runs, enclosures, flurry).
- *
- * @param {Object} currentChord - The chord active at the current step.
- * @param {Object} nextChord - The upcoming chord for anticipation logic.
- * @param {number} step - The global step counter.
- * @param {number|null} prevFreq - The frequency of the previously generated note.
- * @param {number} octave - The base MIDI octave for the soloist.
- * @param {string} style - The soloing style ID.
- * @param {number} stepInChord - The relative step index within the current chord.
- * @param {boolean} [isPriming=false] - Whether the engine is in a context-building priming phase.
- * @returns {Object|Object[]|null} A note object, an array of note objects (for double stops), or null if resting.
- */
 export function getSoloistNote(
     currentChord,
     nextChord,
@@ -71,91 +47,6 @@ export function getSoloistNote(
         }
     };
 
-    /**
-     * Internal helper to finalize a note, updating history and session tracking.
-     */
-    const finalizeNote = (res) => {
-        if (!res) {
-            return null;
-        }
-        // Melody note is ALWAYS the last one in the array (for double stops) or the object itself
-        const primary = Array.isArray(res) ? res[res.length - 1] : res;
-
-        // --- Universal Melodic Integrity Guard ---
-        // If the primary note repeats the last one, force a move for non-Jazz styles.
-        if (primary.midi === lastMidi && activeStyle !== 'bird') {
-            const scaleIntervals = getScaleForChord(targetChord, null, activeStyle);
-            const neighborDir = Math.random() > 0.5 ? 1 : -1;
-            let forcedMidi = primary.midi + neighborDir;
-            let tries = 0;
-            // Search for nearest scale tone that is NOT lastMidi
-            while (!scaleIntervals.includes(((forcedMidi % 12) + 12) % 12) && tries < 12) {
-                forcedMidi += neighborDir;
-                tries++;
-            }
-            primary.midi = Math.max(minMidi, Math.min(maxMidi, forcedMidi));
-        }
-
-        soloist.lastMidiPlayed = primary.midi; // @worker-mutation
-
-        // --- Holistic Pocket Implementation ---
-        const timingOffset = calculateTimingOffset(
-            'soloist',
-            groove.pocket,
-            playback.bandIntensity || 0.5,
-        );
-        primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
-
-        // Update Global Pitch History
-        if (soloist.pitchHistory) {
-            soloist.pitchHistory.push(primary.midi);
-            if (soloist.pitchHistory.length > 128) {
-                soloist.pitchHistory.shift();
-            }
-        }
-
-        // Update session tracking for continuity
-        if (!primary.isDoubleStop) {
-            soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
-        }
-        soloist.notesInPhrase++; // @worker-mutation
-
-        // --- Blues Micro-Bend Inflections ---
-        if (activeStyle === 'blues' && !soloist.isReplayingMotif) {
-            const pc = primary.midi % 12;
-            const rootPC = currentChord.rootMidi % 12;
-            const relativeInterval = (pc - rootPC + 12) % 12;
-
-            // Blue Notes: b3 (3) and b5 (6)
-            if (
-                (relativeInterval === 3 || relativeInterval === 6) &&
-                primary.bendStartInterval === 0
-            ) {
-                // Procedural "curl" or "scoop"
-                // Quarter-tone approximation using small bendStartInterval (-0.5 or +0.5)
-                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
-            }
-        }
-
-        // -- Shared Hook Logic --
-        // If in Ska-Punk mode and replaying a motif, sync to shared buffer for band reinforcement
-        if (groove.genreFeel === 'Ska-Punk' && soloist.isReplayingMotif) {
-            if (!soloist.sharedHookBuffer) {
-                soloist.sharedHookBuffer = []; // @worker-mutation
-            }
-            // Use a sliding window of the last few notes for reinforcement
-            soloist.sharedHookBuffer.push({ step, res });
-            if (soloist.sharedHookBuffer.length > 16) {
-                soloist.sharedHookBuffer.shift();
-            }
-        }
-
-        return res;
-    };
-
-    // --- Coordination Logic ---
-    const bassHit = coordination.bassHit || false;
-
     let targetChord = currentChord;
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
     const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -164,117 +55,50 @@ export function getSoloistNote(
     const measureStep = step % stepsPerMeasure;
     const stepInBeat = measureStep % stepsPerBeat;
 
-    // --- Dynamic Register Control & Soar Lift ---
-    // registerSoar adds extra melodic "lift" at high intensity to prevent sticking.
-    const isDeparture = soloist.srdcState === 'Departure';
-    const isConclusion = soloist.srdcState === 'Conclusion';
-    const isBird = activeStyle === 'bird';
+    // Anticipation
+    const isLateInChord = stepInChord >= currentChord.beats * stepsPerBeat - 2;
+    if (nextChord && isLateInChord && Math.random() < (config.anticipationProb || 0)) {
+        targetChord = nextChord;
+    }
 
-    // Soften SRDC for Jazz/Bird to keep it fluid
-    const srdcIntensity = isBird ? 0.5 : 1.0;
+    const minMidi = 55; // G3
+    const maxMidi = 96; // C7
+    const lastMidi = soloist.lastMidiPlayed || 72;
 
-    const srdcRegisterOffset = (isDeparture ? 6 : isConclusion ? -4 : 0) * srdcIntensity;
-    const soarValue = (config.registerSoar || 8) * (isDeparture ? 1.0 + 0.25 * srdcIntensity : 1.0);
-    const soarOffset = (isDeparture ? 0.2 : 0) + Math.max(0, (intensity - 0.4) * soarValue);
+    const finalizeNote = (res) => {
+        if (!res) {
+            return null;
+        }
+        const primary = Array.isArray(res) ? res[res.length - 1] : res;
 
-    // Absolute melodic ceiling to prevent piercing whistle tones
-    const ABSOLUTE_MAX_MIDI = 96; // C7 (Top of Soprano range)
+        soloist.lastMidiPlayed = primary.midi; // @worker-mutation
 
-    let centerMidi = 60 + intensity * 15 + soarOffset + srdcRegisterOffset;
-    centerMidi = Math.min(ABSOLUTE_MAX_MIDI - 12, centerMidi);
+        const timingOffset = calculateTimingOffset(
+            'soloist',
+            groove.pocket,
+            playback.bandIntensity || 0.5,
+        );
+        primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
 
-    const MIN_GUITAR_MIDI = 55; // G3
-    const MAX_GUITAR_MIDI = Math.min(
-        ABSOLUTE_MAX_MIDI,
-        65 + intensity * 25 + (isDeparture ? 8 * srdcIntensity : 0),
-    );
+        if (!primary.isDoubleStop) {
+            soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
+        }
 
-    // --- Range & Continuity Logic ---
-    const dynamicCenter = centerMidi;
-    // lastMidi should be the ACTUAL last pitch played (from absolute state)
-    const lastMidi = soloist.lastMidiPlayed || Math.round(dynamicCenter);
+        if (activeStyle === 'blues') {
+            const relativeInterval = ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12;
+            if (
+                (relativeInterval === 3 || relativeInterval === 6) &&
+                primary.bendStartInterval === 0
+            ) {
+                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
+            }
+        }
 
-    // Reggae and Minimal should be more constrained in range
-    const rangeLimit = activeStyle === 'reggae' || activeStyle === 'minimal' ? 12 : 14;
-    const minMidi = Math.max(MIN_GUITAR_MIDI, Math.min(dynamicCenter - 12, lastMidi - rangeLimit));
-    const maxMidi = Math.min(MAX_GUITAR_MIDI, Math.max(dynamicCenter + 12, lastMidi + rangeLimit));
+        return res;
+    };
 
     if (!isPriming) {
         soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
-    }
-
-    let maturityFactor = 0;
-
-    // --- Song Arc Logic ---
-    // If a session timer is active, use the song progress to drive maturity/intensity.
-    // Calculate elapsed time based on step and BPM for cross-thread consistency.
-    const elapsedMins = step / (stepsPerBeat * (playback.bpm || 120) * 60);
-
-    if (playback.sessionTimer > 0 && playback.sessionStartTime > 0) {
-        const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
-
-        // Arc: Warmup -> Development -> Climax -> Cooldown
-        // Shortened warmup and raised floors to prevent "janky" starts
-        if (progress < 0.1) {
-            maturityFactor = 0.15 + (progress / 0.1) * 0.15; // 0.15 -> 0.30
-        } else if (progress < 0.6) {
-            maturityFactor = 0.3 + ((progress - 0.1) / 0.5) * 0.55; // 0.30 -> 0.85
-        } else if (progress < 0.85) {
-            maturityFactor = 0.85 + ((progress - 0.6) / 0.25) * 0.15; // 0.85 -> 1.0
-        } else {
-            maturityFactor = 1.0 - ((progress - 0.85) / 0.15) * 0.7; // 1.0 -> 0.3 (Cooldown)
-        }
-    } else {
-        // Fallback: Linear ramp based on steps (but slower/capped)
-        maturityFactor = 0.15 + Math.min(0.85, (soloist.sessionSteps || 0) / 2048);
-    }
-
-    // Warmup Factor: We want a sparse start for the first loop, building up
-    // and maxing out around the start of the 3rd loop (loopCount >= 2).
-    // We blend loopCount and step progress to make it smooth.
-    let loopProgress = 0;
-    if (arranger && arranger.totalSteps > 0) {
-        // Calculate progress through the current loop (0.0 to 1.0)
-        loopProgress = (step % arranger.totalSteps) / arranger.totalSteps;
-    }
-    const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
-    const _isHeadLoop = (playback.currentLoopCount || 0) === 0;
-    const headFactor = Math.max(0, 1.0 - smoothLoopCount); // 1.0 at start, 0.0 by end of loop 1
-
-    const evoEnabled = soloist.evolutionEnabled !== false;
-    // Raise the floor of warmupFactor so the soloist isn't quite as sparse initially
-    let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.85 + (smoothLoopCount / 2.0) * 0.15); // Hits 1.0 right at the start of loop 3 (index 2)
-    if (activeStyle === 'bird') {
-        warmupFactor = 1.0;
-    }
-    const effectiveIntensity =
-        activeStyle === 'bird'
-            ? 1.0
-            : Math.max(
-                  0,
-                  Math.min(
-                      1.0,
-                      intensity +
-                          maturityFactor * 0.05 +
-                          smoothLoopCount * 0.01 +
-                          (playback.intent.soloistMod || 0),
-                  ),
-              );
-    const lyricalBias =
-        activeStyle === 'bird'
-            ? 0.6 * headFactor // Jazz starts VERY lyrical (the "Head") and transitions to shred (0.0)
-            : playback.lyricalBias !== undefined
-              ? Math.min(1.0, playback.lyricalBias + 0.15 * headFactor)
-              : 0.5 + 0.15 * headFactor;
-    const complexity =
-        activeStyle === 'bird'
-            ? 1.0
-            : soloist.complexity !== undefined
-              ? soloist.complexity
-              : playback.complexity;
-
-    if (!soloist.isResting) {
-        soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
     }
 
     // --- 0. Lead Sheet Melody ---
@@ -291,27 +115,9 @@ export function getSoloistNote(
                     velocity: 0.8,
                     style: activeStyle,
                 };
-
-                // Motif Seeding: "Teach" the generative engine these themes
-                if (!soloist.motifBuffer) {
-                    soloist.motifBuffer = []; // @worker-mutation
-                }
-                const motifEntry = {
-                    pc: res.midi % 12,
-                    step: step % 16,
-                    dur: res.durationSteps,
-                };
-                soloist.motifBuffer.push(motifEntry); // @worker-mutation
-                if (soloist.motifBuffer.length > 16) {
-                    soloist.motifBuffer.shift(); // @worker-mutation
-                }
-
                 soloist.busySteps = Math.max(0, (res.durationSteps || 1) - 1); // @worker-mutation
                 return finalizeNote(res);
             }
-
-            // FALL-THROUGH: If no written note, continue to procedural logic
-            // But we must respect the busySteps from the previous written note
             if (soloist.busySteps > 0) {
                 soloist.busySteps--; // @worker-mutation
                 return null;
@@ -333,1019 +139,141 @@ export function getSoloistNote(
         return finalizeNote(devNote);
     }
     if (soloist.busySteps > 0) {
-        soloist.busySteps--;
+        soloist.busySteps--; // @worker-mutation
         return null;
     }
 
     // --- Natural Exit Logic ---
-    // If we are yielding (pending stop), and we are currently resting,
-    // it means we finished our last phrase. Stop completely.
     if (soloist.isYielding && soloist.isResting) {
-        // Increment steps even when yielding so safety checks eventually trigger
-        soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
-
-        // SAFETY: If we have been yielding for an extended period, force a re-entry attempt
-        // to prevent permanent silence bugs.
-        const yieldProgress = soloist.currentPhraseSteps / stepsPerMeasure;
-
         if (soloist.tradeMode === 'manual' && soloist.enabled) {
-            if (yieldProgress > 2.0) {
-                logDebug(
-                    `Stuck yielding for ${yieldProgress.toFixed(2)} measures in manual mode. Forcing re-entry.`,
-                );
-                soloist.isYielding = false; // @worker-mutation
-                soloist.isResting = true; // @worker-mutation (Still resting, but allowed to start now)
-            } else {
-                return null;
-            }
+            soloist.isYielding = false; // @worker-mutation
         } else {
-            // For trading modes, use the original, more lenient 4.0 measure threshold and 10% chance
-            // to avoid interfering with natural long trades.
-            if (yieldProgress > 4.0 && Math.random() < 0.1) {
-                logDebug(
-                    `Stuck yielding for ${yieldProgress.toFixed(2)} measures in trading mode. Forcing re-entry.`,
-                );
-                soloist.isYielding = false; // @worker-mutation
-                soloist.isResting = true; // @worker-mutation
-            } else {
-                return null;
-            }
+            return null;
         }
     }
 
-    // --- 2. Phrasing & History Analysis ---
-    if (typeof soloist.currentPhraseSteps === 'undefined' || (step === 0 && !soloist.isResting)) {
-        soloist.currentPhraseSteps = 0; // @worker-mutation
-        soloist.notesInPhrase = 0; // @worker-mutation
-        soloist.qaState = 'Question'; // @worker-mutation
-        soloist.srdcState = 'Conclusion'; // @worker-mutation
+    // --- 2. Simplified Phrasing State Machine ---
+    if (soloist.isResting === undefined) {
         soloist.isResting = true; // @worker-mutation
-        soloist.currentCell = null; // @worker-mutation
-        if (!soloist.pitchHistory) {
-            soloist.pitchHistory = []; // @worker-mutation
-        }
-        // Proceed instead of returning null to allow immediate re-entry at Step 0
+        soloist.restSteps = stepsPerMeasure; // @worker-mutation
+        soloist.activeSteps = 0; // @worker-mutation
     }
-
-    HIST_COUNTS.fill(0);
-    PC_COUNTS.fill(0);
-    const historyCounts = HIST_COUNTS;
-    const pcCounts = PC_COUNTS;
-    const history = soloist.pitchHistory || [];
-    const fullLen = history.length;
-    const windowSize = 32; // Use a fixed window for repetition statistics
-    const historyLen = Math.min(fullLen, windowSize);
-    if (historyLen > 0) {
-        for (let i = fullLen - historyLen; i < fullLen; i++) {
-            const p = history[i];
-            if (p >= 0 && p < 128) {
-                historyCounts[p]++;
-            }
-            pcCounts[((p % 12) + 12) % 12]++;
-        }
-    }
-
-    const phraseBars = soloist.currentPhraseSteps / stepsPerMeasure;
-
-    const effectiveLyricalBias = activeStyle === 'bird' ? lyricalBias * 0.6 : lyricalBias;
-    const effectiveMaxNotes = Math.max(
-        2,
-        Math.round(config.maxNotesPerPhrase * (1.5 - effectiveLyricalBias)),
-    );
-
-    // Intensity Linearization: Lower the floor of restBase as intensity increases
-    // Scales more aggressively. At intensity 1.0, restBase is multiplied by 0.5. At 0.0, by 2.0.
-    const intensityDamping = 2.0 - effectiveIntensity * 1.5;
-    let restProb = config.restBase * intensityDamping + phraseBars * config.restGrowth;
-
-    // Bird style needs extra rest pressure as phrases get very long
-    if (activeStyle === 'bird' && phraseBars > 1.0) {
-        restProb += (phraseBars - 1.0) * (0.3 + Math.random() * 0.2);
-    }
-
-    // Apply lyrical bias: Higher bias = more rests, shorter phrases
-    restProb += effectiveLyricalBias * 0.2;
-
-    // Session Maturity: Reduce rest probability over time to simulate a warming up soloist
-    restProb -= maturityFactor * 0.15 + smoothLoopCount * 0.02;
-
-    // High BPM Damping (Anti-Shred Safety)
-    if (playback.bpm > 150) {
-        restProb += 0.15;
-        if (playback.bpm > 185) {
-            restProb += activeStyle === 'bird' ? 0.25 : 0.15;
-        }
-    }
-
-    restProb =
-        activeStyle === 'bird'
-            ? Math.max(0.02, restProb)
-            : Math.max(0.05, restProb - maturityFactor * 0.15);
-
-    // SAFETY: Ensure minimum notes per phrase are played before resting,
-    // BUT allow resting if the phrase has gone on for a long time without notes (Liveness protection)
-    const minNotes = config.minNotesPerPhrase || 2;
-    if (soloist.notesInPhrase < minNotes && phraseBars < 1.5) {
-        restProb = 0;
-    }
-
-    if (soloist.notesInPhrase >= effectiveMaxNotes) {
-        restProb += activeStyle === 'bird' ? 0.1 : 0.4;
-    }
-
-    // -- Antiphonal Phrasing (Ska-Punk Call & Response) --
-    // Removed: Soloist should be its own thing in Ska-Punk, not suppressed by the horn section.
-    const isSuppressedByAntiphony = false;
-
-    // High Intensity Re-entry Logic (Anti-Dead-Air)
-    const restBars = soloist.currentPhraseSteps / stepsPerMeasure;
-    const isHighEnergyStyle =
-        activeStyle === 'bird' || activeStyle === 'shred' || activeStyle === 'ska';
 
     if (soloist.isResting) {
-        if (soloist.currentPhraseSteps < 0) {
-            soloist.currentPhraseSteps++; // @worker-mutation
-            return null;
-        }
+        soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
-        soloist.currentPhraseSteps = (soloist.currentPhraseSteps || 0) + 1; // @worker-mutation
-        if (isSuppressedByAntiphony) {
-            return null;
-        }
-
-        // --- Musical Entry Improvement ---
-        if (soloist.isWaitingForEntry) {
-            if (measureStep === 0) {
-                soloist.isWaitingForEntry = false; // @worker-mutation
-            } else {
-                return null;
+        // Check for break-out
+        if (soloist.restSteps <= 0 || coordination.bypassRhythm) {
+            // Find a good rhythmic entry point (e.g. downbeat or strong 8th)
+            const isGoodEntry =
+                stepInBeat === 0 || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
+            if (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure) {
+                soloist.isResting = false; // @worker-mutation
+                // Calculate new active duration based on intensity and config
+                const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
+                soloist.activeSteps = Math.floor(
+                    baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
+                ); // @worker-mutation
+                logDebug(`Waking up for ~${soloist.activeSteps} steps`);
             }
-        }
-
-        // --- Assertive Re-entry ---
-        // If we are a high energy style and we've rested for more than 1/2 measure,
-        // allow re-entry on any 8th note division if intensity is high.
-        const is8thNote = measureStep % (stepsPerBeat / 2) === 0;
-        const isAssertiveReentry =
-            isHighEnergyStyle && intensity > 0.7 && restBars > 0.5 && is8thNote;
-
-        // EMERGENCY RE-ENTRY: Force break-out if rested for > 1.5 measures in high energy styles
-        // Ensure non-high-energy styles also re-enter after slightly longer
-        const isEmergencyReentry =
-            (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.0;
-
-        if (isEmergencyReentry && step % 16 === 0) {
-            logDebug(
-                `Emergency Re-entry Triggered: restBars=${restBars.toFixed(2)}, isHighEnergy=${isHighEnergyStyle}, intensity=${intensity.toFixed(2)}`,
-            );
-        }
-
-        const isDownbeat = measureStep === 0;
-        const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
-
-        let startProb =
-            (0.15 + effectiveIntensity * 0.25) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Boosted floor
-
-        if (isEmergencyReentry) {
-            startProb = 1.0;
-        } else if (activeStyle === 'bird' || isAssertiveReentry) {
-            // BEBOP HEAD IMPROVEMENT: Parker (Ornithology) heavily favors pickups (66%)
-            if (activeStyle === 'bird' && headFactor > 0.5 && isPickupZone) {
-                startProb = 0.8 + Math.random() * 0.15; // Slightly varied pickup chance
-            } else {
-                startProb = 1.0;
-            }
-        } else if (isDownbeat) {
-            startProb =
-                (0.7 + effectiveIntensity * 0.3) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // High chance to start on '1'
-        } else if (isPickupZone) {
-            startProb =
-                (0.5 + effectiveIntensity * 0.4) * (0.4 + (evoEnabled ? warmupFactor : 1.0) * 0.6); // Good chance to play a pickup
-        }
-
-        // HEAD MODE ASSERTIVE ENTRY: Ensure all styles establish melody early
-        if (headFactor > 0.5) {
-            if (isDownbeat || isPickupZone) {
-                startProb = Math.max(startProb, 0.85);
-            } else if (is8thNote) {
-                startProb = Math.max(startProb, 0.35);
-            }
-        }
-
-        // SAFETY: If we have been resting for more than 4 measures, force re-entry
-        if (restBars > 4.0) {
-            startProb = 1.0;
-        }
-
-        // Assertive entry: Force start on the '1' if we just enabled or traded in
-        const isInitialEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
-
-        const shouldStart =
-            coordination.bypassRhythm ||
-            isInitialEntry ||
-            Math.random() < startProb ||
-            isEmergencyReentry;
-
-        if (shouldStart) {
-            if (!coordination.bypassRhythm && startProb < 1.0) {
-                logDebug(
-                    `Starting phrase. (isInitial=${isInitialEntry}, startProb=${startProb.toFixed(2)}, restBars=${restBars.toFixed(2)})`,
-                );
-            }
-            soloist.isResting = false; // @worker-mutation
-            soloist.isPhraseActive = true; // @worker-mutation
-            soloist.currentPhraseSteps = 0; // @worker-mutation
-            soloist.notesInPhrase = 0; // @worker-mutation
-
-            // --- SRDC State Machine ---
-            const srdcOrder = ['Statement', 'Restatement', 'Departure', 'Conclusion'];
-            const currentIndex = srdcOrder.indexOf(soloist.srdcState || 'Conclusion');
-            soloist.srdcState = srdcOrder[(currentIndex + 1) % 4]; // @worker-mutation
-
-            // Sync legacy QA state for compatibility (S/D = Question, R/C = Answer)
-            soloist.qaState =
-                soloist.srdcState === 'Statement' || soloist.srdcState === 'Departure'
-                    ? 'Question'
-                    : 'Answer'; // @worker-mutation
-
-            // Clear shared hook buffer on phrase start to ensure reinforcement is fresh
-            if (soloist.sharedHookBuffer) {
-                soloist.sharedHookBuffer = []; // @worker-mutation
-            }
-
-            // Seed vs Motif Decision
-            const currentRoot = currentChord.rootMidi % 12;
-            const motifRoot = soloist.motifRoot !== undefined ? soloist.motifRoot : currentRoot;
-            const isSignificantShift =
-                Math.abs(currentRoot - motifRoot) > 0 &&
-                Math.abs(currentRoot - motifRoot) !== 5 &&
-                Math.abs(currentRoot - motifRoot) !== 7;
-            const isStale =
-                evoEnabled &&
-                (soloist.motifReplayCount || 0) > 3 + Math.floor(effectiveIntensity * 4);
-            const isOverwhelmed =
-                evoEnabled && Math.random() < Math.max(0, (effectiveIntensity - 0.4) * 0.8);
-
-            let distinctPitchesCount = 0;
-            let pitchRange = 0;
-            if (soloist.motifBuffer && soloist.motifBuffer.length > 0) {
-                const pitches = soloist.motifBuffer.map((n) =>
-                    Array.isArray(n) ? n[0].midi : n.midi,
-                );
-                const distinct = new Set(pitches);
-                distinctPitchesCount = distinct.size;
-                pitchRange = Math.max(...pitches) - Math.min(...pitches);
-            }
-            const isInteresting = distinctPitchesCount > 2 || pitchRange > 2;
-            const isRestatement = soloist.srdcState === 'Restatement';
-            const motifProb = isRestatement ? 0.95 : config.motifProb;
-
-            // Higher chance to use the THEMATIC SEED during Restatement or later in the solo
-            const useSeedProb =
-                (isRestatement ? 0.6 : 0.2) +
-                (soloist.sessionSteps > stepsPerMeasure * 16 ? 0.3 : 0);
-
-            if (
-                !coordination.bypassRhythm && // Don't replay in unit tests unless explicitly testing motifs
-                soloist.thematicSeed &&
-                soloist.thematicSeed.length > 0 &&
-                Math.random() < useSeedProb &&
-                !isStale
-            ) {
-                soloist.isReplayingSeed = true; // @worker-mutation
-                soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1; // @worker-mutation
-                // Limit octave jumps at high BPMs to prevent erratic interval averages
-                const allowOctaveJump = playback.bpm < 160 && Math.random() < 0.2;
-                soloist.seedOctaveOffset = allowOctaveJump ? (Math.random() < 0.5 ? 12 : -12) : 0; // @worker-mutation
-            } else if (
-                !coordination.bypassRhythm &&
-                soloist.motifBuffer &&
-                soloist.motifBuffer.length > 0 &&
-                isInteresting &&
-                Math.random() < motifProb &&
-                !isSignificantShift &&
-                !isStale &&
-                !isOverwhelmed
-            ) {
-                soloist.isReplayingMotif = true; // @worker-mutation
-                soloist.motifReplayIndex = 0; // @worker-mutation
-                soloist.motifReplayCount = (soloist.motifReplayCount || 0) + 1; // @worker-mutation
-            } else {
-                soloist.isReplayingMotif = false; // @worker-mutation
-                soloist.isReplayingSeed = false; // @worker-mutation
-                soloist.motifBuffer = []; // @worker-mutation
-                soloist.motifRoot = currentRoot; // @worker-mutation
-                soloist.motifReplayCount = 0; // @worker-mutation
-            }
-        } else {
-            return null;
-        }
-    }
-
-    const breakProb = restProb;
-
-    if (!soloist.isResting && soloist.currentPhraseSteps > 4 && Math.random() < breakProb) {
-        // --- Seed Capture ---
-        // If we don't have a thematic seed yet, and we just finished a decent phrase
-        // in the first 16 measures, capture it as the solo's "DNA".
-        // Extended from 8 to 16 since early loops are more sparse now.
-        if (
-            (!soloist.thematicSeed || soloist.thematicSeed.length === 0) &&
-            soloist.notesInPhrase >= 3 &&
-            soloist.sessionSteps < stepsPerMeasure * 16
-        ) {
-            soloist.thematicSeed = [...soloist.motifBuffer]; // @worker-mutation
-            soloist.thematicSeedRoot = soloist.motifRoot; // @worker-mutation
-        }
-
-        soloist.isResting = true; // @worker-mutation
-        soloist.isPhraseActive = false; // @worker-mutation
-
-        // DYNAMIC BREATH: Instead of immediate potential re-entry,
-        // set currentPhraseSteps to a negative value to force a minimum rest duration.
-        // This simulates the soloist actually taking a breath.
-        const breathIntensity = (1.2 - effectiveIntensity) * 6; // 1.2 to 6 steps
-        const lyricalBreath = lyricalBias * 4; // 0 to 4 steps
-        const breathSteps = Math.floor(Math.random() * (breathIntensity + lyricalBreath)) + 1;
-
-        logDebug(
-            `Taking a breath for ${breathSteps} steps. (phrase was ${soloist.notesInPhrase} notes)`,
-        );
-
-        soloist.notesInPhrase = 0; // @worker-mutation
-        soloist.currentPhraseSteps = -breathSteps; // @worker-mutation
-        soloist.currentCell = null; // @worker-mutation
-        if (soloist.sharedHookBuffer) {
-            soloist.sharedHookBuffer = []; // @worker-mutation
         }
         return null;
-    }
-
-    // --- 3. Seed Replay ---
-    if (soloist.isReplayingSeed && soloist.thematicSeed && soloist.thematicSeed.length > 0) {
-        const seedNote = soloist.thematicSeed.find((n) => {
-            const primary = Array.isArray(n) ? n[0] : n;
-            return primary && primary.phraseStep === soloist.currentPhraseSteps;
-        });
-
-        if (seedNote) {
-            const currentRoot = currentChord.rootMidi % 12;
-            const seedRoot =
-                soloist.thematicSeedRoot !== undefined ? soloist.thematicSeedRoot : currentRoot;
-            const shift = (currentRoot - seedRoot + 12) % 12;
-
-            // Variation: Occasional octave jump for interest
-            const octaveShift =
-                (soloist.seedOctaveOffset || 0) + (shift > 6 ? -12 : shift < -6 ? 12 : 0);
-
-            let res = seedNote;
-            if (Array.isArray(seedNote)) {
-                res = seedNote.map((n) => ({ ...n, midi: n.midi + shift + octaveShift }));
-            } else {
-                res = { ...seedNote, midi: seedNote.midi + shift + octaveShift };
+    } else {
+        soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
+        if (soloist.activeSteps <= 0 && !coordination.bypassRhythm) {
+            soloist.isResting = true; // @worker-mutation
+            // Calculate rest duration based inversely on intensity
+            const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
+            soloist.restSteps = Math.floor(
+                stepsPerMeasure * restMultiplier * (0.5 + Math.random() * 1.5),
+            ); // @worker-mutation
+            if (soloist.restSteps < 4) {
+                soloist.restSteps = 4; // minimum breath
             }
-
-            // Clamp to Melodic Range
-            if (Array.isArray(res)) {
-                res = res.map((n) => ({
-                    ...n,
-                    midi: Math.max(minMidi, Math.min(maxMidi, n.midi)),
-                }));
-            } else {
-                res.midi = Math.max(minMidi, Math.min(maxMidi, res.midi));
-            }
-
-            let primary = Array.isArray(res) ? res[0] : res;
-            const scaleIntervals = getScaleForChord(currentChord, null, style);
-            const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
-
-            if (!scaleIntervals.includes(relPC)) {
-                // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-                let nearest = scaleIntervals[0];
-                let minDiff = Math.abs(nearest - relPC);
-                for (let i = 1; i < scaleIntervals.length; i++) {
-                    const curr = scaleIntervals[i];
-                    const diff = Math.abs(curr - relPC);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        nearest = curr;
-                    }
-                }
-                const nudge = nearest - relPC;
-                if (Array.isArray(res)) {
-                    res = res.map((n) => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
-                } else {
-                    res.midi += nudge;
-                    res.bendStartInterval = 0;
-                }
-                primary = Array.isArray(res) ? res[0] : res;
-            }
-
-            // Stale check on actual played note (transposed)
-            if (historyLen > 12) {
-                const count = historyCounts[primary.midi] || 0;
-                const pcCount = pcCounts[primary.midi % 12] || 0;
-                if (count / historyLen > 0.3 || pcCount / historyLen > 0.4) {
-                    soloist.isReplayingSeed = false; // @worker-mutation
-                    // Fall through to normal generation
-                }
-            }
-
-            if (soloist.isReplayingSeed) {
-                const lastSeedNote = soloist.thematicSeed[soloist.thematicSeed.length - 1];
-                const lastPrimary = Array.isArray(lastSeedNote) ? lastSeedNote[0] : lastSeedNote;
-                if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                    soloist.isReplayingSeed = false; // @worker-mutation
-                }
-
-                soloist.busySteps = (primary.durationSteps || 1) - 1; // @worker-mutation
-                return finalizeNote(res);
-            }
-        }
-
-        if (soloist.isReplayingSeed && !seedNote) {
-            const lastSeedNote = soloist.thematicSeed[soloist.thematicSeed.length - 1];
-            const lastPrimary = Array.isArray(lastSeedNote) ? lastSeedNote[0] : lastSeedNote;
-            if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                soloist.isReplayingSeed = false; // @worker-mutation
-            }
+            logDebug(`Resting for ~${soloist.restSteps} steps`);
             return null;
         }
     }
 
-    // --- 4. Motif Replay ---
-    if (soloist.isReplayingMotif) {
-        const motifNote = soloist.motifBuffer.find((n) => {
-            const primary = Array.isArray(n) ? n[0] : n;
-            return primary && primary.phraseStep === soloist.currentPhraseSteps;
-        });
+    // --- 3. Rhythmic Density ---
+    const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
+    const baseAttackProb = emphasisMap[measureStep % 16];
 
-        if (motifNote) {
-            const currentRoot = currentChord.rootMidi % 12;
-            const motifRoot = soloist.motifRoot !== undefined ? soloist.motifRoot : currentRoot;
-            const shift = (currentRoot - motifRoot + 12) % 12;
-            const octaveShift = shift > 6 ? -12 : shift < -6 ? 12 : 0;
-
-            let res = motifNote;
-            if (Array.isArray(motifNote)) {
-                res = motifNote.map((n) => ({ ...n, midi: n.midi + shift + octaveShift }));
-            } else {
-                res = { ...motifNote, midi: motifNote.midi + shift + octaveShift };
-            }
-
-            // Clamp to Melodic Range
-            if (Array.isArray(res)) {
-                res = res.map((n) => ({
-                    ...n,
-                    midi: Math.max(minMidi, Math.min(maxMidi, n.midi)),
-                }));
-            } else {
-                res.midi = Math.max(minMidi, Math.min(maxMidi, res.midi));
-            }
-
-            let primary = Array.isArray(res) ? res[0] : res;
-            const scaleIntervals = getScaleForChord(currentChord, null, style);
-            const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
-
-            if (!scaleIntervals.includes(relPC)) {
-                // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-                let nearest = scaleIntervals[0];
-                let minDiff = Math.abs(nearest - relPC);
-                for (let i = 1; i < scaleIntervals.length; i++) {
-                    const curr = scaleIntervals[i];
-                    const diff = Math.abs(curr - relPC);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        nearest = curr;
-                    }
-                }
-                const nudge = nearest - relPC;
-                if (Array.isArray(res)) {
-                    res = res.map((n) => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
-                } else {
-                    res.midi += nudge;
-                    res.bendStartInterval = 0;
-                }
-                primary = Array.isArray(res) ? res[0] : res;
-            }
-
-            // Stale check on actual played note (transposed)
-            if (historyLen > 12) {
-                const count = historyCounts[primary.midi] || 0;
-                const pcCount = pcCounts[primary.midi % 12] || 0;
-                if (count / historyLen > 0.3 || pcCount / historyLen > 0.4) {
-                    soloist.isReplayingMotif = false; // @worker-mutation
-                    soloist.motifBuffer = []; // @worker-mutation
-                    // Abort immediately? Or fall through to normal generation?
-                    // Fall through effectively cancels replay for this step and future steps
-                }
-            }
-
-            if (soloist.isReplayingMotif) {
-                const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
-                const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
-                if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                    soloist.isReplayingMotif = false; // @worker-mutation
-                }
-
-                soloist.busySteps = (primary.durationSteps || 1) - 1; // @worker-mutation
-                return finalizeNote(res);
-            }
-        }
-
-        // If replaying but current step is a rest in the motif
-        if (soloist.isReplayingMotif && !motifNote) {
-            const lastNote = soloist.motifBuffer[soloist.motifBuffer.length - 1];
-            const lastPrimary = Array.isArray(lastNote) ? lastNote[0] : lastNote;
-            if (lastPrimary && soloist.currentPhraseSteps >= lastPrimary.phraseStep) {
-                soloist.isReplayingMotif = false; // @worker-mutation
-            }
-            return null;
-        }
-    }
-
-    // --- 5. Rhythmic Density (Groove DNA Model) ---
+    const intensityScale = 0.5 + intensity * 2.0;
+    let attackProb = baseAttackProb * intensityScale;
 
     const stepCoord = coordination.stepCoordination || {};
-    const kickHit = stepCoord.kickHit || false;
-    const snareHit = stepCoord.snareHit || false;
-
-    // Base Probability from Emphasis Map
-    const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
-    let baseAttackProb = emphasisMap[measureStep % 16];
-
-    // Syllable Pressure: Align with lyrical density if provided
-    const currentSection = arranger.sectionMap
-        ? arranger.sectionMap.find((s) => step >= s.start && step < s.end)
-        : null;
-    let syllableCount = 0;
-    if (currentSection?.syllables) {
-        const relativeStep = step - currentSection.start;
-        const measureIndex = Math.floor(relativeStep / stepsPerMeasure);
-        syllableCount = currentSection.syllables[measureIndex] || 0;
+    if (stepCoord.kickHit) {
+        attackProb += 0.2;
+    }
+    if (stepCoord.snareHit) {
+        attackProb += 0.2;
     }
 
-    if (syllableCount > 0) {
-        // Boost/Scale probability to aim for syllableCount attacks per measure
-        const targetDensity = syllableCount / 16;
-        baseAttackProb = baseAttackProb * 0.5 + targetDensity * 0.5;
+    if (coordination.bypassRhythm) {
+        attackProb = 1.0;
     }
 
-    // Density Scaling
-    // Linearize intensity response: 0.3 to 3.5 multiplier
-    // NEW: Inject warmupFactor and maturityFactor into the density pressure
-    const intensityScale = (0.2 + effectiveIntensity * 3.0) * (0.5 + warmupFactor * 0.5);
-    const lyricalDamping = 1.0 - (effectiveLyricalBias || 0) * 0.7;
-
-    let attackProb = baseAttackProb * intensityScale * lyricalDamping;
-
-    // Liveness Boost: If we just started a phrase, be more eager to play the first note
-    if (soloist.notesInPhrase === 0) {
-        attackProb *= 1.5;
-    }
-
-    // Reactive Alignment: Boost attacks on drum hits for high-energy styles
-    if (activeStyle === 'funk' || activeStyle === 'scalar' || activeStyle === 'shred') {
-        if (kickHit) {
-            attackProb += 0.3;
-        }
-        if (snareHit) {
-            attackProb += 0.25;
-        }
-    }
-
-    // CLAMP BEFORE REDUCTIONS: Ensure penalties like Interlocking/Sparsity actually create gaps
-    attackProb = Math.min(1.0, attackProb);
-
-    // Reactive Interlocking: In Jazz/Bossa, slightly favor gaps on heavy downbeats if intense
-    if ((activeStyle === 'bird' || activeStyle === 'bossa') && measureStep === 0) {
-        attackProb *= 1.0 - Math.max(0, (intensity - 0.4) * 0.5);
-    }
-
-    // Session Maturity: Slight density boost over long sessions
-    attackProb *= 0.9 + maturityFactor * 0.2;
-
-    // Phrase Climax Boost (SRDC)
-    if (soloist.srdcState === 'Departure') {
-        attackProb *= 1.35;
-    } else if (soloist.srdcState === 'Conclusion') {
-        attackProb *= 0.6;
-    }
-
-    // Head Mode Sparsity
-    if (headFactor > 0.5) {
-        attackProb *= 0.7;
-    }
-
-    // High BPM Damping
-    if (playback.bpm > 180) {
-        attackProb *= 0.8;
-    }
-
-    // Section End Tapering: Naturally wind down as the section ends
-    const sectionEnd = coordination.sectionEnd || 999999;
-    const stepsToEnd = sectionEnd - step;
-    if (stepsToEnd < 16 && stepsToEnd >= 0) {
-        attackProb *= stepsToEnd / 16;
-    }
-
-    // FINAL CLAMP
-    attackProb = Math.min(1.0, attackProb);
-
-    // Minimum Gap Protection: Prevent mechanical 'machine-gun' fire
-    // For Jazz/Bird, we allow 16th streams, but for Minimal/Acoustic, we force space.
-    let minGap = 1;
-    // Burst logic: Higher chance at high intensity, but still possible at medium.
-    const isBurst = Math.random() < effectiveIntensity * 0.3;
-
-    if (activeStyle === 'minimal' || activeStyle === 'acoustic') {
-        minGap = 4;
-    } else if (!isBurst) {
-        // Continuous rhythmic scaling: As intensity and lyricalBias change,
-        // the chance to force an 8th note (minGap = 2) scales smoothly.
-        const melodicProb = Math.max(
-            0,
-            0.8 - effectiveIntensity + (effectiveLyricalBias || 0) * 0.2,
-        );
-        if (Math.random() < melodicProb) {
-            minGap = 2;
-        }
-    }
-
-    const stepsSinceLastAttack =
-        soloist.lastAttackStep === undefined ? 999 : step - soloist.lastAttackStep;
-    if (stepsSinceLastAttack < minGap) {
-        attackProb = 0;
-    }
-
-    let isHit = false;
-    if (coordination.bypassRhythm || Math.random() < attackProb) {
-        soloist.lastAttackStep = step; // @worker-mutation
-        isHit = true;
-    }
-
-    if (isHit) {
-        /* hit */
-    } else {
-        // --- Embellishment: Approach Note Filling ---
-        // Fill rests during a phrase with melodic motion at high intensity
-        const fillerProb = evoEnabled ? Math.max(0, (effectiveIntensity - 0.75) * 2.0) : 0;
-        // Bird style is hyper-active by default, but reduce filler during the Head loop for melody clarity
-        const activeFillerProb = activeStyle === 'bird' ? 0.8 - headFactor * 0.6 : fillerProb;
-
-        if (!soloist.isResting && Math.random() < activeFillerProb) {
-            const scaleIntervals = getScaleForChord(targetChord, null, style);
-            const neighborDir = Math.random() > 0.5 ? 1 : -1;
-            let neighborMidi = lastMidi;
-            let neighborPC = (neighborMidi + neighborDir + 120) % 12;
-            let tries = 0;
-            while (!scaleIntervals.includes(neighborPC) && tries < 3) {
-                neighborMidi += neighborDir;
-                neighborPC = (neighborMidi + 120) % 12;
-                tries++;
-            }
-            const fillerNote = {
-                midi: neighborMidi,
-                durationSteps: 1,
-                velocity: 0.7 * (0.5 + effectiveIntensity * 0.5),
-                style: activeStyle,
-                isLegato: true,
-            };
-            return finalizeNote(fillerNote);
-        }
+    if (Math.random() > attackProb) {
         return null;
     }
 
-    // --- 6. Pitch Selection ---
+    // --- 4. Pitch Selection ---
     CANDIDATE_WEIGHTS.fill(0);
-    const isLateInChord = stepInChord >= currentChord.beats * stepsPerBeat - 2;
-    // Enhanced Anticipation for Voice Leading
-    const anticipationWindow = activeStyle === 'bird' ? 4 : 2;
-    const isApproachingChange =
-        stepInChord >= currentChord.beats * stepsPerBeat - anticipationWindow;
-
-    if (nextChord && isLateInChord && Math.random() < (config.anticipationProb || 0)) {
-        targetChord = nextChord;
-    }
-
     const scaleIntervals = getScaleForChord(targetChord, null, style);
-
-    // Optimization: Pre-calculate scale intervals lookup table (bitmask) for O(1) access
     let scaleMask = 0;
     for (let i = 0; i < scaleIntervals.length; i++) {
         scaleMask |= 1 << scaleIntervals[i];
     }
-
     const rootMidi = targetChord.rootMidi;
-    // Optimization: avoid allocating scaleTones and chordTones arrays.
-    // Instead check intervals directly against scaleIntervals and targetChord.intervals.
-    // Note: chordTones check logic updated to use targetChord instead of currentChord for consistency during anticipation.
-
     let totalWeight = 0;
-    CANDIDATE_WEIGHTS.fill(0);
-    const lastInterval = soloist.lastInterval || 0;
-    const isResolvingSkip = Math.abs(lastInterval) > 4;
 
-    if (Math.abs(lastInterval) < 3) {
-        soloist.stagnationCount = (soloist.stagnationCount || 0) + 1; // @worker-mutation
-    } else {
-        soloist.stagnationCount = 0; // @worker-mutation
-    }
-    const isStagnant = soloist.stagnationCount > 4;
+    // Confine search to nearby notes
+    const searchMin = Math.max(minMidi, lastMidi - 14);
+    const searchMax = Math.min(maxMidi, lastMidi + 14);
 
-    // Voice Leading Target Calculation (Lookahead)
-    let voiceLeadingTarget = null;
-    if (isApproachingChange && nextChord) {
-        // Find the nearest chord tone in the NEXT chord to our current position
-        const nextChordTones = nextChord.intervals.map((i) => nextChord.rootMidi + i);
-        // Normalize to nearest octave relative to lastMidi
-        let bestTarget = null;
-        let minTargetDist = 999;
-
-        for (const tone of nextChordTones) {
-            const pc = tone % 12;
-            // Check octaves around lastMidi
-            const octaves = [
-                Math.floor(lastMidi / 12) * 12,
-                (Math.floor(lastMidi / 12) - 1) * 12,
-                (Math.floor(lastMidi / 12) + 1) * 12,
-            ];
-            for (const oct of octaves) {
-                const candidate = oct + pc;
-                const d = Math.abs(candidate - lastMidi);
-                if (d < minTargetDist) {
-                    minTargetDist = d;
-                    bestTarget = candidate;
-                }
-            }
-        }
-        voiceLeadingTarget = bestTarget;
-    }
-
-    for (let m = Math.floor(minMidi); m <= Math.ceil(maxMidi); m++) {
-        if (m < 0 || m > 127) {
-            continue;
-        }
+    for (let m = searchMin; m <= searchMax; m++) {
         const pc = ((m % 12) + 12) % 12;
         const interval = (pc - (rootMidi % 12) + 12) % 12;
         let weight = 1.0;
 
-        const dist = Math.abs(m - lastMidi);
-
         const isScaleTone = (scaleMask >> interval) & 1;
         if (!isScaleTone) {
-            // Allow chromatic passing tones/neighbors for specific styles
-            const allowsChromatic = ['bird', 'blues', 'neo', 'bossa'].includes(activeStyle);
-            if (allowsChromatic && dist === 1) {
-                weight = activeStyle === 'bird' ? 80 : 40; // Moderated for non-jazz styles
+            continue;
+        }
+
+        const dist = Math.abs(m - lastMidi);
+
+        // Prevent exact repetition unless Funk/Ska
+        if (dist === 0) {
+            if (['funk', 'ska'].includes(activeStyle)) {
+                weight *= 0.5;
             } else {
-                CANDIDATE_WEIGHTS[m] = 0;
                 continue;
             }
         }
-        // Bonuses
-        if (
-            isResolvingSkip &&
-            ((lastInterval > 0 && m < lastMidi) || (lastInterval < 0 && m > lastMidi)) &&
-            dist <= 2
-        ) {
-            weight += 1000;
-        }
-        const isGuideTone = [3, 4, 10, 11].includes(interval);
-        const isRoot = interval === 0;
-        const isPentatonicColor = [2, 9].includes(interval);
-        const isBlueNote = [3, 6].includes(interval);
 
-        if (isGuideTone) {
-            weight += 30;
-        }
-        if (isRoot) {
-            weight += 15;
-        }
-        if (activeStyle === 'country' && isPentatonicColor) {
-            weight += 800;
-        }
-
-        // Stepwise Motion Bonus (Melodic Integrity)
-        const isSmoothStyle = ['blues', 'jazz', 'bird', 'acoustic', 'reggae'].includes(activeStyle);
-        if (dist > 0 && dist <= 4 && activeStyle !== 'country') {
-            if (activeStyle === 'bird') {
-                if (dist === 1) {
-                    weight += 400; // Extra chromatic preference for Bird style
-                } else if (dist === 2) {
-                    weight += 10; // Very small bonus for whole-steps
-                } else if (dist === 3) {
-                    weight += 80; // Bonus for minor thirds (common in bebop skips)
-                }
-            } else {
-                if (dist <= 2) {
-                    weight += isSmoothStyle ? 100 : 50;
-                }
-            }
-        }
-        if (activeStyle === 'bird' || activeStyle === 'bossa') {
+        // Reward small steps
+        if (dist <= 2) {
             weight += 100;
         }
-        if (activeStyle === 'blues' || activeStyle === 'acoustic') {
-            weight += 125;
-        }
-        if (activeStyle === 'reggae') {
-            weight += 250; // Very strong stepwise preference for Reggae
+        if (dist <= 4) {
+            weight += 50;
         }
 
-        // Voice Leading Bonus
-        if (voiceLeadingTarget !== null) {
-            // Check if this note leads smoothly to the target (stepwise)
-            const distToTarget = Math.abs(m - voiceLeadingTarget);
-            if (distToTarget <= 2 && distToTarget > 0) {
-                weight += 500; // Strong pull towards voice leading target
-            }
-        }
-
-        // --- Lead Sheet Melodic Anchoring ---
-        if (activeStyle === 'lead_sheet' && soloist.leadSheetMelody?.length > 0) {
-            const isThemePC = soloist.leadSheetMelody.some((n) => n.midi % 12 === pc);
-            if (isThemePC) {
-                weight += 200; // Strong preference for thematic pitch classes
-            }
-
-            // Register damping: Prefer notes near the theme's center
-            const avgMidi = soloist.leadSheetMelody[0]?.midi || 60; // Simple estimate
-            const distToCenter = Math.abs(m - avgMidi);
-            if (distToCenter <= 7) {
-                weight += 100;
-            }
-        }
-
-        // --- Distance Scaling for Bonuses ---
-        // We damp bonuses for notes that are far away to prevent "teleportation"
-        // Adaptive: Only apply damping to styles that need strict smoothness
-        let distDamping = 1.0;
-        if (isSmoothStyle) {
-            distDamping = dist > 4 ? 1.0 / (1.0 + (dist - 4) * 0.05) : 1.0;
-        }
-
-        if (activeStyle === 'blues' && isBlueNote) {
-            weight += 250 * distDamping; // Authentic emphasis on Blue Notes, smoothed
-        }
-
-        // SRDC Tension & Resolution Bonuses
-        if (soloist.srdcState === 'Departure') {
-            const tensionBonus = 250 * effectiveIntensity * distDamping;
-            // Favor 2nds, #11/b5, b6, and 7ths for tension
-            if ([1, 2, 6, 8, 11].includes(interval)) {
-                weight += tensionBonus;
-            }
-        }
-
-        if (soloist.srdcState === 'Conclusion') {
-            const baseRes = isSmoothStyle ? 500 : 400;
-            const resolutionBonus = baseRes * effectiveIntensity * distDamping;
-            const isChordTone = targetChord.intervals?.some(
-                (i) => ((i % 12) + 12) % 12 === interval,
-            );
-            // Strong preference for Root and 5th for finality
-            if (interval === 0 || interval === 7) {
-                weight += resolutionBonus;
-            }
-            // Preference for other chord tones
-            if (isChordTone) {
-                weight += resolutionBonus * 0.5;
-            }
-        }
-
-        if (soloist.qaState === 'Answer') {
-            const qaBonus =
-                (activeStyle === 'minimal' ? 100 : 250) * effectiveIntensity * distDamping;
-            if (isRoot) {
-                weight += qaBonus;
-            }
-            if (isGuideTone) {
-                weight += qaBonus * 0.5;
-            }
-        }
-
-        // Check if interval matches target chord tones (handling extended intervals > 12)
+        // Reward chord tones
         if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
-            const headChordBonus = headFactor > 0.5 ? 1200 : 0; // Moderate bonus for Head (was 8000, too stiff)
-            weight += (isSmoothStyle ? 400 : 100 + headChordBonus) * distDamping;
+            weight += 150;
         }
 
-        // --- Target Extensions (Sophistication Bonus) ---
-        // As intensity increases, the soloist gradually favors the style's defined tensions.
-        if (config.targetExtensions?.includes(interval)) {
-            const extensionBonus = 150 * effectiveIntensity * distDamping;
-            weight += extensionBonus;
-        }
-
-        // Lyrical Head Bonus: Favor 1, 3, 5, 7 during the Head loop even more
-        if (headFactor > 0.3 && [0, 4, 7, 11, 3, 10].includes(interval)) {
-            weight += 600 * headFactor; // Adjusted from 1000
-        }
-
-        if (activeStyle === 'country' && isPentatonicColor) {
-            weight += 1000;
-        }
-
-        // Stepwise Bonus: Reward movement of 1-2 semitones for melodic flow
-        if (dist >= 1 && dist <= 2) {
-            let stepwiseBonus = 200; // Increased from 150
-            if (activeStyle === 'neo' || activeStyle === 'bossa') {
-                stepwiseBonus = 400;
-            }
-            if (activeStyle === 'reggae') {
-                stepwiseBonus = 600;
-            }
-            weight += stepwiseBonus;
-        }
-
-        // --- Multiplicative Penalties (Applied Last) ---
-
-        // 1. Repeated Note Penalty: High priority suppression
-        if (dist === 0) {
-            if (activeStyle === 'bird') {
-                // Jazz allows some repetition for rhythm, but keep it tight
-                const headRepeatedMultiplier = headFactor > 0.5 ? 2.0 : 1.0;
-                weight *= 0.05 * headRepeatedMultiplier; // Reduced from 0.1
-            } else {
-                weight *= 0.0000001; // Near-total ban
-            }
-            if (isStagnant && activeStyle !== 'bird') {
-                weight = 0;
-            }
-        }
-
-        // 2. Octave Jump Penalty: Discourage teleportation
-        if (dist > 12) {
-            weight *= 0.01; // 99% reduction for jumps > octave
-        } else if (dist > 7) {
-            weight *= 0.2; // 80% reduction for large jumps within octave
-        }
-
-        // 3. Melodic Contour: Favor direction changes after large moves
-        if (lastInterval > 4 && m < lastMidi) {
-            weight *= 1.5;
-        }
-        if (lastInterval < -4 && m > lastMidi) {
-            weight *= 1.5;
-        }
-
-        // 4. Smoothness: Exponential penalty for skips in smooth styles
-        if (dist > 2 && isSmoothStyle) {
-            let penaltyBase = ['shred', 'metal', 'bird'].includes(activeStyle) ? 0.8 : 0.5;
-            if (activeStyle === 'neo' || activeStyle === 'funk') {
-                penaltyBase = 0.4;
-            }
-            if (activeStyle === 'bird' && headFactor > 0.5) {
-                penaltyBase *= 0.8;
-            }
-            weight *= penaltyBase ** (dist - 2);
-        }
-
-        // 5. High BPM Safety
-        if (playback.bpm > 160 && dist > 4) {
-            weight *= 0.1;
-        }
-        if (playback.bpm > 185 && dist > 2) {
-            weight *= 0.05;
-        }
-
-        // 6. History Magnets: Prevent overuse of specific pitches/notes
-        if (historyLen > 12) {
-            const count = historyCounts[m] || 0;
-            const pcCount = pcCounts[pc] || 0;
-            const pct = count / historyLen;
-            const pcPct = pcCount / historyLen;
-            if (pct > 0.4 || pcPct > 0.5) {
-                weight *= 0.01; // Strong penalty instead of hard ban
-            } else if (pct > 0.2 || pcPct > 0.3) {
-                weight *= 0.1; // Moderate penalty
-            }
-        }
-
-        // 7. Genre Hard Constraints
-        if (activeStyle === 'reggae' && dist > 4) {
-            weight = 0;
-        }
-        if (['bird', 'bossa', 'acoustic'].includes(activeStyle) && dist > 7) {
-            weight *= 0.05;
-        }
-
-        weight = Math.max(0.01, weight);
         CANDIDATE_WEIGHTS[m] = weight;
         totalWeight += weight;
     }
 
     let selectedMidi = -1;
-    const startM = Math.floor(minMidi);
-    const endM = Math.ceil(maxMidi);
-
     if (totalWeight > 0) {
         let randomVal = Math.random() * totalWeight;
-        for (let m = startM; m <= endM; m++) {
-            if (m < 0 || m > 127) {
-                continue;
-            }
+        for (let m = searchMin; m <= searchMax; m++) {
             const w = CANDIDATE_WEIGHTS[m];
             if (w > 0) {
                 randomVal -= w;
@@ -1357,96 +285,21 @@ export function getSoloistNote(
         }
     }
 
-    if (selectedMidi === -1 || selectedMidi === lastMidi) {
-        const fallbacks = [];
-        for (let m = startM; m <= endM; m++) {
-            if (m < 0 || m > 127) {
-                continue;
-            }
-            const pc = ((m % 12) + 12) % 12;
-            const interval = (pc - (rootMidi % 12) + 12) % 12;
-            if ((scaleMask >> interval) & 1 && m !== lastMidi) {
-                const dist = Math.abs(m - lastMidi);
-                let weight = 1.0;
-                if (dist <= 2) {
-                    weight += 10;
-                }
-                if (activeStyle === 'reggae' && dist > 4) {
-                    weight *= 0.1;
-                }
-
-                if (soloist.srdcState === 'Conclusion') {
-                    const resolutionBonus = 400 * effectiveIntensity;
-                    const isChordTone = targetChord.intervals?.some(
-                        (i) => ((i % 12) + 12) % 12 === interval,
-                    );
-                    if (interval === 0 || interval === 7) {
-                        weight += resolutionBonus;
-                    }
-                    if (isChordTone) {
-                        weight += resolutionBonus * 0.5;
-                    }
-                }
-
-                fallbacks.push({ midi: m, weight });
-            }
-        }
-        if (fallbacks.length > 0) {
-            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-            let totalW = 0;
-            for (let i = 0; i < fallbacks.length; i++) {
-                totalW += fallbacks[i].weight;
-            }
-            let rand = Math.random() * totalW;
-            for (const f of fallbacks) {
-                rand -= f.weight;
-                if (rand <= 0) {
-                    selectedMidi = f.midi;
-                    break;
-                }
-            }
-            if (selectedMidi === -1) {
-                selectedMidi = fallbacks[0].midi;
-            }
-        } else {
-            selectedMidi = lastMidi;
-        }
+    if (selectedMidi === -1) {
+        selectedMidi = lastMidi; // Fallback
     }
 
-    soloist.lastInterval = selectedMidi - lastMidi; // @worker-mutation
-
-    // --- 7. Melodic Devices ---
-    const deviceBaseProb =
-        config.deviceProb *
-        (0.5 + complexity * 1.0) *
-        (1.2 - lyricalBias) *
-        (0.2 + effectiveIntensity * 0.8) *
-        (1.0 - headFactor * 0.7); // Reduce devices by up to 70% during the Head loop
+    // --- 5. Melodic Devices ---
+    const deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const isPiano = soloist.mode === 'piano';
-    // Certain styles MUST allow double stops even in monophonic mode for authentic character,
-    // but ONLY if the configuration (global or local) actually allows them.
-    const isPolyphonic =
-        (soloist.doubleStopProb ?? 1.0) > 0 &&
-        config.doubleStopProb > 0 &&
-        (soloist.mode !== 'monophonic' ||
-            ['country', 'reggae', 'blues', 'ska'].includes(activeStyle));
+    const isPolyphonic = (soloist.doubleStopProb ?? 1.0) > 0 && config.doubleStopProb > 0;
 
-    // Throttle devices at high BPM
-    let bpmDeviceThrottle = playback.bpm > 160 ? 0.3 : 1.0;
-    if (playback.bpm > 185) {
-        bpmDeviceThrottle = 0.05; // Almost no devices at 200 BPM to prevent 16th bursts
-    }
-
-    if (
-        stepInBeat === 0 &&
-        Math.random() < deviceBaseProb * 0.7 * warmupFactor * bpmDeviceThrottle
-    ) {
+    if (stepInBeat === 0 && Math.random() < deviceBaseProb) {
         let allowed = [...(config.allowedDevices || [])];
         if (isPiano) {
             allowed = allowed.filter(
                 (d) => !['slide', 'countryBend', 'graceSlide', 'chickenPick'].includes(d),
             );
-            // Piano-specific devices
             if (!allowed.includes('graceNote')) {
                 allowed.push('graceNote');
             }
@@ -1460,7 +313,7 @@ export function getSoloistNote(
                 selectedMidi,
                 targetChord,
                 activeStyle,
-                effectiveIntensity,
+                effectiveIntensity: intensity,
                 minMidi,
                 maxMidi,
                 lastMidi,
@@ -1468,7 +321,7 @@ export function getSoloistNote(
                 soloist,
                 isPolyphonic,
                 isPiano,
-                dynamicCenter,
+                dynamicCenter: 72,
                 scaleMask,
             });
 
@@ -1477,154 +330,44 @@ export function getSoloistNote(
                 const first = deviceBuffer[0];
                 soloist.busySteps =
                     (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
-                soloist.currentCell = null; // @worker-mutation
                 return finalizeNote(first);
             }
         }
     }
 
     const extraNotes = [];
-    const dsChance =
-        (config.doubleStopProb + maturityFactor * 0.2) *
-        (stepInBeat === 2 ? 1.2 : 0.6) *
-        warmupFactor *
-        (0.4 + effectiveIntensity * 0.6) *
-        (soloist.doubleStopProb ?? 1.0);
-
+    const dsChance = config.doubleStopProb * intensity * (soloist.doubleStopProb ?? 1.0);
     if (isPolyphonic && Math.random() < dsChance) {
         const generatedExtra = generateExtraNotes({
             soloist,
             currentChord,
             activeStyle,
-            effectiveIntensity,
+            effectiveIntensity: intensity,
             selectedMidi,
         });
         extraNotes.push(...generatedExtra);
     }
 
-    // --- 8. Dynamic Duration & Bending ---
-    let durationSteps = 2;
-    let bendStartInterval = 0;
-
-    if (activeStyle === 'bird') {
-        // Tune bird to start more melodic (8th notes) at low intensity or during warmup
-        const birdEighthProb =
-            0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2 + headFactor * 0.5;
-        durationSteps = Math.random() < Math.min(1.0, birdEighthProb) ? 2 : 1;
-    } else {
-        // Continuous duration scaling
-        const longNoteProb = Math.max(
-            0,
-            0.8 - effectiveIntensity + (effectiveLyricalBias || 0) * 0.2,
-        );
-        if (!isBurst && Math.random() < longNoteProb) {
-            durationSteps = Math.random() < 0.6 ? 4 : 8;
-        } else {
-            // Standard style-based durations
-            if (activeStyle === 'funk' || activeStyle === 'disco' || activeStyle === 'ska') {
-                durationSteps = Math.random() < 0.7 ? 1 : 2;
-            } else if (activeStyle === 'neo' || activeStyle === 'bossa') {
-                durationSteps = Math.random() < 0.6 ? 4 : 2;
-            } else if (activeStyle === 'minimal') {
-                durationSteps = Math.random() < 0.8 ? 8 : 4;
-            }
-        }
+    // --- 6. Duration & Velocity ---
+    let durationSteps = activeStyle === 'bird' ? 2 : Math.random() < 0.6 ? 2 : 4;
+    if (['funk', 'disco', 'ska'].includes(activeStyle)) {
+        durationSteps = 1;
     }
 
-    // Lyrical Head: Increase durations for Loop 1 to sound like a written melody
-    if (headFactor > 0.5) {
-        durationSteps = Math.max(durationSteps, 2); // Floor at 8th note
-        if (Math.random() < 0.3 * headFactor) {
-            durationSteps *= 2; // Occasional longer notes
-        }
-    }
-
-    const isImportantStep = stepInBeat === 0 || (stepInBeat === 2 && Math.random() < 0.3);
-    const baseVelocity = 0.5 + effectiveIntensity * 0.7;
+    const baseVelocity = 0.6 + intensity * 0.4;
+    const isImportantStep = stepInBeat === 0 || stepInBeat === 2;
     let stepVelocity = isImportantStep ? baseVelocity * 1.15 : baseVelocity;
 
-    // Head Mode Dynamics: Add slightly more "human" fluctuation during the first loop
-    if (headFactor > 0.5) {
-        stepVelocity *= 0.9 + Math.random() * 0.2;
+    if (coordination.bassHit && selectedMidi < 60) {
+        stepVelocity *= 0.85; // Yield to bass
     }
 
-    // --- ENSEMBLE CLARITY: Yield to Bass ---
-    // If we are playing in the lower soloist register and the bass is hitting,
-    // reduce velocity slightly to avoid low-mid mud.
-    if (bassHit && selectedMidi < 60) {
-        stepVelocity *= 0.85;
+    let bendStartInterval = 0;
+    if (soloist.mode === 'guitar' && durationSteps >= 4 && Math.random() < 0.3) {
+        bendStartInterval = Math.random() < 0.5 ? -1 : 1;
     }
-
-    // --- Legato Logic ---
-    let isLegato = false;
-    const LEGATO_STYLES = ['neo', 'shred', 'bird', 'blues', 'metal', 'scalar'];
-    if (
-        LEGATO_STYLES.includes(activeStyle) &&
-        Math.abs(selectedMidi - lastMidi) <= 2 &&
-        durationSteps <= 2
-    ) {
-        let legatoProb = activeStyle === 'shred' || activeStyle === 'bird' ? 0.7 : 0.4;
-
-        // NEW: Boost legato during the Head loop for smoother melodic phrasing
-        if (headFactor > 0.5) {
-            legatoProb = Math.min(0.95, legatoProb + 0.2);
-        }
-
-        // Boost legato significantly for monophonic lead instruments
-        if (soloist.mode === 'monophonic') {
-            legatoProb = 0.85;
-        }
-
-        if (Math.random() < legatoProb && !soloist.isResting && soloist.notesInPhrase > 1) {
-            isLegato = true;
-        }
-    }
-
-    // Secondary duration overrides
-    if (!isBurst) {
-        if (
-            isImportantStep &&
-            (activeStyle === 'neo' ||
-                activeStyle === 'blues' ||
-                activeStyle === 'minimal' ||
-                activeStyle === 'bossa')
-        ) {
-            durationSteps = Math.random() < 0.4 + maturityFactor * 0.2 ? 8 : 4;
-        } else if (
-            activeStyle === 'scalar' &&
-            stepInBeat === 0 &&
-            Math.random() < 0.15 + maturityFactor * 0.1
-        ) {
-            durationSteps = 4;
-        }
-    }
-
-    const pc = selectedMidi % 12;
-    const isRoot = pc === targetChord.rootMidi % 12;
-    const isGuideTone = [3, 4, 10, 11].includes((pc - (targetChord.rootMidi % 12) + 12) % 12);
-
-    // Guitar mode favors bending UP into notes (pre-bends)
-    const guitarBendProb = soloist.mode === 'guitar' ? 0.35 + (isGuideTone ? 0.2 : 0) : 0;
-
-    if (
-        ((isRoot || isGuideTone) &&
-            Math.abs(lastMidi - selectedMidi) <= 2 &&
-            Math.random() < 0.4 + intensity * 0.3) ||
-        Math.random() < guitarBendProb
-    ) {
-        // Bend up from 1 or 2 semitones below
-        bendStartInterval = -1;
-        if (Math.random() < 0.4 || (soloist.mode === 'guitar' && Math.random() < 0.5)) {
-            bendStartInterval = -2;
-        }
-    } else if (durationSteps >= 4 && Math.random() < 0.3 + maturityFactor * 0.2) {
-        // Natural release/vibrato bend (up)
-        bendStartInterval = Math.random() < 0.7 ? 1 : 2;
-    }
-
     if (isPiano) {
         bendStartInterval = 0;
-        isLegato = false;
     }
 
     const result = {
@@ -1636,47 +379,8 @@ export function getSoloistNote(
         timingOffset: 0,
         style: activeStyle,
         isDoubleStop: false,
-        isLegato,
+        isLegato: false,
     };
-
-    // --- Unified Embellishment: Rhythmic Diminution ---
-    // Splitting longer notes into runs based on intensity and loop progress
-    let embellishmentProb = evoEnabled
-        ? Math.max(
-              0,
-              (effectiveIntensity - 0.5) * 1.5 +
-                  (soloist.motifReplayCount || 0) * 0.1 +
-                  smoothLoopCount * 0.05,
-          )
-        : 0;
-
-    // Reduce embellishments significantly during the Head loop to keep melody clean
-    if (headFactor > 0.5) {
-        embellishmentProb *= 0.2;
-    }
-
-    // Bird style is already dense via cells, reduce auto-embellishment to keep 8th note flow
-    if (activeStyle === 'bird') {
-        embellishmentProb *= 0.3;
-    }
-
-    if (durationSteps > 1 && Math.random() < embellishmentProb * 0.8) {
-        result.durationSteps = 1;
-        if (!soloist.embellishmentBuffer) {
-            soloist.embellishmentBuffer = []; // @worker-mutation
-        }
-        const emb = generateEmbellishment({
-            selectedMidi,
-            targetChord,
-            style,
-            activeStyle,
-        });
-        soloist.embellishmentBuffer.push({
-            ...emb,
-            durationSteps: durationSteps - 1,
-            velocity: emb.velocity * result.velocity,
-        }); // @worker-mutation
-    }
 
     if (result.durationSteps > 1) {
         soloist.busySteps = result.durationSteps - 1; // @worker-mutation
@@ -1684,20 +388,15 @@ export function getSoloistNote(
 
     const finalResult =
         extraNotes.length > 0 && isPolyphonic
-            ? [...extraNotes.map((n) => ({ ...result, ...n })), result]
-            : result;
-
-    if (!soloist.isReplayingMotif) {
-        const motifEntry = Array.isArray(finalResult)
-            ? finalResult.map((n) => ({ ...n, phraseStep: soloist.currentPhraseSteps }))
-            : { ...finalResult, phraseStep: soloist.currentPhraseSteps };
-
-        soloist.motifBuffer.push(motifEntry);
-        if (soloist.motifBuffer.length > 16) {
-            soloist.motifBuffer.shift();
-        }
-        soloist.motifRoot = targetChord.rootMidi % 12; // @worker-mutation
-    }
+            ? [
+                  ...extraNotes.map((n) => ({
+                      ...result,
+                      ...n,
+                      midi: Math.max(minMidi, Math.min(maxMidi, n.midi)),
+                  })),
+                  { ...result, midi: Math.max(minMidi, Math.min(maxMidi, result.midi)) },
+              ]
+            : { ...result, midi: Math.max(minMidi, Math.min(maxMidi, result.midi)) };
 
     return finalizeNote(finalResult);
 }

@@ -109,30 +109,13 @@ describe('Soloist Liveness & Consistency', () => {
         spy.mockRestore();
     });
 
-    it('should continue incrementing counters while in yielding state', () => {
+    it('should continue decrementing restSteps while in resting state', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         mockState.soloist.isResting = true;
-        mockState.soloist.isYielding = true;
-        mockState.soloist.currentPhraseSteps = 10;
+        mockState.soloist.restSteps = 10;
 
         getSoloistNote(chord, null, 100, 440, 72, 'smart', 4, false);
 
-        expect(mockState.soloist.currentPhraseSteps).toBe(11);
-    });
-
-    it('should trigger emergency re-entry after 5 measures of silence', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
-        mockState.soloist.isResting = true;
-
-        // Mock 5 full measures of silence (80 steps) to trigger the safety floor (4.0)
-        mockState.soloist.currentPhraseSteps = 80;
-
-        // Even with high random values, startProb should be forced to 1.0 (Emergency)
-        const spy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
-
-        getSoloistNote(chord, null, 100, 440, 72, 'smart', 0, false);
-
-        expect(mockState.soloist.isResting).toBe(false);
-        spy.mockRestore();
+        expect(mockState.soloist.restSteps).toBe(9);
     });
 });

@@ -21,6 +21,72 @@ let sbBufferHead = 0;
 let cbBufferHead = 0;
 let hbBufferHead = 0;
 
+/**
+ * GENERATIVE STATE PROTECTION
+ * These keys are managed locally by the worker's generative engines.
+ * Overwriting them from the main thread during sync causes glitches, silence,
+ * and resets in the middle of phrases.
+ */
+const WORKER_MANAGED_KEYS = {
+    soloist: [
+        'isResting',
+        'isPhraseActive',
+        'currentPhraseSteps',
+        'notesInPhrase',
+        'busySteps',
+        'lastFreq',
+        'lastMidiPlayed',
+        'pitchHistory',
+        'motifBuffer',
+        'thematicSeed',
+        'thematicSeedRoot',
+        'isReplayingMotif',
+        'isReplayingSeed',
+        'motifReplayIndex',
+        'motifReplayCount',
+        'qaState',
+        'srdcState',
+        'currentCell',
+        'embellishmentBuffer',
+        'deviceBuffer',
+        'sharedHookBuffer',
+        'lastInterval',
+        'stagnationCount',
+        'lastAttackStep',
+        'sessionSteps',
+        'seedOctaveOffset',
+        'isWaitingForEntry',
+        'evolutionEnabled',
+    ],
+    bass: ['lastFreq', 'busySteps', 'lastMidiPlayed'],
+    harmony: ['motifBuffer', 'lastMidis'],
+    groove: [
+        'fillSteps',
+        'fillActive',
+        'fillStartStep',
+        'fillLength',
+        'pendingCrash',
+        'snareMask',
+        'sectionSeedMap',
+    ],
+};
+
+/**
+ * Safely merges state from the main thread while preserving worker-managed properties.
+ */
+function safeSync(target, source, moduleName) {
+    if (!source) {
+        return;
+    }
+    const protectedKeys = WORKER_MANAGED_KEYS[moduleName] || [];
+    for (const key in source) {
+        if (!protectedKeys.includes(key)) {
+            // Only update if it's not a protected generative property
+            target[key] = source[key];
+        }
+    }
+}
+
 // Shared state for multi-way coordination within a single step
 const stepCoordination = {
     step: -1,
@@ -275,16 +341,16 @@ class ExportProcessor {
             sessionSteps: soloist.sessionSteps,
         };
 
-        chords.enabled = true;
-        bass.enabled = true;
-        soloist.enabled = true;
-        harmony.enabled = true;
+        chords.enabled = true; // @worker-mutation
+        bass.enabled = true; // @worker-mutation
+        soloist.enabled = true; // @worker-mutation
+        harmony.enabled = true; // @worker-mutation
         groove.enabled = true; // @worker-mutation
         soloist.sessionSteps = 1000; // @worker-mutation
-        compingState.lockedUntil = 0;
-        compingState.lastChordIndex = -1;
-        soloist.busySteps = 0;
-        soloist.isResting = false;
+        compingState.lockedUntil = 0; // @worker-mutation
+        compingState.lastChordIndex = -1; // @worker-mutation
+        soloist.busySteps = 0; // @worker-mutation
+        soloist.isResting = false; // @worker-mutation
         soloist.currentPhraseSteps = 0; // @worker-mutation
 
         // Conductor State
@@ -351,11 +417,12 @@ class ExportProcessor {
                     shouldFill = this.exportConductor.loopCount % freq === 0;
                 }
                 if (shouldFill) {
-                    groove.fillSteps = generateProceduralFill(
+                    const fill = generateProceduralFill(
                         groove.genreFeel,
                         playback.bandIntensity,
                         this.stepsPerMeasure,
-                    ); // @worker-mutation
+                    );
+                    groove.fillSteps = fill; // @worker-mutation
                     groove.fillActive = true; // @worker-mutation
                     groove.fillStartStep = step; // @worker-mutation
                     groove.fillLength = this.stepsPerMeasure; // @worker-mutation
@@ -1299,28 +1366,18 @@ function processMessage(type, data, startTime) {
                     arranger.stepMap = data.arranger.stepMap;
                     arranger.sectionMap = data.arranger.sectionMap;
                 }
-                if (data.chords) {
-                    Object.assign(chords, data.chords);
-                }
-                if (data.bass) {
-                    Object.assign(bass, data.bass);
-                }
-                if (data.soloist) {
-                    Object.assign(soloist, data.soloist);
-                }
-                if (data.harmony) {
-                    Object.assign(harmony, data.harmony);
-                }
-                if (data.groove) {
-                    Object.assign(groove, data.groove);
-                    if (data.groove.instruments) {
-                        data.groove.instruments.forEach((di) => {
-                            const inst = groove.instruments.find((i) => i.name === di.name);
-                            if (inst) {
-                                inst.steps = di.steps;
-                            }
-                        });
-                    }
+                safeSync(chords, data.chords, 'chords');
+                safeSync(bass, data.bass, 'bass');
+                safeSync(soloist, data.soloist, 'soloist');
+                safeSync(harmony, data.harmony, 'harmony');
+                safeSync(groove, data.groove, 'groove');
+                if (data.groove?.instruments) {
+                    data.groove.instruments.forEach((di) => {
+                        const inst = groove.instruments.find((i) => i.name === di.name);
+                        if (inst) {
+                            inst.steps = di.steps;
+                        }
+                    });
                 }
                 if (data.playback) {
                     Object.assign(playback, data.playback);
@@ -1344,41 +1401,21 @@ function processMessage(type, data, startTime) {
                         lookaheadCursor.index = 0;
                         lookaheadCursor.sectionIndex = 0;
                     }
-                    if (syncData.chords) {
-                        Object.assign(chords, syncData.chords);
-                        if (syncData.chords.rhythmicMask !== undefined) {
-                            chords.rhythmicMask = syncData.chords.rhythmicMask; // @worker-mutation
-                        }
-                    }
-                    if (syncData.bass) {
-                        Object.assign(bass, syncData.bass);
-                    }
-                    if (syncData.soloist) {
-                        Object.assign(soloist, syncData.soloist);
-                    }
-                    if (syncData.harmony) {
-                        Object.assign(harmony, syncData.harmony);
-                        if (syncData.harmony.rhythmicMask !== undefined) {
-                            harmony.rhythmicMask = syncData.harmony.rhythmicMask; // @worker-mutation
-                        }
-                        if (syncData.harmony.pocketOffset !== undefined) {
-                            harmony.pocketOffset = syncData.harmony.pocketOffset; // @worker-mutation
-                        }
-                    }
-                    if (syncData.groove) {
-                        Object.assign(groove, syncData.groove);
-                        if (syncData.groove.instruments) {
-                            syncData.groove.instruments.forEach((di) => {
-                                const inst = groove.instruments.find((i) => i.name === di.name);
-                                if (inst) {
-                                    inst.steps = di.steps;
-                                    inst.muted = di.muted;
-                                }
-                            });
-                        }
-                        if (syncData.groove.snareMask !== undefined) {
-                            groove.snareMask = syncData.groove.snareMask; // @worker-mutation
-                        }
+
+                    safeSync(chords, syncData.chords, 'chords');
+                    safeSync(bass, syncData.bass, 'bass');
+                    safeSync(soloist, syncData.soloist, 'soloist');
+                    safeSync(harmony, syncData.harmony, 'harmony');
+                    safeSync(groove, syncData.groove, 'groove');
+
+                    if (syncData.groove?.instruments) {
+                        syncData.groove.instruments.forEach((di) => {
+                            const inst = groove.instruments.find((i) => i.name === di.name);
+                            if (inst) {
+                                inst.steps = di.steps;
+                                inst.muted = di.muted;
+                            }
+                        });
                     }
                     if (syncData.playback) {
                         Object.assign(playback, syncData.playback);
@@ -1389,16 +1426,16 @@ function processMessage(type, data, startTime) {
                 sbBufferHead = data.step;
                 cbBufferHead = data.step;
                 hbBufferHead = data.step;
-                soloist.isResting = false;
-                soloist.busySteps = 0;
+                soloist.isResting = false; // @worker-mutation
+                soloist.busySteps = 0; // @worker-mutation
                 soloist.currentPhraseSteps = 0; // @worker-mutation
                 soloist.sessionSteps = 0; // @worker-mutation
                 soloist.deviceBuffer = []; // @worker-mutation
                 bass.busySteps = 0; // @worker-mutation
-                soloist.motifBuffer = [];
+                soloist.motifBuffer = []; // @worker-mutation
                 soloist.thematicSeed = []; // @worker-mutation
                 soloist.thematicSeedRoot = 0; // @worker-mutation
-                soloist.hookBuffer = [];
+                soloist.hookBuffer = []; // @worker-mutation
                 soloist.isReplayingMotif = false; // @worker-mutation
                 soloist.isReplayingSeed = false; // @worker-mutation
                 soloist.sharedHookBuffer = []; // @worker-mutation
