@@ -729,13 +729,18 @@ export function getSoloistNote(
         const isAssertiveReentry =
             isHighEnergyStyle && intensity > 0.7 && restBars > 0.5 && is8thNote;
 
+        // EMERGENCY RE-ENTRY: Force break-out if rested for > 1.5 measures in high energy styles
+        const isEmergencyReentry = isHighEnergyStyle && intensity > 0.7 && restBars > 1.5;
+
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
 
         let startProb =
             (0.05 + effectiveIntensity * 0.1) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
 
-        if (activeStyle === 'bird' || isAssertiveReentry) {
+        if (isEmergencyReentry) {
+            startProb = 1.0;
+        } else if (activeStyle === 'bird' || isAssertiveReentry) {
             // BEBOP HEAD IMPROVEMENT: Parker (Ornithology) heavily favors pickups (66%)
             if (activeStyle === 'bird' && headFactor > 0.5 && isPickupZone) {
                 startProb = 0.95;
@@ -759,8 +764,8 @@ export function getSoloistNote(
         const isInitialEntry = measureStep === 0 && soloist.sessionSteps < stepsPerMeasure;
 
         if (isInitialEntry || Math.random() < startProb) {
-            soloist.isResting = false;
-            soloist.currentPhraseSteps = 0;
+            soloist.isResting = false; // @worker-mutation
+            soloist.currentPhraseSteps = 0; // @worker-mutation
             soloist.notesInPhrase = 0; // @worker-mutation
 
             // --- SRDC State Machine ---

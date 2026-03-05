@@ -227,12 +227,27 @@ describe('Soloist Smart Genre Statistics', () => {
         console.table(genres.map((genre) => runGenreSimulation(genre, 200, 0.3)));
 
         // Detailed measure-by-measure for a few interesting genres
-        console.log('\nSample Measure-by-Measure Density (First 32 bars, 0.8 Intensity):');
-        ['Jazz', 'Blues', 'Ska-Punk'].forEach((genre) => {
-            const _mockMeasures = [];
-            // Re-run briefly to capture the sequence
+        console.log(
+            '\nSample Measure-by-Measure Density (Donna Lee - Ab Major, 128 bars, 0.8 Intensity):',
+        );
+        ['Jazz', 'Ska-Punk'].forEach((genre) => {
+            const sequence = [];
+            // Donna Lee in Ab: | Ab | F7 | Bb7 | Bb7 | Bbm7 | Eb7 | Ab | (Bbm7 Eb7) |
+            const progression = [
+                { rootMidi: 68, intervals: [0, 4, 7, 11] }, // Abmaj7
+                { rootMidi: 65, intervals: [0, 4, 7, 10] }, // F7
+                { rootMidi: 70, intervals: [0, 4, 7, 10] }, // Bb7
+                { rootMidi: 70, intervals: [0, 4, 7, 10] }, // Bb7
+                { rootMidi: 70, intervals: [0, 3, 7, 10] }, // Bbm7
+                { rootMidi: 63, intervals: [0, 4, 7, 10] }, // Eb7
+                { rootMidi: 68, intervals: [0, 4, 7, 11] }, // Abmaj7
+                { rootMidi: 63, intervals: [0, 4, 7, 10] }, // Eb7 (Turnaround)
+            ];
+
+            // Re-run to capture the sequence
             mockState.groove.genreFeel = genre;
             mockState.playback.bandIntensity = 0.8;
+            mockState.playback.complexity = 0.8;
             mockState.soloist = {
                 enabled: true,
                 isResting: true,
@@ -241,28 +256,44 @@ describe('Soloist Smart Genre Statistics', () => {
                 motifBuffer: [],
                 sessionSteps: 0,
             };
+
             let count = 0;
-            const sequence = [];
-            for (let s = 0; s < 32 * 16; s++) {
-                const res = getSoloistNote(
-                    { rootMidi: 60, intervals: [0, 4, 7] },
-                    { rootMidi: 60, intervals: [0, 4, 7] },
-                    s,
-                    440,
-                    60,
-                    'smart',
-                    s % 16,
-                    false,
-                );
+            const measuresToRun = 128;
+            for (let s = 0; s < measuresToRun * 16; s++) {
+                const measure = Math.floor(s / 16);
+                const chord = progression[measure % progression.length];
+                mockState.playback.currentLoopCount = Math.floor(measure / progression.length);
+
+                const stepInMeasure = s % 16;
+                const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure, false);
                 if (res) {
                     count += Array.isArray(res) ? res.length : 1;
                 }
-                if (s % 16 === 15) {
+                if (stepInMeasure === 15) {
                     sequence.push(count);
                     count = 0;
                 }
             }
-            console.log(`${genre.padEnd(10)}: ${sequence.join(', ')}`);
+
+            // Find max rest streak in this run
+            let maxStreak = 0;
+            let currentStreak = 0;
+            sequence.forEach((n) => {
+                if (n === 0) {
+                    currentStreak++;
+                    maxStreak = Math.max(maxStreak, currentStreak);
+                } else {
+                    currentStreak = 0;
+                }
+            });
+
+            console.log(`\n${genre.toUpperCase()} (Max Rest: ${maxStreak}m)`);
+            // Print in chunks of 32 for readability
+            for (let i = 0; i < sequence.length; i += 32) {
+                console.log(
+                    `  Bars ${String(i + 1).padStart(3)}-${String(i + 32).padStart(3)}: ${sequence.slice(i, i + 32).join(', ')}`,
+                );
+            }
         });
         console.log(
             '===============================================================================\n',
