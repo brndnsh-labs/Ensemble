@@ -15,12 +15,10 @@ let lastPlayedStep = -1;
  * Clears the internal motif memory. Used for section changes or testing.
  */
 export function clearHarmonyMemory() {
-    const { harmony, soloist } = getState();
+    const { harmony } = getState();
     motifCache.clear();
     harmony.lastMidis = []; // @worker-mutation
     lastPlayedStep = -1;
-    soloist.motifBuffer = []; // @worker-mutation
-    soloist.isReplayingMotif = false; // @worker-mutation
 }
 
 /**
@@ -384,12 +382,9 @@ export function getHarmonyNotes(
     // Latching Logic (Soloist Hook Reinforcement)
     if (soloist.enabled && soloistResult && playback.bandIntensity > 0.6) {
         let reinforce = false;
-        if (soloist.isReplayingMotif) {
-            reinforce = true;
-        }
 
         // -- Shared Hook Reinforcement --
-        if (!reinforce && feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
+        if (feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
             // Check if the soloist is currently playing a known shared hook
             const hookMatch = soloist.sharedHookBuffer.find((h) => h.step === step);
             if (hookMatch) {

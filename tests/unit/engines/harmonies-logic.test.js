@@ -307,10 +307,10 @@ describe('Harmony Engine Logic', () => {
     });
 
     describe('Soloist Hook Reinforcement', () => {
-        it('should reinforce (latch onto) the soloist hook at high intensity', () => {
+        it('should reinforce (latch onto) the soloist hook at high intensity in Ska', () => {
             soloist.enabled = true;
-            soloist.isReplayingMotif = true;
-            soloist.sessionSteps = 128;
+            soloist.sharedHookBuffer = [{ step: 0 }];
+            groove.genreFeel = 'Ska-Punk';
             playback.bandIntensity = 0.8;
 
             const chord = {

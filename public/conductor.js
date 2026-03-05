@@ -368,8 +368,8 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                         isWaitingForEntry: true,
                         isResting: true,
                         isYielding: false,
-                        currentPhraseSteps: 0,
-                        srdcState: 'Conclusion',
+                        activeSteps: 0,
+                        restSteps: 0,
                     });
                 } else {
                     Object.assign(sbUpdate, {

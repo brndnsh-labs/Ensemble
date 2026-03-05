@@ -57,7 +57,23 @@
 - **MIDI Quality:** Professional-grade Pitch Bend slides and expressive velocity fluctuations.
 - **Dynamic Response:** All genres respond linearly and predictably to the Intensity and Lyrical Bias sliders.
 
+## 4. Post-Simplification Refactor (v2.7)
+
+### Motivation
+Accumulated heuristic layers (SRDC, Maturity, Motif Memory) created brittle edge cases, specifically permanent silence in Blues and note-locking in Jazz.
+
+### Key Changes
+- **Heuristic Removal:** Stripped SRDC state machine and motif replaying.
+- **ACTIVE/RESTING Model:** Replaced complex phrase counters with a simple step-based countdown system.
+- **Register Control:** Implemented Dynamic Register Centering (anchored to E4-E5) and an Intensity-Based Ceiling to prevent "register wandering."
+- **Direct Intensity Mapping:** Removed damping and maturity factors; intensity now directly scales density.
+
+### Verified Performance
+- **Blues:** Reliable phrase starts and sustained, emotive lead lines.
+- **Jazz:** Fluid, non-repetitive melodic runs that respect intensity.
+- **Neo-Soul:** Soulful, register-appropriate scoops and slides.
+
 ---
-**Branch:** `main` (Merged)
+**Branch:** `feature/simplify-soloist-engine`
 **Lead:** Gemini CLI
 **Status:** COMPLETED

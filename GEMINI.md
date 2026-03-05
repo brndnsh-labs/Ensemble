@@ -12,7 +12,7 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 *   `ui.js`: Exports a registry of DOM elements used by secondary controllers and legacy logic.
 *   `types.js`: Centralized `ACTIONS` constants for the state dispatch system.
 *   **Engine Architecture**:
-    *   `soloist.js`: Core engine for melodic generation and SRDC state orchestration.
+    *   `soloist.js`: Core engine for melodic generation using a simplified ACTIVE/RESTING phrasing model.
     *   `soloist-config.js`: Centralized style definitions (`STYLE_CONFIG`) and emphasis maps.
     *   `soloist-devices.js`: Procedural embellishment algorithms (Runs, Enclosures, Licks).
     *   `bass.js` / `accompaniment.js`: Specialized engines for groove and comping.
@@ -54,5 +54,6 @@ The project has completed the **v2.29 Codebase Health & Standards Audit**, achie
 12. **Unified Infrastructure**: COMPLETED transition from ESLint to Biome for blazing-fast, consolidated linting and formatting. Verified 100% build stability.
 13. **Drum Motif Engine (v2.5)**: COMPLETED implementation of deterministic, measure-based motif system across all genres. Replaced per-step random probability with cohesive rhythmic patterns (e.g., Charleston for Jazz, Linear for Funk, One Drop for Reggae). Added context-aware phrase turnarounds for structural drum fills. Verified with 9 new integrity suites.
 14. **Virtual Band Authenticity Audit (v2.6)**: COMPLETED implementation of 26 expert critique suites covering all sections (Drums, Bass, Harmony, Soloist). Refined all musical engines to meet pro-level benchmarks for melodic smoothness, harmonic resolution, and stylistic timing. Stabilized the test suite by transitioning to "musical intent" range-based assertions.
+15. **Soloist Engine Simplification (v2.7)**: COMPLETED drastic reduction of heuristic complexity. Removed SRDC state machine and motif memory in favor of a predictable, intensity-driven phrasing model. Implemented dynamic register centering and intensity-based register ceilings for better melodic control.
 
 

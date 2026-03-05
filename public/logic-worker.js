@@ -30,33 +30,19 @@ let hbBufferHead = 0;
 const WORKER_MANAGED_KEYS = {
     soloist: [
         'isResting',
-        'isPhraseActive',
-        'currentPhraseSteps',
-        'notesInPhrase',
+        'restSteps',
+        'activeSteps',
         'busySteps',
         'lastFreq',
         'lastMidiPlayed',
-        'pitchHistory',
-        'motifBuffer',
-        'thematicSeed',
-        'thematicSeedRoot',
-        'isReplayingMotif',
-        'isReplayingSeed',
-        'motifReplayIndex',
-        'motifReplayCount',
-        'qaState',
-        'srdcState',
-        'currentCell',
+        'lastRenderedFreq',
         'embellishmentBuffer',
         'deviceBuffer',
         'sharedHookBuffer',
-        'lastInterval',
-        'stagnationCount',
         'lastAttackStep',
         'sessionSteps',
-        'seedOctaveOffset',
         'isWaitingForEntry',
-        'evolutionEnabled',
+        'isYielding',
     ],
     bass: ['lastFreq', 'busySteps', 'lastMidiPlayed'],
     harmony: ['motifBuffer', 'lastMidis'],
@@ -350,8 +336,9 @@ class ExportProcessor {
         compingState.lockedUntil = 0; // @worker-mutation
         compingState.lastChordIndex = -1; // @worker-mutation
         soloist.busySteps = 0; // @worker-mutation
-        soloist.isResting = false; // @worker-mutation
-        soloist.currentPhraseSteps = 0; // @worker-mutation
+        soloist.isResting = true; // @worker-mutation
+        soloist.restSteps = 0; // @worker-mutation
+        soloist.activeSteps = 0; // @worker-mutation
 
         // Conductor State
         this.exportConductor = {
@@ -1426,20 +1413,15 @@ function processMessage(type, data, startTime) {
                 sbBufferHead = data.step;
                 cbBufferHead = data.step;
                 hbBufferHead = data.step;
-                soloist.isResting = false; // @worker-mutation
+                soloist.isResting = true; // @worker-mutation
                 soloist.busySteps = 0; // @worker-mutation
-                soloist.currentPhraseSteps = 0; // @worker-mutation
+                soloist.activeSteps = 0; // @worker-mutation
+                soloist.restSteps = 0; // @worker-mutation
                 soloist.sessionSteps = 0; // @worker-mutation
                 soloist.deviceBuffer = []; // @worker-mutation
                 bass.busySteps = 0; // @worker-mutation
-                soloist.motifBuffer = []; // @worker-mutation
-                soloist.thematicSeed = []; // @worker-mutation
-                soloist.thematicSeedRoot = 0; // @worker-mutation
                 soloist.hookBuffer = []; // @worker-mutation
-                soloist.isReplayingMotif = false; // @worker-mutation
-                soloist.isReplayingSeed = false; // @worker-mutation
                 soloist.sharedHookBuffer = []; // @worker-mutation
-                harmony.motifBuffer = []; // @worker-mutation
                 harmony.lastMidis = []; // @worker-mutation
 
                 // Reset accompaniment memory
@@ -1542,18 +1524,14 @@ function handlePrime(steps) {
     }
 
     // Reset soloist state for priming
-    soloist.isResting = false; // @worker-mutation
+    soloist.isResting = true; // @worker-mutation
     soloist.busySteps = 0; // @worker-mutation
     bass.busySteps = 0; // @worker-mutation
-    soloist.currentPhraseSteps = 0; // @worker-mutation
-    soloist.motifBuffer = []; // @worker-mutation
-    soloist.thematicSeed = []; // @worker-mutation
-    soloist.thematicSeedRoot = 0; // @worker-mutation
+    soloist.activeSteps = 0; // @worker-mutation
+    soloist.restSteps = 0; // @worker-mutation
     soloist.hookBuffer = []; // @worker-mutation
-    soloist.isReplayingSeed = false; // @worker-mutation
     soloist.lastAttackStep = -100; // @worker-mutation
     soloist.sessionSteps = 0; // @worker-mutation
-    soloist.isPhraseActive = false; // @worker-mutation
 
     // Local cursors for priming
     const primeCursor = { index: 0, sectionIndex: 0 };
