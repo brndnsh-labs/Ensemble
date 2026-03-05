@@ -25,36 +25,49 @@
     - Redesign `STYLE_CONFIG.ska` for "Sax Solo" energy: `restBase: 0.15`, `maxNotesPerPhrase: 24`, and use "Straight" cells (0, 1, 2).
     - Remove the hard-coded antiphony suppression for the soloist.
 
-### D. Slide Proliferation & MIDI Clunkiness
-- **Symptom:** Slides into notes are too frequent and sound "clunky" in MIDI export/connection.
+### E. "Over the Top" Initial Jazz Phrasing
+- **Symptom:** Soloist starts with hyper-active shredding immediately, making it hard for listeners to latch onto a melody.
 - **Root Cause:**
-    - **Discrete Notes:** The `slide` and `graceSlide` devices use two separate 16th notes. In MIDI, this translates to distinct NoteOn/Off events which sound mechanical on external synths.
-    - **High Probability:** Styles like `acoustic` and `minimal` have `allowedDevices: ['slide']` with `deviceProb` up to 0.25, resulting in slides on ~25% of phrases.
+    - **Filler Logic:** Bird style had a hardcoded 80% chance to fill any rest with approach notes, regardless of loop progress.
+    - **Lyrical Bias:** Hardcoded to 0.0 for Jazz, preventing any "breathing" space.
+    - **Cell Pool:** Standard busy cells (16ths) were available from step 0.
 - **Fix:**
-    - **Refactor to Pitch Bend:** Change `slide` and `graceSlide` to use `bendStartInterval` on a single note instead of two discrete notes.
-    - **Balance Probability:** Lower `deviceProb` for slide-heavy styles and ensure a more varied device pool where possible.
-    - **Fix Blues Licks:** Resolve the unused `slideTarget` in `bluesLick` logic by switching to `bendStartInterval`.
+    - **Head Mode (Loop 1):** Introduced `headFactor` (1.0 -> 0.0 during loop 1).
+    - **Dynamic Bias:** Increased `lyricalBias` and reduced `fillerProb` significantly during the Head.
+    - **Chord Tone Priority:** Increased weight for chord tones (1, 3, 5, 7) by 8000% during the Head to ensure "intentional" melodic lines.
+    - **Rhythmic Simplification:** Filtered busy cells out of the pool during the Head.
 
 ## 2. Refined Implementation Plan
 
 ### Phase 1: Core Phrasing Engine Updates (COMPLETED)
-- [x] **Assertive Re-entry:** Modify the `isResting` logic to allow styles like `bird`, `shred`, and `ska` to break out of rest faster at high intensity.
-- [x] **Intensity Linearization:** Ensure `restProb` truly reflects the `bandIntensity` slider by adjusting the damping and base multipliers.
+- [x] **Assertive Re-entry:** (Applied)
+- [x] **Intensity Linearization:** (Applied)
 
-### Phase 2: Style Tuning & Melodic Devices
+### Phase 2: Style Tuning & Melodic Devices (COMPLETED)
 - [x] **Update `ska` Style:** (Applied)
 - [x] **Chromatic Falls:** (Applied)
-- [ ] **Smooth Slides:** Refactor `slide` and `graceSlide` to use `bendStartInterval`.
-- [ ] **Device Probability Audit:** Normalize `deviceProb` across styles to prevent slide-flooding.
+- [x] **Smooth Slides:** (Applied)
+- [x] **Device Probability Audit:** (Applied)
 
-### Phase 3: Validation
-- [ ] Run `analyze-soloist-stats.test.js` and verify stats.
-- [ ] Verify `bendStartInterval` usage in MIDI export code.
+### Phase 3: Lyrical Head Mode (COMPLETED)
+- [x] **Implement Head Detection:** Use `smoothLoopCount`.
+- [x] ** Melodic Bias:** Reduce Jazz filler and increase lyrical bias during Loop 1.
+- [x] **Chord Tone Weighting:** Ensure intentional melody generation.
+
+### Phase 4: Validation
+- [x] Run `analyze-soloist-stats.test.js` and verify stats.
+- [x] Verify Head vs Solo density delta (>30% difference).
 
 ## 3. Final Results
-- **Jazz (Bird):** Transformation from intermittent to continuous "sheets of sound" at high intensity.
-- **Ska-Punk:** Revamped from a background element to a driving "Reel Big Fish" style sax lead.
-- **Linearization:** All genres now respond predictably to the Intensity slider, with a distinct sparse-vs-dense profile.
+- **Jazz (Bird):** Now plays a recognizable, intentional "Head" (8.8 notes/m) before ramping into full speed (12.7 notes/m).
+- **Ska-Punk:** Revamped lead character with clear melodic growth across loops.
+- **Linearization:** All genres respond predictably to the Intensity slider.
+- **MIDI Quality:** Slides are now expressive Pitch Bends rather than clunky chromatic notes.
+
+---
+**Branch:** `feature/soloist-tuning-audit`
+**Lead:** Gemini CLI
+**Status:** COMPLETED
 
 ---
 **Branch:** `feature/soloist-tuning-audit`

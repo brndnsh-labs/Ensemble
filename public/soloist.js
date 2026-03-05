@@ -514,6 +514,9 @@ export function getSoloistNote(
         loopProgress = (step % arranger.totalSteps) / arranger.totalSteps;
     }
     const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
+    const isHeadLoop = (playback.currentLoopCount || 0) === 0;
+    const headFactor = Math.max(0, 1.0 - smoothLoopCount); // 1.0 at start, 0.0 by end of loop 1
+
     const evoEnabled = soloist.evolutionEnabled !== false;
     // Raise the floor of warmupFactor so the soloist isn't quite as sparse initially
     let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.4 + (smoothLoopCount / 2.0) * 0.6); // Hits 1.0 right at the start of loop 3 (index 2)
@@ -532,10 +535,10 @@ export function getSoloistNote(
               );
     const lyricalBias =
         activeStyle === 'bird'
-            ? 0.0
+            ? 0.6 * headFactor // Jazz starts VERY lyrical (the "Head") and transitions to shred (0.0)
             : playback.lyricalBias !== undefined
-              ? playback.lyricalBias
-              : 0.5;
+              ? Math.min(1.0, playback.lyricalBias + 0.3 * headFactor)
+              : 0.5 + 0.3 * headFactor;
     const complexity =
         activeStyle === 'bird'
             ? 1.0
@@ -1105,8 +1108,19 @@ export function getSoloistNote(
             pool.push(RHYTHMIC_CELLS[1]);
         }
 
+        // Lyrical Head Mode: Remove busy cells (16ths, gallops) during the first loop
+        if (headFactor > 0.5) {
+            pool = pool.filter((c) => {
+                const idx = RHYTHMIC_CELLS.indexOf(c);
+                return ![0, 3, 10, 14, 15, 16].includes(idx); // Remove 16th-heavy and syncopated cells
+            });
+            if (pool.length === 0) {
+                pool = [RHYTHMIC_CELLS[1], RHYTHMIC_CELLS[2]]; // Fallback to 8ths/quarters
+            }
+        }
+
         // Intensity/Maturity Expansion: Inject busy cells at high climax
-        if (effectiveIntensity > 0.8 || maturityFactor > 0.9) {
+        if ((effectiveIntensity > 0.8 || maturityFactor > 0.9) && headFactor < 0.2) {
             // Add 16ths (0), Gallops (3), and 16th Offbeats (10)
             if (!pool.includes(RHYTHMIC_CELLS[0])) {
                 pool.push(RHYTHMIC_CELLS[0]);
@@ -1162,11 +1176,11 @@ export function getSoloistNote(
         // --- Embellishment: Approach Note Filling ---
         // Fill rests during a phrase with melodic motion at high intensity
         const fillerProb = evoEnabled ? Math.max(0, (effectiveIntensity - 0.75) * 2.0) : 0;
+        // Bird style is hyper-active by default, but reduce filler during the Head loop for melody clarity
+        const activeFillerProb =
+            activeStyle === 'bird' ? 0.8 - headFactor * 0.6 : fillerProb;
 
-        if (
-            !soloist.isResting &&
-            (Math.random() < fillerProb || (activeStyle === 'bird' && Math.random() < 0.8))
-        ) {
+        if (!soloist.isResting && Math.random() < activeFillerProb) {
             const scaleIntervals = getScaleForChord(targetChord, null, style);
             const neighborDir = Math.random() > 0.5 ? 1 : -1;
             let neighborMidi = lastMidi;
@@ -1400,7 +1414,13 @@ export function getSoloistNote(
 
         // Check if interval matches target chord tones (handling extended intervals > 12)
         if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
-            weight += (isSmoothStyle ? 400 : 100) * distDamping;
+            const headChordBonus = headFactor > 0.5 ? 8000 : 0; // Even stronger bonus for Head
+            weight += (isSmoothStyle ? 400 : 100 + headChordBonus) * distDamping;
+        }
+
+        // Lyrical Head Bonus: Favor 1, 3, 5, 7 during the Head loop even more
+        if (headFactor > 0.3 && [0, 4, 7, 11, 3, 10].includes(interval)) {
+            weight += 1000 * headFactor;
         }
 
         if (activeStyle === 'country' && isPentatonicColor) {
@@ -1557,7 +1577,8 @@ export function getSoloistNote(
         config.deviceProb *
         (0.5 + complexity * 1.0) *
         (1.2 - lyricalBias) *
-        (0.2 + effectiveIntensity * 0.8);
+        (0.2 + effectiveIntensity * 0.8) *
+        (1.0 - headFactor * 0.7); // Reduce devices by up to 70% during the Head loop
     const isPiano = soloist.mode === 'piano';
     // Certain styles MUST allow double stops even in monophonic mode for authentic character,
     // but ONLY if the configuration (global or local) actually allows them.
@@ -2031,8 +2052,10 @@ export function getSoloistNote(
 
     if (activeStyle === 'bird') {
         // Tune bird to start more melodic (8th notes) at low intensity or during warmup
-        const birdEighthProb = 0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2;
-        durationSteps = Math.random() < birdEighthProb ? 2 : 1;
+        // NEW: Force 8th notes during the "Head" (first loop) to establish melody
+        const birdEighthProb =
+            0.9 - (effectiveIntensity - 0.5) * 0.3 - warmupFactor * 0.2 + headFactor * 0.5;
+        durationSteps = Math.random() < Math.min(1.0, birdEighthProb) ? 2 : 1;
     } else if (intensity < 0.4 && activeStyle !== 'bird') {
         durationSteps = Math.random() < 0.6 ? 4 : 8;
     } else if (
@@ -2101,6 +2124,11 @@ export function getSoloistNote(
                   smoothLoopCount * 0.05,
           )
         : 0;
+
+    // Reduce embellishments significantly during the Head loop to keep melody clean
+    if (headFactor > 0.5) {
+        embellishmentProb *= 0.2;
+    }
 
     // Bird style is already dense via cells, reduce auto-embellishment to keep 8th note flow
     if (activeStyle === 'bird') {
