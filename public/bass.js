@@ -952,7 +952,11 @@ export function getBassNote(
                 { midi: targetRoot - 1, weight: 0.6 },
                 { midi: targetRoot + 1, weight: 0.4 },
             ];
-            const totalWeight = choices.reduce((acc, c) => acc + c.weight, 0);
+            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+            let totalWeight = 0;
+            for (let i = 0; i < choices.length; i++) {
+                totalWeight += choices[i].weight;
+            }
             let r = Math.random() * totalWeight;
             let approach = targetRoot - 1;
             for (const c of choices) {

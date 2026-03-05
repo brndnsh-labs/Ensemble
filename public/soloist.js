@@ -941,9 +941,17 @@ export function getSoloistNote(
             const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
 
             if (!scaleIntervals.includes(relPC)) {
-                const nearest = scaleIntervals.reduce((prev, curr) =>
-                    Math.abs(curr - relPC) < Math.abs(prev - relPC) ? curr : prev,
-                );
+                // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+                let nearest = scaleIntervals[0];
+                let minDiff = Math.abs(nearest - relPC);
+                for (let i = 1; i < scaleIntervals.length; i++) {
+                    const curr = scaleIntervals[i];
+                    const diff = Math.abs(curr - relPC);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        nearest = curr;
+                    }
+                }
                 const nudge = nearest - relPC;
                 if (Array.isArray(res)) {
                     res = res.map((n) => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
@@ -1021,9 +1029,17 @@ export function getSoloistNote(
             const relPC = (primary.midi - currentChord.rootMidi + 120) % 12;
 
             if (!scaleIntervals.includes(relPC)) {
-                const nearest = scaleIntervals.reduce((prev, curr) =>
-                    Math.abs(curr - relPC) < Math.abs(prev - relPC) ? curr : prev,
-                );
+                // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+                let nearest = scaleIntervals[0];
+                let minDiff = Math.abs(nearest - relPC);
+                for (let i = 1; i < scaleIntervals.length; i++) {
+                    const curr = scaleIntervals[i];
+                    const diff = Math.abs(curr - relPC);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        nearest = curr;
+                    }
+                }
                 const nudge = nearest - relPC;
                 if (Array.isArray(res)) {
                     res = res.map((n) => ({ ...n, midi: n.midi + nudge, bendStartInterval: 0 }));
@@ -1578,7 +1594,11 @@ export function getSoloistNote(
             }
         }
         if (fallbacks.length > 0) {
-            const totalW = fallbacks.reduce((sum, f) => sum + f.weight, 0);
+            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+            let totalW = 0;
+            for (let i = 0; i < fallbacks.length; i++) {
+                totalW += fallbacks[i].weight;
+            }
             let rand = Math.random() * totalW;
             for (const f of fallbacks) {
                 rand -= f.weight;
