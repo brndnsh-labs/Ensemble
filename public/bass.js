@@ -383,25 +383,14 @@ export function getBassNote(
             }
         }
 
-        // Ensemble Awareness: Shorten notes when soloist is busy to prevent overlaps and mud
-        if (isSoloistBusy) {
-            durationSteps = 0.1; // Bulletproof staccato
-        }
-
         // Wider dynamic range: 0.6 + intensity * 0.7 (Range: 0.6 to 1.3)
         const intensityFactor = 0.6 + intensity * 0.7;
         const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
 
-        // Ensemble Awareness: Shorten notes when soloist is busy
-        let finalDur = durationSteps;
-        if (isSoloistBusy) {
-            finalDur = 0.5;
-        }
-
         // Universal Overlap Protection: Force gaps for legato-heavy styles
         const maxSafeDuration =
             style === 'quarter' ? ts.stepsPerBeat * 0.45 : ts.stepsPerBeat * 0.95;
-        const safeDuration = Math.min(finalDur, maxSafeDuration);
+        const safeDuration = Math.min(durationSteps, maxSafeDuration);
 
         return {
             freq,
