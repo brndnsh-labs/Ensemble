@@ -73,11 +73,36 @@ export function getSoloistNote(
 
         soloist.lastMidiPlayed = primary.midi; // @worker-mutation
 
-        const timingOffset = calculateTimingOffset(
+        let timingOffset = calculateTimingOffset(
             'soloist',
             groove.pocket,
             playback.bandIntensity || 0.5,
         );
+
+        // 1. Genre Gravity
+        const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
+        timingOffset += config.genreGravityOffset || 0;
+
+        // 2. Rhythmic Rolling (Syncopation Lag)
+        const isSyncopated = stepInBeat % (stepsPerBeat / 2) !== 0;
+        if (isSyncopated) {
+            timingOffset += 0.007; // 7ms lag for 'e' and 'a'
+        }
+
+        // Ghost notes drag slightly more
+        if (primary.velocity < 0.7) {
+            timingOffset += 0.005; // 5ms drag
+        }
+
+        // 3 & 4. Style-Specific Jitter & Intensity-Driven Tightness
+        if (config.timingJitter !== undefined) {
+            // Scale jitter: at intensity 0.2 it's looser, at 0.9 it's tighter
+            const tightness = playback.bandIntensity || 0.5;
+            const jitterScale = 1.0 - tightness;
+            const jitterMs = config.timingJitter * jitterScale;
+            timingOffset += (Math.random() - 0.5) * (jitterMs / 1000);
+        }
+
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
 
         if (!primary.isDoubleStop) {
@@ -401,8 +426,19 @@ export function getSoloistNote(
     }
 
     const baseVelocity = 0.6 + intensity * 0.4;
+    // Detect 'The One' (downbeat of measure) and Backbeats (e.g., beats 2 & 4)
+    const isTheOne = measureStep === 0;
+    const isBackbeat = measureStep === stepsPerBeat || measureStep === stepsPerBeat * 3;
     const isImportantStep = stepInBeat === 0 || stepInBeat === 2;
-    let stepVelocity = isImportantStep ? baseVelocity * 1.15 : baseVelocity;
+
+    let stepVelocity = baseVelocity;
+    if (isTheOne) {
+        stepVelocity = baseVelocity * 1.25; // Strongest emphasis
+    } else if (isBackbeat) {
+        stepVelocity = baseVelocity * 1.15; // Strong emphasis
+    } else if (isImportantStep) {
+        stepVelocity = baseVelocity * 1.05; // Light emphasis
+    }
 
     if (coordination.bassHit && selectedMidi < 60) {
         stepVelocity *= 0.85; // Yield to bass
