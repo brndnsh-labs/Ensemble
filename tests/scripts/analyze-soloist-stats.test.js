@@ -155,14 +155,21 @@ describe('Soloist Smart Genre Statistics', () => {
         const measuresPerLoop = 32;
         const totalMeasures = measuresPerLoop * 2;
 
-        const loopResults = testGenres.map(genre => {
+        const loopResults = testGenres.map((genre) => {
             mockState.groove.genreFeel = genre;
             mockState.playback.bandIntensity = 0.8;
             mockState.playback.complexity = 0.8;
             mockState.playback.currentLoopCount = 0; // Start at loop 0
 
             // Reset soloist state
-            mockState.soloist = { enabled: true, isResting: true, pitchHistory: [], deviceBuffer: [], motifBuffer: [], sessionSteps: 0 };
+            mockState.soloist = {
+                enabled: true,
+                isResting: true,
+                pitchHistory: [],
+                deviceBuffer: [],
+                motifBuffer: [],
+                sessionSteps: 0,
+            };
 
             let headNotes = 0;
             let soloNotes = 0;
@@ -170,14 +177,23 @@ describe('Soloist Smart Genre Statistics', () => {
             for (let s = 0; s < totalMeasures * 16; s++) {
                 const stepInMeasure = s % 16;
                 const measure = Math.floor(s / 16);
-                
+
                 // Manually simulate loop transition
                 if (measure >= measuresPerLoop) {
                     mockState.playback.currentLoopCount = 1;
                 }
 
-                const res = getSoloistNote({rootMidi:60, intervals:[0,4,7]}, {rootMidi:60, intervals:[0,4,7]}, s, 440, 60, 'smart', stepInMeasure, false);
-                
+                const res = getSoloistNote(
+                    { rootMidi: 60, intervals: [0, 4, 7] },
+                    { rootMidi: 60, intervals: [0, 4, 7] },
+                    s,
+                    440,
+                    60,
+                    'smart',
+                    stepInMeasure,
+                    false,
+                );
+
                 if (res) {
                     const count = Array.isArray(res) ? res.length : 1;
                     if (mockState.playback.currentLoopCount === 0) {
@@ -192,7 +208,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 Genre: genre,
                 'Head Density (N/M)': (headNotes / measuresPerLoop).toFixed(1),
                 'Solo Density (N/M)': (soloNotes / measuresPerLoop).toFixed(1),
-                'Delta (%)': (((soloNotes - headNotes) / headNotes) * 100).toFixed(0) + '%'
+                'Delta (%)': `${(((soloNotes - headNotes) / headNotes) * 100).toFixed(0)}%`,
             };
         });
 

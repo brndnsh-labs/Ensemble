@@ -514,7 +514,7 @@ export function getSoloistNote(
         loopProgress = (step % arranger.totalSteps) / arranger.totalSteps;
     }
     const smoothLoopCount = (playback.currentLoopCount || 0) + loopProgress;
-    const isHeadLoop = (playback.currentLoopCount || 0) === 0;
+    const _isHeadLoop = (playback.currentLoopCount || 0) === 0;
     const headFactor = Math.max(0, 1.0 - smoothLoopCount); // 1.0 at start, 0.0 by end of loop 1
 
     const evoEnabled = soloist.evolutionEnabled !== false;
@@ -1119,6 +1119,20 @@ export function getSoloistNote(
                 const idx = RHYTHMIC_CELLS.indexOf(c);
                 return ![0, 3, 10, 14, 15, 16].includes(idx); // Remove 16th-heavy and syncopated cells
             });
+
+            // Ensure Bebop/Swing cells are present for authentic Jazz Head feel
+            if (activeStyle === 'bird') {
+                if (!pool.includes(RHYTHMIC_CELLS[7])) {
+                    pool.push(RHYTHMIC_CELLS[7]);
+                }
+                if (!pool.includes(RHYTHMIC_CELLS[8])) {
+                    pool.push(RHYTHMIC_CELLS[8]);
+                }
+                if (!pool.includes(RHYTHMIC_CELLS[12])) {
+                    pool.push(RHYTHMIC_CELLS[12]);
+                }
+            }
+
             if (pool.length === 0) {
                 pool = [RHYTHMIC_CELLS[1], RHYTHMIC_CELLS[2]]; // Fallback to 8ths/quarters
             }
@@ -1182,8 +1196,7 @@ export function getSoloistNote(
         // Fill rests during a phrase with melodic motion at high intensity
         const fillerProb = evoEnabled ? Math.max(0, (effectiveIntensity - 0.75) * 2.0) : 0;
         // Bird style is hyper-active by default, but reduce filler during the Head loop for melody clarity
-        const activeFillerProb =
-            activeStyle === 'bird' ? 0.8 - headFactor * 0.6 : fillerProb;
+        const activeFillerProb = activeStyle === 'bird' ? 0.8 - headFactor * 0.6 : fillerProb;
 
         if (!soloist.isResting && Math.random() < activeFillerProb) {
             const scaleIntervals = getScaleForChord(targetChord, null, style);
@@ -1419,13 +1432,13 @@ export function getSoloistNote(
 
         // Check if interval matches target chord tones (handling extended intervals > 12)
         if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
-            const headChordBonus = headFactor > 0.5 ? 8000 : 0; // Even stronger bonus for Head
+            const headChordBonus = headFactor > 0.5 ? 1200 : 0; // Moderate bonus for Head (was 8000, too stiff)
             weight += (isSmoothStyle ? 400 : 100 + headChordBonus) * distDamping;
         }
 
         // Lyrical Head Bonus: Favor 1, 3, 5, 7 during the Head loop even more
         if (headFactor > 0.3 && [0, 4, 7, 11, 3, 10].includes(interval)) {
-            weight += 1000 * headFactor;
+            weight += 600 * headFactor; // Adjusted from 1000
         }
 
         if (activeStyle === 'country' && isPentatonicColor) {
@@ -2034,6 +2047,11 @@ export function getSoloistNote(
     const baseVelocity = 0.5 + effectiveIntensity * 0.7;
     let stepVelocity = isImportantStep ? baseVelocity * 1.15 : baseVelocity;
 
+    // Head Mode Dynamics: Add slightly more "human" fluctuation during the first loop
+    if (headFactor > 0.5) {
+        stepVelocity *= 0.9 + Math.random() * 0.2;
+    }
+
     // --- ENSEMBLE CLARITY: Yield to Bass ---
     // If we are playing in the lower soloist register and the bass is hitting,
     // reduce velocity slightly to avoid low-mid mud.
@@ -2050,6 +2068,11 @@ export function getSoloistNote(
         durationSteps <= 2
     ) {
         let legatoProb = activeStyle === 'shred' || activeStyle === 'bird' ? 0.7 : 0.4;
+
+        // NEW: Boost legato during the Head loop for smoother melodic phrasing
+        if (headFactor > 0.5) {
+            legatoProb = Math.min(0.95, legatoProb + 0.2);
+        }
 
         // Boost legato significantly for monophonic lead instruments
         if (soloist.mode === 'monophonic') {
