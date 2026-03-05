@@ -511,7 +511,7 @@ export function getSoloistNote(
 
     const evoEnabled = soloist.evolutionEnabled !== false;
     // Raise the floor of warmupFactor so the soloist isn't quite as sparse initially
-    let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.4 + (smoothLoopCount / 2.0) * 0.6); // Hits 1.0 right at the start of loop 3 (index 2)
+    let warmupFactor = isPriming ? 1.0 : Math.min(1.0, 0.7 + (smoothLoopCount / 2.0) * 0.3); // Hits 1.0 right at the start of loop 3 (index 2)
     if (activeStyle === 'bird') {
         warmupFactor = 1.0;
     }
@@ -733,13 +733,14 @@ export function getSoloistNote(
             isHighEnergyStyle && intensity > 0.7 && restBars > 0.5 && is8thNote;
 
         // EMERGENCY RE-ENTRY: Force break-out if rested for > 1.5 measures in high energy styles
-        const isEmergencyReentry = isHighEnergyStyle && intensity > 0.7 && restBars > 1.5;
+        // Ensure non-high-energy styles also re-enter after slightly longer
+        const isEmergencyReentry = (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.5;
 
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
 
         let startProb =
-            (0.05 + effectiveIntensity * 0.1) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
+            (0.1 + effectiveIntensity * 0.2) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // Scaled base prob
 
         if (isEmergencyReentry) {
             startProb = 1.0;
@@ -752,10 +753,10 @@ export function getSoloistNote(
             }
         } else if (isDownbeat) {
             startProb =
-                (0.6 + effectiveIntensity * 0.3) * (0.4 + (evoEnabled ? warmupFactor : 1.0) * 0.6); // High chance to start on '1'
+                (0.7 + effectiveIntensity * 0.3) * (0.5 + (evoEnabled ? warmupFactor : 1.0) * 0.5); // High chance to start on '1'
         } else if (isPickupZone) {
             startProb =
-                (0.4 + effectiveIntensity * 0.4) * (0.3 + (evoEnabled ? warmupFactor : 1.0) * 0.7); // Good chance to play a pickup
+                (0.5 + effectiveIntensity * 0.4) * (0.4 + (evoEnabled ? warmupFactor : 1.0) * 0.6); // Good chance to play a pickup
         }
 
         // HEAD MODE ASSERTIVE ENTRY: Ensure all styles establish melody early
@@ -769,7 +770,7 @@ export function getSoloistNote(
 
         // SAFETY: If we have been resting for more than 4 measures, force re-entry
         if (restBars > 4.0) {
-            startProb = Math.max(startProb, 0.5 + (restBars - 4.0) * 0.2);
+            startProb = 1.0;
         }
 
         // Assertive entry: Force start on the '1' if we just enabled or traded in
@@ -888,8 +889,8 @@ export function getSoloistNote(
         // DYNAMIC BREATH: Instead of immediate potential re-entry,
         // set currentPhraseSteps to a negative value to force a minimum rest duration.
         // This simulates the soloist actually taking a breath.
-        const breathIntensity = (1.2 - effectiveIntensity) * 8; // 1.6 to 8 steps
-        const lyricalBreath = lyricalBias * 8; // 0 to 8 steps
+        const breathIntensity = (1.2 - effectiveIntensity) * 6; // 1.2 to 6 steps
+        const lyricalBreath = lyricalBias * 4; // 0 to 4 steps
         const breathSteps = Math.floor(Math.random() * (breathIntensity + lyricalBreath)) + 1;
 
         soloist.currentPhraseSteps = -breathSteps; // @worker-mutation
