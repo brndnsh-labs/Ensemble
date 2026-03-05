@@ -263,7 +263,9 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
                             <button
                                 class="section-kebab-btn"
                                 title="Insert Symbol"
-                                aria-label="Section Actions Menu"
+                                aria-label={`Actions for ${section.label || 'Section'}`}
+                                aria-expanded={isMenuOpen}
+                                aria-haspopup="true"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setIsMenuOpen(!isMenuOpen);
