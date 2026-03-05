@@ -1,4 +1,10 @@
 import { TIME_SIGNATURES } from './config.js';
+import { GENRE_STYLE_MAPPING, STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
+import {
+    generateEmbellishment,
+    generateExtraNotes,
+    generateMelodicDevice,
+} from './soloist-devices.js';
 import { getState } from './state.js';
 import { getScaleForChord } from './theory-scales.js';
 import { calculateTimingOffset, getFrequency, getMidi } from './utils.js';
@@ -6,289 +12,6 @@ import { calculateTimingOffset, getFrequency, getMidi } from './utils.js';
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 const HIST_COUNTS = new Float32Array(128);
 const PC_COUNTS = new Float32Array(12);
-
-const STYLE_CONFIG = {
-    scalar: {
-        restBase: 0.1,
-        restGrowth: 0.07,
-        registerSoar: 10,
-        tensionScale: 0.6,
-        timingJitter: 8,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.1,
-        anticipationProb: 0.1,
-        targetExtensions: [2, 9],
-        deviceProb: 0.12,
-        allowedDevices: ['run', 'slide', 'guitarDouble'],
-        motifProb: 0.3,
-        hookProb: 0.1,
-    },
-    shred: {
-        restBase: 0.05,
-        restGrowth: 0.02,
-        registerSoar: 16,
-        tensionScale: 0.3,
-        timingJitter: 4,
-        maxNotesPerPhrase: 64,
-        minNotesPerPhrase: 8,
-        doubleStopProb: 0.05,
-        anticipationProb: 0.05,
-        targetExtensions: [2],
-        deviceProb: 0.4,
-        allowedDevices: ['run', 'guitarDouble'],
-        motifProb: 0.1,
-        hookProb: 0.05,
-    },
-    blues: {
-        restBase: 0.15,
-        restGrowth: 0.15,
-        registerSoar: 4,
-        tensionScale: 0.8,
-        timingJitter: 25,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.35,
-        anticipationProb: 0.3,
-        targetExtensions: [9, 10],
-        deviceProb: 0.4,
-        allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
-        motifProb: 0.5,
-        hookProb: 0.3,
-    },
-    neo: {
-        restBase: 0.12,
-        restGrowth: 0.08,
-        registerSoar: 6,
-        tensionScale: 0.7,
-        timingJitter: 25,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.15,
-        anticipationProb: 0.45,
-        targetExtensions: [2, 6, 9, 11],
-        deviceProb: 0.25,
-        allowedDevices: ['quartal', 'slide', 'guitarDouble'],
-        motifProb: 0.4,
-        hookProb: 0.2,
-    },
-    funk: {
-        restBase: 0.1,
-        restGrowth: 0.08,
-        registerSoar: 5,
-        tensionScale: 0.4,
-        timingJitter: 5,
-        maxNotesPerPhrase: 32,
-        minNotesPerPhrase: 3,
-        doubleStopProb: 0.15,
-        anticipationProb: 0.2,
-        targetExtensions: [9, 13],
-        deviceProb: 0.2,
-        allowedDevices: ['slide', 'run'],
-        motifProb: 0.3,
-        hookProb: 0.15,
-    },
-    hiphop: {
-        restBase: 0.15,
-        restGrowth: 0.08,
-        registerSoar: 4,
-        tensionScale: 0.6,
-        timingJitter: 20,
-        maxNotesPerPhrase: 16,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.1,
-        anticipationProb: 0.3,
-        targetExtensions: [2, 9, 11],
-        deviceProb: 0.3,
-        allowedDevices: ['bluesLick', 'slide', 'quartal'],
-        motifProb: 0.4,
-        hookProb: 0.2,
-    },
-    minimal: {
-        restBase: 0.3, // Significantly reduced from 0.75
-        restGrowth: 0.15,
-        registerSoar: 6,
-        tensionScale: 0.95,
-        timingJitter: 35,
-        maxNotesPerPhrase: 8,
-        minNotesPerPhrase: 1,
-        doubleStopProb: 0.0,
-        anticipationProb: 0.25,
-        targetExtensions: [2, 9, 11],
-        deviceProb: 0.15,
-        allowedDevices: ['slide', 'enclosure'],
-        motifProb: 0.7,
-        hookProb: 0.5,
-    },
-    bird: {
-        restBase: 0.05, // Already very low
-        restGrowth: 0.01,
-        registerSoar: 8,
-        tensionScale: 0.9,
-        timingJitter: 12,
-        maxNotesPerPhrase: 48,
-        minNotesPerPhrase: 4,
-        doubleStopProb: 0.15,
-        anticipationProb: 0.8, // Play over the changes heavily
-        targetExtensions: [2, 5, 6, 9],
-        deviceProb: 0.4,
-        allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
-        motifProb: 0.2,
-        hookProb: 0.1,
-    },
-    disco: {
-        restBase: 0.1,
-        restGrowth: 0.06,
-        registerSoar: 8,
-        tensionScale: 0.5,
-        timingJitter: 8,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 3,
-        doubleStopProb: 0.05,
-        anticipationProb: 0.2,
-        targetExtensions: [2, 9],
-        deviceProb: 0.1,
-        allowedDevices: ['run'],
-        motifProb: 0.4,
-        hookProb: 0.2,
-    },
-    bossa: {
-        restBase: 0.12,
-        restGrowth: 0.08,
-        registerSoar: 4,
-        tensionScale: 0.7,
-        timingJitter: 15,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.08,
-        anticipationProb: 0.35,
-        targetExtensions: [2, 6, 9],
-        deviceProb: 0.2,
-        allowedDevices: ['enclosure', 'slide', 'guitarDouble'],
-        motifProb: 0.5,
-        hookProb: 0.25,
-    },
-    country: {
-        restBase: 0.08,
-        restGrowth: 0.08,
-        registerSoar: 6,
-        tensionScale: 0.5,
-        timingJitter: 4,
-        maxNotesPerPhrase: 32,
-        minNotesPerPhrase: 3,
-        doubleStopProb: 0.5,
-        anticipationProb: 0.2,
-        targetExtensions: [2, 4, 9],
-        deviceProb: 0.45,
-        allowedDevices: [
-            'guitarDouble',
-            'slide',
-            'countryBend',
-            'chickenPick',
-            'banjoRoll',
-            'graceSlide',
-        ],
-        motifProb: 0.4,
-        hookProb: 0.2,
-    },
-    metal: {
-        restBase: 0.1,
-        restGrowth: 0.05,
-        registerSoar: 14,
-        tensionScale: 0.4,
-        timingJitter: 2,
-        maxNotesPerPhrase: 32,
-        minNotesPerPhrase: 6,
-        doubleStopProb: 0.05,
-        anticipationProb: 0.05,
-        targetExtensions: [2, 7],
-        deviceProb: 0.5,
-        allowedDevices: ['run'],
-        motifProb: 0.1,
-        hookProb: 0.05,
-    },
-    reggae: {
-        restBase: 0.12,
-        restGrowth: 0.08,
-        registerSoar: 3,
-        tensionScale: 0.6,
-        timingJitter: 20,
-        maxNotesPerPhrase: 16,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.2,
-        anticipationProb: 0.1,
-        targetExtensions: [2, 6, 9],
-        deviceProb: 0.15,
-        allowedDevices: ['guitarDouble'],
-        motifProb: 0.6,
-        hookProb: 0.4,
-    },
-    acoustic: {
-        restBase: 0.15,
-        restGrowth: 0.1,
-        registerSoar: 4,
-        tensionScale: 0.4,
-        timingJitter: 15,
-        maxNotesPerPhrase: 12,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.1,
-        anticipationProb: 0.15,
-        targetExtensions: [2, 9],
-        deviceProb: 0.1,
-        allowedDevices: ['slide', 'run'],
-        motifProb: 0.5,
-        hookProb: 0.3,
-    },
-    ska: {
-        restBase: 0.1,
-        restGrowth: 0.05,
-        registerSoar: 10,
-        tensionScale: 0.5,
-        timingJitter: 5,
-        maxNotesPerPhrase: 32,
-        minNotesPerPhrase: 4,
-        doubleStopProb: 0.2,
-        anticipationProb: 0.3, // Higher anticipation for the "push" feel
-        targetExtensions: [2, 4, 9], // Major / Lydian / Mixolydian feel
-        deviceProb: 0.35,
-        allowedDevices: ['run', 'slide', 'guitarDouble', 'enclosure', 'chromaticFall'],
-        motifProb: 0.4,
-        hookProb: 0.2,
-    },
-};
-
-const STYLE_EMPHASIS = {
-    scalar: [1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3, 1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3],
-    bird: [0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0], // Offbeat push
-    shred: [1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9],
-    funk: [1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4, 1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4],
-    blues: [1.0, 0.2, 0.6, 0.9, 0.8, 0.2, 0.6, 0.9, 1.0, 0.2, 0.6, 0.9, 0.8, 0.2, 0.6, 0.9],
-    neo: [1.0, 0.1, 0.3, 0.8, 0.8, 0.1, 0.3, 0.8, 1.0, 0.1, 0.3, 0.8, 0.8, 0.1, 0.3, 0.8],
-    minimal: [1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0],
-    disco: [1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2],
-    bossa: [1.0, 0.1, 0.5, 0.1, 0.8, 0.1, 0.5, 0.1, 1.0, 0.1, 0.5, 0.1, 0.8, 0.1, 0.5, 0.1],
-    country: [1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2, 1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2],
-    metal: [1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8],
-    ska: [0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1],
-};
-
-const GENRE_STYLE_MAPPING = {
-    Rock: 'scalar',
-    Jazz: 'bird',
-    Funk: 'funk',
-    Blues: 'blues',
-    'Neo-Soul': 'neo',
-    'Hip Hop': 'hiphop',
-    Disco: 'disco',
-    Bossa: 'bossa',
-    'Bossa Nova': 'bossa',
-    Afrobeat: 'funk',
-    Acoustic: 'acoustic',
-    Reggae: 'reggae',
-    Country: 'country',
-    'Ska-Punk': 'ska',
-    Ska: 'ska',
-};
 
 /**
  * Checks for a lead sheet melody note at the given step.
@@ -1695,331 +1418,32 @@ export function getSoloistNote(
 
         const deviceType =
             allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
-        const devBaseVel = 0.5 + effectiveIntensity * 0.6;
 
-        let deviceBuffer = [];
-
-        if (deviceType === 'bluesLick') {
-            const root = targetChord.rootMidi;
-            const relInt = (selectedMidi - root + 120) % 12;
-            let lick = [];
-            const duration = 2; // 8th notes
-
-            // 1. From Root (0)
-            if (relInt === 0) {
-                if (Math.random() < 0.5) {
-                    // Ascending Walk: R -> b3 -> 4 -> #4 -> 5
-                    lick = [
-                        { midi: selectedMidi, durationSteps: duration },
-                        { midi: selectedMidi + 3, durationSteps: duration },
-                        { midi: selectedMidi + 5, durationSteps: duration },
-                        { midi: selectedMidi + 6, durationSteps: duration },
-                        { midi: selectedMidi + 7, durationSteps: duration * 2 },
-                    ];
-                } else {
-                    // Fall to 5: R -> b7 -> 5
-                    lick = [
-                        { midi: selectedMidi, durationSteps: duration },
-                        { midi: selectedMidi - 2, durationSteps: duration },
-                        { midi: selectedMidi - 5, durationSteps: duration * 2 },
-                    ];
-                }
-            }
-            // 2. From b3 (3)
-            else if (relInt === 3) {
-                if (Math.random() < 0.5) {
-                    // Major/Minor Clash: b3 (slide) -> 3 -> 5 -> 6 -> R
-                    lick = [
-                        {
-                            midi: selectedMidi + 1,
-                            durationSteps: duration,
-                            bendStartInterval: 1, // Slide up from b3 to 3
-                        }, // 3 (Major)
-                        { midi: selectedMidi + 4, durationSteps: duration }, // 5
-                        { midi: selectedMidi + 7, durationSteps: duration }, // b7
-                        { midi: selectedMidi + 9, durationSteps: duration * 2 }, // Root
-                    ];
-                } else {
-                    // Resolution: b3 -> R -> b7 -> 5
-                    lick = [
-                        { midi: selectedMidi, durationSteps: duration },
-                        { midi: selectedMidi - 3, durationSteps: duration },
-                        { midi: selectedMidi - 5, durationSteps: duration },
-                        { midi: selectedMidi - 8, durationSteps: duration * 2 },
-                    ];
-                }
-            }
-            // 3. From 4 (5)
-            else if (relInt === 5) {
-                // Chromatic Walkup: 4 -> #4 -> 5 -> b7
-                lick = [
-                    { midi: selectedMidi, durationSteps: duration },
-                    { midi: selectedMidi + 1, durationSteps: duration },
-                    { midi: selectedMidi + 2, durationSteps: duration },
-                    { midi: selectedMidi + 5, durationSteps: duration * 2 },
-                ];
-            }
-            // 4. From 5 (7)
-            else if (relInt === 7) {
-                // Classic Descent: 5 -> 4 -> b3 -> R
-                lick = [
-                    { midi: selectedMidi, durationSteps: duration },
-                    { midi: selectedMidi - 2, durationSteps: duration },
-                    { midi: selectedMidi - 4, durationSteps: duration },
-                    { midi: selectedMidi - 7, durationSteps: duration * 2 },
-                ];
-            }
-            // 5. From b7 (10)
-            else if (relInt === 10) {
-                // Turnaround: b7 -> 5 -> 4 -> b3 -> R
-                lick = [
-                    { midi: selectedMidi, durationSteps: duration },
-                    { midi: selectedMidi - 3, durationSteps: duration },
-                    { midi: selectedMidi - 5, durationSteps: duration },
-                    { midi: selectedMidi - 7, durationSteps: duration },
-                    { midi: selectedMidi - 10, durationSteps: duration * 2 },
-                ];
-            }
-
-            if (lick.length > 0) {
-                // Melodic Continuity: Nudge entire lick to the octave nearest to lastMidi
-                const lickStart = lick[0].midi;
-                const octaveShift = Math.round((lastMidi - lickStart) / 12) * 12;
-
-                deviceBuffer = lick.map((n, idx) => ({
-                    ...n,
-                    midi: Math.max(minMidi, Math.min(maxMidi, n.midi + octaveShift)),
-                    velocity: devBaseVel * (idx === 0 ? 1.15 : 0.9 + Math.random() * 0.15),
-                    style: activeStyle,
-                }));
-            }
-        }
-
-        if (deviceType === 'chromaticFall') {
-            const steps = Math.floor(Math.random() * 3) + 3; // 3-5 steps
-            const duration = 1; // 16ths
-            for (let i = 0; i < steps; i++) {
-                deviceBuffer.push({
-                    midi: Math.max(minMidi, selectedMidi - i),
-                    durationSteps: duration,
-                    velocity: devBaseVel * (1.1 - i * 0.1),
-                    style: activeStyle,
-                });
-            }
-        }
-
-        if (deviceType === 'graceNote') {
-            // ... (rest of device logic remains similar, but using deviceBuffer)
-        }
-
-        // Finalize device buffer and return
-        if (deviceBuffer.length > 0) {
-            soloist.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
-            const first = deviceBuffer[0];
-            soloist.busySteps = (first.durationSteps || 1) - 1; // @worker-mutation
-            soloist.currentCell = null; // @worker-mutation
-            return finalizeNote(first);
-        }
-
-        if (deviceType === 'graceNote') {
-            // Half-step or scale-step below, very fast
-            deviceBuffer = [
-                {
-                    midi: selectedMidi - 1,
-                    velocity: devBaseVel * 0.8,
-                    durationSteps: 1,
-                    style: activeStyle,
-                },
-                {
-                    midi: selectedMidi,
-                    velocity: devBaseVel * 1.1,
-                    durationSteps: 2,
-                    style: activeStyle,
-                },
-            ];
-        }
-        if (deviceType === 'banjoRoll') {
-            // Arpeggiated 16th notes using chord tones + 2nd/6th
-            const root = targetChord.rootMidi;
-            const rollPitches = [0, 4, 7, 9].map((i) => root + i);
-            const roll = [];
-            for (let i = 0; i < 4; i++) {
-                const midi = rollPitches[i % rollPitches.length];
-                roll.push({
-                    midi,
-                    velocity: devBaseVel * (i === 0 ? 1.1 : 0.9),
-                    durationSteps: 1,
-                    style: activeStyle,
-                });
-            }
-            deviceBuffer = roll;
-        }
-        if (deviceType === 'graceSlide') {
-            // Half-step slide into a chord tone (usually minor 3rd to major 3rd)
-            deviceBuffer = [
-                {
-                    midi: selectedMidi,
-                    velocity: devBaseVel * 1.2,
-                    durationSteps: 2,
-                    style: activeStyle,
-                    bendStartInterval: 1, // Slide up from -1 semitone
-                },
-            ];
-        }
-        if (deviceType === 'countryBend' && isPolyphonic && !isPiano) {
-            // Pedal Steel style: Hold one note, bend the other into a chord tone
-            const topNote =
-                selectedMidi + ([3, 4, 7].includes((selectedMidi - rootMidi + 12) % 12) ? 0 : 2);
-            const bottomNote = selectedMidi - 5;
-            deviceBuffer = [
-                [
-                    {
-                        midi: topNote,
-                        velocity: devBaseVel * 1.2,
-                        durationSteps: 4,
-                        style: activeStyle,
-                        bendStartInterval: -1,
-                        isDoubleStop: true,
-                    },
-                    {
-                        midi: bottomNote,
-                        velocity: devBaseVel * 0.9,
-                        durationSteps: 4,
-                        style: activeStyle,
-                        isDoubleStop: false,
-                    },
-                ],
-            ];
-        }
-        if (deviceType === 'chickenPick') {
-            // Snappy, short rhythmic hits, often a double stop
-            const dsInt = Math.random() < 0.5 ? 3 : 4;
-            deviceBuffer = [
-                [
-                    {
-                        midi: selectedMidi + dsInt,
-                        velocity: 1.25,
-                        durationSteps: 1,
-                        style: activeStyle,
-                        isDoubleStop: true,
-                    },
-                    {
-                        midi: selectedMidi,
-                        velocity: 1.2,
-                        durationSteps: 1,
-                        style: activeStyle,
-                        isDoubleStop: false,
-                    },
-                ],
-            ];
-        }
-        if (deviceType === 'birdFlurry') {
-            // Throttle flurry at high BPM
-            if (playback.bpm > 180 && Math.random() < 0.8) {
-                return null;
-            }
-
-            const flurry = [];
-            let curr = selectedMidi + 3;
-            for (let i = 0; i < 4; i++) {
-                let n = curr - 1;
-                while (!((scaleMask >> ((n - rootMidi + 120) % 12)) & 1) && n > curr - 5) {
-                    n--;
-                }
-                flurry.push({
-                    midi: n,
-                    velocity: devBaseVel * 1.05,
-                    durationSteps: 1,
-                    style: activeStyle,
-                });
-                curr = n;
-            }
-            deviceBuffer = flurry;
-        }
-        if (deviceType === 'run' || deviceType === 'enclosure') {
-            deviceBuffer = [
-                {
-                    midi: selectedMidi + (deviceType === 'run' ? -2 : 1),
-                    velocity: devBaseVel * 0.9,
-                    durationSteps: 1,
-                    style: activeStyle,
-                },
-                {
-                    midi: selectedMidi - 1,
-                    velocity: devBaseVel * 1.1,
-                    durationSteps: 1,
-                    style: activeStyle,
-                },
-                {
-                    midi: selectedMidi,
-                    velocity: devBaseVel * 1.2,
-                    durationSteps: 1,
-                    style: activeStyle,
-                },
-            ];
-        }
-        if (deviceType === 'slide') {
-            // Favor sliding from below, but guitar/jazz often slide from above
-            const dir =
-                (soloist.mode === 'guitar' || activeStyle === 'bird') && Math.random() < 0.3
-                    ? 1
-                    : -1;
-            deviceBuffer = [
-                {
-                    midi: selectedMidi,
-                    velocity: devBaseVel * 1.15,
-                    durationSteps: 2,
-                    style: activeStyle,
-                    bendStartInterval: -dir, // dir -1 -> slide UP (bend 1), dir 1 -> slide DOWN (bend -1)
-                },
-            ];
-        }
-
-        // --- Finalize and Smooth Device Buffer ---
-        if (deviceBuffer.length > 0) {
-            // Melodic Continuity: Nudge entire buffer to the octave nearest to lastMidi
-            // unless we're just starting a phrase
-            const firstNote = Array.isArray(deviceBuffer[0]) ? deviceBuffer[0][0] : deviceBuffer[0];
-            const startMidi = firstNote.midi;
-            const targetMidi = soloist.isResting ? dynamicCenter : lastMidi;
-            const octaveShift = Math.round((targetMidi - startMidi) / 12) * 12;
-
-            const finalBuffer = deviceBuffer.map((n) => {
-                const notes = Array.isArray(n) ? n : [n];
-                const shifted = notes.map((note) => ({
-                    ...note,
-                    midi: Math.max(minMidi, Math.min(maxMidi, note.midi + octaveShift)),
-                }));
-                return shifted.length === 1 ? shifted[0] : shifted;
+        if (deviceType) {
+            const deviceBuffer = generateMelodicDevice(deviceType, {
+                selectedMidi,
+                targetChord,
+                activeStyle,
+                effectiveIntensity,
+                minMidi,
+                maxMidi,
+                lastMidi,
+                playback,
+                soloist,
+                isPolyphonic,
+                isPiano,
+                dynamicCenter,
+                scaleMask,
             });
 
-            soloist.deviceBuffer = finalBuffer.slice(1); // @worker-mutation
-            const first = finalBuffer[0];
-            soloist.busySteps =
-                (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
-            soloist.currentCell = null; // @worker-mutation
-            return finalizeNote(first);
-        }
-        if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
-            const dsInt = activeStyle === 'blues' || activeStyle === 'scalar' ? 5 : 4;
-            const res = [
-                {
-                    midi: selectedMidi + dsInt,
-                    velocity: devBaseVel * 1.05,
-                    durationSteps: 1,
-                    style: activeStyle,
-                    isDoubleStop: true,
-                },
-                {
-                    midi: selectedMidi,
-                    velocity: devBaseVel * 1.2,
-                    durationSteps: 1,
-                    style: activeStyle,
-                    isDoubleStop: false,
-                },
-            ];
-            soloist.busySteps = 0; // @worker-mutation
-            return finalizeNote(res);
+            if (deviceBuffer && deviceBuffer.length > 0) {
+                soloist.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
+                const first = deviceBuffer[0];
+                soloist.busySteps =
+                    (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
+                soloist.currentCell = null; // @worker-mutation
+                return finalizeNote(first);
+            }
         }
     }
 
@@ -2032,70 +1456,14 @@ export function getSoloistNote(
         (soloist.doubleStopProb ?? 1.0);
 
     if (isPolyphonic && Math.random() < dsChance) {
-        // Mode-specific voicing differentiation
-        if (soloist.mode === 'piano') {
-            const currentRoot = currentChord.rootMidi;
-            // Modern Jazz/Neo: Use Quartal voicings (4ths)
-            if ((activeStyle === 'neo' || activeStyle === 'bird') && Math.random() < 0.6) {
-                extraNotes.push({
-                    midi: selectedMidi - 5,
-                    velocity: (0.4 + effectiveIntensity * 0.5) * 0.8,
-                    isDoubleStop: true,
-                });
-                if (Math.random() < 0.4) {
-                    extraNotes.push({
-                        midi: selectedMidi - 10,
-                        velocity: (0.3 + effectiveIntensity * 0.5) * 0.7,
-                        isDoubleStop: true,
-                    });
-                }
-            } else {
-                // Classic Block Chord Logic: Add two chord tones immediately below the melody
-                let count = 0;
-                for (let m = selectedMidi - 1; m > selectedMidi - 13 && count < 2; m--) {
-                    const pc = ((m % 12) + 12) % 12;
-                    if (
-                        currentChord.intervals.some(
-                            (i) => i % 12 === (pc - (currentRoot % 12) + 12) % 12,
-                        )
-                    ) {
-                        extraNotes.push({
-                            midi: m,
-                            velocity: (0.5 + effectiveIntensity * 0.6) * 0.85,
-                            isDoubleStop: true,
-                        });
-                        count++;
-                    }
-                }
-            }
-        } else if (activeStyle === 'country') {
-            // Country specific: Exclusively use Sixths (8 or 9)
-            const dsInt = [8, 9][Math.floor(Math.random() * 2)];
-            extraNotes.push({
-                midi: selectedMidi + dsInt,
-                velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
-                isDoubleStop: true,
-            });
-        } else if (soloist.mode === 'guitar') {
-            // Hendrix-style: favor 4ths and 5ths with potential for ornaments
-            const dsInt =
-                activeStyle === 'blues' || activeStyle === 'neo'
-                    ? [5, 7, 5, 4][Math.floor(Math.random() * 4)]
-                    : [3, 4, 5, 8, 9][Math.floor(Math.random() * 5)];
-            extraNotes.push({
-                midi: selectedMidi + dsInt,
-                velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
-                isDoubleStop: true,
-            });
-        } else {
-            // Default generic double stop
-            const dsInt = [5, 7, 9, 12][Math.floor(Math.random() * 4)];
-            extraNotes.push({
-                midi: selectedMidi + dsInt,
-                velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
-                isDoubleStop: true,
-            });
-        }
+        const generatedExtra = generateExtraNotes({
+            soloist,
+            currentChord,
+            activeStyle,
+            effectiveIntensity,
+            selectedMidi,
+        });
+        extraNotes.push(...generatedExtra);
     }
 
     // --- 8. Dynamic Duration & Bending ---
@@ -2261,22 +1629,16 @@ export function getSoloistNote(
         if (!soloist.embellishmentBuffer) {
             soloist.embellishmentBuffer = []; // @worker-mutation
         }
-        const scaleIntervals = getScaleForChord(targetChord, null, style);
-        const neighborDir = Math.random() > 0.5 ? 1 : -1;
-        let neighborMidi = selectedMidi;
-        let neighborPC = (neighborMidi + neighborDir + 120) % 12;
-        let tries = 0;
-        while (!scaleIntervals.includes(neighborPC) && tries < 3) {
-            neighborMidi += neighborDir;
-            neighborPC = (neighborMidi + 120) % 12;
-            tries++;
-        }
+        const emb = generateEmbellishment({
+            selectedMidi,
+            targetChord,
+            style,
+            activeStyle,
+        });
         soloist.embellishmentBuffer.push({
-            midi: neighborMidi,
+            ...emb,
             durationSteps: durationSteps - 1,
-            velocity: 0.8 * result.velocity,
-            style: activeStyle,
-            isLegato: true,
+            velocity: emb.velocity * result.velocity,
         }); // @worker-mutation
     }
 
