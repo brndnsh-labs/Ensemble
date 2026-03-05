@@ -570,7 +570,12 @@ export function getHarmonyNotes(
         // --- ENSEMBLE CLARITY: Slotting ---
         // 1. Avoid Accompaniment: If accompaniment is hitting, Harmony shifts UP
         if (accompanimentHit && accMidis.length > 0) {
-            const avgAccMidi = accMidis.reduce((a, b) => a + b, 0) / accMidis.length;
+            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+            let sum = 0;
+            for (let j = 0; j < accMidis.length; j++) {
+                sum += accMidis[j];
+            }
+            const avgAccMidi = sum / accMidis.length;
             if (finalMidi < avgAccMidi + 7) {
                 finalMidi += 12;
             }

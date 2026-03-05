@@ -151,7 +151,12 @@ export function getBestInversion(
 
     let targetCenter = homeAnchor;
     if (previousMidis && previousMidis.length > 0) {
-        const prevAvg = previousMidis.reduce((a, b) => a + b, 0) / previousMidis.length;
+        // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+        let sum = 0;
+        for (let i = 0; i < previousMidis.length; i++) {
+            sum += previousMidis[i];
+        }
+        const prevAvg = sum / previousMidis.length;
         const drift = prevAvg - homeAnchor;
         const driftLimit = style === 'organ' || isPivot ? 3 : 5;
         targetCenter =
@@ -166,8 +171,12 @@ export function getBestInversion(
         let bestShift = 0;
         let minDistance = Infinity;
         for (let shift = -24; shift <= 24; shift += 12) {
-            const currentAvg =
-                intervals.reduce((a, b) => a + b + rootMidi + shift, 0) / intervals.length;
+            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
+            let sum = 0;
+            for (let i = 0; i < intervals.length; i++) {
+                sum += intervals[i] + rootMidi + shift;
+            }
+            const currentAvg = sum / intervals.length;
             const dist = Math.abs(currentAvg - targetCenter);
             if (dist < minDistance) {
                 minDistance = dist;
