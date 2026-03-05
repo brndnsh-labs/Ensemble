@@ -734,7 +734,8 @@ export function getSoloistNote(
 
         // EMERGENCY RE-ENTRY: Force break-out if rested for > 1.5 measures in high energy styles
         // Ensure non-high-energy styles also re-enter after slightly longer
-        const isEmergencyReentry = (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.5;
+        const isEmergencyReentry =
+            (isHighEnergyStyle && intensity > 0.7 && restBars > 1.5) || restBars > 2.5;
 
         const isDownbeat = measureStep === 0;
         const isPickupZone = measureStep >= stepsPerMeasure - stepsPerBeat; // Last beat of measure
