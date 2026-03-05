@@ -11,7 +11,7 @@ vi.mock('../../../public/state.js', () => {
                 frequency: {
                     setValueAtTime: vi.fn(),
                     exponentialRampToValueAtTime: vi.fn(),
-                    connect: vi.fn()
+                    connect: vi.fn(),
                 },
                 detune: { setValueAtTime: vi.fn() },
                 connect: vi.fn(),
@@ -35,7 +35,7 @@ vi.mock('../../../public/state.js', () => {
                 frequency: {
                     setValueAtTime: vi.fn(),
                     exponentialRampToValueAtTime: vi.fn(),
-                    linearRampToValueAtTime: vi.fn()
+                    linearRampToValueAtTime: vi.fn(),
                 },
                 Q: { setValueAtTime: vi.fn() },
                 connect: vi.fn(),
@@ -73,7 +73,7 @@ vi.mock('../../../public/utils.js', () => ({
     clampFreq: vi.fn((f) => f),
 }));
 
-import { playHarmonyNote, killHarmonyNote } from '../../../public/engine/synth-harmonies.js';
+import { killHarmonyNote, playHarmonyNote } from '../../../public/engine/synth-harmonies.js';
 import { getState } from '../../../public/state.js';
 import { safeDisconnect } from '../../../public/utils.js';
 
@@ -140,7 +140,12 @@ describe('Harmony Synthesis', () => {
     describe('Voice Management', () => {
         it('should filter out expired voices', () => {
             harmony.activeVoices = [
-                { time: 5, duration: 1, midi: 60, gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } } }
+                {
+                    time: 5,
+                    duration: 1,
+                    midi: 60,
+                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
+                },
             ];
             playback.audio.currentTime = 10;
 
@@ -159,8 +164,10 @@ describe('Harmony Synthesis', () => {
                     time: 9,
                     duration: 2,
                     midi: 60,
-                    gain: { gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy } }
-                }
+                    gain: {
+                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
+                    },
+                },
             ];
 
             playHarmonyNote(440, 10, 1.0, 0.4, 'stabs', 60);
@@ -174,9 +181,26 @@ describe('Harmony Synthesis', () => {
             const cancelSpy = vi.fn();
             const setTargetSpy = vi.fn();
             harmony.activeVoices = [
-                { time: 9.7, duration: 1, midi: 60, gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } } },
-                { time: 9.8, duration: 1, midi: 62, gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } } },
-                { time: 9.9, duration: 1, midi: 64, gain: { gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy } } }
+                {
+                    time: 9.7,
+                    duration: 1,
+                    midi: 60,
+                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
+                },
+                {
+                    time: 9.8,
+                    duration: 1,
+                    midi: 62,
+                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
+                },
+                {
+                    time: 9.9,
+                    duration: 1,
+                    midi: 64,
+                    gain: {
+                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
+                    },
+                },
             ];
 
             playHarmonyNote(440, 10, 1.0);
@@ -212,8 +236,16 @@ describe('Harmony Synthesis', () => {
             const cancelSpy = vi.fn();
             const setTargetSpy = vi.fn();
             harmony.activeVoices = [
-                { gain: { gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy } } },
-                { gain: { gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy } } }
+                {
+                    gain: {
+                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
+                    },
+                },
+                {
+                    gain: {
+                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
+                    },
+                },
             ];
 
             killHarmonyNote(0.1);
