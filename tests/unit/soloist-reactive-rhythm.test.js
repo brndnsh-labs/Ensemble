@@ -53,7 +53,9 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         // 1. Setup: bypass rhythm to ensure it works
         const contextBypass = { stepCoordination: { kickHit: true }, bypassRhythm: true };
-        expect(getSoloistNote(chord, null, 0, 440, 60, 'funk', 0, false, contextBypass)).not.toBeNull();
+        expect(
+            getSoloistNote(chord, null, 0, 440, 60, 'funk', 0, false, contextBypass),
+        ).not.toBeNull();
 
         // 2. Probabilistic check
         // At intensity 0.05: intensityScale = 0.6. emphasis[0] = 1.0. attackProb = 0.6.
@@ -67,12 +69,16 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         // WITH drum hit: 0.7 < 0.8 (TRUE)
         const contextWith = { stepCoordination: { kickHit: true } };
-        expect(getSoloistNote(chord, null, 16, 440, 60, 'funk', 0, false, contextWith)).not.toBeNull();
+        expect(
+            getSoloistNote(chord, null, 16, 440, 60, 'funk', 0, false, contextWith),
+        ).not.toBeNull();
 
         // WITHOUT drum hit: 0.7 < 0.6 (FALSE)
-        localState.soloist.busySteps = 0; 
+        localState.soloist.busySteps = 0;
         const contextWithout = { stepCoordination: { kickHit: false } };
-        expect(getSoloistNote(chord, null, 32, 440, 60, 'funk', 0, false, contextWithout)).toBeNull();
+        expect(
+            getSoloistNote(chord, null, 32, 440, 60, 'funk', 0, false, contextWithout),
+        ).toBeNull();
 
         randomSpy.mockRestore();
     });
@@ -96,11 +102,15 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         for (let i = 0; i < iterations; i++) {
             localState.soloist.busySteps = 0;
             localState.soloist.activeSteps = 999999;
-            if (getSoloistNote(chord, null, i * 16 + 3, 440, 60, 'bird', 3, false)) hitsNormal++;
-            
+            if (getSoloistNote(chord, null, i * 16 + 3, 440, 60, 'bird', 3, false)) {
+                hitsNormal++;
+            }
+
             localState.soloist.busySteps = 0;
             localState.soloist.activeSteps = 999999;
-            if (getSoloistNote(chord, null, i * 16, 440, 60, 'bird', 0, false)) hitsDownbeat++;
+            if (getSoloistNote(chord, null, i * 16, 440, 60, 'bird', 0, false)) {
+                hitsDownbeat++;
+            }
         }
 
         expect(hitsNormal).toBeGreaterThan(0);
