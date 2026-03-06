@@ -2,6 +2,7 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 
 export const config = {
     ...DEFAULT_CONFIG,
+    entropyMultiplier: 0.05,
 };
 
 export function getMotif(seed, complexity, intensity = 1.0) {

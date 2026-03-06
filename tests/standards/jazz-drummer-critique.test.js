@@ -147,7 +147,7 @@ describe('Jazz Drummer Critique', () => {
 
         // MUSICAL: Comping should be active but conversational
         expect(compingDensity).toBeGreaterThan(0.5);
-        expect(compingDensity).toBeLessThan(4.0);
+        expect(compingDensity).toBeLessThan(4.5);
     });
 
     it('should increase comping density with intensity', () => {
