@@ -6,16 +6,32 @@ export const config = {
     backbeatCrack: false,
 };
 
-export function getMotif(seed, complexity, _intensity = 1.0) {
-    if (complexity < 0.3) {
-        return 0;
+/**
+ * Maps intensity to motif complexity for Neo-Soul / Hip Hop.
+ * 0: Standard Boom Bap (Grounded)
+ * 1: Ghost Note Heavy (Texture)
+ * 2: Syncopated Dilla Kicks (Lazy/Displaced)
+ * 3: Percussive/Sidestick (Experimental)
+ */
+export function getMotif(seed, complexity, intensity = 1.0) {
+    if (complexity < 0.3 || intensity < 0.35) {
+        return 0; // Solid Boom Bap at low intensity
     }
+
+    // Stable seed ranges for core motifs
     if (seed < 0.3) {
         return 0;
     }
     if (seed < 0.6) {
         return 1;
     }
+
+    // For seeds > 0.6, we only allow complex motifs at high intensity
+    if (intensity < 0.7) {
+        // Fallback to core motifs
+        return seed < 0.8 ? 0 : 1;
+    }
+
     if (seed < 0.8) {
         return 2;
     }
@@ -23,81 +39,113 @@ export function getMotif(seed, complexity, _intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed } = context;
+    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
+    const intensity = playback.bandIntensity;
+    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+
+    // --- 1. THE EXPRESSIVE DRAG (Dilla Micro-timing) ---
+    // At high intensity, we push/pull the boundaries further for that "leaning" feel.
+    const snareDrag = 0.004 + intensity * 0.008; // Up to +0.012s delay
+    const hiHatPush = -0.006 - intensity * 0.009; // Up to -0.015s rush
+
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        instTimeOffset -= 0.012;
-    }
-    if (inst.name === 'Snare') {
-        instTimeOffset += 0.008;
+        instTimeOffset += hiHatPush;
+    } else if (inst.name === 'Snare') {
+        instTimeOffset += snareDrag;
+    } else if (inst.name === 'Kick') {
+        instTimeOffset += 0.005; // Standard kick weight
     }
 
     if (inst.muted) {
         return state;
     }
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, playback.bandIntensity);
+    // --- 2. DRUNKEN JITTER ---
+    // Non-backbeat steps drift noticeably as intensity rises.
+    const drunkenFactor = intensity * 0.015;
+    const isBackbeat = loopStep === 4 || loopStep === 12;
+    const isDownbeat = loopStep % 4 === 0;
 
-    const drunkenFactor = playback.bandIntensity * 0.012;
-    if (loopStep % 4 !== 0) {
+    if (!isBackbeat && !isDownbeat) {
         instTimeOffset += (Math.random() - 0.5) * drunkenFactor;
     }
 
+    // --- 3. HI-HAT DYNAMICS ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         if (shouldPlay) {
-            instTimeOffset -= 0.008;
+            // Subtle shuffle on 16ths
             if (loopStep % 2 === 1) {
-                velocity *= 0.75;
+                velocity *= 0.75 - intensity * 0.1; // Softer 16ths as it gets "lazier"
             }
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
-        instTimeOffset += 0.008;
 
+        // --- Snare Motif Logic ---
         if (activeMotif === 1 || activeMotif === 3) {
-            if (loopStep === 4 || loopStep === 12) {
+            // Motif 1 & 3: Ghost Note Heavy / Percussive
+            if (isBackbeat) {
                 shouldPlay = true;
-                velocity = 1.1;
+                velocity = 1.05 + intensity * 0.1;
             } else if ([3, 7, 11, 15].includes(loopStep)) {
+                // Ghost note placements - keep deterministic for "structured" feel
                 shouldPlay = true;
-                velocity = 0.2 + Math.random() * 0.1;
+                velocity = 0.15 + intensity * 0.15 + Math.random() * 0.1;
             }
         } else {
-            if (loopStep === 4 || loopStep === 12) {
+            // Motif 0 & 2: Solid backbeat
+            if (isBackbeat) {
                 shouldPlay = true;
             }
         }
 
-        if (shouldPlay && playback.bandIntensity < 0.35) {
+        // --- Snare Turnarounds ---
+        if (isTurnaround && intensity > 0.6) {
+            if ([14, 15].includes(loopStep) && Math.random() < 0.6) {
+                shouldPlay = true;
+                velocity = 0.3 + intensity * 0.3;
+                instTimeOffset += 0.01; // Extra drag on turnaround ghosts
+            }
+        }
+
+        if (shouldPlay && intensity < 0.35) {
             soundName = 'Sidestick';
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
-        instTimeOffset += 0.005;
 
+        // --- Kick Motif Logic ---
         if (activeMotif === 0) {
+            // Boom Bap: 1, & of 3
             if (loopStep === 0 || loopStep === 10) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
+            // Dilla Skips: 1, pickup to 3, pickup to 1, "a" of 4
             if ([0, 7, 10, 15].includes(loopStep)) {
                 shouldPlay = true;
             }
         } else {
+            // Standard foundation
             if (loopStep === 0 || loopStep === 8) {
                 shouldPlay = true;
             }
         }
 
         if (shouldPlay) {
-            velocity = 1.1;
+            velocity = 1.1 + intensity * 0.1;
         }
     }
 
+    // --- 4. GLOBAL MULTIPLIER & POLISH ---
     if (shouldPlay) {
-        velocity *= 0.75;
-        if (inst.name === 'Snare' && playback.bandIntensity < 0.35) {
+        // Neo-Soul is generally dampened but scales up slightly with intensity
+        const dampening = 0.65 + intensity * 0.15;
+        velocity *= dampening;
+
+        if (inst.name === 'Snare' && intensity < 0.35) {
             soundName = 'Sidestick';
         }
     }
