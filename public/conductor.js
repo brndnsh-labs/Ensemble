@@ -392,7 +392,11 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 conductorState.loopCount++;
                 conductorState.formIteration++;
 
-                if (arranger.totalSteps <= 64) {
+                // Dynamic threshold based on measure length (instead of hardcoded 64 steps = 4 bars of 4/4)
+                const isShortLoop = arranger.totalSteps <= (stepsPerMeasure * 4);
+
+                if (isShortLoop) {
+                    // How many loops before a fill? Lower intensity = less frequent fills
                     const freq =
                         playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
                     shouldFill = conductorState.loopCount % freq === 0;

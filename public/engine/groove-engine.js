@@ -71,7 +71,8 @@ export function applyGrooveOverrides({
 
     let pulseWeight = 1.0;
     if ((inst.name === 'HiHat' || inst.name === 'Open') && !config.exemptFromPulseShaping) {
-        const isOffbeat = loopStep % 4 === 2;
+        // Find if it's the 3rd 16th note in a quarter note subdivision
+        const isOffbeat = loopStep % (stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4)) === 2;
         const isSyncopated = loopStep % 2 === 1;
         if (isOffbeat) {
             pulseWeight = 0.85;
@@ -85,8 +86,17 @@ export function applyGrooveOverrides({
     const barIndex = Math.floor(step / stepsPerBar);
     const prevBarIndex = Math.floor((step - 1) / stepsPerBar);
     const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
-    const justFinishedTurnaround = groove.creativity && barIndex % 4 === 0 && isFirstStepOfNewBar;
-    const isTurnaround = groove.creativity && barIndex % 4 === 3;
+
+    // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
+    const entry = arrangerState.stepMap?.find((e) => step >= e.start && step < e.end);
+    let measuresInSection = 4; // default
+    if (entry) {
+        measuresInSection = Math.max(1, (entry.end - entry.start) / stepsPerBar);
+    }
+    const barInSection = Math.floor((step - (entry ? entry.start : 0)) / stepsPerBar);
+
+    const justFinishedTurnaround = groove.creativity && barInSection === 0 && isFirstStepOfNewBar;
+    const isTurnaround = groove.creativity && barInSection === measuresInSection - 1;
 
     if (justFinishedTurnaround && isDownbeat) {
         if (inst.name === 'Kick') {
@@ -99,7 +109,6 @@ export function applyGrooveOverrides({
         }
     }
 
-    const entry = arrangerState.stepMap?.find((e) => step >= e.start && step < e.end);
     const sectionId = entry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
     if (sectionSeed === undefined) {
@@ -137,10 +146,17 @@ export function applyGrooveOverrides({
         Math.random() < playback.bandIntensity * config.entropyMultiplier
     ) {
         const isSyncopated = loopStep % 2 === 1;
-        const isHeavySync = loopStep % 4 === 2;
+        const subdivision = stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4);
+        const isHeavySync = loopStep % subdivision === Math.floor(subdivision / 2);
 
-        const isBackbeatAdjacent = [5, 13].includes(loopStep);
-        const isEOfBeat = [1, 9].includes(loopStep);
+        // Simple hardcoded checks adapted to dynamic offset from backbeat
+        let isBackbeatAdjacent = false;
+        let isEOfBeat = false;
+
+        if (arrangerState.timeSignature === '4/4') {
+             isBackbeatAdjacent = [5, 13].includes(loopStep);
+             isEOfBeat = [1, 9].includes(loopStep);
+        }
         const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeat);
 
         if (inst.name === 'Snare' && isSyncopated && !blockSnare && !config.isLatin) {
@@ -163,7 +179,7 @@ export function applyGrooveOverrides({
             currentState.velocity *= pulseWeight;
         }
 
-        if (inst.name === 'Snare' && isBackbeat44 && config.backbeatCrack) {
+        if (inst.name === 'Snare' && isBackbeat && config.backbeatCrack) {
             currentState.velocity *= 1.15;
         }
 

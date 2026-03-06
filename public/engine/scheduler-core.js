@@ -403,12 +403,10 @@ function scheduleCountIn(beat, time) {
     } else {
         if (beat === 0) {
             freq = 1000;
-        } else if (arranger.timeSignature === '4/4' && beat === 2) {
-            freq = 800;
-        } else if (arranger.timeSignature === '6/8' && beat === 3) {
-            freq = 800;
-        } else if (arranger.timeSignature === '12/8' && (beat === 3 || beat === 6 || beat === 9)) {
-            freq = 800;
+        } else if (ts.beats % 2 === 0 && beat === ts.beats / 2) {
+            freq = 800; // Medium click for half-measure in simple meters (e.g., beat 2 in 4/4)
+        } else if (ts.stepsPerBeat === 3 && beat % 3 === 0 && beat !== 0) {
+            freq = 800; // Medium click for macro beats in compound meters (e.g. beat 3 in 6/8, beat 3/6/9 in 12/8)
         }
     }
     osc.frequency.setValueAtTime(freq, time);
@@ -476,7 +474,19 @@ function advanceGlobalStep() {
                         : -shift
                     : playback.step % 4 < 2
                       ? shift
-                      : -shift;
+                      : -shift; // 8th note swing in 4/4
+        } else if (ts.stepsPerBeat === 3) {
+            const shift = (sixteenth / 3) * (groove.swing / 100);
+            duration +=
+                groove.swingSub === '16th'
+                    ? playback.step % 2 === 0
+                        ? shift
+                        : -shift // 16th note swing over compound meters doesn't map exactly to '8th note' logic the same way
+                    : playback.step % ts.stepsPerBeat === 0
+                      ? shift // on macro beat
+                      : playback.step % ts.stepsPerBeat === 2
+                        ? -shift // 3rd triplet part
+                        : 0; // middle triplet stays same or slightly nudged based on deeper logic, simple offset for now
         }
     }
     playback.nextNoteTime += duration;
@@ -1026,7 +1036,7 @@ export function scheduleGlobalEvent(step, swungTime) {
         let snareMask = 0;
         const snare = groove.instruments.find((i) => i.name === 'Snare');
         if (snare) {
-            for (let i = 0; i < 16; i++) {
+            for (let i = 0; i < spm; i++) {
                 if (snare.steps[i] > 0) {
                     snareMask |= 1 << i;
                 }
@@ -1046,7 +1056,7 @@ export function scheduleGlobalEvent(step, swungTime) {
     checkSectionTransition(step, spm);
 
     // MIDI Automation
-    if (midi.enabled && midi.selectedOutputId && step % 4 === 0) {
+    if (midi.enabled && midi.selectedOutputId && stepInfo.isBeatStart) {
         const intensityCC = Math.floor(playback.bandIntensity * 127);
         const soloistTensionCC = Math.floor(soloist.tension * 127);
 
@@ -1061,8 +1071,8 @@ export function scheduleGlobalEvent(step, swungTime) {
 
     if (playback.metronome && stepInfo.isBeatStart) {
         let freq = stepInfo.isMeasureStart ? 1000 : stepInfo.isGroupStart ? 800 : 600;
-        if (ts.beats === 4 && stepInfo.beatIndex === 2 && !stepInfo.isGroupStart) {
-            freq = 800;
+        if (ts.beats % 2 === 0 && stepInfo.beatIndex === ts.beats / 2 && !stepInfo.isGroupStart) {
+            freq = 800; // Accented middle beat for simple meters
         }
 
         const osc = playback.audio.createOscillator();
@@ -1098,8 +1108,15 @@ export function scheduleGlobalEvent(step, swungTime) {
 
     if (groove.enabled) {
         const isQuarter = stepInfo.isBeatStart;
-        const isBackbeat =
-            ts.beats === 4 ? stepInfo.beatIndex === 1 || stepInfo.beatIndex === 3 : false;
+
+        let isBackbeat = false;
+        if (ts.stepsPerBeat === 4) {
+            // Simple meters (4/4, 3/4, 5/4 etc): usually beats 2 and 4 (indices 1 and 3)
+            isBackbeat = stepInfo.beatIndex % 2 !== 0;
+        } else if (ts.stepsPerBeat === 3) {
+             // Compound meters (6/8, 12/8): usually the even macro beats
+            isBackbeat = stepInfo.isGroupStart && stepInfo.groupIndex % 2 !== 0;
+        }
 
         if (stepInfo.isBeatStart && playback.visualFlash) {
             playback.drawQueue.push({

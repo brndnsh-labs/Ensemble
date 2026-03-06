@@ -99,7 +99,13 @@ describe('Time Signature Transitions', () => {
 
     it('should trigger transition for 5/4 time (20 steps per measure)', () => {
         const stepsPerMeasure = 20;
-        // 4 bars of 5/4 = 80 steps (already > 64)
+        // 4 bars of 5/4 = 80 steps
+        // The dynamic threshold is `stepsPerMeasure * 4` = 80 steps
+        // This is a "short loop", so `shouldFill` logic triggers based on `conductorState.loopCount` logic
+        // For intensity 0.5 (playback.bandIntensity = 0.5), freq is 2. Loop count needs to be % 2 === 0
+        // We ensure loop count allows the fill target re-calculation.
+        conductorState.loopCount = 1;
+
         arranger.totalSteps = 80;
         arranger.stepMap = [];
         for (let i = 0; i < 4; i++) {
