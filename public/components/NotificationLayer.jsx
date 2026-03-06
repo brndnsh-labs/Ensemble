@@ -19,7 +19,11 @@ function ToastItem({ message }) {
         return () => clearTimeout(timer);
     }, []);
 
-    return <div class={`toast ${isClosing ? 'closing' : ''}`}>{message}</div>;
+    return (
+        <div class={`toast ${isClosing ? 'closing' : ''}`} role="status" aria-live="polite">
+            {message}
+        </div>
+    );
 }
 
 export function NotificationLayer() {
