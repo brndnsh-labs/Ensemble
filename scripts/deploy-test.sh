@@ -40,7 +40,7 @@ cp public/icon.svg dist/icon.svg
 cp public/icon-192.png dist/icon-192.png
 cp public/icon-512.png dist/icon-512.png
 cp public/sw.js dist/sw.js
-cp public/audio-analyzer-lite.js dist/audio-analyzer-lite.js
+./node_modules/.bin/esbuild public/audio-analyzer-lite.js --minify --outfile=dist/audio-analyzer-lite.js
 
 # 6. Update index.html and manual.html with hashed filenames
 echo "🔧 Updating index.html and manual.html..."
