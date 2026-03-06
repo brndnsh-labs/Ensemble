@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -36,7 +36,7 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed } = context;
+    const { inst, loopStep, playback, drumComplexity, sectionSeed, stepsPerBar } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -56,13 +56,14 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
         if (activeMotif === 0 || activeMotif === 2 || activeMotif === 3) {
-            if ([0, 6, 8, 14].includes(loopStep)) {
+            const patternSteps = getStepIndices(stepsPerBar, [0, 6 / 16, 8 / 16, 14 / 16]);
+            if (patternSteps.includes(loopStep)) {
                 shouldPlay = true;
                 soundName = activeMotif === 2 ? 'Open' : 'HiHat';
 
-                if (loopStep === 6 || loopStep === 14) {
+                if (loopStep === patternSteps[1] || loopStep === patternSteps[3]) {
                     velocity = scaleVelocity(0.6, intensity, 0.1);
-                } else if (loopStep === 0 || loopStep === 8) {
+                } else if (loopStep === patternSteps[0] || loopStep === patternSteps[2]) {
                     velocity = scaleVelocity(0.85, intensity, 0.2);
                 }
             }
@@ -74,11 +75,13 @@ export function applyOverrides(context, state) {
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
-        if (loopStep === 0 || loopStep === 8) {
+        const kickSteps = getStepIndices(stepsPerBar, [0, 8 / 16]);
+        if (kickSteps.includes(loopStep)) {
             shouldPlay = true;
         }
 
-        if (activeMotif === 3 && loopStep === 6) {
+        const syncKick = getStepIndices(stepsPerBar, [6 / 16])[0];
+        if (activeMotif === 3 && loopStep === syncKick) {
             shouldPlay = true;
         }
 
@@ -87,24 +90,27 @@ export function applyOverrides(context, state) {
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
-        if (loopStep === 4 || loopStep === 12) {
+        const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
+        if (backbeats.includes(loopStep)) {
             shouldPlay = true;
             velocity = 1.15;
         }
 
         if (intensity > 0.6) {
-            if (activeMotif === 0 && [3, 11].includes(loopStep) && roll(0.4)) {
+            const ghosts = getStepIndices(stepsPerBar, [3 / 16, 11 / 16]);
+            if (activeMotif === 0 && ghosts.includes(loopStep) && roll(0.4)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.4, intensity, 0.1);
                 instTimeOffset += 0.005;
             }
 
             if (activeMotif === 3) {
-                if (loopStep === 14 && roll(0.6)) {
+                const lateGhosts = getStepIndices(stepsPerBar, [10 / 16, 14 / 16]);
+                if (loopStep === lateGhosts[1] && roll(0.6)) {
                     shouldPlay = true;
                     velocity = 0.7;
                 }
-                if (loopStep === 10 && roll(0.4)) {
+                if (loopStep === lateGhosts[0] && roll(0.4)) {
                     shouldPlay = true;
                     velocity = 0.5;
                 }

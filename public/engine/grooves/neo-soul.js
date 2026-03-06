@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -35,11 +35,14 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
+    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround, stepsPerBar } =
+        context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+
+    const macroBeat = Math.floor(stepsPerBar / 4);
 
     // --- 1. THE EXPRESSIVE DRAG (Dilla Micro-timing) ---
     // At high intensity, we push/pull the boundaries further for that "leaning" feel.
@@ -61,8 +64,9 @@ export function applyOverrides(context, state) {
     // --- 2. DRUNKEN JITTER ---
     // Non-backbeat steps drift noticeably as intensity rises.
     const drunkenFactor = intensity * 0.015;
-    const isBackbeat = loopStep === 4 || loopStep === 12;
-    const isDownbeat = loopStep % 4 === 0;
+    const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
+    const isBackbeat = backbeats.includes(loopStep);
+    const isDownbeat = loopStep % macroBeat === 0;
 
     if (!isBackbeat && !isDownbeat) {
         instTimeOffset += (Math.random() - 0.5) * drunkenFactor;
@@ -72,7 +76,8 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         if (shouldPlay) {
             // Subtle shuffle on 16ths
-            if (loopStep % 2 === 1) {
+            const offbeatAmount = Math.floor(macroBeat / 2);
+            if (loopStep % offbeatAmount !== 0) {
                 velocity *= 0.75 - intensity * 0.1; // Softer 16ths as it gets "lazier"
             }
         }
@@ -85,10 +90,13 @@ export function applyOverrides(context, state) {
             if (isBackbeat) {
                 shouldPlay = true;
                 velocity = scaleVelocity(1.05, intensity, 0.1);
-            } else if ([3, 7, 11, 15].includes(loopStep)) {
-                // Ghost note placements - keep deterministic for "structured" feel
-                shouldPlay = true;
-                velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
+            } else {
+                const ghosts = getStepIndices(stepsPerBar, [3 / 16, 7 / 16, 11 / 16, 15 / 16]);
+                if (ghosts.includes(loopStep)) {
+                    // Ghost note placements - keep deterministic for "structured" feel
+                    shouldPlay = true;
+                    velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
+                }
             }
         } else {
             // Motif 0 & 2: Solid backbeat
@@ -99,7 +107,8 @@ export function applyOverrides(context, state) {
 
         // --- Snare Turnarounds ---
         if (isTurnaround && intensity > 0.6) {
-            if ([14, 15].includes(loopStep) && roll(0.6)) {
+            const turnaroundGhosts = getStepIndices(stepsPerBar, [14 / 16, 15 / 16]);
+            if (turnaroundGhosts.includes(loopStep) && roll(0.6)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
                 instTimeOffset += 0.01; // Extra drag on turnaround ghosts
@@ -115,17 +124,20 @@ export function applyOverrides(context, state) {
         // --- Kick Motif Logic ---
         if (activeMotif === 0) {
             // Boom Bap: 1, & of 3
-            if (loopStep === 0 || loopStep === 10) {
+            const kicks = getStepIndices(stepsPerBar, [0, 10 / 16]);
+            if (kicks.includes(loopStep)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
             // Dilla Skips: 1, pickup to 3, pickup to 1, "a" of 4
-            if ([0, 7, 10, 15].includes(loopStep)) {
+            const kicks = getStepIndices(stepsPerBar, [0, 7 / 16, 10 / 16, 15 / 16]);
+            if (kicks.includes(loopStep)) {
                 shouldPlay = true;
             }
         } else {
             // Standard foundation
-            if (loopStep === 0 || loopStep === 8) {
+            const kicks = getStepIndices(stepsPerBar, [0, 8 / 16]);
+            if (kicks.includes(loopStep)) {
                 shouldPlay = true;
             }
         }

@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -37,7 +37,8 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
+    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround, stepsPerBar } =
+        context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -46,6 +47,8 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+
+    const macroBeat = Math.floor(stepsPerBar / 4);
 
     // --- 1. ENERGETIC PUSH (Micro-timing) ---
     // Increase the "rush" as intensity rises to drive the band harder.
@@ -56,7 +59,8 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         // Core Offbeat Emphasis (Steps 2, 6, 10, 14)
-        if (loopStep % 4 === 2) {
+        const offbeatAmount = Math.floor(macroBeat / 2);
+        if (loopStep % macroBeat === offbeatAmount) {
             shouldPlay = true;
             velocity = scaleVelocity(1.3, intensity, 0.2); // Extra emphasis
 
@@ -64,7 +68,7 @@ export function applyOverrides(context, state) {
             if (intensity > 0.6 && roll(0.4, intensity)) {
                 soundName = 'Open';
             }
-        } else if (activeMotif >= 1 && loopStep % 2 === 0) {
+        } else if (activeMotif >= 1 && loopStep % offbeatAmount === 0) {
             // Constant 8th notes for 2-step/D-Beat
             shouldPlay = true;
             velocity = scaleVelocity(0.85, intensity, 0.1);
@@ -82,22 +86,32 @@ export function applyOverrides(context, state) {
         // --- Kick Motif Logic ---
         if (activeMotif === 0) {
             // Classic Ska: 1 and 3
-            if (loopStep === 0 || loopStep === 8) {
+            const kicks = getStepIndices(stepsPerBar, [0, 8 / 16]);
+            if (kicks.includes(loopStep)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 1) {
             // Driving 2-Step
-            if (loopStep % 4 === 0) {
+            if (loopStep % macroBeat === 0) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
             // D-Beat (Driving syncopation)
-            if ([0, 3, 6, 8, 11, 14].includes(loopStep)) {
+            const dbeat = getStepIndices(stepsPerBar, [
+                0,
+                3 / 16,
+                6 / 16,
+                8 / 16,
+                11 / 16,
+                14 / 16,
+            ]);
+            if (dbeat.includes(loopStep)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 3) {
             // Double Time
-            if (loopStep % 2 === 0) {
+            const doubleTimeAmount = Math.floor(macroBeat / 2);
+            if (loopStep % doubleTimeAmount === 0) {
                 shouldPlay = true;
             }
         }
@@ -109,7 +123,8 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         // Solid Backbeat (Critique requirement)
-        if (loopStep === 4 || loopStep === 12) {
+        const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
+        if (backbeats.includes(loopStep)) {
             shouldPlay = true;
             velocity = scaleVelocity(1.15, intensity, 0.15);
         }
@@ -117,7 +132,8 @@ export function applyOverrides(context, state) {
         // --- Turnaround Fills ---
         if (isTurnaround && intensity > 0.7) {
             // Rapid snare fill on steps 13-15
-            if (loopStep >= 13) {
+            const fillStart = getStepIndices(stepsPerBar, [13 / 16])[0];
+            if (loopStep >= fillStart) {
                 shouldPlay = true;
                 velocity = 1.1;
             }
