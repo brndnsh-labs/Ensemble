@@ -78,7 +78,16 @@ export function extractForm(beatData, options = 4) {
         });
 
         // Majority vote for the measure's chord
-        const majority = Object.entries(counts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+        // Optimization: Replace Object.entries().reduce with standard for...in loop to avoid
+        // intermediate array allocations and closure overhead during frequent structural analysis.
+        let majority = null;
+        let maxCount = -1;
+        for (const chord in counts) {
+            if (counts[chord] > maxCount) {
+                maxCount = counts[chord];
+                majority = chord;
+            }
+        }
         measureEnergy.push(totalEnergy / beatsPerMeasure);
 
         // If the majority chord takes up at least half the bar, use it.
@@ -218,9 +227,14 @@ export function extractForm(beatData, options = 4) {
 
         if (bestLen > 0) {
             const value = getConsensusValue(i, bestLen, bestRepeat);
-            const avgEnergy =
-                measureEnergy.slice(i, i + bestLen * bestRepeat).reduce((a, b) => a + b, 0) /
-                (bestLen * bestRepeat);
+            const sliceLen = bestLen * bestRepeat;
+            // Optimization: Replace Array.prototype.slice().reduce with a standard for loop
+            // to avoid array allocation and closure overhead per analyzed section block.
+            let sumEnergy = 0;
+            for (let k = 0; k < sliceLen; k++) {
+                sumEnergy += measureEnergy[i + k];
+            }
+            const avgEnergy = sumEnergy / sliceLen;
             sections.push({
                 value,
                 repeat: bestRepeat,
@@ -228,12 +242,18 @@ export function extractForm(beatData, options = 4) {
                 startMeasureIndex: i,
                 lengthInMeasures: bestLen,
             });
-            i += bestLen * bestRepeat;
+            i += sliceLen;
         } else {
             // Fallback: 4-bar chunk
             const len = Math.min(4, measures.length - i);
             const value = originalMeasures.slice(i, i + len).join(' | ');
-            const avgEnergy = measureEnergy.slice(i, i + len).reduce((a, b) => a + b, 0) / len;
+            // Optimization: Replace Array.prototype.slice().reduce with a standard for loop
+            // to avoid array allocation and closure overhead per analyzed section block.
+            let sumEnergy = 0;
+            for (let k = 0; k < len; k++) {
+                sumEnergy += measureEnergy[i + k];
+            }
+            const avgEnergy = sumEnergy / len;
             sections.push({
                 value,
                 repeat: 1,
