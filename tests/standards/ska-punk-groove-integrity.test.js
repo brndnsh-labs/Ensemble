@@ -25,7 +25,7 @@ describe('Ska-Punk Groove Integrity', () => {
     it('should assign valid Ska-Punk Motifs', () => {
         const motifs = new Set();
         for (let i = 0; i < 20; i++) {
-            motifs.add(getDrumMotif((((i) * 137 + 42) % 256) / 256, 'Ska-Punk', 0.8));
+            motifs.add(getDrumMotif(((i * 137 + 42) % 256) / 256, 'Ska-Punk', 0.8));
         }
         expect(motifs.has(0)).toBe(true);
         expect(motifs.has(1)).toBe(true);

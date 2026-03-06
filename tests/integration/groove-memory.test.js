@@ -90,7 +90,7 @@ describe('Groove Section Memory (Creativity)', () => {
         // To be thorough, let's call applyGrooveOverrides, which will now use the fallback for section 0.
         // BUT wait, we want to test that the seed is preserved.
         // Let's manually trigger the seed assignment for the first verse so it's "in memory".
-        mockGroove.sectionSeedMap['verse_id'] = 0.42;
+        mockGroove.sectionSeedMap.verse_id = 0.42;
 
         for (let step = 0; step < 64; step++) {
             checkSectionTransition(step, stepsPerMeasure);
