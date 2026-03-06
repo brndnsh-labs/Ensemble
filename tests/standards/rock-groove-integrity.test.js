@@ -52,7 +52,15 @@ describe('Rock Groove Integrity', () => {
             // Find a barIndex that maps to Motif 1
             let barIndexMotif1 = -1;
             for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(((i * 137 + 42) % 256) / 256, 'Rock', 0.8, mockState.playback.bandIntensity) === 1 && i % 4 !== 3) {
+                if (
+                    getDrumMotif(
+                        ((i * 137 + 42) % 256) / 256,
+                        'Rock',
+                        0.8,
+                        mockState.playback.bandIntensity,
+                    ) === 1 &&
+                    i % 4 !== 3
+                ) {
                     barIndexMotif1 = i;
                     break;
                 }
