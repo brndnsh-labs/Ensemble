@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -38,7 +38,7 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed } = context;
+    const { inst, loopStep, playback, drumComplexity, sectionSeed, stepsPerBar } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -47,6 +47,8 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+
+    const macroBeat = Math.floor(stepsPerBar / 4);
 
     // --- 1. SNARE / SIDESTICK (Cajon to Kit Transition) ---
     if (inst.name === 'Snare') {
@@ -57,12 +59,14 @@ export function applyOverrides(context, state) {
 
         if (activeMotif === 2 || activeMotif === 3) {
             // Standard backbeat for Soft Rock/Dynamic
-            if (loopStep === 4 || loopStep === 12) {
+            const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
+            if (backbeats.includes(loopStep)) {
                 shouldPlay = true;
             }
         } else {
             // Minimal backbeat for Folk (Beat 3 only)
-            if (loopStep === 8) {
+            const beat3 = getStepIndices(stepsPerBar, [8 / 16])[0];
+            if (loopStep === beat3) {
                 shouldPlay = true;
             }
         }
@@ -73,7 +77,8 @@ export function applyOverrides(context, state) {
 
         // Occasional ghost notes at high intensity
         if (intensity > 0.8 && activeMotif === 3) {
-            if ([3, 7, 11, 15].includes(loopStep) && roll(0.25)) {
+            const ghosts = getStepIndices(stepsPerBar, [3 / 16, 7 / 16, 11 / 16, 15 / 16]);
+            if (ghosts.includes(loopStep) && roll(0.25)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.2, intensity, 0.2);
                 soundName = 'Sidestick';
@@ -88,16 +93,19 @@ export function applyOverrides(context, state) {
 
         // Add backbeat/syncopation as intensity rises
         if (intensity > 0.45) {
-            if (activeMotif === 0 && loopStep === 6) {
+            const syncKick1 = getStepIndices(stepsPerBar, [6 / 16])[0];
+            if (activeMotif === 0 && loopStep === syncKick1) {
                 shouldPlay = true; // "and" of 2
             }
-            if (activeMotif >= 2 && loopStep === 8) {
+            const beat3 = getStepIndices(stepsPerBar, [8 / 16])[0];
+            if (activeMotif >= 2 && loopStep === beat3) {
                 shouldPlay = true; // Beat 3
             }
         }
 
         if (intensity > 0.75 && activeMotif === 3) {
-            if (loopStep === 10 && roll(0.4)) {
+            const syncKick2 = getStepIndices(stepsPerBar, [10 / 16])[0];
+            if (loopStep === syncKick2 && roll(0.4)) {
                 shouldPlay = true; // syncopated pickup
             }
         }
@@ -110,8 +118,9 @@ export function applyOverrides(context, state) {
         shouldPlay = true;
 
         // Basic 8th note pulse accents
-        const isPulse = loopStep % 2 === 0;
-        const isQuarter = loopStep % 4 === 0;
+        const offbeatAmount = Math.floor(macroBeat / 2);
+        const isPulse = loopStep % offbeatAmount === 0;
+        const isQuarter = loopStep % macroBeat === 0;
 
         if (isQuarter) {
             velocity = scaleVelocity(0.7, intensity, 0.15);
@@ -132,12 +141,13 @@ export function applyOverrides(context, state) {
         }
     } else if (inst.name === 'Shaker' || inst.name === 'Tambourine') {
         // Percussion scales density with intensity
-        shouldPlay = loopStep % 2 === 0;
+        const offbeatAmount = Math.floor(macroBeat / 2);
+        shouldPlay = loopStep % offbeatAmount === 0;
         if (intensity > 0.6) {
             shouldPlay = true; // full 16th coverage
         }
 
-        velocity = loopStep % 4 === 0 ? 0.8 : 0.5;
+        velocity = loopStep % macroBeat === 0 ? 0.8 : 0.5;
         velocity *= scaleVelocity(0.7, intensity, 0.3);
     }
 
