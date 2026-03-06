@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -38,8 +38,7 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround, stepsPerBar } =
-        context;
+    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -49,11 +48,9 @@ export function applyOverrides(context, state) {
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
-    const macroBeat = Math.floor(stepsPerBar / 4);
-
     // --- 1. KICK (Strict 4-on-the-floor) ---
     if (inst.name === 'Kick') {
-        shouldPlay = loopStep % macroBeat === 0;
+        shouldPlay = loopStep % 4 === 0;
         if (shouldPlay) {
             // Scale velocity to drive the energy
             velocity =
@@ -64,17 +61,15 @@ export function applyOverrides(context, state) {
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
         // Standard Disco backbeat
-        const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
-        if (backbeats.includes(loopStep)) {
+        if (loopStep === 4 || loopStep === 12) {
             shouldPlay = true;
             velocity = scaleVelocity(1.15, intensity, 0.1);
         }
 
         // --- Snare Ghosts & Turnarounds ---
-        const endOfBar = stepsPerBar - 1;
         if (intensity > 0.7 && activeMotif >= 2) {
             // Occasional ghost note on "a" of 4
-            if (loopStep === endOfBar && roll(0.4, intensity)) {
+            if (loopStep === 15 && roll(0.4, intensity)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
             }
@@ -82,7 +77,7 @@ export function applyOverrides(context, state) {
 
         if (isTurnaround && intensity > 0.65) {
             // Energetic "Kick-Snare-Crash" finish
-            if (loopStep === endOfBar) {
+            if (loopStep === 15) {
                 shouldPlay = true;
                 velocity = 1.3;
                 soundName = 'Snare'; // Full crack
@@ -96,8 +91,7 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         // Core Offbeat Open Hat (The Disco "And")
-        const offbeatAmount = Math.floor(macroBeat / 2);
-        if (loopStep % macroBeat === offbeatAmount) {
+        if (loopStep % 4 === 2) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = scaleVelocity(1.1, intensity, 0.2);
@@ -114,8 +108,7 @@ export function applyOverrides(context, state) {
 
         // Motif 2: Syncopated hat barks
         if (activeMotif === 2) {
-            const barkStep = getStepIndices(stepsPerBar, [14 / 16])[0];
-            if (loopStep === barkStep) {
+            if (loopStep === 14) {
                 shouldPlay = true;
                 soundName = 'Open';
                 velocity = 1.2;
@@ -124,12 +117,11 @@ export function applyOverrides(context, state) {
     } else if (inst.name === 'Perc' || inst.name.includes('Cowbell')) {
         // Motif 3: Octave Cowbells
         if (activeMotif === 3) {
-            const offbeatAmount = Math.floor(macroBeat / 2);
-            if (loopStep % macroBeat === 0 || loopStep % macroBeat === offbeatAmount) {
+            if (loopStep % 4 === 0 || loopStep % 4 === 2) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, intensity, 0.2);
                 // Alternate High/Low cowbell sounds if available, or just scale velocity
-                soundName = loopStep % (macroBeat * 2) === 0 ? 'CowbellHigh' : 'CowbellLow';
+                soundName = loopStep % 8 === 0 ? 'CowbellHigh' : 'CowbellLow';
             }
             // Add extra syncopation at peak intensity
             if (intensity > 0.9 && loopStep % 2 === 1 && roll(0.3)) {

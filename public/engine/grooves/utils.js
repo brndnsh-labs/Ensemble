@@ -2,14 +2,6 @@
  * Shared utility functions for generative drum strategies.
  */
 
-/**
- * Returns an array of absolute step indices for a given array of relative percentages (0 to 1).
- * Used to translate fixed 16-step patterns to dynamic measure lengths.
- */
-export function getStepIndices(stepsPerBar, percentages) {
-    return percentages.map((p) => Math.round(p * stepsPerBar));
-}
-
 export const INTENSITY_BANDS = {
     LOW: 0.35,
     MID: 0.65,

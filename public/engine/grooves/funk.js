@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -42,16 +42,8 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const {
-        inst,
-        loopStep,
-        playback,
-        stepVal,
-        drumComplexity,
-        sectionSeed,
-        isTurnaround,
-        stepsPerBar,
-    } = context;
+    const { inst, loopStep, playback, stepVal, drumComplexity, sectionSeed, isTurnaround } =
+        context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -61,8 +53,6 @@ export function applyOverrides(context, state) {
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
-    const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
-
     // --- "The One" Reinforcement ---
     if (inst.name === 'Kick' && loopStep === 0) {
         shouldPlay = true;
@@ -71,15 +61,14 @@ export function applyOverrides(context, state) {
 
     // --- Hi-Hat & Open Dynamics ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        const bark = getStepIndices(stepsPerBar, [14 / 16])[0];
-        if (isTurnaround && loopStep === bark) {
+        if (isTurnaround && loopStep === 14) {
             // Standard Turnaround Bark
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.15;
         } else if (shouldPlay) {
             // Pulse shaping
-            if (loopStep % Math.floor(stepsPerBar / 4) === 0) {
+            if (loopStep % 4 === 0) {
                 velocity *= 1.1;
             } else if (loopStep % 2 === 1) {
                 velocity *= 0.8;
@@ -87,8 +76,7 @@ export function applyOverrides(context, state) {
 
             // Occasional open barks at higher intensities
             const barkProb = intensity > 0.6 ? 0.3 * intensity : 0.05;
-            const openBarks = getStepIndices(stepsPerBar, [6 / 16, 10 / 16]);
-            if (activeMotif >= 2 && openBarks.includes(loopStep) && roll(barkProb)) {
+            if (activeMotif >= 2 && [6, 10].includes(loopStep) && roll(barkProb)) {
                 soundName = 'Open';
                 velocity *= 1.1;
             }
@@ -99,61 +87,51 @@ export function applyOverrides(context, state) {
         // --- Motif Snare Patterns ---
         if (activeMotif === 0) {
             // Standard Syncopated Funk
-            if (backbeats.includes(loopStep)) {
+            if (loopStep === 4 || loopStep === 12) {
                 shouldPlay = true;
             }
-            const ghost = getStepIndices(stepsPerBar, [7 / 16])[0];
-            if (stepVal === 0 && loopStep === ghost) {
+            if (stepVal === 0 && loopStep === 7) {
                 shouldPlay = true; // "a" of 2 ghost
                 velocity = scaleVelocity(0.12, intensity, 0.1);
             }
         } else if (activeMotif === 1) {
             // The Funky Drummer (Ghost Note Heavy)
-            if (backbeats.includes(loopStep)) {
+            if (loopStep === 4 || loopStep === 12) {
                 shouldPlay = true;
-            } else {
-                const ghosts = getStepIndices(stepsPerBar, [3 / 16, 7 / 16, 10 / 16, 11 / 16]);
-                if (ghosts.includes(loopStep)) {
-                    shouldPlay = true;
-                    velocity = scaleVelocity(0.06, intensity, 0.15) + Math.random() * 0.1;
-                }
+            } else if ([3, 7, 10, 11].includes(loopStep)) {
+                shouldPlay = true;
+                velocity = scaleVelocity(0.06, intensity, 0.15) + Math.random() * 0.1;
             }
         } else if (activeMotif === 2) {
             // Displaced Backbeats ("Cold Sweat")
-            if (loopStep === backbeats[0]) {
+            if (loopStep === 4) {
                 shouldPlay = true;
             }
-            const dispBackbeat = getStepIndices(stepsPerBar, [14 / 16])[0];
-            if (loopStep === dispBackbeat) {
+            if (loopStep === 14) {
                 shouldPlay = true; // Displaced to "and" of 4
                 velocity = 1.1;
             }
-            const ghosts = getStepIndices(stepsPerBar, [7 / 16, 9 / 16]);
-            if (ghosts.includes(loopStep)) {
+            if ([7, 9].includes(loopStep)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.1, intensity, 0.1);
             }
         } else if (activeMotif === 3) {
             // Busy Linear (Garibaldi)
-            if (backbeats.includes(loopStep)) {
+            if (loopStep === 4 || loopStep === 12) {
                 shouldPlay = true;
                 velocity = 1.15;
-            } else {
-                const ghosts = getStepIndices(stepsPerBar, [2 / 16, 5 / 16, 9 / 16, 14 / 16]);
-                if (ghosts.includes(loopStep)) {
-                    shouldPlay = true;
-                    velocity = scaleVelocity(0.1, intensity, 0.1);
-                }
+            } else if ([2, 5, 9, 14].includes(loopStep)) {
+                shouldPlay = true;
+                velocity = scaleVelocity(0.1, intensity, 0.1);
             }
         }
 
         // --- Snare Turnaround Fills ---
         if (isTurnaround && intensity > 0.75) {
-            const fills = getStepIndices(stepsPerBar, [13 / 16, 14 / 16, 15 / 16]);
-            if (fills.includes(loopStep) && roll(0.7)) {
+            if ([13, 14, 15].includes(loopStep) && roll(0.7)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.6, intensity, 0.4);
-                if (loopStep === fills[2]) {
+                if (loopStep === 15) {
                     velocity = 1.2; // Strong lead back into the One
                 }
             }
@@ -161,8 +139,7 @@ export function applyOverrides(context, state) {
 
         if (shouldPlay) {
             // Ensure strong backbeats
-            const displaced = getStepIndices(stepsPerBar, [14 / 16])[0];
-            if (backbeats.includes(loopStep) || loopStep === displaced) {
+            if (loopStep === 4 || loopStep === 12 || loopStep === 14) {
                 velocity = Math.max(velocity, 1.1);
             }
             // Low intensity sidestick fallback
@@ -175,37 +152,30 @@ export function applyOverrides(context, state) {
 
         // --- Motif Kick Patterns ---
         if (activeMotif === 0) {
-            const kicks = getStepIndices(stepsPerBar, [0, 8 / 16]);
-            if (kicks.includes(loopStep)) {
+            if (loopStep === 0 || loopStep === 8) {
                 shouldPlay = true;
             }
-            const syncKick = getStepIndices(stepsPerBar, [10 / 16])[0];
-            if (loopStep === syncKick && (drumComplexity > 0.5 || intensity > 0.6)) {
+            if (loopStep === 10 && (drumComplexity > 0.5 || intensity > 0.6)) {
                 shouldPlay = true; // "and" of 3
             }
         } else if (activeMotif === 1) {
-            const kicks = getStepIndices(stepsPerBar, [0, 6 / 16, 10 / 16]);
-            if (kicks.includes(loopStep)) {
+            if (loopStep === 0 || loopStep === 6 || loopStep === 10) {
                 shouldPlay = true;
             }
-            const pickup = getStepIndices(stepsPerBar, [13 / 16])[0];
-            if (loopStep === pickup && roll(0.5, intensity)) {
+            if (loopStep === 13 && roll(0.5, intensity)) {
                 shouldPlay = true; // pickup
             }
         } else if (activeMotif === 2) {
-            const kicks = getStepIndices(stepsPerBar, [0, 8 / 16, 11 / 16]);
-            if (kicks.includes(loopStep)) {
+            if (loopStep === 0 || loopStep === 8 || loopStep === 11) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 3) {
             // Busy Linear kick
-            const kicks = getStepIndices(stepsPerBar, [0, 3 / 16, 7 / 16, 10 / 16]);
-            if (kicks.includes(loopStep)) {
+            if (loopStep === 0 || loopStep === 3 || loopStep === 7 || loopStep === 10) {
                 shouldPlay = true;
             }
             // Extra ghost kicks at peak intensity
-            const peakGhost = getStepIndices(stepsPerBar, [15 / 16])[0];
-            if (intensity > 0.9 && loopStep === peakGhost) {
+            if (intensity > 0.9 && loopStep === 15) {
                 shouldPlay = true;
                 velocity = 0.4;
             }
@@ -230,7 +200,7 @@ export function applyOverrides(context, state) {
                 soundName = 'Sidestick';
             }
             // Drive the backbeat slightly as intensity increases
-            if (backbeats.includes(loopStep)) {
+            if (loopStep === 4 || loopStep === 12) {
                 instTimeOffset -= 0.004 + intensity * 0.002;
             }
         }

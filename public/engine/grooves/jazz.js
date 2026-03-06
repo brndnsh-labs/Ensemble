@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, getStepIndices, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -58,41 +58,22 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const halfBar = Math.floor(stepsPerBar / 2);
-    const isCompound = stepsPerBar % 3 === 0 && stepsPerBar !== 3;
 
     if (inst.name === 'Open') {
         shouldPlay = false;
+        const rideSteps = stepsPerBar === 12 ? [0, 2, 4, 6, 8, 10] : [0, 4, 6, 8, 12, 14];
 
-        let rideSteps;
-        let isSkipBeat = false;
-
-        if (isCompound) {
-            const macroBeat = stepsPerBar / 2;
-            rideSteps = [];
-            for (let i = 0; i < stepsPerBar; i += macroBeat / 3) {
-                if (i % (macroBeat / 3) === 0) {
-                    rideSteps.push(i);
-                }
-            }
-        } else {
-            rideSteps = getStepIndices(stepsPerBar, [0, 4 / 16, 6 / 16, 8 / 16, 12 / 16, 14 / 16]);
-            const skipBeats = getStepIndices(stepsPerBar, [6 / 16, 14 / 16]);
-            isSkipBeat = skipBeats.includes(loopStep);
-        }
-
-        if (isTurnaround && loopStep > halfBar - 1) {
+        if (isTurnaround && loopStep > 7) {
             // Drop ride for fill
         } else if (rideSteps.includes(loopStep)) {
+            const isSkipBeat = loopStep === 6 || loopStep === 14;
             const rideProb = isSkipBeat ? 0.6 + drumComplexity * 0.3 : 1.0;
 
             if (roll(rideProb)) {
                 shouldPlay = true;
-                const backbeats = getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
-
-                if (backbeats.includes(loopStep)) {
+                if (loopStep === 4 || loopStep === 12) {
                     velocity = scaleVelocity(0.9, intensity, 0.2);
-                } else if (loopStep % halfBar === 0) {
+                } else if (loopStep % 8 === 0) {
                     velocity = scaleVelocity(0.8, intensity, 0.15);
                 } else {
                     velocity = 0.6 + drumComplexity * 0.1;
@@ -100,58 +81,41 @@ export function applyOverrides(context, state) {
             }
         }
 
-        const accents = getStepIndices(stepsPerBar, [6 / 16, 8 / 16, 14 / 16]);
         if (
-            (activeMotif === 1 && loopStep === accents[0]) ||
-            (activeMotif === 2 && loopStep === accents[1]) ||
-            (activeMotif === 3 && loopStep === accents[2])
+            (activeMotif === 1 && loopStep === 6) ||
+            (activeMotif === 2 && loopStep === 8) ||
+            (activeMotif === 3 && loopStep === 14)
         ) {
             velocity *= 1.2;
         }
 
-        const skipBeats = getStepIndices(stepsPerBar, [6 / 16, 14 / 16]);
-        if (playback.bpm > 180 && skipBeats.includes(loopStep) && roll(0.4)) {
+        if (playback.bpm > 180 && (loopStep === 6 || loopStep === 14) && roll(0.4)) {
             shouldPlay = false;
         }
     } else if (inst.name === 'HiHat') {
         shouldPlay = false;
-        const pedalSteps = isCompound
-            ? [Math.floor(stepsPerBar / 2)]
-            : getStepIndices(stepsPerBar, [4 / 16, 12 / 16]);
-
+        const pedalSteps = stepsPerBar === 12 ? [6] : [4, 12];
         if (pedalSteps.includes(loopStep)) {
             shouldPlay = true;
             velocity = 1.0;
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
-        let heartbeatSteps;
-        if (isCompound) {
-            heartbeatSteps = [0, Math.floor(stepsPerBar / 2)];
-        } else {
-            heartbeatSteps = getStepIndices(stepsPerBar, [0, 4 / 16, 8 / 16, 12 / 16]);
-        }
-
+        const heartbeatSteps = stepsPerBar === 12 ? [0, 6] : [0, 4, 8, 12];
         if (heartbeatSteps.includes(loopStep)) {
             shouldPlay = true;
             velocity = scaleVelocity(0.15, intensity, 0.1);
         }
 
-        const b12 = getStepIndices(stepsPerBar, [12 / 16])[0];
-        const b6 = getStepIndices(stepsPerBar, [6 / 16])[0];
-
-        if (isTurnaround && loopStep === b12) {
+        if (isTurnaround && loopStep === 12) {
             shouldPlay = true;
             velocity = 0.9;
-        } else if (activeMotif === 1 && loopStep === b6 && sectionSeed > 0.5) {
+        } else if (activeMotif === 1 && loopStep === 6 && sectionSeed > 0.5) {
             shouldPlay = true;
             velocity = scaleVelocity(0.7, intensity, 0.2);
-        } else if (activeMotif === 4) {
-            const m4Kicks = getStepIndices(stepsPerBar, [10 / 16, 14 / 16]);
-            if (m4Kicks.includes(loopStep)) {
-                shouldPlay = true;
-                velocity = scaleVelocity(0.8, Math.random(), 0.2);
-            }
+        } else if (activeMotif === 4 && [10, 14].includes(loopStep)) {
+            shouldPlay = true;
+            velocity = scaleVelocity(0.8, Math.random(), 0.2);
         } else if (activeMotif === 0) {
             let bombProb = intensity * 0.15;
             if (isSoloistBusy) {
@@ -161,8 +125,7 @@ export function applyOverrides(context, state) {
                 bombProb *= 0.4;
             }
 
-            const bombs = getStepIndices(stepsPerBar, [6 / 16, 14 / 16, 15 / 16]);
-            if (roll(bombProb) && bombs.includes(loopStep)) {
+            if (roll(bombProb) && [6, 14, 15].includes(loopStep)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, Math.random(), 0.3);
             }
@@ -171,39 +134,24 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         if (isTurnaround) {
-            const fills = getStepIndices(stepsPerBar, [8 / 16, 10 / 16, 11 / 16, 14 / 16]);
-            if (fills.includes(loopStep) && roll(0.7)) {
+            if ([8, 10, 11, 14].includes(loopStep) && roll(0.7)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.6, Math.random(), 0.4);
-                if (loopStep === fills[3]) {
+                if (loopStep === 14) {
                     velocity = 1.1;
                 }
             }
         } else {
-            const points = getStepIndices(stepsPerBar, [
-                2 / 16,
-                3 / 16,
-                6 / 16,
-                7 / 16,
-                8 / 16,
-                11 / 16,
-                14 / 16,
-                15 / 16,
-            ]);
-
-            if (activeMotif === 1 && loopStep === points[2]) {
+            if (activeMotif === 1 && loopStep === 6) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.7, intensity, 0.3);
-            } else if (activeMotif === 2 && (loopStep === points[0] || loopStep === points[4])) {
+            } else if (activeMotif === 2 && [2, 8].includes(loopStep)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.6, intensity, 0.3);
-            } else if (activeMotif === 3 && loopStep === points[6]) {
+            } else if (activeMotif === 3 && loopStep === 14) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, intensity, 0.3);
-            } else if (
-                activeMotif === 4 &&
-                (loopStep === points[1] || loopStep === points[3] || loopStep === points[5])
-            ) {
+            } else if (activeMotif === 4 && [3, 7, 11].includes(loopStep)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.5, Math.random(), 0.3);
             } else {
@@ -216,10 +164,9 @@ export function applyOverrides(context, state) {
                 }
 
                 if (
-                    (loopStep === points[6] && roll(0.5 + compProb)) ||
-                    (loopStep === points[2] && roll(0.3 + compProb)) ||
-                    ((loopStep === points[1] || loopStep === points[5] || loopStep === points[7]) &&
-                        roll(compProb * 0.4))
+                    (loopStep === 14 && roll(0.5 + compProb)) ||
+                    (loopStep === 6 && roll(0.3 + compProb)) ||
+                    ([3, 11, 15].includes(loopStep) && roll(compProb * 0.4))
                 ) {
                     shouldPlay = true;
                     velocity = 0.25 + Math.random() * 0.3 + intensity * 0.2;
@@ -234,8 +181,7 @@ export function applyOverrides(context, state) {
 
         // 3. THE BIG FINISH (Ending Signaling)
         if (playback.songMode && playback.isEndingPending) {
-            const finishes = getStepIndices(stepsPerBar, [13 / 16, 15 / 16]);
-            if (finishes.includes(context.step % stepsPerBar) && roll(0.7)) {
+            if ([13, 15].includes(context.step % 16) && roll(0.7)) {
                 shouldPlay = true;
                 velocity = 1.1;
                 instTimeOffset -= 0.005;
