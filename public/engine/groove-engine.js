@@ -2,6 +2,13 @@ import { getState } from '../state.js';
 import { getStepsPerMeasure } from '../utils.js';
 
 /**
+ * Adds subtle random jitter to velocity to simulate human touch.
+ */
+function humanizeVelocity(vel, amount = 0.05) {
+    return vel * (1.0 + (Math.random() - 0.5) * amount);
+}
+
+/**
  * Applies procedural groove logic based on the active genre and band intensity.
  * @param {Object} params - The current step parameters.
  * @returns {Object} { shouldPlay, velocity, soundName, instTimeOffset }
@@ -13,9 +20,7 @@ export function applyGrooveOverrides({
     playback,
     groove,
     isDownbeat,
-    isQuarter,
     isBackbeat,
-    isGroupStart,
 }) {
     const { soloist } = getState();
     let instTimeOffset = 0;
@@ -32,6 +37,40 @@ export function applyGrooveOverrides({
 
     // Creativity drives the internal complexity of the drum engine
     const drumComplexity = groove.creativity ? 0.8 : 0.3;
+
+    // --- 1. Hi-Hat Dynamic Shaping (Swing-Aware Pulse) ---
+    // Even in "straight" genres, eighth notes shouldn't have identical velocity.
+    // The "and" is usually slightly lighter than the downbeat.
+    // NOTE: Ska-Punk is EXEMPT as it relies on loud offbeats.
+    let pulseWeight = 1.0;
+    if ((inst.name === 'HiHat' || inst.name === 'Open') && groove.genreFeel !== 'Ska-Punk') {
+        const isOffbeat = loopStep % 4 === 2;
+        const isSyncopated = loopStep % 2 === 1;
+        if (isOffbeat) {
+            pulseWeight = 0.85; // Light offbeat pulse
+        } else if (isSyncopated) {
+            pulseWeight = 0.7; // Very light 16th ghost
+        }
+    }
+
+    // --- 2. Turnaround Resolution (The "One" Accent) ---
+    // If we just finished a fill (last measure of 4-bar phrase),
+    // ensure the next Beat 1 has a strong resolution.
+    const barIndex = Math.floor(step / stepsPerBar);
+    const prevBarIndex = Math.floor((step - 1) / stepsPerBar);
+    const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
+    const justFinishedTurnaround = groove.creativity && barIndex % 4 === 0 && isFirstStepOfNewBar;
+
+    if (justFinishedTurnaround && isDownbeat) {
+        if (inst.name === 'Kick') {
+            shouldPlay = true;
+            velocity = 1.35;
+        } else if (inst.name === 'HiHat' || inst.name === 'Open') {
+            shouldPlay = true;
+            soundName = 'Open'; // Crash resolution
+            velocity = 1.2;
+        }
+    }
 
     // --- Neo-Soul "Dilla" Quantization Mismatch ---
     if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') {
@@ -844,10 +883,13 @@ export function applyGrooveOverrides({
         const isHeavySync = loopStep % 4 === 2;
 
         // Block snare hits on steps immediately after the backbeat (5 and 13) for certain genres
-        // to maintain a strong, authoritative pulse.
+        // to maintain a strong, authoritative pulse. Also block the "e" of 1 and 3 (1 and 9)
+        // for these straight genres as they often sound "out of pocket".
         const isBackbeatAdjacent = [5, 13].includes(loopStep);
+        const isEOfBeat = [1, 9].includes(loopStep);
         const blockAdjacentSnare =
-            ['Blues', 'Rock', 'Disco', 'Acoustic'].includes(groove.genreFeel) && isBackbeatAdjacent;
+            ['Blues', 'Rock', 'Disco', 'Acoustic'].includes(groove.genreFeel) &&
+            (isBackbeatAdjacent || isEOfBeat);
 
         const isLatin =
             groove.genreFeel === 'Bossa Nova' ||
@@ -979,32 +1021,21 @@ export function applyGrooveOverrides({
     }
 
     if (shouldPlay && !inst.muted) {
-        if (
-            inst.name === 'HiHat' &&
-            groove.genreFeel !== 'Jazz' &&
-            playback.bandIntensity > 0.8 &&
-            isQuarter
-        ) {
-            soundName = 'Open';
-            velocity *= 1.1;
+        // Apply hi-hat pulse shaping
+        if (inst.name === 'HiHat' || inst.name === 'Open') {
+            velocity *= pulseWeight;
         }
-        if (inst.name === 'Kick') {
-            velocity *= isDownbeat ? 1.15 : isGroupStart ? 1.1 : isQuarter ? 1.05 : 0.9;
-        } else if (inst.name === 'Snare') {
-            velocity *= isBackbeat44 ? 1.1 : 0.9;
-        } else if (inst.name === 'HiHat' || inst.name === 'Open') {
-            if (groove.genreFeel === 'Ska-Punk') {
-                // Ska-Punk has its own velocity logic for offbeat emphasis
-            } else {
-                velocity *= isQuarter ? 1.1 : 0.85;
-                if (groove.genreFeel !== 'Jazz' && playback.bpm > 165) {
-                    velocity *= 0.7;
-                    if (!isQuarter) {
-                        velocity *= 0.6;
-                    }
-                }
+
+        // Apply backbeat "Crack" for Rock and Funk
+        if (inst.name === 'Snare' && isBackbeat44) {
+            if (['Rock', 'Funk'].includes(groove.genreFeel)) {
+                velocity *= 1.15; // Extra snap on 2 and 4
             }
         }
+
+        // Humanize final result
+        const jitterAmount = inst.name === 'Kick' ? 0.04 : 0.08;
+        velocity = humanizeVelocity(velocity, jitterAmount);
     }
 
     return { shouldPlay, velocity, soundName, instTimeOffset };
