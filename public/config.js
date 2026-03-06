@@ -50,7 +50,14 @@ export const TIME_SIGNATURES = {
         pulse: [0, 4, 8, 12, 16],
         grouping: [3, 2],
     },
-    '6/8': { beats: 6, stepsPerBeat: 2, subdivision: '8th', pulse: [0, 6], grouping: [3, 3] },
+    '6/8': {
+        beats: 6,
+        stepsPerBeat: 2,
+        subdivision: '8th',
+        pulse: [0, 6],
+        grouping: [3, 3],
+        isCompound: true,
+    },
     '7/8': { beats: 7, stepsPerBeat: 2, subdivision: '8th', pulse: [0, 4, 8], grouping: [2, 2, 3] },
     '7/4': {
         beats: 7,
@@ -65,6 +72,7 @@ export const TIME_SIGNATURES = {
         subdivision: '8th',
         pulse: [0, 6, 12, 18],
         grouping: [3, 3, 3, 3],
+        isCompound: true,
     },
 };
 

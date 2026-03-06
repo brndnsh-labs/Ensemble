@@ -309,6 +309,7 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         isMeasureStart,
         isGroupStart,
         isBeatStart,
+        isCompound: !!currentTS.isCompound,
         groupIndex,
         stepInGroup,
         beatIndex,

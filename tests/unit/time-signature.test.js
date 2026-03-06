@@ -80,14 +80,29 @@ describe('Time Signature Logic', () => {
             expect(getStepInfo(12, config78).groupIndex).toBe(2);
         });
 
-        it('should handle 6/8 with 3+3 grouping', () => {
+        it('should handle 6/8 with 3+3 grouping and isCompound flag', () => {
             const config68 = TIME_SIGNATURES['6/8']; // { beats: 6, stepsPerBeat: 2, grouping: [3, 3] }
 
-            expect(getStepInfo(0, config68).isGroupStart).toBe(true);
-            expect(getStepInfo(0, config68).groupIndex).toBe(0);
+            const info0 = getStepInfo(0, config68);
+            expect(info0.isGroupStart).toBe(true);
+            expect(info0.groupIndex).toBe(0);
+            expect(info0.isCompound).toBe(true);
 
-            expect(getStepInfo(6, config68).isGroupStart).toBe(true);
-            expect(getStepInfo(6, config68).groupIndex).toBe(1);
+            const info6 = getStepInfo(6, config68);
+            expect(info6.isGroupStart).toBe(true);
+            expect(info6.groupIndex).toBe(1);
+            expect(info6.isCompound).toBe(true);
+        });
+
+        it('should handle 12/8 with compound flag', () => {
+            const config128 = TIME_SIGNATURES['12/8'];
+            expect(getStepInfo(0, config128).isCompound).toBe(true);
+            expect(getStepInfo(6, config128).isGroupStart).toBe(true);
+        });
+
+        it('should identify 4/4 as NOT compound', () => {
+            const config44 = TIME_SIGNATURES['4/4'];
+            expect(getStepInfo(0, config44).isCompound).toBe(false);
         });
     });
 

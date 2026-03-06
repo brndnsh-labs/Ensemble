@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '../config.js';
 import { getState } from '../state.js';
 import { calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
 import * as acoustic from './grooves/acoustic.js';
@@ -55,9 +56,9 @@ export function applyGrooveOverrides({
     const { soloist } = getState();
     const stateObj = getState();
     const arrangerState = stateObj?.arranger || { timeSignature: '4/4' };
+    const ts = TIME_SIGNATURES[arrangerState.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
     const loopStep = step % stepsPerBar;
-    const isBackbeat44 = arrangerState.timeSignature === '4/4' && isBackbeat;
 
     let currentState = {
         shouldPlay: stepVal > 0,
@@ -72,8 +73,9 @@ export function applyGrooveOverrides({
     let pulseWeight = 1.0;
     if ((inst.name === 'HiHat' || inst.name === 'Open') && !config.exemptFromPulseShaping) {
         // Find if it's the 3rd 16th note in a quarter note subdivision
-        const isOffbeat =
-            loopStep % (stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4)) === 2;
+        // For simple meters (4 steps per beat), offbeat is % 4 === 2.
+        // For compound meters (2 steps per beat), we check relative to the beat.
+        const isOffbeat = loopStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
         const isSyncopated = loopStep % 2 === 1;
         if (isOffbeat) {
             pulseWeight = 0.85;
@@ -126,7 +128,6 @@ export function applyGrooveOverrides({
         isBackbeat,
         stepsPerBar,
         loopStep,
-        isBackbeat44,
         drumComplexity,
         barIndex,
         isFirstStepOfNewBar,

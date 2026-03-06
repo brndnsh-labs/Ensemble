@@ -109,7 +109,7 @@ export function draw(viz) {
             viz.setRegister('chords', chords.octave);
             viz.setRegister('harmony', harmony.octave);
             const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-            viz.render(now, playback.bpm, ts.beats);
+            viz.render(now, playback.bpm, ts);
             vizCrashCount = 0;
         } catch (e) {
             console.error('[Visualizer Error]', e);

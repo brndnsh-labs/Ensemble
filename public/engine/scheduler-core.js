@@ -472,9 +472,9 @@ function advanceGlobalStep() {
                     ? playback.step % 2 === 0
                         ? shift
                         : -shift
-                    : playback.step % 4 < 2
+                    : playback.step % (ts.stepsPerBeat * 1) < ts.stepsPerBeat / 2
                       ? shift
-                      : -shift; // 8th note swing in 4/4
+                      : -shift; // 8th note swing logic generalized for any meter with 4 steps per beat
         } else if (ts.stepsPerBeat === 3) {
             const shift = (sixteenth / 3) * (groove.swing / 100);
             duration +=

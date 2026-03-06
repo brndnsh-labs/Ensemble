@@ -253,13 +253,24 @@ export function SequencerGrid() {
                 >
                     {allStepInfos.map((stepInfo, i) => {
                         const isBeatStart = stepInfo.isBeatStart;
-                        const label = isBeatStart
-                            ? stepInfo.beatIndex + 1
-                            : (i % ts.stepsPerBeat) + 1;
+                        const isGroupStart = stepInfo.isGroupStart;
+
+                        // For compound meters, we only want to label the macro beats (group starts)
+                        // For simple meters, we label every beat.
+                        const shouldShowLabel = stepInfo.isCompound ? isGroupStart : isBeatStart;
+
+                        if (!shouldShowLabel) {
+                            return <div key={i} className="step-label" />;
+                        }
+
+                        const label = stepInfo.isCompound
+                            ? stepInfo.groupIndex + 1
+                            : stepInfo.beatIndex + 1;
+
                         return (
                             <div
                                 key={i}
-                                className={`step-label ${isBeatStart ? 'beat-start' : ''} ${stepInfo.isGroupStart ? 'group-start' : ''}`}
+                                className={`step-label ${isBeatStart ? 'beat-start' : ''} ${isGroupStart ? 'group-start' : ''}`}
                             >
                                 {label}
                             </div>

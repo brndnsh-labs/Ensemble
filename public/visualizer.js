@@ -449,7 +449,7 @@ export class UnifiedVisualizer {
         }
     }
 
-    render(currentTime, bpm, beatsPerMeasure = 4) {
+    render(currentTime, bpm, tsConfig) {
         if (!this.container) {
             return;
         }
@@ -623,6 +623,13 @@ export class UnifiedVisualizer {
 
         // 1. Rhythmic Grid
         if (bpm && this.beatReferenceTime !== null) {
+            // Handle numeric fallback for backward compatibility
+            const ts =
+                typeof tsConfig === 'object'
+                    ? tsConfig
+                    : { beats: tsConfig || 4, grouping: [tsConfig || 4] };
+            const beatsPerMeasure = ts.beats;
+
             const beatLen = 60 / bpm;
             const startBeat = floor((minTime - this.beatReferenceTime) / beatLen);
 
@@ -637,7 +644,6 @@ export class UnifiedVisualizer {
                     break;
                 }
 
-                // Optimization: Draw only if it's a measure line
                 if (i % beatsPerMeasure !== 0) {
                     continue;
                 }
@@ -652,8 +658,7 @@ export class UnifiedVisualizer {
             }
             ctx.stroke();
 
-            // Batch Beat Lines
-            ctx.strokeStyle = gridColorBeat;
+            // Batch Beat Lines (Group Starts vs Others)
             ctx.beginPath();
             for (let i = startBeat; ; i++) {
                 const t = this.beatReferenceTime + i * beatLen;
@@ -661,9 +666,9 @@ export class UnifiedVisualizer {
                     break;
                 }
 
-                // Optimization: Draw only if it's NOT a measure line
-                if (i % beatsPerMeasure === 0) {
-                    continue;
+                const beatInMeasure = ((i % beatsPerMeasure) + beatsPerMeasure) % beatsPerMeasure;
+                if (beatInMeasure === 0) {
+                    continue; // Already drawn by measure loop
                 }
 
                 const x = this.getX(t, currentTime);
@@ -671,8 +676,33 @@ export class UnifiedVisualizer {
                     continue;
                 }
 
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, h);
+                // Check if it's a group start (macro beat)
+                let isGroupStart = false;
+                if (ts.grouping && ts.grouping.length > 1) {
+                    let accumulated = 0;
+                    for (const g of ts.grouping) {
+                        if (beatInMeasure === accumulated) {
+                            isGroupStart = true;
+                            break;
+                        }
+                        accumulated += g;
+                    }
+                }
+
+                if (isGroupStart) {
+                    // Stronger beat line for macro beats
+                    ctx.strokeStyle = gridColorMeasure;
+                    ctx.globalAlpha = 0.4;
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    ctx.strokeStyle = gridColorBeat;
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                }
             }
             ctx.stroke();
         }

@@ -392,14 +392,18 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 conductorState.loopCount++;
                 conductorState.formIteration++;
 
-                // Dynamic threshold based on measure length (instead of hardcoded 64 steps = 4 bars of 4/4)
+                // Dynamic threshold based on measure length
+                // If the total song length is 4 measures or fewer, we treat it as a short loop.
                 const isShortLoop = arranger.totalSteps <= stepsPerMeasure * 4;
 
                 if (isShortLoop) {
-                    // How many loops before a fill? Lower intensity = less frequent fills
-                    const freq =
+                    // How many full loop iterations before triggering a transition fill?
+                    // High intensity = fill every loop (1).
+                    // Medium intensity = fill every 2 loops.
+                    // Low intensity = fill every 4 loops.
+                    const loopFrequency =
                         playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
-                    shouldFill = conductorState.loopCount % freq === 0;
+                    shouldFill = conductorState.loopCount % loopFrequency === 0;
                 }
             }
 
