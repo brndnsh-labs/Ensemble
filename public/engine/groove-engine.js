@@ -458,7 +458,12 @@ export function applyGrooveOverrides({
     if (groove.genreFeel === 'Jazz' && !inst.muted) {
         const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(sectionSeed, 'Jazz', drumComplexity);
+        const activeMotif = getDrumMotif(
+            sectionSeed,
+            'Jazz',
+            drumComplexity,
+            playback.bandIntensity,
+        );
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'Open') {
@@ -473,17 +478,22 @@ export function applyGrooveOverrides({
                 // Procedural Ride Variation: Occasionally skip the 'a' or accent the 'and'
                 const isSkipBeat = loopStep === 6 || loopStep === 14;
                 let rideProb = 1.0;
-                if (isSkipBeat && drumComplexity < 0.4) {
-                    rideProb = 0.7; // Simpler ride at low complexity
+                if (isSkipBeat) {
+                    // Simpler ride at low complexity/intensity. Swing ratio feels more natural when skipping "a" occasionally
+                    rideProb = 0.6 + drumComplexity * 0.3;
                 }
 
                 if (Math.random() < rideProb) {
                     shouldPlay = true;
-                    // Velocity contour: Strong 1 and 3
-                    if (loopStep % 8 === 0) {
-                        velocity = 1.1 + playback.bandIntensity * 0.2;
+                    // Velocity contour: Strong 2 and 4 (driving the swing)
+                    if (loopStep === 4 || loopStep === 12) {
+                        velocity = 0.9 + playback.bandIntensity * 0.2;
+                    } else if (loopStep % 8 === 0) {
+                        // Beats 1 and 3
+                        velocity = 0.8 + playback.bandIntensity * 0.15;
                     } else {
-                        velocity = 0.75 + drumComplexity * 0.15;
+                        // The "a" notes (swing pickups)
+                        velocity = 0.6 + drumComplexity * 0.1;
                     }
                 }
             }
@@ -509,15 +519,16 @@ export function applyGrooveOverrides({
             const pedalSteps = stepsPerBar === 12 ? [6] : [4, 12];
             if (pedalSteps.includes(loopStep)) {
                 shouldPlay = true;
-                velocity = 0.8 + playback.bandIntensity * 0.2;
+                velocity = 1.0; // Crisp hi-hat "chick" on 2 and 4
             }
         } else if (inst.name === 'Kick') {
             shouldPlay = false;
-            // 1. Feathering (The heartbeat) - low velocity on primary beats
+            // 1. Feathering (The heartbeat) - low velocity on primary beats to not clash with walking bass
             const heartbeatSteps = stepsPerBar === 12 ? [0, 6] : [0, 4, 8, 12];
             if (heartbeatSteps.includes(loopStep)) {
                 shouldPlay = true;
-                velocity = 0.3 + playback.bandIntensity * 0.15;
+                // Feathered kick, stays out of the way
+                velocity = 0.15 + playback.bandIntensity * 0.1;
             }
 
             // 2. Motif Based Interaction & Bombs
@@ -607,7 +618,8 @@ export function applyGrooveOverrides({
                     }
 
                     if (shouldPlay) {
-                        velocity = 0.4 + playback.bandIntensity * 0.6;
+                        // Randomize snare comping velocities to mimic unpredictable accents, keeping generally low
+                        velocity = 0.25 + Math.random() * 0.3 + playback.bandIntensity * 0.2;
                     }
                 }
             }
@@ -635,17 +647,44 @@ export function applyGrooveOverrides({
 
     // --- Blues Procedural Overrides ---
     if (groove.genreFeel === 'Blues' && !inst.muted) {
-        const activeMotif = getDrumMotif(sectionSeed, 'Blues', drumComplexity);
+        // Blues needs strict triplet/shuffle underlying grid
+        const activeMotif = getDrumMotif(
+            sectionSeed,
+            'Blues',
+            drumComplexity,
+            playback.bandIntensity,
+        );
+
+        // Crash logic - only when arrangement swells
+        if (
+            inst.name === 'Open' &&
+            loopStep === 0 &&
+            playback.bandIntensity > 0.8 &&
+            Math.random() < 0.25
+        ) {
+            shouldPlay = true;
+            velocity = 1.2;
+            return { shouldPlay, velocity, soundName: 'Crash', instTimeOffset };
+        }
 
         if (inst.name === 'HiHat' || inst.name === 'Open') {
             shouldPlay = false;
-            if (activeMotif === 0 || activeMotif === 2) {
+            if (activeMotif === 0 || activeMotif === 2 || activeMotif === 3) {
                 // Shuffle steps: 0, 6, 8, 14
                 if ([0, 6, 8, 14].includes(loopStep)) {
                     shouldPlay = true;
                     // Motif 2 is slow 12/8, so we might want to prioritize Open (Ride)
                     soundName = activeMotif === 2 ? 'Open' : 'HiHat';
-                    velocity = loopStep === 0 || loopStep === 8 ? 1.1 : 0.8;
+
+                    // Emulate dynamic pulsing of human hand playing shuffle
+                    // Accenting 2 and 4 (the offbeats in terms of the shuffle phrase)
+                    if (loopStep === 6 || loopStep === 14) {
+                        // The 'skip' beat is softer
+                        velocity = 0.6 + playback.bandIntensity * 0.1;
+                    } else if (loopStep === 0 || loopStep === 8) {
+                        // The downbeats are stronger
+                        velocity = 0.85 + playback.bandIntensity * 0.2;
+                    }
                 }
             } else if (activeMotif === 1) {
                 // Straight 8ths: 0, 2, 4, 6, 8, 10, 12, 14
@@ -656,7 +695,7 @@ export function applyGrooveOverrides({
             }
         } else if (inst.name === 'Kick') {
             shouldPlay = false;
-            // Root on 1 and 3
+            // Lock with the bass groove for solid pocket (steady 1 and 3)
             if (loopStep === 0 || loopStep === 8) {
                 shouldPlay = true;
             }
@@ -675,22 +714,26 @@ export function applyGrooveOverrides({
                 shouldPlay = true;
                 velocity = 1.15;
             }
-            // Dragging ghost notes for shuffle
-            if (activeMotif === 0 && [3, 11].includes(loopStep) && Math.random() < 0.4) {
-                shouldPlay = true;
-                velocity = 0.3;
-                instTimeOffset += 0.005;
-            }
 
-            // Motif 3: Busy/Syncopated
-            if (activeMotif === 3) {
-                if (loopStep === 14 && Math.random() < 0.6) {
+            // Prominent ghost notes only when arrangement swells / high intensity
+            if (playback.bandIntensity > 0.6) {
+                // Dragging ghost notes for shuffle
+                if (activeMotif === 0 && [3, 11].includes(loopStep) && Math.random() < 0.4) {
                     shouldPlay = true;
-                    velocity = 0.7; // Strong pickup to the next bar
+                    velocity = 0.4 + playback.bandIntensity * 0.1;
+                    instTimeOffset += 0.005;
                 }
-                if (loopStep === 10 && Math.random() < 0.3) {
-                    shouldPlay = true;
-                    velocity = 0.4; // Light ghost note on "and" of 3
+
+                // Motif 3: Busy/Syncopated
+                if (activeMotif === 3) {
+                    if (loopStep === 14 && Math.random() < 0.6) {
+                        shouldPlay = true;
+                        velocity = 0.7; // Strong pickup to the next bar
+                    }
+                    if (loopStep === 10 && Math.random() < 0.4) {
+                        shouldPlay = true;
+                        velocity = 0.5; // Light ghost note on "and" of 3
+                    }
                 }
             }
         }
@@ -1092,27 +1135,45 @@ export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
         // 3: The "& of 4" Push
         // 4: Elvin Interaction (Dense Triplet Drops)
 
-        // Low complexity defaults to standard light comping
-        if (complexity < 0.3) {
+        // Low complexity/intensity defaults to standard light comping
+        if (complexity < 0.3 || intensity < 0.35) {
             return 0;
         }
 
-        if (seed < 0.25) {
-            return 1;
+        // Mid intensity - mix of standard comping and basic syncopations
+        if (intensity < 0.6) {
+            return seed < 0.75 ? 0 : 1; // 75% Motif 0, 25% Motif 1
         }
-        if (seed < 0.5) {
-            return 2;
-        }
-        if (seed < 0.75) {
+
+        // High intensity - introduce more varied pushes and comps
+        if (intensity < 0.85) {
+            if (seed < 0.3) {
+                return 0;
+            }
+            if (seed < 0.6) {
+                return 1;
+            }
+            if (seed < 0.85) {
+                return 2;
+            }
             return 3;
         }
 
-        // Reserve Motif 4 for polyrhythmic scenarios when complexity is high
-        if (complexity > 0.6 && seed > 0.85) {
-            return 4;
+        // Peak intensity - full variety including Elvin drops
+        if (seed < 0.2) {
+            return 0;
+        }
+        if (seed < 0.4) {
+            return 1;
+        }
+        if (seed < 0.6) {
+            return 2;
+        }
+        if (seed < 0.8) {
+            return 3;
         }
 
-        return 0;
+        return 4;
     }
 
     if (genreFeel === 'Rock') {
@@ -1278,20 +1339,38 @@ export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
         // 2: Slow 12/8
         // 3: Busy/Syncopated
 
-        if (complexity < 0.3) {
+        // Low complexity/intensity defaults to standard shuffle
+        if (complexity < 0.3 || intensity < 0.35) {
             return 0;
         }
 
+        // Mid intensity - stick mostly to standard shuffle with occasional 12/8
+        if (intensity < 0.6) {
+            return seed < 0.8 ? 0 : 2;
+        }
+
+        // High intensity - introduce more variations
+        if (intensity < 0.85) {
+            if (seed < 0.5) {
+                return 0;
+            }
+            if (seed < 0.8) {
+                return 2;
+            }
+            return 1;
+        }
+
+        // Peak intensity - full variety including busy syncopation
+        if (seed < 0.3) {
+            return 0;
+        }
         if (seed < 0.6) {
-            return 0; // Standard Shuffle (More common)
+            return 2;
         }
-        if (seed < 0.85) {
-            return 2; // Slow 12/8
+        if (seed < 0.75) {
+            return 1;
         }
-        if (seed > 0.95) {
-            return 1; // Rare Straight 8ths
-        }
-        return 3; // Busy/Syncopated
+        return 3;
     }
 
     if (genreFeel === 'Ska-Punk') {
