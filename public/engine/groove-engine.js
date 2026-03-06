@@ -458,7 +458,12 @@ export function applyGrooveOverrides({
     if (groove.genreFeel === 'Jazz' && !inst.muted) {
         const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(sectionSeed, 'Jazz', drumComplexity, playback.bandIntensity);
+        const activeMotif = getDrumMotif(
+            sectionSeed,
+            'Jazz',
+            drumComplexity,
+            playback.bandIntensity,
+        );
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'Open') {
@@ -643,13 +648,23 @@ export function applyGrooveOverrides({
     // --- Blues Procedural Overrides ---
     if (groove.genreFeel === 'Blues' && !inst.muted) {
         // Blues needs strict triplet/shuffle underlying grid
-        const activeMotif = getDrumMotif(sectionSeed, 'Blues', drumComplexity, playback.bandIntensity);
+        const activeMotif = getDrumMotif(
+            sectionSeed,
+            'Blues',
+            drumComplexity,
+            playback.bandIntensity,
+        );
 
         // Crash logic - only when arrangement swells
-        if (inst.name === 'Open' && loopStep === 0 && playback.bandIntensity > 0.8 && Math.random() < 0.25) {
-             shouldPlay = true;
-             velocity = 1.2;
-             return { shouldPlay, velocity, soundName: 'Crash', instTimeOffset };
+        if (
+            inst.name === 'Open' &&
+            loopStep === 0 &&
+            playback.bandIntensity > 0.8 &&
+            Math.random() < 0.25
+        ) {
+            shouldPlay = true;
+            velocity = 1.2;
+            return { shouldPlay, velocity, soundName: 'Crash', instTimeOffset };
         }
 
         if (inst.name === 'HiHat' || inst.name === 'Open') {
@@ -1132,17 +1147,31 @@ export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
 
         // High intensity - introduce more varied pushes and comps
         if (intensity < 0.85) {
-            if (seed < 0.3) return 0;
-            if (seed < 0.6) return 1;
-            if (seed < 0.85) return 2;
+            if (seed < 0.3) {
+                return 0;
+            }
+            if (seed < 0.6) {
+                return 1;
+            }
+            if (seed < 0.85) {
+                return 2;
+            }
             return 3;
         }
 
         // Peak intensity - full variety including Elvin drops
-        if (seed < 0.2) return 0;
-        if (seed < 0.4) return 1;
-        if (seed < 0.6) return 2;
-        if (seed < 0.8) return 3;
+        if (seed < 0.2) {
+            return 0;
+        }
+        if (seed < 0.4) {
+            return 1;
+        }
+        if (seed < 0.6) {
+            return 2;
+        }
+        if (seed < 0.8) {
+            return 3;
+        }
 
         return 4;
     }
@@ -1322,15 +1351,25 @@ export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
 
         // High intensity - introduce more variations
         if (intensity < 0.85) {
-            if (seed < 0.5) return 0;
-            if (seed < 0.8) return 2;
+            if (seed < 0.5) {
+                return 0;
+            }
+            if (seed < 0.8) {
+                return 2;
+            }
             return 1;
         }
 
         // Peak intensity - full variety including busy syncopation
-        if (seed < 0.3) return 0;
-        if (seed < 0.6) return 2;
-        if (seed < 0.75) return 1;
+        if (seed < 0.3) {
+            return 0;
+        }
+        if (seed < 0.6) {
+            return 2;
+        }
+        if (seed < 0.75) {
+            return 1;
+        }
         return 3;
     }
 
