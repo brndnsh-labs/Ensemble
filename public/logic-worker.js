@@ -11,6 +11,8 @@ import { getState } from './state.js';
 import { getFrequency, getMidi, getStepInfo } from './utils.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
+const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
+
 const { arranger, chords, bass, soloist, groove, harmony, playback } = getState();
 
 // --- WORKER STATE ---
@@ -1033,7 +1035,7 @@ class ExportProcessor {
             offset += c.length;
         });
 
-        const finalFilename = `${(this.filename || 'ensemble-export').replace(/\.midi?$/i, '')}.mid`;
+        const finalFilename = `${(this.filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '')}.mid`;
         postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
     }
 

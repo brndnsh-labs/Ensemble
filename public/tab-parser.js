@@ -5,6 +5,13 @@ import { generateId } from './utils.js';
  * Validates a single chord symbol.
  * Handles roots, complex suffixes (maj7, sus4, add9, etc.), and slash chords.
  */
+
+const CHORD_ROOT_PATTERN = /^[A-G][b#]?/i;
+const VOWEL_GROUP_PATTERN = /[aeiouy]+/g;
+const PARENTHESES_PATTERN = /[()]/g;
+const PIPE_PARENTHESES_PATTERN = /[|()]/g;
+const REPEAT_MULTIPLIER_PATTERN = /^x\s*(\d+)$/i;
+const CAPO_PATTERN = /capo[:\s]*(\d+)/i;
 const CHORD_REGEX =
     /^(?:N\.?C\.?|[A-G][b#]?(?:maj|min|m|dim|aug|sus|add|M|alt)?(?:[0-9]+)?(?:(?:maj|min|m|dim|aug|sus|add|M|alt)?[0-9]*)?(?:[/-][A-G][b#]?(?:maj|min|m|dim|aug|sus|add|M|alt)?[0-9]*|[-+]\d+)?)$/i;
 
@@ -60,7 +67,7 @@ export function detectKey(sections) {
             const diatonicOffsets = isMinor ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];
 
             allChords.forEach(({ chord, weight }) => {
-                const chordRoot = chord.match(/^[A-G][b#]?/i)?.[0];
+                const chordRoot = chord.match(CHORD_ROOT_PATTERN)?.[0];
                 if (!chordRoot) {
                     return;
                 }
@@ -97,8 +104,8 @@ export function detectKey(sections) {
 
             // Cadence Bonus (V -> I)
             for (let i = 0; i < allChords.length - 1; i++) {
-                const c1 = allChords[i].chord.match(/^[A-G][b#]?/i)?.[0];
-                const c2 = allChords[i + 1].chord.match(/^[A-G][b#]?/i)?.[0];
+                const c1 = allChords[i].chord.match(CHORD_ROOT_PATTERN)?.[0];
+                const c2 = allChords[i + 1].chord.match(CHORD_ROOT_PATTERN)?.[0];
                 if (!c1 || !c2) {
                     continue;
                 }
@@ -173,7 +180,7 @@ export function countSyllables(text) {
 
     for (const token of tokens) {
         // Basic vowel group counting: [aeiouy]+
-        const matches = token.match(/[aeiouy]+/g);
+        const matches = token.match(VOWEL_GROUP_PATTERN);
         if (matches) {
             count += matches.length;
             // Adjustment for silent 'e' at the end of words (e.g., "skate", "those")
@@ -279,7 +286,7 @@ export function parseTab(text) {
                     let repeatBar = false;
 
                     tokens.forEach((t) => {
-                        const clean = t.replace(/[()]/g, '');
+                        const clean = t.replace(PARENTHESES_PATTERN, '');
                         if (clean === '%') {
                             repeatBar = true;
                         } else if (CHORD_REGEX.test(clean)) {
@@ -326,7 +333,7 @@ export function parseTab(text) {
         let repeatValue = 1;
 
         const possibleChords = tokens.filter((t) => {
-            const clean = t.replace(/[|()]/g, '');
+            const clean = t.replace(PIPE_PARENTHESES_PATTERN, '');
             if (clean === '') {
                 return false;
             }
@@ -334,7 +341,7 @@ export function parseTab(text) {
                 chordCount++;
                 return true;
             }
-            const repeatMatch = clean.match(/^x\s*(\d+)$/i);
+            const repeatMatch = clean.match(REPEAT_MULTIPLIER_PATTERN);
             if (repeatMatch) {
                 repeatValue = parseInt(repeatMatch[1], 10);
                 return false;
@@ -345,7 +352,7 @@ export function parseTab(text) {
         const isChordLine = chordCount > 0 && (chordCount / tokens.length > 0.4 || chordCount > 3);
 
         if (isChordLine) {
-            const cleanTokens = possibleChords.map((c) => c.replace(/[|()]/g, ''));
+            const cleanTokens = possibleChords.map((c) => c.replace(PIPE_PARENTHESES_PATTERN, ''));
             const lyricLine = lookAheadForLyrics(lineIndex);
             const totalSyllables = countSyllables(lyricLine);
             const syllablesPerMeasure =
@@ -372,7 +379,7 @@ export function parseTab(text) {
             // Check for metadata like Capo
             const lower = line.toLowerCase();
             if (lower.includes('capo')) {
-                const match = line.match(/capo[:\s]*(\d+)/i);
+                const match = line.match(CAPO_PATTERN);
                 if (match) {
                     capo = parseInt(match[1], 10);
                 }
@@ -392,7 +399,7 @@ export function parseTab(text) {
 
             const nextTokens = nextLine.split(/[\s,.]+/).filter((t) => t.length > 0);
             const nextChordCount = nextTokens.filter((t) => {
-                const clean = t.replace(/[|()]/g, '');
+                const clean = t.replace(PIPE_PARENTHESES_PATTERN, '');
                 return clean !== '' && (CHORD_REGEX.test(clean) || clean === '%');
             }).length;
 

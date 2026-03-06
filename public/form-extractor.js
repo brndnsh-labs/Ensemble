@@ -4,6 +4,8 @@
  * @param {Array} beatData Array of { chord, energy } objects
  * @param {number|Object} beatsPerMeasure Number of beats per measure, or a pulse object containing beatsPerMeasure
  */
+const CHORD_EXTENSION_PATTERN = /maj7|maj9|m7|m9|m6|m11|7|6|9|11|13|sus4|sus2|dim|aug|5/g;
+
 export function extractForm(beatData, options = 4) {
     if (!beatData || beatData.length < 4) {
         return [];
@@ -36,7 +38,7 @@ export function extractForm(beatData, options = 4) {
         // Normalize: Cmaj7 -> C, Cm7 -> Cm, C7 -> C
         // We keep root and quality (major/minor) but drop extensions
         return c
-            .replace(/maj7|maj9|m7|m9|m6|m11|7|6|9|11|13|sus4|sus2|dim|aug|5/g, (match) => {
+            .replace(CHORD_EXTENSION_PATTERN, (match) => {
                 if (match.startsWith('m')) {
                     return 'm';
                 }
