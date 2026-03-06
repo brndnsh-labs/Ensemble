@@ -393,7 +393,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 conductorState.formIteration++;
 
                 // Dynamic threshold based on measure length (instead of hardcoded 64 steps = 4 bars of 4/4)
-                const isShortLoop = arranger.totalSteps <= (stepsPerMeasure * 4);
+                const isShortLoop = arranger.totalSteps <= stepsPerMeasure * 4;
 
                 if (isShortLoop) {
                     // How many loops before a fill? Lower intensity = less frequent fills

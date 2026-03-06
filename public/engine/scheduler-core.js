@@ -1114,7 +1114,7 @@ export function scheduleGlobalEvent(step, swungTime) {
             // Simple meters (4/4, 3/4, 5/4 etc): usually beats 2 and 4 (indices 1 and 3)
             isBackbeat = stepInfo.beatIndex % 2 !== 0;
         } else if (ts.stepsPerBeat === 3) {
-             // Compound meters (6/8, 12/8): usually the even macro beats
+            // Compound meters (6/8, 12/8): usually the even macro beats
             isBackbeat = stepInfo.isGroupStart && stepInfo.groupIndex % 2 !== 0;
         }
 

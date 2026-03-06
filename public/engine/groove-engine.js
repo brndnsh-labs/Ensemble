@@ -72,7 +72,8 @@ export function applyGrooveOverrides({
     let pulseWeight = 1.0;
     if ((inst.name === 'HiHat' || inst.name === 'Open') && !config.exemptFromPulseShaping) {
         // Find if it's the 3rd 16th note in a quarter note subdivision
-        const isOffbeat = loopStep % (stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4)) === 2;
+        const isOffbeat =
+            loopStep % (stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4)) === 2;
         const isSyncopated = loopStep % 2 === 1;
         if (isOffbeat) {
             pulseWeight = 0.85;
@@ -154,8 +155,8 @@ export function applyGrooveOverrides({
         let isEOfBeat = false;
 
         if (arrangerState.timeSignature === '4/4') {
-             isBackbeatAdjacent = [5, 13].includes(loopStep);
-             isEOfBeat = [1, 9].includes(loopStep);
+            isBackbeatAdjacent = [5, 13].includes(loopStep);
+            isEOfBeat = [1, 9].includes(loopStep);
         }
         const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeat);
 
