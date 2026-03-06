@@ -83,10 +83,19 @@ export function applyGrooveOverrides({
         }
     }
 
+    // --- Resolve Active Section Seed ---
+    const entry = arrangerState.stepMap?.find((e) => step >= e.start && step < e.end);
+    const sectionId = entry?.chord?.sectionId;
+    let sectionSeed = groove.sectionSeedMap?.[sectionId];
+    if (sectionSeed === undefined) {
+        // Fallback for missing seed (e.g. before first boundary)
+        const barIndex = Math.floor(step / stepsPerBar);
+        sectionSeed = ((barIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
+    }
+
     // --- Neo-Soul / Hip Hop Procedural Overrides ---
     if ((groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') && !inst.muted) {
-        const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Neo-Soul', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Neo-Soul', drumComplexity);
 
         // Universal "Drunken" displacement
         const drunkenFactor = playback.bandIntensity * 0.012;
@@ -153,8 +162,7 @@ export function applyGrooveOverrides({
 
     // --- Acoustic / Percussive Overrides ---
     if (groove.genreFeel === 'Acoustic' && !inst.muted) {
-        const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Acoustic', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Acoustic', drumComplexity);
 
         if (inst.name === 'Snare') {
             shouldPlay = false;
@@ -201,7 +209,7 @@ export function applyGrooveOverrides({
     // --- Funk Procedural Overrides ---
     if (groove.genreFeel === 'Funk' && !inst.muted) {
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Funk', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Funk', drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         // "The One" reinforcement (Universal)
@@ -326,7 +334,7 @@ export function applyGrooveOverrides({
     // --- Disco Procedural Overrides ---
     if (groove.genreFeel === 'Disco' && !inst.muted) {
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Disco', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Disco', drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'Kick') {
@@ -395,8 +403,7 @@ export function applyGrooveOverrides({
 
     // --- Reggae Procedural Overrides ---
     if (groove.genreFeel === 'Reggae' && !inst.muted) {
-        const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Reggae', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Reggae', drumComplexity);
 
         if (inst.name === 'Kick') {
             shouldPlay = false;
@@ -451,7 +458,7 @@ export function applyGrooveOverrides({
     if (groove.genreFeel === 'Jazz' && !inst.muted) {
         const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Jazz', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Jazz', drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'Open') {
@@ -514,7 +521,7 @@ export function applyGrooveOverrides({
             }
 
             // 2. Motif Based Interaction & Bombs
-            const barSeed = ((barIndex * 137) % 256) / 256;
+            const barSeed = sectionSeed; // Using section seed for consistency
             if (isTurnaround && loopStep === 12) {
                 shouldPlay = true; // Setup bomb for the turnaround
                 velocity = 0.9;
@@ -628,8 +635,7 @@ export function applyGrooveOverrides({
 
     // --- Blues Procedural Overrides ---
     if (groove.genreFeel === 'Blues' && !inst.muted) {
-        const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Blues', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Blues', drumComplexity);
 
         if (inst.name === 'HiHat' || inst.name === 'Open') {
             shouldPlay = false;
@@ -693,7 +699,7 @@ export function applyGrooveOverrides({
     // --- Rock Procedural Overrides ---
     if (groove.genreFeel === 'Rock' && !inst.muted) {
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Rock', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Rock', drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'HiHat' || inst.name === 'Open') {
@@ -792,7 +798,7 @@ export function applyGrooveOverrides({
 
     if (isLatinStyle && !inst.muted) {
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Bossa Nova', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Bossa Nova', drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'Kick') {
@@ -971,7 +977,7 @@ export function applyGrooveOverrides({
     // --- Ska-Punk Procedural Overrides ---
     if (groove.genreFeel === 'Ska-Punk' && !inst.muted) {
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(barIndex, 'Ska-Punk', groove.creativity, drumComplexity);
+        const activeMotif = getDrumMotif(sectionSeed, 'Ska-Punk', drumComplexity);
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         instTimeOffset -= 0.005; // Fast energetic push
@@ -1061,20 +1067,17 @@ export function calculatePocketOffset(playback, groove) {
 }
 
 /**
- * Generates a deterministic motif ID for the current measure based on genre and complexity.
- * This ensures drum comping and accents are structurally sound rather than completely random per step.
+ * Generates a deterministic motif ID for the current section based on a stable seed, genre, and complexity.
+ * This ensures drum comping and accents are structurally sound rather than completely random per measure,
+ * serving as a foundation for section memory and structural groove evolution.
  * Extensible for future genres.
  *
- * @param {number} barIndex - The current measure index (e.g. Math.floor(step / 16))
+ * @param {number} seed - A consistent abstract float (0.0-1.0) derived from the current section boundary.
  * @param {string} genreFeel - The active genre feel (e.g. 'Jazz', 'Funk')
- * @param {boolean} creativity - Whether creativity mode is enabled
  * @param {number} complexity - The drum complexity scalar (0.0 to 1.0)
  * @returns {number} Motif ID (meaning depends on genre logic)
  */
-export function getDrumMotif(barIndex, genreFeel, creativity, complexity) {
-    // Pseudo-random 0-1 value based on the measure index. Stable throughout the measure.
-    const seed = ((barIndex * 137 + (creativity ? 42 : 0)) % 256) / 256;
-
+export function getDrumMotif(seed, genreFeel, complexity) {
     if (genreFeel === 'Jazz') {
         // Motif Map:
         // 0: Standard Conversational Comping
@@ -1098,8 +1101,8 @@ export function getDrumMotif(barIndex, genreFeel, creativity, complexity) {
             return 3;
         }
 
-        // Reserve Motif 4 for high-creativity polyrhythmic scenarios
-        if (creativity && seed > 0.85) {
+        // Reserve Motif 4 for polyrhythmic scenarios when complexity is high
+        if (complexity > 0.6 && seed > 0.85) {
             return 4;
         }
 
@@ -1259,7 +1262,7 @@ export function getDrumMotif(barIndex, genreFeel, creativity, complexity) {
         if (seed < 0.85) {
             return 2; // Slow 12/8
         }
-        if (creativity && seed > 0.95) {
+        if (seed > 0.95) {
             return 1; // Rare Straight 8ths
         }
         return 3; // Busy/Syncopated

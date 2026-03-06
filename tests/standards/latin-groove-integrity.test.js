@@ -26,7 +26,7 @@ describe('Latin Groove Integrity', () => {
     it('should assign valid Latin Motifs', () => {
         const motifs = new Set();
         for (let i = 0; i < 20; i++) {
-            motifs.add(getDrumMotif(i, 'Bossa Nova', true, 0.8));
+            motifs.add(getDrumMotif(((i * 137 + 42) % 256) / 256, 'Bossa Nova', 0.8));
         }
         expect(motifs.has(0)).toBe(true);
         expect(motifs.has(1)).toBe(true);
@@ -68,7 +68,10 @@ describe('Latin Groove Integrity', () => {
 
             let barIndexMotif0 = -1;
             for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(i, 'Bossa Nova', true, 0.8) === 0 && i % 4 !== 3) {
+                if (
+                    getDrumMotif(((i * 137 + 42) % 256) / 256, 'Bossa Nova', 0.8) === 0 &&
+                    i % 4 !== 3
+                ) {
                     barIndexMotif0 = i;
                     break;
                 }

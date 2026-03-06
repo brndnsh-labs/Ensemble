@@ -58,7 +58,7 @@ describe('Groove Engine - Multi-Seed Memory', () => {
         expect(mockState.groove.sectionSeedMap.s2).toBeDefined();
     });
 
-    it('should dynamically update the seed for repeating sections based on intensity', () => {
+    it('should NOT dynamically update the seed for repeating sections and should persist section memory', () => {
         // Setup a repeating section
         mockState.arranger.stepMap = [
             { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
@@ -67,19 +67,18 @@ describe('Groove Engine - Multi-Seed Memory', () => {
         ];
         mockState.arranger.totalSteps = 48;
 
-        // 1. High intensity transition to s2 -> likely seed 2 (Driven)
-        mockState.playback.bandIntensity = 0.99; // force high
-        // Force Math.random to always pick the highest probability path for high intensity (< 0.7 = seed 2)
-        vi.spyOn(Math, 'random').mockReturnValue(0.1);
-        checkSectionTransition(0, 16);
-        expect(mockState.groove.sectionSeedMap.s2).toBe(2);
+        // Manually seed s1 since step 0 doesn't cross a boundary to create one initially
+        mockState.groove.sectionSeedMap.s1 = 0.999;
 
-        // 2. Low intensity transition back to s1 -> likely seed 1 (Sparse)
-        mockState.playback.bandIntensity = 0.1; // force low
-        // Force Math.random to pick seed 1 (< 0.6 = seed 1)
-        vi.spyOn(Math, 'random').mockReturnValue(0.1);
+        // 1. Transition to s2 -> seed is generated
+        vi.spyOn(Math, 'random').mockReturnValue(0.123);
+        checkSectionTransition(0, 16);
+        expect(mockState.groove.sectionSeedMap.s2).toBe(0.123);
+
+        // 2. Transition back to s1 -> seed should NOT be overwritten (remains 0.999)
+        vi.spyOn(Math, 'random').mockReturnValue(0.456);
         checkSectionTransition(16, 16);
-        expect(mockState.groove.sectionSeedMap.s1).toBe(1);
+        expect(mockState.groove.sectionSeedMap.s1).toBe(0.999);
 
         // Restore random
         vi.restoreAllMocks();
