@@ -1,23 +1,13 @@
-const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
+import { MODULES } from './constants.js';
 
-const INTERVAL_CATEGORY = [
-    'root', // 0
-    'seventh', // 1
-    'seventh', // 2
-    'third', // 3
-    'third', // 4
-    'seventh', // 5
-    'seventh', // 6
-    'fifth', // 7
-    'seventh', // 8
-    'seventh', // 9
-    'seventh', // 10
-    'seventh', // 11
-];
+const { min, max, floor, PI, round, ceil } = Math;
+
+const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
 
 // Optimization: Map interval indices (0-11) to color categories (0-3)
 // 0=root, 1=third, 2=fifth, 3=seventh
-const INTERVAL_COLOR_INDEX = [0, 3, 3, 1, 1, 3, 3, 2, 3, 3, 3, 3];
+const INTERVAL_CATEGORY = [0, 3, 3, 1, 1, 3, 3, 2, 3, 3, 3, 3];
+const INTERVAL_COLOR_INDEX = INTERVAL_CATEGORY; // Alias to prevent undeclared variable errors
 
 class RingBuffer {
     constructor(capacity) {
@@ -70,7 +60,7 @@ class RingBuffer {
         const start = this.start;
 
         // Loop 1: start to end of buffer (or count if no wrap)
-        const headLength = Math.min(count, capacity - start);
+        const headLength = min(count, capacity - start);
         for (let i = 0; i < headLength; i++) {
             if (callback(buffer[start + i], i) === false) {
                 return;
@@ -87,6 +77,14 @@ class RingBuffer {
             }
         }
     }
+}
+
+function getYStandalone(m, midY, centerMidi, yScale) {
+    return midY - (m - centerMidi) * yScale;
+}
+
+function getXStandalone(t, currentTime, pianoRollWidth, timeScale) {
+    return pianoRollWidth + (currentTime - t) * timeScale;
 }
 
 export class UnifiedVisualizer {
@@ -193,22 +191,19 @@ export class UnifiedVisualizer {
             guideLineBlack: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.03)',
             guideLineWhite: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)',
             separatorColor: isDark ? '#334155' : '#cbd5e1',
-            chordColors: {
-                root: style.getPropertyValue('--blue').trim() || '#268bd2',
-                third: style.getPropertyValue('--green').trim() || '#859900',
-                fifth: style.getPropertyValue('--orange').trim() || '#cb4b16',
-                seventh: style.getPropertyValue('--magenta').trim() || '#d33682',
-            },
+            chordColors: [
+                style.getPropertyValue('--blue').trim() || '#268bd2', // 0: root
+                style.getPropertyValue('--green').trim() || '#859900', // 1: third
+                style.getPropertyValue('--orange').trim() || '#cb4b16', // 2: fifth
+                style.getPropertyValue('--magenta').trim() || '#d33682', // 3: seventh
+            ],
         };
 
         // Optimization: Pre-calculate interval color lookup
-        this.intervalColors = INTERVAL_CATEGORY.map((cat) => this.themeCache.chordColors[cat]);
-        this.categoryColors = [
-            this.themeCache.chordColors.root,
-            this.themeCache.chordColors.third,
-            this.themeCache.chordColors.fifth,
-            this.themeCache.chordColors.seventh,
-        ];
+        this.intervalColors = INTERVAL_CATEGORY.map(
+            (catIndex) => this.themeCache.chordColors[catIndex],
+        );
+        this.categoryColors = this.themeCache.chordColors;
 
         // Update track colors
         for (const name in this.tracks) {
@@ -285,12 +280,12 @@ export class UnifiedVisualizer {
 
     // Optimization: Stable method for Y calculation to avoid closure allocation
     getY(m) {
-        return this.midY - (m - this.centerMidi) * this.yScale;
+        return getYStandalone(m, this.midY, this.centerMidi, this.yScale);
     }
 
     // Optimization: Stable method for X calculation to avoid closure allocation
     getX(t, currentTime) {
-        return this.pianoRollWidth + (currentTime - t) * this.timeScale;
+        return getXStandalone(t, currentTime, this.pianoRollWidth, this.timeScale);
     }
 
     renderStaticLayer() {
@@ -320,8 +315,8 @@ export class UnifiedVisualizer {
 
         const topMidi = this.centerMidi + this.visualRange / 2;
         const bottomMidi = this.centerMidi - this.visualRange / 2;
-        const startMidi = Math.floor(bottomMidi);
-        const endMidi = Math.ceil(topMidi);
+        const startMidi = floor(bottomMidi);
+        const endMidi = ceil(topMidi);
 
         ctx.lineWidth = 1;
         ctx.font = '10px sans-serif';
@@ -493,12 +488,12 @@ export class UnifiedVisualizer {
         // --- Piano Roll Layer (Active Overlays) ---
         const topMidi = this.centerMidi + this.visualRange / 2;
         const bottomMidi = this.centerMidi - this.visualRange / 2;
-        const startMidi = Math.floor(bottomMidi);
-        const endMidi = Math.ceil(topMidi);
+        const startMidi = floor(bottomMidi);
+        const endMidi = ceil(topMidi);
 
         // Optimization: Pre-calculate visible octave range for the frame
-        const minOct = Math.floor(startMidi / 12);
-        const maxOct = Math.ceil(endMidi / 12);
+        const minOct = floor(startMidi / 12);
+        const maxOct = ceil(endMidi / 12);
 
         // Optimization: Direct draw (no intermediate array) + Batch Label Redraw
         this.cNotesBuffer.fill(0);
@@ -564,7 +559,7 @@ export class UnifiedVisualizer {
             const capacity = track.history.capacity;
             const count = track.history.count;
             const start = track.history.start;
-            const headLength = Math.min(count, capacity - start);
+            const headLength = min(count, capacity - start);
 
             // Loop 1: Start to end/wrap
             let stop = false;
@@ -617,7 +612,7 @@ export class UnifiedVisualizer {
         ctx.textBaseline = 'middle';
 
         // Only iterate relevant range in steps of 12
-        const startC = Math.ceil(startMidi / 12) * 12;
+        const startC = ceil(startMidi / 12) * 12;
         for (let m = startC; m <= endMidi; m += 12) {
             if (this.cNotesBuffer[m]) {
                 const y = this.getY(m);
@@ -629,7 +624,7 @@ export class UnifiedVisualizer {
         // 1. Rhythmic Grid
         if (bpm && this.beatReferenceTime !== null) {
             const beatLen = 60 / bpm;
-            const startBeat = Math.floor((minTime - this.beatReferenceTime) / beatLen);
+            const startBeat = floor((minTime - this.beatReferenceTime) / beatLen);
 
             ctx.lineWidth = 1;
 
@@ -721,8 +716,8 @@ export class UnifiedVisualizer {
                 continue;
             }
 
-            const start = Math.max(minTime, ev.time);
-            const end = Math.min(currentTime, chordEnd);
+            const start = max(minTime, ev.time);
+            const end = min(currentTime, chordEnd);
 
             const xStart = frameXBase - start * frameXScale;
             const xEnd = frameXBase - end * frameXScale;
@@ -738,7 +733,7 @@ export class UnifiedVisualizer {
                 // Render in visible octaves (using hoisted range)
                 for (let oct = minOct; oct <= maxOct; oct++) {
                     const m = pc + oct * 12;
-                    const y = Math.round(frameYBase - m * frameYScale);
+                    const y = round(frameYBase - m * frameYScale);
                     if (y >= -10 && y <= h + 10) {
                         // Push flat layout: x, y, w, h
                         buffer.push(x, y - yScale / 2, cw, yScale);
@@ -785,8 +780,8 @@ export class UnifiedVisualizer {
                 continue;
             }
 
-            const start = Math.max(minTime, ev.time);
-            const end = Math.min(currentTime, chordEnd);
+            const start = max(minTime, ev.time);
+            const end = min(currentTime, chordEnd);
 
             const xStart = frameXBase - start * frameXScale;
             const xEnd = frameXBase - end * frameXScale;
@@ -795,7 +790,7 @@ export class UnifiedVisualizer {
             const rootPC = ev.rootMidi % 12;
 
             for (const midi of ev.notes) {
-                const y = Math.round(frameYBase - midi * frameYScale);
+                const y = round(frameYBase - midi * frameYScale);
                 const interval = ((midi % 12) - rootPC + 12) % 12;
                 const colorIdx = INTERVAL_COLOR_INDEX[interval];
 
@@ -845,7 +840,7 @@ export class UnifiedVisualizer {
                 const capacity = track.history.capacity;
                 const count = track.history.count;
                 const start = track.history.start;
-                const headLength = Math.min(count, capacity - start);
+                const headLength = min(count, capacity - start);
                 let stop = false;
 
                 // Loop 1
@@ -863,7 +858,7 @@ export class UnifiedVisualizer {
 
                     // Inline getX/getY
                     const x = frameXBase - ev.time * frameXScale;
-                    const y = Math.round(frameYBase - ev.midi * frameYScale);
+                    const y = round(frameYBase - ev.midi * frameYScale);
                     const intensity = ev.velocity || 1.0;
 
                     ctx.moveTo(x, y - 6 * intensity);
@@ -888,7 +883,7 @@ export class UnifiedVisualizer {
 
                         // Inline getX/getY
                         const x = frameXBase - ev.time * frameXScale;
-                        const y = Math.round(frameYBase - ev.midi * frameYScale);
+                        const y = round(frameYBase - ev.midi * frameYScale);
                         const intensity = ev.velocity || 1.0;
 
                         ctx.moveTo(x, y - 6 * intensity);
@@ -906,7 +901,7 @@ export class UnifiedVisualizer {
             const color = track.resolvedColor || track.color;
 
             // Optimization: Split loop for soloist vs others to avoid per-event branching
-            if (name === 'soloist') {
+            if (name === MODULES.SOLOIST) {
                 const baseWidth = 4;
                 for (let b = 0; b < 4; b++) {
                     this.soloistBuffers[b].length = 0;
@@ -916,7 +911,7 @@ export class UnifiedVisualizer {
                 const capacity = track.history.capacity;
                 const count = track.history.count;
                 const start = track.history.start;
-                const headLength = Math.min(count, capacity - start);
+                const headLength = min(count, capacity - start);
                 let stop = false;
 
                 // Soloist Loop 1
@@ -932,12 +927,12 @@ export class UnifiedVisualizer {
                         continue;
                     }
 
-                    const startT = Math.max(minTime, ev.time);
-                    const endT = Math.min(currentTime, noteEnd);
+                    const startT = max(minTime, ev.time);
+                    const endT = min(currentTime, noteEnd);
                     // Inline getX/getY
                     const x1 = frameXBase - startT * frameXScale;
                     const x2 = frameXBase - endT * frameXScale;
-                    const y = Math.round(frameYBase - ev.midi * frameYScale);
+                    const y = round(frameYBase - ev.midi * frameYScale);
 
                     if (y >= -10 && y <= h + 10) {
                         let typeCode = 0; // default
@@ -957,11 +952,11 @@ export class UnifiedVisualizer {
                             isActive = true;
 
                             if (ev.noteType === 'arp') {
-                                activeColor = chordColors.fifth;
+                                activeColor = chordColors[2];
                             } else if (ev.noteType === 'target') {
-                                activeColor = chordColors.root;
+                                activeColor = chordColors[0];
                             } else if (ev.noteType === 'altered') {
-                                activeColor = chordColors.seventh;
+                                activeColor = chordColors[3];
                             } else {
                                 activeColor = color;
                             }
@@ -983,11 +978,11 @@ export class UnifiedVisualizer {
                             continue;
                         }
 
-                        const startT = Math.max(minTime, ev.time);
-                        const endT = Math.min(currentTime, noteEnd);
+                        const startT = max(minTime, ev.time);
+                        const endT = min(currentTime, noteEnd);
                         const x1 = frameXBase - startT * frameXScale;
                         const x2 = frameXBase - endT * frameXScale;
-                        const y = Math.round(frameYBase - ev.midi * frameYScale);
+                        const y = round(frameYBase - ev.midi * frameYScale);
 
                         if (y >= -10 && y <= h + 10) {
                             let typeCode = 0; // default
@@ -1007,11 +1002,11 @@ export class UnifiedVisualizer {
                                 isActive = true;
 
                                 if (ev.noteType === 'arp') {
-                                    activeColor = chordColors.fifth;
+                                    activeColor = chordColors[2];
                                 } else if (ev.noteType === 'target') {
-                                    activeColor = chordColors.root;
+                                    activeColor = chordColors[0];
                                 } else if (ev.noteType === 'altered') {
-                                    activeColor = chordColors.seventh;
+                                    activeColor = chordColors[3];
                                 } else {
                                     activeColor = color;
                                 }
@@ -1054,7 +1049,7 @@ export class UnifiedVisualizer {
 
                 // Batch 2: Root (Target - 2)
                 if (this.soloistBuffers[2].length > 0) {
-                    ctx.strokeStyle = chordColors.root;
+                    ctx.strokeStyle = chordColors[0];
                     ctx.beginPath();
                     const buf = this.soloistBuffers[2];
                     for (let j = 0; j < buf.length; j += 3) {
@@ -1066,7 +1061,7 @@ export class UnifiedVisualizer {
 
                 // Batch 3: Fifth (Arp - 1)
                 if (this.soloistBuffers[1].length > 0) {
-                    ctx.strokeStyle = chordColors.fifth;
+                    ctx.strokeStyle = chordColors[2];
                     ctx.beginPath();
                     const buf = this.soloistBuffers[1];
                     for (let j = 0; j < buf.length; j += 3) {
@@ -1078,7 +1073,7 @@ export class UnifiedVisualizer {
 
                 // Batch 4: Seventh (Altered - 3)
                 if (this.soloistBuffers[3].length > 0) {
-                    ctx.strokeStyle = chordColors.seventh;
+                    ctx.strokeStyle = chordColors[3];
                     ctx.beginPath();
                     const buf = this.soloistBuffers[3];
                     for (let j = 0; j < buf.length; j += 3) {
@@ -1097,7 +1092,7 @@ export class UnifiedVisualizer {
                 const capacity = track.history.capacity;
                 const count = track.history.count;
                 const start = track.history.start;
-                const headLength = Math.min(count, capacity - start);
+                const headLength = min(count, capacity - start);
                 let stop = false;
 
                 // Generic Loop 1
@@ -1113,11 +1108,11 @@ export class UnifiedVisualizer {
                         continue;
                     }
 
-                    const startT = Math.max(minTime, ev.time);
-                    const endT = Math.min(currentTime, noteEnd);
+                    const startT = max(minTime, ev.time);
+                    const endT = min(currentTime, noteEnd);
                     const x1 = frameXBase - startT * frameXScale;
                     const x2 = frameXBase - endT * frameXScale;
-                    const y = Math.round(frameYBase - ev.midi * frameYScale);
+                    const y = round(frameYBase - ev.midi * frameYScale);
 
                     if (y >= -10 && y <= h + 10) {
                         ctx.moveTo(x1, y);
@@ -1146,11 +1141,11 @@ export class UnifiedVisualizer {
                             continue;
                         }
 
-                        const startT = Math.max(minTime, ev.time);
-                        const endT = Math.min(currentTime, noteEnd);
+                        const startT = max(minTime, ev.time);
+                        const endT = min(currentTime, noteEnd);
                         const x1 = frameXBase - startT * frameXScale;
                         const x2 = frameXBase - endT * frameXScale;
-                        const y = Math.round(frameYBase - ev.midi * frameYScale);
+                        const y = round(frameYBase - ev.midi * frameYScale);
 
                         if (y >= -10 && y <= h + 10) {
                             ctx.moveTo(x1, y);
@@ -1183,7 +1178,7 @@ export class UnifiedVisualizer {
                 ctx.strokeStyle = outlineColor;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(activeX, activeY, 6, 0, Math.PI * 2);
+                ctx.arc(activeX, activeY, 6, 0, PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }

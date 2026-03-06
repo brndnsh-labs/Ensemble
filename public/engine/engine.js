@@ -1,5 +1,6 @@
 import { audioWatchdog } from '../audio-recovery.js';
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { MODULES } from '../constants.js';
 import { getState } from '../state.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
@@ -80,10 +81,10 @@ export function initAudio() {
         playback.reverbNode.connect(playback.masterGain);
 
         const modules = [
-            { name: 'chords', state: chords, mult: MIXER_GAIN_MULTIPLIERS.chords },
-            { name: 'bass', state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass },
-            { name: 'soloist', state: soloist, mult: MIXER_GAIN_MULTIPLIERS.soloist },
-            { name: 'harmonies', state: harmony, mult: MIXER_GAIN_MULTIPLIERS.harmonies },
+            { name: MODULES.CHORDS, state: chords, mult: MIXER_GAIN_MULTIPLIERS.chords },
+            { name: MODULES.BASS, state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass },
+            { name: MODULES.SOLOIST, state: soloist, mult: MIXER_GAIN_MULTIPLIERS.soloist },
+            { name: MODULES.HARMONIES, state: harmony, mult: MIXER_GAIN_MULTIPLIERS.harmonies },
             { name: 'drums', state: groove, mult: MIXER_GAIN_MULTIPLIERS.drums },
         ];
 

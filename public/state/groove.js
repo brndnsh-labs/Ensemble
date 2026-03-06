@@ -91,6 +91,92 @@ export const groove = {
     },
 };
 
+export function setGrooveParam(param, value) {
+    switch (param) {
+        case 'enabled':
+            groove.enabled = value;
+            break;
+        case 'volume':
+            groove.volume = value;
+            break;
+        case 'reverb':
+            groove.reverb = value;
+            break;
+        case 'measures':
+            groove.measures = value;
+            break;
+        case 'currentMeasure':
+            groove.currentMeasure = value;
+            break;
+        case 'followPlayback':
+            groove.followPlayback = value;
+            break;
+        case 'humanize':
+            groove.humanize = value;
+            break;
+        case 'swing':
+            groove.swing = value;
+            break;
+        case 'swingSub':
+            groove.swingSub = value;
+            break;
+        case 'lastDrumPreset':
+            groove.lastDrumPreset = value;
+            break;
+        case 'genreFeel':
+            groove.genreFeel = value;
+            break;
+        case 'larsMode':
+            groove.larsMode = value;
+            break;
+        case 'larsIntensity':
+            groove.larsIntensity = value;
+            break;
+        case 'lastSmartGenre':
+            groove.lastSmartGenre = value;
+            break;
+        case 'pendingGenreFeel':
+            groove.pendingGenreFeel = value;
+            break;
+        case 'genreSwitchCountdown':
+            groove.genreSwitchCountdown = value;
+            break;
+        case 'fillActive':
+            groove.fillActive = value;
+            break;
+        case 'activeTab':
+            groove.activeTab = value;
+            break;
+        case 'mobileTab':
+            groove.mobileTab = value;
+            break;
+        case 'lastHatGain':
+            groove.lastHatGain = value;
+            break;
+        case 'fillStartStep':
+            groove.fillStartStep = value;
+            break;
+        case 'fillLength':
+            groove.fillLength = value;
+            break;
+        case 'snareMask':
+            groove.snareMask = value;
+            break;
+        case 'pendingCrash':
+            groove.pendingCrash = value;
+            break;
+        case 'creativity':
+            groove.creativity = value;
+            break;
+        case 'gridVersion':
+            groove.gridVersion = value;
+            break;
+        default:
+            console.warn(`[State] Unknown groove param: ${param}`);
+            break;
+    }
+}
+
 export function grooveReducer(action, payload, playback) {
     switch (action) {
         case ACTIONS.RESET_STATE:

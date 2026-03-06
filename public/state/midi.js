@@ -38,6 +38,47 @@ export const midi = {
     velocitySensitivity: 1.0,
 };
 
+export function setMidiParam(param, value) {
+    switch (param) {
+        case 'enabled':
+            midi.enabled = value;
+            break;
+        case 'inputs':
+            midi.inputs = value;
+            break;
+        case 'outputs':
+            midi.outputs = value;
+            break;
+        case 'selectedOutputId':
+            midi.selectedOutputId = value;
+            break;
+        case 'learningState':
+            midi.learningState = value;
+            break;
+        case 'learnedMappings':
+            midi.learnedMappings = value;
+            break;
+        case 'ccValues':
+            midi.ccValues = value;
+            break;
+        case 'syncOut':
+            midi.syncOut = value;
+            break;
+        case 'channels':
+            midi.channels = value;
+            break;
+        case 'access':
+            midi.access = value;
+            break;
+        case 'noteToEngineMap':
+            midi.noteToEngineMap = value;
+            break;
+        default:
+            console.warn(`[State] Unknown midi param: ${param}`);
+            break;
+    }
+}
+
 export function midiReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_MIDI_CONFIG:

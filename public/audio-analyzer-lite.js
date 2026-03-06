@@ -7,6 +7,8 @@
 // Helper to allow UI updates during heavy processing
 const yieldToMain = () => new Promise((r) => setTimeout(r, 0));
 
+const { min, max, floor, PI, cos, sin, abs, round, ceil, sqrt } = Math;
+
 // --- Static Data (Optimization: Avoid Re-allocation) ---
 const KEY_TYPES = ['major', 'minor', 'dominant', 'bluesMaj', 'bluesMin'];
 
@@ -27,6 +29,175 @@ const CHORD_PROFILE_ENTRIES = Object.entries(CHORD_PROFILES);
 
 const MAJOR_DIATONIC = [0, 2, 4, 5, 7, 9, 11]; // I ii iii IV V vi vii°
 const MINOR_DIATONIC = [0, 2, 3, 5, 7, 8, 10]; // i ii° III iv v VI VII
+
+function calculateChromagramStandalone(signal, sampleRate, options, pitchFrequencies) {
+    let chroma, pitchEnergy, windowValues;
+
+    if (options.buffers) {
+        chroma = options.buffers.chroma;
+        chroma.fill(0);
+        pitchEnergy = options.buffers.pitchEnergy;
+        pitchEnergy.fill(0);
+    } else {
+        chroma = new Float32Array(12).fill(0);
+        pitchEnergy = new Float32Array(128).fill(0); // High-res pitch map
+    }
+
+    const len = signal.length;
+    const step = options.step || 4;
+    const minMidi = options.minMidi || 0;
+    const maxMidi = options.maxMidi || 127;
+
+    // Pre-calculate window function
+    if (options.buffers?.windowValues) {
+        windowValues = options.buffers.windowValues;
+    } else {
+        const numSteps = ceil(len / step);
+        windowValues = new Float32Array(numSteps);
+        for (let i = 0, idx = 0; i < len; i += step, idx++) {
+            windowValues[idx] = 0.5 * (1 - cos((2 * PI * i) / (len - 1)));
+        }
+    }
+
+    // Optimization: Determine loop bounds based on MIDI range
+    // pitchFrequencies starts at MIDI 24 (Index 0)
+    let startIdx = 0;
+    let endIdx = pitchFrequencies.length;
+
+    if (!options.suppressHarmonics) {
+        // If suppression is OFF, we only need to calculate the requested range.
+        // clamp to valid array indices
+        startIdx = max(0, min(pitchFrequencies.length, minMidi - 24));
+        endIdx = max(0, min(pitchFrequencies.length, maxMidi - 24 + 1));
+    }
+
+    // Pre-windowing Optimization: Apply window function once, outside the frequency loop.
+    let windowedSignal;
+    if (options.buffers?.windowedSignal) {
+        windowedSignal = options.buffers.windowedSignal;
+    } else {
+        const numSteps = ceil(len / step);
+        windowedSignal = new Float32Array(numSteps);
+    }
+
+    for (let i = 0, idx = 0; i < len; i += step, idx++) {
+        windowedSignal[idx] = signal[i] * windowValues[idx];
+    }
+
+    const useTrigCache = options.buffers?.cosTable && options.buffers.sinTable;
+
+    for (let pfIdx = startIdx; pfIdx < endIdx; pfIdx++) {
+        const p = pitchFrequencies[pfIdx];
+
+        let real = 0;
+        let imag = 0;
+        let cosDelta, sinDelta;
+
+        if (useTrigCache) {
+            cosDelta = options.buffers.cosTable[pfIdx];
+            sinDelta = options.buffers.sinTable[pfIdx];
+        } else {
+            const angleStep = (2 * PI * p.freq) / sampleRate;
+
+            // Optimization: Trigonometric recurrence
+            const delta = step * angleStep;
+            cosDelta = cos(delta);
+            sinDelta = sin(delta);
+        }
+
+        let c = 1.0; // cos(0)
+        let s = 0.0; // sin(0)
+
+        const wsLen = windowedSignal.length;
+        // Optimization: Iterate over the windowed buffer directly using a single index.
+        // This avoids the 'i' loop variable and step increment in the hot path.
+        for (let idx = 0; idx < wsLen; idx++) {
+            const sample = windowedSignal[idx];
+            real += sample * c;
+            imag += sample * s;
+
+            const nextC = c * cosDelta - s * sinDelta;
+            const nextS = s * cosDelta + c * sinDelta;
+            c = nextC;
+            s = nextS;
+        }
+
+        pitchEnergy[p.midi] = real * real + imag * imag;
+    }
+
+    // Harmonic Suppression: Remove overtones of low fundamentals
+    if (options.suppressHarmonics) {
+        for (let m = 24; m <= 72; m++) {
+            const energy = pitchEnergy[m];
+            if (energy <= 0) {
+                continue;
+            }
+
+            // Suppress 2nd harmonic (Octave) - REDUCED WEIGHTS
+            if (m + 12 < 128) {
+                pitchEnergy[m + 12] = max(0, pitchEnergy[m + 12] - energy * 0.2);
+            }
+            // Suppress 3rd harmonic (Perfect 5th + Octave)
+            if (m + 19 < 128) {
+                pitchEnergy[m + 19] = max(0, pitchEnergy[m + 19] - energy * 0.1);
+            }
+            // Suppress 4th harmonic (Two Octaves)
+            if (m + 24 < 128) {
+                pitchEnergy[m + 24] = max(0, pitchEnergy[m + 24] - energy * 0.1);
+            }
+            // Suppress 5th harmonic (Major 3rd + Two Octaves)
+            if (m + 28 < 128) {
+                pitchEnergy[m + 28] = max(0, pitchEnergy[m + 28] - energy * 0.05);
+            }
+        }
+    }
+
+    // Map suppressed pitch energy to 12-bin Chroma, RESPECTING minMidi/maxMidi
+    for (let m = 24; m <= 96; m++) {
+        if (m < minMidi || m > maxMidi) {
+            continue;
+        }
+
+        const mag = pitchEnergy[m];
+        let weight = 1.0;
+        // De-emphasize very low notes for chord detection to avoid walking bass interference
+        if (m < 48) {
+            weight = 0.6;
+        } else if (m < 72) {
+            weight = 1.2; // Focus on the "meat" of the chords
+        } else if (m > 80) {
+            weight = 0.5;
+        }
+
+        chroma[m % 12] += mag * weight;
+    }
+
+    if (options.skipSharpening) {
+        return chroma;
+    }
+
+    // Apply "Harmonic Sharpening"
+    const sharpened = new Float32Array(12);
+    for (let i = 0; i < 12; i++) {
+        const prev = chroma[(i - 1 + 12) % 12];
+        const next = chroma[(i + 1) % 12];
+        // Only keep bins that are local maxima to clear out spectral leakage
+        // We use a tolerance (0.85) to allow adjacent peaks of similar magnitude (e.g. Major 7th intervals C and B)
+        if (chroma[i] >= prev * 0.85 && chroma[i] >= next * 0.85 && chroma[i] > 0.1) {
+            sharpened[i] = chroma[i];
+        }
+    }
+
+    // Normalize
+    const maxVal = max(...sharpened);
+    if (maxVal > 0) {
+        for (let i = 0; i < 12; i++) {
+            sharpened[i] /= maxVal;
+        }
+    }
+
+    return sharpened;
+}
 
 export class ChordAnalyzerLite {
     constructor() {
@@ -80,7 +251,7 @@ export class ChordAnalyzerLite {
                     }
 
                     // Bias towards zero tuning offset (favors standard 440Hz)
-                    const offsetBias = 1.0 - Math.abs(offset) * 0.02;
+                    const offsetBias = 1.0 - abs(offset) * 0.02;
                     // Strong bias towards dominant/blues for groovier signals
                     const typeBias = type.startsWith('blues')
                         ? 1.2
@@ -147,7 +318,7 @@ export class ChordAnalyzerLite {
 
         for (let i = 0; i < 12; i++) {
             const sourceIdx = (i - amount + 12) % 12;
-            const idx1 = Math.floor(sourceIdx);
+            const idx1 = floor(sourceIdx);
             const idx2 = (idx1 + 1) % 12;
             const frac = sourceIdx - idx1;
             result[i] = chroma[idx1] * (1 - frac) + chroma[idx2] * frac;
@@ -183,7 +354,7 @@ export class ChordAnalyzerLite {
         // In synthetic tests without transients, downbeatOffset might be 0 but we check for sanity
         const alignmentOffset = pulse.downbeatOffset >= 0 ? pulse.downbeatOffset : 0;
 
-        let startSample = Math.floor((startOffset + alignmentOffset) * sampleRate);
+        let startSample = floor((startOffset + alignmentOffset) * sampleRate);
         // Safety: If alignment offset pushes us past the end, start at 0
         if (startSample >= fullSignal.length) {
             console.warn(
@@ -193,7 +364,7 @@ export class ChordAnalyzerLite {
         }
 
         const secondsPerBeat = 60 / bpm;
-        const samplesPerBeat = Math.floor(secondsPerBeat * sampleRate);
+        const samplesPerBeat = floor(secondsPerBeat * sampleRate);
 
         // Safety: If alignment offset leaves less than one beat, but the original signal was long enough, reset to 0
         if (
@@ -203,15 +374,13 @@ export class ChordAnalyzerLite {
             console.warn(
                 `[Analyzer-Lite] Alignment offset (${alignmentOffset.toFixed(3)}s) leaves insufficient data (< 1 beat). Resetting to 0.`,
             );
-            startSample = Math.floor(startOffset * sampleRate);
+            startSample = floor(startOffset * sampleRate);
         }
 
-        const endSample = options.endTime
-            ? Math.floor(options.endTime * sampleRate)
-            : fullSignal.length;
+        const endSample = options.endTime ? floor(options.endTime * sampleRate) : fullSignal.length;
         const signal = fullSignal.subarray(startSample, endSample);
 
-        const beats = Math.floor(signal.length / samplesPerBeat);
+        const beats = floor(signal.length / samplesPerBeat);
 
         // --- PASS 1: Global Key Inference ---
         // Analyze the entire signal with a large step to find the consensus key.
@@ -221,7 +390,7 @@ export class ChordAnalyzerLite {
             maxMidi: 84,
             skipSharpening: true,
             suppressHarmonics: false,
-            step: Math.max(4, Math.floor(signal.length / 1000000)),
+            step: max(4, floor(signal.length / 1000000)),
         });
         const globalKey = this.identifyGlobalKey(globalChroma);
         const tuningOffset = globalKey.tuningOffset;
@@ -244,14 +413,13 @@ export class ChordAnalyzerLite {
         const chromaBuffer = new Float32Array(12);
         const pitchEnergyBuffer = new Float32Array(128);
         const step = 4; // Default step
-        const numWindowSteps = Math.ceil(samplesPerBeat / step);
+        const numWindowSteps = ceil(samplesPerBeat / step);
         const windowValuesBuffer = new Float32Array(numWindowSteps);
         const windowedSignalBuffer = new Float32Array(numWindowSteps);
 
         // Pre-calculate window values
         for (let i = 0, idx = 0; i < samplesPerBeat; i += step, idx++) {
-            windowValuesBuffer[idx] =
-                0.5 * (1 - Math.cos((2 * Math.PI * i) / (samplesPerBeat - 1)));
+            windowValuesBuffer[idx] = 0.5 * (1 - cos((2 * PI * i) / (samplesPerBeat - 1)));
         }
 
         // Pre-calculate trig tables for analysis loop
@@ -259,10 +427,10 @@ export class ChordAnalyzerLite {
         const sinTable = new Float32Array(this.pitchFrequencies.length);
         for (let i = 0; i < this.pitchFrequencies.length; i++) {
             const p = this.pitchFrequencies[i];
-            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            const angleStep = (2 * PI * p.freq) / sampleRate;
             const delta = step * angleStep;
-            cosTable[i] = Math.cos(delta);
-            sinTable[i] = Math.sin(delta);
+            cosTable[i] = cos(delta);
+            sinTable[i] = sin(delta);
         }
 
         const sharedBuffers = {
@@ -309,7 +477,7 @@ export class ChordAnalyzerLite {
                 const x = window[i];
                 sum += x * x;
             }
-            const energy = Math.sqrt(sum / wLen);
+            const energy = sqrt(sum / wLen);
 
             // 1. Full Chromagram (for quality)
             // We raise minMidi to 48 (C3) to ignore the walking bass range for chord quality detection.
@@ -363,7 +531,7 @@ export class ChordAnalyzerLite {
 
         for (let i = 0; i < results.length; i++) {
             // Sliding window: [Previous, Current, Next]
-            const window = results.slice(Math.max(0, i - 1), Math.min(results.length, i + 2));
+            const window = results.slice(max(0, i - 1), min(results.length, i + 2));
             const counts = {};
 
             window.forEach((r) => {
@@ -440,8 +608,8 @@ export class ChordAnalyzerLite {
         const sampleRate = audioBuffer.sampleRate;
         const bpm = pulseData.bpm;
         const secondsPerBeat = 60 / bpm;
-        const samplesPerBeat = Math.floor(secondsPerBeat * sampleRate);
-        const startSample = Math.floor((pulseData.downbeatOffset || 0) * sampleRate);
+        const samplesPerBeat = floor(secondsPerBeat * sampleRate);
+        const startSample = floor((pulseData.downbeatOffset || 0) * sampleRate);
 
         // Safety check
         if (startSample >= signal.length) {
@@ -449,7 +617,7 @@ export class ChordAnalyzerLite {
         }
 
         const workingSignal = signal.subarray(startSample);
-        const beats = Math.floor(workingSignal.length / samplesPerBeat);
+        const beats = floor(workingSignal.length / samplesPerBeat);
         const rawMelody = [];
 
         // Key Bias logic
@@ -469,10 +637,10 @@ export class ChordAnalyzerLite {
         const step = 4;
         for (let i = 0; i < this.pitchFrequencies.length; i++) {
             const p = this.pitchFrequencies[i];
-            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            const angleStep = (2 * PI * p.freq) / sampleRate;
             const delta = step * angleStep;
-            cosTable[i] = Math.cos(delta);
-            sinTable[i] = Math.sin(delta);
+            cosTable[i] = cos(delta);
+            sinTable[i] = sin(delta);
         }
 
         let lastMidi = 60; // Middle C anchor
@@ -493,7 +661,7 @@ export class ChordAnalyzerLite {
                 const x = window[i];
                 sum += x * x;
             }
-            const rms = Math.sqrt(sum / wLen);
+            const rms = sqrt(sum / wLen);
             if (rms < 0.01) {
                 rawMelody.push({ beat: b, midi: null, energy: 0 });
                 continue;
@@ -503,8 +671,8 @@ export class ChordAnalyzerLite {
             let maxScore = -1;
             let bestMidi = -1;
 
-            const startIdx = Math.max(0, minMidi - 24);
-            const endIdx = Math.min(this.pitchFrequencies.length, maxMidi - 24 + 1);
+            const startIdx = max(0, minMidi - 24);
+            const endIdx = min(this.pitchFrequencies.length, maxMidi - 24 + 1);
 
             for (let pfIdx = startIdx; pfIdx < endIdx; pfIdx++) {
                 const p = this.pitchFrequencies[pfIdx];
@@ -549,9 +717,9 @@ export class ChordAnalyzerLite {
 
                 // --- 3. Melodic Continuity (Soloist-Inspired) ---
                 // Penalize large leaps from the previous detected MIDI note
-                const dist = Math.abs(p.midi - lastMidi);
+                const dist = abs(p.midi - lastMidi);
                 if (dist > 2) {
-                    score *= Math.max(0.1, 1.0 - (dist - 2) * 0.1);
+                    score *= max(0.1, 1.0 - (dist - 2) * 0.1);
                 }
 
                 if (score > maxScore) {
@@ -561,7 +729,7 @@ export class ChordAnalyzerLite {
             }
 
             // Normalize energy score using the raw energy of the winner
-            const normalizedEnergy = Math.min(1.0, maxScore / 130);
+            const normalizedEnergy = min(1.0, maxScore / 130);
 
             rawMelody.push({
                 beat: b,
@@ -593,8 +761,8 @@ export class ChordAnalyzerLite {
                 prev.midi !== null &&
                 next.midi !== null
             ) {
-                const distPrev = Math.abs(curr.midi - prev.midi);
-                const distNext = Math.abs(curr.midi - next.midi);
+                const distPrev = abs(curr.midi - prev.midi);
+                const distNext = abs(curr.midi - next.midi);
 
                 // If it's a sudden leap and return (Outlier Blip)
                 if (distPrev > 7 && distNext > 7 && prev.midi === next.midi) {
@@ -634,13 +802,12 @@ export class ChordAnalyzerLite {
 
         // 1. Calculate Spectral Flux...
         // We use 20ms windows (50Hz resolution) to capture transients
-        const winSize = Math.floor(sampleRate * 0.02);
-        const hopSize = Math.floor(sampleRate * 0.01); // 10ms hop
+        const winSize = floor(sampleRate * 0.02);
+        const hopSize = floor(sampleRate * 0.01); // 10ms hop
 
         // Only analyze first 30s for pulse to save time (unless duration is close)
-        const pulseMaxSeconds = Math.max(30, durationRaw + 1);
-        const numWindows =
-            Math.floor(Math.min(signal.length, sampleRate * pulseMaxSeconds) / hopSize) - 2;
+        const pulseMaxSeconds = max(30, durationRaw + 1);
+        const numWindows = floor(min(signal.length, sampleRate * pulseMaxSeconds) / hopSize) - 2;
 
         const flux = new Float32Array(numWindows);
         let lastSpectrum = new Float32Array(12); // Use 12-bin chroma spectrum for flux
@@ -649,13 +816,13 @@ export class ChordAnalyzerLite {
         const chromaBuffer = new Float32Array(12);
         const pitchEnergyBuffer = new Float32Array(128);
         const step = 8;
-        const numWindowSteps = Math.ceil(winSize / step);
+        const numWindowSteps = ceil(winSize / step);
         const windowValuesBuffer = new Float32Array(numWindowSteps);
         const windowedSignalBuffer = new Float32Array(numWindowSteps);
 
         // Pre-calculate window values for this winSize
         for (let i = 0, idx = 0; i < winSize; i += step, idx++) {
-            windowValuesBuffer[idx] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (winSize - 1)));
+            windowValuesBuffer[idx] = 0.5 * (1 - cos((2 * PI * i) / (winSize - 1)));
         }
 
         // Pre-calculate trig tables for pulse detection loop
@@ -663,10 +830,10 @@ export class ChordAnalyzerLite {
         const sinTable = new Float32Array(this.pitchFrequencies.length);
         for (let i = 0; i < this.pitchFrequencies.length; i++) {
             const p = this.pitchFrequencies[i];
-            const angleStep = (2 * Math.PI * p.freq) / sampleRate;
+            const angleStep = (2 * PI * p.freq) / sampleRate;
             const delta = step * angleStep;
-            cosTable[i] = Math.cos(delta);
-            sinTable[i] = Math.sin(delta);
+            cosTable[i] = cos(delta);
+            sinTable[i] = sin(delta);
         }
 
         const calcOptions = {
@@ -713,10 +880,7 @@ export class ChordAnalyzerLite {
         // --- Flux-Based Tail Compensation ---
         // Use the last detected transient to determine the musical end.
         // We add a small buffer (0.5s) to the last transient.
-        effectiveEndTime = Math.min(
-            rawEndTime,
-            (lastActiveHop * hopSize + winSize) / sampleRate + 0.5,
-        );
+        effectiveEndTime = min(rawEndTime, (lastActiveHop * hopSize + winSize) / sampleRate + 0.5);
 
         // If the trimmed duration is very close to the raw duration, don't trim.
         if (rawEndTime - effectiveEndTime < 0.2) {
@@ -726,7 +890,7 @@ export class ChordAnalyzerLite {
         const duration = effectiveEndTime - startTime;
 
         // Half-wave rectification and normalization of flux
-        const maxFlux = Math.max(...flux);
+        const maxFlux = max(...flux);
         const onsets = flux.map((v) => v / (maxFlux || 1));
 
         if (options.onProgress) {
@@ -745,8 +909,8 @@ export class ChordAnalyzerLite {
                 let bpm = (totalBeats * 60) / duration;
 
                 // Favor integers for structural targets if very close
-                if (Math.abs(bpm - Math.round(bpm)) < 0.1) {
-                    bpm = Math.round(bpm);
+                if (abs(bpm - round(bpm)) < 0.1) {
+                    bpm = round(bpm);
                 }
 
                 if (bpm >= 50 && bpm <= 200) {
@@ -754,7 +918,7 @@ export class ChordAnalyzerLite {
                         bpm,
                         bars,
                         meter,
-                        lag: Math.round(60 / (bpm * 0.01)),
+                        lag: round(60 / (bpm * 0.01)),
                     });
                 }
             });
@@ -768,7 +932,7 @@ export class ChordAnalyzerLite {
         const correlations = new Float32Array(maxLag + 1);
 
         if (manualBpm > 0) {
-            bestLag = Math.round(60 / (manualBpm * 0.01));
+            bestLag = round(60 / (manualBpm * 0.01));
         } else {
             for (let lag = minLag; lag <= maxLag; lag++) {
                 if (lag % 20 === 0) {
@@ -785,10 +949,10 @@ export class ChordAnalyzerLite {
                 const currentBPM = 60 / (lag * 0.01);
 
                 for (const cand of structuralCandidates) {
-                    const bpmDiff = Math.abs(currentBPM - cand.bpm);
+                    const bpmDiff = abs(currentBPM - cand.bpm);
                     // If within 2.5%, apply a boost. Favor closer matches.
                     if (bpmDiff < cand.bpm * 0.025) {
-                        structuralBoost = Math.max(
+                        structuralBoost = max(
                             structuralBoost,
                             2.0 * (1 - bpmDiff / (cand.bpm * 0.025)),
                         );
@@ -827,7 +991,7 @@ export class ChordAnalyzerLite {
             while (changed) {
                 changed = false;
                 for (const m of [2, 3, 4]) {
-                    const slowerLag = Math.round(currentLag * m);
+                    const slowerLag = round(currentLag * m);
                     if (slowerLag > maxLag) {
                         continue;
                     }
@@ -860,7 +1024,7 @@ export class ChordAnalyzerLite {
                 if (currentLag > 85) {
                     // < 70 BPM
                     for (const m of [2, 3, 4]) {
-                        const fasterLag = Math.round(currentLag / m);
+                        const fasterLag = round(currentLag / m);
                         if (fasterLag < minLag) {
                             continue;
                         }
@@ -893,12 +1057,12 @@ export class ChordAnalyzerLite {
         // 1. Check for a structural match using the EFFECTIVE (tail-trimmed) duration
         // This is preferred as it ignores silent tails.
         bestStructuralMatch = structuralCandidates
-            .filter((c) => Math.abs(c.bpm - primaryBPM) < snapThresholdBPM)
-            .sort((a, b) => Math.abs(a.bpm - primaryBPM) - Math.abs(b.bpm - primaryBPM))[0];
+            .filter((c) => abs(c.bpm - primaryBPM) < snapThresholdBPM)
+            .sort((a, b) => abs(a.bpm - primaryBPM) - abs(b.bpm - primaryBPM))[0];
 
         if (bestStructuralMatch) {
             primaryBPM = parseFloat(bestStructuralMatch.bpm.toFixed(2));
-            bestLag = Math.round(60 / (primaryBPM * 0.01));
+            bestLag = round(60 / (primaryBPM * 0.01));
         } else {
             // 2. Otherwise, check if the RAW primary BPM matches a structural anchor for the FULL duration
             // This handles perfectly trimmed loops where tail-trimming might be too aggressive.
@@ -914,21 +1078,21 @@ export class ChordAnalyzerLite {
             });
 
             bestStructuralMatch = structuralCandidatesFull
-                .filter((c) => Math.abs(c.bpm - primaryBPM) < snapThresholdBPM)
-                .sort((a, b) => Math.abs(a.bpm - primaryBPM) - Math.abs(b.bpm - primaryBPM))[0];
+                .filter((c) => abs(c.bpm - primaryBPM) < snapThresholdBPM)
+                .sort((a, b) => abs(a.bpm - primaryBPM) - abs(b.bpm - primaryBPM))[0];
 
             if (bestStructuralMatch) {
                 primaryBPM = parseFloat(bestStructuralMatch.bpm.toFixed(2));
-                bestLag = Math.round(60 / (primaryBPM * 0.01));
+                bestLag = round(60 / (primaryBPM * 0.01));
             }
         }
 
         // Generate candidates
         const candidatesMap = new Map();
         [2, 1, 0.5, 4, 0.25].forEach((mult) => {
-            const lag = Math.round(bestLag * mult);
+            const lag = round(bestLag * mult);
             if (lag >= minLag && lag <= maxLag) {
-                const bpm = mult === 1 ? primaryBPM : Math.round(60 / (lag * 0.01));
+                const bpm = mult === 1 ? primaryBPM : round(60 / (lag * 0.01));
                 if (!candidatesMap.has(bpm)) {
                     candidatesMap.set(bpm, correlations[lag] || 0);
                 }
@@ -985,8 +1149,8 @@ export class ChordAnalyzerLite {
 
         let finalBpm = candidates[0]?.bpm || primaryBPM;
         // Near-integer rounding (e.g. 119.78 -> 120)
-        if (Math.abs(finalBpm - Math.round(finalBpm)) < 0.3) {
-            finalBpm = Math.round(finalBpm);
+        if (abs(finalBpm - round(finalBpm)) < 0.3) {
+            finalBpm = round(finalBpm);
         }
 
         return {
@@ -1017,172 +1181,7 @@ export class ChordAnalyzerLite {
      * single-frequency filters with Hann windowing and Harmonic Suppression.
      */
     calculateChromagram(signal, sampleRate, options = {}) {
-        let chroma, pitchEnergy, windowValues;
-
-        if (options.buffers) {
-            chroma = options.buffers.chroma;
-            chroma.fill(0);
-            pitchEnergy = options.buffers.pitchEnergy;
-            pitchEnergy.fill(0);
-        } else {
-            chroma = new Float32Array(12).fill(0);
-            pitchEnergy = new Float32Array(128).fill(0); // High-res pitch map
-        }
-
-        const len = signal.length;
-        const step = options.step || 4;
-        const minMidi = options.minMidi || 0;
-        const maxMidi = options.maxMidi || 127;
-
-        // Pre-calculate window function
-        if (options.buffers?.windowValues) {
-            windowValues = options.buffers.windowValues;
-        } else {
-            const numSteps = Math.ceil(len / step);
-            windowValues = new Float32Array(numSteps);
-            for (let i = 0, idx = 0; i < len; i += step, idx++) {
-                windowValues[idx] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (len - 1)));
-            }
-        }
-
-        // Optimization: Determine loop bounds based on MIDI range
-        // pitchFrequencies starts at MIDI 24 (Index 0)
-        let startIdx = 0;
-        let endIdx = this.pitchFrequencies.length;
-
-        if (!options.suppressHarmonics) {
-            // If suppression is OFF, we only need to calculate the requested range.
-            // clamp to valid array indices
-            startIdx = Math.max(0, Math.min(this.pitchFrequencies.length, minMidi - 24));
-            endIdx = Math.max(0, Math.min(this.pitchFrequencies.length, maxMidi - 24 + 1));
-        }
-
-        // Pre-windowing Optimization: Apply window function once, outside the frequency loop.
-        let windowedSignal;
-        if (options.buffers?.windowedSignal) {
-            windowedSignal = options.buffers.windowedSignal;
-        } else {
-            const numSteps = Math.ceil(len / step);
-            windowedSignal = new Float32Array(numSteps);
-        }
-
-        for (let i = 0, idx = 0; i < len; i += step, idx++) {
-            windowedSignal[idx] = signal[i] * windowValues[idx];
-        }
-
-        const useTrigCache = options.buffers?.cosTable && options.buffers.sinTable;
-
-        for (let pfIdx = startIdx; pfIdx < endIdx; pfIdx++) {
-            const p = this.pitchFrequencies[pfIdx];
-
-            let real = 0;
-            let imag = 0;
-            let cosDelta, sinDelta;
-
-            if (useTrigCache) {
-                cosDelta = options.buffers.cosTable[pfIdx];
-                sinDelta = options.buffers.sinTable[pfIdx];
-            } else {
-                const angleStep = (2 * Math.PI * p.freq) / sampleRate;
-
-                // Optimization: Trigonometric recurrence
-                const delta = step * angleStep;
-                cosDelta = Math.cos(delta);
-                sinDelta = Math.sin(delta);
-            }
-
-            let c = 1.0; // cos(0)
-            let s = 0.0; // sin(0)
-
-            const wsLen = windowedSignal.length;
-            // Optimization: Iterate over the windowed buffer directly using a single index.
-            // This avoids the 'i' loop variable and step increment in the hot path.
-            for (let idx = 0; idx < wsLen; idx++) {
-                const sample = windowedSignal[idx];
-                real += sample * c;
-                imag += sample * s;
-
-                const nextC = c * cosDelta - s * sinDelta;
-                const nextS = s * cosDelta + c * sinDelta;
-                c = nextC;
-                s = nextS;
-            }
-
-            pitchEnergy[p.midi] = real * real + imag * imag;
-        }
-
-        // Harmonic Suppression: Remove overtones of low fundamentals
-        if (options.suppressHarmonics) {
-            for (let m = 24; m <= 72; m++) {
-                const energy = pitchEnergy[m];
-                if (energy <= 0) {
-                    continue;
-                }
-
-                // Suppress 2nd harmonic (Octave) - REDUCED WEIGHTS
-                if (m + 12 < 128) {
-                    pitchEnergy[m + 12] = Math.max(0, pitchEnergy[m + 12] - energy * 0.2);
-                }
-                // Suppress 3rd harmonic (Perfect 5th + Octave)
-                if (m + 19 < 128) {
-                    pitchEnergy[m + 19] = Math.max(0, pitchEnergy[m + 19] - energy * 0.1);
-                }
-                // Suppress 4th harmonic (Two Octaves)
-                if (m + 24 < 128) {
-                    pitchEnergy[m + 24] = Math.max(0, pitchEnergy[m + 24] - energy * 0.1);
-                }
-                // Suppress 5th harmonic (Major 3rd + Two Octaves)
-                if (m + 28 < 128) {
-                    pitchEnergy[m + 28] = Math.max(0, pitchEnergy[m + 28] - energy * 0.05);
-                }
-            }
-        }
-
-        // Map suppressed pitch energy to 12-bin Chroma, RESPECTING minMidi/maxMidi
-        for (let m = 24; m <= 96; m++) {
-            if (m < minMidi || m > maxMidi) {
-                continue;
-            }
-
-            const mag = pitchEnergy[m];
-            let weight = 1.0;
-            // De-emphasize very low notes for chord detection to avoid walking bass interference
-            if (m < 48) {
-                weight = 0.6;
-            } else if (m < 72) {
-                weight = 1.2; // Focus on the "meat" of the chords
-            } else if (m > 80) {
-                weight = 0.5;
-            }
-
-            chroma[m % 12] += mag * weight;
-        }
-
-        if (options.skipSharpening) {
-            return chroma;
-        }
-
-        // Apply "Harmonic Sharpening"
-        const sharpened = new Float32Array(12);
-        for (let i = 0; i < 12; i++) {
-            const prev = chroma[(i - 1 + 12) % 12];
-            const next = chroma[(i + 1) % 12];
-            // Only keep bins that are local maxima to clear out spectral leakage
-            // We use a tolerance (0.85) to allow adjacent peaks of similar magnitude (e.g. Major 7th intervals C and B)
-            if (chroma[i] >= prev * 0.85 && chroma[i] >= next * 0.85 && chroma[i] > 0.1) {
-                sharpened[i] = chroma[i];
-            }
-        }
-
-        // Normalize
-        const max = Math.max(...sharpened);
-        if (max > 0) {
-            for (let i = 0; i < 12; i++) {
-                sharpened[i] /= max;
-            }
-        }
-
-        return sharpened;
+        return calculateChromagramStandalone(signal, sampleRate, options, this.pitchFrequencies);
     }
 
     identifyChord(chroma, options = {}) {
@@ -1295,7 +1294,7 @@ export class ChordAnalyzerLite {
             let bassEnergy = chroma[bassIdx];
             // If bassChroma is provided, use it to capture energy below the main analysis range (e.g. C1-B2)
             if (options.bassChroma) {
-                bassEnergy = Math.max(bassEnergy, options.bassChroma[bassIdx]);
+                bassEnergy = max(bassEnergy, options.bassChroma[bassIdx]);
             }
 
             // Significant bass presence (at least 12% of total chromagram energy to avoid jitter in walking lines)

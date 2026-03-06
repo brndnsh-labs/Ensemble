@@ -142,6 +142,200 @@ const instrumentStateMap = {
     harmony,
 };
 
+export function setChordsParam(param, value) {
+    switch (param) {
+        case 'enabled':
+            chords.enabled = value;
+            break;
+        case 'volume':
+            chords.volume = value;
+            break;
+        case 'reverb':
+            chords.reverb = value;
+            break;
+        case 'instrument':
+            chords.instrument = value;
+            break;
+        case 'filterCutoff':
+            chords.filterCutoff = value;
+            break;
+        case 'attack':
+            chords.attack = value;
+            break;
+        case 'release':
+            chords.release = value;
+            break;
+        case 'sustain':
+            chords.sustain = value;
+            break;
+        case 'shape':
+            chords.shape = value;
+            break;
+        case 'delay':
+            chords.delay = value;
+            break;
+        case 'compingStyle':
+            chords.compingStyle = value;
+            break;
+        case 'inversionStrategy':
+            chords.inversionStrategy = value;
+            break;
+        case 'humanizeVoiceLeading':
+            chords.humanizeVoiceLeading = value;
+            break;
+        case 'drive':
+            chords.drive = value;
+            break;
+        case 'tremoloRate':
+            chords.tremoloRate = value;
+            break;
+        case 'tremoloDepth':
+            chords.tremoloDepth = value;
+            break;
+        case 'chorusRate':
+            chords.chorusRate = value;
+            break;
+        case 'chorusDepth':
+            chords.chorusDepth = value;
+            break;
+        case 'octaveShift':
+            chords.octaveShift = value;
+            break;
+        default:
+            console.warn(`[State] Unknown chords param: ${param}`);
+            break;
+    }
+}
+
+export function setBassParam(param, value) {
+    switch (param) {
+        case 'enabled':
+            bass.enabled = value;
+            break;
+        case 'volume':
+            bass.volume = value;
+            break;
+        case 'reverb':
+            bass.reverb = value;
+            break;
+        case 'instrument':
+            bass.instrument = value;
+            break;
+        case 'pattern':
+            bass.pattern = value;
+            break;
+        case 'octave':
+            bass.octave = value;
+            break;
+        case 'glide':
+            bass.glide = value;
+            break;
+        case 'drive':
+            bass.drive = value;
+            break;
+        case 'release':
+            bass.release = value;
+            break;
+        case 'pocketOffset':
+            bass.pocketOffset = value;
+            break;
+        default:
+            console.warn(`[State] Unknown bass param: ${param}`);
+            break;
+    }
+}
+
+export function setSoloistParam(param, value) {
+    switch (param) {
+        case 'enabled':
+            soloist.enabled = value;
+            break;
+        case 'volume':
+            soloist.volume = value;
+            break;
+        case 'reverb':
+            soloist.reverb = value;
+            break;
+        case 'instrument':
+            soloist.instrument = value;
+            break;
+        case 'drive':
+            soloist.drive = value;
+            break;
+        case 'delay':
+            soloist.delay = value;
+            break;
+        case 'chorus':
+            soloist.chorus = value;
+            break;
+        case 'density':
+            soloist.density = value;
+            break;
+        case 'syncopation':
+            soloist.syncopation = value;
+            break;
+        case 'motifRange':
+            soloist.motifRange = value;
+            break;
+        case 'isResting':
+            soloist.isResting = value;
+            break;
+        case 'currentPhraseSteps':
+            soloist.currentPhraseSteps = value;
+            break;
+        case 'lastNoteMidi':
+            soloist.lastNoteMidi = value;
+            break;
+        default:
+            console.warn(`[State] Unknown soloist param: ${param}`);
+            break;
+    }
+}
+
+export function setHarmonyParam(param, value) {
+    switch (param) {
+        case 'enabled':
+            harmony.enabled = value;
+            break;
+        case 'volume':
+            harmony.volume = value;
+            break;
+        case 'reverb':
+            harmony.reverb = value;
+            break;
+        case 'instrument':
+            harmony.instrument = value;
+            break;
+        case 'style':
+            harmony.style = value;
+            break;
+        case 'voices':
+            harmony.voices = value;
+            break;
+        case 'density':
+            harmony.density = value;
+            break;
+        case 'attack':
+            harmony.attack = value;
+            break;
+        case 'release':
+            harmony.release = value;
+            break;
+        case 'filterCutoff':
+            harmony.filterCutoff = value;
+            break;
+        case 'glide':
+            harmony.glide = value;
+            break;
+        case 'pocketOffset':
+            harmony.pocketOffset = value;
+            break;
+        default:
+            console.warn(`[State] Unknown harmony param: ${param}`);
+            break;
+    }
+}
+
 export function instrumentReducer(action, payload) {
     switch (action) {
         case ACTIONS.IMPORT_MUSICXML: {
