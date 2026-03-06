@@ -25,7 +25,7 @@ describe('Reggae Groove Integrity', () => {
     it('should assign valid Reggae Motifs', () => {
         const motifs = new Set();
         for (let i = 0; i < 20; i++) {
-            motifs.add(getDrumMotif(i, 'Reggae', true, 0.8));
+            motifs.add(getDrumMotif((((i) * 137 + 42) % 256) / 256, 'Reggae', 0.8));
         }
         expect(motifs.has(0)).toBe(true);
         expect(motifs.has(1)).toBe(true);
@@ -50,7 +50,7 @@ describe('Reggae Groove Integrity', () => {
             getState.mockReturnValue(mockState);
             let barIndexMotif0 = -1;
             for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(i, 'Reggae', true, 0.8) === 0 && i % 4 !== 3) {
+                if (getDrumMotif((((i) * 137 + 42) % 256) / 256, 'Reggae', 0.8) === 0 && i % 4 !== 3) {
                     barIndexMotif0 = i;
                     break;
                 }
@@ -73,7 +73,7 @@ describe('Reggae Groove Integrity', () => {
             getState.mockReturnValue(mockState);
             let barIndexMotif1 = -1;
             for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(i, 'Reggae', true, 0.8) === 1 && i % 4 !== 3) {
+                if (getDrumMotif((((i) * 137 + 42) % 256) / 256, 'Reggae', 0.8) === 1 && i % 4 !== 3) {
                     barIndexMotif1 = i;
                     break;
                 }

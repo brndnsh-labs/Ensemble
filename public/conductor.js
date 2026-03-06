@@ -539,21 +539,15 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
 
                 // --- 3. THE DRUM SEED (Creativity Memory) ---
                 if (groove.creativity && nextSection) {
-                    // Re-evaluate the drum seed based on current band intensity
-                    // Variation 0: Standard, 1: Sparse/Linear, 2: Driven/Complex
-                    let seed = 0;
-                    const rand = Math.random();
-                    if (playback.bandIntensity > 0.7) {
-                        seed = rand < 0.7 ? 2 : rand < 0.9 ? 0 : 1;
-                    } else if (playback.bandIntensity < 0.4) {
-                        seed = rand < 0.6 ? 1 : rand < 0.9 ? 0 : 2;
-                    } else {
-                        seed = rand < 0.5 ? 0 : rand < 0.8 ? 1 : 2;
+                    // Re-evaluate the drum seed only if it hasn't been set for this section
+                    if (groove.sectionSeedMap[nextSection.id] === undefined) {
+                        // Generate a robust float seed (0.0 to 1.0) to serve as the abstract pool marker
+                        const seed = Math.random();
+                        dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed });
                     }
-                    dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed });
                 } else if (!groove.creativity && nextSection) {
                     // Reset or force to Standard if creativity is toggled off mid-song
-                    dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed: 0 });
+                    dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed: 0.5 });
                 }
             }
         }

@@ -12,12 +12,12 @@ describe('Rock Groove Integrity', () => {
     });
 
     it('should assign valid Rock Motifs based on seed and complexity', () => {
-        expect(getDrumMotif(0, 'Rock', false, 0.2)).toBe(0); // Low complexity = Standard
+        expect(getDrumMotif((((0) * 137 + 0) % 256) / 256, 'Rock', 0.2)).toBe(0); // Low complexity = Standard
 
         // At high complexity, we expect non-zero motifs depending on the barIndex seed
         const motifs = new Set();
         for (let i = 0; i < 20; i++) {
-            motifs.add(getDrumMotif(i, 'Rock', true, 0.8));
+            motifs.add(getDrumMotif((((i) * 137 + 42) % 256) / 256, 'Rock', 0.8));
         }
         expect(motifs.has(1)).toBe(true);
         expect(motifs.has(2)).toBe(true);
@@ -51,7 +51,7 @@ describe('Rock Groove Integrity', () => {
             // Find a barIndex that maps to Motif 1
             let barIndexMotif1 = -1;
             for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(i, 'Rock', true, 0.8) === 1 && i % 4 !== 3) {
+                if (getDrumMotif((((i) * 137 + 42) % 256) / 256, 'Rock', 0.8) === 1 && i % 4 !== 3) {
                     barIndexMotif1 = i;
                     break;
                 }
