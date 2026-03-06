@@ -9,6 +9,8 @@ const { arranger, playback } = getState();
 
 import { ACTIONS } from '../types.js';
 
+const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s-_]/g;
+
 export function ExportModal() {
     const isOpen = useEnsembleState((s) => s.playback.modals.export);
     const [filename, setFilename] = useState('Ensemble Export');
@@ -28,7 +30,7 @@ export function ExportModal() {
     useEffect(() => {
         if (isOpen) {
             let defaultName = arranger.lastChordPreset || 'Ensemble Export';
-            defaultName = defaultName.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
+            defaultName = defaultName.replace(FILENAME_CLEANUP_PATTERN, '').trim();
             setFilename(`${defaultName} - ${arranger.key} - ${playback.bpm}bpm`);
         }
     }, [isOpen]);

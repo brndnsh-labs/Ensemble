@@ -1,3 +1,5 @@
+const NOTE_MATCH_PATTERN = /^([A-G](?:[#b\u266F\u266D])?)(.*)/i;
+
 import { transformRelativeProgression, validateProgression } from './chords.js';
 import { conductorState } from './conductor.js';
 import { KEY_ORDER } from './config.js';
@@ -185,7 +187,7 @@ export function transposeKey(delta) {
     arranger.sections.forEach((section) => {
         const parts = section.value.split(/([\s,|,-]+)/);
         const transposed = parts.map((part) => {
-            const noteMatch = part.match(/^([A-G](?:[#b\u266F\u266D])?)(.*)/i);
+            const noteMatch = part.match(NOTE_MATCH_PATTERN);
             if (noteMatch && !isMusicalNotation(part)) {
                 let rootStr = noteMatch[1];
                 // Normalize Unicode to ASCII for lookup
