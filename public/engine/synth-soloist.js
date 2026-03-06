@@ -237,7 +237,8 @@ function playTrumpet(
     osc1.type = 'sawtooth';
 
     const osc2 = ctx.createOscillator();
-    osc2.type = 'square';
+    osc2.type = 'sawtooth';
+    osc2.detune.value = 5; // Slight detune for thickness
 
     voiceObj.nodes.push(osc1, osc2);
 
@@ -266,18 +267,28 @@ function playTrumpet(
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
 
-    // Brass swell
-    filter.frequency.setValueAtTime(clampFreq(freq * 1.5), playTime);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 5), playTime + 0.06);
+    // Brass swell - slower, warmer bloom
+    filter.frequency.setValueAtTime(clampFreq(freq * 1.2), playTime);
+    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 4.0), playTime + 0.08);
     filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2.5), playTime + 0.15);
 
-    filter.Q.value = 1.5;
+    filter.Q.value = 0.8; // Lower resonance to avoid synth-brass tone
 
     voiceObj.cleanup.push(filter);
 
+    // Formant/Bell filter
+    const bellFilter = ctx.createBiquadFilter();
+    bellFilter.type = 'peaking';
+    bellFilter.frequency.value = 1200; // Typical trumpet bell resonance
+    bellFilter.Q.value = 1.5;
+    bellFilter.gain.value = 4; // Slight boost for presence
+
+    voiceObj.cleanup.push(bellFilter);
+
     osc1.connect(filter);
     osc2.connect(filter);
-    filter.connect(outputGain);
+    filter.connect(bellFilter);
+    bellFilter.connect(outputGain);
 
     const attack = isLegato ? 0.005 : 0.02;
 
@@ -325,6 +336,7 @@ function playSaxophone(
 
     const osc2 = ctx.createOscillator();
     osc2.type = 'triangle';
+    osc2.detune.value = -7; // Beating effect for reedy character
 
     voiceObj.nodes.push(osc1, osc2);
 
@@ -350,34 +362,59 @@ function playSaxophone(
         voiceObj.cleanup.push(vibGain);
     }
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
+    // Parallel Formant Filters (Alto Sax Core)
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass';
+    f1.frequency.value = 900; // Alto core
+    f1.Q.value = 3.0;
 
-    // Static or slight sweep for sax formant
-    filter.frequency.setValueAtTime(clampFreq(freq * 2.0), playTime);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2.5), playTime + 0.05);
+    const f2 = ctx.createBiquadFilter();
+    f2.type = 'bandpass';
+    f2.frequency.value = 2400; // Reedy bite
+    f2.Q.value = 4.0;
 
-    filter.Q.value = 4.0;
+    voiceObj.cleanup.push(f1, f2);
 
-    voiceObj.cleanup.push(filter);
+    // Breath Liveness (Subtle Gain LFO)
+    const breathLfo = ctx.createOscillator();
+    breathLfo.frequency.value = 3.5; // Natural breath fluctuation
+    const breathGain = ctx.createGain();
+    breathGain.gain.value = 0.05; // Subtle amplitude modulation
 
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(outputGain);
+    // We need a base gain to modulate
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 1.0;
 
-    const attack = isLegato ? 0.005 : 0.05;
+    breathLfo.connect(breathGain);
+    breathGain.connect(masterGain.gain);
+
+    voiceObj.nodes.push(breathLfo);
+    voiceObj.cleanup.push(breathGain, masterGain);
+
+    osc1.connect(f1);
+    osc2.connect(f1);
+    osc1.connect(f2);
+    osc2.connect(f2);
+
+    f1.connect(masterGain);
+    f2.connect(masterGain);
+    masterGain.connect(outputGain);
+
+    const attack = isLegato ? 0.008 : 0.04;
 
     outputGain.gain.setValueAtTime(0, playTime);
-    // Bandpass significantly drops overall amplitude, compensate with 2.5x
-    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, attack);
+    // Parallel bandpass + higher Q needs more boost to match other presets
+    outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1); // release
 
     osc1.start(playTime);
     osc2.start(playTime);
+    breathLfo.start(playTime);
 
     const stopTime = playTime + duration + 0.2;
     osc1.stop(stopTime);
     osc2.stop(stopTime);
+    breathLfo.stop(stopTime);
 
     // Only apply vibrato if note is long enough
     if (duration > 0.15 && soloist.mode !== 'piano') {
