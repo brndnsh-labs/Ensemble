@@ -1,9 +1,8 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
-    entropyMultiplier: 0.15,
-    blockAdjacentSnare: false,
+    ...DEFAULT_CONFIG,
     exemptFromPulseShaping: true,
-    dillaFeel: false,
-    backbeatCrack: false,
 };
 
 /**
@@ -14,7 +13,7 @@ export const config = {
  * 3: Double Time (Maximum energy Skate Punk)
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.35) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Pure Ska feel at low intensity
     }
 
@@ -59,20 +58,20 @@ export function applyOverrides(context, state) {
         // Core Offbeat Emphasis (Steps 2, 6, 10, 14)
         if (loopStep % 4 === 2) {
             shouldPlay = true;
-            velocity = 1.3 + intensity * 0.2; // Extra emphasis
+            velocity = scaleVelocity(1.3, intensity, 0.2); // Extra emphasis
 
             // Splashy Open Hats as intensity rises
-            if (intensity > 0.6 && Math.random() < 0.4 * intensity) {
+            if (intensity > 0.6 && roll(0.4, intensity)) {
                 soundName = 'Open';
             }
         } else if (activeMotif >= 1 && loopStep % 2 === 0) {
             // Constant 8th notes for 2-step/D-Beat
             shouldPlay = true;
-            velocity = 0.85 + intensity * 0.1;
+            velocity = scaleVelocity(0.85, intensity, 0.1);
         }
 
         // Occasional Crash on the One
-        if (loopStep === 0 && intensity > 0.85 && Math.random() < 0.3) {
+        if (loopStep === 0 && intensity > 0.85 && roll(0.3)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.4;
@@ -104,7 +103,7 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            velocity = 1.2 + intensity * 0.15;
+            velocity = scaleVelocity(1.2, intensity, 0.15);
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
@@ -112,7 +111,7 @@ export function applyOverrides(context, state) {
         // Solid Backbeat (Critique requirement)
         if (loopStep === 4 || loopStep === 12) {
             shouldPlay = true;
-            velocity = 1.15 + intensity * 0.15;
+            velocity = scaleVelocity(1.15, intensity, 0.15);
         }
 
         // --- Turnaround Fills ---

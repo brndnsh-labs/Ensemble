@@ -1,9 +1,9 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
+    ...DEFAULT_CONFIG,
     entropyMultiplier: 0.08,
     blockAdjacentSnare: true,
-    exemptFromPulseShaping: false,
-    dillaFeel: false,
-    backbeatCrack: false,
 };
 
 /**
@@ -14,7 +14,7 @@ export const config = {
  * 3: Dynamic Acoustic (16th note shimmer)
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.35) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Pure Cajon feel at low intensity
     }
 
@@ -68,14 +68,14 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            velocity = 0.85 + intensity * 0.15 + Math.random() * 0.1;
+            velocity = scaleVelocity(0.85, intensity, 0.15) + Math.random() * 0.1;
         }
 
         // Occasional ghost notes at high intensity
         if (intensity > 0.8 && activeMotif === 3) {
-            if ([3, 7, 11, 15].includes(loopStep) && Math.random() < 0.25) {
+            if ([3, 7, 11, 15].includes(loopStep) && roll(0.25)) {
                 shouldPlay = true;
-                velocity = 0.2 + intensity * 0.2;
+                velocity = scaleVelocity(0.2, intensity, 0.2);
                 soundName = 'Sidestick';
             }
         }
@@ -97,13 +97,13 @@ export function applyOverrides(context, state) {
         }
 
         if (intensity > 0.75 && activeMotif === 3) {
-            if (loopStep === 10 && Math.random() < 0.4) {
+            if (loopStep === 10 && roll(0.4)) {
                 shouldPlay = true; // syncopated pickup
             }
         }
 
         if (shouldPlay) {
-            velocity = 0.9 + intensity * 0.1;
+            velocity = scaleVelocity(0.9, intensity, 0.1);
         }
     } else if (inst.name === 'HiHat' || inst.name === 'Open') {
         // Acoustic HiHats often act as a constant shaker-like pulse
@@ -114,14 +114,14 @@ export function applyOverrides(context, state) {
         const isQuarter = loopStep % 4 === 0;
 
         if (isQuarter) {
-            velocity = 0.7 + intensity * 0.15;
+            velocity = scaleVelocity(0.7, intensity, 0.15);
         } else if (isPulse) {
-            velocity = 0.5 + intensity * 0.1;
+            velocity = scaleVelocity(0.5, intensity, 0.1);
         } else {
             // 16th note "ghost" pulse
-            velocity = 0.3 + intensity * 0.1;
+            velocity = scaleVelocity(0.3, intensity, 0.1);
             // Higher intensity increases 16th clarity
-            if (intensity < 0.5 && Math.random() < 0.4) {
+            if (intensity < 0.5 && roll(0.4)) {
                 shouldPlay = false; // lower density at low intensity
             }
         }
@@ -138,12 +138,12 @@ export function applyOverrides(context, state) {
         }
 
         velocity = loopStep % 4 === 0 ? 0.8 : 0.5;
-        velocity *= 0.7 + intensity * 0.3;
+        velocity *= scaleVelocity(0.7, intensity, 0.3);
     }
 
     // --- FINAL POLISH ---
     if (shouldPlay) {
-        if (inst.name === 'Snare' && intensity < 0.35) {
+        if (inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
             soundName = 'Sidestick';
         }
         // Subtle human jitter for acoustic feel

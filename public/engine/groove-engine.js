@@ -10,6 +10,7 @@ import * as neoSoul from './grooves/neo-soul.js';
 import * as reggae from './grooves/reggae.js';
 import * as rock from './grooves/rock.js';
 import * as skaPunk from './grooves/ska-punk.js';
+import { DEFAULT_CONFIG } from './grooves/utils.js';
 
 const strategies = {
     Jazz: jazz,
@@ -66,16 +67,7 @@ export function applyGrooveOverrides({
     };
 
     const strategy = getStrategy(groove);
-    const config = strategy
-        ? strategy.config
-        : {
-              entropyMultiplier: 0.15,
-              blockAdjacentSnare: false,
-              exemptFromPulseShaping: false,
-              dillaFeel: false,
-              backbeatCrack: false,
-              isLatin: false,
-          };
+    const config = strategy ? strategy.config : DEFAULT_CONFIG;
 
     let pulseWeight = 1.0;
     if ((inst.name === 'HiHat' || inst.name === 'Open') && !config.exemptFromPulseShaping) {

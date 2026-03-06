@@ -1,19 +1,20 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
+    ...DEFAULT_CONFIG,
     entropyMultiplier: 0.08,
     blockAdjacentSnare: true,
-    exemptFromPulseShaping: false,
-    dillaFeel: false,
     backbeatCrack: false,
 };
 
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.35) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0;
     }
     if (intensity < 0.6) {
         return seed < 0.8 ? 0 : 2;
     }
-    if (intensity < 0.85) {
+    if (intensity < INTENSITY_BANDS.HIGH) {
         if (seed < 0.5) {
             return 0;
         }
@@ -42,14 +43,10 @@ export function applyOverrides(context, state) {
         return state;
     }
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, playback.bandIntensity);
+    const intensity = playback.bandIntensity;
+    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
-    if (
-        inst.name === 'Open' &&
-        loopStep === 0 &&
-        playback.bandIntensity > 0.8 &&
-        Math.random() < 0.25
-    ) {
+    if (inst.name === 'Open' && loopStep === 0 && intensity > 0.8 && roll(0.25)) {
         shouldPlay = true;
         velocity = 1.2;
         soundName = 'Crash';
@@ -64,9 +61,9 @@ export function applyOverrides(context, state) {
                 soundName = activeMotif === 2 ? 'Open' : 'HiHat';
 
                 if (loopStep === 6 || loopStep === 14) {
-                    velocity = 0.6 + playback.bandIntensity * 0.1;
+                    velocity = scaleVelocity(0.6, intensity, 0.1);
                 } else if (loopStep === 0 || loopStep === 8) {
-                    velocity = 0.85 + playback.bandIntensity * 0.2;
+                    velocity = scaleVelocity(0.85, intensity, 0.2);
                 }
             }
         } else if (activeMotif === 1) {
@@ -95,19 +92,19 @@ export function applyOverrides(context, state) {
             velocity = 1.15;
         }
 
-        if (playback.bandIntensity > 0.6) {
-            if (activeMotif === 0 && [3, 11].includes(loopStep) && Math.random() < 0.4) {
+        if (intensity > 0.6) {
+            if (activeMotif === 0 && [3, 11].includes(loopStep) && roll(0.4)) {
                 shouldPlay = true;
-                velocity = 0.4 + playback.bandIntensity * 0.1;
+                velocity = scaleVelocity(0.4, intensity, 0.1);
                 instTimeOffset += 0.005;
             }
 
             if (activeMotif === 3) {
-                if (loopStep === 14 && Math.random() < 0.6) {
+                if (loopStep === 14 && roll(0.6)) {
                     shouldPlay = true;
                     velocity = 0.7;
                 }
-                if (loopStep === 10 && Math.random() < 0.4) {
+                if (loopStep === 10 && roll(0.4)) {
                     shouldPlay = true;
                     velocity = 0.5;
                 }
@@ -115,7 +112,7 @@ export function applyOverrides(context, state) {
         }
     }
 
-    if (shouldPlay && inst.name === 'Snare' && playback.bandIntensity < 0.35) {
+    if (shouldPlay && inst.name === 'Snare' && intensity < 0.35) {
         soundName = 'Sidestick';
     }
 

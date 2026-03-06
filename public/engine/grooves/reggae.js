@@ -1,9 +1,7 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
-    entropyMultiplier: 0.15,
-    blockAdjacentSnare: false,
-    exemptFromPulseShaping: false,
-    dillaFeel: false,
-    backbeatCrack: false,
+    ...DEFAULT_CONFIG,
 };
 
 /**
@@ -14,7 +12,7 @@ export const config = {
  * 3: Dub Variations (Busy/Experimental)
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.35) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Solid One Drop foundation
     }
 
@@ -28,7 +26,7 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     }
 
     // Standard intensity (< 0.65) requires extremely dominant One Drop for critique
-    if (intensity < 0.65) {
+    if (intensity < INTENSITY_BANDS.MID) {
         return seed < 0.98 ? 0 : 1; // ~90% One Drop, remaining Steppers
     }
 
@@ -82,7 +80,7 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            velocity = 1.1 + intensity * 0.15;
+            velocity = scaleVelocity(1.1, intensity, 0.15);
             // "Deep Pocket": Slightly pull back the Step 8 kick
             if (loopStep === 8) {
                 instTimeOffset += 0.005;
@@ -93,23 +91,23 @@ export function applyOverrides(context, state) {
         // Core Reggae backbeat on Step 8 (Beat 3)
         if (loopStep === 8) {
             shouldPlay = true;
-            velocity = 1.2 + intensity * 0.1;
+            velocity = scaleVelocity(1.2, intensity, 0.1);
             // Transition from Sidestick to Snare rimshot as intensity rises
             soundName = intensity > 0.65 ? 'Snare' : 'Sidestick';
         }
 
         // --- Snare Ghosting & Dub Flams ---
         if (activeMotif === 3) {
-            if ([3, 6, 11, 14].includes(loopStep) && Math.random() < 0.3 * intensity) {
+            if ([3, 6, 11, 14].includes(loopStep) && roll(0.3, intensity)) {
                 shouldPlay = true;
-                velocity = 0.4 + intensity * 0.3;
+                velocity = scaleVelocity(0.4, intensity, 0.3);
                 soundName = 'Sidestick';
             }
         }
 
         if (isTurnaround && intensity > 0.75) {
             // Probability for a snare "flam" on the end of the bar
-            if (loopStep === 15 && Math.random() < 0.4) {
+            if (loopStep === 15 && roll(0.4)) {
                 shouldPlay = true;
                 velocity = 0.9;
                 instTimeOffset -= 0.01; // Push it early
@@ -132,7 +130,7 @@ export function applyOverrides(context, state) {
             velocity = loopStep % 4 === 0 ? 0.9 : 0.7;
 
             // At high intensity, transition from steady 8ths to a 16th shuffle for Motif 3
-            if (activeMotif === 3 && intensity > 0.8 && Math.random() < 0.4) {
+            if (activeMotif === 3 && intensity > 0.8 && roll(0.4)) {
                 // Occasional 16th-note skip
                 shouldPlay = true;
                 velocity = 0.4;
@@ -140,7 +138,7 @@ export function applyOverrides(context, state) {
         }
 
         // Occasional Open hat barks on the "and" of 4
-        if (loopStep === 14 && intensity > 0.7 && Math.random() < 0.25) {
+        if (loopStep === 14 && intensity > 0.7 && roll(0.25)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.1;
@@ -148,7 +146,7 @@ export function applyOverrides(context, state) {
     }
 
     // --- 3. FINAL POLISH ---
-    if (shouldPlay && inst.name === 'Snare' && intensity < 0.35) {
+    if (shouldPlay && inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
         soundName = 'Sidestick';
     }
 

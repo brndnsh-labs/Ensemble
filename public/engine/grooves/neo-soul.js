@@ -1,20 +1,16 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
-    entropyMultiplier: 0.15,
-    blockAdjacentSnare: false,
-    exemptFromPulseShaping: false,
+    ...DEFAULT_CONFIG,
     dillaFeel: true,
-    backbeatCrack: false,
 };
 
 /**
  * Maps intensity to motif complexity for Neo-Soul / Hip Hop.
- * 0: Standard Boom Bap (Grounded)
- * 1: Ghost Note Heavy (Texture)
- * 2: Syncopated Dilla Kicks (Lazy/Displaced)
- * 3: Percussive/Sidestick (Experimental)
+...
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.35) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Solid Boom Bap at low intensity
     }
 
@@ -88,11 +84,11 @@ export function applyOverrides(context, state) {
             // Motif 1 & 3: Ghost Note Heavy / Percussive
             if (isBackbeat) {
                 shouldPlay = true;
-                velocity = 1.05 + intensity * 0.1;
+                velocity = scaleVelocity(1.05, intensity, 0.1);
             } else if ([3, 7, 11, 15].includes(loopStep)) {
                 // Ghost note placements - keep deterministic for "structured" feel
                 shouldPlay = true;
-                velocity = 0.15 + intensity * 0.15 + Math.random() * 0.1;
+                velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
             }
         } else {
             // Motif 0 & 2: Solid backbeat
@@ -103,9 +99,9 @@ export function applyOverrides(context, state) {
 
         // --- Snare Turnarounds ---
         if (isTurnaround && intensity > 0.6) {
-            if ([14, 15].includes(loopStep) && Math.random() < 0.6) {
+            if ([14, 15].includes(loopStep) && roll(0.6)) {
                 shouldPlay = true;
-                velocity = 0.3 + intensity * 0.3;
+                velocity = scaleVelocity(0.3, intensity, 0.3);
                 instTimeOffset += 0.01; // Extra drag on turnaround ghosts
             }
         }
@@ -135,7 +131,7 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            velocity = 1.1 + intensity * 0.1;
+            velocity = scaleVelocity(1.1, intensity, 0.1);
         }
     }
 
@@ -145,7 +141,7 @@ export function applyOverrides(context, state) {
         const dampening = 0.65 + intensity * 0.15;
         velocity *= dampening;
 
-        if (inst.name === 'Snare' && intensity < 0.35) {
+        if (inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
             soundName = 'Sidestick';
         }
     }

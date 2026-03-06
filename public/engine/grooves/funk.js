@@ -1,8 +1,7 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
-    entropyMultiplier: 0.15,
-    blockAdjacentSnare: false,
-    exemptFromPulseShaping: false,
-    dillaFeel: false,
+    ...DEFAULT_CONFIG,
     backbeatCrack: true,
 };
 
@@ -14,7 +13,7 @@ export const config = {
  * 3: Busy Linear (Garibaldi)
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.4) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Grounded pocket at low intensity
     }
 
@@ -57,7 +56,7 @@ export function applyOverrides(context, state) {
     // --- "The One" Reinforcement ---
     if (inst.name === 'Kick' && loopStep === 0) {
         shouldPlay = true;
-        velocity = 1.3 + intensity * 0.1; // Scale reinforcement with intensity
+        velocity = scaleVelocity(1.3, intensity, 0.1); // Scale reinforcement with intensity
     }
 
     // --- Hi-Hat & Open Dynamics ---
@@ -77,7 +76,7 @@ export function applyOverrides(context, state) {
 
             // Occasional open barks at higher intensities
             const barkProb = intensity > 0.6 ? 0.3 * intensity : 0.05;
-            if (activeMotif >= 2 && [6, 10].includes(loopStep) && Math.random() < barkProb) {
+            if (activeMotif >= 2 && [6, 10].includes(loopStep) && roll(barkProb)) {
                 soundName = 'Open';
                 velocity *= 1.1;
             }
@@ -93,7 +92,7 @@ export function applyOverrides(context, state) {
             }
             if (stepVal === 0 && loopStep === 7) {
                 shouldPlay = true; // "a" of 2 ghost
-                velocity = 0.12 + intensity * 0.1;
+                velocity = scaleVelocity(0.12, intensity, 0.1);
             }
         } else if (activeMotif === 1) {
             // The Funky Drummer (Ghost Note Heavy)
@@ -101,7 +100,7 @@ export function applyOverrides(context, state) {
                 shouldPlay = true;
             } else if ([3, 7, 10, 11].includes(loopStep)) {
                 shouldPlay = true;
-                velocity = 0.06 + intensity * 0.15 + Math.random() * 0.1;
+                velocity = scaleVelocity(0.06, intensity, 0.15) + Math.random() * 0.1;
             }
         } else if (activeMotif === 2) {
             // Displaced Backbeats ("Cold Sweat")
@@ -114,7 +113,7 @@ export function applyOverrides(context, state) {
             }
             if ([7, 9].includes(loopStep)) {
                 shouldPlay = true;
-                velocity = 0.1 + intensity * 0.1;
+                velocity = scaleVelocity(0.1, intensity, 0.1);
             }
         } else if (activeMotif === 3) {
             // Busy Linear (Garibaldi)
@@ -123,15 +122,15 @@ export function applyOverrides(context, state) {
                 velocity = 1.15;
             } else if ([2, 5, 9, 14].includes(loopStep)) {
                 shouldPlay = true;
-                velocity = 0.1 + intensity * 0.1;
+                velocity = scaleVelocity(0.1, intensity, 0.1);
             }
         }
 
         // --- Snare Turnaround Fills ---
         if (isTurnaround && intensity > 0.75) {
-            if ([13, 14, 15].includes(loopStep) && Math.random() < 0.7) {
+            if ([13, 14, 15].includes(loopStep) && roll(0.7)) {
                 shouldPlay = true;
-                velocity = 0.6 + intensity * 0.4;
+                velocity = scaleVelocity(0.6, intensity, 0.4);
                 if (loopStep === 15) {
                     velocity = 1.2; // Strong lead back into the One
                 }
@@ -163,7 +162,7 @@ export function applyOverrides(context, state) {
             if (loopStep === 0 || loopStep === 6 || loopStep === 10) {
                 shouldPlay = true;
             }
-            if (loopStep === 13 && Math.random() < 0.5 * intensity) {
+            if (loopStep === 13 && roll(0.5, intensity)) {
                 shouldPlay = true; // pickup
             }
         } else if (activeMotif === 2) {
@@ -183,7 +182,7 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            velocity = 1.1 + Math.random() * 0.1 + intensity * 0.1;
+            velocity = scaleVelocity(1.1, intensity, 0.1) + Math.random() * 0.1;
         }
     }
 
@@ -193,7 +192,7 @@ export function applyOverrides(context, state) {
             if (stepVal === 2 && intensity > 0.6) {
                 velocity = 1.0;
             } else if (stepVal !== 2 && soundName !== 'Open') {
-                velocity = Math.min(velocity, 0.75 + intensity * 0.1);
+                velocity = Math.min(velocity, scaleVelocity(0.75, intensity, 0.1));
             }
         }
         if (inst.name === 'Snare') {

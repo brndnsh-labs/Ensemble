@@ -1,19 +1,20 @@
+import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+
 export const config = {
+    ...DEFAULT_CONFIG,
     entropyMultiplier: 0.08,
     blockAdjacentSnare: true,
-    exemptFromPulseShaping: false,
-    dillaFeel: false,
     backbeatCrack: true,
 };
 
 export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < 0.35) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0;
     }
     if (intensity < 0.6) {
         return seed < 0.75 ? 0 : 2;
     }
-    if (intensity < 0.85) {
+    if (intensity < INTENSITY_BANDS.HIGH) {
         if (seed < 0.4) {
             return 0;
         }
@@ -43,7 +44,8 @@ export function applyOverrides(context, state) {
         return state;
     }
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, playback.bandIntensity);
+    const intensity = playback.bandIntensity;
+    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         if (isTurnaround && loopStep > 7) {
@@ -53,7 +55,7 @@ export function applyOverrides(context, state) {
                 shouldPlay = true;
                 velocity = loopStep % 4 === 0 ? 1.05 : 0.85;
 
-                if (playback.bandIntensity > 0.7) {
+                if (intensity > 0.7) {
                     soundName = 'Open';
                     velocity *= 1.1;
                 } else {
@@ -90,17 +92,13 @@ export function applyOverrides(context, state) {
         }
 
         if (isTurnaround && loopStep > 7) {
-            if ([8, 10, 14].includes(loopStep) && Math.random() < 0.4) {
+            if ([8, 10, 14].includes(loopStep) && roll(0.4)) {
                 shouldPlay = true;
-                velocity = 0.8 + Math.random() * 0.2;
+                velocity = scaleVelocity(0.8, Math.random(), 0.2);
             }
         } else {
             if (!shouldPlay && (loopStep === 7 || loopStep === 9)) {
-                if (
-                    playback.bandIntensity > 0.4 &&
-                    playback.bandIntensity < 0.75 &&
-                    Math.random() < 0.08
-                ) {
+                if (intensity > 0.4 && intensity < 0.75 && roll(0.08)) {
                     shouldPlay = true;
                     velocity = 0.25;
                 }
@@ -111,13 +109,13 @@ export function applyOverrides(context, state) {
             if (loopStep === 4 || loopStep === 12) {
                 velocity = 1.15;
             }
-            if (playback.bandIntensity < 0.25) {
+            if (intensity < 0.25) {
                 soundName = 'Sidestick';
             }
         }
     } else if (inst.name.includes('Tom')) {
         if (isTurnaround && loopStep > 7) {
-            if ([8, 10, 12, 14].includes(loopStep) && Math.random() < 0.6) {
+            if ([8, 10, 12, 14].includes(loopStep) && roll(0.6)) {
                 shouldPlay = true;
                 velocity = 1.1;
             }
