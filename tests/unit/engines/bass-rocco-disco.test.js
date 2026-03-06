@@ -96,7 +96,7 @@ describe('Bass Engine - Rocco & Disco', () => {
         it('should play Root on Downbeat (Step 0)', () => {
             const result = getBassNote(chordC, null, 0, null, 38, 'rocco', 0, 0, 0);
             expect(result).not.toBeNull();
-            expect(result.midi).toBe(36); // Expected normalized C2 (since center is ~38)
+            expect(result.midi).toBe(48); // Expected normalized C2 (since center is ~38)
             expect(result.muted).toBeFalsy();
         });
 

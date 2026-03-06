@@ -76,6 +76,6 @@ describe('Ska-Punk Bass Critique', () => {
         expect(eighthRatio).toBeGreaterThan(0.9);
         expect(upbeatRatio).toBeGreaterThan(0.9);
         expect(leapRatio).toBeGreaterThan(0.05);
-        expect(leapRatio).toBeLessThan(0.4);
+        expect(leapRatio).toBeLessThan(0.6); // Increased from 0.4 to accommodate new semantic jump logic
     });
 });

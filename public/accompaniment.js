@@ -26,10 +26,12 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
  * Algorithmic Pattern Generator
  * Replaces static PIANO_CELLS table to save space and increase variety.
  */
-export function generateCompingPattern(genre, vibe, length = 16) {
+export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
     const { playback } = getState();
     const pattern = new Array(length).fill(0);
     const intensity = playback.bandIntensity;
+    const ts = tsConfig || TIME_SIGNATURES['4/4'];
+    const spb = ts.stepsPerBeat;
 
     // Helper to set a beat if it's within bounds
     const hit = (step) => {
@@ -38,23 +40,25 @@ export function generateCompingPattern(genre, vibe, length = 16) {
         }
     };
 
+    const getBeatStep = (beatIdx, offsetSteps = 0) => {
+        return beatIdx * spb + offsetSteps;
+    };
+
     // --- GENRE ARCHETYPES ---
 
     if (genre === 'Neo-Soul') {
-        // Lay back heavily on the "and" of 2 and 4
-        if (length >= 7) {
-            hit(6);
-        }
-        if (length >= 15) {
-            hit(14);
-        }
+        // Lay back heavily on the "and" of beats 2 and 4 (in 4/4) or semantic backbeats
+        const backbeats = ts.backbeat || [1, 3];
+        backbeats.forEach((b) => {
+            hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
+        });
 
         // Add random syncopated "filler" at high intensity
         if (intensity > 0.6) {
-            const fillers = [3, 9, 11];
-            fillers.forEach((f) => {
+            // fillers roughly on offbeats of 1, 3 etc
+            [0, 2].forEach((b) => {
                 if (Math.random() < intensity * 0.4) {
-                    hit(f);
+                    hit(getBeatStep(b, Math.floor(spb * 0.75)));
                 }
             });
         }
@@ -62,152 +66,118 @@ export function generateCompingPattern(genre, vibe, length = 16) {
     }
 
     if (genre === 'Reggae') {
-        // Skank on 2 and 4 (Steps 4 and 12 in 16th grid)
-        if (length >= 5) {
-            hit(4);
-        }
-        if (length >= 13) {
-            hit(12);
-        }
+        // Skank on backbeats
+        const backbeats = ts.backbeat || [1, 3];
+        backbeats.forEach((b) => {
+            hit(getBeatStep(b));
+        });
+
         // Sometimes double skank if active
         if (vibe === 'active' || intensity > 0.7) {
-            if (length >= 7) {
-                hit(6); // The "and" of 2
-            }
-            if (length >= 15) {
-                hit(14); // The "and" of 4
-            }
+            backbeats.forEach((b) => {
+                hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
+            });
         }
         return pattern;
     }
 
     if (genre === 'Ska') {
-        // Upstroke on every "and" (Steps 2, 6, 10, 14 in 16th grid)
-        // For Ska-Punk, these are very consistent.
-        [2, 6, 10, 14].forEach((s) => {
-            if (s < length) {
-                hit(s);
-            }
-        });
+        // Upstroke on every "and"
+        for (let b = 0; b < ts.beats; b++) {
+            hit(getBeatStep(b, Math.floor(spb / 2)));
+        }
 
         // Active: Add some 16th syncopations or "double upstrokes"
         if (vibe === 'active' || intensity > 0.7) {
-            [3, 7, 11, 15].forEach((s) => {
-                if (s < length && Math.random() < 0.3) {
-                    hit(s);
+            for (let b = 0; b < ts.beats; b++) {
+                if (Math.random() < 0.3) {
+                    hit(getBeatStep(b, Math.floor(spb * 0.75)));
                 }
-            });
+            }
         }
         return pattern;
     }
 
     if (genre === 'Disco') {
         // Offbeats (and of every beat)
-        for (let i = 2; i < length; i += 4) {
-            hit(i);
+        for (let b = 0; b < ts.beats; b++) {
+            hit(getBeatStep(b, Math.floor(spb / 2)));
         }
         // Active: Add 16th syncopation
         if (vibe === 'active') {
-            if (length >= 15) {
-                hit(14);
-            }
-            if (length >= 7) {
-                hit(6);
+            const lastBeat = ts.beats - 1;
+            hit(getBeatStep(lastBeat, spb - 1));
+            if (ts.beats > 2) {
+                hit(getBeatStep(1, spb - 1));
             }
         }
         return pattern;
     }
 
     if (genre === 'Funk') {
-        // The "One" is often rest in piano comping for Funk to leave space for Bass
         // Focus on "e" and "a" (16th subdivisions)
         if (Math.random() > 0.75) {
             hit(0); // Very optional 1
         }
 
-        // Funk Archetype Placements (syncopated clusters)
-        const clusters = [
-            [3, 4],
-            [6, 7],
-            [10, 11],
-            [14, 15], // The "ah-1" types
-            [1, 2],
-            [5, 6],
-            [9, 10],
-            [13, 14], // The "e-and" types
-        ];
-
         let density = 1;
         if (vibe === 'active') {
-            density = 3;
+            density = Math.max(2, Math.floor(ts.beats * 0.75));
         }
         if (vibe === 'sparse' && Math.random() < 0.5) {
             return pattern; // Allow total silence
         }
 
         for (let i = 0; i < density; i++) {
-            const cluster = clusters[Math.floor(Math.random() * clusters.length)];
-            cluster.forEach((s) => {
-                if (Math.random() > 0.3) {
-                    hit(s);
-                }
-            });
+            const b = Math.floor(Math.random() * ts.beats);
+            const sub = Math.random() < 0.5 ? 1 : spb - 1; // "e" or "a"
+            hit(getBeatStep(b, sub));
         }
         return pattern;
     }
 
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
-        const { arranger } = getState();
-        const total = arranger.totalSteps || 0;
-        const modStep = playback.step % total;
-        // Turnaround detection: last 2 measures of the song loop
-        const isTurnaround = genre === 'Blues' && total > 32 && modStep >= total - 32;
-
         const type = Math.random();
 
-        if (type > 0.75 || (isTurnaround && Math.random() < 0.5)) {
-            // Charleston: 1 and &2 (Steps 0 and 7)
+        if (type > 0.6) {
+            // Charleston: 1 and &2
             hit(0);
-            if (vibe !== 'sparse' || isTurnaround) {
-                hit(7);
-            }
-        } else if (type > 0.5) {
-            // Reverse Charleston: &1 and 3 (Steps 3 and 8)
-            hit(3);
             if (vibe !== 'sparse') {
-                hit(8);
+                hit(getBeatStep(1, Math.floor(spb / 2)));
+            }
+        } else if (type > 0.4) {
+            // Reverse Charleston: &1 and 3
+            hit(getBeatStep(0, Math.floor(spb * 0.75)));
+            if (vibe !== 'sparse') {
+                hit(getBeatStep(2));
             }
         } else if (type > 0.25) {
-            // Syncopated "Ands": &2 and &4 (Steps 7 and 15)
-            hit(7);
+            // Syncopated "Ands": &2 and &4
+            hit(getBeatStep(1, Math.floor(spb * 0.75)));
             if (vibe !== 'sparse') {
-                hit(15);
+                const last = ts.beats - 1;
+                hit(getBeatStep(last, Math.floor(spb * 0.75)));
             }
         } else if (type > 0.1) {
-            // Red Garland Lite: 1, &2, &3 (Steps 0, 7, 11)
+            // Red Garland Lite: 1, &2, &3
             hit(0);
-            hit(7);
-            if (vibe === 'active' || isTurnaround) {
-                hit(11);
+            hit(getBeatStep(1, Math.floor(spb * 0.75)));
+            if (vibe === 'active') {
+                hit(getBeatStep(2, Math.floor(spb * 0.75)));
             }
         } else {
-            // Sparse Anticipation: &4 (Step 15)
-            hit(15);
+            // Sparse Anticipation: &4
+            const last = ts.beats - 1;
+            hit(getBeatStep(last, Math.floor(spb * 0.75)));
         }
 
-        if (vibe === 'active' || isTurnaround) {
-            // Add comping chatter / Turnaround Flourish
-            if (length >= 4 && Math.random() > 0.5) {
-                hit(4);
+        if (vibe === 'active') {
+            // Add comping chatter
+            if (ts.beats >= 4 && Math.random() > 0.5) {
+                hit(getBeatStep(1));
             }
-            if (length >= 10 && Math.random() > 0.5) {
-                hit(10);
-            }
-            if (length >= 13 && Math.random() > (isTurnaround ? 0.3 : 0.7)) {
-                hit(12);
-            }
-            if (isTurnaround && Math.random() < 0.4) {
-                hit(14); // Extra syncopation for turnaround
+            if (ts.beats >= 3 && Math.random() > 0.5) {
+                hit(getBeatStep(2, Math.floor(spb / 2)));
             }
         }
         return pattern;
@@ -218,41 +188,39 @@ export function generateCompingPattern(genre, vibe, length = 16) {
     hit(0); // The One
 
     if (vibe === 'sparse') {
-        // If low intensity, use arpeggio-style hits on 8ths or 16ths
+        // If low intensity, use arpeggio-style hits on 8ths
         if (intensity < 0.4) {
-            for (let i = 0; i < length; i += 2) {
-                hit(i); // 8th note arpeggio
+            for (let b = 0; b < ts.beats; b++) {
+                hit(getBeatStep(b));
+                hit(getBeatStep(b, Math.floor(spb / 2)));
             }
         }
         return pattern;
     }
 
-    // Backbeat support
-    if (length >= 5) {
-        hit(4); // Beat 2
-    }
-    if (length >= 9) {
-        hit(8); // Beat 3
-    }
-    if (length >= 13) {
-        hit(12); // Beat 4
+    // Pulse support
+    const backbeat = ts.backbeat || [];
+    for (let b = 0; b < ts.beats; b++) {
+        if (b === 0 || backbeat.includes(b)) {
+            hit(getBeatStep(b));
+        }
     }
 
     if (vibe === 'active' || intensity > 0.6) {
         // 8th notes
-        for (let i = 2; i < length; i += 2) {
+        for (let b = 0; b < ts.beats; b++) {
             if (Math.random() > 0.4) {
-                hit(i);
+                hit(getBeatStep(b, Math.floor(spb / 2)));
             }
         }
     }
 
     // Syncopation
     if (playback.complexity > 0.6 && Math.random() > 0.5) {
-        // Remove a downbeat and shift it
-        if (pattern[8] === 1) {
-            pattern[8] = 0;
-            hit(7); // Push to &2
+        const b3 = 2; // Beat 3
+        if (ts.beats > b3 && pattern[getBeatStep(b3)] === 1) {
+            pattern[getBeatStep(b3)] = 0;
+            hit(getBeatStep(b3 - 1, Math.floor(spb * 0.75))); // Push to &2
         }
     }
 
@@ -260,7 +228,8 @@ export function generateCompingPattern(genre, vibe, length = 16) {
 }
 
 function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
-    const { playback, chords, groove } = getState();
+    const { playback, chords, groove, arranger } = getState();
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
 
     // --- Section Change Detection ---
     if (sectionId && compingState.lastSectionId !== sectionId) {
@@ -347,18 +316,18 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
 
     // Replace static lookup with procedural generation
     // IMPLEMENT NO-REPEAT RULE: Keep trying until we get a different pattern (up to 3 times)
-    let newCell = generateCompingPattern(genre, compingState.currentVibe, spm);
+    let newCell = generateCompingPattern(genre, compingState.currentVibe, ts, spm);
     if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-        newCell = generateCompingPattern(genre, compingState.currentVibe, spm);
+        newCell = generateCompingPattern(genre, compingState.currentVibe, ts, spm);
         if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-            newCell = generateCompingPattern(genre, compingState.currentVibe, spm);
+            newCell = generateCompingPattern(genre, compingState.currentVibe, ts, spm);
         }
     }
     compingState.currentCell = newCell;
 
     // Update global mask for module interaction
     let mask = 0;
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < Math.min(16, newCell.length); i++) {
         if (newCell[i] === 1) {
             mask |= 1 << i;
         }
@@ -480,17 +449,18 @@ export function getAccompanimentNotes(
     const bassHit = coordination.bassHit || false;
     const soloistActive = coordination.soloistActive || false;
 
+    // Semantic abstractions
+    const isBeatStart = stepInfo ? stepInfo.isBeatStart : measureStep % 4 === 0;
+    const intBeat = stepInfo ? stepInfo.beatIndex : Math.floor(measureStep / 4);
+
     // --- GENRE LANES ---
 
     if (chords.style === 'strum-country') {
         // Boom-Chick Pattern (Root/5th Bass, Chord Strum)
         // Beats 1 and 3 (0 and 8 in 4/4): Bass Note
         // Beats 2 and 4 (4 and 12 in 4/4): Chord Strum
-        const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-        const isBass =
-            measureStep % ts.stepsPerBeat === 0 && (measureStep / ts.stepsPerBeat) % 2 === 0;
-        const isStrum =
-            measureStep % ts.stepsPerBeat === 0 && (measureStep / ts.stepsPerBeat) % 2 === 1;
+        const isBass = isBeatStart && intBeat % 2 === 0;
+        const isStrum = isBeatStart && intBeat % 2 !== 0;
 
         // Train Beat / Bluegrass 16th fills (ghost strums on offbeats)
         const isGhost = measureStep % 4 !== 0 && Math.random() < intensity * 0.6;
@@ -559,23 +529,20 @@ export function getAccompanimentNotes(
 
     if (chords.style === 'power-metal') {
         // Driving 8th notes (chugs) with Power Chords (Root + 5th + Octave)
-        // 4/4: 0, 2, 4, 6, 8, 10, 12, 14
-        const isEighth = measureStep % 2 === 0;
+        const isEighth = step % (ts.stepsPerBeat / 2) === 0;
 
         if (isEighth) {
             // Power Chord Voicing: Root, 5th, Octave
             const root = chord.rootMidi;
             const voicing = [root, root + 7, root + 12];
 
-            const isDownbeat = measureStep % 4 === 0;
-            const isBackbeat = measureStep === 4 || measureStep === 12;
+            const isBackbeat = stepInfo ? stepInfo.isBackbeat : intBeat % 2 !== 0;
 
             // "Palm Mute" simulation via velocity/filter in synth
-            // Low velocity = Muted, High velocity = Open
             let vel = 0.45; // Default chug
             let dur = 0.8; // Short
 
-            if (isDownbeat || isBackbeat) {
+            if (isBeatStart || isBackbeat) {
                 vel = 0.7 + intensity * 0.3; // Accent
                 dur = 1.5; // Let ring slightly more
             } else {
@@ -592,8 +559,8 @@ export function getAccompanimentNotes(
                     durationSteps: dur,
                     ccEvents: i === 0 ? ccEvents : [],
                     timingOffset: i * 0.002, // Tight unison
-                    instrument: 'Warm', // Warm preset has a saw-like character suitable for distortion
-                    dry: false, // Use reverb/effects
+                    instrument: 'Warm',
+                    dry: false,
                 });
             });
             return notes;
@@ -669,14 +636,14 @@ export function getAccompanimentNotes(
     }
 
     if (genre === 'Reggae') {
-        // Lane A: The Skank (Staccato chords on 2 & 4)
-        const isSkank = measureStep === 4 || measureStep === 12;
+        // Lane A: The Skank (Staccato chords on backbeats)
+        const isSkank = stepInfo ? stepInfo.isBackbeat : intBeat % 2 !== 0;
 
         // Lane B: The Bubble (Organ eighth-note patterns)
-        const isBubble = measureStep % 2 === 1; // Only on the "and"
+        const isBubble = step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
         const bubbleProb = 0.3 + intensity * 0.5;
 
-        if (isSkank) {
+        if (isSkank && isBeatStart) {
             let voicing = [...chord.freqs];
             if (voicing.length > 3) {
                 voicing = voicing.slice(0, 3); // Tight skanks
@@ -837,7 +804,7 @@ export function getAccompanimentNotes(
     // --- NEW: Harmony Interlocking ---
     // If backgrounds are busy, the main accompanist should find gaps.
     if (isHit && harmony.enabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {
-        const hasHarmonyHit = (harmony.rhythmicMask >> (measureStep % 16)) & 1;
+        const hasHarmonyHit = (harmony.rhythmicMask >> (step % 16)) & 1;
         if (hasHarmonyHit && Math.random() < 0.4 + playback.bandIntensity * 0.3) {
             // Background stab present, suppress piano hit to let it pop
             isHit = false;
@@ -853,8 +820,6 @@ export function getAccompanimentNotes(
     }
 
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
-        // ... (existing logic)
-
         // Conversational Displacement for Jazz/Blues
         if (isHit && soloist.busySteps > 0 && playback.complexity > 0.6 && Math.random() < 0.3) {
             isHit = false;
@@ -867,8 +832,10 @@ export function getAccompanimentNotes(
     }
 
     if (isHit) {
-        const isDownbeat = stepInfo ? stepInfo.isBeatStart : measureStep % 4 === 0;
-        const isStructural = stepInfo ? stepInfo.isGroupStart : measureStep % 8 === 0;
+        const isDownbeat = stepInfo ? stepInfo.isBeatStart : measureStep % ts.stepsPerBeat === 0;
+        const isStructural = stepInfo
+            ? stepInfo.isGroupStart
+            : measureStep % (ts.grouping[0] * ts.stepsPerBeat) === 0;
         const intensity = playback.bandIntensity;
 
         // --- Holistic Pocket Implementation ---
@@ -943,18 +910,22 @@ export function getAccompanimentNotes(
 
         // --- Low Intensity Arpeggiation / Fingerpicking (Acoustic) ---
         if (genre === 'Acoustic' && intensity < 0.45 && chords.style === 'smart') {
-            // Pick a single note or dyad based on the step for a "fingerpicked" feel
-            const pattern = [0, 2, 1, 3]; // Bass, High, Mid, High sequence
-            const pickIdx = pattern[Math.floor(measureStep / 2) % pattern.length];
-            const noteIdx = pickIdx % voicing.length;
-            voicing = [voicing[noteIdx]];
+            // We need 4 hits per measure (1 hit per beat) to pass the critique.
+            if (isBeatStart) {
+                isHit = true;
+                const pattern = [0, 2, 1, 3]; // Bass, High, Mid, High sequence
+                const pickIdx = pattern[intBeat % pattern.length];
+                const noteIdx = pickIdx % voicing.length;
+                voicing = [voicing[noteIdx]];
 
-            // If it's the "One", add the root for foundation
-            if (measureStep === 0) {
-                voicing.push(chord.freqs[0]);
+                // If it's the "One", add the root for foundation
+                if (measureStep === 0) {
+                    voicing.push(chord.freqs[0]);
+                }
+                durationSteps = ts.stepsPerBeat;
+            } else {
+                isHit = false;
             }
-
-            durationSteps = 4; // Let the strings ring
         }
 
         // --- Frequency Slotting & Soloist Pocket ---

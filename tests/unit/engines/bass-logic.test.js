@@ -45,8 +45,10 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 import { getBassNote, isBassActive } from '../../../public/bass.js';
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { getState } from '../../../public/state.js';
 import { getScaleForChord } from '../../../public/theory-scales.js';
+import { getStepInfo } from '../../../public/utils.js';
 
 const { arranger, playback, bass, soloist, groove } = getState();
 
@@ -153,7 +155,8 @@ describe('Bass Engine Logic', () => {
             // Retry a few times because of Math.random() < 0.45 in funk logic
             // Use high step (60) to boost sectionProgress part of intensity
             for (let i = 0; i < 500; i++) {
-                result = getBassNote(chordC, null, 0.5, 110, 38, 'funk', 0, 60, 2);
+                const info = getStepInfo(60, '4/4', [], TIME_SIGNATURES);
+                result = getBassNote(chordC, null, 0.5, 110, 38, 'funk', 0, 60, 2, {}, info);
                 if (result && result.velocity >= 1.1) {
                     break;
                 }
@@ -223,7 +226,20 @@ describe('Bass Engine Logic', () => {
             arranger.stepMap = [{ start: 0, end: 64, chord: { sectionId: 's1' } }]; // Add stepMap for sectionProgress
             for (let i = 0; i < 100; i++) {
                 // Step 63 in 64 total steps
-                const result = getBassNote(chordC, chordF, 0, null, 38, 'quarter', 0, 63, 63);
+                const info = getStepInfo(63, '4/4', arranger.stepMap, TIME_SIGNATURES);
+                const result = getBassNote(
+                    chordC,
+                    chordF,
+                    0,
+                    null,
+                    38,
+                    'quarter',
+                    0,
+                    63,
+                    63,
+                    {},
+                    info,
+                );
                 if (result.midi >= 48) {
                     highCount++;
                 }

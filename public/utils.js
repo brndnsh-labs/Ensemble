@@ -237,7 +237,24 @@ export function getStepsPerMeasure(ts) {
  */
 export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
     let currentTS = tsConfig;
-    let tsName = `${tsConfig.beats}/${tsConfig.stepsPerBeat === 4 ? 4 : 8}`;
+    const allTS = allTSConfigs || {};
+
+    if (typeof currentTS === 'string') {
+        currentTS = allTS[currentTS] || allTS['4/4'];
+    } else if (currentTS && !currentTS.beats && currentTS.tsName) {
+        // Handle case where it's an object with only tsName
+        currentTS = allTS[currentTS.tsName] || allTS['4/4'];
+    }
+
+    if (!currentTS) {
+        currentTS = allTS['4/4'] || { beats: 4, stepsPerBeat: 4 };
+    }
+
+    let tsName =
+        currentTS.tsName ||
+        (typeof tsConfig === 'string'
+            ? tsConfig
+            : `${currentTS.beats}/${currentTS.stepsPerBeat === 4 ? 4 : 8}`);
     let mStep = step;
     let isMeasureStart = false;
 

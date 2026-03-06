@@ -471,7 +471,7 @@ class ExportProcessor {
 
         const stepTimeS = this.stepTimes[globalStep];
         const measureStep = globalStep % this.stepsPerMeasure;
-        const stepInfo = getStepInfo(globalStep, this.ts);
+        const stepInfo = getStepInfo(globalStep, this.ts, arranger.measureMap, TIME_SIGNATURES);
         const chordData = getChordAtStep(globalStep, this.exportCursor);
 
         // Coordination state for export
@@ -554,7 +554,7 @@ class ExportProcessor {
             // 1. Bass (Moved up for coordination)
             if (
                 this.includedTracks.includes('bass') &&
-                isBassActive(bass.style, globalStep, stepInChord)
+                isBassActive(bass.style, globalStep, stepInChord, stepInfo)
             ) {
                 const { sectionStart, sectionEnd } = chordData;
                 const res = getBassNote(
@@ -568,6 +568,7 @@ class ExportProcessor {
                     globalStep,
                     stepInChord,
                     { sectionStart, sectionEnd, stepCoordination: coordination },
+                    stepInfo,
                 );
                 if (res?.midi) {
                     const noteTimeS = stepTimeS + (res.timingOffset || 0);
@@ -618,6 +619,7 @@ class ExportProcessor {
                     stepInChord,
                     false,
                     { sectionStart, sectionEnd, stepCoordination: coordination },
+                    stepInfo,
                 );
                 if (soloResult) {
                     const results = Array.isArray(soloResult) ? soloResult : [soloResult];
@@ -743,6 +745,7 @@ class ExportProcessor {
                     stepInChord,
                     soloResult,
                     coordination,
+                    stepInfo,
                 );
                 const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
 
@@ -1167,11 +1170,12 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
     }
 
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
+    const _stepsPerMeasure = ts.beats * ts.stepsPerBeat;
 
     while (head < targetStep) {
         const step = head;
         const chordData = getChordAtStep(step, mainCursor);
+        const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
         // Reset step coordination for this specific step
         stepCoordination.step = step;
@@ -1202,7 +1206,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         if (bass.enabled && step >= bbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord } = chordData;
-                if (isBassActive(bass.style, step, stepInChord)) {
+                if (isBassActive(bass.style, step, stepInChord, stepInfo)) {
                     const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
                     const { sectionStart, sectionEnd } = chordData;
                     const bassResult = getBassNote(
@@ -1216,6 +1220,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                         step,
                         stepInChord,
                         { sectionStart, sectionEnd, stepCoordination },
+                        stepInfo,
                     );
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                         if (!bassResult.midi) {
@@ -1252,6 +1257,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     stepInChord,
                     false,
                     { sectionStart, sectionEnd, stepCoordination },
+                    stepInfo,
                 );
 
                 if (soloResult) {
@@ -1284,12 +1290,11 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         if (chords.enabled && step >= cbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord } = chordData;
-                const stepInfo = getStepInfo(step, ts);
                 const chordNotes = getAccompanimentNotes(
                     chord,
                     step,
                     stepInChord,
-                    step % stepsPerMeasure,
+                    stepInfo.mStep,
                     stepInfo,
                     stepCoordination,
                 );
@@ -1324,6 +1329,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     stepInChord,
                     soloResult,
                     stepCoordination,
+                    stepInfo,
                 );
                 for (let i = 0; i < harmonyNotes.length; i++) {
                     const n = harmonyNotes[i];

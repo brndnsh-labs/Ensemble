@@ -49,102 +49,125 @@ export function getSafeVoicings(intervals) {
  * Values indicate intensity threshold: 1=Always, 2=Medium(>0.4), 3=High(>0.7)
  * @param {string} feel - The genre feel
  * @param {number} seed - Random seed
- * @returns {number[]} 32-step pattern (2 bars)
+ * @param {object} tsConfig - Time signature config
+ * @returns {number[]} pattern matching total measure length (or 2 bars)
  */
-export function generateCompingPattern(feel, seed) {
-    const pattern = new Array(32).fill(0);
+export function generateCompingPattern(feel, seed, tsConfig) {
+    const ts = tsConfig || TIME_SIGNATURES['4/4'];
+    const spm = ts.beats * ts.stepsPerBeat;
+    const length = spm * 2; // Always generate 2 bars
+    const pattern = new Array(length).fill(0);
     const pseudoRandom = () => {
         seed = (seed * 9301 + 49297) % 233280;
         return seed / 233280;
     };
 
+    const getBeatStep = (bar, beatIdx, offsetSteps = 0) => {
+        return bar * spm + beatIdx * ts.stepsPerBeat + offsetSteps;
+    };
+
     if (feel === 'Jazz') {
-        // Bar 1: Charleston (0, 6)
-        pattern[0] = 1;
-        pattern[6] = 1;
+        // Bar 1: Charleston
+        pattern[getBeatStep(0, 0)] = 1;
+        pattern[getBeatStep(0, 1, Math.floor(ts.stepsPerBeat * 0.75))] = 1;
+
         // Bar 2: Displaced Charleston or Anticipations
         if (pseudoRandom() < 0.5) {
-            pattern[16] = 1;
-            pattern[22] = 2; // Delayed "And"
+            pattern[getBeatStep(1, 0)] = 1;
+            pattern[getBeatStep(1, 1, Math.floor(ts.stepsPerBeat * 0.75))] = 2;
         } else {
-            pattern[14] = 3; // Anticipation into Bar 2
-            pattern[30] = 3; // Anticipation into next Bar 1
+            const lastBeat = ts.beats - 1;
+            pattern[getBeatStep(0, lastBeat, Math.floor(ts.stepsPerBeat * 0.75))] = 3; // Anticipation into Bar 2
+            pattern[getBeatStep(1, lastBeat, Math.floor(ts.stepsPerBeat * 0.75))] = 3; // Anticipation into next Bar 1
         }
-        // Random sparse fillers
-        [4, 10, 20, 26].forEach((s) => {
-            if (pseudoRandom() < 0.3) {
-                pattern[s] = 2;
-            }
-        });
     } else if (feel === 'Bossa Nova') {
-        // Authentic 2-Bar Bossa Pattern
         // Bar 1: 1, (and-of-2), 4
-        pattern[0] = 1;
-        pattern[6] = 1;
-        pattern[12] = 2;
+        pattern[getBeatStep(0, 0)] = 1;
+        pattern[getBeatStep(0, 1, Math.floor(ts.stepsPerBeat / 2))] = 1;
+        if (ts.beats >= 4) {
+            pattern[getBeatStep(0, 3)] = 2;
+        }
         // Bar 2: (and-of-1), 3, (and-of-4)
-        pattern[18] = 1;
-        pattern[24] = 2;
-        pattern[30] = 1;
+        pattern[getBeatStep(1, 0, Math.floor(ts.stepsPerBeat / 2))] = 1;
+        if (ts.beats >= 3) {
+            pattern[getBeatStep(1, 2)] = 2;
+        }
+        const lastBeat = ts.beats - 1;
+        pattern[getBeatStep(1, lastBeat, Math.floor(ts.stepsPerBeat / 2))] = 1;
     } else if (feel === 'Funk') {
-        // Percussive 16ths focus (Clavinet style)
-        // Focus on "e" and "a" of the beat
-        [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31].forEach((s) => {
-            const r = pseudoRandom();
-            if (r < 0.2) {
-                pattern[s] = 1;
-            } else if (r < 0.4) {
-                pattern[s] = 2;
-            }
-        });
-        pattern[0] = 1; // Always the "One"
-        pattern[16] = 1;
+        const spb = ts.stepsPerBeat;
+        for (let b = 0; b < ts.beats * 2; b++) {
+            const bar = Math.floor(b / ts.beats);
+            const beatInBar = b % ts.beats;
+            [1, spb - 1].forEach((sub) => {
+                const s = getBeatStep(bar, beatInBar, sub);
+                const r = pseudoRandom();
+                if (r < 0.2) {
+                    pattern[s] = 1;
+                } else if (r < 0.4) {
+                    pattern[s] = 2;
+                }
+            });
+        }
+        pattern[getBeatStep(0, 0)] = 1;
+        pattern[getBeatStep(1, 0)] = 1;
     } else if (feel === 'Neo-Soul') {
-        // "Dilla" feel / Ghost notes
         pattern[0] = 1;
-        pattern[14] = 3; // Anticipation
-        pattern[18] = 1; // Late hit in Bar 2
-        // Ghost notes (val 4 as special marker for low-velocity)
-        [3, 7, 11, 19, 23, 27].forEach((s) => {
+        const lastBeat = ts.beats - 1;
+        pattern[getBeatStep(0, lastBeat, Math.floor(ts.stepsPerBeat * 0.75))] = 3; // Anticipation
+        pattern[getBeatStep(1, 1, Math.floor(ts.stepsPerBeat / 2))] = 1; // Lazy hit in Bar 2
+
+        // Ghost notes (val 4) on the "a" of each beat
+        for (let b = 0; b < ts.beats * 2; b++) {
+            const bar = Math.floor(b / ts.beats);
+            const beatInBar = b % ts.beats;
             if (pseudoRandom() < 0.4) {
-                pattern[s] = 4;
+                pattern[getBeatStep(bar, beatInBar, ts.stepsPerBeat - 1)] = 4;
             }
-        });
+        }
     } else if (feel === 'Disco') {
-        // Off-beat stabs (And of every beat)
-        [2, 6, 10, 14, 18, 22, 26, 30].forEach((s) => {
-            pattern[s] = 2;
-        });
+        for (let b = 0; b < ts.beats * 2; b++) {
+            pattern[
+                getBeatStep(Math.floor(b / ts.beats), b % ts.beats, Math.floor(ts.stepsPerBeat / 2))
+            ] = 2;
+        }
     } else if (feel === 'Rock' || feel === 'Metal') {
-        // Driving 8ths
-        [0, 4, 8, 12, 16, 20, 24, 28].forEach((s) => {
-            pattern[s] = 1;
-        });
-        [2, 6, 10, 14, 18, 22, 26, 30].forEach((s) => {
-            pattern[s] = 3;
-        });
+        for (let b = 0; b < ts.beats * 2; b++) {
+            pattern[getBeatStep(Math.floor(b / ts.beats), b % ts.beats)] = 1;
+            pattern[
+                getBeatStep(Math.floor(b / ts.beats), b % ts.beats, Math.floor(ts.stepsPerBeat / 2))
+            ] = 3;
+        }
     } else if (feel === 'Reggae') {
-        // Skank: Off-beats (Beats 2 and 4)
-        [4, 12, 20, 28].forEach((s) => {
-            pattern[s] = 1;
+        const backbeats = ts.backbeat || [1, 3];
+        backbeats.forEach((b) => {
+            pattern[getBeatStep(0, b)] = 1;
+            pattern[getBeatStep(1, b)] = 1;
         });
     } else if (feel === 'Ska') {
-        // Off-beat stabs (And of 1, 2, 3, 4)
-        [2, 6, 10, 14, 18, 22, 26, 30].forEach((s) => {
-            pattern[s] = 1;
-        });
-        // Occasional punchy syncopation
-        [3, 7, 11, 15, 19, 23, 27, 31].forEach((s) => {
+        for (let b = 0; b < ts.beats * 2; b++) {
+            pattern[
+                getBeatStep(Math.floor(b / ts.beats), b % ts.beats, Math.floor(ts.stepsPerBeat / 2))
+            ] = 1;
             if (pseudoRandom() < 0.3) {
-                pattern[s] = 2;
+                pattern[
+                    getBeatStep(
+                        Math.floor(b / ts.beats),
+                        b % ts.beats,
+                        Math.floor(ts.stepsPerBeat * 0.75),
+                    )
+                ] = 2;
             }
-        });
+        }
     } else {
-        // Default / Pop
         pattern[0] = 1;
-        pattern[8] = 1;
-        pattern[16] = 2;
-        pattern[24] = 2;
+        if (ts.beats >= 3) {
+            pattern[getBeatStep(0, 2)] = 1;
+        }
+        pattern[getBeatStep(1, 0)] = 2;
+        if (ts.beats >= 3) {
+            pattern[getBeatStep(1, 2)] = 2;
+        }
     }
 
     return pattern;
@@ -162,6 +185,7 @@ export function getHarmonyNotes(
     stepInChord,
     soloistResult = null,
     coordination = {},
+    stepInfo,
 ) {
     if (!chord) {
         return [];
@@ -339,12 +363,12 @@ export function getHarmonyNotes(
         const seed = Math.abs(hash);
 
         // Generate and cache the base pattern structure (independent of intensity)
-        const pattern = generateCompingPattern(feel, seed);
+        const pattern = generateCompingPattern(feel, seed, ts);
 
         // Calculate a broad rhythmic mask for UI/Consistency based on "Base" hits only
         let rhythmicMask = 0;
         // Use first 16 steps for UI mask to maintain grid alignment
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < Math.min(16, pattern.length); i++) {
             if (pattern[i] > 0) {
                 rhythmicMask |= 1 << i;
             }
@@ -421,7 +445,7 @@ export function getHarmonyNotes(
         }
         // -- Comping / Stabs Logic --
         else {
-            const patternStep = step % 32;
+            const patternStep = step % motif.pattern.length;
             const val = motif.pattern[patternStep];
             if (val > 0) {
                 // Sparse Comping: If soloist is busy, only play "Base" hits (val=1)
@@ -454,8 +478,13 @@ export function getHarmonyNotes(
 
                     if (shouldPlay) {
                         // Variable Durations: Downbeats are longer, syncopations are shorter
-                        const isDownbeat = measureStep % 4 === 0;
-                        const isAnticipation = measureStep === 14 || measureStep === 6;
+                        const isDownbeat = stepInfo
+                            ? stepInfo.isBeatStart
+                            : measureStep % ts.stepsPerBeat === 0;
+                        const isAnticipation = stepInfo
+                            ? stepInfo.mStep % ts.stepsPerBeat ===
+                              Math.floor(ts.stepsPerBeat * 0.75)
+                            : measureStep % 4 === 3;
 
                         if (isDownbeat) {
                             durationSteps = 3;

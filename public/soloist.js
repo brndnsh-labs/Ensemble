@@ -28,6 +28,7 @@ export function getSoloistNote(
     stepInChord,
     isPriming,
     coordination = {},
+    stepInfo,
 ) {
     const { playback, groove, soloist, arranger } = getState();
     if (!currentChord) {
@@ -52,8 +53,11 @@ export function getSoloistNote(
     const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
-    const measureStep = step % stepsPerMeasure;
+    const measureStep = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
     const stepInBeat = measureStep % stepsPerBeat;
+    const isBeatStart = stepInfo ? stepInfo.isBeatStart : stepInBeat === 0;
+    const isDownbeat = stepInfo ? stepInfo.isMeasureStart : measureStep === 0;
+    const isBackbeat = stepInfo ? stepInfo.isBackbeat : false;
 
     // Anticipation
     const isLateInChord = stepInChord >= currentChord.beats * stepsPerBeat - 2;
@@ -182,7 +186,7 @@ export function getSoloistNote(
     const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
 
     // Evaluate transition state at the downbeat of the final measure
-    if (isFinalMeasure && measureStep === 0) {
+    if (isFinalMeasure && isDownbeat) {
         soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
         logDebug(`Selected transition state: ${soloist.transitionState}`);
     } else if (!isFinalMeasure && step !== coordination.sectionStart) {
@@ -200,8 +204,8 @@ export function getSoloistNote(
     // If we're in 'rest' transition, enforce silence starting from beat 3 or 4
     if (isFinalMeasure && soloist.transitionState === 'rest') {
         const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
-        // Force rest on beat 3 (or 4 if beats == 4 and random is low)
-        const restBeatStart = tsConfig.beats >= 4 && Math.random() < 0.5 ? 3 : 2;
+        // Force rest on second half of measure
+        const restBeatStart = Math.ceil(tsConfig.beats / 2);
         if (beatInMeasure >= restBeatStart) {
             soloist.isResting = true; // @worker-mutation
             soloist.restSteps = remainingSteps; // @worker-mutation stay resting until next section
@@ -215,12 +219,12 @@ export function getSoloistNote(
         if (soloist.restSteps <= 0 || coordination.bypassRhythm) {
             // Find a good rhythmic entry point (e.g. downbeat or strong 8th)
             const isGoodEntry =
-                stepInBeat === 0 || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
+                isBeatStart || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
             // Don't break out if we are in the 'rest' transition late in the measure
             const preventBreakout =
                 isFinalMeasure &&
                 soloist.transitionState === 'rest' &&
-                Math.floor(measureStep / stepsPerBeat) >= 2;
+                Math.floor(measureStep / stepsPerBeat) >= Math.ceil(tsConfig.beats / 2);
 
             if (
                 !preventBreakout &&
@@ -241,10 +245,16 @@ export function getSoloistNote(
     } else {
         soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
 
-        // Structural Awareness: Defer rest until a strong rhythmic boundary (end of measure or beat 4)
-        const isStrongResolution = measureStep === 15 || (measureStep === 13 && intensity > 0.5);
+        // Structural Awareness: Defer rest until a strong rhythmic boundary (end of measure or last beat)
+        const isEndOfMeasure = measureStep === stepsPerMeasure - 1;
+        const isNearEndOfMeasure =
+            measureStep >= (tsConfig.beats - 1) * stepsPerBeat && intensity > 0.5;
 
-        if (soloist.activeSteps <= 0 && isStrongResolution && !coordination.bypassRhythm) {
+        if (
+            soloist.activeSteps <= 0 &&
+            (isEndOfMeasure || isNearEndOfMeasure) &&
+            !coordination.bypassRhythm
+        ) {
             soloist.isResting = true; // @worker-mutation
             // Calculate rest duration based inversely on intensity
             const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
@@ -272,7 +282,9 @@ export function getSoloistNote(
         step === coordination.sectionStart && soloist.transitionState === 'lead_in';
 
     const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
-    const baseAttackProb = emphasisMap[measureStep % 16];
+    // Map emphasis relative to steps per measure
+    const emphasisIdx = measureStep % 16; // Maintain 16th resolution for map, but wrapping is handled
+    const baseAttackProb = emphasisMap[emphasisIdx];
 
     // Session Warm-Up: Ramp density from 50% to 100% over first 64 steps
     const warmUpScale = Math.min(1.0, 0.5 + ((soloist.sessionSteps || 0) / 64) * 0.5);
@@ -453,7 +465,7 @@ export function getSoloistNote(
         (soloist.doubleStopProb ?? 1.0) > 0 &&
         config.doubleStopProb > 0;
 
-    if (stepInBeat === 0 && Math.random() < deviceBaseProb) {
+    if (isBeatStart && Math.random() < deviceBaseProb) {
         let allowed = [...(config.allowedDevices || [])];
         if (isPiano) {
             allowed = allowed.filter(
@@ -514,13 +526,10 @@ export function getSoloistNote(
     }
 
     const baseVelocity = 0.6 + intensity * 0.4;
-    // Detect 'The One' (downbeat of measure) and Backbeats (e.g., beats 2 & 4)
-    const isTheOne = measureStep === 0;
-    const isBackbeat = measureStep === stepsPerBeat || measureStep === stepsPerBeat * 3;
-    const isImportantStep = stepInBeat === 0 || stepInBeat === 2;
+    const isImportantStep = stepInBeat === 0 || stepInBeat === Math.floor(stepsPerBeat / 2);
 
     let stepVelocity = baseVelocity;
-    if (isTheOne) {
+    if (isDownbeat) {
         stepVelocity = baseVelocity * 1.25; // Strongest emphasis
     } else if (isBackbeat) {
         stepVelocity = baseVelocity * 1.15; // Strong emphasis

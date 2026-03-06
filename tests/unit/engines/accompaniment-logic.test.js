@@ -44,6 +44,7 @@ import {
     generateCompingPattern,
     getAccompanimentNotes,
 } from '../../../public/accompaniment.js';
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { getState } from '../../../public/state.js';
 
 const { arranger, playback, chords, bass, groove } = getState();
@@ -138,13 +139,14 @@ describe('Accompaniment Engine Logic', () => {
 
     describe('Procedural Pattern Generation', () => {
         it('should generate a 16-step pattern and increase density with intensity', () => {
-            const pattern = generateCompingPattern('Rock', 'balanced', 16);
+            const ts44 = TIME_SIGNATURES['4/4'];
+            const pattern = generateCompingPattern('Rock', 'balanced', ts44, 16);
             expect(pattern).toHaveLength(16);
 
-            const sparse = generateCompingPattern('Rock', 'sparse', 16).filter(
+            const sparse = generateCompingPattern('Rock', 'sparse', ts44, 16).filter(
                 (n) => n === 1,
             ).length;
-            const active = generateCompingPattern('Rock', 'active', 16).filter(
+            const active = generateCompingPattern('Rock', 'active', ts44, 16).filter(
                 (n) => n === 1,
             ).length;
             expect(active).toBeGreaterThanOrEqual(sparse);
@@ -152,9 +154,10 @@ describe('Accompaniment Engine Logic', () => {
 
         it('should generate Jazz Charleston rhythm', () => {
             let foundCharleston = false;
+            const ts44 = TIME_SIGNATURES['4/4'];
             for (let i = 0; i < 100; i++) {
-                const p = generateCompingPattern('Jazz', 'balanced', 16);
-                if (p[0] === 1 && p[7] === 1) {
+                const p = generateCompingPattern('Jazz', 'balanced', ts44, 16);
+                if (p[0] === 1 && p[6] === 1) {
                     foundCharleston = true;
                     break;
                 }
