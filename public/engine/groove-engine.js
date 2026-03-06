@@ -699,7 +699,12 @@ export function applyGrooveOverrides({
     // --- Rock Procedural Overrides ---
     if (groove.genreFeel === 'Rock' && !inst.muted) {
         const barIndex = Math.floor(step / stepsPerBar);
-        const activeMotif = getDrumMotif(sectionSeed, 'Rock', drumComplexity);
+        const activeMotif = getDrumMotif(
+            sectionSeed,
+            'Rock',
+            drumComplexity,
+            playback.bandIntensity,
+        );
         const isTurnaround = groove.creativity && barIndex % 4 === 3;
 
         if (inst.name === 'HiHat' || inst.name === 'Open') {
@@ -725,18 +730,19 @@ export function applyGrooveOverrides({
             if (loopStep === 0 || loopStep === 8) {
                 shouldPlay = true;
             } else if (activeMotif === 1) {
-                // Syncopated Kick
+                // Syncopated Kick (Beat 1, & of 2, & of 3)
                 if (loopStep === 6 || loopStep === 10) {
                     shouldPlay = true;
                 }
             } else if (activeMotif === 2) {
-                // The "Push"
+                // The "Push" (Kick on 1, & of 3)
                 if (loopStep === 10) {
                     shouldPlay = true;
                 }
             } else if (activeMotif === 3) {
-                // Heavy Syncopation
-                if (loopStep === 6 || loopStep === 10 || loopStep === 14) {
+                // Heavy Syncopation / Ghosting
+                // Slightly less busy than before, but still adds movement
+                if (loopStep === 6 || loopStep === 14) {
                     shouldPlay = true;
                 }
             }
@@ -1077,7 +1083,7 @@ export function calculatePocketOffset(playback, groove) {
  * @param {number} complexity - The drum complexity scalar (0.0 to 1.0)
  * @returns {number} Motif ID (meaning depends on genre logic)
  */
-export function getDrumMotif(seed, genreFeel, complexity) {
+export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
     if (genreFeel === 'Jazz') {
         // Motif Map:
         // 0: Standard Conversational Comping
@@ -1116,14 +1122,34 @@ export function getDrumMotif(seed, genreFeel, complexity) {
         // 2: The "Push" (Kick on 1, & of 3)
         // 3: Heavy Syncopation / Ghosting
 
-        if (complexity < 0.3) {
-            return 0;
+        if (complexity < 0.3 || intensity < 0.35) {
+            return 0; // Simple standard beat at start of session
         }
 
-        if (seed < 0.33) {
+        // At low/mid intensity, stick mostly to simple beats with rare syncopation
+        if (intensity < 0.6) {
+            return seed < 0.75 ? 0 : 2; // 75% Money Beat, 25% "The Push"
+        }
+
+        // As intensity rises, introduce more variety
+        if (intensity < 0.85) {
+            if (seed < 0.4) {
+                return 0;
+            }
+            if (seed < 0.7) {
+                return 2;
+            }
+            return 1; // Introduce syncopated kick
+        }
+
+        // At peak intensity, use full variety
+        if (seed < 0.25) {
+            return 0;
+        }
+        if (seed < 0.5) {
             return 1;
         }
-        if (seed < 0.66) {
+        if (seed < 0.75) {
             return 2;
         }
         return 3;
