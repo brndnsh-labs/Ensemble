@@ -174,7 +174,7 @@ export function hydrateState() {
                 enabled:
                     savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
                 style: savedState.soloist.style || 'smart',
-                preset: savedState.soloist.preset || 'neo',
+                preset: savedState.soloist.preset || 'trumpet',
                 octave:
                     savedState.soloist.octave === 77 ||
                     savedState.soloist.octave === 67 ||

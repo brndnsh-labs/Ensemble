@@ -69,7 +69,7 @@ export const bass = {
  */
 export const soloist = {
     enabled: false,
-    preset: 'neo',
+    preset: 'trumpet',
     volume: 0.5,
     reverb: 0.6,
     lastPlayedFreq: null,
@@ -194,7 +194,7 @@ export function instrumentReducer(action, payload) {
             });
             Object.assign(soloist, {
                 enabled: false,
-                preset: 'neo',
+                preset: 'trumpet',
                 volume: 0.5,
                 reverb: 0.6,
                 octave: 72,

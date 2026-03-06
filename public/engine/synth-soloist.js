@@ -55,7 +55,7 @@ export function playSoloNote(
         return;
     }
 
-    const preset = soloist.preset || 'neo';
+    const preset = soloist.preset || 'trumpet';
     const ctx = playback.audio;
     const now = ctx.currentTime;
     const playTime = Math.max(time, now);
