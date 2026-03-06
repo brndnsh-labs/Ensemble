@@ -304,12 +304,26 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
 
     const isBeatStart = mStep % stepsPerBeat === 0;
     const beatIndex = Math.floor(mStep / stepsPerBeat);
+    const isCompound = !!currentTS.isCompound;
+
+    let isBackbeat = false;
+    const backbeatArray = currentTS.backbeat || [];
+    if (isCompound) {
+        if (isGroupStart && backbeatArray.includes(groupIndex)) {
+            isBackbeat = true;
+        }
+    } else {
+        if (isBeatStart && backbeatArray.includes(beatIndex)) {
+            isBackbeat = true;
+        }
+    }
 
     return {
         isMeasureStart,
         isGroupStart,
         isBeatStart,
-        isCompound: !!currentTS.isCompound,
+        isBackbeat,
+        isCompound,
         groupIndex,
         stepInGroup,
         beatIndex,

@@ -34,14 +34,29 @@ export const INTERVAL_TO_ROMAN = {
 };
 
 export const TIME_SIGNATURES = {
-    '2/4': { beats: 2, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4], grouping: [2] },
-    '3/4': { beats: 3, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8], grouping: [3] },
+    '2/4': {
+        beats: 2,
+        stepsPerBeat: 4,
+        subdivision: '16th',
+        pulse: [0, 4],
+        grouping: [2],
+        backbeat: [1],
+    },
+    '3/4': {
+        beats: 3,
+        stepsPerBeat: 4,
+        subdivision: '16th',
+        pulse: [0, 4, 8],
+        grouping: [3],
+        backbeat: [2],
+    },
     '4/4': {
         beats: 4,
         stepsPerBeat: 4,
         subdivision: '16th',
         pulse: [0, 4, 8, 12],
         grouping: [2, 2],
+        backbeat: [1, 3],
     },
     '5/4': {
         beats: 5,
@@ -49,6 +64,7 @@ export const TIME_SIGNATURES = {
         subdivision: '16th',
         pulse: [0, 4, 8, 12, 16],
         grouping: [3, 2],
+        backbeat: [1, 3],
     },
     '6/8': {
         beats: 6,
@@ -57,14 +73,23 @@ export const TIME_SIGNATURES = {
         pulse: [0, 6],
         grouping: [3, 3],
         isCompound: true,
+        backbeat: [1],
     },
-    '7/8': { beats: 7, stepsPerBeat: 2, subdivision: '8th', pulse: [0, 4, 8], grouping: [2, 2, 3] },
+    '7/8': {
+        beats: 7,
+        stepsPerBeat: 2,
+        subdivision: '8th',
+        pulse: [0, 4, 8],
+        grouping: [2, 2, 3],
+        backbeat: [1, 2],
+    },
     '7/4': {
         beats: 7,
         stepsPerBeat: 4,
         subdivision: '16th',
         pulse: [0, 4, 8, 12, 16, 20, 24],
         grouping: [4, 3],
+        backbeat: [1, 3, 5],
     },
     '12/8': {
         beats: 12,
@@ -73,6 +98,7 @@ export const TIME_SIGNATURES = {
         pulse: [0, 6, 12, 18],
         grouping: [3, 3, 3, 3],
         isCompound: true,
+        backbeat: [1, 3],
     },
 };
 

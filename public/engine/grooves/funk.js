@@ -42,8 +42,22 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, stepVal, drumComplexity, sectionSeed, isTurnaround } =
-        context;
+    const {
+        inst,
+        playback,
+        stepVal,
+        isDownbeat,
+        isBeatStart,
+        isBackbeat,
+        isOffbeat,
+        isEOfBeat,
+        isAOfBeat,
+        beatIndex,
+        drumComplexity,
+        sectionSeed,
+        isTurnaround,
+    } = context;
+
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -54,29 +68,34 @@ export function applyOverrides(context, state) {
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- "The One" Reinforcement ---
-    if (inst.name === 'Kick' && loopStep === 0) {
+    if (inst.name === 'Kick' && isDownbeat) {
         shouldPlay = true;
         velocity = scaleVelocity(1.3, intensity, 0.1); // Scale reinforcement with intensity
     }
 
     // --- Hi-Hat & Open Dynamics ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        if (isTurnaround && loopStep === 14) {
-            // Standard Turnaround Bark
+        // Standard Turnaround Bark on the "&" of the last beat (e.g., beat 4 in 4/4)
+        if (isTurnaround && isOffbeat && beatIndex >= 3) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.15;
         } else if (shouldPlay) {
             // Pulse shaping
-            if (loopStep % 4 === 0) {
+            if (isBeatStart) {
                 velocity *= 1.1;
-            } else if (loopStep % 2 === 1) {
+            } else if (isEOfBeat || isAOfBeat) {
                 velocity *= 0.8;
             }
 
-            // Occasional open barks at higher intensities
+            // Occasional open barks at higher intensities on the "&" of beats 2 and 3
             const barkProb = intensity > 0.6 ? 0.3 * intensity : 0.05;
-            if (activeMotif >= 2 && [6, 10].includes(loopStep) && roll(barkProb)) {
+            if (
+                activeMotif >= 2 &&
+                isOffbeat &&
+                (beatIndex === 1 || beatIndex === 2) &&
+                roll(barkProb)
+            ) {
                 soundName = 'Open';
                 velocity *= 1.1;
             }
@@ -87,40 +106,46 @@ export function applyOverrides(context, state) {
         // --- Motif Snare Patterns ---
         if (activeMotif === 0) {
             // Standard Syncopated Funk
-            if (loopStep === 4 || loopStep === 12) {
+            if (isBackbeat) {
                 shouldPlay = true;
             }
-            if (stepVal === 0 && loopStep === 7) {
+            if (stepVal === 0 && isAOfBeat && beatIndex === 1) {
                 shouldPlay = true; // "a" of 2 ghost
                 velocity = scaleVelocity(0.12, intensity, 0.1);
             }
         } else if (activeMotif === 1) {
             // The Funky Drummer (Ghost Note Heavy)
-            if (loopStep === 4 || loopStep === 12) {
+            if (isBackbeat) {
                 shouldPlay = true;
-            } else if ([3, 7, 10, 11].includes(loopStep)) {
+            } else if (
+                (isAOfBeat && (beatIndex === 0 || beatIndex === 1 || beatIndex === 2)) ||
+                (isOffbeat && beatIndex === 2)
+            ) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.06, intensity, 0.15) + Math.random() * 0.1;
             }
         } else if (activeMotif === 2) {
             // Displaced Backbeats ("Cold Sweat")
-            if (loopStep === 4) {
-                shouldPlay = true;
+            if (isBackbeat && beatIndex === 1) {
+                shouldPlay = true; // Solid on beat 2
             }
-            if (loopStep === 14) {
+            if (isOffbeat && beatIndex === 3) {
                 shouldPlay = true; // Displaced to "and" of 4
                 velocity = 1.1;
             }
-            if ([7, 9].includes(loopStep)) {
+            if ((isAOfBeat && beatIndex === 1) || (isEOfBeat && beatIndex === 2)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.1, intensity, 0.1);
             }
         } else if (activeMotif === 3) {
             // Busy Linear (Garibaldi)
-            if (loopStep === 4 || loopStep === 12) {
+            if (isBackbeat) {
                 shouldPlay = true;
                 velocity = 1.15;
-            } else if ([2, 5, 9, 14].includes(loopStep)) {
+            } else if (
+                (isOffbeat && (beatIndex === 0 || beatIndex === 3)) ||
+                (isEOfBeat && (beatIndex === 1 || beatIndex === 2))
+            ) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.1, intensity, 0.1);
             }
@@ -128,18 +153,19 @@ export function applyOverrides(context, state) {
 
         // --- Snare Turnaround Fills ---
         if (isTurnaround && intensity > 0.75) {
-            if ([13, 14, 15].includes(loopStep) && roll(0.7)) {
+            // Fill on the 16ths of the last beat
+            if (beatIndex >= 3 && !isBeatStart && roll(0.7)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.6, intensity, 0.4);
-                if (loopStep === 15) {
+                if (isAOfBeat) {
                     velocity = 1.2; // Strong lead back into the One
                 }
             }
         }
 
         if (shouldPlay) {
-            // Ensure strong backbeats
-            if (loopStep === 4 || loopStep === 12 || loopStep === 14) {
+            // Ensure strong backbeats and specific displaced accents
+            if (isBackbeat || (isOffbeat && beatIndex >= 3)) {
                 velocity = Math.max(velocity, 1.1);
             }
             // Low intensity sidestick fallback
@@ -152,30 +178,34 @@ export function applyOverrides(context, state) {
 
         // --- Motif Kick Patterns ---
         if (activeMotif === 0) {
-            if (loopStep === 0 || loopStep === 8) {
+            if (isBeatStart && !isBackbeat) {
                 shouldPlay = true;
             }
-            if (loopStep === 10 && (drumComplexity > 0.5 || intensity > 0.6)) {
+            if (isOffbeat && beatIndex === 2 && (drumComplexity > 0.5 || intensity > 0.6)) {
                 shouldPlay = true; // "and" of 3
             }
         } else if (activeMotif === 1) {
-            if (loopStep === 0 || loopStep === 6 || loopStep === 10) {
+            if (isDownbeat || (isOffbeat && (beatIndex === 1 || beatIndex === 2))) {
                 shouldPlay = true;
             }
-            if (loopStep === 13 && roll(0.5, intensity)) {
+            if (isEOfBeat && beatIndex === 3 && roll(0.5, intensity)) {
                 shouldPlay = true; // pickup
             }
         } else if (activeMotif === 2) {
-            if (loopStep === 0 || loopStep === 8 || loopStep === 11) {
+            if ((isBeatStart && !isBackbeat) || (isAOfBeat && beatIndex === 2)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 3) {
             // Busy Linear kick
-            if (loopStep === 0 || loopStep === 3 || loopStep === 7 || loopStep === 10) {
+            if (
+                isDownbeat ||
+                (isAOfBeat && (beatIndex === 0 || beatIndex === 1)) ||
+                (isOffbeat && beatIndex === 2)
+            ) {
                 shouldPlay = true;
             }
-            // Extra ghost kicks at peak intensity
-            if (intensity > 0.9 && loopStep === 15) {
+            // Extra ghost kicks at peak intensity on the last 16th
+            if (intensity > 0.9 && isAOfBeat && beatIndex >= 3) {
                 shouldPlay = true;
                 velocity = 0.4;
             }
@@ -200,7 +230,7 @@ export function applyOverrides(context, state) {
                 soundName = 'Sidestick';
             }
             // Drive the backbeat slightly as intensity increases
-            if (loopStep === 4 || loopStep === 12) {
+            if (isBackbeat) {
                 instTimeOffset -= 0.004 + intensity * 0.002;
             }
         }

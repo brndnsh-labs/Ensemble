@@ -34,7 +34,7 @@ describe('Funk Groove Integrity', () => {
         const createParams = (step, instName, stepVal = 0) => {
             return {
                 step,
-                inst: { name: instName, muted: false, steps: [] },
+                inst: { name: instName, muted: false },
                 stepVal,
                 playback: mockState.playback,
                 groove: mockState.groove,
@@ -42,6 +42,7 @@ describe('Funk Groove Integrity', () => {
                 isQuarter: step % 4 === 0,
                 isBackbeat: step % 16 === 4 || step % 16 === 12,
                 isGroupStart: step % 16 === 0 || step % 16 === 8,
+                beatIndex: Math.floor((step % 16) / 4),
             };
         };
 

@@ -38,7 +38,20 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
+    const {
+        inst,
+        playback,
+        isBeatStart,
+        isBackbeat,
+        isOffbeat,
+        isAOfBeat,
+        beatIndex,
+        drumComplexity,
+        sectionSeed,
+        isTurnaround,
+        stepsPerBar,
+        loopStep,
+    } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -47,37 +60,38 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. KICK (Strict 4-on-the-floor) ---
     if (inst.name === 'Kick') {
-        shouldPlay = loopStep % 4 === 0;
+        shouldPlay = isBeatStart;
         if (shouldPlay) {
             // Scale velocity to drive the energy
             velocity =
-                loopStep === 0
+                beatIndex === 0
                     ? scaleVelocity(1.2, intensity, 0.15)
                     : scaleVelocity(1.1, intensity, 0.1);
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
         // Standard Disco backbeat
-        if (loopStep === 4 || loopStep === 12) {
+        if (isBackbeat) {
             shouldPlay = true;
             velocity = scaleVelocity(1.15, intensity, 0.1);
         }
 
         // --- Snare Ghosts & Turnarounds ---
         if (intensity > 0.7 && activeMotif >= 2) {
-            // Occasional ghost note on "a" of 4
-            if (loopStep === 15 && roll(0.4, intensity)) {
+            // Occasional ghost note on "a" of the last beat
+            if (isAOfBeat && beatIndex >= 3 && roll(0.4, intensity)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
             }
         }
 
         if (isTurnaround && intensity > 0.65) {
-            // Energetic "Kick-Snare-Crash" finish
-            if (loopStep === 15) {
+            // Energetic "Kick-Snare-Crash" finish on the last step of the bar
+            if (loopStep === stepsPerBar - 1) {
                 shouldPlay = true;
                 velocity = 1.3;
                 soundName = 'Snare'; // Full crack
@@ -91,7 +105,7 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         // Core Offbeat Open Hat (The Disco "And")
-        if (loopStep % 4 === 2) {
+        if (isOffbeat) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = scaleVelocity(1.1, intensity, 0.2);
@@ -99,7 +113,7 @@ export function applyOverrides(context, state) {
 
         // Motif 1: Shimmering 16th closed hats
         if (activeMotif === 1 || activeMotif === 3) {
-            if (loopStep % 2 === 0 && soundName !== 'Open') {
+            if (isEighthNote && soundName !== 'Open') {
                 shouldPlay = true;
                 soundName = 'HiHat';
                 velocity = scaleVelocity(0.8, intensity, 0.15);
@@ -108,7 +122,7 @@ export function applyOverrides(context, state) {
 
         // Motif 2: Syncopated hat barks
         if (activeMotif === 2) {
-            if (loopStep === 14) {
+            if (isOffbeat && beatIndex === 3) {
                 shouldPlay = true;
                 soundName = 'Open';
                 velocity = 1.2;
@@ -117,14 +131,17 @@ export function applyOverrides(context, state) {
     } else if (inst.name === 'Perc' || inst.name.includes('Cowbell')) {
         // Motif 3: Octave Cowbells
         if (activeMotif === 3) {
-            if (loopStep % 4 === 0 || loopStep % 4 === 2) {
+            if (isEighthNote) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, intensity, 0.2);
-                // Alternate High/Low cowbell sounds if available, or just scale velocity
-                soundName = loopStep % 8 === 0 ? 'CowbellHigh' : 'CowbellLow';
+                // Alternate High/Low cowbell sounds based on beat index
+                soundName =
+                    isBeatStart && (beatIndex === 0 || beatIndex === 2)
+                        ? 'CowbellHigh'
+                        : 'CowbellLow';
             }
             // Add extra syncopation at peak intensity
-            if (intensity > 0.9 && loopStep % 2 === 1 && roll(0.3)) {
+            if (intensity > 0.9 && !isEighthNote && roll(0.3)) {
                 shouldPlay = true;
                 velocity = 0.6;
                 soundName = 'CowbellHigh';

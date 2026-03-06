@@ -38,7 +38,19 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed } = context;
+    const {
+        inst,
+        playback,
+        isDownbeat,
+        isBeatStart,
+        isBackbeat,
+        isOffbeat,
+        isAOfBeat,
+        beatIndex,
+        drumComplexity,
+        sectionSeed,
+    } = context;
+
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -47,6 +59,7 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. SNARE / SIDESTICK (Cajon to Kit Transition) ---
     if (inst.name === 'Snare') {
@@ -57,12 +70,12 @@ export function applyOverrides(context, state) {
 
         if (activeMotif === 2 || activeMotif === 3) {
             // Standard backbeat for Soft Rock/Dynamic
-            if (loopStep === 4 || loopStep === 12) {
+            if (isBackbeat) {
                 shouldPlay = true;
             }
         } else {
             // Minimal backbeat for Folk (Beat 3 only)
-            if (loopStep === 8) {
+            if (isBeatStart && beatIndex === 2) {
                 shouldPlay = true;
             }
         }
@@ -73,7 +86,7 @@ export function applyOverrides(context, state) {
 
         // Occasional ghost notes at high intensity
         if (intensity > 0.8 && activeMotif === 3) {
-            if ([3, 7, 11, 15].includes(loopStep) && roll(0.25)) {
+            if (isAOfBeat && roll(0.25)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.2, intensity, 0.2);
                 soundName = 'Sidestick';
@@ -82,22 +95,22 @@ export function applyOverrides(context, state) {
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
         // Minimal kick at low intensity (The One)
-        if (loopStep === 0) {
+        if (isDownbeat) {
             shouldPlay = true;
         }
 
         // Add backbeat/syncopation as intensity rises
         if (intensity > 0.45) {
-            if (activeMotif === 0 && loopStep === 6) {
+            if (activeMotif === 0 && isOffbeat && beatIndex === 1) {
                 shouldPlay = true; // "and" of 2
             }
-            if (activeMotif >= 2 && loopStep === 8) {
+            if (activeMotif >= 2 && isBeatStart && beatIndex === 2) {
                 shouldPlay = true; // Beat 3
             }
         }
 
         if (intensity > 0.75 && activeMotif === 3) {
-            if (loopStep === 10 && roll(0.4)) {
+            if (isOffbeat && beatIndex === 2 && roll(0.4)) {
                 shouldPlay = true; // syncopated pickup
             }
         }
@@ -109,13 +122,9 @@ export function applyOverrides(context, state) {
         // Acoustic HiHats often act as a constant shaker-like pulse
         shouldPlay = true;
 
-        // Basic 8th note pulse accents
-        const isPulse = loopStep % 2 === 0;
-        const isQuarter = loopStep % 4 === 0;
-
-        if (isQuarter) {
+        if (isBeatStart) {
             velocity = scaleVelocity(0.7, intensity, 0.15);
-        } else if (isPulse) {
+        } else if (isOffbeat) {
             velocity = scaleVelocity(0.5, intensity, 0.1);
         } else {
             // 16th note "ghost" pulse
@@ -127,17 +136,17 @@ export function applyOverrides(context, state) {
         }
 
         // Motif 3: Extra shimmer
-        if (activeMotif === 3 && !isPulse) {
+        if (activeMotif === 3 && !isEighthNote) {
             velocity *= 1.2;
         }
     } else if (inst.name === 'Shaker' || inst.name === 'Tambourine') {
         // Percussion scales density with intensity
-        shouldPlay = loopStep % 2 === 0;
+        shouldPlay = isEighthNote;
         if (intensity > 0.6) {
             shouldPlay = true; // full 16th coverage
         }
 
-        velocity = loopStep % 4 === 0 ? 0.8 : 0.5;
+        velocity = isBeatStart ? 0.8 : 0.5;
         velocity *= scaleVelocity(0.7, intensity, 0.3);
     }
 

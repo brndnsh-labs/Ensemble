@@ -41,6 +41,7 @@ describe('Rock Drummer Critique', () => {
                         isQuarter: step % 4 === 0,
                         isBackbeat: step === 4 || step === 12,
                         isGroupStart: step === 0 || step === 8,
+                        beatIndex: Math.floor(step / 4),
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay && result.soundName === instName) {

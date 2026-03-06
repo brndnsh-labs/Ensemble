@@ -36,8 +36,21 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, isDownbeat, drumComplexity, sectionSeed, isTurnaround } =
-        context;
+    const {
+        inst,
+        playback,
+        isDownbeat,
+        isBeatStart,
+        isBackbeat,
+        isOffbeat,
+        beatIndex,
+        drumComplexity,
+        sectionSeed,
+        isTurnaround,
+        stepsPerBar,
+        loopStep,
+    } = context;
+
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -47,13 +60,16 @@ export function applyOverrides(context, state) {
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
+    const halfBarStep = Math.floor(stepsPerBar / 2);
+    const isEighthNote = isBeatStart || isOffbeat;
+
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        if (isTurnaround && loopStep > 7) {
+        if (isTurnaround && loopStep >= halfBarStep) {
             shouldPlay = false;
         } else {
-            if (loopStep % 2 === 0) {
+            if (isEighthNote) {
                 shouldPlay = true;
-                velocity = loopStep % 4 === 0 ? 1.05 : 0.85;
+                velocity = isBeatStart ? 1.05 : 0.85;
 
                 if (intensity > 0.7) {
                     soundName = 'Open';
@@ -65,18 +81,18 @@ export function applyOverrides(context, state) {
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
-        if (loopStep === 0 || loopStep === 8) {
+        if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
         } else if (activeMotif === 1) {
-            if (loopStep === 6 || loopStep === 10) {
+            if (isOffbeat && (beatIndex === 1 || beatIndex === 2)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
-            if (loopStep === 10) {
+            if (isOffbeat && beatIndex === 2) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 3) {
-            if (loopStep === 6 || loopStep === 14) {
+            if (isOffbeat && (beatIndex === 1 || beatIndex === 3)) {
                 shouldPlay = true;
             }
         }
@@ -87,17 +103,17 @@ export function applyOverrides(context, state) {
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
 
-        if (loopStep === 4 || loopStep === 12) {
+        if (isBackbeat) {
             shouldPlay = true;
         }
 
-        if (isTurnaround && loopStep > 7) {
-            if ([8, 10, 14].includes(loopStep) && roll(0.4)) {
+        if (isTurnaround && loopStep >= halfBarStep) {
+            if (isEighthNote && roll(0.4)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, Math.random(), 0.2);
             }
         } else {
-            if (!shouldPlay && (loopStep === 7 || loopStep === 9)) {
+            if (!shouldPlay && !isEighthNote && (beatIndex === 1 || beatIndex === 2)) {
                 if (intensity > 0.4 && intensity < 0.75 && roll(0.08)) {
                     shouldPlay = true;
                     velocity = 0.25;
@@ -106,7 +122,7 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            if (loopStep === 4 || loopStep === 12) {
+            if (isBackbeat) {
                 velocity = 1.15;
             }
             if (intensity < 0.25) {
@@ -114,8 +130,8 @@ export function applyOverrides(context, state) {
             }
         }
     } else if (inst.name.includes('Tom')) {
-        if (isTurnaround && loopStep > 7) {
-            if ([8, 10, 12, 14].includes(loopStep) && roll(0.6)) {
+        if (isTurnaround && loopStep >= halfBarStep) {
+            if (isEighthNote && roll(0.6)) {
                 shouldPlay = true;
                 velocity = 1.1;
             }

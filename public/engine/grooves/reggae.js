@@ -41,7 +41,18 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
+    const {
+        inst,
+        playback,
+        drumComplexity,
+        sectionSeed,
+        isTurnaround,
+        isDownbeat,
+        isBeatStart,
+        isOffbeat,
+        isAOfBeat,
+        beatIndex,
+    } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     if (inst.muted) {
@@ -50,46 +61,51 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. KICK & SNARE INTERPLAY ---
     if (inst.name === 'Kick') {
         shouldPlay = false;
         if (activeMotif === 0) {
             // One Drop
-            if (loopStep === 8) {
+            if (isBeatStart && beatIndex === 2) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 1) {
             // Steppers
-            if (loopStep % 4 === 0) {
+            if (isBeatStart) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
             // Rockers
-            if ([0, 4, 8, 12, 14].includes(loopStep)) {
+            if (isBeatStart || (isOffbeat && beatIndex === 3)) {
                 shouldPlay = true;
-                if (loopStep === 14) {
+                if (isOffbeat && beatIndex === 3) {
                     velocity = 0.85;
                 }
             }
         } else {
             // Dub/Experimental
-            if ([0, 3, 8, 11, 15].includes(loopStep)) {
+            if (
+                isDownbeat ||
+                (isAOfBeat && (beatIndex === 0 || beatIndex === 2 || beatIndex === 3)) ||
+                (isBeatStart && beatIndex === 2)
+            ) {
                 shouldPlay = true;
             }
         }
 
         if (shouldPlay) {
             velocity = scaleVelocity(1.1, intensity, 0.15);
-            // "Deep Pocket": Slightly pull back the Step 8 kick
-            if (loopStep === 8) {
+            // "Deep Pocket": Slightly pull back the One Drop kick
+            if (isBeatStart && beatIndex === 2) {
                 instTimeOffset += 0.005;
             }
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
-        // Core Reggae backbeat on Step 8 (Beat 3)
-        if (loopStep === 8) {
+        // Core Reggae backbeat on Beat 3
+        if (isBeatStart && beatIndex === 2) {
             shouldPlay = true;
             velocity = scaleVelocity(1.2, intensity, 0.1);
             // Transition from Sidestick to Snare rimshot as intensity rises
@@ -98,7 +114,11 @@ export function applyOverrides(context, state) {
 
         // --- Snare Ghosting & Dub Flams ---
         if (activeMotif === 3) {
-            if ([3, 6, 11, 14].includes(loopStep) && roll(0.3, intensity)) {
+            if (
+                ((isAOfBeat && (beatIndex === 0 || beatIndex === 2)) ||
+                    (isOffbeat && (beatIndex === 1 || beatIndex === 3))) &&
+                roll(0.3, intensity)
+            ) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.4, intensity, 0.3);
                 soundName = 'Sidestick';
@@ -107,7 +127,7 @@ export function applyOverrides(context, state) {
 
         if (isTurnaround && intensity > 0.75) {
             // Probability for a snare "flam" on the end of the bar
-            if (loopStep === 15 && roll(0.4)) {
+            if (isAOfBeat && beatIndex === 3 && roll(0.4)) {
                 shouldPlay = true;
                 velocity = 0.9;
                 instTimeOffset -= 0.01; // Push it early
@@ -125,9 +145,9 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         // Reggae 8th-note pulse
-        if (loopStep % 2 === 0) {
+        if (isEighthNote) {
             shouldPlay = true;
-            velocity = loopStep % 4 === 0 ? 0.9 : 0.7;
+            velocity = isBeatStart ? 0.9 : 0.7;
 
             // At high intensity, transition from steady 8ths to a 16th shuffle for Motif 3
             if (activeMotif === 3 && intensity > 0.8 && roll(0.4)) {
@@ -138,7 +158,7 @@ export function applyOverrides(context, state) {
         }
 
         // Occasional Open hat barks on the "and" of 4
-        if (loopStep === 14 && intensity > 0.7 && roll(0.25)) {
+        if (isOffbeat && beatIndex === 3 && intensity > 0.7 && roll(0.25)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.1;

@@ -35,7 +35,19 @@ export function getMotif(seed, complexity, intensity = 1.0) {
 }
 
 export function applyOverrides(context, state) {
-    const { inst, loopStep, playback, drumComplexity, sectionSeed, isTurnaround } = context;
+    const {
+        inst,
+        playback,
+        isDownbeat,
+        isBeatStart,
+        isBackbeat,
+        isOffbeat,
+        isAOfBeat,
+        beatIndex,
+        drumComplexity,
+        sectionSeed,
+        isTurnaround,
+    } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
     const intensity = playback.bandIntensity;
@@ -61,10 +73,8 @@ export function applyOverrides(context, state) {
     // --- 2. DRUNKEN JITTER ---
     // Non-backbeat steps drift noticeably as intensity rises.
     const drunkenFactor = intensity * 0.015;
-    const isBackbeat = loopStep === 4 || loopStep === 12;
-    const isDownbeat = loopStep % 4 === 0;
 
-    if (!isBackbeat && !isDownbeat) {
+    if (!isBackbeat && !isBeatStart) {
         instTimeOffset += (Math.random() - 0.5) * drunkenFactor;
     }
 
@@ -72,7 +82,7 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         if (shouldPlay) {
             // Subtle shuffle on 16ths
-            if (loopStep % 2 === 1) {
+            if (!isBeatStart && !isOffbeat) {
                 velocity *= 0.75 - intensity * 0.1; // Softer 16ths as it gets "lazier"
             }
         }
@@ -85,7 +95,7 @@ export function applyOverrides(context, state) {
             if (isBackbeat) {
                 shouldPlay = true;
                 velocity = scaleVelocity(1.05, intensity, 0.1);
-            } else if ([3, 7, 11, 15].includes(loopStep)) {
+            } else if (isAOfBeat) {
                 // Ghost note placements - keep deterministic for "structured" feel
                 shouldPlay = true;
                 velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
@@ -99,7 +109,7 @@ export function applyOverrides(context, state) {
 
         // --- Snare Turnarounds ---
         if (isTurnaround && intensity > 0.6) {
-            if ([14, 15].includes(loopStep) && roll(0.6)) {
+            if (beatIndex >= 3 && !isBeatStart && roll(0.6)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
                 instTimeOffset += 0.01; // Extra drag on turnaround ghosts
@@ -115,17 +125,22 @@ export function applyOverrides(context, state) {
         // --- Kick Motif Logic ---
         if (activeMotif === 0) {
             // Boom Bap: 1, & of 3
-            if (loopStep === 0 || loopStep === 10) {
+            if (isDownbeat || (isOffbeat && beatIndex === 2)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
             // Dilla Skips: 1, pickup to 3, pickup to 1, "a" of 4
-            if ([0, 7, 10, 15].includes(loopStep)) {
+            if (
+                isDownbeat ||
+                (isAOfBeat && beatIndex === 1) ||
+                (isOffbeat && beatIndex === 2) ||
+                (isAOfBeat && beatIndex === 3)
+            ) {
                 shouldPlay = true;
             }
         } else {
             // Standard foundation
-            if (loopStep === 0 || loopStep === 8) {
+            if (isBeatStart && !isBackbeat) {
                 shouldPlay = true;
             }
         }

@@ -51,7 +51,10 @@ export function applyGrooveOverrides({
     playback,
     groove,
     isDownbeat,
+    isQuarter,
     isBackbeat,
+    isGroupStart,
+    beatIndex,
 }) {
     const { soloist } = getState();
     const stateObj = getState();
@@ -59,6 +62,17 @@ export function applyGrooveOverrides({
     const ts = TIME_SIGNATURES[arrangerState.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
     const loopStep = step % stepsPerBar;
+
+    // Semantic abstractions
+    const isBeatStart = ts.isCompound ? isGroupStart : isQuarter;
+    const isOffbeat = loopStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
+    const activeBeatIndex = ts.isCompound
+        ? Math.floor(loopStep / (ts.stepsPerBeat * ts.grouping[0]))
+        : beatIndex;
+
+    // 16th note subdivisions
+    const isEOfBeat = loopStep % ts.stepsPerBeat === 1;
+    const isAOfBeat = loopStep % ts.stepsPerBeat === ts.stepsPerBeat - 1;
 
     let currentState = {
         shouldPlay: stepVal > 0,
@@ -72,10 +86,6 @@ export function applyGrooveOverrides({
 
     let pulseWeight = 1.0;
     if ((inst.name === 'HiHat' || inst.name === 'Open') && !config.exemptFromPulseShaping) {
-        // Find if it's the 3rd 16th note in a quarter note subdivision
-        // For simple meters (4 steps per beat), offbeat is % 4 === 2.
-        // For compound meters (2 steps per beat), we check relative to the beat.
-        const isOffbeat = loopStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
         const isSyncopated = loopStep % 2 === 1;
         if (isOffbeat) {
             pulseWeight = 0.85;
@@ -125,7 +135,13 @@ export function applyGrooveOverrides({
         playback,
         groove,
         isDownbeat,
+        isBeatStart,
+        isGroupStart,
         isBackbeat,
+        isOffbeat,
+        isEOfBeat,
+        isAOfBeat,
+        beatIndex: activeBeatIndex,
         stepsPerBar,
         loopStep,
         drumComplexity,
