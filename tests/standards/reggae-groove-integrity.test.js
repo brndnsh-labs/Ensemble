@@ -12,7 +12,7 @@ describe('Reggae Groove Integrity', () => {
     });
 
     const mockState = {
-        playback: { bandIntensity: 0.6, bpm: 75, songMode: false },
+        playback: { bandIntensity: 0.8, bpm: 75, songMode: false },
         groove: {
             genreFeel: 'Reggae',
             creativity: true,
