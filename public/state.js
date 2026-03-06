@@ -1,10 +1,21 @@
-import { arranger, arrangerReducer } from './state/arranger.js';
-import { groove, grooveReducer } from './state/groove.js';
-import { bass, chords, harmony, instrumentReducer, soloist } from './state/instruments.js';
-import { midi, midiReducer } from './state/midi.js';
+import { MODULES } from './constants.js';
+import { arranger, arrangerReducer, setArrangerParam } from './state/arranger.js';
+import { groove, grooveReducer, setGrooveParam } from './state/groove.js';
+import {
+    bass,
+    chords,
+    harmony,
+    instrumentReducer,
+    setBassParam,
+    setChordsParam,
+    setHarmonyParam,
+    setSoloistParam,
+    soloist,
+} from './state/instruments.js';
+import { midi, midiReducer, setMidiParam } from './state/midi.js';
 // Import Modular State Slices
-import { playback, playbackReducer } from './state/playback.js';
-import { vizReducer, vizState } from './state/visualizer.js';
+import { playback, playbackReducer, setPlaybackParam } from './state/playback.js';
+import { setVizParam, vizReducer, vizState } from './state/visualizer.js';
 import { ACTIONS } from './types.js';
 
 // Central State Map for Generic PARAM Updates
@@ -85,9 +96,49 @@ export function dispatch(action, payload) {
 
     // 1. Generic Param Handling (Legacy/Dynamic)
     if (action === ACTIONS.SET_PARAM) {
-        if (stateMap[payload.module]) {
-            stateMap[payload.module][payload.param] = payload.value;
-            handled = true;
+        switch (payload.module) {
+            case MODULES.PLAYBACK:
+                setPlaybackParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.CHORDS:
+                setChordsParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.BASS:
+                setBassParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.SOLOIST:
+                setSoloistParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.GROOVE:
+            case 'drum':
+            case 'drums':
+                setGrooveParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.HARMONIES:
+            case 'harmony':
+                setHarmonyParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.ARRANGER:
+                setArrangerParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.VIZ:
+                setVizParam(payload.param, payload.value);
+                handled = true;
+                break;
+            case MODULES.MIDI:
+                setMidiParam(payload.param, payload.value);
+                handled = true;
+                break;
+            default:
+                console.warn(`[State] SET_PARAM failed: Unknown module ${payload.module}`);
+                break;
         }
     }
 

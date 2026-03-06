@@ -51,6 +51,65 @@ export const arranger = {
     isDirty: false,
 };
 
+export function setArrangerParam(param, value) {
+    switch (param) {
+        case 'sections':
+            arranger.sections = value;
+            break;
+        case 'progression':
+            arranger.progression = value;
+            break;
+        case 'key':
+            arranger.key = value;
+            break;
+        case 'timeSignature':
+            arranger.timeSignature = value;
+            break;
+        case 'grouping':
+            arranger.grouping = value;
+            break;
+        case 'isMinor':
+            arranger.isMinor = value;
+            break;
+        case 'notation':
+            arranger.notation = value;
+            break;
+        case 'valid':
+            arranger.valid = value;
+            break;
+        case 'totalSteps':
+            arranger.totalSteps = value;
+            break;
+        case 'stepMap':
+            arranger.stepMap = value;
+            break;
+        case 'measureMap':
+            arranger.measureMap = value;
+            break;
+        case 'sectionMap':
+            arranger.sectionMap = value;
+            break;
+        case 'history':
+            arranger.history = value;
+            break;
+        case 'lastInteractedSectionId':
+            arranger.lastInteractedSectionId = value;
+            break;
+        case 'lastChordPreset':
+            arranger.lastChordPreset = value;
+            break;
+        case 'mutatedSectionId':
+            arranger.mutatedSectionId = value;
+            break;
+        case 'isDirty':
+            arranger.isDirty = value;
+            break;
+        default:
+            console.warn(`[State] Unknown arranger param: ${param}`);
+            break;
+    }
+}
+
 export function arrangerReducer(action, payload) {
     switch (action) {
         case ACTIONS.IMPORT_MUSICXML:
