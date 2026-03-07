@@ -1389,6 +1389,7 @@ function processMessage(type, data, startTime) {
                     Object.assign(arranger, data.arranger);
                     arranger.totalSteps = data.arranger.totalSteps;
                     arranger.stepMap = data.arranger.stepMap;
+                    arranger.measureMap = data.arranger.measureMap;
                     arranger.sectionMap = data.arranger.sectionMap;
                 }
                 safeSync(chords, data.chords, 'chords');

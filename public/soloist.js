@@ -282,8 +282,11 @@ export function getSoloistNote(
         step === coordination.sectionStart && soloist.transitionState === 'lead_in';
 
     const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
-    // Map emphasis relative to steps per measure
-    const emphasisIdx = measureStep % 16; // Maintain 16th resolution for map, but wrapping is handled
+    // Map emphasis relative to steps per beat to ensure alignment in non-4/4 meters
+    // (Each beat in the 16-step map is 4 steps: 0-3, 4-7, 8-11, 12-15)
+    const bIdx = stepInfo ? stepInfo.beatIndex : Math.floor(measureStep / 4);
+    const sInB = stepInfo ? stepInfo.stepInBeat : measureStep % 4;
+    const emphasisIdx = (bIdx % 4) * 4 + (sInB % 4);
     const baseAttackProb = emphasisMap[emphasisIdx];
 
     // Session Warm-Up: Ramp density from 50% to 100% over first 64 steps

@@ -625,9 +625,9 @@ export class UnifiedVisualizer {
         if (bpm && this.beatReferenceTime !== null) {
             // Handle numeric fallback for backward compatibility
             const ts =
-                typeof tsConfig === 'object'
+                typeof tsConfig === 'object' && tsConfig !== null
                     ? tsConfig
-                    : { beats: tsConfig || 4, grouping: [tsConfig || 4] };
+                    : { beats: tsConfig || 4, grouping: [tsConfig || 4], stepsPerBeat: 4 };
             const beatsPerMeasure = ts.beats;
 
             const beatLen = 60 / bpm;
