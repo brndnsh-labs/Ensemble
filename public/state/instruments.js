@@ -84,6 +84,11 @@ export const soloist = {
     restSteps: 0,
     activeSteps: 0,
     lastAttackStep: -100,
+    phrasingState: 'rest',
+    motifCache: null,
+    lickDictionary: [],
+    recentNotes: [],
+    phraseStartStep: null,
     busySteps: 0,
     hookBuffer: [],
     sharedHookBuffer: [], // Shared hooks for band interaction
@@ -291,6 +296,21 @@ export function setSoloistParam(param, value) {
             break;
         case 'isYielding':
             soloist.isYielding = value;
+            break;
+        case 'phrasingState':
+            soloist.phrasingState = value;
+            break;
+        case 'motifCache':
+            soloist.motifCache = value;
+            break;
+        case 'lickDictionary':
+            soloist.lickDictionary = value;
+            break;
+        case 'recentNotes':
+            soloist.recentNotes = value;
+            break;
+        case 'phraseStartStep':
+            soloist.phraseStartStep = value;
             break;
         default:
             console.warn(`[State] Unknown soloist param: ${param}`);
