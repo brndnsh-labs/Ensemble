@@ -2,7 +2,7 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 
 export const config = {
     ...DEFAULT_CONFIG,
-    entropyMultiplier: 0.05,
+    entropyMultiplier: 0.06,
     blockAdjacentSnare: true,
     backbeatCrack: true,
 };
@@ -43,6 +43,8 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
+        isEOfBeat,
+        isAOfBeat,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -68,7 +70,7 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         if (isTurnaround && loopStep >= halfBarStep) {
             shouldPlay = false;
-        } else {
+        } else if (!shouldPlay) {
             if (isEighthNote) {
                 shouldPlay = true;
                 velocity = isBeatStart ? 1.05 : 0.85;
@@ -82,28 +84,29 @@ export function applyOverrides(context, state) {
             }
         }
     } else if (inst.name === 'Kick') {
-        shouldPlay = false;
-        if (isBeatStart && !isBackbeat) {
-            shouldPlay = true;
-        } else if (intensity < 0.85) {
-            // Only allow syncopated kicks (offbeats) at moderate intensities
-            if (activeMotif === 1) {
-                if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 2)) {
-                    shouldPlay = true;
-                }
-            } else if (activeMotif === 2) {
-                if (safeIsOffbeat && beatIndex === 2) {
-                    shouldPlay = true;
-                }
-            } else if (activeMotif === 3) {
-                if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 3)) {
-                    shouldPlay = true;
+        if (!shouldPlay) {
+            shouldPlay = false;
+            if (isBeatStart && !isBackbeat) {
+                shouldPlay = true;
+            } else {
+                if (activeMotif === 1) {
+                    if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 2)) {
+                        shouldPlay = true;
+                    }
+                } else if (activeMotif === 2) {
+                    if (safeIsOffbeat && beatIndex === 2) {
+                        shouldPlay = true;
+                    }
+                } else if (activeMotif === 3) {
+                    if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 3)) {
+                        shouldPlay = true;
+                    }
                 }
             }
-        }
 
-        if (shouldPlay) {
-            velocity = isDownbeat ? 1.25 : 1.1;
+            if (shouldPlay) {
+                velocity = isDownbeat ? 1.25 : 1.1;
+            }
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
@@ -112,17 +115,17 @@ export function applyOverrides(context, state) {
             shouldPlay = true;
         }
 
-        if (isTurnaround && loopStep >= halfBarStep) {
+        if (isTurnaround && loopStep >= halfBarStep && drumComplexity > 0.5) {
             if (isEighthNote && roll(0.4)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, Math.random(), 0.2);
             }
-        } else {
-            if (!shouldPlay && !isEighthNote && (beatIndex === 1 || beatIndex === 2)) {
-                // Ghost notes: restrict to medium intensity range to keep high intensity focused
+        } else if (drumComplexity > 0.5) {
+            if (!shouldPlay && ((isAOfBeat && beatIndex === 1) || (isEOfBeat && beatIndex === 2))) {
+                // Restore intensity gate to prevent ghosting at max or min intensities
                 if (intensity > 0.4 && intensity < 0.8 && roll(0.12)) {
                     shouldPlay = true;
-                    velocity = 0.25;
+                    velocity = scaleVelocity(0.25, Math.random(), 0.2);
                 }
             }
         }
@@ -136,7 +139,7 @@ export function applyOverrides(context, state) {
             }
         }
     } else if (inst.name.includes('Tom')) {
-        if (isTurnaround && loopStep >= halfBarStep) {
+        if (isTurnaround && loopStep >= halfBarStep && drumComplexity > 0.5) {
             if (isEighthNote && roll(0.6)) {
                 shouldPlay = true;
                 velocity = 1.1;

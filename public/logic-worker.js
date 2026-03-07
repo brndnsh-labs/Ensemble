@@ -1,6 +1,7 @@
 import { compingState, getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass.js';
 import { TIME_SIGNATURES } from './config.js';
+import { applyGrooveOverrides, calculatePocketOffset } from './engine/groove-engine.js';
 import { generateProceduralFill } from './fills.js';
 import { analyzeForm } from './form-analysis.js';
 import { getHarmonyNotes } from './harmonies.js';
@@ -12,8 +13,6 @@ import { getFrequency, getMidi, getStepInfo } from './utils.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
-
-const { arranger, chords, bass, soloist, groove, harmony, playback } = getState();
 
 // --- WORKER STATE ---
 let timerID = null;
@@ -244,6 +243,7 @@ export class MidiTrack {
 
 class ExportProcessor {
     constructor(options) {
+        const { arranger, groove, playback, chords, bass, soloist, harmony } = getState();
         this.options = options;
         this.includedTracks = options.includedTracks || [
             'chords',
@@ -355,6 +355,7 @@ class ExportProcessor {
     }
 
     start() {
+        const { arranger } = getState();
         if (arranger.progression.length === 0) {
             postMessage({ type: WORKER_RESP.ERROR, data: 'No progression to export' });
             this.cleanup();
@@ -366,10 +367,12 @@ class ExportProcessor {
     }
 
     toPulses(t) {
+        const { playback } = getState();
         return Math.round(t * (playback.bpm / 60.0) * PPQ);
     }
 
     checkWorkerTransition(step) {
+        const { groove, playback, arranger, harmony } = getState();
         if (!groove.enabled) {
             return;
         }
@@ -399,8 +402,8 @@ class ExportProcessor {
             }
 
             if (nextEntry.chord.sectionId !== entry.chord.sectionId || isLoopEnd) {
-                let shouldFill = true;
-                if (isLoopEnd && this.totalStepsOneLoop <= 64) {
+                let shouldFill = groove.creativity;
+                if (shouldFill && isLoopEnd && this.totalStepsOneLoop <= 64) {
                     const freq =
                         playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
                     shouldFill = this.exportConductor.loopCount % freq === 0;
@@ -468,11 +471,29 @@ class ExportProcessor {
 
     processStep(globalStep) {
         this.checkWorkerTransition(globalStep);
+        const { arranger, groove, playback, soloist, chords, bass, harmony } = getState();
 
         const stepTimeS = this.stepTimes[globalStep];
         const measureStep = globalStep % this.stepsPerMeasure;
         const stepInfo = getStepInfo(globalStep, this.ts, arranger.measureMap, TIME_SIGNATURES);
         const chordData = getChordAtStep(globalStep, this.exportCursor);
+
+        // --- Calculate Turnaround State (Match main engine) ---
+        const stepsPerBar = this.stepsPerMeasure;
+        const sectionEntry = arranger.sectionMap?.find(
+            (e) => globalStep >= e.start && globalStep < e.end,
+        );
+        let measuresInSection = 4;
+        let startStep = 0;
+        if (sectionEntry) {
+            measuresInSection = Math.max(1, (sectionEntry.end - sectionEntry.start) / stepsPerBar);
+            startStep = sectionEntry.start;
+        }
+        const barInSection = Math.floor((globalStep - startStep) / stepsPerBar);
+        const isTurnaround =
+            groove.creativity &&
+            measuresInSection > 1 &&
+            barInSection % measuresInSection === measuresInSection - 1;
 
         // Coordination state for export
         const coordination = {
@@ -503,11 +524,10 @@ class ExportProcessor {
 
         // Pre-calculate Drum Hits for Coordination
         if (this.includedTracks.includes('drums')) {
-            const modStepGroove = globalStep % (groove.measures * this.stepsPerMeasure);
+            const drumStep = globalStep % (groove.measures * this.stepsPerMeasure);
+            const sectionId = chordData?.chord?.sectionId || null;
             const seedIdx =
-                groove.sectionSeedMap && chordData?.sectionId
-                    ? groove.sectionSeedMap[chordData.sectionId] || 0
-                    : 0;
+                groove.sectionSeedMap && sectionId ? groove.sectionSeedMap[sectionId] || 0 : 0;
             const preset = DRUM_PRESETS[groove.lastDrumPreset];
 
             const checkHit = (instName) => {
@@ -515,16 +535,34 @@ class ExportProcessor {
                 if (!inst || inst.muted) {
                     return false;
                 }
-                let val = 0;
-                if (preset?.variations?.[seedIdx]) {
+                let stepVal = inst.steps[drumStep];
+                if (groove.creativity && preset?.variations?.[seedIdx]) {
                     const varInst = preset.variations[seedIdx][instName];
                     if (varInst) {
-                        val = varInst[modStepGroove];
+                        stepVal = varInst[drumStep];
                     }
-                } else {
-                    val = inst.steps[modStepGroove];
                 }
-                return val > 0;
+
+                const result = applyGrooveOverrides({
+                    step: globalStep,
+                    inst,
+                    stepVal,
+                    playback,
+                    groove,
+                    isDownbeat: stepInfo.isMeasureStart,
+                    isBeatStart: stepInfo.isBeatStart,
+                    isBackbeat: stepInfo.isBackbeat,
+                    isGroupStart: stepInfo.isGroupStart,
+                    sectionId,
+                    beatIndex: stepInfo.beatIndex,
+                    isOffbeat: stepInfo.isOffbeat,
+                    isEOfBeat: stepInfo.isEOfBeat,
+                    isAOfBeat: stepInfo.isAOfBeat,
+                    isTurnaround,
+                    stepsPerBar: this.stepsPerMeasure,
+                    loopStep: drumStep,
+                });
+                return result.shouldPlay;
             };
 
             coordination.kickHit = checkHit('Kick');
@@ -773,18 +811,7 @@ class ExportProcessor {
             }
 
             if (this.includedTracks.includes('drums')) {
-                let pocketOffset = 0;
-                if (groove.genreFeel === 'Neo-Soul' || groove.genreFeel === 'Hip Hop') {
-                    pocketOffset += 0.015;
-                }
-
-                if (playback.bandIntensity > 0.75) {
-                    pocketOffset -= 0.008;
-                } else if (playback.bandIntensity < 0.3) {
-                    pocketOffset += 0.01;
-                }
-
-                const drumTimeS = stepTimeS + pocketOffset;
+                const drumTimeS = stepTimeS + calculatePocketOffset(playback, groove);
                 const drumPulse = Math.max(0, this.toPulses(drumTimeS));
 
                 const nextStepTimeS =
@@ -853,36 +880,58 @@ class ExportProcessor {
                 }
 
                 if (!fillPlayed) {
-                    groove.instruments.forEach((inst) => {
-                        // --- MULTI-SEED LOGIC ---
-                        // Find the seed assigned to this section
-                        const seedIdx =
-                            groove.sectionSeedMap && chordData.sectionId
-                                ? groove.sectionSeedMap[chordData.sectionId] || 0
-                                : 0;
+                    const drumStep = globalStep % (groove.measures * this.stepsPerMeasure);
+                    const sectionId = chordData?.chord?.sectionId || null;
+                    const seedIdx =
+                        groove.sectionSeedMap && sectionId
+                            ? groove.sectionSeedMap[sectionId] || 0
+                            : 0;
+                    const preset = DRUM_PRESETS[groove.lastDrumPreset];
 
-                        let val = 0;
-                        const preset = DRUM_PRESETS[groove.lastDrumPreset];
-                        if (preset?.variations?.[seedIdx]) {
+                    groove.instruments.forEach((inst) => {
+                        let stepVal = inst.steps[drumStep];
+                        if (groove.creativity && preset?.variations?.[seedIdx]) {
                             const varInst = preset.variations[seedIdx][inst.name];
                             if (varInst) {
-                                val =
-                                    varInst[globalStep % (groove.measures * this.stepsPerMeasure)];
+                                stepVal = varInst[drumStep];
                             }
-                        } else {
-                            // Fallback to main grid if no variation/preset found
-                            val = inst.steps[globalStep % (groove.measures * this.stepsPerMeasure)];
                         }
 
-                        if (val > 0 && !inst.muted) {
-                            const midi = drumMap[inst.name];
+                        const { shouldPlay, velocity, soundName, instTimeOffset } =
+                            applyGrooveOverrides({
+                                step: globalStep,
+                                inst,
+                                stepVal,
+                                playback,
+                                groove,
+                                isDownbeat: stepInfo.isMeasureStart,
+                                isBeatStart: stepInfo.isBeatStart,
+                                isBackbeat: stepInfo.isBackbeat,
+                                isGroupStart: stepInfo.isGroupStart,
+                                sectionId,
+                                beatIndex: stepInfo.beatIndex,
+                                isOffbeat: stepInfo.isOffbeat,
+                                isEOfBeat: stepInfo.isEOfBeat,
+                                isAOfBeat: stepInfo.isAOfBeat,
+                                isTurnaround,
+                                stepsPerBar: this.stepsPerMeasure,
+                                loopStep: drumStep,
+                            });
+
+                        if (shouldPlay && !inst.muted) {
+                            const midi = drumMap[soundName] || drumMap[inst.name];
                             if (midi) {
                                 const durS =
-                                    inst.name === 'Crash' ? this.secondsPerBeat : tightDurationS;
-                                const baseVel = val === 2 ? 110 : 90;
-                                const midiVel = Math.max(1, Math.min(127, baseVel));
-                                this.drumTrack.noteOn(drumPulse, 9, midi, midiVel);
-                                this.drumTrack.noteOff(this.toPulses(drumTimeS + durS), 9, midi);
+                                    soundName === 'Open' || soundName === 'Crash'
+                                        ? this.secondsPerBeat
+                                        : tightDurationS;
+                                const finalTimeS = drumTimeS + instTimeOffset;
+                                const midiVel = Math.max(
+                                    1,
+                                    Math.min(127, Math.round(velocity * 127)),
+                                );
+                                this.drumTrack.noteOn(this.toPulses(finalTimeS), 9, midi, midiVel);
+                                this.drumTrack.noteOff(this.toPulses(finalTimeS + durS), 9, midi);
                             }
                         }
                     });
@@ -892,6 +941,7 @@ class ExportProcessor {
     }
 
     finish() {
+        const { arranger, playback, groove, soloist } = getState();
         const resolutionStep = this.totalStepsWithoutEnding;
         const resTimeS = this.stepTimes[resolutionStep];
         const resPulse = this.toPulses(resTimeS);
@@ -1043,6 +1093,7 @@ class ExportProcessor {
     }
 
     cleanup() {
+        const { chords, bass, soloist, harmony, groove, playback } = getState();
         if (this.prevStates) {
             chords.enabled = this.prevStates.chords; // @worker-mutation
             bass.enabled = this.prevStates.bass; // @worker-mutation
@@ -1062,6 +1113,7 @@ class ExportProcessor {
 // --- LOGIC ---
 
 export function getChordAtStep(step, cursor = null) {
+    const { arranger } = getState();
     if (arranger.totalSteps === 0) {
         return null;
     }
@@ -1144,6 +1196,7 @@ export function getChordAtStep(step, cursor = null) {
 }
 
 function fillBuffers(currentStep, requestTimestamp = null, processStartTime = null) {
+    const { arranger, chords, bass, soloist, harmony, playback, groove } = getState();
     const targetStep = currentStep + LOOKAHEAD;
     const notesToMain = [];
     if (bbBufferHead < currentStep) {
@@ -1365,6 +1418,7 @@ export function handleExport(options) {
 }
 
 function processMessage(type, data, startTime) {
+    const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
     try {
         switch (type) {
             case WORKER_MSG.START:
@@ -1527,6 +1581,7 @@ if (typeof self !== 'undefined') {
 }
 
 export function handleResolution(step, requestTimestamp = null, processStartTime = null) {
+    const { arranger, bass, chords, soloist, harmony, groove, playback } = getState();
     const coordination = {
         step,
         bassHit: false,
@@ -1563,6 +1618,7 @@ export function handleResolution(step, requestTimestamp = null, processStartTime
 }
 
 function handlePrime(steps) {
+    const { soloist, arranger, playback, bass } = getState();
     if (!soloist.enabled || arranger.totalSteps === 0) {
         return;
     }
