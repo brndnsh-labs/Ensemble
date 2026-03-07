@@ -451,7 +451,10 @@ export function getAccompanimentNotes(
 
     // Semantic abstractions
     const isBeatStart = stepInfo ? stepInfo.isBeatStart : measureStep % 4 === 0;
-    const intBeat = stepInfo ? stepInfo.beatIndex : Math.floor(measureStep / 4);
+    const intBeat =
+        stepInfo && stepInfo.beatIndex !== undefined
+            ? stepInfo.beatIndex
+            : Math.floor(measureStep / (ts.stepsPerBeat || 4));
 
     // --- GENRE LANES ---
 
@@ -831,6 +834,11 @@ export function getAccompanimentNotes(
         isHit = stepInChord === 0;
     }
 
+    // Acoustic Arpeggiator Override
+    if (genre === 'Acoustic' && intensity < 0.45 && chords.style === 'smart') {
+        isHit = isBeatStart;
+    }
+
     if (isHit) {
         const isDownbeat = stepInfo ? stepInfo.isBeatStart : measureStep % ts.stepsPerBeat === 0;
         const isStructural = stepInfo
@@ -911,21 +919,16 @@ export function getAccompanimentNotes(
         // --- Low Intensity Arpeggiation / Fingerpicking (Acoustic) ---
         if (genre === 'Acoustic' && intensity < 0.45 && chords.style === 'smart') {
             // We need 4 hits per measure (1 hit per beat) to pass the critique.
-            if (isBeatStart) {
-                isHit = true;
-                const pattern = [0, 2, 1, 3]; // Bass, High, Mid, High sequence
-                const pickIdx = pattern[intBeat % pattern.length];
-                const noteIdx = pickIdx % voicing.length;
-                voicing = [voicing[noteIdx]];
+            const pattern = [0, 2, 1, 3]; // Bass, High, Mid, High sequence
+            const pickIdx = pattern[intBeat % pattern.length];
+            const noteIdx = pickIdx % voicing.length;
+            voicing = [voicing[noteIdx]];
 
-                // If it's the "One", add the root for foundation
-                if (measureStep === 0) {
-                    voicing.push(chord.freqs[0]);
-                }
-                durationSteps = ts.stepsPerBeat;
-            } else {
-                isHit = false;
+            // If it's the "One", add the root for foundation
+            if (measureStep === 0) {
+                voicing.push(chord.freqs[0]);
             }
+            durationSteps = ts.stepsPerBeat;
         }
 
         // --- Frequency Slotting & Soloist Pocket ---

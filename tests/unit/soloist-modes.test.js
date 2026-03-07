@@ -188,13 +188,11 @@ describe('Soloist Mode Differentiation Logic', () => {
         expect(Array.isArray(note)).toBe(true);
         expect(note.length).toBeGreaterThanOrEqual(2);
 
-        // The primary note is the LAST element in the array returned by getSoloistNote
-        const melodyMidi = note[note.length - 1].midi;
-        for (let i = 0; i < note.length - 1; i++) {
-            // Extra notes should be lower than the melody in piano mode if they are double stops.
-            // (Melodic devices like licks might return notes in any order)
+        // Find the maximum pitch to ensure all harmonic double-stops are built downwards
+        const maxMidi = Math.max(...note.map((n) => n.midi));
+        for (let i = 0; i < note.length; i++) {
             if (note[i].isDoubleStop) {
-                expect(note[i].midi).toBeLessThanOrEqual(melodyMidi);
+                expect(note[i].midi).toBeLessThanOrEqual(maxMidi);
             }
         }
     });

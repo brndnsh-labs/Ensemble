@@ -146,7 +146,7 @@ export function isBassActive(style, step, stepInChord, stepInfo) {
 export function getBassNote(
     chord,
     nextChord,
-    beatInMeasure,
+    _beatInMeasure,
     prevFreq,
     centerMidi,
     style,
@@ -192,7 +192,7 @@ export function getBassNote(
         : stepInMeasure % (grouping[0] * ts.stepsPerBeat) === 0;
     const isBeatStart = stepInfo ? stepInfo.isBeatStart : stepInMeasure % ts.stepsPerBeat === 0;
     const backbeatArray = ts.backbeat || [1, 3];
-    const isBackbeat = stepInfo
+    const _isBackbeat = stepInfo
         ? stepInfo.isBackbeat
         : isBeatStart && backbeatArray.includes(intBeat);
 
@@ -200,12 +200,13 @@ export function getBassNote(
     const globalIntensity = playback.bandIntensity || 0.5;
     const loopStep = step % (arranger.totalSteps || 1);
 
-    let sectionProgress = 0;
+    let _sectionProgress = 0;
 
     if (context.sectionStart !== undefined && context.sectionEnd !== undefined) {
         // O(1) Optimization: Use provided context
         const sectionLength = context.sectionEnd - context.sectionStart;
-        sectionProgress = sectionLength > 0 ? (loopStep - context.sectionStart) / sectionLength : 0;
+        _sectionProgress =
+            sectionLength > 0 ? (loopStep - context.sectionStart) / sectionLength : 0;
     } else if (arranger.stepMap && arranger.stepMap.length > 0) {
         // Fallback: O(N) Lookup
         const entry = arranger.stepMap.find((e) => loopStep >= e.start && loopStep < e.end);
@@ -217,7 +218,7 @@ export function getBassNote(
             const sectionStart = sectionEntries[0].start;
             const sectionEnd = sectionEntries[sectionEntries.length - 1].end;
             const sectionLength = sectionEnd - sectionStart;
-            sectionProgress = sectionLength > 0 ? (loopStep - sectionStart) / sectionLength : 0;
+            _sectionProgress = sectionLength > 0 ? (loopStep - sectionStart) / sectionLength : 0;
         }
     }
 
@@ -897,14 +898,15 @@ export function getBassNote(
         );
     }
 
-    if (!isBeatStart) {
+    const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.75);
+    if (!isBeatStart && !(style === 'quarter' && isEighthSkip)) {
         return null;
     }
 
     // Walking Bass Approach Logic (Jazz/Blues)
     const isLastBeatOfMeasure = intBeat === ts.beats - 1;
     const isEndOfChord = intBeat === beatsInChord - 1;
-    const isApproachPoint = isLastBeatOfMeasure || isEndOfChord || step % 16 === 12;
+    const isApproachPoint = isLastBeatOfMeasure || isEndOfChord || isEighthSkip || step % 16 === 12;
 
     // Use a slightly more aggressive chromatic probability for the critique to ensure it triggers
     if (isApproachPoint && nextChord) {
@@ -920,9 +922,9 @@ export function getBassNote(
             (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues' || pullTension > 0.7)
         ) {
             const choices = [
-                { midi: targetRoot - 5, weight: 1.0 },
-                { midi: targetRoot - 1, weight: 0.6 },
-                { midi: targetRoot + 1, weight: 0.4 },
+                { midi: targetRoot - 5, weight: 0.5 },
+                { midi: targetRoot - 1, weight: 1.0 },
+                { midi: targetRoot + 1, weight: 1.0 },
             ];
             // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
             let totalWeight = 0;

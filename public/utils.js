@@ -278,8 +278,13 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         }
 
         if (measure) {
-            tsName = measure.ts;
-            currentTS = allTSConfigs ? allTSConfigs[tsName] : tsConfig;
+            tsName = measure.ts || tsName;
+            currentTS = allTSConfigs?.[tsName] ? allTSConfigs[tsName] : tsConfig;
+            if (!currentTS) {
+                currentTS = allTSConfigs?.['4/4']
+                    ? allTSConfigs['4/4']
+                    : { beats: 4, stepsPerBeat: 4 };
+            }
             mStep = step - measure.start;
             if (mStep === 0) {
                 isMeasureStart = true;
@@ -296,6 +301,9 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         isMeasureStart = mStep === 0;
     }
 
+    if (!currentTS) {
+        currentTS = allTSConfigs?.['4/4'] ? allTSConfigs['4/4'] : { beats: 4, stepsPerBeat: 4 };
+    }
     const grouping = currentTS.grouping || [currentTS.beats];
     const stepsPerBeat = currentTS.stepsPerBeat;
 
