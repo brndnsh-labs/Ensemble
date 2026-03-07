@@ -1,0 +1,14 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "entry": [
+        "public/main.js",
+        "public/sw.js",
+        "public/ui-root.jsx",
+        "public/manual-theme.js",
+        "scripts/*.js",
+        "tests/scripts/*.js"
+    ],
+    "project": ["public/**/*.{js,jsx}", "scripts/*.js", "tests/**/*.js"],
+    "ignoreDependencies": ["esbuild"],
+    "ignoreExportsUsedInFile": true
+}
