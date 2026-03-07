@@ -1,20 +1,14 @@
 import { TIME_SIGNATURES } from './config.js';
-import { GENRE_STYLE_MAPPING, STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
-import {
-    generateEmbellishment,
-    generateExtraNotes,
-    generateMelodicDevice,
-} from './soloist-devices.js';
+import { selectPitchAndDevices } from './engine/soloist-pitch-engine.js';
+import { generateRhythmPlan } from './engine/soloist-rhythm-engine.js';
+import { GENRE_STYLE_MAPPING, STYLE_CONFIG } from './soloist-config.js';
 import { getState } from './state.js';
-import { getScaleForChord } from './theory-scales.js';
 import { calculateTimingOffset, getFrequency } from './utils.js';
-
-const CANDIDATE_WEIGHTS = new Float32Array(128);
 
 /**
  * Simplified soloist engine.
  * Focuses on lively, probabilistic phrasing with form and meter awareness.
- * Reverts to logic similar to PR 360 while maintaining dynamic time signature support.
+ * Uses a two-phase Rhythm and Pitch engine.
  */
 export function getSoloistNote(
     currentChord,
@@ -46,7 +40,6 @@ export function getSoloistNote(
         }
     };
 
-    let targetChord = currentChord;
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
     const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
@@ -54,21 +47,15 @@ export function getSoloistNote(
 
     // Use stepInfo for all meter-aware timing calculations
     const measureStep = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
-    const stepInBeat = measureStep % stepsPerBeat;
-    const isBeatStart = stepInfo ? stepInfo.isBeatStart : stepInBeat === 0;
+    const isBeatStart = stepInfo ? stepInfo.isBeatStart : measureStep % stepsPerBeat === 0;
     const isDownbeat = stepInfo ? stepInfo.isMeasureStart : measureStep === 0;
     const isBackbeat = stepInfo ? stepInfo.isBackbeat : false;
 
-    // Anticipation
-    const isLateInChord = stepInChord >= currentChord.beats * stepsPerBeat - 2;
-    if (nextChord && isLateInChord && Math.random() < (config.anticipationProb || 0)) {
-        targetChord = nextChord;
+    if (!isPriming) {
+        soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
     }
 
-    const minMidi = 60; // C4
-    const maxMidi = 96; // C7
-    const lastMidi = soloist.lastMidiPlayed || 72;
-
+    // --- Helper to finalize legacy notes (Lead Sheet / Devices) ---
     const finalizeNote = (res) => {
         if (!res) {
             return null;
@@ -82,23 +69,18 @@ export function getSoloistNote(
             groove.pocket,
             playback.bandIntensity || 0.5,
         );
-
-        // 1. Genre Gravity
-        const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
         timingOffset += config.genreGravityOffset || 0;
 
-        // 2. Rhythmic Rolling (Syncopation Lag)
+        const stepInBeat = measureStep % stepsPerBeat;
         const isSyncopated = stepInBeat % (stepsPerBeat / 2) !== 0;
         if (isSyncopated) {
-            timingOffset += 0.007; // 7ms lag for 'e' and 'a'
+            timingOffset += 0.007;
         }
 
-        // Ghost notes drag slightly more
         if (primary.velocity < 0.7) {
-            timingOffset += 0.005; // 5ms drag
+            timingOffset += 0.005;
         }
 
-        // 3 & 4. Style-Specific Jitter & Intensity-Driven Tightness
         if (config.timingJitter !== undefined) {
             const tightness = playback.bandIntensity || 0.5;
             const jitterScale = 1.0 - tightness;
@@ -121,13 +103,8 @@ export function getSoloistNote(
                 primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
             }
         }
-
         return res;
     };
-
-    if (!isPriming) {
-        soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
-    }
 
     // --- 0. Lead Sheet Melody ---
     if (activeStyle === 'lead_sheet') {
@@ -186,17 +163,14 @@ export function getSoloistNote(
 
     // Transition evaluation at structural points (Downbeat of final measure)
     if (isFinalMeasure && isDownbeat) {
-        // Evaluate if we should lead in to the next section or rest at the end of this one
         soloist.transitionState = Math.random() < 0.6 - intensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
         logDebug(`Selected transition state: ${soloist.transitionState}`);
     } else if (!isFinalMeasure && step !== coordination.sectionStart) {
-        // Reset transition state once past the boundary
         soloist.transitionState = null; // @worker-mutation
     }
 
     // --- 2. Simplified Phrasing State Machine ---
     if (soloist.isResting === undefined) {
-        // Robust initialization that respects phrasingState
         soloist.isResting = soloist.phrasingState === 'rest' || soloist.phrasingState === undefined; // @worker-mutation
         if (soloist.restSteps === undefined) {
             soloist.restSteps = soloist.isResting ? stepsPerMeasure : 0; // @worker-mutation
@@ -206,14 +180,13 @@ export function getSoloistNote(
         }
     }
 
-    // If we're in 'rest' transition, enforce silence starting from beat 3 or 4
     if (isFinalMeasure && soloist.transitionState === 'rest') {
         const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
         const restBeatStart = tsConfig.beats >= 4 ? 2 : 1;
         if (beatInMeasure >= restBeatStart) {
             soloist.isResting = true; // @worker-mutation
             soloist.phrasingState = 'rest'; // @worker-mutation
-            soloist.restSteps = remainingSteps; // @worker-mutation stay resting until next section
+            soloist.restSteps = remainingSteps; // @worker-mutation
         }
     }
 
@@ -233,13 +206,31 @@ export function getSoloistNote(
                 (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure)
             ) {
                 soloist.isResting = false; // @worker-mutation
-                soloist.phrasingState = 'active'; // @worker-mutation for legacy observers
-                soloist.notesInPhrase = 0; // @worker-mutation
+                soloist.phrasingState = 'active'; // @worker-mutation
+
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                soloist.activeSteps = Math.floor(
+                const _nextActiveSteps = Math.floor(
                     baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
-                ); // @worker-mutation
+                );
+                if (soloist.activeSteps === undefined) {
+                    soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
+                }
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
+
+                // GENERATE RHYTHM PLAN FOR THE PHRASE
+                const nextRhythmPlan = generateRhythmPlan(
+                    step,
+                    soloist.activeSteps,
+                    activeStyle,
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    coordination,
+                    soloist.sessionSteps,
+                    soloist,
+                    stepInfo,
+                );
+                soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
             }
         }
         if (soloist.isResting) {
@@ -248,7 +239,6 @@ export function getSoloistNote(
     } else {
         soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
 
-        // Defer rest until a strong rhythmic boundary (end of measure or backbeat)
         const isStrongResolution =
             measureStep === stepsPerMeasure - 1 || (isBackbeat && intensity > 0.5);
 
@@ -256,301 +246,82 @@ export function getSoloistNote(
             soloist.isResting = true; // @worker-mutation
             soloist.phrasingState = 'rest'; // @worker-mutation
             const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
-            const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
-            soloist.restSteps = Math.floor(
+            const fatigueMultiplier = 1.0;
+            const nextRestSteps = Math.floor(
                 stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
-            ); // @worker-mutation
+            );
+            soloist.restSteps = nextRestSteps; // @worker-mutation
+
             if (soloist.restSteps < 4) {
-                soloist.restSteps = 4; // @worker-mutation minimum breath
+                soloist.restSteps = 4; // @worker-mutation
             }
             logDebug(`Resting for ~${soloist.restSteps} steps`);
+            // Clear rhythm plan just in case
+            soloist.rhythmPlan = []; // @worker-mutation
             return null;
         }
     }
 
-    // --- 3. Rhythmic Density ---
-    const isSectionDownbeat =
-        step === coordination.sectionStart && soloist.transitionState === 'lead_in';
-
-    const emphasisMap = STYLE_EMPHASIS[activeStyle] || STYLE_EMPHASIS.scalar;
-    // Map to 16-step emphasis map to handle any meter
-    const emphasisIdx = Math.floor((measureStep / stepsPerMeasure) * 16) % 16;
-    const baseAttackProb = emphasisMap[emphasisIdx];
-
-    const warmUpScale = Math.min(1.0, 0.5 + ((soloist.sessionSteps || 0) / 64) * 0.5);
-    const intensityScale = 0.5 + intensity * 2.0;
-    let attackProb = baseAttackProb * intensityScale * warmUpScale;
-
-    // Phrase Contextual Scaling (Fatigue)
-    if (soloist.notesInPhrase > 8) {
-        attackProb *= 0.8;
-    }
-
-    // Rhythmic Simplification at Low Intensity:
-    // Penalize syncopated/weak subdivisions (16ths and weak 8ths) heavily when band is quiet.
-    if (intensity < 0.4) {
-        const isSixteenthNote = stepInBeat % 2 !== 0; // Steps 1, 3
-        const isOffbeatEighth = stepInBeat === stepsPerBeat / 2; // Step 2 (the "and")
-
-        if (isSixteenthNote) {
-            attackProb *= intensity * 1.5; // Drastic penalty for 16ths
-        } else if (isOffbeatEighth) {
-            attackProb *= 0.4 + intensity; // Moderate penalty for offbeat 8ths
-        }
-    }
-
-    if (isFinalMeasure && soloist.transitionState === 'lead_in') {
-        attackProb *= 1.5;
-    }
-
-    // Boost downbeats to ensure resolution
-    if (isDownbeat) {
-        attackProb += 0.2;
-    }
-
-    const stepCoord = coordination.stepCoordination || {};
-    if (stepCoord.kickHit) {
-        attackProb += 0.2;
-    }
-    if (stepCoord.snareHit) {
-        attackProb += 0.2;
-    }
-
-    if (coordination.bypassRhythm) {
-        attackProb = 1.0;
-    }
-    if (isSectionDownbeat) {
-        attackProb = 1.0;
-        soloist.transitionState = null; // @worker-mutation
-    }
-
-    if (Math.random() > attackProb) {
-        return null;
-    }
-
-    soloist.notesInPhrase = (soloist.notesInPhrase || 0) + 1; // @worker-mutation
-    soloist.lastAttackStep = step; // @worker-mutation
-
-    // --- 4. Pitch Selection ---
-    CANDIDATE_WEIGHTS.fill(0);
-
-    // Harmonic Anticipation
+    // --- 3. Rhythm Plan Execution & Pitch Selection ---
     if (
-        isFinalMeasure &&
-        soloist.transitionState === 'lead_in' &&
-        remainingSteps <= 2 &&
-        coordination.stepCoordination?.upcomingSectionFirstChord
+        !soloist.rhythmPlan ||
+        (soloist.rhythmPlan.length === 0 && !soloist.isResting && soloist.activeSteps <= 0)
     ) {
-        targetChord = coordination.stepCoordination.upcomingSectionFirstChord;
-    }
-
-    const scaleIntervals = getScaleForChord(targetChord, null, style);
-    let scaleMask = 0;
-    for (let i = 0; i < scaleIntervals.length; i++) {
-        scaleMask |= 1 << scaleIntervals[i];
-    }
-    const rootMidi = targetChord.rootMidi;
-    let totalWeight = 0;
-
-    const dynamicCenter = 64 + intensity * 12;
-    const searchMin = Math.max(minMidi, lastMidi - 14);
-    const searchMax = Math.min(maxMidi, lastMidi + 14);
-
-    for (let m = searchMin; m <= searchMax; m++) {
-        const pc = ((m % 12) + 12) % 12;
-        const interval = (pc - (rootMidi % 12) + 12) % 12;
-        let weight = 1.0;
-
-        const isScaleTone = (scaleMask >> interval) & 1;
-        if (!isScaleTone) {
-            continue;
-        }
-
-        const dist = Math.abs(m - lastMidi);
-        if (dist === 0) {
-            if (['funk', 'ska'].includes(activeStyle)) {
-                weight *= 0.5;
-            } else {
-                continue;
-            }
-        }
-
-        if (dist <= 2) {
-            weight += 100;
-        }
-        if (dist <= 4) {
-            weight += 50;
-        }
-        if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
-            weight += 150;
-        }
-
-        const resolutionChord = isSectionDownbeat
-            ? targetChord
-            : coordination.stepCoordination?.upcomingSectionFirstChord;
-        if (
-            (isFinalMeasure || isSectionDownbeat) &&
-            (soloist.transitionState === 'lead_in' || isSectionDownbeat) &&
-            resolutionChord
-        ) {
-            const upcomingRoot = resolutionChord.rootMidi;
-            const upcoming3rd =
-                resolutionChord.intervals.length > 1 ? resolutionChord.intervals[1] : 4;
-            const upcomingInterval = (pc - (upcomingRoot % 12) + 12) % 12;
-            if (upcomingInterval === 0 || upcomingInterval === upcoming3rd % 12) {
-                if (isSectionDownbeat) {
-                    weight += 500;
-                } else {
-                    weight += 100 + (stepsPerMeasure - remainingSteps) * 10;
-                }
-            }
-        }
-
-        if (dist > 7) {
-            weight *= 0.4;
-        }
-        const distFromCenter = Math.abs(m - dynamicCenter);
-        if (distFromCenter <= 7) {
-            weight += 100;
-        } else if (distFromCenter <= 14) {
-            weight += 40;
-        }
-
-        if (m >= 84 && intensity < 0.75) {
-            weight *= 0.05;
-        } else if (m >= 72 && intensity < 0.35) {
-            weight *= 0.2;
-        }
-
-        CANDIDATE_WEIGHTS[m] = weight;
-        totalWeight += weight;
-    }
-
-    let selectedMidi = -1;
-    if (totalWeight > 0) {
-        let randomVal = Math.random() * totalWeight;
-        for (let m = searchMin; m <= searchMax; m++) {
-            const w = CANDIDATE_WEIGHTS[m];
-            if (w > 0) {
-                randomVal -= w;
-                if (randomVal <= 0) {
-                    selectedMidi = m;
-                    break;
-                }
-            }
-        }
-    }
-    if (selectedMidi === -1) {
-        selectedMidi = lastMidi;
-    }
-
-    // --- 5. Melodic Devices ---
-    const deviceBaseProb = config.deviceProb * (0.5 + intensity);
-    const isPolyphonic =
-        soloist.mode !== 'monophonic' &&
-        (soloist.doubleStopProb ?? 1.0) > 0 &&
-        config.doubleStopProb > 0;
-
-    if (isBeatStart && Math.random() < deviceBaseProb) {
-        let allowed = [...(config.allowedDevices || [])];
-        if (soloist.mode === 'piano') {
-            allowed = allowed.filter(
-                (d) => !['slide', 'countryBend', 'graceSlide', 'chickenPick'].includes(d),
-            );
-            if (!allowed.includes('graceNote')) {
-                allowed.push('graceNote');
-            }
-        }
-
-        const deviceType =
-            allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
-        if (deviceType) {
-            const deviceBuffer = generateMelodicDevice(deviceType, {
-                selectedMidi,
-                targetChord,
+        // If plan is uninitialized or exhausted but test forces active state, generate it
+        if (!soloist.isResting) {
+            const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
+            const planSteps =
+                soloist.activeSteps && soloist.activeSteps > 0
+                    ? soloist.activeSteps
+                    : Math.floor(baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5));
+            const nextRhythmPlan = generateRhythmPlan(
+                step,
+                planSteps,
                 activeStyle,
-                effectiveIntensity: intensity,
-                minMidi,
-                maxMidi,
-                lastMidi,
+                intensity,
+                stepsPerMeasure,
+                stepsPerBeat,
+                coordination,
+                soloist.sessionSteps,
+                soloist,
+                stepInfo,
+            );
+            soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
+            if (soloist.activeSteps === undefined) {
+                soloist.activeSteps = planSteps; /* @worker-mutation */
+            }
+        } else {
+            soloist.rhythmPlan = []; // @worker-mutation
+        }
+    }
+
+    if (soloist.rhythmPlan.length > 0) {
+        while (soloist.rhythmPlan.length > 0 && step > soloist.rhythmPlan[0].stepTarget) {
+            soloist.rhythmPlan.shift(); // @worker-mutation
+        }
+        if (soloist.rhythmPlan.length > 0 && step >= soloist.rhythmPlan[0].stepTarget) {
+            const rhythmNode = soloist.rhythmPlan.shift(); // @worker-mutation
+
+            soloist.lastAttackStep = step; // @worker-mutation
+
+            return selectPitchAndDevices(
+                step,
+                rhythmNode,
+                currentChord,
+                nextChord,
+                activeStyle,
+                intensity,
+                stepInChord,
+                coordination,
                 playback,
                 soloist,
-                isPolyphonic,
-                isPiano: soloist.mode === 'piano',
-                dynamicCenter: 72,
-                scaleMask,
-            });
-
-            if (deviceBuffer && deviceBuffer.length > 0) {
-                soloist.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
-                const first = deviceBuffer[0];
-                soloist.busySteps =
-                    (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
-                return finalizeNote(first);
-            }
+                groove,
+                arranger,
+                stepsPerMeasure,
+                stepsPerBeat,
+            );
         }
     }
 
-    // --- 6. Duration & Velocity ---
-    let durationSteps = activeStyle === 'bird' ? 2 : Math.random() < 0.6 ? 2 : 4;
-    if (['funk', 'disco', 'ska'].includes(activeStyle)) {
-        durationSteps = 1;
-    }
-
-    let stepVelocity = 0.6 + intensity * 0.4;
-    if (isDownbeat) {
-        stepVelocity *= 1.25;
-    } else if (isBackbeat) {
-        stepVelocity *= 1.15;
-    } else if (isBeatStart || stepInBeat === stepsPerBeat / 2) {
-        stepVelocity *= 1.05;
-    }
-
-    if (coordination.bassHit && selectedMidi < 60) {
-        stepVelocity *= 0.85;
-    }
-
-    const result = {
-        midi: selectedMidi,
-        velocity: Math.min(1.25, stepVelocity),
-        durationSteps,
-        bendStartInterval:
-            soloist.mode === 'guitar' && durationSteps >= 4 && Math.random() < 0.3
-                ? Math.random() < 0.5
-                    ? -1
-                    : 1
-                : 0,
-        ccEvents: [],
-        timingOffset: 0,
-        style: activeStyle,
-        isDoubleStop: false,
-        isLegato: false,
-    };
-
-    // Polyphony check (Double Stops)
-    if (
-        isPolyphonic &&
-        Math.random() < config.doubleStopProb * intensity * (soloist.doubleStopProb ?? 1.0)
-    ) {
-        const extra = generateExtraNotes({
-            soloist,
-            currentChord,
-            activeStyle,
-            effectiveIntensity: intensity,
-            selectedMidi,
-        });
-        if (extra && extra.length > 0) {
-            const polyResult = [...extra.map((n) => ({ ...result, ...n })), result];
-            if (result.durationSteps > 1) {
-                soloist.busySteps = result.durationSteps - 1; // @worker-mutation
-            }
-            return finalizeNote(polyResult);
-        }
-    }
-
-    if (result.durationSteps > 1) {
-        soloist.busySteps = result.durationSteps - 1; // @worker-mutation
-    }
-
-    return finalizeNote(result);
+    return null; // Idle waiting for next attack or resting
 }

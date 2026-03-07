@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { selectPitchAndDevices } from '../../../public/engine/soloist-pitch-engine.js';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
@@ -383,9 +384,23 @@ describe('Soloist Engine Logic', () => {
                 soloist.activeSteps = 100;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'neo', 0, false, {
-                    bypassRhythm: true,
-                });
+                const rhythmNode = { velocity: 1.0, durationSteps: 8, isStrongBeat: true };
+                const res = selectPitchAndDevices(
+                    i * 4,
+                    rhythmNode,
+                    chordC,
+                    null,
+                    'neo',
+                    1.0,
+                    0,
+                    {},
+                    getState().playback,
+                    getState().soloist,
+                    getState().groove,
+                    getState().arranger,
+                    16,
+                    4,
+                );
                 if (res) {
                     total++;
                     if (res.durationSteps >= 4) {

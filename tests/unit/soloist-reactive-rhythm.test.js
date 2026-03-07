@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
 import { getSoloistNote } from '../../public/soloist.js';
 import * as stateModule from '../../public/state.js';
 
@@ -56,20 +57,33 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
         const randomSpy = vi.spyOn(Math, 'random');
 
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+        const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
         // 1. Setup: bypass rhythm to ensure it works
         const contextBypass = { stepCoordination: { kickHit: true }, bypassRhythm: true };
-        expect(
-            getSoloistNote(chord, null, 0, 440, 60, 'funk', 0, false, contextBypass),
-        ).not.toBeNull();
+        localState.soloist.rhythmPlan = undefined;
+
+        const planBypass = generateRhythmPlan(
+            0,
+            16,
+            'funk',
+            0.05,
+            16,
+            4,
+            contextBypass,
+            64,
+            localState.soloist,
+            null,
+        );
+        expect(planBypass.length).toBeGreaterThan(0);
 
         // 2. Probabilistic check
         // At intensity 0.05: intensityScale = 0.6. emphasis[0] = 1.0. attackProb = 0.6.
         // With kickHit (+0.2): attackProb = 0.8.
         localState.playback.bandIntensity = 0.05;
         localState.soloist.busySteps = 0;
-        localState.soloist.activeSteps = 999999;
+        localState.soloist.rhythmPlan = undefined;
+
         localState.soloist.sessionSteps = 64; // Bypass warm-up scaling
 
         // Force random to 0.99 for all calls so breathing offset doesn't trigger random attacks
@@ -77,19 +91,40 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         // WITHOUT drum hit: 0.99 > 0.6 (FALSE)
         localState.soloist.busySteps = 0;
+        localState.soloist.rhythmPlan = undefined;
         const contextWithout = { stepCoordination: { kickHit: false } };
-        expect(
-            getSoloistNote(chord, null, 32, 440, 60, 'funk', 0, false, contextWithout),
-        ).toBeNull();
+        const planWithout = generateRhythmPlan(
+            32,
+            16,
+            'funk',
+            0.05,
+            16,
+            4,
+            contextWithout,
+            64,
+            localState.soloist,
+            null,
+        );
+        expect(planWithout.length).toBe(0);
 
         // Change random to 0.7 which is between 0.6 (base) and 0.8 (base + drum hit)
         randomSpy.mockReturnValue(0.7);
 
         // WITH drum hit: 0.7 < 0.8 (TRUE)
         const contextWith = { stepCoordination: { kickHit: true } };
-        expect(
-            getSoloistNote(chord, null, 16, 440, 60, 'funk', 0, false, contextWith),
-        ).not.toBeNull();
+        const planWith = generateRhythmPlan(
+            16,
+            16,
+            'funk',
+            0.05,
+            16,
+            4,
+            contextWith,
+            64,
+            localState.soloist,
+            null,
+        );
+        expect(planWith.length).toBeGreaterThan(0);
 
         randomSpy.mockRestore();
     });
@@ -99,7 +134,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+        const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         localState.playback.bandIntensity = 0.01; // scale = 0.52
         localState.groove.genreFeel = 'Jazz';
 
@@ -120,16 +155,42 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         for (let i = 0; i < iterations; i++) {
             localState.soloist.busySteps = 0;
-            localState.soloist.activeSteps = 999999;
+            localState.soloist.rhythmPlan = undefined;
+
             // Test step 3 (16th syncopation). Emphasis 1.0, but penalized heavily at 0.01 intensity!
-            if (getSoloistNote(chord, null, i * 16 + 3, 440, 60, 'bird', 3, false)) {
+            const planNormal = generateRhythmPlan(
+                i * 16 + 3,
+                1,
+                'bird',
+                0.01,
+                16,
+                4,
+                {},
+                64,
+                localState.soloist,
+                null,
+            );
+            if (planNormal.length > 0) {
                 hitsNormal++;
             }
 
             localState.soloist.busySteps = 0;
-            localState.soloist.activeSteps = 999999;
+            localState.soloist.rhythmPlan = undefined;
+
             // Test step 0 (downbeat). Emphasis 0.7. Prob ~ 0.364. 0.2 < 0.364 -> PLAY!
-            if (getSoloistNote(chord, null, i * 16, 440, 60, 'bird', 0, false)) {
+            const planDownbeat = generateRhythmPlan(
+                i * 16,
+                1,
+                'bird',
+                0.01,
+                16,
+                4,
+                {},
+                64,
+                localState.soloist,
+                null,
+            );
+            if (planDownbeat.length > 0) {
                 hitsDownbeat++;
             }
         }
