@@ -265,7 +265,9 @@ export function getSoloistNote(
     // --- 3. Rhythm Plan Execution & Pitch Selection ---
     if (
         !soloist.rhythmPlan ||
-        (soloist.rhythmPlan.length === 0 && !soloist.isResting && soloist.activeSteps <= 0)
+        (soloist.rhythmPlan.length === 0 &&
+            !soloist.isResting &&
+            (soloist.activeSteps <= 0 || coordination.bypassRhythm))
     ) {
         // If plan is uninitialized or exhausted but test forces active state, generate it
         if (!soloist.isResting) {
