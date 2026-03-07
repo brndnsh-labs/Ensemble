@@ -235,7 +235,7 @@ export function flushBuffers(primeSteps = 0) {
     restoreGains();
 }
 
-export function flushBuffer(type, primeSteps = 0) {
+function flushBuffer(type, primeSteps = 0) {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
         if (bass.lastPlayedFreq !== null) {
