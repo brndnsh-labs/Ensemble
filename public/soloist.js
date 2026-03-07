@@ -215,7 +215,7 @@ export function getSoloistNote(
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
         // Safety Watchdog: Even if rest step reduction breaks, force out of rest after max rest steps
-        const absoluteMaxRest = Math.floor(stepsPerMeasure * (2.0 - intensity));
+        const absoluteMaxRest = Math.floor(stepsPerMeasure * (1.5 - intensity * 1.0));
         if (soloist.restSteps < -absoluteMaxRest) {
             soloist.restSteps = 0; // @worker-mutation
             soloist.phrasingState = 'call'; // @worker-mutation
@@ -308,17 +308,18 @@ export function getSoloistNote(
                 } else if (soloist.activeSteps <= 0 && soloist.lastAttackStep === step) {
                     // We just played a note on this step, it is our resolution. Time to rest.
                     soloist.phrasingState = 'rest'; // @worker-mutation
-                    const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
+                    const restMultiplier = config.restBase * (1.5 - intensity * 1.0); // reduced from 2.0 to 1.5 to shorten base rests
                     const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
                     const restVal =
                         stepsPerMeasure *
                         restMultiplier *
                         fatigueMultiplier *
-                        (0.5 + Math.random() * 1.5);
+                        (0.5 + Math.random() * 1.0); // reduced max randomness from 1.5 to 1.0
 
                     // Intensity Watchdog: Force max rest time inversely based on intensity
                     let finalRestSteps = Math.floor(restVal);
-                    const maxRestSteps = Math.floor(stepsPerMeasure * (2.0 - intensity)); // 1 measure max at intensity=1.0, 2 measures at 0.0
+                    // 0.5 measures max at intensity=1.0, 1.5 measures at 0.0
+                    const maxRestSteps = Math.floor(stepsPerMeasure * (1.5 - intensity * 1.0));
                     if (finalRestSteps > maxRestSteps) {
                         finalRestSteps = maxRestSteps;
                     }
@@ -597,7 +598,7 @@ export function getSoloistNote(
                     // At distance 16 (1 measure), weight is slightly boosted.
                     // At distance 2 (1 eighth note), weight is heavily boosted.
                     const distanceFactor = 1.0 - distanceToStructuralDownbeat / stepsPerMeasure;
-                    const exponentialPull = Math.pow(distanceFactor, 2) * 200;
+                    const exponentialPull = distanceFactor ** 2 * 200;
                     weight += 50 + exponentialPull;
                 } else if (
                     soloist.transitionState === 'lead_in' &&
@@ -882,7 +883,21 @@ export function getSoloistNote(
 
     // Save Motif if in Call state
     if (soloist.phrasingState === 'call' && soloist.motifCache) {
-        if (soloist.motifCache.length < 16) {
+        // Stop recording the motif if we have rested for more than 1 measure
+        // or if the motif itself has extended past 1.5 measures to prevent large silences from being repeated
+        let isHugeGap = false;
+        if (soloist.motifCache.length > 0) {
+            const lastMotifNote = soloist.motifCache[soloist.motifCache.length - 1];
+            if (phraseRelativeStep - lastMotifNote.relativeStep >= stepsPerMeasure) {
+                isHugeGap = true;
+            }
+        }
+
+        if (
+            soloist.motifCache.length < 16 &&
+            phraseRelativeStep < stepsPerMeasure * 1.5 &&
+            !isHugeGap
+        ) {
             // hard limit to keep memory tight
             const relativeInterval = ((result.midi % 12) - (targetChord.rootMidi % 12) + 12) % 12;
             soloist.motifCache.push({
