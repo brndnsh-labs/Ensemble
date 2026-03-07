@@ -127,3 +127,4 @@ Reports an internal worker error.
 1.  **Step Mapping**: Both threads must use the same `arranger.stepMap`, `arranger.sectionMap`, and `totalSteps` to ensure harmonic and structural alignment.
 2.  **Lookahead**: The worker targets a `LOOKAHEAD` of 64 steps (typically 4 measures in 4/4) to prevent buffer underruns during CPU spikes.
 3.  **Priming**: During a `flush` operation, the worker can "prime" the engine by simulating multiple measures of playback to establish musical context (e.g., updating `bass.lastFreq`).
+4.  **Generative Drum Parity**: To ensure MIDI exports match live playback, the worker utilizes the shared `applyGrooveOverrides` strategy. This ensures that intensity-aware ghost notes, turnaround fills, and pocket timing offsets are identical in both environments.

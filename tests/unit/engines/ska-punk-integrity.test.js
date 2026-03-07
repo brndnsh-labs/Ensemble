@@ -79,6 +79,7 @@ describe('Ska-Punk Genre Integrity', () => {
             isOffbeat: info.isOffbeat,
             isEOfBeat: info.isEOfBeat,
             isAOfBeat: info.isAOfBeat,
+            tsConfig: info.tsConfig,
         });
         // Offbeat (step 2) should have velocity boost
         expect(result.velocity).toBeGreaterThan(1.0);

@@ -370,6 +370,7 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         beatIndex,
         mStep,
         tsName,
+        tsConfig: currentTS,
     };
 }
 

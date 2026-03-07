@@ -47,6 +47,7 @@ describe('Rock Snare Density Reproduction', () => {
                     isOffbeat: info.isOffbeat,
                     isEOfBeat: info.isEOfBeat,
                     isAOfBeat: info.isAOfBeat,
+                    tsConfig: info.tsConfig,
                     isTurnaround: false,
                     stepsPerBar: 16,
                     loopStep: step,

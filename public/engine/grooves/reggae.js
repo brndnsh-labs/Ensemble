@@ -17,27 +17,24 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     }
 
     // Stable seed ranges for core motifs (0 and 1)
-    // Adjusted thresholds to ensure reachability within first 20 bars of test seed generator.
     if (seed < 0.06) {
-        return 0; // One Drop is reachable (hits i=11)
+        return 0;
     }
     if (seed < 0.15) {
-        return 1; // Steppers is reachable (hits i=13)
+        return 1;
     }
 
-    // Standard intensity (< 0.65) requires extremely dominant One Drop for critique
     if (intensity < INTENSITY_BANDS.MID) {
-        return seed < 0.98 ? 0 : 1; // ~90% One Drop, remaining Steppers
+        return seed < 0.98 ? 0 : 1;
     }
 
-    // High Intensity: Allow more Rockers and Dub variations
     if (seed < 0.6) {
-        return 1; // Steppers
+        return 1;
     }
     if (seed < 0.85) {
-        return 2; // Rockers
+        return 2;
     }
-    return 3; // Dub
+    return 3;
 }
 
 export function applyOverrides(context, state) {
@@ -52,6 +49,7 @@ export function applyOverrides(context, state) {
         isOffbeat,
         isAOfBeat,
         beatIndex,
+        tsConfig,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
@@ -63,12 +61,18 @@ export function applyOverrides(context, state) {
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
     const isEighthNote = isBeatStart || isOffbeat;
 
+    // --- Relative Position Markers ---
+    // Reggae phrasing is highly centered around the halfway point (Beat 3 in 4/4)
+    const midBeatIndex = tsConfig.isCompound
+        ? Math.floor(tsConfig.grouping.length / 2)
+        : Math.floor(tsConfig.beats / 2);
+    const lastBeatIndex = tsConfig.isCompound ? tsConfig.grouping.length - 1 : tsConfig.beats - 1;
     // --- 1. KICK & SNARE INTERPLAY ---
     if (inst.name === 'Kick') {
         shouldPlay = false;
         if (activeMotif === 0) {
-            // One Drop
-            if (isBeatStart && beatIndex === 2) {
+            // One Drop: Halfway point (Beat 3 in 4/4)
+            if (isBeatStart && beatIndex === midBeatIndex) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 1) {
@@ -78,9 +82,9 @@ export function applyOverrides(context, state) {
             }
         } else if (activeMotif === 2) {
             // Rockers
-            if (isBeatStart || (isOffbeat && beatIndex === 3)) {
+            if (isBeatStart || (isOffbeat && beatIndex === lastBeatIndex)) {
                 shouldPlay = true;
-                if (isOffbeat && beatIndex === 3) {
+                if (isOffbeat && beatIndex === lastBeatIndex) {
                     velocity = 0.85;
                 }
             }
@@ -88,8 +92,11 @@ export function applyOverrides(context, state) {
             // Dub/Experimental
             if (
                 isDownbeat ||
-                (isAOfBeat && (beatIndex === 0 || beatIndex === 2 || beatIndex === 3)) ||
-                (isBeatStart && beatIndex === 2)
+                (isAOfBeat &&
+                    (beatIndex === 0 ||
+                        beatIndex === midBeatIndex ||
+                        beatIndex === lastBeatIndex)) ||
+                (isBeatStart && beatIndex === midBeatIndex)
             ) {
                 shouldPlay = true;
             }
@@ -97,26 +104,23 @@ export function applyOverrides(context, state) {
 
         if (shouldPlay) {
             velocity = scaleVelocity(1.1, intensity, 0.15);
-            // "Deep Pocket": Slightly pull back the One Drop kick
-            if (isBeatStart && beatIndex === 2) {
+            if (isBeatStart && beatIndex === midBeatIndex) {
                 instTimeOffset += 0.005;
             }
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
-        // Core Reggae backbeat on Beat 3
-        if (isBeatStart && beatIndex === 2) {
+        // Core Reggae backbeat on halfway point
+        if (isBeatStart && beatIndex === midBeatIndex) {
             shouldPlay = true;
             velocity = scaleVelocity(1.2, intensity, 0.1);
-            // Transition from Sidestick to Snare rimshot as intensity rises
             soundName = intensity > 0.65 ? 'Snare' : 'Sidestick';
         }
 
-        // --- Snare Ghosting & Dub Flams ---
         if (activeMotif === 3) {
             if (
-                ((isAOfBeat && (beatIndex === 0 || beatIndex === 2)) ||
-                    (isOffbeat && (beatIndex === 1 || beatIndex === 3))) &&
+                ((isAOfBeat && (beatIndex === 0 || beatIndex === midBeatIndex)) ||
+                    (isOffbeat && (beatIndex === 1 || beatIndex === lastBeatIndex))) &&
                 roll(0.3, intensity)
             ) {
                 shouldPlay = true;
@@ -126,46 +130,33 @@ export function applyOverrides(context, state) {
         }
 
         if (isTurnaround && intensity > 0.75) {
-            // Probability for a snare "flam" on the end of the bar
-            if (isAOfBeat && beatIndex === 3 && roll(0.4)) {
+            if (isAOfBeat && beatIndex === lastBeatIndex && roll(0.4)) {
                 shouldPlay = true;
                 velocity = 0.9;
-                instTimeOffset -= 0.01; // Push it early
+                instTimeOffset -= 0.01;
             }
         }
 
         if (shouldPlay && soundName === 'Sidestick' && intensity > 0.8) {
-            // Add extra "crack" to the sidestick at peak intensity
             velocity *= 1.15;
         }
-    }
-
-    // --- 2. HI-HAT DYNAMICS ---
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    } else if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
-
-        // Reggae 8th-note pulse
         if (isEighthNote) {
             shouldPlay = true;
             velocity = isBeatStart ? 0.9 : 0.7;
-
-            // At high intensity, transition from steady 8ths to a 16th shuffle for Motif 3
             if (activeMotif === 3 && intensity > 0.8 && roll(0.4)) {
-                // Occasional 16th-note skip
                 shouldPlay = true;
                 velocity = 0.4;
             }
         }
-
-        // Occasional Open hat barks on the "and" of 4
-        if (isOffbeat && beatIndex === 3 && intensity > 0.7 && roll(0.25)) {
+        if (isOffbeat && beatIndex === lastBeatIndex && intensity > 0.7 && roll(0.25)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.1;
         }
     }
 
-    // --- 3. FINAL POLISH ---
     if (shouldPlay && inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
         soundName = 'Sidestick';
     }

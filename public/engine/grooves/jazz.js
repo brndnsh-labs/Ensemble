@@ -65,6 +65,7 @@ export function applyOverrides(context, state) {
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
     const halfBarStep = Math.floor(stepsPerBar / 2);
+    const lastBeatIndex = Math.max(1, Math.round(stepsPerBar / 4) - 1);
 
     if (inst.name === 'Open') {
         shouldPlay = false;
@@ -91,7 +92,7 @@ export function applyOverrides(context, state) {
         if (
             (activeMotif === 1 && isOffbeat && beatIndex === 1) ||
             (activeMotif === 2 && isBeatStart && beatIndex === 2) ||
-            (activeMotif === 3 && isOffbeat && beatIndex === 3)
+            (activeMotif === 3 && isOffbeat && beatIndex === lastBeatIndex)
         ) {
             velocity *= 1.2;
         }
@@ -112,7 +113,7 @@ export function applyOverrides(context, state) {
             velocity = scaleVelocity(0.15, intensity, 0.1);
         }
 
-        if (isTurnaround && isBeatStart && beatIndex === 3) {
+        if (isTurnaround && isBeatStart && beatIndex === lastBeatIndex) {
             shouldPlay = true;
             velocity = 0.9;
         } else if (activeMotif === 1 && isOffbeat && beatIndex === 1 && sectionSeed > 0.5) {
@@ -132,7 +133,7 @@ export function applyOverrides(context, state) {
 
             if (
                 roll(bombProb) &&
-                ((isOffbeat && beatIndex % 2 !== 0) || (isAOfBeat && beatIndex === 3))
+                ((isOffbeat && beatIndex % 2 !== 0) || (isAOfBeat && beatIndex === lastBeatIndex))
             ) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, Math.random(), 0.3);
@@ -143,13 +144,13 @@ export function applyOverrides(context, state) {
 
         if (isTurnaround) {
             if (
-                ((isBeatStart || isOffbeat || isAOfBeat) && beatIndex === 2) ||
-                (isOffbeat && beatIndex === 3)
+                ((isBeatStart || isOffbeat || isAOfBeat) && beatIndex === lastBeatIndex - 1) ||
+                (isOffbeat && beatIndex === lastBeatIndex)
             ) {
                 if (roll(0.7)) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.6, Math.random(), 0.4);
-                    if (isOffbeat && beatIndex === 3) {
+                    if (isOffbeat && beatIndex === lastBeatIndex) {
                         velocity = 1.1;
                     }
                 }
@@ -164,10 +165,10 @@ export function applyOverrides(context, state) {
             ) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.6, intensity, 0.3);
-            } else if (activeMotif === 3 && isOffbeat && beatIndex === 3) {
+            } else if (activeMotif === 3 && isOffbeat && beatIndex === lastBeatIndex) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, intensity, 0.3);
-            } else if (activeMotif === 4 && isAOfBeat && beatIndex < 3) {
+            } else if (activeMotif === 4 && isAOfBeat && beatIndex < lastBeatIndex) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.5, Math.random(), 0.3);
             } else {
@@ -180,7 +181,7 @@ export function applyOverrides(context, state) {
                 }
 
                 if (
-                    (isOffbeat && beatIndex === 3 && roll(0.5 + compProb)) ||
+                    (isOffbeat && beatIndex === lastBeatIndex && roll(0.5 + compProb)) ||
                     (isOffbeat && beatIndex === 1 && roll(0.3 + compProb)) ||
                     (isAOfBeat && beatIndex !== 1 && roll(compProb * 0.4))
                 ) {
@@ -197,7 +198,11 @@ export function applyOverrides(context, state) {
 
         // 3. THE BIG FINISH (Ending Signaling)
         if (playback.songMode && playback.isEndingPending) {
-            if (((isEOfBeat && beatIndex === 3) || (isAOfBeat && beatIndex === 3)) && roll(0.7)) {
+            if (
+                ((isEOfBeat && beatIndex === lastBeatIndex) ||
+                    (isAOfBeat && beatIndex === lastBeatIndex)) &&
+                roll(0.7)
+            ) {
                 shouldPlay = true;
                 velocity = 1.1;
                 instTimeOffset -= 0.005;

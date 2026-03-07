@@ -58,6 +58,7 @@ export function applyGrooveOverrides({
     isEOfBeat,
     isAOfBeat,
     beatIndex,
+    tsConfig,
 }) {
     const { soloist } = getState();
     const stateObj = getState();
@@ -172,6 +173,7 @@ export function applyGrooveOverrides({
         isEOfBeat,
         isAOfBeat,
         beatIndex,
+        tsConfig,
         stepsPerBar,
         loopStep,
         drumComplexity,

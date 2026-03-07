@@ -471,7 +471,7 @@ class ExportProcessor {
 
     processStep(globalStep) {
         this.checkWorkerTransition(globalStep);
-        const { arranger, groove, playback, soloist, chords, bass, harmony } = getState();
+        const { arranger, groove, playback, soloist, bass, harmony } = getState();
 
         const stepTimeS = this.stepTimes[globalStep];
         const measureStep = globalStep % this.stepsPerMeasure;
@@ -558,6 +558,7 @@ class ExportProcessor {
                     isOffbeat: stepInfo.isOffbeat,
                     isEOfBeat: stepInfo.isEOfBeat,
                     isAOfBeat: stepInfo.isAOfBeat,
+                    tsConfig: stepInfo.tsConfig,
                     isTurnaround,
                     stepsPerBar: this.stepsPerMeasure,
                     loopStep: drumStep,
@@ -913,6 +914,7 @@ class ExportProcessor {
                                 isOffbeat: stepInfo.isOffbeat,
                                 isEOfBeat: stepInfo.isEOfBeat,
                                 isAOfBeat: stepInfo.isAOfBeat,
+                                tsConfig: stepInfo.tsConfig,
                                 isTurnaround,
                                 stepsPerBar: this.stepsPerMeasure,
                                 loopStep: drumStep,
@@ -1196,7 +1198,7 @@ export function getChordAtStep(step, cursor = null) {
 }
 
 function fillBuffers(currentStep, requestTimestamp = null, processStartTime = null) {
-    const { arranger, chords, bass, soloist, harmony, playback, groove } = getState();
+    const { arranger, chords, bass, soloist, harmony } = getState();
     const targetStep = currentStep + LOOKAHEAD;
     const notesToMain = [];
     if (bbBufferHead < currentStep) {

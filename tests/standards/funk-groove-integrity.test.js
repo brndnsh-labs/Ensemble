@@ -50,6 +50,7 @@ describe('Funk Groove Integrity', () => {
                 isOffbeat: info.isOffbeat,
                 isEOfBeat: info.isEOfBeat,
                 isAOfBeat: info.isAOfBeat,
+                tsConfig: info.tsConfig,
             };
         };
 

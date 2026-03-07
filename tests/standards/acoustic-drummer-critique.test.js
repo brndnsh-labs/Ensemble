@@ -53,6 +53,7 @@ describe('Acoustic Drummer Critique', () => {
                         isOffbeat: info.isOffbeat,
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
+                        tsConfig: info.tsConfig,
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay) {

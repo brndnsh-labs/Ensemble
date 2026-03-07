@@ -545,6 +545,7 @@ function scheduleDrums(params) {
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
+        tsConfig,
         isTurnaround,
     } = params;
 
@@ -630,6 +631,7 @@ function scheduleDrums(params) {
             isOffbeat,
             isEOfBeat,
             isAOfBeat,
+            tsConfig,
             isTurnaround,
             stepsPerBar,
             loopStep: step, // scheduleDrums 'step' is the local drum loop step
@@ -1166,6 +1168,7 @@ export function scheduleGlobalEvent(step, swungTime) {
             isOffbeat: stepInfo.isOffbeat,
             isEOfBeat: stepInfo.isEOfBeat,
             isAOfBeat: stepInfo.isAOfBeat,
+            tsConfig: stepInfo.tsConfig,
             isTurnaround,
         });
     }
