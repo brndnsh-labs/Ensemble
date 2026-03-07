@@ -127,6 +127,9 @@ describe('Soloist Phrasing Analysis', () => {
             steps: 0,
         };
 
+        let idleSteps = 0;
+        const phraseGapThreshold = 8; // Steps of silence to define a new phrase
+
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
             mockState.playback.currentLoopCount = Math.floor(s / stepsPerLoop);
@@ -137,10 +140,10 @@ describe('Soloist Phrasing Analysis', () => {
                 mockState.soloist.busySteps--;
                 results.stepsPlaying++;
                 currentPhrase.steps++;
+                idleSteps = 0;
                 continue;
             }
 
-            const wasResting = mockState.soloist.phrasingState === 'rest';
             // Force wakeup at start
             const coordination = s === 0 ? { bypassRhythm: true } : {};
             const res = getSoloistNote(
@@ -154,36 +157,46 @@ describe('Soloist Phrasing Analysis', () => {
                 false,
                 coordination,
             );
-            const isResting = mockState.soloist.phrasingState === 'rest';
 
-            if (!isResting) {
+            if (res) {
                 results.stepsPlaying++;
-                if (wasResting) {
+                idleSteps = 0;
+
+                if (currentPhrase.startStep === -1) {
                     currentPhrase = { startStep: s, notes: 0, steps: 0 };
                 }
 
-                if (res) {
-                    const notes = Array.isArray(res) ? res : [res];
-                    results.totalNotes += notes.length;
-                    currentPhrase.notes += notes.length;
+                const notes = Array.isArray(res) ? res : [res];
+                results.totalNotes += notes.length;
+                currentPhrase.notes += notes.length;
 
-                    // Soloist.js sets busySteps based on duration
-                    const primary = notes[notes.length - 1];
-                    if (primary.durationSteps > 1) {
-                        mockState.soloist.busySteps = primary.durationSteps - 1;
-                    }
+                // Soloist.js sets busySteps based on duration
+                const primary = notes[notes.length - 1];
+                if (primary.durationSteps > 1) {
+                    mockState.soloist.busySteps = primary.durationSteps - 1;
                 }
                 currentPhrase.steps++;
             } else {
                 results.stepsResting++;
-                if (!wasResting && currentPhrase.startStep !== -1) {
-                    results.phrases.push(currentPhrase);
-                    if (currentPhrase.notes === 0) {
-                        results.emptyPhrases++;
+                idleSteps++;
+
+                if (currentPhrase.startStep !== -1) {
+                    currentPhrase.steps++;
+                    // If we've been silent for a full gap threshold, close the phrase
+                    if (idleSteps >= phraseGapThreshold) {
+                        currentPhrase.steps -= idleSteps; // Remove idle padding from phrase duration
+                        results.phrases.push(currentPhrase);
+                        if (currentPhrase.notes === 0) {
+                            results.emptyPhrases++;
+                        }
+                        currentPhrase = { startStep: -1, notes: 0, steps: 0 };
                     }
-                    currentPhrase = { startStep: -1, notes: 0, steps: 0 };
                 }
             }
+        }
+
+        if (currentPhrase.startStep !== -1) {
+             results.phrases.push(currentPhrase);
         }
 
         return results;
