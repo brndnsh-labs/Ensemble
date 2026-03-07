@@ -2,7 +2,7 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 
 export const config = {
     ...DEFAULT_CONFIG,
-    entropyMultiplier: 0.08,
+    entropyMultiplier: 0.05,
     blockAdjacentSnare: true,
     backbeatCrack: true,
 };
@@ -85,17 +85,20 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
         if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
-        } else if (activeMotif === 1) {
-            if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 2)) {
-                shouldPlay = true;
-            }
-        } else if (activeMotif === 2) {
-            if (safeIsOffbeat && beatIndex === 2) {
-                shouldPlay = true;
-            }
-        } else if (activeMotif === 3) {
-            if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 3)) {
-                shouldPlay = true;
+        } else if (intensity < 0.85) {
+            // Only allow syncopated kicks (offbeats) at moderate intensities
+            if (activeMotif === 1) {
+                if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 2)) {
+                    shouldPlay = true;
+                }
+            } else if (activeMotif === 2) {
+                if (safeIsOffbeat && beatIndex === 2) {
+                    shouldPlay = true;
+                }
+            } else if (activeMotif === 3) {
+                if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 3)) {
+                    shouldPlay = true;
+                }
             }
         }
 

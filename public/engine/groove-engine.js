@@ -161,7 +161,10 @@ export function applyGrooveOverrides({
         groove.creativity &&
         !inst.muted &&
         !currentState.shouldPlay &&
-        Math.random() < playback.bandIntensity * config.entropyMultiplier
+        Math.random() <
+            playback.bandIntensity *
+                config.entropyMultiplier *
+                (config.blockAdjacentSnare ? 0.7 : 1.0)
     ) {
         const isSyncopated = loopStep % 2 === 1;
         const subdivision = stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4);
