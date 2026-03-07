@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
+import { TIME_SIGNATURES } from '../../public/config.js';
+import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -31,17 +33,26 @@ describe('Jazz Drummer Critique', () => {
             for (let step = 0; step < 16; step++) {
                 const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
+                    const info = getStepInfo(
+                        bar * 16 + step,
+                        TIME_SIGNATURES['4/4'],
+                        [],
+                        TIME_SIGNATURES,
+                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
                         stepVal: 0,
                         playback: mockState.playback,
                         groove: mockState.groove,
-                        isDownbeat: step === 0,
-                        isQuarter: step % 4 === 0,
-                        isBackbeat: step === 4 || step === 12,
-                        isGroupStart: step === 0 || step === 8,
-                        beatIndex: Math.floor(step / 4),
+                        isDownbeat: info.isMeasureStart,
+                        isBeatStart: info.isBeatStart,
+                        isBackbeat: info.isBackbeat,
+                        isGroupStart: info.isGroupStart,
+                        beatIndex: info.beatIndex,
+                        isOffbeat: info.isOffbeat,
+                        isEOfBeat: info.isEOfBeat,
+                        isAOfBeat: info.isAOfBeat,
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay && result.soundName === instName) {

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
+import { getStepInfo } from '../../../public/utils.js';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
@@ -12,6 +14,7 @@ vi.mock('../../../public/state.js', () => {
             instruments: [],
         },
         playback: { bandIntensity: 0.5, complexity: 0.5 },
+        arranger: { timeSignature: '4/4', stepMap: [] },
     };
     return {
         getState: () => mockState,
@@ -19,46 +22,50 @@ vi.mock('../../../public/state.js', () => {
 });
 
 describe('Groove Engine - Generative (Creativity) Mode', () => {
-    let mockParams;
+    const ts44 = TIME_SIGNATURES['4/4'];
 
-    beforeEach(() => {
-        mockParams = {
-            step: 0,
-            inst: { name: 'Snare', muted: false },
-            stepVal: 0, // Not playing in grid
-            playback: { bandIntensity: 0.5, complexity: 0.5 },
+    const createParams = (step, instName, creativity = false, intensity = 0.5) => {
+        const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+        return {
+            step,
+            inst: { name: instName, muted: false },
+            stepVal: 0,
+            playback: { bandIntensity: intensity, complexity: 0.5 },
             groove: {
-                creativity: false,
+                creativity: creativity,
                 genreFeel: 'Rock',
                 lastDrumPreset: 'Basic Rock',
                 instruments: [],
             },
-            isDownbeat: false,
-            isQuarter: false,
-            isBackbeat: false,
-            isGroupStart: false,
+            isDownbeat: info.isMeasureStart,
+            isBeatStart: info.isBeatStart,
+            isBackbeat: info.isBackbeat,
+            isGroupStart: info.isGroupStart,
+            beatIndex: info.beatIndex,
+            isOffbeat: info.isOffbeat,
+            isEOfBeat: info.isEOfBeat,
+            isAOfBeat: info.isAOfBeat,
         };
-    });
+    };
 
     it('should NOT generate extra hits when creativity is disabled', () => {
-        mockParams.groove.creativity = false;
-        mockParams.step = 1; // Offbeat
+        const step = 1; // Offbeat
 
         // Run many times to ensure no random hits
         for (let i = 0; i < 100; i++) {
-            const result = applyGrooveOverrides(mockParams);
+            const params = createParams(step, 'Snare', false);
+            const result = applyGrooveOverrides(params);
             expect(result.shouldPlay).toBe(false);
         }
     });
 
     it('should generate extra hits (Entropy) when creativity is enabled', () => {
-        mockParams.groove.creativity = true;
-        mockParams.playback.bandIntensity = 1.0; // Max probability
-        mockParams.step = 7; // Syncopated step (not blocked for Rock)
+        const step = 7; // Syncopated step (not blocked for Rock)
 
         let generatedHits = 0;
         for (let i = 0; i < 200; i++) {
-            const result = applyGrooveOverrides(mockParams);
+            const params = createParams(step, 'Snare', true, 1.0);
+            const result = applyGrooveOverrides(params);
             if (result.shouldPlay) {
                 generatedHits++;
             }
@@ -70,21 +77,12 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
     });
 
     it('should respect genre boundaries even in creativity mode', () => {
-        mockParams.groove.creativity = true;
-        mockParams.playback.bandIntensity = 1.0;
-        mockParams.step = 0; // Downbeat - typically reserved for core genre markers
-        mockParams.inst.name = 'HiHat';
-
-        // The Entropy block only adds hits if stepVal === 0 AND it's a syncopated step
-        // In Rock, applyGrooveOverrides might force HiHat on quarters anyway,
-        // but let's check our new Entropy block specifically.
-
-        // Reset stepVal to 0 and ensure it's NOT a syncopated step for Entropy
-        mockParams.step = 0;
+        const step = 0; // Downbeat
 
         let entropyHits = 0;
         for (let i = 0; i < 100; i++) {
-            const result = applyGrooveOverrides(mockParams);
+            const params = createParams(step, 'HiHat', true, 1.0);
+            const result = applyGrooveOverrides(params);
             // In Rock, Downbeat HiHat might be forced to play by global logic,
             // but we want to ensure ENTROPY doesn't just fire everywhere.
             // Our entropy block uses (loopStep % 2 === 1) or (loopStep % 4 === 2).

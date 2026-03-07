@@ -1,14 +1,84 @@
 /* eslint-disable */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../public/config.js';
 import {
+    calculateTimingOffset,
     formatUnicodeSymbols,
     getFrequency,
     getMidi,
+    getStepInfo,
     midiToNote,
     normalizeKey,
 } from '../../public/utils.js';
 
 describe('Utility Functions', () => {
+    describe('calculateTimingOffset', () => {
+        const pocket = {
+            globalDrive: 0.5,
+            tightness: 0.8,
+            bassGravity: 0.7,
+            chordGravity: 0.6,
+            soloistGravity: 0.4,
+        };
+
+        it('should correctly calculate global drive offset', () => {
+            // 0.5 drive = -6ms (ahead)
+            // With 1.0 intensity (elasticity 1.0, factor 0.1), jitter 0
+            // instrumentSpecific for drums at high intensity is -0.005
+            // Total = -0.006 + (-0.005 * 0.1) = -0.0065
+            vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            const offset = calculateTimingOffset('drums', pocket, 1.0);
+            expect(offset).toBeCloseTo(-0.0065, 4);
+        });
+
+        it('should apply bass gravity displacement', () => {
+            vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            // 0.7 gravity = 0.3 * 0.008 = 0.0024
+            // At 1.0 intensity (elasticity 1.0, factor 0.1) -> 0.00024
+            // Global drive (0.5) -> -0.006
+            // Total -> -0.00576
+            const offset = calculateTimingOffset('bass', pocket, 1.0);
+            expect(offset).toBeCloseTo(-0.00576, 5);
+        });
+
+        it('should return 0 if pocket is missing', () => {
+            expect(calculateTimingOffset('drums', null, 0.5)).toBe(0);
+        });
+    });
+
+    describe('getStepInfo', () => {
+        const ts44 = TIME_SIGNATURES['4/4'];
+
+        it('should identify beat starts and offbeats in 4/4', () => {
+            const info0 = getStepInfo(0, ts44, [], TIME_SIGNATURES);
+            const info2 = getStepInfo(2, ts44, [], TIME_SIGNATURES);
+            const info4 = getStepInfo(4, ts44, [], TIME_SIGNATURES);
+
+            expect(info0.isBeatStart).toBe(true);
+            expect(info0.isOffbeat).toBe(false);
+
+            expect(info2.isBeatStart).toBe(false);
+            expect(info2.isOffbeat).toBe(true);
+
+            expect(info4.isBeatStart).toBe(true);
+            expect(info4.isOffbeat).toBe(false);
+        });
+
+        it('should identify e and a of the beat in 4/4', () => {
+            const info1 = getStepInfo(1, ts44, [], TIME_SIGNATURES);
+            const info3 = getStepInfo(3, ts44, [], TIME_SIGNATURES);
+
+            expect(info1.isEOfBeat).toBe(true);
+            expect(info3.isAOfBeat).toBe(true);
+        });
+
+        it('should identify backbeats in 4/4', () => {
+            const info4 = getStepInfo(4, ts44, [], TIME_SIGNATURES); // Beat 2
+            const info12 = getStepInfo(12, ts44, [], TIME_SIGNATURES); // Beat 4
+            expect(info4.isBackbeat).toBe(true);
+            expect(info12.isBackbeat).toBe(true);
+        });
+    });
     describe('formatUnicodeSymbols', () => {
         it('should convert ASCII sharp (#) to Unicode sharp (♯) in chord strings', () => {
             expect(formatUnicodeSymbols('C#')).toBe('C♯');

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -19,6 +21,7 @@ describe('Snare Creativity Integrity', () => {
             lastDrumPreset: 'Blues',
             instruments: [],
         },
+        arranger: { timeSignature: '4/4', stepMap: [] },
         soloist: { enabled: false, busySteps: 0 },
     };
 
@@ -27,21 +30,27 @@ describe('Snare Creativity Integrity', () => {
 
         let totalExtraSnareHits = 0;
         const numBars = 100;
+        const ts44 = TIME_SIGNATURES['4/4'];
 
         for (let bar = 0; bar < numBars; bar++) {
             let barSnareHits = 0;
             for (let step = 0; step < 16; step++) {
+                const globalStep = bar * 16 + step;
+                const info = getStepInfo(globalStep, ts44, [], TIME_SIGNATURES);
                 const params = {
-                    step: bar * 16 + step,
+                    step: globalStep,
                     inst: { name: 'Snare', muted: false, steps: [] },
                     stepVal: 0,
                     playback: mockState.playback,
                     groove: mockState.groove,
-                    isDownbeat: step === 0,
-                    isQuarter: step % 4 === 0,
-                    isBackbeat: step === 4 || step === 12,
-                    isGroupStart: step === 0 || step === 8,
-                    beatIndex: Math.floor(step / 4),
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    isGroupStart: info.isGroupStart,
+                    beatIndex: info.beatIndex,
+                    isOffbeat: info.isOffbeat,
+                    isEOfBeat: info.isEOfBeat,
+                    isAOfBeat: info.isAOfBeat,
                 };
 
                 const result = applyGrooveOverrides(params);
@@ -55,10 +64,6 @@ describe('Snare Creativity Integrity', () => {
         }
 
         const averageExtraHits = totalExtraSnareHits / numBars;
-        // With the fix, entropy is 0.08 * 0.8 = 0.064 prob on 6 syncopated steps (excluding 5 and 13) = 0.384.
-        // Motif 0 adds 2 ghost notes (steps 3, 11) at 40% prob = 0.8.
-        // Total expected extra hits for Motif 0 = 0.384 + 0.8 = 1.184.
-        // This is below the 1.5 threshold.
         expect(averageExtraHits).toBeLessThan(1.5);
     });
 
@@ -67,19 +72,26 @@ describe('Snare Creativity Integrity', () => {
 
         let hitsOnStep5Or13 = 0;
         const numBars = 200;
+        const ts44 = TIME_SIGNATURES['4/4'];
 
         for (let bar = 0; bar < numBars; bar++) {
             for (const step of [5, 13]) {
+                const globalStep = bar * 16 + step;
+                const info = getStepInfo(globalStep, ts44, [], TIME_SIGNATURES);
                 const params = {
-                    step: bar * 16 + step,
+                    step: globalStep,
                     inst: { name: 'Snare', muted: false, steps: [] },
                     stepVal: 0,
                     playback: mockState.playback,
                     groove: mockState.groove,
-                    isDownbeat: false,
-                    isQuarter: false,
-                    isBackbeat: false,
-                    isGroupStart: false,
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    isGroupStart: info.isGroupStart,
+                    beatIndex: info.beatIndex,
+                    isOffbeat: info.isOffbeat,
+                    isEOfBeat: info.isEOfBeat,
+                    isAOfBeat: info.isAOfBeat,
                 };
 
                 const result = applyGrooveOverrides(params);

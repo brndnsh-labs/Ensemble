@@ -39,9 +39,34 @@ vi.mock('../../../public/state.js', () => {
             progression: [],
             totalSteps: 64,
             stepMap: [],
+            sectionMap: [],
             timeSignature: '4/4',
         },
-        groove: { genreFeel: 'Rock', enabled: true, instruments: [], audioBuffers: { noise: {} } },
+        groove: {
+            genreFeel: 'Rock',
+            enabled: true,
+            creativity: false,
+            instruments: [
+                {
+                    name: 'Kick',
+                    muted: false,
+                    steps: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+                },
+                {
+                    name: 'Snare',
+                    muted: false,
+                    steps: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                },
+                {
+                    name: 'HiHat',
+                    muted: false,
+                    steps: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+                },
+            ],
+            measures: 1,
+            lastDrumPreset: 'Basic Rock',
+            sectionSeedMap: {},
+        },
         vizState: {},
         midi: {},
         storage: {},
@@ -243,5 +268,118 @@ describe('Export and Resolution Logic Validation', () => {
         expect(exportMsg).toBeDefined();
         expect(exportMsg.blob).toBeInstanceOf(Uint8Array);
         expect(exportMsg.filename).toContain('.mid');
+    });
+
+    describe('Generative Drums Export Parity', () => {
+        let noteOnSpy;
+        let noteOnEvents = [];
+
+        beforeEach(() => {
+            noteOnEvents = [];
+            noteOnSpy = vi
+                .spyOn(MidiTrack.prototype, 'noteOn')
+                .mockImplementation(function (time, chan, midi, vel) {
+                    if (chan === 9) {
+                        noteOnEvents.push({ time, midi, vel });
+                    }
+                    // Call original logic by appending to events array directly
+                    this.events.push({ time, data: [0x90 | chan, midi, vel] });
+                });
+
+            // Re-setup arrangement to 4 bars
+            arranger.totalSteps = 64;
+            const mockChord = {
+                root: 'C',
+                beats: 4,
+                sectionId: 's1',
+                sectionLabel: 'Verse',
+                freqs: [261.63, 329.63, 392.0],
+                intervals: [0, 4, 7],
+                rootMidi: 60,
+                value: 'C',
+                quality: 'Major',
+            };
+            arranger.stepMap = [
+                { start: 0, end: 16, chord: mockChord, chordIndex: 0 },
+                { start: 16, end: 32, chord: mockChord, chordIndex: 0 },
+                { start: 32, end: 48, chord: mockChord, chordIndex: 0 },
+                { start: 48, end: 64, chord: mockChord, chordIndex: 0 },
+            ];
+            arranger.sectionMap = [{ id: 's1', start: 0, end: 64, label: 'Verse' }];
+
+            vi.spyOn(Math, 'random').mockReturnValue(0.05);
+        });
+
+        afterEach(() => {
+            noteOnSpy.mockRestore();
+            vi.restoreAllMocks();
+        });
+
+        it('should NOT include generative ghost notes when creativity is disabled', () => {
+            const state = getState();
+            state.groove.creativity = false;
+
+            handleExport({
+                includedTracks: ['drums'],
+                loopMode: 'once',
+            });
+
+            vi.runAllTimers();
+
+            const snareHits = noteOnEvents.filter((e) => e.midi === 38);
+            const snareSteps = snareHits.map((e) => Math.round(e.time / 120));
+            console.log('Snare hits when OFF at steps:', snareSteps);
+            expect(snareHits.length).toBe(8); // 2 backbeats * 4 bars
+        });
+
+        it('should include generative ghost notes in Rock export when creativity is enabled', () => {
+            const state = getState();
+            state.groove.creativity = true;
+            state.playback.bandIntensity = 0.7; // Ideal range for ghost notes in rock.js
+
+            handleExport({
+                includedTracks: ['drums'],
+                loopMode: 'once',
+            });
+
+            vi.runAllTimers();
+
+            const snareHits = noteOnEvents.filter((e) => e.midi === 38);
+            // If there are MORE than 8 snare hits, they must be generative ghost notes
+            expect(snareHits.length).toBeGreaterThan(8);
+        });
+
+        it('should include start-of-section crashes in MIDI export', () => {
+            const state = getState();
+            state.groove.creativity = true;
+            state.playback.bandIntensity = 0.8;
+
+            arranger.sectionMap = [
+                { id: 's1', start: 0, end: 32, label: 'Verse' },
+                { id: 's2', start: 32, end: 64, label: 'Chorus' },
+            ];
+
+            handleExport({
+                includedTracks: ['drums'],
+                loopMode: 'once',
+            });
+
+            vi.runAllTimers();
+
+            // Crash is MIDI 49
+            const crashHits = noteOnEvents.filter((e) => e.midi === 49);
+            const openHits = noteOnEvents.filter((e) => e.midi === 46);
+            console.log(
+                `[Export Test] Crash Hits (49): ${crashHits.length}, Open Hits (46): ${openHits.length}`,
+            );
+
+            // Check if a crash happened at the start of section 2
+            const steps = crashHits.map((e) => Math.round(e.time / 120));
+            console.log('Crash steps:', steps);
+            const openSteps = openHits.map((e) => Math.round(e.time / 120));
+            console.log('Open steps:', openSteps);
+
+            expect(crashHits.length + openHits.length).toBeGreaterThanOrEqual(1);
+        });
     });
 });

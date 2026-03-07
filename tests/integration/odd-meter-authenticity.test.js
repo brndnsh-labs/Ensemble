@@ -4,13 +4,6 @@ import { getSoloistNote } from '../../public/soloist.js';
 import { getStepInfo } from '../../public/utils.js';
 
 describe('Odd-Meter Authenticity Integration', () => {
-    const mockState = {
-        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5 },
-        arranger: { key: 'C', timeSignature: '4/4' },
-        soloist: { enabled: true, mode: 'monophonic', busySteps: 0, lastFreq: 261.63 },
-        groove: { genreFeel: 'Jazz' },
-    };
-
     it('should correctly identify measure starts in 3/4', () => {
         const ts34 = TIME_SIGNATURES['3/4'];
         const info0 = getStepInfo(0, ts34, [], TIME_SIGNATURES);
@@ -33,6 +26,35 @@ describe('Odd-Meter Authenticity Integration', () => {
         expect(info0.isGroupStart).toBe(true);
         expect(info6.isGroupStart).toBe(true);
         expect(info4.isGroupStart).toBe(false);
+    });
+
+    it('should identify offbeats in 6/8 correctly', () => {
+        const ts68 = TIME_SIGNATURES['6/8'];
+        // In 6/8, stepsPerBeat is 2. Offbeat is stepInBeat === 1.
+        const info0 = getStepInfo(0, ts68, [], TIME_SIGNATURES); // Beat start
+        const info1 = getStepInfo(1, ts68, [], TIME_SIGNATURES); // Offbeat
+        const info2 = getStepInfo(2, ts68, [], TIME_SIGNATURES); // Beat start
+
+        expect(info0.isOffbeat).toBe(false);
+        expect(info1.isOffbeat).toBe(true);
+        expect(info2.isOffbeat).toBe(false);
+    });
+
+    it('should identify backbeats in 12/8 correctly', () => {
+        const ts128 = TIME_SIGNATURES['12/8'];
+        // 12/8 is compound. backbeat: [1, 3] (group indices).
+        // grouping: [3, 3, 3, 3]. stepsPerBeat: 2.
+        // Group 0: steps 0-5. Group 1: steps 6-11 (BACKBEAT start at 6).
+        // Group 2: steps 12-17. Group 3: steps 18-23 (BACKBEAT start at 18).
+        const info0 = getStepInfo(0, ts128, [], TIME_SIGNATURES);
+        const info6 = getStepInfo(6, ts128, [], TIME_SIGNATURES);
+        const info12 = getStepInfo(12, ts128, [], TIME_SIGNATURES);
+        const info18 = getStepInfo(18, ts128, [], TIME_SIGNATURES);
+
+        expect(info0.isBackbeat).toBe(false);
+        expect(info6.isBackbeat).toBe(true);
+        expect(info12.isBackbeat).toBe(false);
+        expect(info18.isBackbeat).toBe(true);
     });
 
     it('should correctly identify measure starts in 5/4', () => {

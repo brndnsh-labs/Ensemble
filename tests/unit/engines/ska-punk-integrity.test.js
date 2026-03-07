@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../../public/accompaniment.js';
 import { getBassNote, isBassActive } from '../../../public/bass.js';
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getHarmonyNotes } from '../../../public/harmonies.js';
 import { getSoloistNote } from '../../../public/soloist.js';
 import { getState } from '../../../public/state.js';
+import { getStepInfo } from '../../../public/utils.js';
 
 vi.mock('../../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
@@ -61,16 +63,22 @@ describe('Ska-Punk Genre Integrity', () => {
 
     it('should apply Hi-Hat offbeat accents in groove-engine', () => {
         const inst = { name: 'HiHat' };
+        const ts44 = TIME_SIGNATURES['4/4'];
+        const info = getStepInfo(2, ts44, [], TIME_SIGNATURES);
         const result = applyGrooveOverrides({
             step: 2,
             inst,
             stepVal: 1,
             playback,
             groove,
-            isDownbeat: false,
-            isQuarter: false,
-            isBackbeat: false,
-            isGroupStart: false,
+            isDownbeat: info.isMeasureStart,
+            isBeatStart: info.isBeatStart,
+            isBackbeat: info.isBackbeat,
+            isGroupStart: info.isGroupStart,
+            beatIndex: info.beatIndex,
+            isOffbeat: info.isOffbeat,
+            isEOfBeat: info.isEOfBeat,
+            isAOfBeat: info.isAOfBeat,
         });
         // Offbeat (step 2) should have velocity boost
         expect(result.velocity).toBeGreaterThan(1.0);

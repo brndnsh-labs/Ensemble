@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
+import { TIME_SIGNATURES } from '../../public/config.js';
+import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -20,6 +22,7 @@ describe('Blues Drummer Critique', () => {
                 lastDrumPreset: 'Blues',
                 instruments: [],
             },
+            arranger: { timeSignature: '4/4', stepMap: [] },
             soloist: { enabled: false, busySteps: 0 },
             ...stateOverrides,
         };
@@ -31,17 +34,26 @@ describe('Blues Drummer Critique', () => {
             for (let step = 0; step < 16; step++) {
                 const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
+                    const info = getStepInfo(
+                        bar * 16 + step,
+                        TIME_SIGNATURES['4/4'],
+                        [],
+                        TIME_SIGNATURES,
+                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
                         stepVal: 0,
                         playback: mockState.playback,
                         groove: mockState.groove,
-                        isDownbeat: step === 0,
-                        isQuarter: step % 4 === 0,
-                        isBackbeat: step === 4 || step === 12,
-                        isGroupStart: step === 0 || step === 8,
-                        beatIndex: Math.floor(step / 4),
+                        isDownbeat: info.isMeasureStart,
+                        isBeatStart: info.isBeatStart,
+                        isBackbeat: info.isBackbeat,
+                        isGroupStart: info.isGroupStart,
+                        beatIndex: info.beatIndex,
+                        isOffbeat: info.isOffbeat,
+                        isEOfBeat: info.isEOfBeat,
+                        isAOfBeat: info.isAOfBeat,
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay) {
@@ -140,7 +152,6 @@ describe('Blues Drummer Critique', () => {
         expect(kickScore).toBe(1.0);
 
         // MUSICAL: HiHat/Ride should be mostly on the shuffle grid.
-        // At intensity 0.75, straight 8th motifs or other variations might drop the score slightly below 0.9.
         expect(shuffleScore).toBeGreaterThan(0.8);
 
         // MUSICAL: Snare extra hits should not overwhelm the groove.
@@ -164,10 +175,6 @@ describe('Blues Drummer Critique', () => {
         const highHits = countTotalHits(highIntensityPerf);
 
         console.log(`[Intensity Scan] Low: ${lowHits} total hits, High: ${highHits} total hits`);
-        // Because creativity logic uses bandIntensity to swap variations in conductor, and here we are just calling applyGrooveOverrides,
-        // we should expect highHits to be generally comparable or greater. Procedural generation can occasionally
-        // cause high intensity to have slightly fewer hits if a sparser, heavier variation is selected.
-        // Using a 5% margin to prevent flakiness.
         expect(highHits).toBeGreaterThanOrEqual(lowHits * 0.95);
     });
 });

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -33,17 +35,22 @@ describe('Rock Groove Integrity', () => {
         };
 
         const createParams = (step, instName, stepVal = 0) => {
+            const ts44 = TIME_SIGNATURES['4/4'];
+            const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
             return {
                 step,
-                inst: { name: instName, muted: false },
+                inst: { name: instName, muted: false, steps: [] },
                 stepVal,
                 playback: mockState.playback,
                 groove: mockState.groove,
-                isDownbeat: step % 16 === 0,
-                isQuarter: step % 4 === 0,
-                isBackbeat: step % 16 === 4 || step % 16 === 12,
-                isGroupStart: step % 16 === 0 || step % 16 === 8,
-                beatIndex: Math.floor((step % 16) / 4),
+                isDownbeat: info.isMeasureStart,
+                isBeatStart: info.isBeatStart,
+                isBackbeat: info.isBackbeat,
+                isGroupStart: info.isGroupStart,
+                beatIndex: info.beatIndex,
+                isOffbeat: info.isOffbeat,
+                isEOfBeat: info.isEOfBeat,
+                isAOfBeat: info.isAOfBeat,
             };
         };
 
