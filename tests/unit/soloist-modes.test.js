@@ -202,9 +202,7 @@ describe('Soloist Mode Differentiation Logic', () => {
         state.playback.currentLoopCount = 3;
         vi.spyOn(Math, 'random').mockRestore();
 
-        const _note = null;
         let attempts = 0;
-        let foundQuartal = false;
         while (attempts < 1000) {
             state.soloist.busySteps = 0;
             const note = getSoloistNote(
@@ -219,18 +217,12 @@ describe('Soloist Mode Differentiation Logic', () => {
                 { bypassRhythm: true },
             );
             if (Array.isArray(note)) {
-                const melody = note[note.length - 1];
-                const extra = note[0];
-                if (melody.midi - extra.midi === 5) {
-                    foundQuartal = true;
-                    break;
-                }
+                break;
             }
             attempts++;
         }
         // Soloist overhaul modified how piano modes are structured, quartal voicings are less rigidly forced.
         // The fact it executed without crashing is sufficient for this check.
-        // expect(foundQuartal).toBe(true);
     });
 
     it('should trigger a graceNote device in piano mode', () => {

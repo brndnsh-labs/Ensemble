@@ -196,7 +196,7 @@ describe('Soloist Phrasing Analysis', () => {
         }
 
         if (currentPhrase.startStep !== -1) {
-             results.phrases.push(currentPhrase);
+            results.phrases.push(currentPhrase);
         }
 
         return results;

@@ -224,7 +224,6 @@ describe('Country Soloist Overhaul', () => {
         });
 
         it('should execute pitch generation in country style', () => {
-            let colorTones = 0;
             let total = 0;
             for (let i = 0; i < 1000; i++) {
                 soloist.busySteps = 0;
@@ -233,11 +232,6 @@ describe('Country Soloist Overhaul', () => {
                     bypassRhythm: true,
                 });
                 if (res) {
-                    const note = Array.isArray(res) ? res[res.length - 1] : res;
-                    const interval = (note.midi - chordC.rootMidi + 120) % 12;
-                    if (interval === 2 || interval === 9) {
-                        colorTones++;
-                    }
                     total++;
                 }
             }
