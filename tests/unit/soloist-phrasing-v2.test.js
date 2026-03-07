@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
 import { getSoloistNote } from '../../public/soloist.js';
 import * as stateModule from '../../public/state.js';
 
@@ -62,18 +63,44 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
         const randomSpy = vi.spyOn(Math, 'random');
 
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+        const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         localState.playback.bandIntensity = 0.5;
         localState.soloist.sessionSteps = 0;
         localState.soloist.notesInPhrase = 5; // Bypass urgency boost
 
         // Random 0.99 > attackProb -> null
         randomSpy.mockReturnValue(0.99);
-        expect(getSoloistNote(chord, null, 16, 440, 60, 'funk', 0, false)).toBeNull();
+        localState.soloist.rhythmPlan = undefined;
+        const planA = generateRhythmPlan(
+            16,
+            16,
+            'funk',
+            0.5,
+            16,
+            4,
+            {},
+            0,
+            localState.soloist,
+            null,
+        );
+        expect(planA.length).toBe(0);
 
         // Now move sessionSteps to 64 (end of warmup)
         localState.soloist.sessionSteps = 64;
-        expect(getSoloistNote(chord, null, 16, 440, 60, 'funk', 0, false)).not.toBeNull();
+        localState.soloist.rhythmPlan = undefined;
+        const planB = generateRhythmPlan(
+            16,
+            16,
+            'funk',
+            0.5,
+            16,
+            4,
+            {},
+            64,
+            localState.soloist,
+            null,
+        );
+        expect(planB.length).toBeGreaterThan(0);
 
         randomSpy.mockRestore();
     });

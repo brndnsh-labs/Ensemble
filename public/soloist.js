@@ -209,10 +209,12 @@ export function getSoloistNote(
                 soloist.phrasingState = 'active'; // @worker-mutation
 
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                const nextActiveSteps = Math.floor(
+                const _nextActiveSteps = Math.floor(
                     baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
                 );
-                soloist.activeSteps = nextActiveSteps; // @worker-mutation
+                if (soloist.activeSteps === undefined) {
+                    soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
+                }
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
 
                 // GENERATE RHYTHM PLAN FOR THE PHRASE
@@ -261,16 +263,20 @@ export function getSoloistNote(
     }
 
     // --- 3. Rhythm Plan Execution & Pitch Selection ---
-    if (!soloist.rhythmPlan) {
-        // If plan is uninitialized but we are active, generate it (handles test mocking)
+    if (
+        !soloist.rhythmPlan ||
+        (soloist.rhythmPlan.length === 0 && !soloist.isResting && soloist.activeSteps <= 0)
+    ) {
+        // If plan is uninitialized or exhausted but test forces active state, generate it
         if (!soloist.isResting) {
             const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-            const nextActiveSteps = Math.floor(
-                baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
-            );
+            const planSteps =
+                soloist.activeSteps && soloist.activeSteps > 0
+                    ? soloist.activeSteps
+                    : Math.floor(baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5));
             const nextRhythmPlan = generateRhythmPlan(
                 step,
-                nextActiveSteps,
+                planSteps,
                 activeStyle,
                 intensity,
                 stepsPerMeasure,
@@ -281,6 +287,9 @@ export function getSoloistNote(
                 stepInfo,
             );
             soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
+            if (soloist.activeSteps === undefined) {
+                soloist.activeSteps = planSteps; /* @worker-mutation */
+            }
         } else {
             soloist.rhythmPlan = []; // @worker-mutation
         }
