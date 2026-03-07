@@ -173,7 +173,7 @@ export function getSoloistNote(
     }
 
     // --- Natural Exit Logic ---
-    if (soloist.isYielding && soloist.isResting) {
+    if (soloist.isYielding && soloist.phrasingState === 'rest') {
         if (soloist.tradeMode === 'manual' && soloist.enabled) {
             soloist.isYielding = false; // @worker-mutation
         } else {
@@ -184,96 +184,157 @@ export function getSoloistNote(
     // --- Form Awareness & Phrasing States ---
     const remainingSteps = coordination.sectionEnd - step;
     const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
+    const measuresPerBlock = intensity >= 0.5 ? 4 : 8;
+    const hyperMeasureLength = stepsPerMeasure * measuresPerBlock;
+    const isHyperMeasureStart = step % hyperMeasureLength === 0;
 
-    // Evaluate transition state at the downbeat of the final measure
-    if (isFinalMeasure && isDownbeat) {
-        soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
-        logDebug(`Selected transition state: ${soloist.transitionState}`);
+    // Transition evaluation at structural points
+    if (isHyperMeasureStart || (isFinalMeasure && isDownbeat)) {
+        if (soloist.phrasingState === 'rest' || soloist.phrasingState === 'resolution') {
+            soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
+            if (soloist.transitionState === 'lead_in') {
+                soloist.phrasingState = 'call'; // @worker-mutation
+                soloist.phraseStartStep = step; // @worker-mutation
+                soloist.motifCache = []; // @worker-mutation reset motif for new call
+            }
+            logDebug(`Selected transition state: ${soloist.transitionState}`);
+        }
     } else if (!isFinalMeasure && step !== coordination.sectionStart) {
-        // Only reset if we are past the downbeat, so we can use it to resolve on step 0
+        // Only reset transition if we are past the downbeat, so we can use it to resolve on step 0
         soloist.transitionState = null; // @worker-mutation
     }
 
-    // --- 2. Simplified Phrasing State Machine ---
-    if (soloist.isResting === undefined) {
-        soloist.isResting = true; // @worker-mutation
-        soloist.restSteps = stepsPerMeasure; // @worker-mutation
-        soloist.activeSteps = 0; // @worker-mutation
-    }
-
-    // If we're in 'rest' transition, enforce silence starting from beat 3 or 4
-    if (isFinalMeasure && soloist.transitionState === 'rest') {
-        const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
-        // Force rest on second half of measure
-        const restBeatStart = Math.ceil(tsConfig.beats / 2);
-        if (beatInMeasure >= restBeatStart) {
-            soloist.isResting = true; // @worker-mutation
-            soloist.restSteps = remainingSteps; // @worker-mutation stay resting until next section
+    // --- 2. Advanced Phrasing State Machine ---
+    if (soloist.phrasingState === undefined || soloist.phrasingState === 'rest') {
+        if (soloist.phrasingState === undefined) {
+            soloist.phrasingState = 'rest'; // @worker-mutation
+            soloist.restSteps = stepsPerMeasure; // @worker-mutation
+            soloist.activeSteps = 0; // @worker-mutation
         }
-    }
 
-    if (soloist.isResting) {
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
-        // Check for break-out
-        if (soloist.restSteps <= 0 || coordination.bypassRhythm) {
-            // Find a good rhythmic entry point (e.g. downbeat or strong 8th)
-            const isGoodEntry =
-                isBeatStart || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
-            // Don't break out if we are in the 'rest' transition late in the measure
-            const preventBreakout =
-                isFinalMeasure &&
-                soloist.transitionState === 'rest' &&
-                Math.floor(measureStep / stepsPerBeat) >= Math.ceil(tsConfig.beats / 2);
+        // Safety Watchdog: Even if rest step reduction breaks, force out of rest after max rest steps
+        const absoluteMaxRest = Math.floor(stepsPerMeasure * (2.0 - intensity));
+        if (soloist.restSteps < -absoluteMaxRest) {
+            soloist.restSteps = 0; // @worker-mutation
+            soloist.phrasingState = 'call'; // @worker-mutation
+            soloist.motifCache = []; // @worker-mutation
+            soloist.notesInPhrase = 0; // @worker-mutation
+            soloist.activeSteps = stepsPerMeasure; // @worker-mutation
+            logDebug(`Watchdog forced state to Call after extended rest`);
+        } else {
+            // Check for natural break-out into a call
+            if (soloist.restSteps <= 0 || coordination.bypassRhythm) {
+                const isGoodEntry =
+                    isBeatStart || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
 
-            if (
-                !preventBreakout &&
-                (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure)
-            ) {
-                soloist.isResting = false; // @worker-mutation
-                soloist.notesInPhrase = 0; // @worker-mutation
-                // Calculate new active duration based on intensity and config
-                const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                const activeVal = baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5);
-                soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
-                logDebug(`Waking up for ~${soloist.activeSteps} steps`);
+                // Don't break out if we are in the 'rest' transition late in the measure
+                const preventBreakout =
+                    isFinalMeasure &&
+                    soloist.transitionState === 'rest' &&
+                    Math.floor(measureStep / stepsPerBeat) >= Math.ceil(tsConfig.beats / 2);
+
+                if (
+                    !preventBreakout &&
+                    (isGoodEntry ||
+                        coordination.bypassRhythm ||
+                        soloist.restSteps < -stepsPerMeasure)
+                ) {
+                    soloist.phrasingState = 'call'; // @worker-mutation
+                    soloist.motifCache = []; // @worker-mutation start recording new motif
+                    soloist.notesInPhrase = 0; // @worker-mutation
+                    const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
+                    const activeVal = baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5);
+                    soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
+                    soloist.phraseStartStep = step; // @worker-mutation
+                    logDebug(`Waking up for ~${soloist.activeSteps} steps (Call)`);
+                }
+            }
+            if (soloist.phrasingState === 'rest') {
+                return null; // Return null while resting
             }
         }
-        return null;
-    } else {
+    }
+
+    if (soloist.phrasingState !== 'rest') {
         soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
 
-        // Structural Awareness: Defer rest until a strong rhythmic boundary (end of measure or last beat)
+        // Structural Awareness: Defer state transitions until a strong rhythmic boundary
         const isEndOfMeasure = measureStep === stepsPerMeasure - 1;
         const isNearEndOfMeasure =
             measureStep >= (tsConfig.beats - 1) * stepsPerBeat && intensity > 0.5;
 
+        // Fluid State Transitions
         if (
             soloist.activeSteps <= 0 &&
             (isEndOfMeasure || isNearEndOfMeasure) &&
             !coordination.bypassRhythm
         ) {
-            soloist.isResting = true; // @worker-mutation
-            // Calculate rest duration based inversely on intensity
-            const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
+            const currentState = soloist.phrasingState;
 
-            // Phrase-Density Fatigue: Longer rests after busy phrases
-            const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
+            if (currentState === 'call') {
+                soloist.phrasingState = 'response'; // @worker-mutation
+                const activeVal =
+                    (soloist.motifCache
+                        ? soloist.motifCache.length * stepsPerBeat
+                        : stepsPerMeasure) *
+                    (0.8 + Math.random() * 0.4);
+                soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
+                soloist.phraseStartStep = step; // @worker-mutation
+                logDebug(`Transitioning to Response (~${soloist.activeSteps} steps)`);
+            } else if (currentState === 'response') {
+                soloist.phrasingState = Math.random() < 0.6 ? 'development' : 'resolution'; // @worker-mutation
+                const activeVal = stepsPerMeasure * (0.5 + Math.random());
+                soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
+                logDebug(`Transitioning to ${soloist.phrasingState}`);
+            } else if (currentState === 'development') {
+                soloist.phrasingState = 'resolution'; // @worker-mutation
+                soloist.activeSteps = stepsPerBeat * 2; // @worker-mutation short window to find a resolution note
+                logDebug(`Transitioning to Resolution`);
+            } else if (currentState === 'resolution') {
+                // Fallback Resolution: If we reached the end of resolution but haven't played a satisfying note,
+                // force one now on the nearest valid beat, but only if we are actually at a beat boundary.
+                if (soloist.activeSteps < -stepsPerMeasure) {
+                    // Hard limit to not wait forever
+                    soloist.phrasingState = 'rest'; // @worker-mutation
+                } else if (
+                    soloist.activeSteps <= 0 &&
+                    isBeatStart &&
+                    soloist.lastAttackStep !== step
+                ) {
+                    // Do not transition to rest yet, force a note resolution to happen on this beat
+                    // The Pitch Selection logic will strongly pull it to the chord tone.
+                } else if (soloist.activeSteps <= 0 && soloist.lastAttackStep === step) {
+                    // We just played a note on this step, it is our resolution. Time to rest.
+                    soloist.phrasingState = 'rest'; // @worker-mutation
+                    const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
+                    const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
+                    const restVal =
+                        stepsPerMeasure *
+                        restMultiplier *
+                        fatigueMultiplier *
+                        (0.5 + Math.random() * 1.5);
 
-            const restVal =
-                stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5);
-            soloist.restSteps = Math.floor(restVal); // @worker-mutation
-            if (soloist.restSteps < 4) {
-                soloist.restSteps = 4; // @worker-mutation minimum breath
+                    // Intensity Watchdog: Force max rest time inversely based on intensity
+                    let finalRestSteps = Math.floor(restVal);
+                    const maxRestSteps = Math.floor(stepsPerMeasure * (2.0 - intensity)); // 1 measure max at intensity=1.0, 2 measures at 0.0
+                    if (finalRestSteps > maxRestSteps) {
+                        finalRestSteps = maxRestSteps;
+                    }
+
+                    soloist.restSteps = finalRestSteps; // @worker-mutation
+                    if (soloist.restSteps < 4) {
+                        soloist.restSteps = 4; // @worker-mutation minimum breath
+                    }
+                    logDebug(`Transitioning to Rest for ~${soloist.restSteps} steps`);
+                    return null;
+                }
             }
-            logDebug(
-                `Resting for ~${soloist.restSteps} steps (Fatigue: ${fatigueMultiplier.toFixed(2)}x)`,
-            );
-            return null;
         }
     }
 
-    // --- 3. Rhythmic Density ---
+    // --- 3. Rhythmic Density & Layered Musicality ---
     // Resolve on Downbeat
     const isSectionDownbeat =
         step === coordination.sectionStart && soloist.transitionState === 'lead_in';
@@ -286,11 +347,39 @@ export function getSoloistNote(
     const emphasisIdx = (bIdx % 4) * 4 + (sInB % 4);
     const baseAttackProb = emphasisMap[emphasisIdx];
 
+    // Motif Masking: Recall cached rhythm during response
+    const phraseRelativeStep = step - (soloist.phraseStartStep || step);
+    let motifForcedAttack = false;
+    let expectedMotifInterval = null;
+    if (
+        soloist.phrasingState === 'response' &&
+        soloist.motifCache &&
+        soloist.motifCache.length > 0
+    ) {
+        const matchingMotifNote = soloist.motifCache.find(
+            (m) => m.relativeStep === phraseRelativeStep,
+        );
+        if (matchingMotifNote) {
+            // Apply strict mask: only allow attack if the base rhythm allows it too (safety fallback)
+            if (baseAttackProb > 0.1 || coordination.bypassRhythm) {
+                motifForcedAttack = true;
+                expectedMotifInterval = matchingMotifNote.interval;
+                logDebug(`Motif Mask Match at relative step ${phraseRelativeStep}`);
+            }
+        }
+    }
+
     // Session Warm-Up: Ramp density from 50% to 100% over first 64 steps
     const warmUpScale = Math.min(1.0, 0.5 + ((soloist.sessionSteps || 0) / 64) * 0.5);
 
     const intensityScale = 0.5 + intensity * 2.0;
     let attackProb = baseAttackProb * intensityScale * warmUpScale;
+
+    // Breathing Contours: Layer an 8-measure sine wave over the probability
+    const sinePeriod = stepsPerMeasure * 8;
+    const breathingPhase = (step % sinePeriod) / sinePeriod;
+    const breathingOffset = Math.sin(breathingPhase * Math.PI * 2) * 0.25; // +/- 0.25
+    attackProb += breathingOffset;
 
     // Rhythmic Simplification at Low Intensity:
     // Penalize syncopated/weak subdivisions (16ths and weak 8ths) heavily when band is quiet.
@@ -328,24 +417,76 @@ export function getSoloistNote(
         soloist.transitionState = null; // @worker-mutation (reset after resolution)
     }
 
-    if (Math.random() > attackProb) {
+    // Motif Mask enforces attack or rests, overriding randomness unless resolving
+    let shouldAttack = false;
+
+    // Force Fallback Resolution Attack
+    let isForcedFallbackResolution = false;
+    if (
+        soloist.phrasingState === 'resolution' &&
+        soloist.activeSteps <= 0 &&
+        isBeatStart &&
+        soloist.lastAttackStep !== step
+    ) {
+        shouldAttack = true;
+        isForcedFallbackResolution = true;
+        attackProb = 1.0;
+    }
+
+    if (isForcedFallbackResolution || isSectionDownbeat) {
+        shouldAttack = true;
+    } else if (
+        soloist.phrasingState === 'response' &&
+        soloist.motifCache &&
+        soloist.motifCache.length > 0
+    ) {
+        if (motifForcedAttack) {
+            shouldAttack = true;
+        } else if (
+            phraseRelativeStep < soloist.motifCache[soloist.motifCache.length - 1].relativeStep
+        ) {
+            // Force rest if we are still within the motif duration but there's no note
+            shouldAttack = false;
+        } else {
+            // Motif ended, fall back to normal probabilities
+            shouldAttack = Math.random() < attackProb;
+        }
+    } else {
+        shouldAttack = Math.random() < attackProb;
+    }
+
+    if (!shouldAttack) {
         return null;
     }
 
     // Increment heat for density fatigue
     soloist.notesInPhrase = (soloist.notesInPhrase || 0) + 1; // @worker-mutation
+    soloist.lastAttackStep = step; // @worker-mutation
 
     // --- 4. Pitch Selection ---
     CANDIDATE_WEIGHTS.fill(0);
 
-    // Harmonic Anticipation: Shift scale to upcoming chord 1 eighth-note (2 steps) before downbeat
+    // Harmonic Anticipation & Checkpoints
+    let structuralTargetChord = null;
+    let distanceToStructuralDownbeat = stepsPerMeasure;
+
+    if (isFinalMeasure && coordination.stepCoordination?.upcomingSectionFirstChord) {
+        structuralTargetChord = coordination.stepCoordination.upcomingSectionFirstChord;
+        distanceToStructuralDownbeat = remainingSteps;
+    } else if (!isFinalMeasure && coordination.stepCoordination?.upcomingMeasureChord) {
+        // Find next structural downbeat chord 1-2 measures ahead via stepCoordination
+        structuralTargetChord = coordination.stepCoordination.upcomingMeasureChord;
+        distanceToStructuralDownbeat = stepsPerMeasure - (step % stepsPerMeasure);
+    }
+
+    // Shift scale to upcoming chord 1 eighth-note (2 steps) before downbeat if leading in
     if (
         isFinalMeasure &&
         soloist.transitionState === 'lead_in' &&
         remainingSteps <= 2 &&
-        coordination.stepCoordination?.upcomingSectionFirstChord
+        structuralTargetChord
     ) {
-        targetChord = coordination.stepCoordination.upcomingSectionFirstChord;
+        targetChord = structuralTargetChord;
     }
 
     const scaleIntervals = getScaleForChord(targetChord, null, style);
@@ -398,29 +539,71 @@ export function getSoloistNote(
             weight += 150;
         }
 
-        // Target Note Resolution
-        // When leading in, we target the upcoming chord. On the downbeat, the 'upcoming chord' IS the current targetChord.
-        const resolutionChord = isSectionDownbeat
-            ? targetChord
-            : coordination.stepCoordination?.upcomingSectionFirstChord;
+        // Motif Recall Pitch Shifting: heavily weight the expected motif interval
+        if (soloist.phrasingState === 'response' && expectedMotifInterval !== null) {
+            if (interval === expectedMotifInterval) {
+                weight += 200; // Strongly pull toward the masked interval
+            }
+        }
 
+        // Transient Lick Dictionary Matching
+        let matchedLickNote = null;
         if (
-            (isFinalMeasure || isSectionDownbeat) &&
-            (soloist.transitionState === 'lead_in' || isSectionDownbeat) &&
-            resolutionChord
+            soloist.lickDictionary &&
+            soloist.lickDictionary.length > 0 &&
+            soloist.recentNotes &&
+            soloist.recentNotes.length >= 2
         ) {
+            const lastTwoNotes = soloist.recentNotes.slice(-2).map((n) => n.midi);
+
+            for (const lick of soloist.lickDictionary) {
+                // Check if the end of recentNotes matches the start of the lick
+                if (
+                    lick.sequence.length > 2 &&
+                    lastTwoNotes[0] === lick.sequence[0] &&
+                    lastTwoNotes[1] === lick.sequence[1]
+                ) {
+                    // Match found! We are looking for the 3rd note.
+                    matchedLickNote = lick.sequence[2];
+                    break;
+                }
+            }
+        }
+
+        if (matchedLickNote !== null && m === matchedLickNote) {
+            weight += 800; // Strong pull to complete the transient lick
+        }
+
+        // Target Note Resolution (Harmonic Checkpoints)
+        // Check if we are approaching a structural boundary (like the downbeat of a new section or next measure)
+        // and strongly pull the pitch toward the root or 3rd of that chord as it gets closer.
+        const resolutionChord = isSectionDownbeat ? targetChord : structuralTargetChord;
+
+        if (resolutionChord) {
             const upcomingRoot = resolutionChord.rootMidi;
-            // The 3rd interval is typically the second element in intervals array
             const upcoming3rd =
                 resolutionChord.intervals.length > 1 ? resolutionChord.intervals[1] : 4;
             const upcomingInterval = (pc - (upcomingRoot % 12) + 12) % 12;
 
-            // Walk toward target note (Root or 3rd) of the upcoming chord
+            // Is the candidate pitch the root or 3rd of the upcoming target chord?
             if (upcomingInterval === 0 || upcomingInterval === upcoming3rd % 12) {
-                if (isSectionDownbeat) {
-                    weight += 500; // Force resolution on downbeat
-                } else {
-                    weight += 100 + (stepsPerMeasure - remainingSteps) * 10; // Stronger pull as we get closer
+                if (isSectionDownbeat || isForcedFallbackResolution) {
+                    weight += 500; // Force resolution on downbeat or fallback
+                } else if (
+                    soloist.phrasingState === 'resolution' &&
+                    distanceToStructuralDownbeat <= stepsPerMeasure
+                ) {
+                    // Exponential multiplier pulling toward the checkpoint as we get closer (last measure)
+                    // At distance 16 (1 measure), weight is slightly boosted.
+                    // At distance 2 (1 eighth note), weight is heavily boosted.
+                    const distanceFactor = 1.0 - distanceToStructuralDownbeat / stepsPerMeasure;
+                    const exponentialPull = Math.pow(distanceFactor, 2) * 200;
+                    weight += 50 + exponentialPull;
+                } else if (
+                    soloist.transitionState === 'lead_in' &&
+                    distanceToStructuralDownbeat <= 8
+                ) {
+                    weight += 100 + (8 - distanceToStructuralDownbeat) * 15; // Linear pull for standard lead_in
                 }
             }
         }
@@ -538,6 +721,42 @@ export function getSoloistNote(
         durationSteps = 1;
     }
 
+    // Context Aware Durations: Calculate gap to next projected note
+    let gapToNextNote = 4; // default conservative lookahead
+    if (soloist.phrasingState === 'response' && soloist.motifCache) {
+        const nextMotifNote = soloist.motifCache.find((m) => m.relativeStep > phraseRelativeStep);
+        if (nextMotifNote) {
+            gapToNextNote = nextMotifNote.relativeStep - phraseRelativeStep;
+        } else {
+            gapToNextNote = stepsPerMeasure - (step % stepsPerMeasure); // gap to end of measure
+        }
+    } else {
+        // Find next emphasis peak
+        for (let nextOffset = 1; nextOffset <= 8; nextOffset++) {
+            const lookaheadStep = step + nextOffset;
+            const lbIdx = Math.floor((lookaheadStep % stepsPerMeasure) / 4);
+            const lsInB = (lookaheadStep % stepsPerMeasure) % 4;
+            const lEmphasisIdx = (lbIdx % 4) * 4 + (lsInB % 4);
+            if (emphasisMap[lEmphasisIdx] > 0.4) {
+                gapToNextNote = nextOffset;
+                break;
+            }
+        }
+    }
+
+    // Choose duration: connect the notes (legato) or staccato
+    const isLegato = Math.random() < (intensity < 0.5 ? 0.7 : 0.3);
+    if (isLegato) {
+        durationSteps = Math.min(8, gapToNextNote);
+    } else {
+        durationSteps = Math.max(1, Math.floor(gapToNextNote / 2));
+    }
+
+    // Override for short styles
+    if (['funk', 'disco', 'ska'].includes(activeStyle)) {
+        durationSteps = 1;
+    }
+
     // Dynamic Duration Scaling: Play longer, simpler notes at low intensity
     if (intensity < 0.5 && !isPolyphonic) {
         // At 0.1 intensity, 80% chance for a long note (4-8 steps).
@@ -545,7 +764,15 @@ export function getSoloistNote(
         const longNoteChance = 1.0 - intensity * 2.0;
         if (Math.random() < longNoteChance) {
             // Pick a longer duration that aligns with the beat
-            durationSteps = Math.random() < 0.5 ? 4 : 8; // Quarter or Half note
+            durationSteps = Math.max(durationSteps, Math.random() < 0.5 ? 4 : 8); // Quarter or Half note
+        }
+    }
+
+    // Ensure we don't bleed past the structural downbeat heavily if resolving
+    if (soloist.phrasingState === 'resolution') {
+        const remainingToDownbeat = stepsPerMeasure - (step % stepsPerMeasure);
+        if (remainingToDownbeat > 0) {
+            durationSteps = Math.min(durationSteps, remainingToDownbeat + 4);
         }
     }
 
@@ -587,6 +814,85 @@ export function getSoloistNote(
 
     if (result.durationSteps > 1) {
         soloist.busySteps = result.durationSteps - 1; // @worker-mutation
+    }
+
+    // Transient Lick Dictionary Scoring and Saving
+    if (!soloist.recentNotes) {
+        soloist.recentNotes = []; // @worker-mutation
+    }
+    soloist.recentNotes.push({
+        // @worker-mutation
+        midi: selectedMidi,
+        step: step,
+        isDownbeat: isDownbeat || isBackbeat,
+    });
+
+    // Keep only the last 4 notes for heuristic scoring
+    if (soloist.recentNotes.length > 4) {
+        soloist.recentNotes.shift(); // @worker-mutation
+    }
+
+    // Score the lick if we have 4 notes
+    if (soloist.recentNotes.length === 4) {
+        const notes = soloist.recentNotes;
+
+        // 1. Start on strong beat
+        const strongStart = notes[0].isDownbeat;
+
+        // 2. Resolve on strong chord tone
+        const resolveNote = notes[3].midi;
+        const relativeInterval = ((resolveNote % 12) - (targetChord.rootMidi % 12) + 12) % 12;
+        const targetChord3rd = targetChord.intervals.length > 1 ? targetChord.intervals[1] : 4;
+        const strongResolution =
+            relativeInterval === 0 ||
+            relativeInterval === targetChord3rd % 12 ||
+            relativeInterval === 7;
+
+        // 3. Stepwise motion
+        let stepwiseCount = 0;
+        for (let i = 1; i < 4; i++) {
+            const dist = Math.abs(notes[i].midi - notes[i - 1].midi);
+            if (dist > 0 && dist <= 4) {
+                stepwiseCount++;
+            }
+        }
+
+        if (strongStart && strongResolution && stepwiseCount >= 2) {
+            // Excellent lick, cache it
+            if (!soloist.lickDictionary) {
+                soloist.lickDictionary = []; // @worker-mutation
+            }
+            const lickSequence = notes.map((n) => n.midi);
+
+            // Check if lick already exists
+            const exists = soloist.lickDictionary.some(
+                (l) => l.sequence.join(',') === lickSequence.join(','),
+            );
+            if (!exists) {
+                soloist.lickDictionary.push({ sequence: lickSequence, score: stepwiseCount + 2 }); // @worker-mutation
+
+                // Keep dictionary small
+                if (soloist.lickDictionary.length > 3) {
+                    soloist.lickDictionary.shift(); // @worker-mutation
+                }
+                logDebug(`Cached strong transient lick!`);
+            }
+        }
+    }
+
+    // Save Motif if in Call state
+    if (soloist.phrasingState === 'call' && soloist.motifCache) {
+        if (soloist.motifCache.length < 16) {
+            // hard limit to keep memory tight
+            const relativeInterval = ((result.midi % 12) - (targetChord.rootMidi % 12) + 12) % 12;
+            soloist.motifCache.push({
+                // @worker-mutation
+                relativeStep: phraseRelativeStep,
+                interval: relativeInterval,
+                durationSteps: result.durationSteps,
+            });
+            logDebug(`Motif recorded: step ${phraseRelativeStep}, int ${relativeInterval}`);
+        }
     }
 
     const finalResult =

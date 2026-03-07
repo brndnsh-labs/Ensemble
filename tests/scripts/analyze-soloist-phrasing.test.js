@@ -97,10 +97,11 @@ describe('Soloist Phrasing Analysis', () => {
             activeSteps: 0,
             restSteps: 0,
             notesInPhrase: 0,
-            isResting: true,
+            phrasingState: 'rest',
             pitchHistory: [],
             deviceBuffer: [],
             motifBuffer: [],
+            motifCache: [],
             sessionSteps: 64, // Bypass warmup
         };
         mockState.playback.bandIntensity = intensity;
@@ -139,7 +140,7 @@ describe('Soloist Phrasing Analysis', () => {
                 continue;
             }
 
-            const wasResting = mockState.soloist.isResting;
+            const wasResting = mockState.soloist.phrasingState === 'rest';
             // Force wakeup at start
             const coordination = s === 0 ? { bypassRhythm: true } : {};
             const res = getSoloistNote(
@@ -153,7 +154,7 @@ describe('Soloist Phrasing Analysis', () => {
                 false,
                 coordination,
             );
-            const isResting = mockState.soloist.isResting;
+            const isResting = mockState.soloist.phrasingState === 'rest';
 
             if (!isResting) {
                 results.stepsPlaying++;
@@ -193,7 +194,7 @@ describe('Soloist Phrasing Analysis', () => {
 
         const playingRatio = (stats.stepsPlaying / stats.totalSteps) * 100;
         const avgNotesPerPhrase =
-            stats.phrases.length > 0 ? stats.totalNotes / stats.phrases.length : 0;
+            stats.phrases.length > 0 ? stats.totalNotes / stats.phrases.length : stats.totalNotes; // account for giant phrases
         const emptyPhraseRatio =
             stats.phrases.length > 0 ? (stats.emptyPhrases / stats.phrases.length) * 100 : 0;
 
@@ -208,7 +209,7 @@ describe('Soloist Phrasing Analysis', () => {
         );
         console.log(`Avg Notes per Phrase: ${avgNotesPerPhrase.toFixed(1)}`);
         console.log(
-            `Avg Phrase Duration: ${(stats.stepsPlaying / stats.phrases.length).toFixed(1)} steps`,
+            `Avg Phrase Duration: ${(stats.stepsPlaying / Math.max(1, stats.phrases.length)).toFixed(1)} steps`,
         );
         console.log(
             '============================================================================\n',
