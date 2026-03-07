@@ -65,7 +65,7 @@ function parseContourSkeleton(skeleton, targetChord, style, startMidi) {
     return buffer;
 }
 
-function extractDrumSkeleton(step, intensity, style, stepsPerMeasure, tsConfig) {
+function extractDrumSkeleton(step, intensity, _style, stepsPerMeasure, tsConfig) {
     const motif = [];
     const stateObj = getState();
     const { groove } = stateObj;
@@ -144,9 +144,14 @@ function extractDrumSkeleton(step, intensity, style, stepsPerMeasure, tsConfig) 
         }
     }
 
-    // If it's too sparse for some reason, fall back
+    // If it's too sparse for some reason, artificially pad it on strong beats
     if (motif.length < 2) {
-        return generateRhythmicMotif(intensity, style);
+        if (!motif.includes(0)) {
+            motif.push(0);
+        }
+        if (motif.length < 2 && !motif.includes(8)) {
+            motif.push(8);
+        }
     }
 
     return motif;
@@ -173,6 +178,11 @@ function generateRhythmicMotif(intensity, style) {
 
     for (let i = 0; i < Math.min(density, candidates.length); i++) {
         motif.push(candidates[i].step);
+    }
+
+    // Safety check: avoid completely silent generated motifs
+    if (motif.length === 0) {
+        motif.push(0, 8); // At least hit the downbeat and backbeat
     }
 
     return motif.sort((a, b) => a - b);
@@ -365,7 +375,14 @@ export function getSoloistNote(
 
     // Transition evaluation at structural points
     if (isHyperMeasureStart || (isFinalMeasure && isDownbeat)) {
-        if (soloist.phrasingState === 'rest' || soloist.phrasingState === 'IMPROV') {
+        // Only force a transition if we are resting, or if we naturally reached the end of an IMPROV phrase.
+        // Don't arbitrarily cut off an active, playing IMPROV phrase just because of a measure boundary.
+        const shouldTransition =
+            soloist.phrasingState === 'rest' ||
+            (soloist.phrasingState === 'IMPROV' &&
+                (soloist.activeSteps || 0) < stepsPerMeasure * 2);
+
+        if (shouldTransition) {
             soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
             if (soloist.transitionState === 'lead_in') {
                 soloist.phrasingState = 'HOOK'; // @worker-mutation
@@ -530,12 +547,16 @@ export function getSoloistNote(
         ) {
             if (currentState === 'HOOK') {
                 soloist.phrasingState = 'IMPROV'; // @worker-mutation
-                soloist.rhythmicMotif = []; // @worker-mutation
+                // We deliberately DO NOT clear the rhythmicMotif here.
+                // We keep it to "seed" the IMPROV state with a memorable framework.
                 soloist.isMotifLocked = false; // @worker-mutation
                 const baseLength = config.maxNotesPerPhrase * (0.2 + intensity * 0.6);
                 const activeVal = baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5);
                 soloist.activeSteps = Math.min(64, Math.floor(activeVal)); // @worker-mutation
-                logDebug(`Transitioning to IMPROV (~${soloist.activeSteps} steps)`);
+
+                // Track probability to retain the hook structure
+                soloist.hookRetentionProb = 0.5 + intensity * 0.3; // @worker-mutation
+                logDebug(`Transitioning to IMPROV (~${soloist.activeSteps} steps, retaining hook)`);
             } else if (currentState === 'IMPROV') {
                 soloist.phrasingState = 'rest'; // @worker-mutation
                 soloist.rhythmicMotif = []; // @worker-mutation
@@ -658,6 +679,16 @@ export function getSoloistNote(
     ) {
         // Enforce the prescribed rhythmic motif for Hook
         shouldAttack = soloist.rhythmicMotif.includes(measureStep);
+    } else if (
+        !coordination.bypassRhythm &&
+        soloist.phrasingState === 'IMPROV' &&
+        soloist.rhythmicMotif &&
+        soloist.rhythmicMotif.length > 0 &&
+        soloist.rhythmicMotif.includes(measureStep)
+    ) {
+        // Retain the motif framework heavily during Improv
+        const retainProb = soloist.hookRetentionProb ?? 0.7;
+        shouldAttack = Math.random() < retainProb;
     } else {
         shouldAttack = Math.random() < attackProb;
     }
