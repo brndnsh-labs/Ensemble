@@ -430,8 +430,8 @@ export function getSoloistNote(
 
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
-        // Safety Watchdog: Relaxed to allow longer breathing
-        const absoluteMaxRest = Math.floor(stepsPerMeasure * (2.0 - intensity));
+        // Safety Watchdog: Prevent excessive resting even at low intensities
+        const absoluteMaxRest = Math.floor(stepsPerMeasure * (1.5 - intensity * 0.5));
         if (soloist.restSteps < -absoluteMaxRest) {
             soloist.restSteps = 0; // @worker-mutation
             soloist.phrasingState = 'HOOK'; // @worker-mutation
@@ -539,14 +539,14 @@ export function getSoloistNote(
                 soloist.rhythmicMotif = []; // @worker-mutation
 
                 // Fatigue scaling based on notes played in phrase
-                const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
-                const baseRest = config.restBase * (1.5 - intensity * 0.5);
+                const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.02; // Reduced fatigue impact
+                const baseRest = config.restBase * (1.0 - intensity * 0.5); // Reduced base rest overall
                 const restVal =
-                    stepsPerMeasure * baseRest * fatigueMultiplier * (0.5 + Math.random() * 1.5);
+                    stepsPerMeasure * baseRest * fatigueMultiplier * (0.5 + Math.random() * 1.0); // Less wild randomness
 
                 let finalRestSteps = Math.floor(restVal);
-                // Increase the max rest steps slightly to hit the 5-10% empty measure target at high intensity
-                const maxRestSteps = Math.floor(stepsPerMeasure * (2.0 - intensity * 0.5));
+                // Ensure it rarely rests for more than a single measure at a time
+                const maxRestSteps = Math.floor(stepsPerMeasure * (1.5 - intensity * 0.5));
                 if (finalRestSteps > maxRestSteps) {
                     finalRestSteps = maxRestSteps;
                 }
