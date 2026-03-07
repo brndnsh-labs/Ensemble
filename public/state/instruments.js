@@ -86,6 +86,7 @@ export const soloist = {
     lastAttackStep: -100,
     phrasingState: 'rest',
     motifCache: null,
+    rhythmicMotif: [], // Template for current phrase
     lickDictionary: [],
     recentNotes: [],
     phraseStartStep: null,

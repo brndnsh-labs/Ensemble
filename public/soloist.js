@@ -18,6 +18,32 @@ export function getMelodyAtStep(melody, step) {
     return melody.find((n) => n.globalStep === step);
 }
 
+function generateRhythmicMotif(intensity, style) {
+    // Return an array of steps (0-15) that should have attacks
+    const motif = [];
+    // Catchy phrases usually have 3-5 notes per measure for hooks
+    const density = 3 + Math.floor(intensity * 2);
+
+    // Weighted probabilities for steps based on style
+    const weights = STYLE_EMPHASIS[style] || STYLE_EMPHASIS.scalar;
+
+    // Pick steps based on weights until we reach density
+    const candidates = [];
+    for (let i = 0; i < 16; i++) {
+        // Favor stronger beats for motifs
+        const strength = weights[i];
+        candidates.push({ step: i, weight: strength * (0.5 + Math.random() * 0.5) });
+    }
+
+    candidates.sort((a, b) => b.weight - a.weight);
+
+    for (let i = 0; i < Math.min(density, candidates.length); i++) {
+        motif.push(candidates[i].step);
+    }
+
+    return motif.sort((a, b) => a - b);
+}
+
 export function getSoloistNote(
     currentChord,
     nextChord,
@@ -194,7 +220,9 @@ export function getSoloistNote(
             soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
             if (soloist.transitionState === 'lead_in') {
                 soloist.phrasingState = 'call'; // @worker-mutation
-                soloist.phraseStartStep = step; // @worker-mutation
+                soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+                soloist.phraseStartStep = null; // @worker-mutation (set on first attack)
+                soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
                 soloist.motifCache = []; // @worker-mutation reset motif for new call
             }
             logDebug(`Selected transition state: ${soloist.transitionState}`);
@@ -208,20 +236,22 @@ export function getSoloistNote(
     if (soloist.phrasingState === undefined || soloist.phrasingState === 'rest') {
         if (soloist.phrasingState === undefined) {
             soloist.phrasingState = 'rest'; // @worker-mutation
-            soloist.restSteps = stepsPerMeasure; // @worker-mutation
+            soloist.restSteps = stepsPerBeat * 2; // @worker-mutation (short initial breath)
             soloist.activeSteps = 0; // @worker-mutation
         }
 
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
         // Safety Watchdog: Even if rest step reduction breaks, force out of rest after max rest steps
-        const absoluteMaxRest = Math.floor(stepsPerMeasure * (1.5 - intensity * 1.0));
+        const absoluteMaxRest = Math.floor(stepsPerMeasure * (1.0 - intensity * 0.5));
         if (soloist.restSteps < -absoluteMaxRest) {
             soloist.restSteps = 0; // @worker-mutation
             soloist.phrasingState = 'call'; // @worker-mutation
+            soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
             soloist.motifCache = []; // @worker-mutation
             soloist.notesInPhrase = 0; // @worker-mutation
             soloist.activeSteps = stepsPerMeasure; // @worker-mutation
+            soloist.phraseStartStep = null; // @worker-mutation
             logDebug(`Watchdog forced state to Call after extended rest`);
         } else {
             // Check for natural break-out into a call
@@ -242,13 +272,12 @@ export function getSoloistNote(
                         soloist.restSteps < -stepsPerMeasure)
                 ) {
                     soloist.phrasingState = 'call'; // @worker-mutation
+                    soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
                     soloist.motifCache = []; // @worker-mutation start recording new motif
                     soloist.notesInPhrase = 0; // @worker-mutation
-                    const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                    const activeVal = baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5);
-                    soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
-                    soloist.phraseStartStep = step; // @worker-mutation
-                    logDebug(`Waking up for ~${soloist.activeSteps} steps (Call)`);
+                    soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
+                    soloist.phraseStartStep = null; // @worker-mutation (set on first attack)
+                    logDebug(`Waking up for Call (~${soloist.activeSteps} steps)`);
                 }
             }
             if (soloist.phrasingState === 'rest') {
@@ -259,6 +288,18 @@ export function getSoloistNote(
 
     if (soloist.phrasingState !== 'rest') {
         soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
+
+        const currentState = soloist.phrasingState;
+
+        // Resolution State Safety: Break out if window missed
+        if (currentState === 'resolution') {
+            if (soloist.activeSteps < -stepsPerMeasure) {
+                soloist.phrasingState = 'rest'; // @worker-mutation
+                soloist.rhythmicMotif = []; // @worker-mutation
+                soloist.restSteps = stepsPerMeasure; // @worker-mutation (force a breath)
+                return null;
+            }
+        }
 
         // Structural Awareness: Defer state transitions until a strong rhythmic boundary
         const isEndOfMeasure = measureStep === stepsPerMeasure - 1;
@@ -271,68 +312,29 @@ export function getSoloistNote(
             (isEndOfMeasure || isNearEndOfMeasure) &&
             !coordination.bypassRhythm
         ) {
-            const currentState = soloist.phrasingState;
-
             if (currentState === 'call') {
                 soloist.phrasingState = 'response'; // @worker-mutation
-                const activeVal =
-                    (soloist.motifCache
-                        ? soloist.motifCache.length * stepsPerBeat
-                        : stepsPerMeasure) *
-                    (0.8 + Math.random() * 0.4);
-                soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
+                soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure response)
                 soloist.phraseStartStep = step; // @worker-mutation
                 logDebug(`Transitioning to Response (~${soloist.activeSteps} steps)`);
             } else if (currentState === 'response') {
                 soloist.phrasingState = Math.random() < 0.6 ? 'development' : 'resolution'; // @worker-mutation
-                const activeVal = stepsPerMeasure * (0.5 + Math.random());
-                soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
+                soloist.rhythmicMotif = []; // @worker-mutation (break the hook for shredding)
+                const baseLength = config.maxNotesPerPhrase * (0.2 + intensity * 0.5); // Reduced base length
+                const activeVal = baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5);
+                soloist.activeSteps = Math.min(64, Math.floor(activeVal)); // @worker-mutation (Capped at 4 measures)
                 logDebug(`Transitioning to ${soloist.phrasingState}`);
             } else if (currentState === 'development') {
                 soloist.phrasingState = 'resolution'; // @worker-mutation
+                soloist.rhythmicMotif = []; // @worker-mutation
                 soloist.activeSteps = stepsPerBeat * 2; // @worker-mutation short window to find a resolution note
                 logDebug(`Transitioning to Resolution`);
-            } else if (currentState === 'resolution') {
-                // Fallback Resolution: If we reached the end of resolution but haven't played a satisfying note,
-                // force one now on the nearest valid beat, but only if we are actually at a beat boundary.
-                if (soloist.activeSteps < -stepsPerMeasure) {
-                    // Hard limit to not wait forever
-                    soloist.phrasingState = 'rest'; // @worker-mutation
-                } else if (
-                    soloist.activeSteps <= 0 &&
-                    isBeatStart &&
-                    soloist.lastAttackStep !== step
-                ) {
-                    // Do not transition to rest yet, force a note resolution to happen on this beat
-                    // The Pitch Selection logic will strongly pull it to the chord tone.
-                } else if (soloist.activeSteps <= 0 && soloist.lastAttackStep === step) {
-                    // We just played a note on this step, it is our resolution. Time to rest.
-                    soloist.phrasingState = 'rest'; // @worker-mutation
-                    const restMultiplier = config.restBase * (1.5 - intensity * 1.0); // reduced from 2.0 to 1.5 to shorten base rests
-                    const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
-                    const restVal =
-                        stepsPerMeasure *
-                        restMultiplier *
-                        fatigueMultiplier *
-                        (0.5 + Math.random() * 1.0); // reduced max randomness from 1.5 to 1.0
-
-                    // Intensity Watchdog: Force max rest time inversely based on intensity
-                    let finalRestSteps = Math.floor(restVal);
-                    // 0.5 measures max at intensity=1.0, 1.5 measures at 0.0
-                    const maxRestSteps = Math.floor(stepsPerMeasure * (1.5 - intensity * 1.0));
-                    if (finalRestSteps > maxRestSteps) {
-                        finalRestSteps = maxRestSteps;
-                    }
-
-                    soloist.restSteps = finalRestSteps; // @worker-mutation
-                    if (soloist.restSteps < 4) {
-                        soloist.restSteps = 4; // @worker-mutation minimum breath
-                    }
-                    logDebug(`Transitioning to Rest for ~${soloist.restSteps} steps`);
-                    return null;
-                }
             }
         }
+    }
+
+    if (soloist.phrasingState === 'rest') {
+        return null;
     }
 
     // --- 3. Rhythmic Density & Layered Musicality ---
@@ -370,11 +372,15 @@ export function getSoloistNote(
         }
     }
 
-    // Session Warm-Up: Ramp density from 50% to 100% over first 64 steps
     const warmUpScale = Math.min(1.0, 0.5 + ((soloist.sessionSteps || 0) / 64) * 0.5);
 
-    const intensityScale = 0.5 + intensity * 2.0;
+    const intensityScale = 0.3 + intensity * 1.2; // Scale density with intensity
     let attackProb = baseAttackProb * intensityScale * warmUpScale;
+
+    // Phrase Contextual Scaling
+    if (soloist.phrasingState === 'resolution') {
+        attackProb *= 0.4; // Resolutions are sparse landings
+    }
 
     // Breathing Contours: Layer an 8-measure sine wave over the probability
     const sinePeriod = stepsPerMeasure * 8;
@@ -437,6 +443,14 @@ export function getSoloistNote(
     if (isForcedFallbackResolution || isSectionDownbeat) {
         shouldAttack = true;
     } else if (
+        !coordination.bypassRhythm &&
+        (soloist.phrasingState === 'call' || soloist.phrasingState === 'response') &&
+        soloist.rhythmicMotif &&
+        soloist.rhythmicMotif.length > 0
+    ) {
+        // Enforce the prescribed rhythmic motif for Hook and Echo
+        shouldAttack = soloist.rhythmicMotif.includes(step % 16);
+    } else if (
         soloist.phrasingState === 'response' &&
         soloist.motifCache &&
         soloist.motifCache.length > 0
@@ -463,6 +477,12 @@ export function getSoloistNote(
     // Increment heat for density fatigue
     soloist.notesInPhrase = (soloist.notesInPhrase || 0) + 1; // @worker-mutation
     soloist.lastAttackStep = step; // @worker-mutation
+
+    // Initialize phraseStartStep on the first attack to prevent leading rests in motif
+    if (soloist.phrasingState === 'call' && soloist.phraseStartStep === null) {
+        soloist.phraseStartStep = step; // @worker-mutation
+        logDebug(`Call phrase actual start at step ${step}`);
+    }
 
     // --- 4. Pitch Selection ---
     CANDIDATE_WEIGHTS.fill(0);
@@ -718,6 +738,9 @@ export function getSoloistNote(
 
     // --- 6. Duration & Velocity ---
     let durationSteps = activeStyle === 'bird' ? 2 : Math.random() < 0.6 ? 2 : 4;
+    if (activeStyle === 'neo') {
+        durationSteps = 4; // Neo-Soul defaults to longer, soulful notes
+    }
     if (['funk', 'disco', 'ska'].includes(activeStyle)) {
         durationSteps = 1;
     }
@@ -738,7 +761,8 @@ export function getSoloistNote(
             const lbIdx = Math.floor((lookaheadStep % stepsPerMeasure) / 4);
             const lsInB = (lookaheadStep % stepsPerMeasure) % 4;
             const lEmphasisIdx = (lbIdx % 4) * 4 + (lsInB % 4);
-            if (emphasisMap[lEmphasisIdx] > 0.4) {
+            const lookaheadThreshold = activeStyle === 'neo' ? 0.85 : 0.4;
+            if (emphasisMap[lEmphasisIdx] > lookaheadThreshold) {
                 gapToNextNote = nextOffset;
                 break;
             }
@@ -776,6 +800,9 @@ export function getSoloistNote(
             durationSteps = Math.min(durationSteps, remainingToDownbeat + 4);
         }
     }
+
+    // Hard maximum for duration to prevent "stuck" notes
+    durationSteps = Math.min(8, durationSteps);
 
     const baseVelocity = 0.6 + intensity * 0.4;
     const isImportantStep = stepInBeat === 0 || stepInBeat === Math.floor(stepsPerBeat / 2);
@@ -883,21 +910,7 @@ export function getSoloistNote(
 
     // Save Motif if in Call state
     if (soloist.phrasingState === 'call' && soloist.motifCache) {
-        // Stop recording the motif if we have rested for more than 1 measure
-        // or if the motif itself has extended past 1.5 measures to prevent large silences from being repeated
-        let isHugeGap = false;
-        if (soloist.motifCache.length > 0) {
-            const lastMotifNote = soloist.motifCache[soloist.motifCache.length - 1];
-            if (phraseRelativeStep - lastMotifNote.relativeStep >= stepsPerMeasure) {
-                isHugeGap = true;
-            }
-        }
-
-        if (
-            soloist.motifCache.length < 16 &&
-            phraseRelativeStep < stepsPerMeasure * 1.5 &&
-            !isHugeGap
-        ) {
+        if (soloist.motifCache.length < 16) {
             // hard limit to keep memory tight
             const relativeInterval = ((result.midi % 12) - (targetChord.rootMidi % 12) + 12) % 12;
             soloist.motifCache.push({
@@ -921,6 +934,28 @@ export function getSoloistNote(
                   { ...result, midi: Math.max(minMidi, Math.min(maxMidi, result.midi)) },
               ]
             : { ...result, midi: Math.max(minMidi, Math.min(maxMidi, result.midi)) };
+
+    // Immediate transition to rest after playing a resolution note
+    if (soloist.phrasingState === 'resolution' && soloist.lastAttackStep === step) {
+        soloist.phrasingState = 'rest'; // @worker-mutation
+        soloist.rhythmicMotif = []; // @worker-mutation
+        const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
+        const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.02;
+        const restVal =
+            stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5);
+
+        let finalRestSteps = Math.floor(restVal);
+        const maxRestSteps = Math.floor(stepsPerMeasure * (0.75 - intensity * 0.25)); // 0.5 measure max at intensity=1.0, 0.75 measure at 0.0
+        if (finalRestSteps > maxRestSteps) {
+            finalRestSteps = maxRestSteps;
+        }
+
+        soloist.restSteps = finalRestSteps; // @worker-mutation
+        if (soloist.restSteps < 4) {
+            soloist.restSteps = 4; // @worker-mutation minimum breath
+        }
+        logDebug(`Resolution hit. Transitioning to Rest for ~${soloist.restSteps} steps`);
+    }
 
     return finalizeNote(finalResult);
 }
