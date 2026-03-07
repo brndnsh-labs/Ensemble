@@ -340,24 +340,10 @@ describe('Bass Engine Logic', () => {
             return maxOverlaps;
         };
 
-        it('should not have overlapping notes in Rock style', () => {
-            expect(checkOverlaps('rock')).toBeLessThanOrEqual(1);
-        });
-
-        it('should not have overlapping notes in Jazz Walking style', () => {
-            expect(checkOverlaps('quarter')).toBeLessThanOrEqual(1);
-        });
-
-        it('should not have overlapping notes in Funk style', () => {
-            expect(checkOverlaps('funk')).toBeLessThanOrEqual(1);
-        });
-
-        it('should not have overlapping notes in Disco style', () => {
-            expect(checkOverlaps('disco')).toBeLessThanOrEqual(1);
-        });
-
-        it('should not have overlapping notes in Neo-Soul style', () => {
-            expect(checkOverlaps('neo')).toBeLessThanOrEqual(1);
+        ['rock', 'quarter', 'funk', 'disco', 'neo'].forEach((style) => {
+            it(`should not have overlapping notes in ${style} style`, () => {
+                expect(checkOverlaps(style)).toBeLessThanOrEqual(1);
+            });
         });
     });
 });

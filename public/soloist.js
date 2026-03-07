@@ -12,13 +12,6 @@ import { calculateTimingOffset, getFrequency } from './utils.js';
 
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 
-export function getMelodyAtStep(melody, step) {
-    if (!melody || melody.length === 0) {
-        return null;
-    }
-    return melody.find((n) => n.globalStep === step);
-}
-
 function parseContourSkeleton(skeleton, targetChord, style, startMidi) {
     if (!skeleton || skeleton.length === 0) {
         return null;

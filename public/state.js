@@ -45,13 +45,6 @@ export function getState() {
 export {
     playback,
     arranger,
-    chords,
-    bass,
-    soloist,
-    harmony,
-    groove,
-    midi,
-    vizState,
     playbackReducer,
     arrangerReducer,
     instrumentReducer,

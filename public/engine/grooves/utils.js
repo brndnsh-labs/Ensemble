@@ -23,13 +23,6 @@ export function scaleVelocity(base, intensity, factor = 0.2) {
 }
 
 /**
- * Adds random jitter to a value.
- */
-export function jitter(value, amount = 0.1) {
-    return value + (Math.random() - 0.5) * amount;
-}
-
-/**
  * Default configuration for drum strategies.
  */
 export const DEFAULT_CONFIG = {

@@ -55,40 +55,20 @@ describe('Session Timer Intensity Arc', () => {
         return conductorState.target;
     };
 
-    it('should keep intensity low during Warmup (0-15%)', () => {
-        // 1 minute in (10%)
-        const target = runTransitionCheck(1);
-        expect(target).toBeGreaterThanOrEqual(0.2);
-        expect(target).toBeLessThanOrEqual(0.55); // Ceiling 0.45 + variance
-    });
+    const phases = [
+        { phase: 'Warmup (0-15%)', time: 1, min: 0.2, max: 0.55 },
+        { phase: 'Development (15-40%)', time: 3, min: 0.4, max: 0.8 },
+        { phase: 'Mid-Session (40-65%)', time: 5, min: 0.5, max: 0.9 },
+        { phase: 'Climax (65-85%)', time: 7.5, min: 0.7, max: 1.0 },
+        { phase: 'cool down at the end (85-100%)', time: 9.5, min: 0.2, max: 0.6 },
+    ];
 
-    it('should build intensity during Development (15-40%)', () => {
-        // 3 minutes in (30%)
-        const target = runTransitionCheck(3);
-        expect(target).toBeGreaterThanOrEqual(0.4);
-        expect(target).toBeLessThanOrEqual(0.8); // Ceiling 0.7 + variance
-    });
-
-    it('should stay in the pocket during Mid-Session (40-65%)', () => {
-        // 5 minutes in (50%)
-        const target = runTransitionCheck(5);
-        expect(target).toBeGreaterThanOrEqual(0.5);
-        expect(target).toBeLessThanOrEqual(0.9); // Ceiling 0.8 + variance
-    });
-
-    it('should reach peak intensity during Climax (65-85%)', () => {
-        // 7.5 minutes in (75%)
-        const target = runTransitionCheck(7.5);
-        expect(target).toBeGreaterThanOrEqual(0.7);
-        // Ceiling 1.0 + variance could go over 1.0 but clamped to 1.0
-        expect(target).toBeLessThanOrEqual(1.0);
-    });
-
-    it('should cool down at the end (85-100%)', () => {
-        // 9.5 minutes in (95%)
-        const target = runTransitionCheck(9.5);
-        expect(target).toBeGreaterThanOrEqual(0.2);
-        expect(target).toBeLessThanOrEqual(0.6); // Ceiling 0.5 + variance
+    phases.forEach(({ phase, time, min, max }) => {
+        it(`should control intensity during ${phase}`, () => {
+            const target = runTransitionCheck(time);
+            expect(target).toBeGreaterThanOrEqual(min);
+            expect(target).toBeLessThanOrEqual(max);
+        });
     });
 
     it('should fall back to loop-based logic if session timer is 0', () => {

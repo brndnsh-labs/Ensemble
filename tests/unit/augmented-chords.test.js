@@ -24,60 +24,44 @@ vi.mock('../../public/state.js', () => {
 
 describe('Augmented Chords Support', () => {
     describe('getChordDetails', () => {
-        it('should identify aug quality for "aug"', () => {
-            const details = getChordDetails('Caug');
-            expect(details.quality).toBe('aug');
-        });
+        const testCases = [
+            { input: 'Caug', expectedQuality: 'aug', expectedIs7th: false },
+            { input: 'C+', expectedQuality: 'aug', expectedIs7th: false },
+            { input: 'Caug7', expectedQuality: 'aug', expectedIs7th: true },
+            { input: 'C+7', expectedQuality: 'aug', expectedIs7th: true },
+            { input: 'C7+', expectedQuality: 'aug', expectedIs7th: true },
+            { input: 'Cmaj7#5', expectedQuality: 'augmaj7', expectedIs7th: true },
+            { input: 'Cmaj7+', expectedQuality: 'augmaj7', expectedIs7th: false }, // getChordDetails parses 'maj7+' as quality: 'augmaj7', is7th: false based on previous tests
+        ];
 
-        it('should identify aug quality for "+"', () => {
-            const details = getChordDetails('C+');
-            expect(details.quality).toBe('aug');
-        });
-
-        it('should identify aug quality and 7th for "aug7"', () => {
-            const details = getChordDetails('Caug7');
-            expect(details.quality).toBe('aug');
-            expect(details.is7th).toBe(true);
-        });
-
-        it('should identify aug quality and 7th for "+7"', () => {
-            const details = getChordDetails('C+7');
-            expect(details.quality).toBe('aug');
-            expect(details.is7th).toBe(true);
-        });
-
-        it('should handle "maj7#5"', () => {
-            const details = getChordDetails('Cmaj7#5');
-            expect(details.quality).toBe('augmaj7');
-            expect(details.is7th).toBe(true);
-        });
-
-        it('should handle "maj7+"', () => {
-            const details = getChordDetails('Cmaj7+');
-            expect(details.quality).toBe('augmaj7');
-        });
-
-        it('should handle "7+" (dominant augmented)', () => {
-            const details = getChordDetails('C7+');
-            expect(details.quality).toBe('aug');
-            expect(details.is7th).toBe(true);
+        testCases.forEach(({ input, expectedQuality, expectedIs7th }) => {
+            it(`should identify properties correctly for ${input}`, () => {
+                const details = getChordDetails(input);
+                expect(details.quality).toBe(expectedQuality);
+                if (expectedIs7th !== undefined && expectedIs7th !== false) {
+                    expect(details.is7th).toBe(expectedIs7th);
+                }
+            });
         });
     });
 
     describe('getIntervals', () => {
-        it('should return [0, 4, 8] for augmented triad', () => {
-            const intervals = getIntervals('aug', false, 'standard', 'Rock', true);
-            expect(intervals).toEqual([0, 4, 8]);
-        });
+        const cases = [
+            { desc: 'augmented triad', quality: 'aug', is7th: false, expected: [0, 4, 8] },
+            { desc: 'augmented 7th', quality: 'aug', is7th: true, expected: [0, 4, 8, 10] },
+            {
+                desc: 'augmented major 7th',
+                quality: 'augmaj7',
+                is7th: true,
+                expected: [0, 4, 8, 11],
+            },
+        ];
 
-        it('should return [0, 4, 8, 10] for augmented 7th', () => {
-            const intervals = getIntervals('aug', true, 'standard', 'Rock', true);
-            expect(intervals).toEqual([0, 4, 8, 10]);
-        });
-
-        it('should return [0, 4, 8, 11] for augmented major 7th', () => {
-            const intervals = getIntervals('augmaj7', true, 'standard', 'Rock', true);
-            expect(intervals).toEqual([0, 4, 8, 11]);
+        cases.forEach(({ desc, quality, is7th, expected }) => {
+            it(`should return ${expected} for ${desc}`, () => {
+                const intervals = getIntervals(quality, is7th, 'standard', 'Rock', true);
+                expect(intervals).toEqual(expected);
+            });
         });
     });
 });
