@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from './config.js';
+import { getDrumMotif } from './engine/groove-engine.js';
 import { GENRE_STYLE_MAPPING, STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
 import {
     generateEmbellishment,
@@ -69,6 +70,93 @@ function parseContourSkeleton(skeleton, targetChord, style, startMidi) {
     }
 
     return buffer;
+}
+
+function extractDrumSkeleton(step, intensity, style, stepsPerMeasure, tsConfig) {
+    const motif = [];
+    const stateObj = getState();
+    const { groove } = stateObj;
+
+    // We map the deterministic motif IDs from getDrumMotif to rhythmic skeletons
+    // to match the requested constraints without simulating the context-heavy engine state
+    const barIndex = Math.floor(step / stepsPerMeasure);
+    const sectionSeed = ((barIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
+    const complexity = groove.creativity ? 0.8 : 0.3;
+    const motifId = getDrumMotif(sectionSeed, groove.genreFeel, complexity, intensity);
+
+    // For generating skeletons based on motif IDs, we want to hit the busy subdivisions
+    for (let i = 0; i < stepsPerMeasure; i++) {
+        const isBeatStart = i % tsConfig.stepsPerBeat === 0;
+        const beatIndex = Math.floor(i / tsConfig.stepsPerBeat);
+
+        let isBackbeat = false;
+        if (tsConfig.beats === 4) {
+            isBackbeat = beatIndex === 1 || beatIndex === 3;
+        } else if (tsConfig.beats === 3) {
+            isBackbeat = beatIndex === 2;
+        }
+
+        const isOffbeat = i % tsConfig.stepsPerBeat === Math.floor(tsConfig.stepsPerBeat / 2);
+        const isEOfBeat = i % tsConfig.stepsPerBeat === Math.floor(tsConfig.stepsPerBeat / 4);
+        const isAOfBeat = i % tsConfig.stepsPerBeat === Math.floor((tsConfig.stepsPerBeat * 3) / 4);
+
+        let hit = false;
+
+        // Base 8th note / backbeat pocket for motif 0 (Simple/Grounded)
+        if (motifId === 0) {
+            if (isBeatStart || isBackbeat) {
+                hit = true;
+            } else if (isOffbeat && intensity > 0.4) {
+                hit = true;
+            }
+        }
+        // Syncopated / Ghost Note Heavy for motif 1
+        else if (motifId === 1) {
+            if (isBeatStart || isBackbeat || isOffbeat) {
+                hit = true;
+            } else if ((isEOfBeat && beatIndex === 1) || (isAOfBeat && beatIndex === 2)) {
+                hit = true;
+            }
+        }
+        // Displaced Backbeats / Heavily Syncopated for motif 2
+        else if (motifId === 2) {
+            if (isBeatStart && !isBackbeat) {
+                hit = true;
+            } else if (isBackbeat && beatIndex === 1) {
+                hit = true; // Beat 2 solid
+            } else if (isOffbeat && beatIndex === 3) {
+                hit = true; // Beat 4 pushed
+            } else if ((isAOfBeat && beatIndex === 1) || (isEOfBeat && beatIndex === 2)) {
+                hit = true; // Pickups
+            }
+        }
+        // Busy Linear (16th note heavy) for motif 3
+        else if (motifId >= 3) {
+            if (isBeatStart || isBackbeat || isOffbeat) {
+                hit = true;
+            } else if (isAOfBeat && (beatIndex === 0 || beatIndex === 1 || beatIndex === 3)) {
+                hit = true;
+            } else if (isEOfBeat && (beatIndex === 2 || beatIndex === 1)) {
+                hit = true;
+            }
+        }
+
+        // Additional fallback: Always capture backbeat if we missed it
+        if (isBackbeat && motifId !== 2) {
+            hit = true;
+        }
+
+        if (hit) {
+            motif.push(i);
+        }
+    }
+
+    // If it's too sparse for some reason, fall back
+    if (motif.length < 2) {
+        return generateRhythmicMotif(intensity, style);
+    }
+
+    return motif;
 }
 
 function generateRhythmicMotif(intensity, style) {
@@ -284,38 +372,57 @@ export function getSoloistNote(
 
     // Transition evaluation at structural points
     if (isHyperMeasureStart || (isFinalMeasure && isDownbeat)) {
-        if (soloist.phrasingState === 'rest' || soloist.phrasingState === 'resolution') {
+        if (
+            soloist.phrasingState === 'rest' ||
+            soloist.phrasingState === 'resolution' ||
+            soloist.phrasingState === 'motif_lock'
+        ) {
+            // Allow breaking out of motif_lock at structural points
             soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
             if (soloist.transitionState === 'lead_in') {
-                soloist.phrasingState = 'call'; // @worker-mutation
+                soloist.phrasingState = soloist.motifTracking ? 'motif_lock' : 'call'; // @worker-mutation
 
                 const phrasingIntensity = soloist.phrasingIntensity ?? 0.5;
-                const useSkeleton =
-                    config.contourSkeletons && Math.random() < 0.6 + phrasingIntensity * 0.1;
-                if (useSkeleton && config.contourSkeletons.length > 0) {
-                    const skeleton =
-                        config.contourSkeletons[
-                            Math.floor(Math.random() * config.contourSkeletons.length)
-                        ];
-                    const startMidi = lastMidi;
-                    const buffer = parseContourSkeleton(
-                        skeleton,
-                        targetChord,
+                if (soloist.phrasingState === 'motif_lock') {
+                    soloist.rhythmicMotif = extractDrumSkeleton(
+                        // @worker-mutation
+                        step,
+                        intensity,
                         activeStyle,
-                        startMidi,
+                        stepsPerMeasure,
+                        tsConfig,
                     );
-                    if (buffer && buffer.length > 0) {
-                        soloist.hookBuffer = buffer; // @worker-mutation
-                    }
+                    soloist.activeSteps = stepsPerMeasure * measuresPerBlock; // @worker-mutation
                 } else {
-                    soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
-                }
+                    const useSkeleton =
+                        config.contourSkeletons && Math.random() < 0.6 + phrasingIntensity * 0.1;
+                    if (useSkeleton && config.contourSkeletons.length > 0) {
+                        const skeleton =
+                            config.contourSkeletons[
+                                Math.floor(Math.random() * config.contourSkeletons.length)
+                            ];
+                        const startMidi = lastMidi;
+                        const buffer = parseContourSkeleton(
+                            skeleton,
+                            targetChord,
+                            activeStyle,
+                            startMidi,
+                        );
+                        if (buffer && buffer.length > 0) {
+                            soloist.hookBuffer = buffer; // @worker-mutation
+                        }
+                    } else {
+                        soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+                    }
 
-                soloist.phraseStartStep = null; // @worker-mutation (set on first attack)
-                soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
-                soloist.motifCache = []; // @worker-mutation reset motif for new call
+                    soloist.phraseStartStep = null; // @worker-mutation (set on first attack)
+                    soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
+                    soloist.motifCache = []; // @worker-mutation reset motif for new call
+                }
             }
-            logDebug(`Selected transition state: ${soloist.transitionState}`);
+            logDebug(
+                `Selected transition state: ${soloist.transitionState} (phrasingState: ${soloist.phrasingState})`,
+            );
         }
     } else if (!isFinalMeasure && step !== coordination.sectionStart) {
         // Only reset transition if we are past the downbeat, so we can use it to resolve on step 0
@@ -361,35 +468,52 @@ export function getSoloistNote(
                         coordination.bypassRhythm ||
                         soloist.restSteps < -stepsPerMeasure)
                 ) {
-                    soloist.phrasingState = 'call'; // @worker-mutation
+                    soloist.phrasingState = soloist.motifTracking ? 'motif_lock' : 'call'; // @worker-mutation
 
-                    const phrasingIntensity = soloist.phrasingIntensity ?? 0.5;
-                    const useSkeleton =
-                        config.contourSkeletons && Math.random() < 0.6 + phrasingIntensity * 0.1;
-                    if (useSkeleton && config.contourSkeletons.length > 0) {
-                        const skeleton =
-                            config.contourSkeletons[
-                                Math.floor(Math.random() * config.contourSkeletons.length)
-                            ];
-                        const startMidi = lastMidi;
-                        const buffer = parseContourSkeleton(
-                            skeleton,
-                            targetChord,
+                    if (soloist.phrasingState === 'motif_lock') {
+                        soloist.rhythmicMotif = extractDrumSkeleton(
+                            // @worker-mutation
+                            step,
+                            intensity,
                             activeStyle,
-                            startMidi,
+                            stepsPerMeasure,
+                            tsConfig,
                         );
-                        if (buffer && buffer.length > 0) {
-                            soloist.hookBuffer = buffer; // @worker-mutation
-                        }
+                        soloist.activeSteps = stepsPerMeasure * measuresPerBlock; // @worker-mutation
                     } else {
-                        soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+                        const phrasingIntensity = soloist.phrasingIntensity ?? 0.5;
+                        const useSkeleton =
+                            config.contourSkeletons &&
+                            Math.random() < 0.6 + phrasingIntensity * 0.1;
+                        if (useSkeleton && config.contourSkeletons.length > 0) {
+                            const skeleton =
+                                config.contourSkeletons[
+                                    Math.floor(Math.random() * config.contourSkeletons.length)
+                                ];
+                            const startMidi = lastMidi;
+                            const buffer = parseContourSkeleton(
+                                skeleton,
+                                targetChord,
+                                activeStyle,
+                                startMidi,
+                            );
+                            if (buffer && buffer.length > 0) {
+                                soloist.hookBuffer = buffer; // @worker-mutation
+                            }
+                        } else {
+                            soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+                        }
                     }
 
                     soloist.motifCache = []; // @worker-mutation start recording new motif
                     soloist.notesInPhrase = 0; // @worker-mutation
-                    soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
+                    if (soloist.phrasingState !== 'motif_lock') {
+                        soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
+                    }
                     soloist.phraseStartStep = null; // @worker-mutation (set on first attack)
-                    logDebug(`Waking up for Call (~${soloist.activeSteps} steps)`);
+                    logDebug(
+                        `Waking up for ${soloist.phrasingState} (~${soloist.activeSteps} steps)`,
+                    );
                 }
             }
             if (soloist.phrasingState === 'rest') {
@@ -418,11 +542,28 @@ export function getSoloistNote(
         const isNearEndOfMeasure =
             measureStep >= (tsConfig.beats - 1) * stepsPerBeat && intensity > 0.5;
 
+        // Motif refresh at measure boundary
+        if (currentState === 'motif_lock' && isEndOfMeasure) {
+            // Keep the state, just refresh the skeleton for the next measure if needed
+            // Actually, requirements say to use the *exact same* rhythmic template
+            // and shift pitches. So we don't recalculate the motif, we just keep repeating it!
+            // But we might need to reset active steps or transition out if intensity dropped.
+            if (!soloist.motifTracking) {
+                soloist.phrasingState = 'resolution'; // @worker-mutation
+                soloist.activeSteps = stepsPerBeat * 2; // @worker-mutation
+            } else if (soloist.activeSteps <= 0) {
+                // Time to resolve and breathe after hypermeasure
+                soloist.phrasingState = 'resolution'; // @worker-mutation
+                soloist.activeSteps = stepsPerBeat * 2; // @worker-mutation
+            }
+        }
+
         // Fluid State Transitions
         if (
             soloist.activeSteps <= 0 &&
             (isEndOfMeasure || isNearEndOfMeasure) &&
-            !coordination.bypassRhythm
+            !coordination.bypassRhythm &&
+            currentState !== 'motif_lock'
         ) {
             if (currentState === 'call') {
                 soloist.phrasingState = 'response'; // @worker-mutation
@@ -582,6 +723,8 @@ export function getSoloistNote(
 
     if (isForcedFallbackResolution || isSectionDownbeat) {
         shouldAttack = true;
+    } else if (soloist.phrasingState === 'motif_lock') {
+        shouldAttack = soloist.rhythmicMotif?.includes(measureStep);
     } else if (
         !coordination.bypassRhythm &&
         (soloist.phrasingState === 'call' || soloist.phrasingState === 'response') &&
@@ -589,7 +732,7 @@ export function getSoloistNote(
         soloist.rhythmicMotif.length > 0
     ) {
         // Enforce the prescribed rhythmic motif for Hook and Echo
-        shouldAttack = soloist.rhythmicMotif.includes(step % 16);
+        shouldAttack = soloist.rhythmicMotif.includes(measureStep); // measureStep is correct for non-4/4
     } else if (
         soloist.phrasingState === 'response' &&
         soloist.motifCache &&
@@ -919,19 +1062,39 @@ export function getSoloistNote(
 
     // Choose duration: connect the notes (legato) or staccato
     const isLegato = Math.random() < (intensity < 0.5 ? 0.7 : 0.3);
-    if (isLegato) {
+    if (soloist.phrasingState === 'motif_lock') {
+        // In motif_lock, notes sustain perfectly until the next drum hit for a continuous melodic line
+        durationSteps = gapToNextNote;
+
+        // Find next motif step specifically
+        if (soloist.rhythmicMotif && soloist.rhythmicMotif.length > 0) {
+            let foundNext = false;
+            for (let i = measureStep + 1; i < stepsPerMeasure; i++) {
+                if (soloist.rhythmicMotif.includes(i)) {
+                    durationSteps = i - measureStep;
+                    foundNext = true;
+                    break;
+                }
+            }
+            if (!foundNext) {
+                // Gap to first note of next measure
+                const firstNote = soloist.rhythmicMotif[0] || 0;
+                durationSteps = stepsPerMeasure - measureStep + firstNote;
+            }
+        }
+    } else if (isLegato) {
         durationSteps = Math.min(8, gapToNextNote);
     } else {
         durationSteps = Math.max(1, Math.floor(gapToNextNote / 2));
     }
 
-    // Override for short styles
-    if (['funk', 'disco', 'ska'].includes(activeStyle)) {
+    // Override for short styles unless motif-locked
+    if (['funk', 'disco', 'ska'].includes(activeStyle) && soloist.phrasingState !== 'motif_lock') {
         durationSteps = 1;
     }
 
     // Dynamic Duration Scaling: Play longer, simpler notes at low intensity
-    if (intensity < 0.5 && !isPolyphonic) {
+    if (intensity < 0.5 && !isPolyphonic && soloist.phrasingState !== 'motif_lock') {
         // At 0.1 intensity, 80% chance for a long note (4-8 steps).
         // At 0.4 intensity, 20% chance.
         const longNoteChance = 1.0 - intensity * 2.0;

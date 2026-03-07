@@ -108,6 +108,7 @@ export const soloist = {
     tradeMode: 'manual',
     isWaitingForEntry: false,
     isYielding: false,
+    motifTracking: false,
     leadSheetMelody: [],
     phrasingIntensity: 0.5,
 };
@@ -300,6 +301,9 @@ export function setSoloistParam(param, value) {
         case 'isYielding':
             soloist.isYielding = value;
             break;
+        case 'motifTracking':
+            soloist.motifTracking = value;
+            break;
         case 'phrasingState':
             soloist.phrasingState = value;
             break;
@@ -431,6 +435,7 @@ export function instrumentReducer(action, payload) {
                 tradeMode: 'manual',
                 isWaitingForEntry: false,
                 isYielding: false,
+                motifTracking: false,
                 phrasingIntensity: 0.5,
             });
             Object.assign(harmony, {
