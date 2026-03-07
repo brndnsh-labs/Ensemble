@@ -1,6 +1,9 @@
 import { getState } from './state.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
+const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
+const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
+
 let timerWorker = null;
 let schedulerRequestHandler = null;
 let notesReceivedHandler = null;
@@ -57,12 +60,11 @@ export function initWorker(onSchedulerRequest, onNotesReceived) {
             a.href = url;
 
             // Sanitize filename (Defense in Depth)
-            let safeName = (filename || 'ensemble-export').replace(/\.midi?$/i, '');
+            // Optimization: Use module constants for filename cleanup to reduce regex recompilation overhead
+            let safeName = (filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '');
             safeName =
-                safeName
-                    .replace(/[^a-zA-Z0-9\s\-_()]/g, '')
-                    .substring(0, 64)
-                    .trim() || 'ensemble-export';
+                safeName.replace(FILENAME_CLEANUP_PATTERN, '').substring(0, 64).trim() ||
+                'ensemble-export';
 
             a.download = `${safeName}.mid`;
             a.click();

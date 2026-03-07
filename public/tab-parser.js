@@ -14,6 +14,7 @@ const REPEAT_MULTIPLIER_PATTERN = /^x\s*(\d+)$/i;
 const CAPO_PATTERN = /capo[:\s]*(\d+)/i;
 const CHORD_REGEX =
     /^(?:N\.?C\.?|[A-G][b#]?(?:maj|min|m|dim|aug|sus|add|M|alt)?(?:[0-9]+)?(?:(?:maj|min|m|dim|aug|sus|add|M|alt)?[0-9]*)?(?:[/-][A-G][b#]?(?:maj|min|m|dim|aug|sus|add|M|alt)?[0-9]*|[-+]\d+)?)$/i;
+const NON_ALPHA_PATTERN = /[^a-z]/g;
 
 const SECTION_COLORS = [
     '#3b82f6', // blue
@@ -174,7 +175,8 @@ export function countSyllables(text) {
     if (!text) {
         return 0;
     }
-    const clean = text.toLowerCase().replace(/[^a-z]/g, ' ');
+    // Optimization: Replace inline regex with module constant to avoid recompilation overhead
+    const clean = text.toLowerCase().replace(NON_ALPHA_PATTERN, ' ');
     const tokens = clean.split(/\s+/).filter((t) => t.length > 0);
     let count = 0;
 

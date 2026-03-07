@@ -9,7 +9,8 @@ const { arranger, playback } = getState();
 
 import { ACTIONS } from '../types.js';
 
-const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s-_]/g;
+// Optimization: Expand the regex to include parentheses, reducing the need for multiple regexes
+const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 
 export function ExportModal() {
     const isOpen = useEnsembleState((s) => s.playback.modals.export);
@@ -86,8 +87,9 @@ export function ExportModal() {
         const targetDurationInput = document.getElementById('exportDurationInput');
         const targetDuration = targetDurationInput ? parseFloat(targetDurationInput.value) : 1;
         // Sanitize filename to prevent XSS and file system issues (defense in depth)
+        // Optimization: Use module constant for filename cleanup to reduce regex recompilation overhead
         const safeFilename = (filename || 'Ensemble Export')
-            .replace(/[^a-zA-Z0-9\s\-_()]/g, '')
+            .replace(FILENAME_CLEANUP_PATTERN, '')
             .substring(0, 64)
             .trim();
 
