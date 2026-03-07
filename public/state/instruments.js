@@ -95,6 +95,8 @@ export const soloist = {
     hookBuffer: [],
     sharedHookBuffer: [], // Shared hooks for band interaction
     tension: 0,
+    phraseTension: 0,
+    gravityNote: null,
     mode: 'monophonic',
     doubleStopProb: 1.0,
     activeVoices: [],
@@ -291,6 +293,12 @@ export function setSoloistParam(param, value) {
             break;
         case 'currentPhraseSteps':
             soloist.currentPhraseSteps = value;
+            break;
+        case 'phraseTension':
+            soloist.phraseTension = value;
+            break;
+        case 'gravityNote':
+            soloist.gravityNote = value;
             break;
         case 'lastNoteMidi':
             soloist.lastNoteMidi = value;
