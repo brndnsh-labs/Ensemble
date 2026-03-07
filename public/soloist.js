@@ -234,10 +234,7 @@ export function getSoloistNote(
                 soloist.notesInPhrase = 0; // @worker-mutation
                 // Calculate new active duration based on intensity and config
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                soloist.activeSteps = Math.floor(
-                    // @worker-mutation
-                    baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
-                ); // @worker-mutation
+                soloist.activeSteps = Math.floor(baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5)); // @worker-mutation
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
             }
         }
@@ -262,10 +259,7 @@ export function getSoloistNote(
             // Phrase-Density Fatigue: Longer rests after busy phrases
             const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
 
-            soloist.restSteps = Math.floor(
-                // @worker-mutation
-                stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
-            ); // @worker-mutation
+            soloist.restSteps = Math.floor(stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5)); // @worker-mutation
             if (soloist.restSteps < 4) {
                 soloist.restSteps = 4; // @worker-mutation minimum breath
             }
@@ -294,6 +288,19 @@ export function getSoloistNote(
 
     const intensityScale = 0.5 + intensity * 2.0;
     let attackProb = baseAttackProb * intensityScale * warmUpScale;
+
+    // Rhythmic Simplification at Low Intensity:
+    // Penalize syncopated/weak subdivisions (16ths and weak 8ths) heavily when band is quiet.
+    if (intensity < 0.4) {
+        const isSixteenthNote = sInB % 2 !== 0; // Steps 1, 3
+        const isOffbeatEighth = sInB === 2; // Step 2 (the "and")
+
+        if (isSixteenthNote) {
+            attackProb *= intensity * 1.5; // Drastic penalty for 16ths
+        } else if (isOffbeatEighth) {
+            attackProb *= 0.4 + intensity; // Moderate penalty for offbeat 8ths
+        }
+    }
 
     // Increase rhythmic density for 'lead_in'
     if (isFinalMeasure && soloist.transitionState === 'lead_in') {
@@ -526,6 +533,17 @@ export function getSoloistNote(
     let durationSteps = activeStyle === 'bird' ? 2 : Math.random() < 0.6 ? 2 : 4;
     if (['funk', 'disco', 'ska'].includes(activeStyle)) {
         durationSteps = 1;
+    }
+
+    // Dynamic Duration Scaling: Play longer, simpler notes at low intensity
+    if (intensity < 0.5 && !isPolyphonic) {
+        // At 0.1 intensity, 80% chance for a long note (4-8 steps).
+        // At 0.4 intensity, 20% chance.
+        const longNoteChance = 1.0 - intensity * 2.0;
+        if (Math.random() < longNoteChance) {
+            // Pick a longer duration that aligns with the beat
+            durationSteps = Math.random() < 0.5 ? 4 : 8; // Quarter or Half note
+        }
     }
 
     const baseVelocity = 0.6 + intensity * 0.4;
