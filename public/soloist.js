@@ -430,8 +430,10 @@ export function getSoloistNote(
 
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
-        // Safety Watchdog: Prevent excessive resting even at low intensities
-        const absoluteMaxRest = Math.floor(stepsPerMeasure * (1.5 - intensity * 0.5));
+        // Safety Watchdog: Prevent excessive resting even at low intensities.
+        // The watchdog acts as a safety net if `finalRestSteps` fails or we miss a beat.
+        // At high intensity, max rest is ~0.75 measures before forcing a hook. At low intensity, ~1.25 measures.
+        const absoluteMaxRest = Math.floor(stepsPerMeasure * (1.25 - intensity * 0.5));
         if (soloist.restSteps < -absoluteMaxRest) {
             soloist.restSteps = 0; // @worker-mutation
             soloist.phrasingState = 'HOOK'; // @worker-mutation
@@ -545,10 +547,19 @@ export function getSoloistNote(
                     stepsPerMeasure * baseRest * fatigueMultiplier * (0.5 + Math.random() * 1.0); // Less wild randomness
 
                 let finalRestSteps = Math.floor(restVal);
-                // Ensure it rarely rests for more than a single measure at a time
-                const maxRestSteps = Math.floor(stepsPerMeasure * (1.5 - intensity * 0.5));
-                if (finalRestSteps > maxRestSteps) {
-                    finalRestSteps = maxRestSteps;
+
+                // Allow a tiny 2% chance for a full measure rest to add musical "breathing room" dynamically
+                const forceFullRest = Math.random() < 0.02;
+
+                if (forceFullRest) {
+                    finalRestSteps = stepsPerMeasure;
+                } else {
+                    // Otherwise, strictly bound the maximum rest so it doesn't stay quiet for too long.
+                    // At high intensity, it rests at most ~0.5 measures. At low intensity, ~0.75 measures.
+                    const maxRestSteps = Math.floor(stepsPerMeasure * (0.75 - intensity * 0.25));
+                    if (finalRestSteps > maxRestSteps) {
+                        finalRestSteps = maxRestSteps;
+                    }
                 }
 
                 soloist.restSteps = finalRestSteps; // @worker-mutation
