@@ -286,6 +286,12 @@ export function setSoloistParam(param, value) {
         case 'lastNoteMidi':
             soloist.lastNoteMidi = value;
             break;
+        case 'isWaitingForEntry':
+            soloist.isWaitingForEntry = value;
+            break;
+        case 'isYielding':
+            soloist.isYielding = value;
+            break;
         default:
             console.warn(`[State] Unknown soloist param: ${param}`);
             break;
