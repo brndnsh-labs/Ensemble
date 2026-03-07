@@ -1,5 +1,5 @@
 import { generateProceduralFill } from './fills.js';
-import { getSectionEnergy } from './form-analysis.js';
+import { analyzeForm, getSectionEnergy } from './form-analysis.js';
 import { debounceSaveState, saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
@@ -13,6 +13,14 @@ export const conductorState = {
     form: null,
     larsBpmOffset: 0,
 };
+
+export function analyzeFormUI() {
+    const form = analyzeForm();
+    if (form) {
+        conductorState.form = form;
+        // console.log(`Analyzed Form: ${form.sequence}`, form.sections);
+    }
+}
 
 export function applyConductor() {
     const { playback, soloist, groove, chords, bass, harmony, arranger } = getState();

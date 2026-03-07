@@ -301,29 +301,6 @@ export function generateMelodicDevice(deviceType, ctx) {
 }
 
 /**
- * Generates an embellishment note for rhythmic diminution (splitting long notes).
- */
-export function generateEmbellishment(ctx) {
-    const { selectedMidi, targetChord, style, activeStyle } = ctx;
-    const scaleIntervals = getScaleForChord(targetChord, null, style);
-    const neighborDir = Math.random() > 0.5 ? 1 : -1;
-    let neighborMidi = selectedMidi;
-    let neighborPC = (neighborMidi + neighborDir + 120) % 12;
-    let tries = 0;
-    while (!scaleIntervals.includes(neighborPC) && tries < 3) {
-        neighborMidi += neighborDir;
-        neighborPC = (neighborMidi + 120) % 12;
-        tries++;
-    }
-    return {
-        midi: neighborMidi,
-        velocity: 0.8, // Will be scaled by parent velocity
-        style: activeStyle,
-        isLegato: true,
-    };
-}
-
-/**
  * Generates additional notes for double stops based on style and mode.
  */
 export function generateExtraNotes(ctx) {

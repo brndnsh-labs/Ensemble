@@ -1,10 +1,10 @@
 const NOTE_MATCH_PATTERN = /^([A-G](?:[#b\u266F\u266D])?)(.*)/i;
 
 import { transformRelativeProgression, validateProgression } from './chords.js';
-import { conductorState } from './conductor.js';
+import { analyzeFormUI, conductorState } from './conductor.js';
 import { KEY_ORDER } from './config.js';
 import { restoreGains } from './engine/engine.js';
-import { analyzeForm } from './form-analysis.js';
+import { getSectionEnergy } from './form-analysis.js';
 import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
@@ -12,14 +12,6 @@ import { getState } from './state.js';
 import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
 import { syncWorker } from './worker-client.js';
-
-export function analyzeFormUI() {
-    const form = analyzeForm();
-    if (form) {
-        conductorState.form = form;
-        // console.log(`Analyzed Form: ${form.sequence}`, form.sections);
-    }
-}
 
 export function saveProgression() {
     const { arranger } = getState();

@@ -1,5 +1,5 @@
-import { analyzeFormUI } from './arranger-controller.js';
 import { validateProgression } from './chords.js';
+import { analyzeFormUI } from './conductor.js';
 import { initAudio, playNote } from './engine/engine.js';
 import { scheduler } from './engine/scheduler-core.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
