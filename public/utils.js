@@ -247,7 +247,14 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
     }
 
     if (!currentTS) {
-        currentTS = allTS['4/4'] || { beats: 4, stepsPerBeat: 4 };
+        currentTS = allTS['4/4'] || { beats: 4, stepsPerBeat: 4, grouping: [4], backbeat: [1, 3] };
+    }
+
+    if (!currentTS.grouping) {
+        currentTS.grouping = [currentTS.beats];
+    }
+    if (!currentTS.backbeat) {
+        currentTS.backbeat = currentTS.beats === 4 ? [1, 3] : [1];
     }
 
     let tsName =
@@ -343,11 +350,20 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         }
     }
 
+    // Semantic Timing Flags
+    const stepInBeat = mStep % stepsPerBeat;
+    const isOffbeat = stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1; // 8th note offbeat
+    const isEOfBeat = stepsPerBeat === 4 && stepInBeat === 1;
+    const isAOfBeat = stepsPerBeat === 4 && stepInBeat === 3;
+
     return {
         isMeasureStart,
         isGroupStart,
         isBeatStart,
         isBackbeat,
+        isOffbeat,
+        isEOfBeat,
+        isAOfBeat,
         isCompound,
         groupIndex,
         stepInGroup,

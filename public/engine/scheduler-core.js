@@ -536,20 +536,22 @@ function scheduleDrums(params) {
         step,
         time,
         isDownbeat,
-        isQuarter,
+        isBeatStart,
         isBackbeat,
         absoluteStep,
         isGroupStart,
         sectionId,
         beatIndex,
         isOffbeat,
+        isEOfBeat,
+        isAOfBeat,
         isTurnaround,
-        stepsPerBar,
     } = params;
 
-    const { playback, groove, vizState, midi } = getState();
+    const { playback, groove, vizState, midi, arranger } = getState();
     const conductorVel = playback.conductorVelocity || 1.0;
     const finalTime = time + calculatePocketOffset(playback, groove);
+    const stepsPerBar = getStepsPerMeasure(arranger.timeSignature);
 
     // ... (fill logic) ...
     if (groove.fillActive) {
@@ -615,17 +617,19 @@ function scheduleDrums(params) {
         }
 
         const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides({
-            step,
+            step: absoluteStep,
             inst,
             stepVal,
             playback,
             groove,
             isDownbeat,
-            isQuarter,
+            isBeatStart,
             isBackbeat,
             isGroupStart,
             beatIndex,
             isOffbeat,
+            isEOfBeat,
+            isAOfBeat,
             isTurnaround,
             stepsPerBar,
             loopStep: step, // scheduleDrums 'step' is the local drum loop step
@@ -1118,9 +1122,6 @@ export function scheduleGlobalEvent(step, swungTime) {
         (Math.random() - 0.5) * (groove.humanize / 100) * 0.025;
 
     if (groove.enabled) {
-        const isQuarter = stepInfo.isBeatStart;
-        const isBackbeat = stepInfo.isBackbeat;
-
         if (stepInfo.isBeatStart && playback.visualFlash) {
             playback.drawQueue.push({
                 type: 'flash',
@@ -1137,27 +1138,35 @@ export function scheduleGlobalEvent(step, swungTime) {
 
         // --- Port Turnaround Logic from Worker ---
         const stepsPerBar = spm;
-        const entry = arranger.stepMap?.find((e) => step >= e.start && step < e.end);
+        const entry = arranger.sectionMap?.find((e) => step >= e.start && step < e.end);
         let isTurnaround = false;
-        if (entry && groove.creativity) {
-            const measuresInSection = Math.max(1, (entry.end - entry.start) / stepsPerBar);
-            const barInSection = Math.floor((step - entry.start) / stepsPerBar);
-            isTurnaround = barInSection === measuresInSection - 1;
+        if (groove.creativity) {
+            let measuresInSection = 4;
+            let startStep = 0;
+            if (entry) {
+                measuresInSection = Math.max(1, (entry.end - entry.start) / stepsPerBar);
+                startStep = entry.start;
+            }
+            const barInSection = Math.floor((step - startStep) / stepsPerBar);
+            // Use modulo for fallback (entry-less) turnaround logic, and suppress turnaround fills for 1-measure sections
+            isTurnaround =
+                measuresInSection > 1 && barInSection % measuresInSection === measuresInSection - 1;
         }
 
         scheduleDrums({
             step: drumStep,
             time: t,
             isDownbeat: stepInfo.isMeasureStart,
-            isQuarter,
-            isBackbeat,
+            isBeatStart: stepInfo.isBeatStart,
+            isBackbeat: stepInfo.isBackbeat,
             absoluteStep: step,
             isGroupStart: stepInfo.isGroupStart,
             sectionId,
             beatIndex: stepInfo.beatIndex,
-            isOffbeat: stepInfo.isBeatStart === false && step % (ts.stepsPerBeat / 2) === 0,
+            isOffbeat: stepInfo.isOffbeat,
+            isEOfBeat: stepInfo.isEOfBeat,
+            isAOfBeat: stepInfo.isAOfBeat,
             isTurnaround,
-            stepsPerBar,
         });
     }
 

@@ -51,28 +51,19 @@ export function applyGrooveOverrides({
     playback,
     groove,
     isDownbeat,
-    isQuarter,
-    isBackbeat,
+    isBeatStart,
     isGroupStart,
+    isBackbeat,
+    isOffbeat,
+    isEOfBeat,
+    isAOfBeat,
     beatIndex,
 }) {
     const { soloist } = getState();
     const stateObj = getState();
     const arrangerState = stateObj?.arranger || { timeSignature: '4/4' };
-    const ts = TIME_SIGNATURES[arrangerState.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
     const loopStep = step % stepsPerBar;
-
-    // Semantic abstractions
-    const isBeatStart = ts.isCompound ? isGroupStart : isQuarter;
-    const isOffbeat = loopStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
-    const activeBeatIndex = ts.isCompound
-        ? Math.floor(loopStep / (ts.stepsPerBeat * ts.grouping[0]))
-        : beatIndex;
-
-    // 16th note subdivisions
-    const isEOfBeat = loopStep % ts.stepsPerBeat === 1;
-    const isAOfBeat = loopStep % ts.stepsPerBeat === ts.stepsPerBeat - 1;
 
     let currentState = {
         shouldPlay: stepVal > 0,
@@ -101,15 +92,54 @@ export function applyGrooveOverrides({
     const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
-    const entry = arrangerState.stepMap?.find((e) => step >= e.start && step < e.end);
+    const sectionEntry = arrangerState.sectionMap?.find((e) => step >= e.start && step < e.end);
     let measuresInSection = 4; // default
-    if (entry) {
-        measuresInSection = Math.max(1, (entry.end - entry.start) / stepsPerBar);
+    let startStep = 0;
+    if (sectionEntry) {
+        measuresInSection = Math.max(1, (sectionEntry.end - sectionEntry.start) / stepsPerBar);
+        startStep = sectionEntry.start;
     }
-    const barInSection = Math.floor((step - (entry ? entry.start : 0)) / stepsPerBar);
+    const barInSection = Math.floor((step - startStep) / stepsPerBar);
 
-    const justFinishedTurnaround = groove.creativity && barInSection === 0 && isFirstStepOfNewBar;
-    const isTurnaround = groove.creativity && barInSection === measuresInSection - 1;
+    // Use modulo for fallback logic, and prevent Turnarounds on 1-measure sections to avoid clutter
+    const isTurnaround =
+        groove.creativity &&
+        measuresInSection > 1 &&
+        barInSection % measuresInSection === measuresInSection - 1;
+
+    // Check if the PREVIOUS bar was a turnaround to determine if we should crash now
+    const prevStep = step - stepsPerBar;
+    const prevSectionEntry = arrangerState.sectionMap?.find(
+        (e) => prevStep >= e.start && prevStep < e.end,
+    );
+    let prevMeasuresInSection = 4;
+    let prevStartStep = 0;
+    if (prevSectionEntry) {
+        prevMeasuresInSection = Math.max(
+            1,
+            (prevSectionEntry.end - prevSectionEntry.start) / stepsPerBar,
+        );
+        prevStartStep = prevSectionEntry.start;
+    } else {
+        // If no previous section entry, use current section length as a more localized fallback than hardcoded 4
+        prevMeasuresInSection = measuresInSection;
+        prevStartStep = startStep;
+    }
+    const prevBarInSection = Math.floor((prevStep - prevStartStep) / stepsPerBar);
+    const prevWasTurnaround =
+        groove.creativity &&
+        prevMeasuresInSection > 1 &&
+        barIndex > 0 &&
+        prevBarInSection % prevMeasuresInSection === prevMeasuresInSection - 1;
+
+    const justFinishedTurnaround = prevWasTurnaround && isFirstStepOfNewBar;
+
+    const chordEntry = arrangerState.stepMap?.find((e) => step >= e.start && step < e.end);
+    const sectionId = chordEntry?.chord?.sectionId;
+    let sectionSeed = groove.sectionSeedMap?.[sectionId];
+    if (sectionSeed === undefined) {
+        sectionSeed = ((barIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
+    }
 
     if (justFinishedTurnaround && isDownbeat) {
         if (inst.name === 'Kick') {
@@ -117,15 +147,15 @@ export function applyGrooveOverrides({
             currentState.velocity = 1.35;
         } else if (inst.name === 'HiHat' || inst.name === 'Open') {
             currentState.shouldPlay = true;
-            currentState.soundName = 'Open';
-            currentState.velocity = 1.2;
+            // Use Open hats only at higher intensities for the section-start crash
+            if (playback.bandIntensity > 0.45) {
+                currentState.soundName = 'Open';
+                currentState.velocity = 1.2;
+            } else {
+                currentState.soundName = 'HiHat';
+                currentState.velocity = 1.1;
+            }
         }
-    }
-
-    const sectionId = entry?.chord?.sectionId;
-    let sectionSeed = groove.sectionSeedMap?.[sectionId];
-    if (sectionSeed === undefined) {
-        sectionSeed = ((barIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
     }
 
     const context = {
@@ -141,13 +171,12 @@ export function applyGrooveOverrides({
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
-        beatIndex: activeBeatIndex,
+        beatIndex,
         stepsPerBar,
         loopStep,
         drumComplexity,
         barIndex,
         isFirstStepOfNewBar,
-        justFinishedTurnaround,
         sectionSeed,
         isTurnaround,
         isSoloistBusy: soloist.enabled && soloist.busySteps > 0,
@@ -159,12 +188,11 @@ export function applyGrooveOverrides({
 
     if (
         groove.creativity &&
-        !inst.muted &&
         !currentState.shouldPlay &&
         Math.random() <
             playback.bandIntensity *
                 config.entropyMultiplier *
-                (config.blockAdjacentSnare ? 0.7 : 1.0)
+                (config.blockAdjacentSnare && groove.genreFeel !== 'Rock' ? 0.7 : 1.0)
     ) {
         const isSyncopated = loopStep % 2 === 1;
         const subdivision = stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4);
@@ -172,13 +200,13 @@ export function applyGrooveOverrides({
 
         // Simple hardcoded checks adapted to dynamic offset from backbeat
         let isBackbeatAdjacent = false;
-        let isEOfBeat = false;
+        let isEOfBeatCheck = false;
 
         if (arrangerState.timeSignature === '4/4') {
             isBackbeatAdjacent = [3, 5, 11, 13].includes(loopStep);
-            isEOfBeat = [1, 9].includes(loopStep);
+            isEOfBeatCheck = [1, 9].includes(loopStep);
         }
-        const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeat);
+        const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeatCheck);
 
         if (inst.name === 'Snare' && isSyncopated && !blockSnare && !config.isLatin) {
             currentState.shouldPlay = true;
