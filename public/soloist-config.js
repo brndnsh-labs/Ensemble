@@ -11,6 +11,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9],
         deviceProb: 0.12,
         allowedDevices: ['run', 'slide', 'guitarDouble'],
+
+        rhythmicDensity: 0.5,
+        syncopationLikelihood: 0.2,
+        targetAnchoring: 0.8,
+        chromaticism: 0.1,
+        contourSkeletons: [
+            [
+                { interval: 1, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 4 },
+                { interval: -1, durationSteps: 2 },
+                { interval: 1, durationSteps: 2 },
+            ],
+            [
+                { interval: -1, durationSteps: 2 },
+                { interval: -2, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+        ],
     },
     shred: {
         genreGravityOffset: 0,
@@ -24,6 +46,31 @@ export const STYLE_CONFIG = {
         targetExtensions: [2],
         deviceProb: 0.4,
         allowedDevices: ['run', 'guitarDouble'],
+
+        rhythmicDensity: 0.9,
+        syncopationLikelihood: 0.4,
+        targetAnchoring: 0.4,
+        chromaticism: 0.5,
+        contourSkeletons: [
+            [
+                { interval: 1, durationSteps: 1 },
+                { interval: 2, durationSteps: 1 },
+                { interval: 3, durationSteps: 1 },
+                { interval: 4, durationSteps: 1 },
+            ],
+            [
+                { interval: -1, durationSteps: 1 },
+                { interval: 1, durationSteps: 1 },
+                { interval: -2, durationSteps: 1 },
+                { interval: 0, durationSteps: 1 },
+            ],
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+                { interval: 6, durationSteps: 2 },
+                { interval: 7, durationSteps: 2 },
+            ],
+        ],
     },
     blues: {
         genreGravityOffset: 0,
@@ -37,6 +84,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [9, 10],
         deviceProb: 0.4,
         allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
+
+        rhythmicDensity: 0.6,
+        syncopationLikelihood: 0.8,
+        targetAnchoring: 0.9,
+        chromaticism: 0.6,
+        contourSkeletons: [
+            [
+                { interval: 3, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 0, durationSteps: 2 },
+                { interval: -2, durationSteps: 2 },
+                { interval: -3, durationSteps: 4 },
+            ],
+            [
+                { interval: 5, durationSteps: 2 },
+                { interval: 6, durationSteps: 1 },
+                { interval: 7, durationSteps: 5 },
+            ],
+        ],
     },
     neo: {
         genreGravityOffset: 0.015,
@@ -50,6 +119,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 6, 9, 11],
         deviceProb: 0.25,
         allowedDevices: ['quartal', 'slide', 'guitarDouble'],
+
+        rhythmicDensity: 0.5,
+        syncopationLikelihood: 0.9,
+        targetAnchoring: 0.6,
+        chromaticism: 0.4,
+        contourSkeletons: [
+            [
+                { interval: 2, durationSteps: 3 },
+                { interval: 4, durationSteps: 1 },
+                { interval: 6, durationSteps: 4 },
+            ],
+            [
+                { interval: 1, durationSteps: 2 },
+                { interval: 3, durationSteps: 4 },
+                { interval: 0, durationSteps: 2 },
+            ],
+            [
+                { interval: 4, durationSteps: 4 },
+                { interval: 2, durationSteps: 2 },
+                { interval: -1, durationSteps: 2 },
+            ],
+        ],
     },
     funk: {
         genreGravityOffset: -0.005,
@@ -63,6 +154,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [9, 13],
         deviceProb: 0.2,
         allowedDevices: ['slide', 'run'],
+
+        rhythmicDensity: 0.8,
+        syncopationLikelihood: 0.9,
+        targetAnchoring: 0.7,
+        chromaticism: 0.3,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 1 },
+                { interval: 0, durationSteps: 1 },
+                { interval: 2, durationSteps: 2 },
+            ],
+            [
+                { interval: 3, durationSteps: 1 },
+                { interval: 0, durationSteps: 1 },
+                { interval: -2, durationSteps: 2 },
+            ],
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: 1, durationSteps: 1 },
+                { interval: 0, durationSteps: 1 },
+            ],
+        ],
     },
     hiphop: {
         genreGravityOffset: 0.015,
@@ -76,6 +189,27 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9, 11],
         deviceProb: 0.3,
         allowedDevices: ['bluesLick', 'slide', 'quartal'],
+
+        rhythmicDensity: 0.6,
+        syncopationLikelihood: 0.7,
+        targetAnchoring: 0.8,
+        chromaticism: 0.2,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 4 },
+                { interval: 1, durationSteps: 2 },
+                { interval: 0, durationSteps: 2 },
+            ],
+            [
+                { interval: -1, durationSteps: 2 },
+                { interval: 0, durationSteps: 6 },
+            ],
+        ],
     },
     minimal: {
         genreGravityOffset: 0,
@@ -89,6 +223,22 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9, 11],
         deviceProb: 0.15,
         allowedDevices: ['slide', 'enclosure'],
+
+        rhythmicDensity: 0.3,
+        syncopationLikelihood: 0.3,
+        targetAnchoring: 0.95,
+        chromaticism: 0.1,
+        contourSkeletons: [
+            [{ interval: 0, durationSteps: 8 }],
+            [
+                { interval: 2, durationSteps: 4 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: -1, durationSteps: 4 },
+                { interval: 0, durationSteps: 4 },
+            ],
+        ],
     },
     bird: {
         genreGravityOffset: 0,
@@ -102,6 +252,31 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 5, 6, 9],
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
+
+        rhythmicDensity: 0.95,
+        syncopationLikelihood: 0.7,
+        targetAnchoring: 0.3,
+        chromaticism: 0.9,
+        contourSkeletons: [
+            [
+                { interval: 1, durationSteps: 2 },
+                { interval: 3, durationSteps: 2 },
+                { interval: 5, durationSteps: 2 },
+                { interval: 7, durationSteps: 2 },
+            ],
+            [
+                { interval: 2, durationSteps: 1 },
+                { interval: 1, durationSteps: 1 },
+                { interval: 0, durationSteps: 1 },
+                { interval: -1, durationSteps: 1 },
+            ],
+            [
+                { interval: -2, durationSteps: 2 },
+                { interval: 0, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+            ],
+        ],
     },
     disco: {
         genreGravityOffset: 0,
@@ -115,6 +290,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9],
         deviceProb: 0.1,
         allowedDevices: ['run'],
+
+        rhythmicDensity: 0.7,
+        syncopationLikelihood: 0.6,
+        targetAnchoring: 0.8,
+        chromaticism: 0.2,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+                { interval: 2, durationSteps: 4 },
+            ],
+            [
+                { interval: 4, durationSteps: 4 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 2 },
+            ],
+        ],
     },
     bossa: {
         genreGravityOffset: 0,
@@ -128,6 +325,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 6, 9],
         deviceProb: 0.2,
         allowedDevices: ['enclosure', 'slide', 'guitarDouble'],
+
+        rhythmicDensity: 0.6,
+        syncopationLikelihood: 0.8,
+        targetAnchoring: 0.7,
+        chromaticism: 0.5,
+        contourSkeletons: [
+            [
+                { interval: 2, durationSteps: 3 },
+                { interval: 0, durationSteps: 3 },
+                { interval: -1, durationSteps: 2 },
+            ],
+            [
+                { interval: 1, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 4 },
+            ],
+            [
+                { interval: 4, durationSteps: 4 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 1, durationSteps: 2 },
+            ],
+        ],
     },
     country: {
         genreGravityOffset: 0,
@@ -148,6 +367,28 @@ export const STYLE_CONFIG = {
             'banjoRoll',
             'graceSlide',
         ],
+
+        rhythmicDensity: 0.7,
+        syncopationLikelihood: 0.4,
+        targetAnchoring: 0.9,
+        chromaticism: 0.3,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 2 },
+                { interval: 1, durationSteps: 2 },
+                { interval: 2, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: -1, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: -2, durationSteps: 2 },
+                { interval: -1, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+        ],
     },
     metal: {
         genreGravityOffset: 0,
@@ -161,6 +402,30 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 7],
         deviceProb: 0.5,
         allowedDevices: ['run'],
+
+        rhythmicDensity: 0.9,
+        syncopationLikelihood: 0.3,
+        targetAnchoring: 0.5,
+        chromaticism: 0.6,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 1 },
+                { interval: 1, durationSteps: 1 },
+                { interval: 2, durationSteps: 1 },
+                { interval: 3, durationSteps: 1 },
+            ],
+            [
+                { interval: 4, durationSteps: 2 },
+                { interval: 3, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 2 },
+            ],
+            [
+                { interval: 0, durationSteps: 2 },
+                { interval: -1, durationSteps: 2 },
+                { interval: -2, durationSteps: 4 },
+            ],
+        ],
     },
     reggae: {
         genreGravityOffset: 0,
@@ -174,6 +439,28 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 6, 9],
         deviceProb: 0.15,
         allowedDevices: ['guitarDouble'],
+
+        rhythmicDensity: 0.5,
+        syncopationLikelihood: 0.9,
+        targetAnchoring: 0.8,
+        chromaticism: 0.2,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 3 },
+                { interval: 2, durationSteps: 1 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+                { interval: 2, durationSteps: 4 },
+            ],
+            [
+                { interval: 4, durationSteps: 4 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 2 },
+            ],
+        ],
     },
     acoustic: {
         genreGravityOffset: 0,
@@ -187,6 +474,26 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9],
         deviceProb: 0.1,
         allowedDevices: ['slide', 'run'],
+
+        rhythmicDensity: 0.6,
+        syncopationLikelihood: 0.4,
+        targetAnchoring: 0.8,
+        chromaticism: 0.2,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 4 },
+                { interval: 1, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+            ],
+            [
+                { interval: 2, durationSteps: 4 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: -1, durationSteps: 2 },
+                { interval: 0, durationSteps: 6 },
+            ],
+        ],
     },
     ska: {
         genreGravityOffset: -0.005,
@@ -200,6 +507,29 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 4, 9],
         deviceProb: 0.35,
         allowedDevices: ['run', 'slide', 'guitarDouble', 'enclosure', 'chromaticFall'],
+
+        rhythmicDensity: 0.8,
+        syncopationLikelihood: 0.8,
+        targetAnchoring: 0.7,
+        chromaticism: 0.4,
+        contourSkeletons: [
+            [
+                { interval: 0, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+            ],
+            [
+                { interval: 4, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: 3, durationSteps: 2 },
+                { interval: 4, durationSteps: 4 },
+            ],
+        ],
     },
 };
 

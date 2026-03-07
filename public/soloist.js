@@ -18,6 +18,59 @@ export function getMelodyAtStep(melody, step) {
     return melody.find((n) => n.globalStep === step);
 }
 
+function parseContourSkeleton(skeleton, targetChord, style, startMidi) {
+    if (!skeleton || skeleton.length === 0) {
+        return null;
+    }
+
+    const scaleIntervals = getScaleForChord(targetChord, null, style);
+    let scaleMask = 0;
+    for (let i = 0; i < scaleIntervals.length; i++) {
+        scaleMask |= 1 << scaleIntervals[i];
+    }
+    const rootMidi = targetChord.rootMidi;
+
+    // Mutation: occasionally reverse interval direction or double duration
+    const isMutated = Math.random() < 0.2;
+    const directionMult = isMutated && Math.random() < 0.5 ? -1 : 1;
+    const durationMult = isMutated && Math.random() < 0.5 ? 2 : 1;
+
+    const buffer = [];
+    let currentMidi = startMidi;
+
+    for (const node of skeleton) {
+        const targetInterval = node.interval * directionMult;
+        const absTarget = Math.abs(targetInterval);
+        const dir = targetInterval > 0 ? 1 : -1;
+        let stepsMoved = 0;
+        let m = currentMidi;
+
+        if (targetInterval !== 0) {
+            let tries = 0;
+            while (stepsMoved < absTarget && tries < 24) {
+                m += dir;
+                const pc = ((m % 12) + 12) % 12;
+                const relativeInterval = (pc - (rootMidi % 12) + 12) % 12;
+                if ((scaleMask >> relativeInterval) & 1) {
+                    stepsMoved++;
+                }
+                tries++;
+            }
+        }
+
+        currentMidi = m;
+
+        buffer.push({
+            midi: currentMidi,
+            durationSteps: node.durationSteps * durationMult,
+            velocity: 0.8, // Baseline, dynamically adjusted later
+            style: style,
+        });
+    }
+
+    return buffer;
+}
+
 function generateRhythmicMotif(intensity, style) {
     // Return an array of steps (0-15) that should have attacks
     const motif = [];
@@ -187,6 +240,21 @@ export function getSoloistNote(
         soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
         return finalizeNote(embNote);
     }
+    if (soloist.hookBuffer && soloist.hookBuffer.length > 0) {
+        const hookNote = soloist.hookBuffer.shift();
+        soloist.busySteps = (hookNote.durationSteps || 1) - 1; // @worker-mutation
+
+        // Ensure velocity is adjusted dynamically
+        const baseVelocity = 0.6 + intensity * 0.4;
+        const finalVelocity = isDownbeat
+            ? baseVelocity * 1.25
+            : isBackbeat
+              ? baseVelocity * 1.15
+              : baseVelocity;
+        hookNote.velocity = Math.min(1.25, finalVelocity * hookNote.velocity);
+
+        return finalizeNote(hookNote);
+    }
     if (soloist.deviceBuffer && soloist.deviceBuffer.length > 0) {
         const devNote = soloist.deviceBuffer.shift();
         const primaryNote = Array.isArray(devNote) ? devNote[0] : devNote;
@@ -220,7 +288,29 @@ export function getSoloistNote(
             soloist.transitionState = Math.random() < 0.5 ? 'rest' : 'lead_in'; // @worker-mutation
             if (soloist.transitionState === 'lead_in') {
                 soloist.phrasingState = 'call'; // @worker-mutation
-                soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+
+                const phrasingIntensity = soloist.phrasingIntensity ?? 0.5;
+                const useSkeleton =
+                    config.contourSkeletons && Math.random() < 0.6 + phrasingIntensity * 0.1;
+                if (useSkeleton && config.contourSkeletons.length > 0) {
+                    const skeleton =
+                        config.contourSkeletons[
+                            Math.floor(Math.random() * config.contourSkeletons.length)
+                        ];
+                    const startMidi = lastMidi;
+                    const buffer = parseContourSkeleton(
+                        skeleton,
+                        targetChord,
+                        activeStyle,
+                        startMidi,
+                    );
+                    if (buffer && buffer.length > 0) {
+                        soloist.hookBuffer = buffer; // @worker-mutation
+                    }
+                } else {
+                    soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+                }
+
                 soloist.phraseStartStep = null; // @worker-mutation (set on first attack)
                 soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
                 soloist.motifCache = []; // @worker-mutation reset motif for new call
@@ -272,7 +362,29 @@ export function getSoloistNote(
                         soloist.restSteps < -stepsPerMeasure)
                 ) {
                     soloist.phrasingState = 'call'; // @worker-mutation
-                    soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+
+                    const phrasingIntensity = soloist.phrasingIntensity ?? 0.5;
+                    const useSkeleton =
+                        config.contourSkeletons && Math.random() < 0.6 + phrasingIntensity * 0.1;
+                    if (useSkeleton && config.contourSkeletons.length > 0) {
+                        const skeleton =
+                            config.contourSkeletons[
+                                Math.floor(Math.random() * config.contourSkeletons.length)
+                            ];
+                        const startMidi = lastMidi;
+                        const buffer = parseContourSkeleton(
+                            skeleton,
+                            targetChord,
+                            activeStyle,
+                            startMidi,
+                        );
+                        if (buffer && buffer.length > 0) {
+                            soloist.hookBuffer = buffer; // @worker-mutation
+                        }
+                    } else {
+                        soloist.rhythmicMotif = generateRhythmicMotif(intensity, activeStyle); // @worker-mutation
+                    }
+
                     soloist.motifCache = []; // @worker-mutation start recording new motif
                     soloist.notesInPhrase = 0; // @worker-mutation
                     soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure hook)
@@ -316,6 +428,27 @@ export function getSoloistNote(
                 soloist.phrasingState = 'response'; // @worker-mutation
                 soloist.activeSteps = stepsPerMeasure; // @worker-mutation (fixed 1 measure response)
                 soloist.phraseStartStep = step; // @worker-mutation
+
+                const phrasingIntensity = soloist.phrasingIntensity ?? 0.5;
+                const useSkeleton =
+                    config.contourSkeletons && Math.random() < 0.6 + phrasingIntensity * 0.1;
+                if (useSkeleton && config.contourSkeletons.length > 0) {
+                    const skeleton =
+                        config.contourSkeletons[
+                            Math.floor(Math.random() * config.contourSkeletons.length)
+                        ];
+                    const startMidi = lastMidi;
+                    const buffer = parseContourSkeleton(
+                        skeleton,
+                        targetChord,
+                        activeStyle,
+                        startMidi,
+                    );
+                    if (buffer && buffer.length > 0) {
+                        soloist.hookBuffer = buffer; // @worker-mutation
+                    }
+                }
+
                 logDebug(`Transitioning to Response (~${soloist.activeSteps} steps)`);
             } else if (currentState === 'response') {
                 soloist.phrasingState = Math.random() < 0.6 ? 'development' : 'resolution'; // @worker-mutation
@@ -350,6 +483,9 @@ export function getSoloistNote(
     const emphasisIdx = (bIdx % 4) * 4 + (sInB % 4);
     const baseAttackProb = emphasisMap[emphasisIdx];
 
+    const baseRhythmicDensity = config.rhythmicDensity ?? 0.5;
+    const baseSyncopationLikelihood = config.syncopationLikelihood ?? 0.5;
+
     // Motif Masking: Recall cached rhythm during response
     const phraseRelativeStep = step - (soloist.phraseStartStep || step);
     let motifForcedAttack = false;
@@ -374,12 +510,16 @@ export function getSoloistNote(
 
     const warmUpScale = Math.min(1.0, 0.5 + ((soloist.sessionSteps || 0) / 64) * 0.5);
 
+    const densityScale = 0.5 + baseRhythmicDensity;
     const intensityScale = 0.3 + intensity * 1.2; // Scale density with intensity
-    let attackProb = baseAttackProb * intensityScale * warmUpScale;
+    let attackProb = baseAttackProb * intensityScale * warmUpScale * densityScale;
 
     // Phrase Contextual Scaling
     if (soloist.phrasingState === 'resolution') {
         attackProb *= 0.4; // Resolutions are sparse landings
+    } else if (soloist.phrasingState === 'development') {
+        // Utilize the probability matrices heavily during the development state to drive the ambient playing
+        attackProb *= 0.8 + baseRhythmicDensity * 0.4;
     }
 
     // Breathing Contours: Layer an 8-measure sine wave over the probability
@@ -390,7 +530,7 @@ export function getSoloistNote(
 
     // Rhythmic Simplification at Low Intensity:
     // Penalize syncopated/weak subdivisions (16ths and weak 8ths) heavily when band is quiet.
-    if (intensity < 0.4) {
+    if (intensity < 0.4 || Math.random() > baseSyncopationLikelihood) {
         const isSixteenthNote = sInB % 2 !== 0; // Steps 1, 3
         const isOffbeatEighth = sInB === 2; // Step 2 (the "and")
 
@@ -532,11 +672,18 @@ export function getSoloistNote(
         let weight = 1.0;
 
         const isScaleTone = (scaleMask >> interval) & 1;
-        if (!isScaleTone) {
-            continue;
-        }
 
         const dist = Math.abs(m - lastMidi);
+
+        // Chromaticism handling
+        const chromaticism = config.chromaticism ?? 0.2;
+        if (!isScaleTone) {
+            if (chromaticism > 0.5 && dist <= 2) {
+                weight += 20 * chromaticism; // allow passing tones if chromaticism is high
+            } else {
+                continue; // Skip non-scale tones usually
+            }
+        }
 
         // Prevent exact repetition unless Funk/Ska
         if (dist === 0) {
@@ -607,9 +754,10 @@ export function getSoloistNote(
             const upcomingInterval = (pc - (upcomingRoot % 12) + 12) % 12;
 
             // Is the candidate pitch the root or 3rd of the upcoming target chord?
+            const targetAnchoring = config.targetAnchoring ?? 0.8;
             if (upcomingInterval === 0 || upcomingInterval === upcoming3rd % 12) {
                 if (isSectionDownbeat || isForcedFallbackResolution) {
-                    weight += 500; // Force resolution on downbeat or fallback
+                    weight += 500 * targetAnchoring; // Force resolution on downbeat or fallback
                 } else if (
                     soloist.phrasingState === 'resolution' &&
                     distanceToStructuralDownbeat <= stepsPerMeasure
@@ -618,13 +766,13 @@ export function getSoloistNote(
                     // At distance 16 (1 measure), weight is slightly boosted.
                     // At distance 2 (1 eighth note), weight is heavily boosted.
                     const distanceFactor = 1.0 - distanceToStructuralDownbeat / stepsPerMeasure;
-                    const exponentialPull = distanceFactor ** 2 * 200;
-                    weight += 50 + exponentialPull;
+                    const exponentialPull = distanceFactor ** 2 * 200 * targetAnchoring;
+                    weight += 50 * targetAnchoring + exponentialPull;
                 } else if (
                     soloist.transitionState === 'lead_in' &&
                     distanceToStructuralDownbeat <= 8
                 ) {
-                    weight += 100 + (8 - distanceToStructuralDownbeat) * 15; // Linear pull for standard lead_in
+                    weight += (100 + (8 - distanceToStructuralDownbeat) * 15) * targetAnchoring; // Linear pull for standard lead_in
                 }
             }
         }
