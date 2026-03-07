@@ -531,17 +531,22 @@ function getChordAtStep(step) {
  * @param {boolean} isGroupStart - Whether this step is the start of a rhythm group.
  * @param {string} sectionId - The ID of the current song section.
  */
-function scheduleDrums(
-    step,
-    time,
-    isDownbeat,
-    isQuarter,
-    isBackbeat,
-    absoluteStep,
-    isGroupStart,
-    sectionId,
-    beatIndex,
-) {
+function scheduleDrums(params) {
+    const {
+        step,
+        time,
+        isDownbeat,
+        isQuarter,
+        isBackbeat,
+        absoluteStep,
+        isGroupStart,
+        sectionId,
+        beatIndex,
+        isOffbeat,
+        isTurnaround,
+        stepsPerBar,
+    } = params;
+
     const { playback, groove, vizState, midi } = getState();
     const conductorVel = playback.conductorVelocity || 1.0;
     const finalTime = time + calculatePocketOffset(playback, groove);
@@ -620,6 +625,10 @@ function scheduleDrums(
             isBackbeat,
             isGroupStart,
             beatIndex,
+            isOffbeat,
+            isTurnaround,
+            stepsPerBar,
+            loopStep: step, // scheduleDrums 'step' is the local drum loop step
         });
 
         if (shouldPlay && !inst.muted) {
@@ -1126,17 +1135,30 @@ export function scheduleGlobalEvent(step, swungTime) {
         const chordDataForDrums = getChordAtStep(step);
         const sectionId = chordDataForDrums?.chord?.sectionId || null;
 
-        scheduleDrums(
-            drumStep,
-            t,
-            stepInfo.isMeasureStart,
+        // --- Port Turnaround Logic from Worker ---
+        const stepsPerBar = spm;
+        const entry = arranger.stepMap?.find((e) => step >= e.start && step < e.end);
+        let isTurnaround = false;
+        if (entry && groove.creativity) {
+            const measuresInSection = Math.max(1, (entry.end - entry.start) / stepsPerBar);
+            const barInSection = Math.floor((step - entry.start) / stepsPerBar);
+            isTurnaround = barInSection === measuresInSection - 1;
+        }
+
+        scheduleDrums({
+            step: drumStep,
+            time: t,
+            isDownbeat: stepInfo.isMeasureStart,
             isQuarter,
             isBackbeat,
-            step,
-            stepInfo.isGroupStart,
+            absoluteStep: step,
+            isGroupStart: stepInfo.isGroupStart,
             sectionId,
-            stepInfo.beatIndex,
-        );
+            beatIndex: stepInfo.beatIndex,
+            isOffbeat: stepInfo.isBeatStart === false && step % (ts.stepsPerBeat / 2) === 0,
+            isTurnaround,
+            stepsPerBar,
+        });
     }
 
     const chordData = getChordAtStep(step);

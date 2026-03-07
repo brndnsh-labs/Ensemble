@@ -172,7 +172,7 @@ export function applyGrooveOverrides({
         let isEOfBeat = false;
 
         if (arrangerState.timeSignature === '4/4') {
-            isBackbeatAdjacent = [5, 13].includes(loopStep);
+            isBackbeatAdjacent = [3, 5, 11, 13].includes(loopStep);
             isEOfBeat = [1, 9].includes(loopStep);
         }
         const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeat);

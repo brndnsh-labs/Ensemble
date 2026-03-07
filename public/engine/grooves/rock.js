@@ -61,7 +61,9 @@ export function applyOverrides(context, state) {
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     const halfBarStep = Math.floor(stepsPerBar / 2);
-    const isEighthNote = isBeatStart || isOffbeat;
+    // isOffbeat should be passed in context, fallback to manual check if missing
+    const safeIsOffbeat = isOffbeat !== undefined ? isOffbeat : loopStep % (stepsPerBar / 8) === 2;
+    const isEighthNote = isBeatStart || safeIsOffbeat;
 
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         if (isTurnaround && loopStep >= halfBarStep) {
@@ -84,15 +86,15 @@ export function applyOverrides(context, state) {
         if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
         } else if (activeMotif === 1) {
-            if (isOffbeat && (beatIndex === 1 || beatIndex === 2)) {
+            if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 2)) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
-            if (isOffbeat && beatIndex === 2) {
+            if (safeIsOffbeat && beatIndex === 2) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 3) {
-            if (isOffbeat && (beatIndex === 1 || beatIndex === 3)) {
+            if (safeIsOffbeat && (beatIndex === 1 || beatIndex === 3)) {
                 shouldPlay = true;
             }
         }
@@ -114,7 +116,8 @@ export function applyOverrides(context, state) {
             }
         } else {
             if (!shouldPlay && !isEighthNote && (beatIndex === 1 || beatIndex === 2)) {
-                if (intensity > 0.4 && intensity < 0.75 && roll(0.08)) {
+                // Ghost notes: restrict to medium intensity range to keep high intensity focused
+                if (intensity > 0.4 && intensity < 0.8 && roll(0.12)) {
                     shouldPlay = true;
                     velocity = 0.25;
                 }

@@ -54,7 +54,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
     it('should generate extra hits (Entropy) when creativity is enabled', () => {
         mockParams.groove.creativity = true;
         mockParams.playback.bandIntensity = 1.0; // Max probability
-        mockParams.step = 3; // Syncopated step (not blocked for Rock)
+        mockParams.step = 7; // Syncopated step (not blocked for Rock)
 
         let generatedHits = 0;
         for (let i = 0; i < 200; i++) {
