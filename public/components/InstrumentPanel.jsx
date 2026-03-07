@@ -90,6 +90,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                         class={powerClass}
                         id={`${module === 'chords' ? 'chord' : module}PowerBtnDesktop`}
                         aria-label={`Toggle ${title}`}
+                        aria-pressed={enabled}
                         onClick={() => togglePower(module)}
                     >
                         ⏻

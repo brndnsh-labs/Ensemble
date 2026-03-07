@@ -90,6 +90,7 @@ export function GroovePanel({ isActiveMobile }) {
                         class={`power-btn desktop-power-btn ${enabled ? 'active' : ''}`}
                         id="groovePowerBtnDesktop"
                         aria-label="Toggle Grooves"
+                        aria-pressed={enabled}
                         onClick={() => togglePower('groove')}
                     >
                         ⏻

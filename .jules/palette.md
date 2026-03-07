@@ -10,3 +10,7 @@
 ## 2025-03-05 - Contextual Accessible Names for Generic Buttons
 **Learning:** Generic icon-only buttons like "Settings" (⋮) in repeating or multi-panel layouts (like `InstrumentPanel` or `SectionCard`) are ambiguous to screen reader users if they all have the exact same `aria-label` (e.g. "Settings" or "Section Actions Menu"). Additionally, if they trigger menus, they need state indicators.
 **Action:** Always interpolate contextual data into the `aria-label` for generic buttons (e.g. ``aria-label={`${title} Settings`}``) and include `aria-expanded` and `aria-haspopup="true"` to accurately communicate their state and function.
+
+## 2025-02-17 - Dynamic Text and ARIA
+**Learning:** Adding a static `aria-label` or `aria-pressed` to buttons with dynamically changing text (like a play/stop button with a timer) hides that critical dynamic information from screen readers.
+**Action:** Only use `aria-pressed` on buttons whose accessible name/text doesn't change when toggled (e.g. icon-only instrument power buttons). Rely on the changing text for explicit state (e.g. 'START' vs 'STOP').
