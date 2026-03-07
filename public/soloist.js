@@ -234,7 +234,8 @@ export function getSoloistNote(
                 soloist.notesInPhrase = 0; // @worker-mutation
                 // Calculate new active duration based on intensity and config
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                soloist.activeSteps = Math.floor(baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5)); // @worker-mutation
+                const activeVal = baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5);
+                soloist.activeSteps = Math.floor(activeVal); // @worker-mutation
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
             }
         }
@@ -259,7 +260,9 @@ export function getSoloistNote(
             // Phrase-Density Fatigue: Longer rests after busy phrases
             const fatigueMultiplier = 1.0 + (soloist.notesInPhrase || 0) * 0.05;
 
-            soloist.restSteps = Math.floor(stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5)); // @worker-mutation
+            const restVal =
+                stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5);
+            soloist.restSteps = Math.floor(restVal); // @worker-mutation
             if (soloist.restSteps < 4) {
                 soloist.restSteps = 4; // @worker-mutation minimum breath
             }
