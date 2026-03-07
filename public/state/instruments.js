@@ -66,6 +66,7 @@ export const bass = {
  * @property {number} volume - Mix volume (0.0 - 1.0).
  * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
  * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
+ * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
  */
 export const soloist = {
     enabled: false,
@@ -108,6 +109,7 @@ export const soloist = {
     isWaitingForEntry: false,
     isYielding: false,
     leadSheetMelody: [],
+    phrasingIntensity: 0.5,
 };
 
 /**
@@ -313,6 +315,9 @@ export function setSoloistParam(param, value) {
         case 'phraseStartStep':
             soloist.phraseStartStep = value;
             break;
+        case 'phrasingIntensity':
+            soloist.phrasingIntensity = value;
+            break;
         default:
             console.warn(`[State] Unknown soloist param: ${param}`);
             break;
@@ -426,6 +431,7 @@ export function instrumentReducer(action, payload) {
                 tradeMode: 'manual',
                 isWaitingForEntry: false,
                 isYielding: false,
+                phrasingIntensity: 0.5,
             });
             Object.assign(harmony, {
                 enabled: false,
