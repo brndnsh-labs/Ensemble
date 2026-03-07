@@ -5,6 +5,13 @@
 import { Harmonizer } from './melody-harmonizer.js';
 import { getStepsPerMeasure } from './utils.js';
 
+const REGEX_MIN7 = /min7/g;
+const REGEX_MAJ7 = /maj7/g;
+const REGEX_MIN = /min/g;
+const REGEX_MI7 = /mi7/g;
+const REGEX_MA7 = /ma7/g;
+const REGEX_MI = /mi/g;
+
 export function parseMusicXML(xmlString) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlString, 'application/xml');
@@ -166,13 +173,14 @@ export function parseMusicXML(xmlString) {
                 // Clean up format to match Ensemble expectations if needed
                 let chordString = `${root}${alter}${kind}`;
                 // Map common MusicXML text to Ensemble formats
+                // Optimization: Replace inline regexes with module constants to reduce recompilation overhead
                 chordString = chordString
-                    .replace(/min7/g, 'm7')
-                    .replace(/maj7/g, 'maj7')
-                    .replace(/min/g, 'm')
-                    .replace(/mi7/g, 'm7')
-                    .replace(/ma7/g, 'maj7')
-                    .replace(/mi/g, 'm');
+                    .replace(REGEX_MIN7, 'm7')
+                    .replace(REGEX_MAJ7, 'maj7')
+                    .replace(REGEX_MIN, 'm')
+                    .replace(REGEX_MI7, 'm7')
+                    .replace(REGEX_MA7, 'maj7')
+                    .replace(REGEX_MI, 'm');
 
                 measureChords.push(chordString);
             }
