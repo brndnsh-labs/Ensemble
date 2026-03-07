@@ -296,9 +296,8 @@ export function getSoloistNote(
         return res;
     };
 
-    if (!isPriming) {
-        soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
-    }
+    // We intentionally DO increment sessionSteps during priming so the engine warms up
+    soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
 
     // --- 0. Lead Sheet Melody ---
     if (activeStyle === 'lead_sheet') {
@@ -439,6 +438,9 @@ export function getSoloistNote(
     }
 
     // --- 2. Consolidated Phrasing State Machine ---
+    // Maintain backwards compatibility with legacy properties and outside observers
+    soloist.isResting = soloist.phrasingState === 'rest' || soloist.phrasingState === undefined; // @worker-mutation
+
     if (soloist.phrasingState === undefined || soloist.phrasingState === 'rest') {
         if (soloist.phrasingState === undefined) {
             soloist.phrasingState = 'rest'; // @worker-mutation
