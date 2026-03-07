@@ -1521,6 +1521,9 @@ function processMessage(type, data, startTime) {
                 cbBufferHead = data.step;
                 hbBufferHead = data.step;
                 soloist.isResting = true; // @worker-mutation
+                soloist.phrasingState = 'rest'; // @worker-mutation
+                soloist.transitionState = null; // @worker-mutation
+                soloist.rhythmicMotif = []; // @worker-mutation
                 soloist.busySteps = 0; // @worker-mutation
                 soloist.activeSteps = 0; // @worker-mutation
                 soloist.restSteps = 0; // @worker-mutation
@@ -1529,6 +1532,8 @@ function processMessage(type, data, startTime) {
                 bass.busySteps = 0; // @worker-mutation
                 soloist.hookBuffer = []; // @worker-mutation
                 soloist.sharedHookBuffer = []; // @worker-mutation
+                soloist.lickDictionary = []; // @worker-mutation
+                soloist.recentNotes = []; // @worker-mutation
                 harmony.lastMidis = []; // @worker-mutation
 
                 // Reset accompaniment memory
@@ -1634,6 +1639,9 @@ function handlePrime(steps) {
 
     // Reset soloist state for priming
     soloist.isResting = true; // @worker-mutation
+    soloist.phrasingState = 'rest'; // @worker-mutation
+    soloist.transitionState = null; // @worker-mutation
+    soloist.rhythmicMotif = []; // @worker-mutation
     soloist.busySteps = 0; // @worker-mutation
     bass.busySteps = 0; // @worker-mutation
     soloist.activeSteps = 0; // @worker-mutation
