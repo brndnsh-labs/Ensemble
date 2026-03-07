@@ -260,21 +260,18 @@ function GenreSelector() {
         import('../presets.js').then(({ SMART_GENRES }) => {
             const config = SMART_GENRES[genre];
             if (config) {
-                import('../state.js').then(({ groove }) => {
-                    Object.assign(groove, { lastSmartGenre: genre });
-                    dispatch(ACTIONS.SET_GENRE_FEEL, {
-                        genreName: genre,
-                        feel: config.feel,
-                        swing: config.swing,
-                        sub: config.sub,
-                        drum: config.drum,
-                        chord: config.chord,
-                        bass: config.bass,
-                        soloist: config.soloist,
-                    });
-                    syncWorker();
-                    saveCurrentState();
+                dispatch(ACTIONS.SET_GENRE_FEEL, {
+                    genreName: genre,
+                    feel: config.feel,
+                    swing: config.swing,
+                    sub: config.sub,
+                    drum: config.drum,
+                    chord: config.chord,
+                    bass: config.bass,
+                    soloist: config.soloist,
                 });
+                syncWorker();
+                saveCurrentState();
             }
         });
     };

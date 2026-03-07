@@ -278,11 +278,15 @@ export function grooveReducer(action, payload, playback) {
             return false;
         case ACTIONS.SET_GENRE_FEEL:
             if (playback.isPlaying) {
-                Object.assign(groove, { pendingGenreFeel: payload });
+                Object.assign(groove, {
+                    pendingGenreFeel: payload,
+                    lastSmartGenre: payload.genreName || groove.lastSmartGenre,
+                });
             } else {
                 const updates = {
                     genreFeel: payload.feel,
                     pendingGenreFeel: null,
+                    lastSmartGenre: payload.genreName || groove.lastSmartGenre,
                     activeTab: 'smart',
                     // Create a fresh array reference to ensure UI components like SequencerGrid re-render
                     instruments: groove.instruments.map((inst) => ({
