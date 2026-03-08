@@ -62,44 +62,57 @@ header {
     border-bottom: 1px solid var(--border-color);
 }
 
+#settingsBtn {
+    padding: 0.5rem;
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 @media (max-width: 600px) {
     header {
-        padding: 0.5rem 0.6rem;
+        padding: 0.5rem 0.75rem;
         height: 64px;
-        gap: 0.35rem;
+        gap: 0.5rem;
         max-width: 100%;
         overflow: hidden;
         justify-content: space-between;
     }
 
     h1 {
-        font-size: 1.15rem;
+        font-size: 1.1rem;
         letter-spacing: -0.03em;
-        flex-shrink: 0;
-        overflow: visible;
+        flex-shrink: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .main-controls {
-        gap: 0.4rem;
-        flex-shrink: 1;
+        gap: 0.35rem;
+        flex-shrink: 0;
         justify-content: flex-end;
     }
 
     .primary-btn {
-        min-width: 64px;
-        font-size: 0.8rem;
-        padding: 0.5rem 0.4rem;
+        min-width: 60px;
+        font-size: 0.75rem;
+        padding: 0.4rem 0.35rem;
     }
 
     input[type="number"] {
-        width: 42px;
-        font-size: 0.9rem;
+        width: 38px;
+        font-size: 0.85rem;
         padding: 0;
     }
 
     .control-group {
-        padding: 0.2rem 0.25rem;
-        gap: 0.2rem;
+        padding: 0.15rem 0.2rem;
+        gap: 0.15rem;
     }
 
     .control-label {
@@ -107,14 +120,14 @@ header {
     }
 
     #settingsBtn {
-        margin-right: 0;
-        padding: 0.3rem;
-        font-size: 1.25rem;
+        margin-right: -0.25rem; /* Allow some negative margin to balance padding but keep it on screen */
+        padding: 0.4rem;
+        font-size: 1.2rem;
     }
 
     #tapBtn {
-        padding: 0.25rem 0.4rem;
-        font-size: 0.75rem;
+        padding: 0.2rem 0.35rem;
+        font-size: 0.7rem;
     }
 }
 
