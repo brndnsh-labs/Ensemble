@@ -1,6 +1,11 @@
 import { compingState, getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass.js';
 import { TIME_SIGNATURES } from './config.js';
+import {
+    createCoordinationContext,
+    enforceRegisterSlotting,
+    updateCoordinationContext,
+} from './engine/coordination-engine.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './engine/groove-engine.js';
 import { generateProceduralFill } from './fills.js';
 import { analyzeForm } from './form-analysis.js';
@@ -73,17 +78,6 @@ function safeSync(target, source, moduleName) {
         }
     }
 }
-
-// Shared state for multi-way coordination within a single step
-const stepCoordination = {
-    step: -1,
-    bassHit: false,
-    bassMidi: 0,
-    soloistActive: false,
-    soloistMidi: 0,
-    accompanimentHit: false,
-    accompanimentMidis: [],
-};
 
 let lastChordIndex = 0;
 let lastSectionIndex = 0;
@@ -495,19 +489,10 @@ class ExportProcessor {
             measuresInSection > 1 &&
             barInSection % measuresInSection === measuresInSection - 1;
 
-        // Coordination state for export
-        const coordination = {
-            step: globalStep,
-            bassHit: false,
-            bassMidi: 0,
-            soloistActive: false,
-            soloistMidi: 0,
-            accompanimentHit: false,
-            accompanimentMidis: [],
-            kickHit: false,
-            snareHit: false,
-            upcomingSectionFirstChord: null,
-        };
+        const state = getState();
+        // 1. Context Assembly (Anchor: Groove)
+        const coordination = createCoordinationContext(globalStep, state);
+        coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
             const { sectionEnd } = chordData;
@@ -590,61 +575,7 @@ class ExportProcessor {
                 }
             }
 
-            // 1. Bass (Moved up for coordination)
-            if (
-                this.includedTracks.includes('bass') &&
-                isBassActive(bass.style, globalStep, stepInChord, stepInfo)
-            ) {
-                const { sectionStart, sectionEnd } = chordData;
-                const res = getBassNote(
-                    chord,
-                    nextChordData?.chord,
-                    stepInChord / this.ts.stepsPerBeat,
-                    bass.lastFreq,
-                    bass.octave,
-                    bass.style,
-                    chordData.chordIndex,
-                    globalStep,
-                    stepInChord,
-                    { sectionStart, sectionEnd, stepCoordination: coordination },
-                    stepInfo,
-                );
-                if (res?.midi) {
-                    const noteTimeS = stepTimeS + (res.timingOffset || 0);
-                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
-
-                    let finalVel = res.velocity;
-                    if (res.muted) {
-                        finalVel *= 0.25;
-                    }
-                    const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
-
-                    this.bassTrack.noteOn(notePulse, 1, res.midi, midiVel);
-
-                    let endTimeS;
-                    if (res.durationSteps < 1) {
-                        endTimeS = noteTimeS + res.durationSteps * this.sixteenthSec;
-                    } else {
-                        const targetStepIdx = globalStep + Math.round(res.durationSteps);
-                        endTimeS =
-                            this.stepTimes[targetStepIdx] ||
-                            noteTimeS + res.durationSteps * this.sixteenthSec;
-                    }
-                    if (endTimeS - noteTimeS < 0.05) {
-                        endTimeS = noteTimeS + 0.05;
-                    }
-                    endTimeS += 0.02;
-
-                    this.bassTrack.noteOff(this.toPulses(endTimeS), 1, res.midi);
-                    bass.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
-
-                    // Register in coordination state
-                    coordination.bassHit = true;
-                    coordination.bassMidi = res.midi;
-                }
-            }
-
-            // 2. Soloist
+            // 2. Soloist Generation (High Priority)
             let soloResult = null;
             if (this.includedTracks.includes('soloist')) {
                 const { sectionStart, sectionEnd } = chordData;
@@ -673,6 +604,9 @@ class ExportProcessor {
                                 1,
                                 Math.min(127, Math.round(res.velocity * polyphonyComp * 127)),
                             );
+
+                            // Enforce Contract: Register Slotting
+                            res.midi = enforceRegisterSlotting('soloist', res.midi, coordination);
 
                             if (res.bendStartInterval) {
                                 this.soloistTrack.pitchBend(
@@ -707,17 +641,68 @@ class ExportProcessor {
                             this.soloistTrack.noteOff(this.toPulses(endTimeS), 2, res.midi);
                             if (!res.isDoubleStop) {
                                 soloist.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
-
-                                // Register in coordination state
-                                coordination.soloistActive = true;
-                                coordination.soloistMidi = res.midi;
                             }
                         }
                     });
+                    updateCoordinationContext(coordination, 'soloist', soloResult);
                 }
             }
 
-            // 3. Chords (Accompaniment)
+            // 3. Bass Generation (Yields to Soloist, Locks to Kick)
+            if (
+                this.includedTracks.includes('bass') &&
+                isBassActive(bass.style, globalStep, stepInChord, stepInfo, coordination)
+            ) {
+                const { sectionStart, sectionEnd } = chordData;
+                const res = getBassNote(
+                    chord,
+                    nextChordData?.chord,
+                    stepInChord / this.ts.stepsPerBeat,
+                    bass.lastFreq,
+                    bass.octave,
+                    bass.style,
+                    chordData.chordIndex,
+                    globalStep,
+                    stepInChord,
+                    { sectionStart, sectionEnd, stepCoordination: coordination },
+                    stepInfo,
+                );
+                if (res?.midi) {
+                    const noteTimeS = stepTimeS + (res.timingOffset || 0);
+                    const notePulse = Math.max(0, this.toPulses(noteTimeS));
+
+                    let finalVel = res.velocity;
+                    if (res.muted) {
+                        finalVel *= 0.25;
+                    }
+                    const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
+
+                    // Enforce Contract: Register Slotting
+                    res.midi = enforceRegisterSlotting('bass', res.midi, coordination);
+
+                    this.bassTrack.noteOn(notePulse, 1, res.midi, midiVel);
+
+                    let endTimeS;
+                    if (res.durationSteps < 1) {
+                        endTimeS = noteTimeS + res.durationSteps * this.sixteenthSec;
+                    } else {
+                        const targetStepIdx = globalStep + Math.round(res.durationSteps);
+                        endTimeS =
+                            this.stepTimes[targetStepIdx] ||
+                            noteTimeS + res.durationSteps * this.sixteenthSec;
+                    }
+                    if (endTimeS - noteTimeS < 0.05) {
+                        endTimeS = noteTimeS + 0.05;
+                    }
+                    endTimeS += 0.02;
+
+                    this.bassTrack.noteOff(this.toPulses(endTimeS), 1, res.midi);
+                    bass.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
+                    updateCoordinationContext(coordination, 'bass', res);
+                }
+            }
+
+            // 4. Chords Generation (Yields Density to Soloist)
             if (this.includedTracks.includes('chords')) {
                 const notes = getAccompanimentNotes(
                     chord,
@@ -735,6 +720,9 @@ class ExportProcessor {
                     const notePulse = Math.max(0, this.toPulses(noteTimeS));
 
                     if (n.midi > 0) {
+                        // Enforce Contract: Register Slotting
+                        n.midi = enforceRegisterSlotting('chords', n.midi, coordination);
+
                         n.ccEvents.forEach((cc) =>
                             this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
                         );
@@ -761,16 +749,13 @@ class ExportProcessor {
                         }
 
                         this.chordTrack.noteOff(this.toPulses(endTimeS), 0, n.midi);
-
-                        // Register in coordination state
-                        coordination.accompanimentHit = true;
-                        coordination.accompanimentMidis.push(n.midi);
                     } else if (n.ccEvents.length > 0) {
                         n.ccEvents.forEach((cc) =>
                             this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
                         );
                     }
                 });
+                updateCoordinationContext(coordination, 'chords', notes);
             }
 
             // 4. Harmonies
@@ -1198,7 +1183,8 @@ export function getChordAtStep(step, cursor = null) {
 }
 
 function fillBuffers(currentStep, requestTimestamp = null, processStartTime = null) {
-    const { arranger, chords, bass, soloist, harmony } = getState();
+    const state = getState();
+    const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
     const targetStep = currentStep + LOOKAHEAD;
     const notesToMain = [];
     if (bbBufferHead < currentStep) {
@@ -1225,78 +1211,91 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
     }
 
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const _stepsPerMeasure = ts.beats * ts.stepsPerBeat;
+    const stepsPerBar = ts.beats * ts.stepsPerBeat;
 
     while (head < targetStep) {
         const step = head;
         const chordData = getChordAtStep(step, mainCursor);
         const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
-        // Reset step coordination for this specific step
-        stepCoordination.step = step;
-        stepCoordination.upcomingSectionFirstChord = null;
+        // 1. Context Assembly (Anchor: Groove)
+        const coordination = createCoordinationContext(step, state);
+        coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
             const { sectionEnd } = chordData;
             const remainingSteps = sectionEnd - step;
-            const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
             const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
 
-            // Look ahead to the next section if we are within 1 measure of the end
             if (remainingSteps <= stepsPerMeasure) {
                 const nextSectionChordData = getChordAtStep(sectionEnd, lookaheadCursor);
                 if (nextSectionChordData?.chord) {
-                    stepCoordination.upcomingSectionFirstChord = nextSectionChordData.chord;
+                    coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
                 }
             }
         }
-        stepCoordination.bassHit = false;
-        stepCoordination.bassMidi = 0;
-        stepCoordination.soloistActive = false;
-        stepCoordination.soloistMidi = 0;
-        stepCoordination.accompanimentHit = false;
-        stepCoordination.accompanimentMidis = [];
 
-        // --- Bass ---
-        if (bass.enabled && step >= bbBufferHead) {
-            if (chordData) {
-                const { chord, stepInChord } = chordData;
-                if (isBassActive(bass.style, step, stepInChord, stepInfo)) {
-                    const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
-                    const { sectionStart, sectionEnd } = chordData;
-                    const bassResult = getBassNote(
-                        chord,
-                        nextChordData?.chord,
-                        stepInChord / ts.stepsPerBeat,
-                        bass.lastFreq,
-                        bass.octave,
-                        bass.style,
-                        chordData.chordIndex,
-                        step,
-                        stepInChord,
-                        { sectionStart, sectionEnd, stepCoordination },
-                        stepInfo,
-                    );
-                    if (bassResult && (bassResult.freq || bassResult.midi)) {
-                        if (!bassResult.midi) {
-                            bassResult.midi = getMidi(bassResult.freq);
-                        }
-                        if (!bassResult.freq) {
-                            bassResult.freq = getFrequency(bassResult.midi);
-                        }
-                        bass.lastFreq = bassResult.freq; // @worker-mutation
-                        notesToMain.push({ ...bassResult, step, module: 'bass' });
+        // Pre-calculate Drum Hits for Coordination
+        const drumStep = step % (groove.measures * stepsPerBar);
+        const sectionId = chordData?.chord?.sectionId || null;
+        const seedIdx =
+            groove.sectionSeedMap && sectionId ? groove.sectionSeedMap[sectionId] || 0 : 0;
+        const preset = DRUM_PRESETS[groove.lastDrumPreset];
 
-                        // Register in coordination state
-                        stepCoordination.bassHit = true;
-                        stepCoordination.bassMidi = bassResult.midi;
-                    }
+        // --- Calculate Turnaround State ---
+        const sectionEntry = arranger.sectionMap?.find((e) => step >= e.start && step < e.end);
+        let measuresInSection = 4;
+        let startStep = 0;
+        if (sectionEntry) {
+            measuresInSection = Math.max(1, (sectionEntry.end - sectionEntry.start) / stepsPerBar);
+            startStep = sectionEntry.start;
+        }
+        const barInSection = Math.floor((step - startStep) / stepsPerBar);
+        const isTurnaround =
+            groove.creativity &&
+            measuresInSection > 1 &&
+            barInSection % measuresInSection === measuresInSection - 1;
+
+        const checkHit = (instName) => {
+            const inst = groove.instruments.find((i) => i.name === instName);
+            if (!inst || inst.muted) {
+                return false;
+            }
+            let stepVal = inst.steps[drumStep];
+            if (groove.creativity && preset?.variations?.[seedIdx]) {
+                const varInst = preset.variations[seedIdx][instName];
+                if (varInst) {
+                    stepVal = varInst[drumStep];
                 }
             }
-            bbBufferHead++;
-        }
 
-        // --- Soloist ---
+            const result = applyGrooveOverrides({
+                step,
+                inst,
+                stepVal,
+                playback,
+                groove,
+                isDownbeat: stepInfo.isMeasureStart,
+                isBeatStart: stepInfo.isBeatStart,
+                isBackbeat: stepInfo.isBackbeat,
+                isGroupStart: stepInfo.isGroupStart,
+                sectionId,
+                beatIndex: stepInfo.beatIndex,
+                isOffbeat: stepInfo.isOffbeat,
+                isEOfBeat: stepInfo.isEOfBeat,
+                isAOfBeat: stepInfo.isAOfBeat,
+                tsConfig: stepInfo.tsConfig,
+                isTurnaround,
+                stepsPerBar,
+                loopStep: drumStep,
+            });
+            return result.shouldPlay;
+        };
+
+        coordination.kickHit = checkHit('Kick');
+        coordination.snareHit = checkHit('Snare');
+
+        // 2. Soloist Generation (High Priority)
         let soloResult = null;
         if (soloist.enabled && step >= sbBufferHead) {
             if (chordData) {
@@ -1311,7 +1310,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     soloist.style,
                     stepInChord,
                     false,
-                    { sectionStart, sectionEnd, stepCoordination },
+                    { sectionStart, sectionEnd, stepCoordination: coordination },
                     stepInfo,
                 );
 
@@ -1323,25 +1322,68 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                             if (!res.midi) {
                                 res.midi = getMidi(res.freq);
                             }
+                            // Enforce Contract: Register Slotting
+                            res.midi = enforceRegisterSlotting('soloist', res.midi, coordination);
+
                             if (!res.freq) {
                                 res.freq = getFrequency(res.midi);
                             }
                             if (!res.isDoubleStop) {
                                 soloist.lastFreq = res.freq; // @worker-mutation
-
-                                // Register in coordination state (non-double-stops)
-                                stepCoordination.soloistActive = true;
-                                stepCoordination.soloistMidi = res.midi;
                             }
                             notesToMain.push({ ...res, step, module: 'soloist' });
                         }
                     }
+                    updateCoordinationContext(coordination, 'soloist', soloResult);
                 }
             }
             sbBufferHead++;
         }
 
-        // --- Chords ---
+        // 3. Bass Generation (Yields to Soloist, Locks to Kick)
+        if (bass.enabled && step >= bbBufferHead) {
+            if (chordData) {
+                const { chord, stepInChord } = chordData;
+                if (isBassActive(bass.style, step, stepInChord, stepInfo, coordination)) {
+                    const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
+                    const { sectionStart, sectionEnd } = chordData;
+                    const bassResult = getBassNote(
+                        chord,
+                        nextChordData?.chord,
+                        stepInChord / ts.stepsPerBeat,
+                        bass.lastFreq,
+                        bass.octave,
+                        bass.style,
+                        chordData.chordIndex,
+                        step,
+                        stepInChord,
+                        { sectionStart, sectionEnd, stepCoordination: coordination },
+                        stepInfo,
+                    );
+                    if (bassResult && (bassResult.freq || bassResult.midi)) {
+                        if (!bassResult.midi) {
+                            bassResult.midi = getMidi(bassResult.freq);
+                        }
+                        // Enforce Contract: Register Slotting
+                        bassResult.midi = enforceRegisterSlotting(
+                            'bass',
+                            bassResult.midi,
+                            coordination,
+                        );
+
+                        if (!bassResult.freq) {
+                            bassResult.freq = getFrequency(bassResult.midi);
+                        }
+                        bass.lastFreq = bassResult.freq; // @worker-mutation
+                        notesToMain.push({ ...bassResult, step, module: 'bass' });
+                        updateCoordinationContext(coordination, 'bass', bassResult);
+                    }
+                }
+            }
+            bbBufferHead++;
+        }
+
+        // 4. Chords Generation (Yields Density to Soloist)
         if (chords.enabled && step >= cbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord } = chordData;
@@ -1351,26 +1393,24 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     stepInChord,
                     stepInfo.mStep,
                     stepInfo,
-                    stepCoordination,
+                    coordination,
                 );
                 for (let i = 0; i < chordNotes.length; i++) {
                     const n = chordNotes[i];
+                    // Enforce Contract: Register Slotting
+                    n.midi = enforceRegisterSlotting('chords', n.midi, coordination);
+
                     if (!n.freq) {
                         n.freq = getFrequency(n.midi);
                     }
                     notesToMain.push({ ...n, step, module: 'chords' });
-
-                    // Register in coordination state
-                    if (n.midi > 0) {
-                        stepCoordination.accompanimentHit = true;
-                        stepCoordination.accompanimentMidis.push(n.midi);
-                    }
                 }
+                updateCoordinationContext(coordination, 'chords', chordNotes);
             }
             cbBufferHead++;
         }
 
-        // --- Harmonies ---
+        // 5. Harmony Generation (Yields to All)
         if (harmony.enabled && step >= hbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord } = chordData;
@@ -1383,7 +1423,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                     harmony.style,
                     stepInChord,
                     soloResult,
-                    stepCoordination,
+                    coordination,
                     stepInfo,
                 );
                 for (let i = 0; i < harmonyNotes.length; i++) {
@@ -1588,16 +1628,9 @@ if (typeof self !== 'undefined') {
 }
 
 export function handleResolution(step, requestTimestamp = null, processStartTime = null) {
-    const { arranger, bass, chords, soloist, harmony, groove, playback } = getState();
-    const coordination = {
-        step,
-        bassHit: false,
-        bassMidi: 0,
-        soloistActive: false,
-        soloistMidi: 0,
-        accompanimentHit: false,
-        accompanimentMidis: [],
-    };
+    const state = getState();
+    const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
+    const coordination = createCoordinationContext(step, state);
 
     const notesToMain = generateResolutionNotes(
         step,
@@ -1664,64 +1697,14 @@ function handlePrime(steps) {
 
         if (chordData) {
             const { chord, stepInChord } = chordData;
-            const nextChordData = getChordAtStep(s + 4, primeLookaheadCursor);
+            const nextChordData = getChordAtStep(s, primeLookaheadCursor);
             const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
 
-            const coordination = {
-                step: s,
-                bassHit: false,
-                bassMidi: 0,
-                soloistActive: false,
-                soloistMidi: 0,
-                accompanimentHit: false,
-                accompanimentMidis: [],
-                kickHit: false,
-                snareHit: false,
-                upcomingSectionFirstChord: null,
-            };
+            const state = getState();
+            const coordination = createCoordinationContext(s, state);
+            const { sectionStart, sectionEnd } = chordData;
 
-            const { sectionEnd } = chordData;
-            const remainingSteps = sectionEnd - s;
-            const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-
-            if (remainingSteps <= stepsPerMeasure) {
-                const nextSectionChordData = getChordAtStep(sectionEnd, primeLookaheadCursor);
-                if (nextSectionChordData?.chord) {
-                    coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
-                }
-            }
-
-            // 1. Prime Bass (if enabled) to update bass.lastFreq
-            if (bass.enabled) {
-                if (isBassActive(bass.style, s, stepInChord)) {
-                    const { sectionStart } = chordData;
-                    const centerMidi = bass.octave;
-                    const bassResult = getBassNote(
-                        chord,
-                        nextChordData?.chord,
-                        stepInChord / ts.stepsPerBeat,
-                        bass.lastFreq,
-                        centerMidi,
-                        bass.style,
-                        chordData.chordIndex,
-                        s,
-                        stepInChord,
-                        { sectionStart, sectionEnd, stepCoordination: coordination },
-                    );
-                    if (bassResult && (bassResult.freq || bassResult.midi)) {
-                        if (!bassResult.freq) {
-                            bassResult.freq = 440 * 2 ** ((bassResult.midi - 69) / 12);
-                        }
-                        bass.lastFreq = bassResult.freq; // @worker-mutation
-                        coordination.bassHit = true;
-                        coordination.bassMidi = bassResult.midi;
-                    }
-                }
-            }
-
-            // 2. Prime Soloist
-            const { sectionStart } = chordData;
-
+            // 1. Prime Soloist
             const soloResult = getSoloistNote(
                 chord,
                 nextChordData?.chord,
@@ -1743,11 +1726,36 @@ function handlePrime(steps) {
                         }
                         if (!res.isDoubleStop) {
                             soloist.lastFreq = res.freq; // @worker-mutation
-                            coordination.soloistActive = true;
-                            coordination.soloistMidi = res.midi;
                         }
                     }
                 });
+                updateCoordinationContext(coordination, 'soloist', soloResult);
+            }
+
+            // 2. Prime Bass (if enabled) to update bass.lastFreq
+            if (bass.enabled) {
+                if (isBassActive(bass.style, s, stepInChord, null, coordination)) {
+                    const centerMidi = bass.octave;
+                    const bassResult = getBassNote(
+                        chord,
+                        nextChordData?.chord,
+                        stepInChord / ts.stepsPerBeat,
+                        bass.lastFreq,
+                        centerMidi,
+                        bass.style,
+                        chordData.chordIndex,
+                        s,
+                        stepInChord,
+                        { sectionStart, sectionEnd, stepCoordination: coordination },
+                    );
+                    if (bassResult && (bassResult.freq || bassResult.midi)) {
+                        if (!bassResult.freq) {
+                            bassResult.freq = 440 * 2 ** ((bassResult.midi - 69) / 12);
+                        }
+                        bass.lastFreq = bassResult.freq; // @worker-mutation
+                        updateCoordinationContext(coordination, 'bass', bassResult);
+                    }
+                }
             }
         }
     }
