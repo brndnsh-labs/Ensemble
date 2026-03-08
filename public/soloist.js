@@ -177,12 +177,14 @@ export function getSoloistNote(
     }
 
     // --- Form Awareness & Phrasing States ---
-    const remainingSteps = coordination.sectionEnd - step;
+    const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
+    const stepInForm = step % totalFormSteps;
+    const remainingSteps = coordination.sectionEnd - stepInForm;
     const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
 
     // --- Structural Structural Influence Rotation ---
     // At the start of a section, the soloist adopts a new "state of mind" (influence)
-    if (step === coordination.sectionStart) {
+    if (stepInForm === coordination.sectionStart) {
         const pool = INFLUENCE_POOLS[activeStyle] || [];
         if (pool.length > 0) {
             // High intensity sections might shift influence more frequently (probabilistically)
@@ -204,7 +206,7 @@ export function getSoloistNote(
         // This locks the variation for the next section, preserving micro-level predictability
         const shiftScale = 0.2 + intensity * 0.4; // Max 0.6 shift at high intensity
         soloist.rhythmicEntropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
-    } else if (!isFinalMeasure && step !== coordination.sectionStart) {
+    } else if (!isFinalMeasure && stepInForm !== coordination.sectionStart) {
         soloist.transitionState = null; // @worker-mutation
     }
 
