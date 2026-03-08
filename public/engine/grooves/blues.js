@@ -42,11 +42,11 @@ export function applyOverrides(context, state) {
         isDownbeat,
         isBeatStart,
         isBackbeat,
-        isOffbeat,
         isAOfBeat,
         beatIndex,
         drumComplexity,
         sectionSeed,
+        stepsPerBar,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
@@ -67,21 +67,18 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
         if (activeMotif === 0 || activeMotif === 2 || activeMotif === 3) {
-            if (
-                (isBeatStart && (beatIndex === 0 || beatIndex === 2)) ||
-                (isOffbeat && (beatIndex === 1 || beatIndex === 3))
-            ) {
+            if (isBeatStart || isAOfBeat) {
                 shouldPlay = true;
                 soundName = activeMotif === 2 ? 'Open' : 'HiHat';
 
-                if (isOffbeat) {
+                if (isAOfBeat) {
                     velocity = scaleVelocity(0.6, intensity, 0.1);
                 } else {
                     velocity = scaleVelocity(0.85, intensity, 0.2);
                 }
             }
         } else if (activeMotif === 1) {
-            if (isBeatStart || isOffbeat) {
+            if (isBeatStart || isAOfBeat) {
                 shouldPlay = true;
                 velocity = 0.9;
             }
@@ -92,8 +89,14 @@ export function applyOverrides(context, state) {
             shouldPlay = true;
         }
 
-        if (activeMotif === 3 && isOffbeat && beatIndex === 1) {
-            shouldPlay = true;
+        if (activeMotif >= 2) {
+            const beatsPerMeasure = stepsPerBar / 4;
+            const lastBeatIndex = beatsPerMeasure - 1;
+            const midBeatIndex = Math.floor(beatsPerMeasure / 2) - 1;
+
+            if (isAOfBeat && (beatIndex === lastBeatIndex || beatIndex === midBeatIndex)) {
+                shouldPlay = true;
+            }
         }
 
         if (shouldPlay) {
@@ -106,27 +109,21 @@ export function applyOverrides(context, state) {
             velocity = 1.15;
         }
 
-        if (intensity > 0.6) {
+        if (activeMotif >= 2) {
+            const beatsPerMeasure = stepsPerBar / 4;
+            const midBeatIndex = Math.floor(beatsPerMeasure / 2);
+            // Targeting the beatIndex immediately preceding a backbeat.
+            // In 4/4, backbeats are on index 1 and 3, so we trigger ghost notes
+            // on the isAOfBeat of index 0 and 2.
+
             if (
-                activeMotif === 0 &&
                 isAOfBeat &&
-                (beatIndex === 0 || beatIndex === 2) &&
-                roll(0.4)
+                (beatIndex === 0 || beatIndex === midBeatIndex) &&
+                roll(0.6, intensity)
             ) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.4, intensity, 0.1);
                 instTimeOffset += 0.005;
-            }
-
-            if (activeMotif === 3) {
-                if (isOffbeat && beatIndex === 3 && roll(0.6)) {
-                    shouldPlay = true;
-                    velocity = 0.7;
-                }
-                if (isOffbeat && beatIndex === 2 && roll(0.4)) {
-                    shouldPlay = true;
-                    velocity = 0.5;
-                }
             }
         }
     }

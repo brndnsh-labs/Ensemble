@@ -52,10 +52,11 @@ describe('Blues Groove Integrity', () => {
                 isEOfBeat: info.isEOfBeat,
                 isAOfBeat: info.isAOfBeat,
                 tsConfig: info.tsConfig,
+                stepsPerBar: 16,
             };
         };
 
-        it('should play characteristic Shuffle pattern on Open (Ride) for Motif 0', () => {
+        it('should play characteristic continuous Shuffle pattern on HiHat for Motif 0', () => {
             getState.mockReturnValue(mockState);
             let barIndexMotif0 = -1;
             for (let i = 0; i < 100; i++) {
@@ -68,11 +69,17 @@ describe('Blues Groove Integrity', () => {
                 return;
             }
 
-            // Shuffle steps (1, 2-a, 3, 4-a): 0, 6, 8, 14
-            const shuffleSteps = [0, 6, 8, 14].map((s) => barIndexMotif0 * 16 + s);
+            // Continuous shuffle on 0, 2, 4, 6, 8, 10, 12, 14
+            // Wait, isAOfBeat in 4/4 is typically step 3, 7, 11, 15 if step is sixteenth notes!
+            // isBeatStart is 0, 4, 8, 12.
+            // Let's test the correct step indices.
+            // isBeatStart: 0, 4, 8, 12. isAOfBeat: 3, 7, 11, 15.
+            const shuffleSteps = [0, 3, 4, 7, 8, 11, 12, 15].map((s) => barIndexMotif0 * 16 + s);
             for (const step of shuffleSteps) {
-                const result = applyGrooveOverrides(createParams(step, 'Open'));
+                // We use HiHat because Motif 0 assigns HiHat
+                const result = applyGrooveOverrides(createParams(step, 'HiHat'));
                 expect(result.shouldPlay).toBe(true);
+                expect(result.soundName).toBe('HiHat');
             }
         });
     });
