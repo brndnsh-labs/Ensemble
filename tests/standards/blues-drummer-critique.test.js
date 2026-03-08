@@ -113,8 +113,10 @@ describe('Blues Drummer Critique', () => {
                     kickSolidHits++;
                 }
 
-                // --- CRITIQUE: Shuffle Grid (0, 6, 8, 14) for HiHat/Open ---
-                if ([0, 6, 8, 14].includes(s)) {
+                // --- CRITIQUE: Shuffle Grid (0, 3, 4, 7, 8, 11, 12, 15) for HiHat/Open ---
+                // Continuous triplet shuffle momentum (isBeatStart || isAOfBeat)
+                // In 16th notes: beatStart is 0, 4, 8, 12. AOfBeat is 3, 7, 11, 15.
+                if ([0, 3, 4, 7, 8, 11, 12, 15].includes(s)) {
                     if (stepData.instruments.HiHat || stepData.instruments.Open) {
                         shuffleGridHits++;
                     }
