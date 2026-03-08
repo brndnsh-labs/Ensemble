@@ -27,8 +27,12 @@ describe('Security Ledger Verification: DOM Injection', () => {
     const publicDir = path.join(projectRoot, 'public');
 
     const sourceFiles = getFiles(publicDir).filter((f) => {
-        // Ignore parsers that may need to look at raw HTML/XML
-        return !f.includes('audio-analyzer-lite.js') && !f.includes('musicxml-parser.js');
+        // Ignore bundled code and parsers that may need to look at raw HTML/XML
+        return (
+            !f.includes('public/dist/') &&
+            !f.includes('audio-analyzer-lite.js') &&
+            !f.includes('musicxml-parser.js')
+        );
     });
 
     it('should NOT contain direct innerHTML or dangerouslySetInnerHTML assignments for musical content', () => {
