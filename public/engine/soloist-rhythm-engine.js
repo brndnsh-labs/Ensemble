@@ -53,7 +53,14 @@ export function generateRhythmPlan(
             });
         }
     } else {
+        let sustainStepsRemaining = 0;
+
         for (let step = startStep; step < startStep + activeSteps; step++) {
+            if (sustainStepsRemaining > 0) {
+                sustainStepsRemaining--;
+                continue;
+            }
+
             // Evaluate everything as if we are on 'step'
             const measureStep = step % stepsPerMeasure;
             const stepInBeat = measureStep % stepsPerBeat;
@@ -80,9 +87,9 @@ export function generateRhythmPlan(
 
             // Apply persistent rhythmic entropy if set
             if (soloistState.rhythmicEntropy !== undefined) {
-                // rhythmicEntropy ranges roughly from -1.0 to 1.0. 
+                // rhythmicEntropy ranges roughly from -1.0 to 1.0.
                 // Using multiplicative scaling to keep bounds somewhat reasonable.
-                attackProb *= (1.0 + soloistState.rhythmicEntropy * 0.5);
+                attackProb *= 1.0 + soloistState.rhythmicEntropy * 0.5;
             }
 
             // Syncopation Arc: gently favor syncopation as the session progresses
@@ -179,11 +186,44 @@ export function generateRhythmPlan(
                     stepVelocity *= 0.6; // Soft ghost note
                 }
 
+                // --- STRATEGIC SUSTAIN LOGIC ---
+                let isSustained = false;
+                const baseSustainProb = _config.sustainProb || 0;
+                let finalSustainProb = baseSustainProb;
+
+                // 1. Resolution Hold: Boost sustain if we land on a strong beat after a period of density
+                if (notesInPhrase >= 6 && (isDownbeat || isBeatStart)) {
+                    finalSustainProb += 0.3 * intensity;
+                }
+
+                // 2. Structural Bridge: Sustain leading into or across section boundaries
+                if (isFinalMeasure && stepInBeat >= stepsPerBeat / 2) {
+                    finalSustainProb += 0.4;
+                }
+
+                // 3. Dynamic Contrast: Sparse sections favor holding notes
+                if (
+                    soloistState.rhythmicEntropy !== undefined &&
+                    soloistState.rhythmicEntropy < -0.3
+                ) {
+                    finalSustainProb += 0.2;
+                }
+
+                if (Math.random() < finalSustainProb) {
+                    isSustained = true;
+                    // Held for a logical amount of time (4 steps = 1 beat, 8 steps = 2 beats)
+                    const maxSustain = _config.maxSustainSteps || 8;
+                    const sustainLength = Math.floor(3 + Math.random() * maxSustain);
+                    sustainStepsRemaining = sustainLength;
+                }
+
                 plan.push({
                     stepTarget: step,
                     velocity: Math.min(1.25, stepVelocity),
                     isStrongBeat: isBeatStart || isDownbeat || isBackbeat,
-                    durationSteps: 1, // Placeholder
+                    durationSteps: isSustained ? sustainStepsRemaining + 1 : 1,
+                    isSustained,
+                    vibrato: isSustained,
                 });
             }
         }
@@ -199,7 +239,9 @@ export function generateRhythmPlan(
             : Math.max(1, startStep + activeSteps - current.stepTarget);
 
         let baseDuration = gap;
-        if (['funk', 'disco', 'ska'].includes(style)) {
+        if (current.isSustained) {
+            baseDuration = current.durationSteps;
+        } else if (['funk', 'disco', 'ska'].includes(style)) {
             baseDuration = 1;
         } else if (['blues', 'neo'].includes(style)) {
             baseDuration = gap;

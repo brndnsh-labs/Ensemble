@@ -11,6 +11,9 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9],
         deviceProb: 0.12,
         allowedDevices: ['run', 'slide', 'guitarDouble'],
+        sustainProb: 0.15,
+        maxSustainSteps: 8,
+        vibratoIntensity: 0.8,
 
         rhythmicDensity: 0.5,
         syncopationLikelihood: 0.2,
@@ -84,6 +87,9 @@ export const STYLE_CONFIG = {
         targetExtensions: [9, 10],
         deviceProb: 0.4,
         allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
+        sustainProb: 0.4,
+        maxSustainSteps: 12,
+        vibratoIntensity: 1.2,
 
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.8,
@@ -119,6 +125,9 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 6, 9, 11],
         deviceProb: 0.25,
         allowedDevices: ['quartal', 'slide', 'guitarDouble'],
+        sustainProb: 0.25,
+        maxSustainSteps: 10,
+        vibratoIntensity: 0.9,
 
         rhythmicDensity: 0.5,
         syncopationLikelihood: 0.9,

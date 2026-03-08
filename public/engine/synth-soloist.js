@@ -1,3 +1,4 @@
+import { STYLE_CONFIG } from '../soloist-config.js';
 import { getState } from '../state.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 
@@ -797,6 +798,7 @@ function applyPitchEnvelope(
 
 function createVibrato(ctx, freq, time, duration, style) {
     const { soloist } = getState();
+    const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
     const vibrato = ctx.createOscillator();
     let vibSpeed = 5.5;
     let depthFactor = 0.005;
@@ -811,6 +813,11 @@ function createVibrato(ctx, freq, time, duration, style) {
     } else if (style === 'shred') {
         vibSpeed = 6.5;
         depthFactor = 0.004;
+    }
+
+    // Apply multiplier from config if present
+    if (config.vibratoIntensity !== undefined) {
+        depthFactor *= config.vibratoIntensity;
     }
 
     // Mode-specific differentiation (Lead Synth/Horn/Guitar feel)
