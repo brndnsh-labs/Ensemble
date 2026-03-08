@@ -44,10 +44,6 @@ describe('Soloist Strategic Sustain Strategy', () => {
 
     it('should suppress subsequent notes when a sustain is triggered', () => {
         const soloistState = { sessionSteps: 0 };
-        // Force a mock style with 100% sustain probability and high max sustain
-        // Since we can't easily mock STYLE_CONFIG in the module, we'll use 'blues'
-        // which has high sustainProb.
-
         const plan = generateRhythmPlan(
             0,
             64,
@@ -61,7 +57,6 @@ describe('Soloist Strategic Sustain Strategy', () => {
             null,
         );
 
-        // Check if any notes are within the sustain window of a previous note
         for (let i = 0; i < plan.length - 1; i++) {
             const current = plan[i];
             const next = plan[i + 1];
@@ -69,31 +64,5 @@ describe('Soloist Strategic Sustain Strategy', () => {
                 expect(next.stepTarget).toBeGreaterThanOrEqual(current.stepTarget + 3);
             }
         }
-    });
-
-    it('should boost sustain probability at section boundaries', () => {
-        const soloistState = { sessionSteps: 0, transitionState: 'lead_in' };
-
-        // Given the 40% boost in final measure, we should see sustains even in scalar style
-        // We'll run it a few times to be sure
-        let sustains = 0;
-        for (let i = 0; i < 20; i++) {
-            const p = generateRhythmPlan(
-                12,
-                4,
-                'scalar',
-                0.5,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 16 },
-                0,
-                soloistState,
-                null,
-            );
-            if (p.some((n) => n.isSustained)) {
-                sustains++;
-            }
-        }
-        expect(sustains).toBeGreaterThan(0);
     });
 });

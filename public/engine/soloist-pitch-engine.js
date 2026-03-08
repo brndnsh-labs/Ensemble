@@ -162,13 +162,51 @@ export function selectPitchAndDevices(
         }
 
         // --- Greats Stylistic Profiles ---
-        if (['blues', 'jazz'].includes(activeStyle) && soloistState.phraseContext?.profile) {
+        if (
+            ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle) &&
+            soloistState.phraseContext?.profile
+        ) {
             const profile = soloistState.phraseContext.profile;
             switch (profile) {
                 case 'srv':
                     // SRV: High energy, favors pentatonic/blues notes
                     if ([0, 3, 5, 6, 7, 10].includes(interval)) {
                         weight *= 1.2;
+                    }
+                    break;
+                case 'gilmour':
+                    // Gilmour: Melodic, Root and 5th stability for singsong leads
+                    if ([0, 7].includes(interval)) {
+                        weight *= 1.4;
+                    }
+                    break;
+                case 'slash':
+                    // Slash: Classic rock, targets 3rds and 6ths
+                    if ([4, 9].includes(interval)) {
+                        weight *= 1.3;
+                    }
+                    break;
+                case 'hendrix':
+                    // Hendrix: Double stop focus (handled below) and bluesy 3rds
+                    if (interval === 3 || interval === 10) {
+                        weight *= 1.4;
+                    }
+                    break;
+                case 'evh': {
+                    // EVH: Wide intervals, intense
+                    const evhDist = Math.abs(m - lastMidi);
+                    if (evhDist > 5) {
+                        weight *= 1.5;
+                    }
+                    break;
+                }
+                case 'beck':
+                    // Jeff Beck: Unpredictable intervals, targets #4/b5 for tension
+                    if (interval === 6) {
+                        weight *= 1.5;
+                    }
+                    if (interval === 1) {
+                        weight *= 1.3;
                     }
                     break;
                 case 'monk':
@@ -221,12 +259,12 @@ export function selectPitchAndDevices(
 
         // --- Call & Response: Melodic Resolution ---
         if (
-            ['blues', 'jazz'].includes(activeStyle) &&
+            ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle) &&
             soloistState.phraseContext?.role === 'response'
         ) {
             const isResolutionTone = [0, 7].includes(interval); // Root and 5th
             if (isResolutionTone) {
-                weight *= 3.0; // Aggressively favor strong resolution
+                weight *= 5.0; // Aggressively favor strong resolution
             }
             if (interval === soloistState.phraseContext.lastInterval) {
                 weight *= 0.5; // Avoid stagnation
@@ -372,18 +410,23 @@ export function selectPitchAndDevices(
         let allowed = [...(config.allowedDevices || [])];
 
         // --- Greats Profiles: Device Priority ---
-        if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
+        if (
+            ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle) &&
+            soloistState.phraseContext?.profile
+        ) {
             const profile = soloistState.phraseContext.profile;
             const relativeInterval = (selectedMidi - targetChord.rootMidi + 120) % 12;
 
             if (
-                (profile === 'srv' || profile === 'armstrong') &&
+                (profile === 'srv' || profile === 'armstrong' || profile === 'slash') &&
                 relativeInterval === 3 &&
                 intensity > 0.5
             ) {
                 allowed = ['bluesCurl', ...allowed]; // Prioritize the curl
-            } else if (profile === 'monk') {
+            } else if (profile === 'monk' || profile === 'beck') {
                 allowed = ['graceNote', ...allowed]; // Prioritize crushed notes
+            } else if (profile === 'gilmour' && durationSteps >= 4) {
+                allowed = ['slide', ...allowed];
             }
         }
 

@@ -55,7 +55,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
         const mapping = {
-            Rock: 'scalar',
+            Rock: 'rock',
             Jazz: 'jazz',
             Funk: 'funk',
             Blues: 'blues',
@@ -69,10 +69,10 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
             Country: 'country',
             Metal: 'metal',
             'Rock/Metal': 'metal',
-            'Ska-Punk': 'scalar',
-            Ska: 'scalar',
+            'Ska-Punk': 'rock',
+            Ska: 'rock',
         };
-        style = mapping[groove.genreFeel] || 'scalar';
+        style = mapping[groove.genreFeel] || 'rock';
     }
 
     if (style === 'country') {
@@ -125,7 +125,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         if (
             quality === '7alt' ||
             quality === '7#9' ||
-            (soloist.tension > 0.7 && style !== 'rock' && style !== 'country')
+            (soloist.tension > 0.7 && !['rock', 'scalar', 'country'].includes(style))
         ) {
             if (style === 'funk' || style === 'blues') {
                 return SCALE_INTERVALS.BLUES;
@@ -256,9 +256,9 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         return SCALE_INTERVALS.LYDIAN;
     }
 
-    // Explicitly handle 'scalar' style for non-diatonic Major chords to ensure consonance (Ionian/Lydian)
+    // Explicitly handle 'rock'/'scalar' style for non-diatonic Major chords to ensure consonance (Ionian/Lydian)
     // as requested by dissonance prevention logic (e.g. F Major in C Minor).
-    if (style === 'scalar') {
+    if (style === 'rock' || style === 'scalar') {
         return SCALE_INTERVALS.MAJOR;
     }
 

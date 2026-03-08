@@ -20,7 +20,7 @@ export function generateRhythmPlan(
 
     // --- Call & Response: Rhythmic Mirroring ---
     if (
-        ['blues', 'jazz'].includes(style) &&
+        ['blues', 'jazz', 'rock', 'scalar'].includes(style) &&
         soloistState.phraseContext?.role === 'response' &&
         soloistState.phraseContext?.skeleton?.length > 0 &&
         Math.random() < 0.8 // 80% chance to follow skeleton for response
@@ -79,11 +79,34 @@ export function generateRhythmPlan(
 
             // Map to 16-step emphasis map to handle any meter
             const emphasisIdx = Math.floor((measureStep / stepsPerMeasure) * 16) % 16;
-            const baseAttackProb = emphasisMap[emphasisIdx];
+            let baseAttackProb = emphasisMap[emphasisIdx];
+
+            // --- Emphasis Mutation: Prevent Stagnant Rhythms ---
+            if (['rock', 'scalar', 'blues'].includes(style)) {
+                // Gently shift emphasis based on session progress to prevent 100% predictability
+                const mutation = Math.sin((sessionSteps || 0) / 128) * 0.15;
+                if (emphasisIdx % 4 !== 0) {
+                    // Boost off-beats occasionally
+                    baseAttackProb += Math.max(0, mutation);
+                } else {
+                    // Slightly nudge downbeats
+                    baseAttackProb -= Math.max(0, mutation * 0.5);
+                }
+            }
 
             const warmUpScale = Math.min(1.0, 0.5 + ((sessionSteps || 0) / 64) * 0.5);
             const intensityScale = 0.5 + intensity * 2.0;
             let attackProb = baseAttackProb * intensityScale * warmUpScale;
+
+            // --- Rock Profile Bursts (EVH / Beck) ---
+            if ((style === 'rock' || style === 'scalar') && intensity > 0.65) {
+                const profile = soloistState.phraseContext?.profile;
+                if (profile === 'evh' || profile === 'beck') {
+                    if (stepInBeat % 2 !== 0) {
+                        attackProb *= 1.6; // Boost 16ths for shreddy/unpredictable feel
+                    }
+                }
+            }
 
             // Apply persistent rhythmic entropy if set
             if (soloistState.rhythmicEntropy !== undefined) {

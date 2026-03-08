@@ -37,6 +37,39 @@ export const STYLE_CONFIG = {
             ],
         ],
     },
+    rock: {
+        genreGravityOffset: 0,
+        restBase: 0.1,
+        tensionScale: 0.6,
+        timingJitter: 8,
+        maxNotesPerPhrase: 24,
+        minNotesPerPhrase: 2,
+        doubleStopProb: 0.1,
+        anticipationProb: 0.1,
+        targetExtensions: [2, 9],
+        deviceProb: 0.12,
+        allowedDevices: ['run', 'slide', 'guitarDouble', 'bluesCurl'],
+        sustainProb: 0.2,
+        maxSustainSteps: 8,
+        vibratoIntensity: 1.0,
+
+        rhythmicDensity: 0.5,
+        syncopationLikelihood: 0.3,
+        targetAnchoring: 0.8,
+        chromaticism: 0.1,
+        contourSkeletons: [
+            [
+                { interval: 1, durationSteps: 2 },
+                { interval: 2, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 2, durationSteps: 4 },
+                { interval: -1, durationSteps: 2 },
+                { interval: 1, durationSteps: 2 },
+            ],
+        ],
+    },
     shred: {
         genreGravityOffset: 0,
         restBase: 0.05,
@@ -595,10 +628,11 @@ export const STYLE_EMPHASIS = {
     country: [1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2, 1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2],
     metal: [1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8],
     ska: [0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1],
+    rock: [1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3, 1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3],
 };
 
 export const GENRE_STYLE_MAPPING = {
-    Rock: 'scalar',
+    Rock: 'rock',
     Jazz: 'jazz',
     Funk: 'funk',
     Blues: 'blues',

@@ -797,21 +797,35 @@ function applyPitchEnvelope(
 }
 
 function createVibrato(ctx, freq, time, duration, style) {
-    const { soloist } = getState();
+    const { soloist, playback } = getState();
     const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
     const vibrato = ctx.createOscillator();
-    let vibSpeed = 5.5;
-    let depthFactor = 0.005;
 
-    // Style adjustments
+    const bps = (playback.bpm || 120) / 60;
+    // Find best rhythmic subdivision (2, 3, or 4 cycles per beat) to stay in natural range
+    let vibSpeed = bps * 3;
+    if (vibSpeed > 7.5) {
+        vibSpeed = bps * 2;
+    } else if (vibSpeed < 4.5) {
+        vibSpeed = bps * 4;
+    }
+
+    // Style-based adjustments (relative nudge)
     if (style === 'blues') {
-        vibSpeed = 4.8;
+        vibSpeed -= 0.5;
+    } else if (style === 'neo') {
+        vibSpeed -= 0.8;
+    } else if (style === 'shred') {
+        vibSpeed += 1.2;
+    }
+
+    let depthFactor = 0.005;
+    // Base depth offsets
+    if (style === 'blues') {
         depthFactor = 0.012;
     } else if (style === 'neo') {
-        vibSpeed = 4.2;
         depthFactor = 0.015;
     } else if (style === 'shred') {
-        vibSpeed = 6.5;
         depthFactor = 0.004;
     }
 

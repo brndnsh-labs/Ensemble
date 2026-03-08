@@ -133,6 +133,7 @@ describe('Soloist Synthesis', () => {
     });
 
     it('should configure vibrato for the "blues" style', () => {
+        playback.bpm = 120;
         soloist.mode = 'guitar';
         playSoloNote(440, 10, 1.0, 0.4, 0, 'blues');
 
@@ -140,20 +141,20 @@ describe('Soloist Synthesis', () => {
         const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
-        // Blues speed (baseline) is 4.8
-        expect(vibSpeed).toBeGreaterThanOrEqual(4.8);
+        // Base 120 BPM speed is 6.0. Blues nudge is -0.5. Guitar nudge is +0.4. Total 5.9
+        expect(vibSpeed).toBeCloseTo(5.9);
     });
 
     it('should reduce vibrato speed for monophonic mode', () => {
+        playback.bpm = 120;
         soloist.mode = 'monophonic';
         playSoloNote(440, 10, 1.0, 0.4, 0, 'blues');
 
         const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
-        // Monophonic reduces speed by 0.5 (4.8 -> 4.3)
-        expect(vibSpeed).toBeLessThan(4.5);
-        expect(vibSpeed).toBeGreaterThanOrEqual(4.0);
+        // 6.0 (base) - 0.5 (blues) - 0.5 (monophonic) = 5.0
+        expect(vibSpeed).toBe(5.0);
     });
 
     it('should disable vibrato and use piano-specific synthesis settings', () => {
