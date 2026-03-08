@@ -5,7 +5,8 @@
     "license": "AGPL-3.0-only",
     "type": "module",
     "scripts": {
-        "test": "npm run check-mutations && npm run lint && vitest run",
+        "test": "npm run check-mutations && npm run lint && vitest run --reporter=dot --silent=true",
+        "test:verbose": "npm run check-mutations && npm run lint && vitest run",
         "lint": "biome check .",
         "knip": "knip",
         "format": "biome check --write .",
