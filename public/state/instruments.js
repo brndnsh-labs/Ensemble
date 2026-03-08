@@ -91,6 +91,12 @@ export const soloist = {
     lickDictionary: [],
     recentNotes: [],
     phraseStartStep: null,
+    phraseContext: {
+        role: 'call',
+        skeleton: [],
+        lastInterval: null,
+        profile: 'srv', // 'srv', 'monk', 'armstrong', 'miles'
+    },
     busySteps: 0,
     hookBuffer: [],
     sharedHookBuffer: [], // Shared hooks for band interaction

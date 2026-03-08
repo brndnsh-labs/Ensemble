@@ -58,7 +58,24 @@ export function selectPitchAndDevices(
 
         soloistState.lastMidiPlayed = primary.midi; // @worker-mutation
 
+        // Store interval for call & response tracking
+        if (activeStyle === 'blues' && soloistState.phraseContext) {
+            soloistState.phraseContext.lastInterval =
+                ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12; // @worker-mutation
+        }
+
         let timingOffset = calculateTimingOffset('soloist', groove.pocket, intensity);
+
+        // --- Greats Profiles: Timing ---
+        if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
+            const profile = soloistState.phraseContext.profile;
+            if (profile === 'armstrong' && isBeatStart) {
+                timingOffset += 0.015; // Louis drags behind the beat
+            }
+            if (profile === 'monk' && Math.random() < 0.3) {
+                timingOffset += (Math.random() - 0.5) * 0.025; // Monk displacement
+            }
+        }
 
         // 1. Genre Gravity
         timingOffset += config.genreGravityOffset || 0;
@@ -141,6 +158,51 @@ export function selectPitchAndDevices(
             continue;
         }
 
+        // --- Greats Stylistic Profiles ---
+        if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
+            const profile = soloistState.phraseContext.profile;
+            switch (profile) {
+                case 'srv':
+                    // SRV: High energy, favors pentatonic/blues notes
+                    if ([0, 3, 5, 6, 7, 10].includes(interval)) {
+                        weight *= 1.2;
+                    }
+                    break;
+                case 'monk':
+                    // Monk: Dissonant, targets #4 and b2
+                    if (interval === 6) {
+                        weight *= 1.5;
+                    }
+                    if (interval === 1) {
+                        weight *= 1.3;
+                    }
+                    break;
+                case 'armstrong':
+                    // Armstrong: Classic, Major 3rd and 6th
+                    if (interval === 4 || interval === 9) {
+                        weight *= 1.4;
+                    }
+                    break;
+                case 'miles':
+                    // Miles: Modal, targets extensions (9, 11, 13)
+                    if ([2, 5, 9].includes(interval)) {
+                        weight *= 1.3;
+                    }
+                    break;
+            }
+        }
+
+        // --- Call & Response: Melodic Resolution ---
+        if (activeStyle === 'blues' && soloistState.phraseContext?.role === 'response') {
+            const isResolutionTone = [0, 7].includes(interval); // Root and 5th
+            if (isResolutionTone) {
+                weight *= 3.0; // Aggressively favor strong resolution
+            }
+            if (interval === soloistState.phraseContext.lastInterval) {
+                weight *= 0.5; // Avoid stagnation
+            }
+        }
+
         const dist = Math.abs(m - lastMidi);
         if (dist === 0) {
             if (['funk', 'ska'].includes(activeStyle)) {
@@ -212,7 +274,12 @@ export function selectPitchAndDevices(
         if (isBlueNote) {
             weight += 80;
             if (interval === 3) {
-                weight += 500;
+                // Temper the minor 3rd during responses to allow for clearer resolution to Root/5th
+                if (soloistState.phraseContext?.role === 'response') {
+                    weight += 100;
+                } else {
+                    weight += 500;
+                }
             }
         }
         CANDIDATE_WEIGHTS[m] = weight;
@@ -244,8 +311,52 @@ export function selectPitchAndDevices(
         (soloistState.doubleStopProb ?? 1.0) > 0 &&
         config.doubleStopProb > 0;
 
+    // --- Structural Awareness: Turnaround Handling ---
+    if (activeStyle === 'blues' && coordination.isTurnaround && Math.random() < 0.6) {
+        const deviceBuffer = generateMelodicDevice('bluesTurnaround', {
+            selectedMidi,
+            targetChord,
+            activeStyle,
+            effectiveIntensity: intensity,
+            minMidi,
+            maxMidi,
+            lastMidi,
+            playback,
+            soloist: soloistState,
+            isPolyphonic,
+            isPiano: soloistState.mode === 'piano',
+            dynamicCenter: 72,
+            scaleMask,
+        });
+
+        if (deviceBuffer && deviceBuffer.length > 0) {
+            soloistState.embellishmentBuffer = deviceBuffer.slice(1); // @worker-mutation
+            const first = deviceBuffer[0];
+            soloistState.busySteps =
+                (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
+            return finalizeNote(first);
+        }
+    }
+
     if (isBeatStart && Math.random() < deviceBaseProb) {
         let allowed = [...(config.allowedDevices || [])];
+
+        // --- Greats Profiles: Device Priority ---
+        if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
+            const profile = soloistState.phraseContext.profile;
+            const relativeInterval = (selectedMidi - targetChord.rootMidi + 120) % 12;
+
+            if (
+                (profile === 'srv' || profile === 'armstrong') &&
+                relativeInterval === 3 &&
+                intensity > 0.5
+            ) {
+                allowed = ['bluesCurl', ...allowed]; // Prioritize the curl
+            } else if (profile === 'monk') {
+                allowed = ['graceNote', ...allowed]; // Prioritize crushed notes
+            }
+        }
+
         if (soloistState.mode === 'piano') {
             allowed = allowed.filter(
                 (d) => !['slide', 'countryBend', 'graceSlide', 'chickenPick'].includes(d),

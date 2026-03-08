@@ -495,9 +495,14 @@ class ExportProcessor {
         coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
-            const { sectionEnd } = chordData;
+            const { sectionEnd, sectionStart } = chordData;
             const remainingSteps = sectionEnd - globalStep;
             const stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
+
+            // --- Structural Awareness: Turnaround Detection ---
+            const sectionSteps = sectionEnd - sectionStart;
+            const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
+            coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
             if (remainingSteps <= stepsPerMeasure) {
                 const nextSectionChordData = getChordAtStep(sectionEnd, this.exportLookaheadCursor);
@@ -1237,9 +1242,15 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
-            const { sectionEnd } = chordData;
+            const { sectionEnd, sectionStart } = chordData;
             const remainingSteps = sectionEnd - step;
             const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
+
+            // --- Structural Awareness: Turnaround Detection ---
+            const sectionSteps = sectionEnd - sectionStart;
+            // A turnaround is generally the last 2 bars of a section (if section is long enough)
+            const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
+            coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
             if (remainingSteps <= stepsPerMeasure) {
                 const nextSectionChordData = getChordAtStep(sectionEnd, lookaheadCursor);

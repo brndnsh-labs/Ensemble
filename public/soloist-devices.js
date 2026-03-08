@@ -259,6 +259,41 @@ export function generateMelodicDevice(deviceType, ctx) {
                 bendStartInterval: -dir,
             },
         ];
+    } else if (deviceType === 'bluesCurl') {
+        // Quick bend up and down (half-step)
+        deviceBuffer = [
+            {
+                midi: selectedMidi,
+                velocity: devBaseVel,
+                durationSteps: 1,
+                style: activeStyle,
+                bendStartInterval: 0,
+            },
+            {
+                midi: selectedMidi,
+                velocity: devBaseVel * 0.9,
+                durationSteps: 1,
+                style: activeStyle,
+                bendStartInterval: 0.5,
+            },
+            {
+                midi: selectedMidi,
+                velocity: devBaseVel * 0.8,
+                durationSteps: 2,
+                style: activeStyle,
+                bendStartInterval: 0,
+            },
+        ];
+    } else if (deviceType === 'bluesTurnaround') {
+        const root = targetChord.rootMidi;
+        // Iconic V-IV-I resolution lick
+        deviceBuffer = [
+            { midi: root + 7, durationSteps: 2, style: activeStyle },
+            { midi: root + 6, durationSteps: 2, style: activeStyle },
+            { midi: root + 5, durationSteps: 4, style: activeStyle },
+            { midi: root + 3, durationSteps: 2, style: activeStyle, bendStartInterval: -0.5 },
+            { midi: root, durationSteps: 6, style: activeStyle },
+        ];
     } else if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
         const dsInt = activeStyle === 'blues' || activeStyle === 'scalar' ? 5 : 4;
         deviceBuffer = [

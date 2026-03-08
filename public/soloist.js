@@ -32,7 +32,22 @@ export function getSoloistNote(
         activeStyle = GENRE_STYLE_MAPPING[groove.genreFeel] || 'scalar';
     }
 
-    const intensity = playback.bandIntensity || 0.5;
+    let intensity = playback.bandIntensity || 0.5;
+
+    // --- Safety: Initialize phraseContext if missing (for tests/legacy) ---
+    if (!soloist.phraseContext) {
+        soloist.phraseContext = {
+            role: 'call',
+            skeleton: [],
+            lastInterval: null,
+            profile: 'srv',
+        };
+    }
+
+    // --- Greats Profiles: Intensity/Density Overrides ---
+    if (activeStyle === 'blues' && soloist.phraseContext?.profile === 'miles') {
+        intensity *= 0.6; // Miles uses much more space
+    }
 
     const logDebug = (msg) => {
         if (playback.debugSoloist) {
@@ -221,6 +236,27 @@ export function getSoloistNote(
                 }
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
 
+                // --- Call & Response Framework ---
+                if (activeStyle === 'blues') {
+                    const wasCall = soloist.phraseContext.role === 'call';
+                    const responseProb = wasCall ? 0.7 : 0.2;
+                    const nextRole = Math.random() < responseProb ? 'response' : 'call';
+
+                    logDebug(
+                        `C&R transition: ${soloist.phraseContext.role} -> ${nextRole} (prob: ${responseProb})`,
+                    );
+
+                    if (nextRole === 'call') {
+                        // Pick a new profile for this cycle
+                        const profiles = ['srv', 'monk', 'armstrong', 'miles'];
+                        soloist.phraseContext.profile =
+                            profiles[Math.floor(Math.random() * profiles.length)]; // @worker-mutation
+                    }
+                    soloist.phraseContext.role = nextRole; // @worker-mutation
+                } else {
+                    soloist.phraseContext.role = 'call'; // @worker-mutation
+                }
+
                 // GENERATE RHYTHM PLAN FOR THE PHRASE
                 const nextRhythmPlan = generateRhythmPlan(
                     step,
@@ -235,6 +271,12 @@ export function getSoloistNote(
                     stepInfo,
                 );
                 soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
+
+                // Capture skeleton for future responses
+                if (nextRhythmPlan.length > 0) {
+                    // Skeleton is relative steps from phrase start
+                    soloist.phraseContext.skeleton = nextRhythmPlan.map((n) => n.stepTarget - step); // @worker-mutation
+                }
             }
         }
         if (soloist.isResting) {
