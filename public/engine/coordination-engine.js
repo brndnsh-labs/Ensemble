@@ -39,8 +39,21 @@ export function updateCoordinationContext(context, module, result) {
     switch (module) {
         case 'soloist': {
             const results = Array.isArray(result) ? result : [result];
-            const activeNotes = results.filter((r) => r.midi > 0);
-            const mainResult = activeNotes.find((r) => !r.isDoubleStop) || activeNotes[0];
+            // Optimization: Replace filter/reduce/find chain with single loop to avoid allocations
+            let sum = 0;
+            let count = 0;
+            let mainResult = null;
+
+            for (let i = 0; i < results.length; i++) {
+                const r = results[i];
+                if (r.midi > 0) {
+                    sum += r.midi;
+                    count++;
+                    if (!mainResult || (!r.isDoubleStop && mainResult.isDoubleStop)) {
+                        mainResult = r;
+                    }
+                }
+            }
 
             if (mainResult) {
                 context.soloistActive = true;
@@ -50,8 +63,7 @@ export function updateCoordinationContext(context, module, result) {
                 }
 
                 // Calculate average for harmony slotting
-                const sum = activeNotes.reduce((acc, r) => acc + r.midi, 0);
-                context.avgSoloistMidi = sum / activeNotes.length;
+                context.avgSoloistMidi = sum / count;
             }
             break;
         }
@@ -63,13 +75,20 @@ export function updateCoordinationContext(context, module, result) {
             break;
         case 'chords': {
             const notes = Array.isArray(result) ? result : [result];
-            const activeMidis = notes.map((n) => n.midi).filter((m) => m > 0);
+            // Optimization: Replace map/filter/reduce chain with standard for loop to avoid intermediate array allocations
+            const activeMidis = [];
+            let sum = 0;
+            for (let i = 0; i < notes.length; i++) {
+                const m = notes[i].midi;
+                if (m > 0) {
+                    activeMidis.push(m);
+                    sum += m;
+                }
+            }
 
             if (activeMidis.length > 0) {
                 context.accompanimentHit = true;
                 context.accompanimentMidis = activeMidis;
-
-                const sum = activeMidis.reduce((acc, m) => acc + m, 0);
                 context.avgChordMidi = sum / activeMidis.length;
             }
             break;
