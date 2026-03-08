@@ -45,48 +45,35 @@ echo "📦 Bundling JavaScript..."
 echo "🎨 Bundling CSS..."
 ./node_modules/.bin/esbuild public/styles.css --bundle $MINIFY_FLAG --sourcemap --outfile=dist/styles.$REV.css
 
-# 5. Copy other assets
+# 5. Copy static assets
 echo "📄 Copying static assets..."
-cp public/index.html dist/index.html
-cp public/manual.html dist/manual.html
-cp public/manual-theme.js dist/manual-theme.js
-cp public/manifest.json dist/manifest.json
-cp public/icon.svg dist/icon.svg
-cp public/icon-192.png dist/icon-192.png
-cp public/icon-512.png dist/icon-512.png
-cp public/sw.js dist/sw.js
+cp public/{index.html,manual.html,manual-theme.js,manifest.json,icon.svg,icon-192.png,icon-512.png,sw.js} dist/
 
-# 6. Update index.html and manual.html with hashed filenames
-echo "🔧 Updating index.html and manual.html..."
-sed -i "s/styles.css/styles.$REV.css/" dist/index.html
-sed -i "s/main.js/main.$REV.js/" dist/index.html
-sed -i "s/styles.css/styles.$REV.css/" dist/manual.html
-
-# 7. Update sw.js with hashed assets and cache name using placeholders
-echo "🔧 Updating Service Worker..."
+# 6. Update HTML and Service Worker
+echo "🔧 Injecting hashes and manifest..."
+sed -i "s/styles.css/styles.$REV.css/g" dist/*.html
+sed -i "s/main.js/main.$REV.js/g" dist/*.html
 sed -i "s#/\* CACHE_NAME_PLACEHOLDER \*/#ensemble-test-$REV#" dist/sw.js
 
-# Generate dynamic asset list based on actual generated files
-echo "📝 Generating dynamic asset manifest..."
-ASSETS_LIST="'./', './index.html', './manual.html', './manual-theme.js', './styles.$REV.css', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'"
+# Generate dynamic asset list (excluding sw and maps)
+JS_FILES=$(find dist -name "*.js" -not -name "sw.js" -not -name "manual-theme.js" -printf "'./%f', ")
+# Remove trailing comma and space from JS_FILES
+JS_FILES=${JS_FILES%, }
 
-while IFS= read -r file; do
-    filename=$(basename "$file")
-    ASSETS_LIST="$ASSETS_LIST, './$filename'"
-done < <(find dist -name "*.js" -not -name "sw.js" -not -name "manual-theme.js")
+STATIC_ASSETS="'./', './index.html', './manual.html', './manual-theme.js', './styles.$REV.css', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'"
+sed -i "s#/\* ASSETS_PLACEHOLDER \*/#$STATIC_ASSETS, $JS_FILES#" dist/sw.js
 
-sed -i "s#/\* ASSETS_PLACEHOLDER \*/#$ASSETS_LIST#" dist/sw.js
+# 8. Report Final Footprint
+echo "📊 Final Bundle Footprint (Excluding Sourcemaps):"
+find dist -type f -not -name "*.map" -exec du -ch {} + | grep total$
 
-# 8. Deploy to TEST server
+# 9. Deploy to TEST server
 if [ "$DRY_RUN" = true ]; then
     echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/"
-    echo "✅ Dry run complete. Artifacts available in 'dist/' for inspection."
+    echo "✅ Dry run complete."
 else
-    echo "🚚 Syncing to ensembletest (cleaning old files)..."
+    echo "🚚 Syncing to ensembletest..."
     rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/
-    
-    # 9. Cleanup
-    echo "🧹 Cleaning up..."
     rm -rf dist
-    echo "✅ Deployment to TEST complete!"
+    echo "✅ Deployment complete!"
 fi
