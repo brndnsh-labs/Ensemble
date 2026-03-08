@@ -84,6 +84,12 @@ export function generateRhythmPlan(
             }
         }
 
+        // Turnaround Flourishes (Structural Signaling)
+        const stepCoord = coordination.stepCoordination || {};
+        if (stepCoord.isMeasureEnd) {
+            attackProb *= 1.3; // Boost density at measure ends
+        }
+
         if (coordination.bypassRhythm) {
             attackProb = 1.0;
         }

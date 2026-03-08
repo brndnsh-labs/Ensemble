@@ -249,10 +249,19 @@ export function getBassNote(
             : Math.floor(intensity * 7);
     safeCenterMidi += registerShift;
 
+    // --- ENSEMBLE COORDINATION: Proactive Register Clamping ---
+    // Ensure the anchor itself doesn't drift into Chord territory (52+)
+    while (safeCenterMidi > 51) {
+        safeCenterMidi -= 12;
+    }
+    while (safeCenterMidi < 28) {
+        safeCenterMidi += 12;
+    }
+
     const prevMidi = getMidi(prevFreq);
 
     const absMin = 28,
-        absMax = 60; // Common bass range (E1 to C4) - Increased to 60 for Disco octaves
+        absMax = 51; // Bass claims 28-51 as per Coordination Contract
 
     const clampAndNormalize = (midi) => {
         if (!Number.isFinite(midi)) {

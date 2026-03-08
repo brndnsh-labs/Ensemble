@@ -241,12 +241,12 @@ describe('Bass Engine Logic', () => {
                     {},
                     info,
                 );
-                if (result && result.midi >= 48) {
+                if (result && result.midi >= 40) {
                     highCount++;
                 }
             }
-            // Intensity = 0.0 yields ~0 high notes.
-            // Intensity = 1.0 yields ~35-45 high notes due to probabilistic chromatic approaches and clamping.
+            // Intensity = 0.0 yields ~0 notes >= 40.
+            // Intensity = 1.0 yields notes in the upper half of the 28-51 range.
             expect(highCount).toBeGreaterThan(20);
         });
     });

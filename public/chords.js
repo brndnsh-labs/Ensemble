@@ -137,8 +137,8 @@ export function getBestInversion(
     previousMidis,
     isPivot = false,
     anchor = null,
-    min = 40,
-    max = 80,
+    min = 52,
+    max = 84,
     style = 'stabs',
 ) {
     const { chords } = getState();

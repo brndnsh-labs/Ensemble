@@ -5,19 +5,28 @@
  * This module ensures the "Musical Coordination Contract" is satisfied.
  */
 
-export function createCoordinationContext(step, _state) {
+export function createCoordinationContext(step, stepInfo = null) {
     // Initial context derived from the "anchor" (Groove)
+    const ts = stepInfo?.tsConfig || { beats: 4, stepsPerBeat: 4 };
+    const stepsPerBar = ts.beats * ts.stepsPerBeat;
+    const mStep = stepInfo ? stepInfo.mStep : step % stepsPerBar;
+
     return {
         step,
+        mStep,
+        isMeasureStart: stepInfo ? stepInfo.isMeasureStart : mStep === 0,
+        isMeasureEnd: mStep >= stepsPerBar - (ts.stepsPerBeat || 4), // Last beat of measure
         kickHit: false, // Set during pre-calculation
         snareHit: false, // Set during pre-calculation
         pocketOffset: 0, // To be set from groove-engine
         soloistBusy: false, // Set by soloist turn
         soloistMidi: 0, // Set by soloist turn
+        avgSoloistMidi: 0,
         bassHit: false, // Set by bass turn
         bassMidi: 0, // Set by bass turn
         accompanimentHit: false,
         accompanimentMidis: [],
+        avgChordMidi: 0,
         upcomingSectionFirstChord: null,
     };
 }
@@ -30,15 +39,19 @@ export function updateCoordinationContext(context, module, result) {
     switch (module) {
         case 'soloist': {
             const results = Array.isArray(result) ? result : [result];
-            const mainResult = results.find((r) => !r.isDoubleStop) || results[0];
-            if (mainResult && mainResult.midi > 0) {
+            const activeNotes = results.filter((r) => r.midi > 0);
+            const mainResult = activeNotes.find((r) => !r.isDoubleStop) || activeNotes[0];
+
+            if (mainResult) {
                 context.soloistActive = true;
                 context.soloistMidi = mainResult.midi;
-                // soloistBusy is typically determined by the soloist generator itself
-                // but we can also infer it from density in the future.
                 if (mainResult.isBusy) {
                     context.soloistBusy = true;
                 }
+
+                // Calculate average for harmony slotting
+                const sum = activeNotes.reduce((acc, r) => acc + r.midi, 0);
+                context.avgSoloistMidi = sum / activeNotes.length;
             }
             break;
         }
@@ -50,12 +63,15 @@ export function updateCoordinationContext(context, module, result) {
             break;
         case 'chords': {
             const notes = Array.isArray(result) ? result : [result];
-            notes.forEach((n) => {
-                if (n.midi > 0) {
-                    context.accompanimentHit = true;
-                    context.accompanimentMidis.push(n.midi);
-                }
-            });
+            const activeMidis = notes.map((n) => n.midi).filter((m) => m > 0);
+
+            if (activeMidis.length > 0) {
+                context.accompanimentHit = true;
+                context.accompanimentMidis = activeMidis;
+
+                const sum = activeMidis.reduce((acc, m) => acc + m, 0);
+                context.avgChordMidi = sum / activeMidis.length;
+            }
             break;
         }
     }
@@ -65,7 +81,7 @@ export function updateCoordinationContext(context, module, result) {
  * Enforces the "Strict Register Slotting" rules defined in ENSEMBLE_COORDINATION.md.
  * If a note is outside its designated slot, it is transposed to the nearest octave within range.
  */
-export function enforceRegisterSlotting(module, midi, _context) {
+export function enforceRegisterSlotting(module, midi, _context, targetMidi = null) {
     if (midi <= 0) {
         return midi;
     }
@@ -73,18 +89,17 @@ export function enforceRegisterSlotting(module, midi, _context) {
     switch (module) {
         case 'bass':
             // Bass: MIDI 28 to 51
-            return clampToOctave(midi, 28, 51);
+            return smoothOctaveClamp(midi, 28, 51, targetMidi);
 
         case 'chords':
             // Chords: 52 to 84 (when Bass is present/active)
-            // Note: We check if bass is enabled in the state or if a bass note was played.
-            return clampToOctave(midi, 52, 84);
+            return smoothOctaveClamp(midi, 52, 84, targetMidi);
 
         case 'soloist':
             // Soloist: Priority 60 to 90, but has free range.
             // We only clamp if it's hitting extremely low bass frequencies.
             if (midi < 40) {
-                return clampToOctave(midi, 60, 90);
+                return smoothOctaveClamp(midi, 60, 90, targetMidi);
             }
             return midi;
 
@@ -93,16 +108,38 @@ export function enforceRegisterSlotting(module, midi, _context) {
     }
 }
 
-function clampToOctave(midi, min, max) {
+function smoothOctaveClamp(midi, min, max, target = null) {
     let current = midi;
-    while (current < min) {
-        current += 12;
-    }
-    while (current > max) {
-        current -= 12;
+
+    // If we have a target (e.g. previous note), try to get as close as possible
+    // while staying within [min, max]
+    if (target !== null) {
+        // First get into range
+        while (current < min) {
+            current += 12;
+        }
+        while (current > max) {
+            current -= 12;
+        }
+
+        // Then try to match target octave
+        const octaves = [-12, 12];
+        for (const shift of octaves) {
+            const shifted = current + shift;
+            if (shifted >= min && shifted <= max) {
+                if (Math.abs(shifted - target) < Math.abs(current - target)) {
+                    current = shifted;
+                }
+            }
+        }
+    } else {
+        while (current < min) {
+            current += 12;
+        }
+        while (current > max) {
+            current -= 12;
+        }
     }
 
-    // If still out of range after octave shifts (meaning the range is < 12 semitones)
-    // we just clamp to the bounds.
     return Math.max(min, Math.min(max, current));
 }

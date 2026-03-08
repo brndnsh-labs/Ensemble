@@ -489,9 +489,9 @@ class ExportProcessor {
             measuresInSection > 1 &&
             barInSection % measuresInSection === measuresInSection - 1;
 
-        const state = getState();
+        const _state = getState();
         // 1. Context Assembly (Anchor: Groove)
-        const coordination = createCoordinationContext(globalStep, state);
+        const coordination = createCoordinationContext(globalStep, stepInfo);
         coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
@@ -605,8 +605,16 @@ class ExportProcessor {
                                 Math.min(127, Math.round(res.velocity * polyphonyComp * 127)),
                             );
 
-                            // Enforce Contract: Register Slotting
-                            res.midi = enforceRegisterSlotting('soloist', res.midi, coordination);
+                            // Enforce Contract: Register Slotting (with smooth octave shift)
+                            const lastSoloMidi = soloist.lastFreq
+                                ? getMidi(soloist.lastFreq)
+                                : null;
+                            res.midi = enforceRegisterSlotting(
+                                'soloist',
+                                res.midi,
+                                coordination,
+                                lastSoloMidi,
+                            );
 
                             if (res.bendStartInterval) {
                                 this.soloistTrack.pitchBend(
@@ -677,8 +685,14 @@ class ExportProcessor {
                     }
                     const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
 
-                    // Enforce Contract: Register Slotting
-                    res.midi = enforceRegisterSlotting('bass', res.midi, coordination);
+                    // Enforce Contract: Register Slotting (with smooth octave shift)
+                    const lastBassMidi = bass.lastFreq ? getMidi(bass.lastFreq) : null;
+                    res.midi = enforceRegisterSlotting(
+                        'bass',
+                        res.midi,
+                        coordination,
+                        lastBassMidi,
+                    );
 
                     this.bassTrack.noteOn(notePulse, 1, res.midi, midiVel);
 
@@ -1219,7 +1233,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
         // 1. Context Assembly (Anchor: Groove)
-        const coordination = createCoordinationContext(step, state);
+        const coordination = createCoordinationContext(step, stepInfo);
         coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
@@ -1322,8 +1336,16 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                             if (!res.midi) {
                                 res.midi = getMidi(res.freq);
                             }
-                            // Enforce Contract: Register Slotting
-                            res.midi = enforceRegisterSlotting('soloist', res.midi, coordination);
+                            // Enforce Contract: Register Slotting (with smooth octave shift)
+                            const lastSoloMidi = soloist.lastFreq
+                                ? getMidi(soloist.lastFreq)
+                                : null;
+                            res.midi = enforceRegisterSlotting(
+                                'soloist',
+                                res.midi,
+                                coordination,
+                                lastSoloMidi,
+                            );
 
                             if (!res.freq) {
                                 res.freq = getFrequency(res.midi);
@@ -1364,11 +1386,13 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                         if (!bassResult.midi) {
                             bassResult.midi = getMidi(bassResult.freq);
                         }
-                        // Enforce Contract: Register Slotting
+                        // Enforce Contract: Register Slotting (with smooth octave shift)
+                        const lastBassMidi = bass.lastFreq ? getMidi(bass.lastFreq) : null;
                         bassResult.midi = enforceRegisterSlotting(
                             'bass',
                             bassResult.midi,
                             coordination,
+                            lastBassMidi,
                         );
 
                         if (!bassResult.freq) {
@@ -1630,7 +1654,9 @@ if (typeof self !== 'undefined') {
 export function handleResolution(step, requestTimestamp = null, processStartTime = null) {
     const state = getState();
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
-    const coordination = createCoordinationContext(step, state);
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
+    const coordination = createCoordinationContext(step, stepInfo);
 
     const notesToMain = generateResolutionNotes(
         step,
@@ -1699,9 +1725,10 @@ function handlePrime(steps) {
             const { chord, stepInChord } = chordData;
             const nextChordData = getChordAtStep(s, primeLookaheadCursor);
             const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+            const stepInfo = getStepInfo(s, ts, arranger.measureMap, TIME_SIGNATURES);
 
-            const state = getState();
-            const coordination = createCoordinationContext(s, state);
+            const _state = getState();
+            const coordination = createCoordinationContext(s, stepInfo);
             const { sectionStart, sectionEnd } = chordData;
 
             // 1. Prime Soloist

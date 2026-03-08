@@ -258,9 +258,9 @@ export function getHarmonyNotes(
 
     // -- ENSEMBLE COORDINATION --
     const bassHit = coordination.bassHit || false;
-    const soloistActive = coordination.soloistActive || false;
+    const _soloistActive = coordination.soloistActive || false;
     const accompanimentHit = coordination.accompanimentHit || false;
-    const accMidis = coordination.accompanimentMidis || [];
+    const _accMidis = coordination.accompanimentMidis || [];
 
     const notes = [];
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -552,8 +552,24 @@ export function getHarmonyNotes(
         }
     }
 
+    // --- ENSEMBLE CLARITY: Proactive Slotting ---
+    const soloistMidi = coordination.soloistMidi || 0;
+    const _avgChordMidi = coordination.avgChordMidi || 60;
+
     // Increased minimums to avoid bass mud (MIDI 57 = A3, MIDI 53 = F3)
-    const rangeMin = activeStyle === 'organ' ? 57 : 53;
+    let rangeMin = activeStyle === 'organ' ? 57 : 53;
+    let rangeMax = 79;
+
+    // Spectral Hole Filling: target the gap between chords and soloist
+    if (soloistMidi > 75) {
+        // Soloist is high, target lower-mid (52-65)
+        rangeMax = Math.min(rangeMax, soloistMidi - 10);
+    } else if (soloistMidi > 0 && soloistMidi < 65) {
+        // Soloist is low, target upper-mid (70-84)
+        rangeMin = Math.max(rangeMin, soloistMidi + 7);
+        rangeMax = 84;
+    }
+
     const currentMidis = getBestInversion(
         rootMidi,
         finalIntervals,
@@ -561,7 +577,7 @@ export function getHarmonyNotes(
         stepInChord === 0,
         octave,
         rangeMin,
-        79,
+        rangeMax,
         activeStyle,
     );
 
@@ -589,31 +605,6 @@ export function getHarmonyNotes(
         // Safety Filter: Hard cut above MIDI 100 (E7) to avoid piercing high frequencies
         if (finalMidi > 100) {
             finalMidi -= 12; // Shift down an octave if too high
-        }
-
-        // --- ENSEMBLE CLARITY: Slotting ---
-        // 1. Avoid Accompaniment: If accompaniment is hitting, Harmony shifts UP
-        if (accompanimentHit && accMidis.length > 0) {
-            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-            let sum = 0;
-            for (let j = 0; j < accMidis.length; j++) {
-                sum += accMidis[j];
-            }
-            const avgAccMidi = sum / accMidis.length;
-            if (finalMidi < avgAccMidi + 7) {
-                finalMidi += 12;
-            }
-        }
-
-        // 2. Avoid Soloist: If soloist is active and high, Harmony shifts DOWN
-        if (soloistActive && coordination.soloistMidi > 84) {
-            if (finalMidi > 72) {
-                finalMidi -= 12;
-            }
-        }
-
-        if (finalMidi > 100) {
-            continue; // Skip if still too high (rare)
         }
 
         let slideInterval = 0,

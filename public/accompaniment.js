@@ -761,12 +761,12 @@ export function getAccompanimentNotes(
                 voicing = chord.freqs.slice(0, 2).map((f) => getMidi(f));
             }
 
-            // Register Slotting: Ensure it stays in a punchy mid-register (C3-C5)
+            // Register Slotting: Ensure it stays in a punchy mid-register (E3-C6)
             voicing = voicing.map((m) => {
-                while (m < 48) {
+                while (m < 52) {
                     m += 12;
                 }
-                while (m > 72) {
+                while (m > 84) {
                     m -= 12;
                 }
                 return m;
