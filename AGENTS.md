@@ -44,4 +44,6 @@
 ## 5. Final Verification
 *   **Biome Check:** Run `npm run lint` to catch unused variables or formatting issues introduced during refactoring. Biome handles both linting and formatting in a single pass.
 *   **Build:** Ensure the project builds/transpiles if applicable.
-*   **State Integrity:** Verify that any changes to state schema are reflected in the domain slices in `public/state/`.
+> 4. **State Integrity:** Verify that any changes to state schema are reflected in the domain slices in `public/state/`.
+> 5. **Musical Coordination:** ALWAYS pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain the interactive register slots defined in `ENSEMBLE_COORDINATION.md`.
+
