@@ -141,6 +141,7 @@ export function hydrateState() {
                 savedState.applyPresetSettings !== undefined
                     ? savedState.applyPresetSettings
                     : false,
+            masterVolume: clamp(savedState.masterVolume, 0, 1, 0.4),
             stopAtEnd: false,
         });
 
