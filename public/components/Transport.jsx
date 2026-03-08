@@ -100,12 +100,7 @@ export function Transport() {
                 </button>
             </div>
 
-            <button
-                id="settingsBtn"
-                style="padding: 0.5rem; background: transparent; border: none; font-size: 1.2rem; cursor: pointer;"
-                aria-label="Settings"
-                onClick={openSettings}
-            >
+            <button id="settingsBtn" aria-label="Settings" onClick={openSettings}>
                 ⚙️
             </button>
         </div>
