@@ -30,32 +30,36 @@ export function useEnsembleState(selector) {
     const selectorRef = useRef(selector);
     selectorRef.current = selector;
 
-    const [slice, setSlice] = useState(() => selector(getState()));
+    // Trigger re-renders via a version counter
     const [, forceUpdate] = useState(0);
+
+    const currentState = getState();
+    const currentSlice = selector(currentState);
+
+    // Track what we last rendered so the subscriber can perform an efficient comparison
+    const lastRenderedSliceRef = useRef(currentSlice);
+    lastRenderedSliceRef.current = currentSlice;
 
     useEffect(() => {
         const update = (_action, _payload, updatedStateMap) => {
-            const newSlice = selectorRef.current(updatedStateMap);
+            const nextSlice = selectorRef.current(updatedStateMap);
             const stateVersion = updatedStateMap.playback.stateVersion;
 
-            setSlice((prevSlice) => {
-                // If we have a version change, we MUST force an update even if shallowEqual passes
-                // because the underlying object might have been mutated in-place.
-                if (!shallowEqual(prevSlice, newSlice)) {
-                    return newSlice;
-                }
-                // If the slice is an object, it might have been mutated in-place.
-                // We use stateVersion to force a re-render.
+            if (!shallowEqual(lastRenderedSliceRef.current, nextSlice)) {
+                // If data has changed, force a re-render
+                forceUpdate((v) => v + 1);
+            } else if (typeof nextSlice === 'object' && nextSlice !== null) {
+                // If data is an object, it might have been mutated in-place.
+                // We use the global stateVersion to guarantee a re-render.
                 forceUpdate(stateVersion);
-                return prevSlice;
-            });
+            }
         };
 
         const unsubscribe = subscribe(update);
         return unsubscribe;
     }, []);
 
-    return slice;
+    return currentSlice;
 }
 
 useEnsembleState.getState = getState;

@@ -135,7 +135,9 @@ export function Settings() {
     };
 
     const isOpen = useEnsembleState((s) => s.playback.modals.settings);
-    const playback = useEnsembleState((s) => s.playback);
+    const notation = useEnsembleState((s) => s.arranger.notation);
+    const applyPresetSettings = useEnsembleState((s) => s.playback.applyPresetSettings);
+    const playbackState = useEnsembleState((s) => s.playback);
     const overlayRef = useRef(null);
 
     useEffect(() => {
@@ -203,7 +205,7 @@ export function Settings() {
                             </label>
                             <select
                                 id="notationSelect"
-                                value={useEnsembleState((s) => s.arranger.notation)}
+                                value={notation}
                                 onChange={(e) => {
                                     dispatch(ACTIONS.SET_NOTATION, e.target.value);
                                     saveCurrentState();
@@ -522,9 +524,7 @@ export function Settings() {
                                 <input
                                     type="checkbox"
                                     id="applyPresetSettingsCheck"
-                                    checked={useEnsembleState(
-                                        (s) => s.playback.applyPresetSettings,
-                                    )}
+                                    checked={applyPresetSettings}
                                     onChange={(e) => {
                                         dispatch(
                                             ACTIONS.SET_PRESET_SETTINGS_MODE,
@@ -770,7 +770,7 @@ export function Settings() {
                             <input
                                 type="checkbox"
                                 id="debugSoloistToggle"
-                                checked={playback.debugSoloist}
+                                checked={playbackState.debugSoloist}
                                 onChange={(e) =>
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
