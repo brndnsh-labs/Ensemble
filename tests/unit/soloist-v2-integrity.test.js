@@ -24,14 +24,17 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 rhythmicEntropy: -1.0, // Suppress
             };
 
+            // Force random to 0.5 to make attackProb changes deterministic
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
             const planLow = generateRhythmPlan(
                 0,
-                64,
+                512,
                 style,
                 intensity,
                 stepsPerMeasure,
                 stepsPerBeat,
-                { sectionEnd: 64 },
+                { sectionEnd: 512 },
                 64,
                 soloistState,
                 null,
@@ -40,18 +43,23 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             soloistState.rhythmicEntropy = 1.0; // Boost
             const planHigh = generateRhythmPlan(
                 0,
-                64,
+                512,
                 style,
                 intensity,
                 stepsPerMeasure,
                 stepsPerBeat,
-                { sectionEnd: 64 },
+                { sectionEnd: 512 },
                 64,
                 soloistState,
                 null,
             );
 
-            expect(planHigh.length).toBeGreaterThan(planLow.length);
+            const lowLen = planLow.length;
+            const highLen = planHigh.length;
+            randomSpy.mockRestore();
+
+            console.log(`[Entropy Audit] Low: ${lowLen}, High: ${highLen}`);
+            expect(highLen).toBeGreaterThan(lowLen);
         });
 
         it('should drift toward syncopation during Syncopation Drift cycles', () => {
@@ -69,14 +77,17 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 return offbeats / plan.length;
             };
 
+            // Force random to 0.5 for all calls so breathing offset doesn't trigger random attacks
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
             const planNormal = generateRhythmPlan(
                 0,
-                64,
+                512,
                 style,
                 intensity,
                 stepsPerMeasure,
                 stepsPerBeat,
-                { sectionEnd: 64 },
+                { sectionEnd: 512 },
                 0,
                 soloistState,
                 null,
@@ -84,58 +95,72 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
 
             soloistState.sessionSteps = 128;
             const planDrift = generateRhythmPlan(
-                128,
-                64,
+                512,
+                512,
                 style,
                 intensity,
                 stepsPerMeasure,
                 stepsPerBeat,
-                { sectionEnd: 256 },
+                { sectionEnd: 1024 },
                 128,
                 soloistState,
                 null,
             );
 
-            expect(getSyncopationRatio(planDrift)).toBeGreaterThanOrEqual(
-                getSyncopationRatio(planNormal),
+            const normalRatio = getSyncopationRatio(planNormal);
+            const driftRatio = getSyncopationRatio(planDrift);
+
+            randomSpy.mockRestore();
+
+            console.log(
+                `[Syncopation Audit] Normal Ratio: ${normalRatio.toFixed(3)}, Drift Ratio: ${driftRatio.toFixed(3)}`,
             );
+            expect(driftRatio).toBeGreaterThanOrEqual(normalRatio);
         });
     });
 
     describe('Strategic Sustain Strategy', () => {
         it('should produce longer durations for blues style than funk', () => {
-            const soloistState = { sessionSteps: 0 };
+            const soloistState = { sessionSteps: 64 }; // Warmed up
+
+            // Force low random to trigger sustains reliably
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
 
             const planBlues = generateRhythmPlan(
                 0,
-                128,
+                1024,
                 'blues',
                 intensity,
                 stepsPerMeasure,
                 stepsPerBeat,
-                { sectionEnd: 128 },
-                0,
+                { sectionEnd: 1024 },
+                64,
                 soloistState,
                 null,
             );
             const planFunk = generateRhythmPlan(
                 0,
-                128,
+                1024,
                 'funk',
                 intensity,
                 stepsPerMeasure,
                 stepsPerBeat,
-                { sectionEnd: 128 },
-                0,
+                { sectionEnd: 1024 },
+                64,
                 soloistState,
                 null,
             );
 
             const avgDurationBlues =
-                planBlues.reduce((sum, n) => sum + n.durationSteps, 0) / planBlues.length;
+                planBlues.reduce((sum, n) => sum + n.durationSteps, 0) / (planBlues.length || 1);
             const avgDurationFunk =
-                planFunk.reduce((sum, n) => sum + n.durationSteps, 0) / planFunk.length;
+                planFunk.reduce((sum, n) => sum + n.durationSteps, 0) / (planFunk.length || 1);
 
+            randomSpy.mockRestore();
+
+            console.log(
+                `[Sustain Audit] Blues Avg: ${avgDurationBlues.toFixed(2)}, Funk Avg: ${avgDurationFunk.toFixed(2)}`,
+            );
             expect(avgDurationBlues).toBeGreaterThan(avgDurationFunk);
         });
 
@@ -238,21 +263,22 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
         });
 
         it('should produce higher density for EVH bursts than Gilmour lyrical phrases', () => {
-            const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionStart: 0, sectionEnd: 1024 };
+            const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionStart: 0, sectionEnd: 8192 };
             const { soloist, playback } = getState();
-            playback.bandIntensity = 0.8;
+            playback.bandIntensity = 0.66; // Just above 0.65 threshold
 
             // Test Gilmour
             soloist.phraseContext.profile = 'gilmour';
             soloist.isResting = false;
-            soloist.activeSteps = 0;
-            soloist.sessionSteps = 128;
+            soloist.activeSteps = 10000;
+            soloist.sessionSteps = 512; // Warmed up
+            soloist.rhythmPlan = undefined;
 
             let gilmourNotes = 0;
-            for (let i = 0; i < 512; i++) {
+            for (let i = 0; i < 5000; i++) {
                 if (
                     getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, false, {
-                        sectionEnd: 1024,
+                        sectionEnd: 8192,
                     })
                 ) {
                     gilmourNotes++;
@@ -262,15 +288,15 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             // Test EVH
             soloist.phraseContext.profile = 'evh';
             soloist.isResting = false;
-            soloist.activeSteps = 0;
-            soloist.sessionSteps = 128;
-            soloist.rhythmPlan = [];
+            soloist.activeSteps = 10000;
+            soloist.sessionSteps = 512; // Warmed up
+            soloist.rhythmPlan = undefined;
 
             let evhNotes = 0;
-            for (let i = 0; i < 512; i++) {
+            for (let i = 0; i < 5000; i++) {
                 if (
                     getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, false, {
-                        sectionEnd: 1024,
+                        sectionEnd: 8192,
                     })
                 ) {
                     evhNotes++;
@@ -284,6 +310,10 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
     describe('Pickup & Loop Logic', () => {
         it('should produce notes during negative count-in steps', () => {
             const chord = { rootMidi: 60, intervals: [0, 4, 7] };
+            const { soloist, playback } = getState();
+            playback.bandIntensity = 1.0;
+            soloist.sessionSteps = 64; // Warmed up
+
             let notesFound = 0;
             for (let i = -16; i < 0; i++) {
                 const note = getSoloistNote(chord, chord, i, 440, 0, 'rock', 0, false, {

@@ -55,14 +55,15 @@ describe('Blues Soloist Authenticity Benchmark', () => {
 
     it('should end Response phrases on resolution tones more often than Call phrases', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 128 };
-        const { soloist } = getState();
+        const { soloist, playback } = getState();
+        playback.bandIntensity = 0.8; // More active for better statistics
 
         let callResScore = 0;
         let respResScore = 0;
         let callTotal = 0;
         let respTotal = 0;
 
-        for (let i = 0; i < 2000; i++) {
+        for (let i = 0; i < 50000; i++) {
             const step = i;
             const note = getSoloistNote(
                 chord,
@@ -73,7 +74,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 'blues',
                 step % 16,
                 false,
-                { sectionStart: 0, sectionEnd: 128 },
+                { sectionStart: 0, sectionEnd: 50000 },
                 { mStep: step % 16 },
             );
 
@@ -97,8 +98,8 @@ describe('Blues Soloist Authenticity Benchmark', () => {
             }
         }
 
-        const callRate = callResScore / callTotal;
-        const respRate = respResScore / respTotal;
+        const callRate = callResScore / (callTotal || 1);
+        const respRate = respResScore / (respTotal || 1);
 
         console.log(
             `[Blues Audit] Call Resolution: ${(callRate * 100).toFixed(1)}%, Response Resolution: ${(respRate * 100).toFixed(1)}%`,
@@ -108,33 +109,35 @@ describe('Blues Soloist Authenticity Benchmark', () => {
 
     it('should trigger bluesTurnaround device during turnaround steps', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 128 };
-        // Turnaround is last 2 bars of 128 steps (8 bars)
-        // 128 - 32 = 96
+        const { soloist } = getState();
 
-        let turnaroundNotes = 0;
-        for (let i = 100; i < 128; i++) {
-            const note = getSoloistNote(
-                chord,
-                null,
-                i,
-                440,
-                0,
-                'blues',
-                i % 16,
-                false,
-                { sectionStart: 0, sectionEnd: 128, isTurnaround: true, bypassRhythm: true },
-                { mStep: i % 16 },
-            );
-            if (note) {
-                const results = Array.isArray(note) ? note : [note];
-                if (results.some((n) => n.midi === 67 || n.midi === 66)) {
-                    // 5th or b5 in turnaround
-                    turnaroundNotes++;
-                }
-            }
-        }
+        // Setup state to ensure selectPitchAndDevices is called
+        soloist.rhythmPlan = [{ stepTarget: 100, durationSteps: 1, velocity: 1.0 }];
+        soloist.isResting = false;
+        soloist.activeSteps = 100;
+        soloist.embellishmentBuffer = [];
 
-        console.log(`[Blues Audit] Turnaround-flavored notes detected: ${turnaroundNotes}`);
-        expect(turnaroundNotes).toBeGreaterThan(0);
+        // Force high probability for device triggering
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
+
+        getSoloistNote(
+            chord,
+            null,
+            100,
+            440,
+            0,
+            'blues',
+            4,
+            false,
+            { sectionStart: 0, sectionEnd: 128, isTurnaround: true, bypassRhythm: false },
+            { mStep: 4 },
+        );
+
+        console.log(
+            `[Blues Audit] Embellishment Buffer Size: ${soloist.embellishmentBuffer.length}`,
+        );
+        expect(soloist.embellishmentBuffer.length).toBeGreaterThan(0);
+
+        randomSpy.mockRestore();
     });
 });

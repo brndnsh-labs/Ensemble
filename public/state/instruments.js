@@ -445,6 +445,20 @@ export function instrumentReducer(action, payload) {
                 isYielding: false,
                 motifTracking: false,
                 phrasingIntensity: 0.5,
+                busySteps: 0,
+                sessionSteps: 0,
+                phraseCount: 0,
+                isResting: true,
+                restSteps: 0,
+                activeSteps: 0,
+                rhythmicEntropy: 0,
+                rhythmPlan: [],
+                phraseContext: {
+                    role: 'call',
+                    skeleton: [],
+                    lastInterval: null,
+                    profile: 'srv',
+                },
             });
             Object.assign(harmony, {
                 enabled: false,
