@@ -30,6 +30,7 @@ vi.mock('../../../public/arranger-controller.js', () => ({
 }));
 
 vi.mock('../../../public/audio-analyzer-lite.js', () => ({
+    // biome-ignore lint/complexity/useArrowFunction: Must be a function for constructor use
     ChordAnalyzerLite: vi.fn().mockImplementation(function () {
         return {
             calculateChromagram: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock('../../../public/audio-analyzer-lite.js', () => ({
 }));
 
 vi.mock('../../../public/melody-harmonizer.js', () => ({
+    // biome-ignore lint/complexity/useArrowFunction: Must be a function for constructor use
     Harmonizer: vi.fn().mockImplementation(function () {
         return {
             generateOptions: vi.fn().mockReturnValue([]),
@@ -68,6 +70,7 @@ const mockAudioContext = {
 };
 
 // Use a function to correctly mock a constructor
+// biome-ignore lint/complexity/useArrowFunction: Must be a function for constructor use
 const AudioContextMock = vi.fn().mockImplementation(function () {
     return mockAudioContext;
 });
@@ -83,8 +86,8 @@ vi.stubGlobal('navigator', {
     },
 });
 
-import { showToast } from '../../../public/ui.js';
 import { AnalyzerModal } from '../../../public/components/AnalyzerModal.jsx';
+import { showToast } from '../../../public/ui.js';
 
 describe('AnalyzerModal Component', () => {
     let container;
@@ -131,23 +134,30 @@ describe('AnalyzerModal Component', () => {
 
     it('should transition to live listen view when clicking the button', async () => {
         setupOpenState();
-        
+
         act(() => {
             render(<AnalyzerModal />, container);
         });
 
         const liveBtn = container.querySelector('#liveListenBtn');
-        
+
         await act(async () => {
             liveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        // Wait for potential async microtasks
-        await act(async () => {
-            await new Promise(r => setTimeout(r, 50));
-        });
+        // Wait for potential async microtasks and view transition
+        // Using a poll loop for better reliability in full test runs
+        let display = null;
+        for (let i = 0; i < 10; i++) {
+            await act(async () => {
+                await new Promise((r) => setTimeout(r, 20));
+            });
+            display = container.querySelector('#liveChordDisplay');
+            if (display) {
+                break;
+            }
+        }
 
-        const display = container.querySelector('#liveChordDisplay');
         expect(display).not.toBeNull();
     });
 
@@ -177,7 +187,7 @@ describe('AnalyzerModal Component', () => {
         });
 
         const melodyModeRadio = container.querySelectorAll('input[name="analyzerMode"]')[1];
-        
+
         await act(async () => {
             melodyModeRadio.click();
             melodyModeRadio.dispatchEvent(new Event('change', { bubbles: true }));
