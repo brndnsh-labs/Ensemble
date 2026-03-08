@@ -56,8 +56,8 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
 
         const profilesSeen = new Set();
 
-        // Simulate 50 section boundaries to ensure we see the whole pool
-        for (let section = 0; section < 50; section++) {
+        // Simulate 100 section boundaries to ensure we see the whole pool
+        for (let section = 0; section < 100; section++) {
             const sectionStart = section * 64;
             const sectionEnd = (section + 1) * 64;
 

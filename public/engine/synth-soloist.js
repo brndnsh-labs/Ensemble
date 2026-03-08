@@ -5,51 +5,41 @@ import { clampFreq, safeDisconnect } from '../utils.js';
 export function killSoloistNote() {
     const { playback, soloist } = getState();
     if (soloist.activeVoices && soloist.activeVoices.length > 0) {
-        soloist.activeVoices.forEach((voice) => {
+        const now = playback.audio.currentTime;
+        soloist.activeVoices.forEach((v) => {
             try {
-                // Cancel gain AND frequency ramps to prevent pitch artifacts
-                if (voice.gain?.gain) {
-                    voice.gain.gain.cancelScheduledValues(playback.audio.currentTime);
-                    voice.gain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.01);
-                }
-
-                if (voice.nodes) {
-                    voice.nodes.forEach((node) => {
-                        try {
-                            if (node.frequency) {
-                                node.frequency.cancelScheduledValues(playback.audio.currentTime);
-                            }
-                            if (node.detune) {
-                                node.detune.cancelScheduledValues(playback.audio.currentTime);
-                            }
-                            // Stop if it's a source node
-                            if (node.stop) {
-                                node.stop(playback.audio.currentTime + 0.02);
-                            }
-                        } catch {
-                            /* ignore */
+                v.gain.gain.cancelScheduledValues(now);
+                v.gain.gain.setTargetAtTime(0, now, 0.01);
+                v.nodes.forEach((node) => {
+                    try {
+                        if (node.stop) {
+                            node.stop(now + 0.05);
                         }
-                    });
-                }
+                    } catch {
+                        /* ignore cleanup errors */
+                    }
+                });
             } catch {
-                /* ignore error */
+                /* ignore cleanup errors */
             }
         });
-        soloist.activeVoices = []; // @direct-mutation
+        soloist.activeVoices = [];
     }
 }
 
 /**
  * Main entry point for playing a soloist note.
+ * Orchestrates voice management, preset selection, and common DSP.
  */
 export function playSoloNote(
     freq,
     time,
     duration,
-    vol = 0.4,
+    vol,
     bendStartInterval = 0,
     style = 'scalar',
     isLegato = false,
+    vibrato = false,
 ) {
     const { playback, soloist } = getState();
     if (!Number.isFinite(freq)) {
@@ -63,7 +53,7 @@ export function playSoloNote(
 
     if (playback.debugSoloist) {
         console.log(
-            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, preset=${preset}`,
+            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, preset=${preset}, vibrato=${vibrato}`,
         );
     }
 
@@ -94,85 +84,46 @@ export function playSoloNote(
     const prevFreq = soloist.lastRenderedFreq || freq;
     soloist.lastRenderedFreq = freq; // @direct-mutation
 
+    const args = [
+        ctx,
+        freq,
+        playTime,
+        duration,
+        vol,
+        bendStartInterval,
+        style,
+        gain,
+        voiceObj,
+        isLegato,
+        prevFreq,
+        vibrato,
+    ];
+
     switch (preset) {
         case 'neo':
-            playNeoJuno(
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-            );
+            playNeoJuno(...args);
             break;
         case 'vowel':
-            playVowel(
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-            );
+            playVowel(...args);
             break;
         case 'trumpet':
-            playTrumpet(
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-            );
+            playTrumpet(...args);
             break;
         case 'saxophone':
-            playSaxophone(
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-            );
+            playSaxophone(...args);
+            break;
+        case 'shred':
+            playShred(...args);
+            break;
+        case 'classic':
+            playClassic(...args);
             break;
         default:
-            playClassic(
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-            );
+            playNeoJuno(...args);
             break;
     }
 
-    soloist.activeVoices.push(voiceObj);
+    soloist.activeVoices.push(voiceObj); // @direct-mutation
 }
 
 function manageVoices(playTime, soloist) {
@@ -231,6 +182,7 @@ function playTrumpet(
     voiceObj,
     isLegato,
     prevFreq,
+    vibratoFlag,
 ) {
     const { soloist } = getState();
 
@@ -257,7 +209,14 @@ function playTrumpet(
     );
 
     if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(ctx, freq, playTime, duration, style);
+        const { vibrato, vibGain } = createVibrato(
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
         vibrato.connect(vibGain);
         vibGain.connect(osc1.frequency);
         vibGain.connect(osc2.frequency);
@@ -305,8 +264,8 @@ function playTrumpet(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough
-    if (duration > 0.15 && soloist.mode !== 'piano') {
+    // Only apply vibrato if note is long enough or forced
+    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
         const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
         if (vibrato) {
             vibrato.start(playTime);
@@ -329,6 +288,7 @@ function playSaxophone(
     voiceObj,
     isLegato,
     prevFreq,
+    vibratoFlag,
 ) {
     const { soloist } = getState();
 
@@ -355,7 +315,14 @@ function playSaxophone(
     );
 
     if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(ctx, freq, playTime, duration, style);
+        const { vibrato, vibGain } = createVibrato(
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
         vibrato.connect(vibGain);
         vibGain.connect(osc1.frequency);
         vibGain.connect(osc2.frequency);
@@ -417,8 +384,8 @@ function playSaxophone(
     osc2.stop(stopTime);
     breathLfo.stop(stopTime);
 
-    // Only apply vibrato if note is long enough
-    if (duration > 0.15 && soloist.mode !== 'piano') {
+    // Only apply vibrato if note is long enough or forced
+    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
         const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
         if (vibrato) {
             vibrato.start(playTime);
@@ -441,6 +408,7 @@ function playClassic(
     voiceObj,
     isLegato,
     prevFreq,
+    vibratoFlag,
 ) {
     const { playback, soloist } = getState();
     const intensity = playback.bandIntensity || 0.5;
@@ -472,7 +440,14 @@ function playClassic(
 
     // Vibrato
     if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(ctx, freq, playTime, duration, style);
+        const { vibrato, vibGain } = createVibrato(
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
         vibrato.connect(vibGain);
         vibGain.connect(osc1.frequency);
         vibGain.connect(osc2.frequency);
@@ -542,8 +517,8 @@ function playClassic(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough
-    if (duration > 0.15 && soloist.mode !== 'piano') {
+    // Only apply vibrato if note is long enough or forced
+    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
         const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
         if (vibrato) {
             vibrato.start(playTime);
@@ -566,6 +541,7 @@ function playNeoJuno(
     voiceObj,
     isLegato,
     prevFreq,
+    vibratoFlag,
 ) {
     const { soloist } = getState();
     const osc1 = ctx.createOscillator();
@@ -605,12 +581,27 @@ function playNeoJuno(
         soloist.mode === 'piano',
     );
 
-    // Filter - Warm Lowpass
+    if (soloist.mode !== 'piano') {
+        const { vibrato, vibGain } = createVibrato(
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
+        vibrato.connect(vibGain);
+        vibGain.connect(osc1.frequency);
+        vibGain.connect(osc2.frequency);
+        voiceObj.nodes.push(vibrato);
+        voiceObj.cleanup.push(vibGain);
+    }
+
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(Math.min(freq * 6, 8000), playTime);
-    filter.frequency.exponentialRampToValueAtTime(Math.min(freq * 3, 4000), playTime + duration);
-    filter.Q.value = 2;
+    filter.frequency.setValueAtTime(clampFreq(freq * 3), playTime);
+    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + duration);
+    filter.Q.value = 1.0;
 
     voiceObj.cleanup.push(filter);
 
@@ -621,19 +612,28 @@ function playNeoJuno(
     const attack = isLegato ? 0.005 : 0.02;
 
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 0.8, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.15);
+    outputGain.gain.setTargetAtTime(vol * 1.1, playTime, attack);
+    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
 
     osc1.start(playTime);
     osc2.start(playTime);
     lfo1.start(playTime);
     lfo2.start(playTime);
 
-    const stopTime = playTime + duration + 0.5;
+    const stopTime = playTime + duration + 0.2;
     osc1.stop(stopTime);
     osc2.stop(stopTime);
     lfo1.stop(stopTime);
     lfo2.stop(stopTime);
+
+    // Only apply vibrato if note is long enough or forced
+    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
+        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
+        if (vibrato) {
+            vibrato.start(playTime);
+            vibrato.stop(stopTime);
+        }
+    }
 
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
@@ -650,14 +650,20 @@ function playVowel(
     voiceObj,
     isLegato,
     prevFreq,
+    vibratoFlag,
 ) {
     const { soloist } = getState();
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth'; // Rich harmonics for filtering
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sawtooth';
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'square';
+    osc2.detune.value = 4;
+
+    voiceObj.nodes.push(osc1, osc2);
 
     applyPitchEnvelope(
-        osc,
-        null,
+        osc1,
+        osc2,
         freq,
         playTime,
         duration,
@@ -667,136 +673,188 @@ function playVowel(
         prevFreq,
         soloist.mode === 'piano',
     );
-    voiceObj.nodes.push(osc);
 
-    // Formant Filters (Ah/Oh sound)
-    const f1 = ctx.createBiquadFilter();
-    f1.type = 'bandpass';
-    f1.frequency.value = 600;
-    f1.Q.value = 4;
+    if (soloist.mode !== 'piano') {
+        const { vibrato, vibGain } = createVibrato(
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
+        vibrato.connect(vibGain);
+        vibGain.connect(osc1.frequency);
+        vibGain.connect(osc2.frequency);
+        voiceObj.nodes.push(vibrato);
+        voiceObj.cleanup.push(vibGain);
+    }
 
-    const f2 = ctx.createBiquadFilter();
-    f2.type = 'bandpass';
-    f2.frequency.value = 1000;
-    f2.Q.value = 4;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800, playTime);
+    filter.frequency.exponentialRampToValueAtTime(1200, playTime + 0.1);
+    filter.frequency.exponentialRampToValueAtTime(800, playTime + duration);
+    filter.Q.value = 5.0;
 
-    const f3 = ctx.createBiquadFilter();
-    f3.type = 'bandpass';
-    f3.frequency.value = 2500;
-    f3.Q.value = 5;
+    voiceObj.cleanup.push(filter);
 
-    // Movement LFO for "alive" vowels
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 1.5; // Slow breathing rate
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 50; // Subtle shift in Hz
-
-    lfo.connect(lfoGain);
-    lfoGain.connect(f1.frequency);
-    lfoGain.connect(f2.frequency);
-
-    voiceObj.nodes.push(lfo);
-    voiceObj.cleanup.push(lfoGain);
-    lfo.start(playTime);
-    lfo.stop(playTime + duration + 0.5);
-
-    // Parallel connection
-    osc.connect(f1);
-    osc.connect(f2);
-    osc.connect(f3);
-
-    f1.connect(outputGain);
-    f2.connect(outputGain);
-    f3.connect(outputGain);
-
-    voiceObj.cleanup.push(f1, f2, f3);
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(outputGain);
 
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.8, playTime, 0.03); // Needs boost due to bandpass
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.1);
+    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, 0.02);
+    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
 
-    osc.start(playTime);
-    const stopTime = playTime + duration + 0.3;
-    osc.stop(stopTime);
+    osc1.start(playTime);
+    osc2.start(playTime);
 
-    osc.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
+    const stopTime = playTime + duration + 0.2;
+    osc1.stop(stopTime);
+    osc2.stop(stopTime);
+
+    // Only apply vibrato if note is long enough or forced
+    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
+        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
+        if (vibrato) {
+            vibrato.start(playTime);
+            vibrato.stop(stopTime);
+        }
+    }
+
+    osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
-// --- HELPERS ---
+function playShred(
+    ctx,
+    freq,
+    playTime,
+    duration,
+    vol,
+    bendStartInterval,
+    style,
+    outputGain,
+    voiceObj,
+    isLegato,
+    prevFreq,
+    vibratoFlag,
+) {
+    const { soloist } = getState();
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sawtooth';
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sawtooth';
+    osc2.detune.value = 12;
+
+    voiceObj.nodes.push(osc1, osc2);
+
+    applyPitchEnvelope(
+        osc1,
+        osc2,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        isLegato,
+        prevFreq,
+        soloist.mode === 'piano',
+    );
+
+    if (soloist.mode !== 'piano') {
+        const { vibrato, vibGain } = createVibrato(
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
+        vibrato.connect(vibGain);
+        vibGain.connect(osc1.frequency);
+        vibGain.connect(osc2.frequency);
+        voiceObj.nodes.push(vibrato);
+        voiceObj.cleanup.push(vibGain);
+    }
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(clampFreq(freq * 6), playTime);
+    filter.Q.value = 2.0;
+
+    voiceObj.cleanup.push(filter);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(outputGain);
+
+    outputGain.gain.setValueAtTime(0, playTime);
+    outputGain.gain.setTargetAtTime(vol * 1.3, playTime, 0.005);
+    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.05);
+
+    osc1.start(playTime);
+    osc2.start(playTime);
+
+    const stopTime = playTime + duration + 0.1;
+    osc1.stop(stopTime);
+    osc2.stop(stopTime);
+
+    // Only apply vibrato if note is long enough or forced
+    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
+        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
+        if (vibrato) {
+            vibrato.start(playTime);
+            vibrato.stop(stopTime);
+        }
+    }
+
+    osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
+}
 
 function applyPitchEnvelope(
     osc1,
     osc2,
     freq,
-    time,
+    playTime,
     duration,
-    bendInterval,
-    style,
+    bendStartInterval,
+    _style,
     isLegato,
     prevFreq,
     isPiano = false,
 ) {
+    const { soloist } = getState();
     if (isPiano) {
-        // Strict pitch for piano
-        if (osc1) {
-            osc1.frequency.setValueAtTime(freq, time);
-        }
-        if (osc2) {
-            osc2.frequency.setValueAtTime(freq, time);
-        }
+        osc1.frequency.setValueAtTime(freq, playTime);
+        osc2.frequency.setValueAtTime(freq, playTime);
         return;
     }
 
-    if (isLegato && prevFreq) {
-        // Portamento Glide - Smoother for monophonic lead mode
-        const { soloist } = getState();
-        // Guitar hammer-ons/pull-offs are faster (0.03s), synths slightly slower
-        const glideTime =
-            soloist.mode === 'monophonic' ? 0.06 : soloist.mode === 'guitar' ? 0.03 : 0.04;
+    const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
 
-        if (osc1) {
-            osc1.frequency.setValueAtTime(prevFreq, time);
-            osc1.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
-        }
-        if (osc2) {
-            osc2.frequency.setValueAtTime(prevFreq, time);
-            osc2.frequency.exponentialRampToValueAtTime(freq, time + glideTime);
-        }
-    } else if (bendInterval !== 0) {
-        const startFreq = freq * 2 ** (-bendInterval / 12);
-        let bendDuration = 0.1;
-        if (style === 'blues') {
-            bendDuration = 0.15;
-        } else if (style === 'bird') {
-            bendDuration = 0.05;
-        } else if (style === 'minimal') {
-            bendDuration = 0.25;
-        }
-
-        bendDuration = Math.min(duration * 0.6, bendDuration);
-
-        if (osc1) {
-            osc1.frequency.setValueAtTime(startFreq, time);
-            osc1.frequency.exponentialRampToValueAtTime(freq, time + bendDuration);
-        }
-        if (osc2) {
-            osc2.frequency.setValueAtTime(startFreq, time);
-            osc2.frequency.exponentialRampToValueAtTime(freq, time + bendDuration);
-        }
+    if (isLegato && Math.abs(freq - prevFreq) < freq * 0.5) {
+        // Portamento for legato
+        const glideTime = soloist.mode === 'guitar' ? 0.03 : 0.06;
+        osc1.frequency.setValueAtTime(prevFreq, playTime);
+        osc2.frequency.setValueAtTime(prevFreq, playTime);
+        osc1.frequency.exponentialRampToValueAtTime(freq, playTime + glideTime);
+        osc2.frequency.exponentialRampToValueAtTime(freq, playTime + glideTime);
+    } else if (bendStartInterval !== 0) {
+        // Pitch Scoop/Bend
+        osc1.frequency.setValueAtTime(startFreq, playTime);
+        osc2.frequency.setValueAtTime(startFreq, playTime);
+        const rampTime = Math.min(0.1, duration * 0.5);
+        osc1.frequency.exponentialRampToValueAtTime(freq, playTime + rampTime);
+        osc2.frequency.exponentialRampToValueAtTime(freq, playTime + rampTime);
     } else {
-        const scoop = style === 'shred' ? 0.998 : 0.995;
-        if (osc1) {
-            osc1.frequency.setValueAtTime(freq * scoop, time);
-            osc1.frequency.setTargetAtTime(freq, time, 0.01);
-        }
-        if (osc2) {
-            osc2.frequency.setValueAtTime(freq * scoop, time);
-            osc2.frequency.setTargetAtTime(freq, time, 0.01);
-        }
+        // Standard attack
+        osc1.frequency.setValueAtTime(freq, playTime);
+        osc2.frequency.setValueAtTime(freq, playTime);
     }
 }
 
-function createVibrato(ctx, freq, time, duration, style) {
+function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
     const { soloist, playback } = getState();
     const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
     const vibrato = ctx.createOscillator();
@@ -834,6 +892,11 @@ function createVibrato(ctx, freq, time, duration, style) {
         depthFactor *= config.vibratoIntensity;
     }
 
+    // Explicitly boost depth for strategic holds
+    if (forceVibrato) {
+        depthFactor *= 1.5;
+    }
+
     // Mode-specific differentiation (Lead Synth/Horn/Guitar feel)
     if (soloist.mode === 'monophonic') {
         vibSpeed -= 0.5; // Slightly slower, more deliberate
@@ -846,8 +909,8 @@ function createVibrato(ctx, freq, time, duration, style) {
     vibrato.frequency.setValueAtTime(vibSpeed, time);
 
     const vibGain = ctx.createGain();
-    const isLongNote = duration > 0.4;
-    const vibDelay = 0.15 + Math.random() * 0.1;
+    const isLongNote = duration > 0.4 || forceVibrato;
+    const vibDelay = forceVibrato ? 0.1 : 0.15 + Math.random() * 0.1;
     const finalVibDepth = freq * (isLongNote ? depthFactor : depthFactor * 0.3);
 
     vibGain.gain.setValueAtTime(0, time);

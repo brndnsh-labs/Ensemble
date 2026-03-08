@@ -10,6 +10,7 @@ vi.mock('../../../public/state.js', () => {
                 value: 0,
                 setValueAtTime: vi.fn(),
                 linearRampToValueAtTime: vi.fn(),
+                exponentialRampToValueAtTime: vi.fn(),
                 setTargetAtTime: vi.fn(),
                 cancelScheduledValues: vi.fn(),
             },

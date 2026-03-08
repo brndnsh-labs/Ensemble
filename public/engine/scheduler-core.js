@@ -27,7 +27,7 @@ import { getSoloistNote } from '../soloist.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
-import { getMidi, getStepInfo, getStepsPerMeasure, midiToNote } from '../utils.js';
+import { getFrequency, getMidi, getStepInfo, getStepsPerMeasure, midiToNote } from '../utils.js';
 import {
     flushWorker,
     requestBuffer,
@@ -379,7 +379,7 @@ function advanceCountIn() {
 }
 
 function scheduleCountIn(beat, time) {
-    const { playback, arranger } = getState();
+    const { playback, arranger, soloist } = getState();
     if (playback.visualFlash) {
         playback.drawQueue.push({ type: 'flash', time: time, intensity: 0.3, beat: 1 });
     }
@@ -421,31 +421,50 @@ function scheduleCountIn(beat, time) {
 
     // --- Soloist Pick-up Support ---
     const pickupStep = (beat - ts.beats) * ts.stepsPerBeat;
+    const firstChord = arranger.stepMap?.[0]?.chord || {
+        rootMidi: 60,
+        scale: [0, 2, 4, 5, 7, 9, 11],
+        intervals: [0, 4, 7],
+    };
+    const pickupStepInfo = getStepInfo(pickupStep, ts, null, TIME_SIGNATURES);
+
     const soloistNote = getSoloistNote(
-        { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] }, // C Major dummy
-        { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] },
+        firstChord,
+        firstChord,
         pickupStep,
-        0,
-        64,
-        'lead_sheet',
+        soloist.lastFreq,
+        soloist.octave,
+        soloist.style,
         0,
         false,
+        { sectionStart: 0, sectionEnd: arranger.totalSteps, bypassRhythm: false },
+        pickupStepInfo,
     );
 
     if (soloistNote) {
-        sendMIDINote(
-            'Soloist',
-            soloistNote.midi,
-            soloistNote.velocity,
-            time,
-            soloistNote.duration || 0.25,
-        );
-        playback.drawQueue.push({
-            type: 'note',
-            track: 'soloist',
-            midi: soloistNote.midi,
-            time: time,
-            velocity: soloistNote.velocity,
+        const results = Array.isArray(soloistNote) ? soloistNote : [soloistNote];
+        results.forEach((res) => {
+            const freq = res.freq || getFrequency(res.midi);
+            const duration = (res.durationSteps || 4) * 0.25 * (60.0 / playback.bpm);
+
+            playSoloNote(
+                freq,
+                time,
+                duration,
+                res.velocity,
+                res.bendStartInterval || 0,
+                soloist.style,
+                false,
+                res.vibrato,
+            );
+            sendMIDINote('Soloist', res.midi, res.velocity, time, res.duration || 0.25);
+            playback.drawQueue.push({
+                type: 'note',
+                track: 'soloist',
+                midi: res.midi,
+                time: time,
+                velocity: res.velocity,
+            });
         });
     }
 }
@@ -796,6 +815,7 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                     style,
                     timingOffset,
                     noteType,
+                    vibrato,
                 } = noteEntry;
                 const { chord } = chordData;
                 const offsetS = timingOffset || 0;
@@ -812,7 +832,16 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                 const vel = baseVel * polyphonyComp;
                 const playTime = unswungTime + offsetS;
 
-                playSoloNote(freq, playTime, duration, vel, bendStartInterval || 0, style);
+                playSoloNote(
+                    freq,
+                    playTime,
+                    duration,
+                    vel,
+                    bendStartInterval || 0,
+                    style,
+                    false,
+                    vibrato,
+                );
 
                 // Soloist is monophonic UNLESS double stops are enabled
                 const isMono = soloist.mode === 'monophonic';

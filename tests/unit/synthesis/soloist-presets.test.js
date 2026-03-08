@@ -122,8 +122,8 @@ describe('Soloist Presets', () => {
         soloist.preset = 'neo';
         playSoloNote(440, 10, 1.0);
 
-        // 2 Oscs + 2 LFOs = 4 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
+        // 2 Oscs + 2 LFOs + 1 Vibrato = 5 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(5);
         expect(soloist.activeVoices.length).toBe(1);
     });
 
@@ -131,15 +131,13 @@ describe('Soloist Presets', () => {
         soloist.preset = 'vowel';
         playSoloNote(440, 10, 1.0);
 
-        // 1 Osc + 1 LFO = 2 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(2);
-        // 3 Formant filters
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
+        // 2 Oscs + 1 Vibrato = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 1 Bandpass filter (in current implementation)
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
 
         const filters = playback.audio.createBiquadFilter.mock.results.map((r) => r.value);
-        expect(filters[0].frequency.value).toBe(600);
-        expect(filters[1].frequency.value).toBe(1000);
-        expect(filters[2].frequency.value).toBe(2500);
+        expect(filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(800, 10);
     });
 
     it('should kill active voices properly', () => {

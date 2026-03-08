@@ -299,12 +299,12 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
         } else {
             // Fallback for steps beyond the map
             const spm = getStepsPerMeasure(tsName);
-            mStep = step % spm;
+            mStep = ((step % spm) + spm) % spm;
             isMeasureStart = mStep === 0;
         }
     } else {
         const spm = getStepsPerMeasure(tsName);
-        mStep = step % spm;
+        mStep = ((step % spm) + spm) % spm;
         isMeasureStart = mStep === 0;
     }
 
@@ -351,7 +351,7 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
     }
 
     // Semantic Timing Flags
-    const stepInBeat = mStep % stepsPerBeat;
+    const stepInBeat = ((mStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
     const isOffbeat = stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1; // 8th note offbeat
     const isEOfBeat = stepsPerBeat === 4 && stepInBeat === 1;
     const isAOfBeat = stepsPerBeat === 4 && stepInBeat === 3;

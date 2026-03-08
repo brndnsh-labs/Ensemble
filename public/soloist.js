@@ -61,8 +61,12 @@ export function getSoloistNote(
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
     // Use stepInfo for all meter-aware timing calculations
-    const measureStep = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
-    const isBeatStart = stepInfo ? stepInfo.isBeatStart : measureStep % stepsPerBeat === 0;
+    const measureStep = stepInfo
+        ? stepInfo.mStep
+        : ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+    const isBeatStart = stepInfo
+        ? stepInfo.isBeatStart
+        : ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat === 0;
     const isDownbeat = stepInfo ? stepInfo.isMeasureStart : measureStep === 0;
     const isBackbeat = stepInfo ? stepInfo.isBackbeat : false;
 
@@ -90,7 +94,7 @@ export function getSoloistNote(
         );
         timingOffset += config.genreGravityOffset || 0;
 
-        const stepInBeat = measureStep % stepsPerBeat;
+        const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
         const isSyncopated = stepInBeat % (stepsPerBeat / 2) !== 0;
         if (isSyncopated) {
             timingOffset += 0.007;
@@ -129,8 +133,8 @@ export function getSoloistNote(
     if (activeStyle === 'lead_sheet') {
         if (soloist.leadSheetMelody && soloist.leadSheetMelody.length > 0) {
             const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
-            const stepInForm = step % totalFormSteps;
-            const note = soloist.leadSheetMelody.find((n) => n.globalStep === stepInForm);
+            const stepInFormRelative = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
+            const note = soloist.leadSheetMelody.find((n) => n.globalStep === stepInFormRelative);
 
             if (note) {
                 const res = {
@@ -178,13 +182,14 @@ export function getSoloistNote(
 
     // --- Form Awareness & Phrasing States ---
     const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
-    const stepInForm = step % totalFormSteps;
+    const stepInForm = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
     const remainingSteps = coordination.sectionEnd - stepInForm;
     const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
 
     // --- Structural Structural Influence Rotation ---
     // At the start of a section, the soloist adopts a new "state of mind" (influence)
-    if (stepInForm === coordination.sectionStart) {
+    // PRE-HEAT: Also trigger rotation at the start of the count-in (e.g., step -16)
+    if (stepInForm === coordination.sectionStart || (step < 0 && step === -stepsPerMeasure)) {
         const pool = INFLUENCE_POOLS[activeStyle] || [];
         if (pool.length > 0) {
             // High intensity sections might shift influence more frequently (probabilistically)
@@ -195,12 +200,22 @@ export function getSoloistNote(
                 logDebug(`New section influence: ${nextInfluence}`);
             }
         }
+
+        // PRE-HEAT: Force a lead-in transition at the start of the song to ensure count-in pick-ups
+        if (step < 0 && intensity > 0.3) {
+            soloist.transitionState = 'lead_in'; // @worker-mutation
+            logDebug(`Forcing START-OF-SONG lead-in`);
+        }
     }
 
     // Transition evaluation at structural points (Downbeat of final measure)
     if (isFinalMeasure && isDownbeat) {
-        soloist.transitionState = Math.random() < 0.6 - intensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
-        logDebug(`Selected transition state: ${soloist.transitionState}`);
+        // PRE-HEAT: If we are at the start of the song, preserve the forced lead_in
+        const isStartOfSong = step < 0 && step === -stepsPerMeasure;
+        if (!isStartOfSong || soloist.transitionState === null) {
+            soloist.transitionState = Math.random() < 0.6 - intensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
+            logDebug(`Selected transition state: ${soloist.transitionState}`);
+        }
 
         // Mutate rhythmic entropy at section boundaries based on intensity
         // This locks the variation for the next section, preserving micro-level predictability
@@ -233,6 +248,15 @@ export function getSoloistNote(
 
     if (soloist.isResting) {
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
+
+        // --- Proactive Lead-in Wake-up ---
+        if (soloist.transitionState === 'lead_in') {
+            const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
+            // If we are in the last beat of the measure, force wake up to play pick-ups
+            if (beatInMeasure === tsConfig.beats - 1) {
+                soloist.restSteps = 0; // @worker-mutation
+            }
+        }
 
         if (soloist.restSteps <= 0 || coordination.bypassRhythm) {
             const isGoodEntry =

@@ -62,8 +62,8 @@ export function generateRhythmPlan(
             }
 
             // Evaluate everything as if we are on 'step'
-            const measureStep = step % stepsPerMeasure;
-            const stepInBeat = measureStep % stepsPerBeat;
+            const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+            const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
             const isBeatStart = stepInBeat === 0;
             const isDownbeat = measureStep === 0;
 
@@ -146,6 +146,11 @@ export function generateRhythmPlan(
 
             if (isFinalMeasure && soloistState.transitionState === 'lead_in') {
                 attackProb *= 1.5;
+            }
+
+            // PRE-HEAT: Boost density during count-in (negative steps)
+            if (step < 0 && soloistState.transitionState === 'lead_in') {
+                attackProb *= 1.8;
             }
 
             // Boost downbeats to ensure resolution
@@ -248,9 +253,34 @@ export function generateRhythmPlan(
                     isSustained,
                     vibrato: isSustained,
                 });
+            } else {
+                // Not an attack step
             }
         }
     }
+
+    // --- Rhythmic Mirroring Fallback ---
+    // (If mirroring logic didn't push anything, ensuring we have a valid plan object)
+    if (plan.length === 0 && coordination.bypassRhythm) {
+        plan.push({
+            stepTarget: startStep,
+            velocity: 0.8,
+            isStrongBeat: true,
+            durationSteps: activeSteps,
+            isSustained: false,
+            vibrato: false,
+        });
+    }
+
+    // Default flags for mirroring or other paths
+    plan.forEach((node) => {
+        if (node.isSustained === undefined) {
+            node.isSustained = false;
+        }
+        if (node.vibrato === undefined) {
+            node.vibrato = false;
+        }
+    });
 
     // Calculate durations based on gaps
     for (let i = 0; i < plan.length; i++) {

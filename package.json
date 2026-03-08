@@ -7,6 +7,7 @@
     "scripts": {
         "test": "npm run check-mutations && npm run lint && vitest run",
         "lint": "biome check .",
+        "knip": "knip",
         "format": "biome check --write .",
         "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
         "deploy:test": "./scripts/deploy-test.sh",

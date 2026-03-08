@@ -28,7 +28,7 @@ export function selectPitchAndDevices(
     const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
 
     // Derived from the Rhythm Engine node
-    const { velocity, durationSteps, isStrongBeat } = rhythmNode;
+    const { velocity, durationSteps, isStrongBeat, vibrato } = rhythmNode;
 
     let targetChord = currentChord;
 
@@ -475,6 +475,8 @@ export function selectPitchAndDevices(
         midi: selectedMidi,
         velocity: velocity,
         durationSteps: durationSteps,
+        vibrato: vibrato,
+        isSustained: rhythmNode.isSustained,
         bendStartInterval:
             soloistState.mode === 'guitar' && durationSteps >= 4 && Math.random() < 0.3
                 ? Math.random() < 0.5
