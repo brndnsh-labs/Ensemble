@@ -60,7 +60,11 @@ export function getSoloistNote(
         if (!res) {
             return null;
         }
-        const primary = Array.isArray(res) ? res[res.length - 1] : res;
+        const results = Array.isArray(res) ? res : [res];
+        const primary = results[results.length - 1];
+
+        // Coordination: Mark as busy if playing short durations or dense phrases
+        primary.isBusy = soloist.busySteps > 0 || (primary.durationSteps || 1) < 1.0;
 
         soloist.lastMidiPlayed = primary.midi; // @worker-mutation
 

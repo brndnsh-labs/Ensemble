@@ -16,9 +16,14 @@ const BOSSA_STEPS = [0, 6, 8, 14];
  */
 
 // (Old getScaleForBass removed, using imported version)
-
-export function isBassActive(style, step, stepInChord, stepInfo) {
+export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     const { playback, groove, arranger } = getState();
+
+    // Rhythmic Yielding: Lock to Kick if available
+    if (coordination?.kickHit) {
+        return true;
+    }
+
     if (style === 'smart') {
         const mapping = {
             Rock: 'rock',

@@ -443,7 +443,26 @@ export function getAccompanimentNotes(
         chord.quality,
     );
 
-    updateRhythmicIntent(step, soloist.enabled && soloist.busySteps > 0, spm, chord.sectionId);
+    // Rhythmic Yielding (Contract Compliance)
+    const isSoloistBusy = coordination?.soloistBusy || (soloist.enabled && soloist.busySteps > 0);
+    updateRhythmicIntent(step, isSoloistBusy, spm, chord.sectionId);
+
+    if (isSoloistBusy && step % 16 !== 0 && Math.random() < 0.7) {
+        // Yield density to busy soloist: Skip offbeats and less-foundational hits
+        if (ccEvents.length > 0) {
+            return [
+                {
+                    midi: 0,
+                    velocity: 0,
+                    durationSteps: 0,
+                    ccEvents,
+                    instrument: 'Piano',
+                    muted: true,
+                },
+            ];
+        }
+        return [];
+    }
 
     // --- Coordination Logic (Ensemble Awareness) ---
     const bassHit = coordination.bassHit || false;
