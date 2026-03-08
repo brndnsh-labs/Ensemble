@@ -11,11 +11,16 @@
         "knip": "knip",
         "format": "biome check --write .",
         "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
+        "build": "esbuild public/main.js --bundle --minify --sourcemap --outdir=public/dist",
+        "preview": "esbuild --serve=5173 --servedir=public",
+        "test:e2e": "playwright test",
+        "test:e2e:update": "playwright test --update-snapshots",
         "deploy:test": "./scripts/deploy-test.sh",
         "deploy:prod": "./scripts/deploy-prod.sh"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.6",
+        "@playwright/test": "^1.58.2",
         "esbuild": "^0.27.3",
         "happy-dom": "^20.8.3",
         "knip": "^5.86.0",

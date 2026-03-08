@@ -14,12 +14,26 @@ This directory contains the automated tests for the Ensemble application, powere
 *   **`standards/`**: Musical validity checks.
     *   *Examples:* Ensuring generated bass lines adhere to genre rules (e.g., Reggae "One Drop") over thousands of measures.
     *   *Critique Tests:* Advanced statistical analysis of musical authenticity (e.g., Jazz Charleston frequency, Soloist melodic smoothness). See [Critique Guidelines](./standards/CRITIQUE_GUIDELINES.md) for details.
+*   **`e2e/`**: Visual Regression and End-to-End tests powered by [Playwright](https://playwright.dev/).
+    *   *Examples:* Mobile header title visibility, Modal centering, Sequencer Grid responsiveness.
+    *   *Decision Matrix:*
+        *   **Use Vitest** for structural logic, component state changes, and accessibility (A11y).
+        *   **Use Playwright** for visual appearance, clipping, layout shifts, and cross-browser (WebKit/Safari) rendering issues.
 
 ## Running Tests
 
-### Run All Tests
+### Run Core Suite (Vitest)
 ```bash
 npm test
+```
+
+### Run Visual Suite (Playwright)
+```bash
+# Requires local dev server (started automatically)
+npm run test:e2e
+
+# Update visual snapshots if changes were intentional
+npm run test:e2e:update
 ```
 
 ### Run Specific Tests

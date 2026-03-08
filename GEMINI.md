@@ -31,8 +31,10 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 Before concluding any task, an agent MUST:
 1.  Run `npm run format` to ensure Biome standards are met.
 2.  Run `npm test` and ensure all checks pass (State Integrity, Biome Linting/Formatting, and 850+ tests).
-3.  Verify that no NEW direct state mutations were introduced (check the `npm test` output).
-4.  Fix any new linting warnings or architectural regressions.
+3.  **Run `npm run test:e2e`** if UI changes were made, ensuring no visual regressions occur.
+4.  **Update Visual Snapshots:** If style changes were intentional, run `npm run test:e2e:update` to establish new baselines.
+5.  Verify that no NEW direct state mutations were introduced (check the `npm test` output).
+6.  Fix any new linting warnings or architectural regressions.
 
 *   **Branch Management**: Do NOT delete feature branches until the user has confirmed the implementation works as expected in the UI or through integration tests. Always verify behavior before merging and deleting.
 

@@ -57,9 +57,17 @@ The "Ensemble" codebase is exceptionally well-structured for AI agents. Followin
 *   **Performance:** Keep animations subtle (under 400ms) and use GPU-accelerated properties (`opacity`, `transform`) to ensure 60fps on mobile devices. Avoid animating layout properties like `height` or `margin`.
 
 #### 8. Formatting & Precision for AI Agents
-To minimize `replace` tool failures and linting errors:
-*   **Exact Matching:** Before using `replace`, perform a `read_file` on the target lines. Copy the text *exactly* as it appears, including whitespace, indentation (4 spaces), and quote styles (single quotes).
-*   **Contextual Buffering:** Provide 2-3 lines of surrounding context in both `old_string` and `new_string` to ensure a unique match and preserve surrounding formatting.
-*   **The "Post-Edit Cycle":** Always run `npm run format` immediately after applying code changes and *before* running `npm test`. This resolves minor syntax or whitespace issues introduced during generation.
+...
 *   **Biome Standards:** This project uses Biome with **4-space indentation**, **single quotes**, and a **100-character line width**. Refer to `biome.json` for full rules.
+
+#### 9. Visual Regression & E2E Testing (Playwright)
+To prevent visual regressions (clipping, layout shifts, overlap) that Vitest cannot detect:
+*   **When to Add Tests:** Add a Playwright spec in `tests/e2e/` for any new UI component with complex layouts or responsive behavior (modals, grids, headers).
+*   **Snapshot Workflow:**
+    1.  **Run Tests:** Use `npm run test:e2e` to verify the UI against existing baselines.
+    2.  **Snapshot Failures:** If a test fails due to a visual difference, Playwright will generate a `diff.png`. Review this to determine if the change is a bug or an intentional style update.
+    3.  **Updating Baselines:** If the visual change is **intentional** (e.g., a deliberate padding adjustment), run `npm run test:e2e:update` to generate new "golden" images. **Never** update snapshots to "fix" a regression you didn't intend to make.
+*   **Mobile-First Verification:** Always include a `@mobile` tag in your test titles and use the `Mobile Safari` project in `playwright.config.js` to verify responsiveness at 390x844.
+*   **CI Artifacts:** If tests fail in GitHub Actions, download the `playwright-report` artifact to view the visual diffs and traces.
+
 
