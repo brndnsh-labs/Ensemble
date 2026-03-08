@@ -171,6 +171,10 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
             return [0, 2, 3, 4, 5, 7, 9, 10].sort((a, b) => a - b);
         }
 
+        if (style === 'metal') {
+            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+        }
+
         return SCALE_INTERVALS.MIXOLYDIAN;
     }
 
@@ -239,12 +243,6 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     }
 
     // --- GENRE SPECIFIC FALLBACKS ---
-
-    // Metal: Only override Dominant chords (Phrygian Dominant).
-    // Non-dominant chords fall through to Default Fallbacks (Natural Minor for Minor, Major for Major).
-    if (style === 'metal' && isDominant) {
-        return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
-    }
 
     // Default Fallbacks if not Diatonic
     if (isMinor) {
