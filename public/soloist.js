@@ -1,7 +1,7 @@
 import { TIME_SIGNATURES } from './config.js';
 import { selectPitchAndDevices } from './engine/soloist-pitch-engine.js';
 import { generateRhythmPlan } from './engine/soloist-rhythm-engine.js';
-import { GENRE_STYLE_MAPPING, STYLE_CONFIG } from './soloist-config.js';
+import { GENRE_STYLE_MAPPING, INFLUENCE_POOLS, STYLE_CONFIG } from './soloist-config.js';
 import { getState } from './state.js';
 import { calculateTimingOffset, getFrequency } from './utils.js';
 
@@ -180,6 +180,21 @@ export function getSoloistNote(
     const remainingSteps = coordination.sectionEnd - step;
     const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
 
+    // --- Structural Structural Influence Rotation ---
+    // At the start of a section, the soloist adopts a new "state of mind" (influence)
+    if (step === coordination.sectionStart) {
+        const pool = INFLUENCE_POOLS[activeStyle] || [];
+        if (pool.length > 0) {
+            // High intensity sections might shift influence more frequently (probabilistically)
+            const shouldShift = soloist.phraseCount === 0 || Math.random() < 0.8;
+            if (shouldShift) {
+                const nextInfluence = pool[Math.floor(Math.random() * pool.length)];
+                soloist.phraseContext.profile = nextInfluence; // @worker-mutation
+                logDebug(`New section influence: ${nextInfluence}`);
+            }
+        }
+    }
+
     // Transition evaluation at structural points (Downbeat of final measure)
     if (isFinalMeasure && isDownbeat) {
         soloist.transitionState = Math.random() < 0.6 - intensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
@@ -252,17 +267,6 @@ export function getSoloistNote(
                         `C&R transition: ${soloist.phraseContext.role} -> ${nextRole} (prob: ${responseProb})`,
                     );
 
-                    if (nextRole === 'call') {
-                        // Pick a new profile for this cycle
-                        let profiles = ['srv', 'monk', 'armstrong', 'miles'];
-                        if (activeStyle === 'jazz') {
-                            profiles = ['bird', 'evans', 'coltrane', 'miles'];
-                        } else if (activeStyle === 'rock' || activeStyle === 'scalar') {
-                            profiles = ['gilmour', 'slash', 'hendrix', 'evh', 'beck'];
-                        }
-                        soloist.phraseContext.profile =
-                            profiles[Math.floor(Math.random() * profiles.length)]; // @worker-mutation
-                    }
                     soloist.phraseContext.role = nextRole; // @worker-mutation
                 } else {
                     soloist.phraseContext.role = 'call'; // @worker-mutation

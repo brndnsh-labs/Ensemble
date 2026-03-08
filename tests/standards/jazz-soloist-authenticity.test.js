@@ -51,35 +51,32 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
     });
 
     it('should pick characteristic Jazz profiles (Bird, Evans, Coltrane, Miles)', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 64 };
+        const chord = { rootMidi: 60, intervals: [0, 4, 7, 10] };
         const { soloist } = getState();
 
         const profilesSeen = new Set();
 
-        for (let i = 0; i < 1000; i += 16) {
-            if (soloist.isResting) {
-                soloist.restSteps = 0;
-            }
+        // Simulate 50 section boundaries to ensure we see the whole pool
+        for (let section = 0; section < 50; section++) {
+            const sectionStart = section * 64;
+            const sectionEnd = (section + 1) * 64;
+
             getSoloistNote(
                 chord,
                 null,
-                i,
+                sectionStart,
                 440,
                 0,
                 'jazz',
                 0,
                 false,
-                { sectionStart: 0, sectionEnd: 128, bypassRhythm: true },
-                { mStep: 0 },
+                { sectionStart, sectionEnd, bypassRhythm: true },
+                { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
 
             if (soloist.phraseContext.profile) {
                 profilesSeen.add(soloist.phraseContext.profile);
             }
-
-            soloist.activeSteps = 0;
-            soloist.isResting = true;
-            soloist.phraseContext.role = 'response'; // Force transition back to call next time
         }
 
         console.log(`[Jazz Audit] Profiles detected: ${Array.from(profilesSeen).join(', ')}`);
@@ -99,7 +96,7 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
         let extensionCount = 0;
         let totalNotes = 0;
 
-        for (let i = 0; i < 200; i++) {
+        for (let i = 1; i < 201; i++) {
             const note = getSoloistNote(
                 chord,
                 null,

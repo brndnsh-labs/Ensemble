@@ -46,7 +46,7 @@ describe('Soloist Rhythmic Entropy & Mutation', () => {
 
     it('should drift toward syncopation during Syncopation Drift cycles', () => {
         const soloistState = {
-            sessionSteps: 0, 
+            sessionSteps: 0,
             phraseCount: 1,
             rhythmicEntropy: 0,
         };

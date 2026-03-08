@@ -648,3 +648,15 @@ export const GENRE_STYLE_MAPPING = {
     'Ska-Punk': 'ska',
     Ska: 'ska',
 };
+
+/**
+ * Collective pools of stylistic influences for each genre.
+ * The soloist randomly "channels" one of these for the duration of a section.
+ */
+export const INFLUENCE_POOLS = {
+    rock: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
+    jazz: ['bird', 'evans', 'coltrane', 'miles'],
+    blues: ['srv', 'monk', 'armstrong', 'miles'],
+    neo: ['miles', 'srv'], // Cross-genre influences
+    funk: ['srv', 'slash'],
+};

@@ -264,7 +264,7 @@ export function selectPitchAndDevices(
         ) {
             const isResolutionTone = [0, 7].includes(interval); // Root and 5th
             if (isResolutionTone) {
-                weight *= 5.0; // Aggressively favor strong resolution
+                weight *= 8.0; // Aggressively favor strong resolution
             }
             if (interval === soloistState.phraseContext.lastInterval) {
                 weight *= 0.5; // Avoid stagnation
