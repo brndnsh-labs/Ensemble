@@ -88,10 +88,9 @@ header {
         letter-spacing: -0.07em;
         flex-shrink: 1;
         min-width: 0;
-        overflow: hidden;
-        text-overflow: clip; /* clip to maximize space on narrow screens */
         z-index: 1;
-        max-width: 25%;
+        /* Removed max-width to let flexbox handle space; added padding to prevent character clipping */
+        padding-right: 4px;
     }
 
     .main-controls {
@@ -124,7 +123,7 @@ header {
     }
 
     #settingsBtn {
-        margin-right: -0.5rem; /* Pull slightly closer to edge but avoid clipping */
+        margin-right: 0; /* Removed negative margin to prevent clipping */
         padding: 0.4rem 0.2rem;
         font-size: 1.2rem;
     }
