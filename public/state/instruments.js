@@ -117,6 +117,8 @@ export const soloist = {
     motifTracking: false,
     leadSheetMelody: [],
     phrasingIntensity: 0.5,
+    phraseCount: 0,
+    rhythmicEntropy: 0,
 };
 
 /**

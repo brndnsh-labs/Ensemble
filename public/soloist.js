@@ -184,6 +184,11 @@ export function getSoloistNote(
     if (isFinalMeasure && isDownbeat) {
         soloist.transitionState = Math.random() < 0.6 - intensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
         logDebug(`Selected transition state: ${soloist.transitionState}`);
+
+        // Mutate rhythmic entropy at section boundaries based on intensity
+        // This locks the variation for the next section, preserving micro-level predictability
+        const shiftScale = 0.2 + intensity * 0.4; // Max 0.6 shift at high intensity
+        soloist.rhythmicEntropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
     } else if (!isFinalMeasure && step !== coordination.sectionStart) {
         soloist.transitionState = null; // @worker-mutation
     }
@@ -226,10 +231,11 @@ export function getSoloistNote(
             ) {
                 soloist.isResting = false; // @worker-mutation
                 soloist.phrasingState = 'active'; // @worker-mutation
+                soloist.phraseCount = (soloist.phraseCount || 0) + 1; // @worker-mutation
 
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
                 const _nextActiveSteps = Math.floor(
-                    baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5),
+                    baseLength * stepsPerBeat * (0.3 + Math.random() * 1.2),
                 );
                 if (soloist.activeSteps === undefined) {
                     soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */

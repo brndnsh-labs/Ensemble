@@ -78,6 +78,25 @@ export function generateRhythmPlan(
             const intensityScale = 0.5 + intensity * 2.0;
             let attackProb = baseAttackProb * intensityScale * warmUpScale;
 
+            // Apply persistent rhythmic entropy if set
+            if (soloistState.rhythmicEntropy !== undefined) {
+                // rhythmicEntropy ranges roughly from -1.0 to 1.0. 
+                // Using multiplicative scaling to keep bounds somewhat reasonable.
+                attackProb *= (1.0 + soloistState.rhythmicEntropy * 0.5);
+            }
+
+            // Syncopation Arc: gently favor syncopation as the session progresses
+            // Driven by sessionSteps over multiple choruses (e.g., 256 steps = 16 measures)
+            const driftFactor = Math.sin(((sessionSteps || 0) / 512) * Math.PI); // Half-cycle every 16 measures
+            if (driftFactor > 0.0) {
+                const isSixteenthNote = stepInBeat % 2 !== 0; // Offbeat
+                if (isSixteenthNote) {
+                    attackProb *= 1.0 + driftFactor * 1.0; // Boost offbeats during drift
+                } else {
+                    attackProb *= 1.0 - driftFactor * 0.15; // Slightly suppress downbeats
+                }
+            }
+
             // Phrase Contextual Scaling (Fatigue)
             if (notesInPhrase > 8) {
                 attackProb *= 0.8;
