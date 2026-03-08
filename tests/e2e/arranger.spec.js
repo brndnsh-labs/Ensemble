@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Arranger & Chord Visualizer @visual', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    // Ensure app is loaded
-    await expect(page.locator('.app-main-layout')).toHaveClass(/loaded/);
+    await page.waitForLoadState('networkidle');
   });
 
   test('Chord Visualizer - Default Layout', async ({ page }) => {

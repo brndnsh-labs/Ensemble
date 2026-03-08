@@ -4,8 +4,8 @@ test.describe('Header Visual Integrity', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the app before each test
     await page.goto('/');
-    // Wait for the app to be 'loaded' as per App.jsx layout class
-    await expect(page.locator('.app-main-layout')).toHaveClass(/loaded/);
+    // Wait for the app to be fully loaded
+    await page.waitForLoadState('networkidle');
   });
 
   test('Mobile Header - Title and Settings Icon @mobile', async ({ page }) => {

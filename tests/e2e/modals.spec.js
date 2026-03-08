@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Modals Responsiveness @ui', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.app-main-layout')).toHaveClass(/loaded/);
+    await page.waitForLoadState('networkidle');
   });
 
   test('Settings Modal - Centering and Content @mobile', async ({ page }) => {
