@@ -1,25 +1,13 @@
 import { Fragment, h } from 'preact';
-import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
-// Lazy load heavy components to reduce initial bundle size
-const Settings = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.Settings })));
-const EditorModal = lazy(() =>
-    import('./EditorModal.jsx').then((m) => ({ default: m.EditorModal })),
-);
-const GenerateSongModal = lazy(() =>
-    import('./GenerateSongModal.jsx').then((m) => ({ default: m.GenerateSongModal })),
-);
-const ExportModal = lazy(() =>
-    import('./ExportModal.jsx').then((m) => ({ default: m.ExportModal })),
-);
-const TemplatesModal = lazy(() =>
-    import('./TemplatesModal.jsx').then((m) => ({ default: m.TemplatesModal })),
-);
-const AnalyzerModal = lazy(() =>
-    import('./AnalyzerModal.jsx').then((m) => ({ default: m.AnalyzerModal })),
-);
+import { AnalyzerModal } from './AnalyzerModal.jsx';
+import { EditorModal } from './EditorModal.jsx';
+import { ExportModal } from './ExportModal.jsx';
+import { GenerateSongModal } from './GenerateSongModal.jsx';
+import { Settings } from './Settings.jsx';
+import { TemplatesModal } from './TemplatesModal.jsx';
 
 /**
  * AnimatedModalWrapper handles the entrance and exit lifecycle for modals.
@@ -86,14 +74,12 @@ export function Modals() {
 
     return (
         <Fragment>
-            <Suspense fallback={null}>
-                <AnimatedModalWrapper isOpen={settingsOpen} component={Settings} />
-                <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
-                <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
-                <AnimatedModalWrapper isOpen={exportOpen} component={ExportModal} />
-                <AnimatedModalWrapper isOpen={templatesOpen} component={TemplatesModal} />
-                <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
-            </Suspense>
+            <AnimatedModalWrapper isOpen={settingsOpen} component={Settings} />
+            <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
+            <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
+            <AnimatedModalWrapper isOpen={exportOpen} component={ExportModal} />
+            <AnimatedModalWrapper isOpen={templatesOpen} component={TemplatesModal} />
+            <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
         </Fragment>
     );
 }
