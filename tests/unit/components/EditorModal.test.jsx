@@ -101,19 +101,23 @@ describe('EditorModal Component', () => {
         });
 
         const triggerBtn = container.querySelector('#arrangerActionTrigger');
-        
+
         await act(async () => {
             triggerBtn.click();
         });
 
-        expect(container.querySelector('#arrangerActionMenu').classList.contains('open')).toBe(true);
+        expect(container.querySelector('#arrangerActionMenu').classList.contains('open')).toBe(
+            true,
+        );
         expect(container.textContent).toContain('Import Tab');
 
         await act(async () => {
             triggerBtn.click();
         });
 
-        expect(container.querySelector('#arrangerActionMenu').classList.contains('open')).toBe(false);
+        expect(container.querySelector('#arrangerActionMenu').classList.contains('open')).toBe(
+            false,
+        );
     });
 
     it('should transition to import mode when clicking Import Tab in the menu', async () => {

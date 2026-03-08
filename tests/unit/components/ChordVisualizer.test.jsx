@@ -33,8 +33,20 @@ describe('ChordVisualizer Component', () => {
             const state = {
                 arranger: {
                     progression: [
-                        { sectionId: 's1', sectionLabel: 'Verse', beats: 4, absName: 'C', globalIndex: 0 },
-                        { sectionId: 's1', sectionLabel: 'Verse', beats: 4, absName: 'G', globalIndex: 1 },
+                        {
+                            sectionId: 's1',
+                            sectionLabel: 'Verse',
+                            beats: 4,
+                            absName: 'C',
+                            globalIndex: 0,
+                        },
+                        {
+                            sectionId: 's1',
+                            sectionLabel: 'Verse',
+                            beats: 4,
+                            absName: 'G',
+                            globalIndex: 1,
+                        },
                     ],
                     timeSignature: '4/4',
                     sections: [{ id: 's1', label: 'Verse', seamless: false }],
@@ -101,7 +113,15 @@ describe('ChordVisualizer Component', () => {
             },
             arranger: {
                 progression: [
-                    { sectionId: 's1', sectionLabel: 'Verse', beats: 4, absName: 'C', globalIndex: 0, start: 0, end: 16 },
+                    {
+                        sectionId: 's1',
+                        sectionLabel: 'Verse',
+                        beats: 4,
+                        absName: 'C',
+                        globalIndex: 0,
+                        start: 0,
+                        end: 16,
+                    },
                 ],
                 timeSignature: '4/4',
                 sections: [{ id: 's1', label: 'Verse', seamless: false }],
