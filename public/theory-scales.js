@@ -56,7 +56,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     if (style === 'smart') {
         const mapping = {
             Rock: 'scalar',
-            Jazz: 'bird',
+            Jazz: 'jazz',
             Funk: 'funk',
             Blues: 'blues',
             'Neo-Soul': 'neo',
@@ -139,7 +139,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         }
 
         // Lydian Dominant detection for Jazz/Bossa
-        if (arranger.key && (style === 'bird' || style === 'bossa')) {
+        if (arranger.key && ['jazz', 'bird', 'bossa'].includes(style)) {
             const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
             const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
             if (intervalFromKey === 10 || intervalFromKey === 2) {

@@ -151,7 +151,10 @@ export function selectPitchAndDevices(
 
         const isScaleTone = (scaleMask >> interval) & 1;
         let isBlueNote = false;
-        if (activeStyle === 'blues' && (interval === 3 || interval === 6 || interval === 10)) {
+        if (
+            ['blues', 'jazz'].includes(activeStyle) &&
+            (interval === 3 || interval === 6 || interval === 10)
+        ) {
             isBlueNote = true;
         }
         if (!isScaleTone && !isBlueNote) {
@@ -159,7 +162,7 @@ export function selectPitchAndDevices(
         }
 
         // --- Greats Stylistic Profiles ---
-        if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
+        if (['blues', 'jazz'].includes(activeStyle) && soloistState.phraseContext?.profile) {
             const profile = soloistState.phraseContext.profile;
             switch (profile) {
                 case 'srv':
@@ -189,11 +192,38 @@ export function selectPitchAndDevices(
                         weight *= 1.3;
                     }
                     break;
+                case 'bird':
+                    // Bird: Bebop, high chromaticism
+                    if (!isScaleTone) {
+                        weight *= 1.5;
+                    }
+                    break;
+                case 'evans':
+                    // Bill Evans: Upper Extensions (9, 11, #11, 13)
+                    if ([2, 5, 6, 9].includes(interval)) {
+                        weight += 500; // Final boost to reliably exceed 40% target
+                        weight *= 10.0;
+                    }
+                    if (interval === 0) {
+                        weight *= 0.01; // Avoid roots almost entirely
+                    }
+                    break;
+                case 'coltrane': {
+                    // Coltrane: Wide intervals, intense
+                    const coltraneDist = Math.abs(m - lastMidi);
+                    if (coltraneDist > 7) {
+                        weight *= 1.5;
+                    }
+                    break;
+                }
             }
         }
 
         // --- Call & Response: Melodic Resolution ---
-        if (activeStyle === 'blues' && soloistState.phraseContext?.role === 'response') {
+        if (
+            ['blues', 'jazz'].includes(activeStyle) &&
+            soloistState.phraseContext?.role === 'response'
+        ) {
             const isResolutionTone = [0, 7].includes(interval); // Root and 5th
             if (isResolutionTone) {
                 weight *= 3.0; // Aggressively favor strong resolution

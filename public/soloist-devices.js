@@ -288,12 +288,81 @@ export function generateMelodicDevice(deviceType, ctx) {
         const root = targetChord.rootMidi;
         // Iconic V-IV-I resolution lick
         deviceBuffer = [
-            { midi: root + 7, durationSteps: 2, style: activeStyle },
-            { midi: root + 6, durationSteps: 2, style: activeStyle },
-            { midi: root + 5, durationSteps: 4, style: activeStyle },
-            { midi: root + 3, durationSteps: 2, style: activeStyle, bendStartInterval: -0.5 },
-            { midi: root, durationSteps: 6, style: activeStyle },
+            { midi: root + 7, durationSteps: 2, velocity: devBaseVel, style: activeStyle },
+            { midi: root + 6, durationSteps: 2, velocity: devBaseVel * 0.9, style: activeStyle },
+            { midi: root + 5, durationSteps: 4, velocity: devBaseVel, style: activeStyle },
+            {
+                midi: root + 3,
+                durationSteps: 2,
+                velocity: devBaseVel * 0.8,
+                style: activeStyle,
+                bendStartInterval: -0.5,
+            },
+            { midi: root, durationSteps: 6, velocity: devBaseVel * 1.1, style: activeStyle },
         ];
+    } else if (deviceType === 'chromaticEnclosure') {
+        // Enclosure: One above, one below, target
+        deviceBuffer = [
+            {
+                midi: selectedMidi + 1,
+                durationSteps: 1,
+                velocity: devBaseVel * 0.8,
+                style: activeStyle,
+            },
+            {
+                midi: selectedMidi - 1,
+                durationSteps: 1,
+                velocity: devBaseVel * 0.8,
+                style: activeStyle,
+            },
+            { midi: selectedMidi, durationSteps: 2, velocity: devBaseVel, style: activeStyle },
+        ];
+    } else if (deviceType === 'bebopScale') {
+        // Run with chromatic passing tone
+        const _scale = getScaleForChord(targetChord, null, activeStyle);
+        const root = targetChord.rootMidi;
+        const bebopNote = root + 11; // Major 7 passing tone for dominant
+
+        deviceBuffer = [
+            { midi: root + 12, durationSteps: 1, velocity: devBaseVel, style: activeStyle },
+            { midi: bebopNote, durationSteps: 1, velocity: devBaseVel * 0.9, style: activeStyle },
+            { midi: root + 10, durationSteps: 1, velocity: devBaseVel * 0.8, style: activeStyle },
+            { midi: root + 9, durationSteps: 1, velocity: devBaseVel * 0.7, style: activeStyle },
+        ];
+    } else if (deviceType === 'quartalStack' && isPolyphonic) {
+        // Stack of 4ths
+        deviceBuffer = [
+            [
+                { midi: selectedMidi, velocity: devBaseVel, durationSteps: 4, style: activeStyle },
+                {
+                    midi: selectedMidi + 5,
+                    velocity: devBaseVel * 0.9,
+                    durationSteps: 4,
+                    style: activeStyle,
+                },
+                {
+                    midi: selectedMidi + 10,
+                    velocity: devBaseVel * 0.8,
+                    durationSteps: 4,
+                    style: activeStyle,
+                },
+            ],
+        ];
+    } else if (deviceType === 'sheetsOfSound') {
+        // Fast multi-octave run
+        const scale = getScaleForChord(targetChord, null, activeStyle);
+        deviceBuffer = [];
+        const startMidi = selectedMidi - 12;
+        for (let i = 0; i < 8; i++) {
+            const interval = scale[i % scale.length];
+            const octaveShift = Math.floor(i / scale.length) * 12;
+            deviceBuffer.push({
+                midi: startMidi + interval + octaveShift,
+                durationSteps: 0.5, // 32nd notes
+                velocity: devBaseVel * (0.7 + Math.random() * 0.3),
+                style: activeStyle,
+            });
+        }
     } else if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
         const dsInt = activeStyle === 'blues' || activeStyle === 'scalar' ? 5 : 4;
         deviceBuffer = [

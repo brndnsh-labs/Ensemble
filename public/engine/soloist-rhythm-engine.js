@@ -20,7 +20,7 @@ export function generateRhythmPlan(
 
     // --- Call & Response: Rhythmic Mirroring ---
     if (
-        style === 'blues' &&
+        ['blues', 'jazz'].includes(style) &&
         soloistState.phraseContext?.role === 'response' &&
         soloistState.phraseContext?.skeleton?.length > 0 &&
         Math.random() < 0.8 // 80% chance to follow skeleton for response
@@ -125,6 +125,17 @@ export function generateRhythmPlan(
                 attackProb *= 1.3; // Boost density at measure ends
             }
 
+            // --- Jazz Specifics ---
+            if (style === 'jazz') {
+                const profile = soloistState.phraseContext?.profile;
+                // Double-time bursts for Bird/Coltrane
+                if ((profile === 'bird' || profile === 'coltrane') && intensity > 0.7) {
+                    if (stepInBeat % 2 !== 0) {
+                        attackProb *= 1.5; // Favor 16ths
+                    }
+                }
+            }
+
             if (coordination.bypassRhythm) {
                 attackProb = 1.0;
             }
@@ -142,6 +153,11 @@ export function generateRhythmPlan(
                     stepVelocity *= 1.15;
                 } else if (isBeatStart || stepInBeat === stepsPerBeat / 2) {
                     stepVelocity *= 1.05;
+                }
+
+                // Jazz Ghosting
+                if (style === 'jazz' && !isBeatStart && Math.random() < 0.4) {
+                    stepVelocity *= 0.6; // Soft ghost note
                 }
 
                 plan.push({

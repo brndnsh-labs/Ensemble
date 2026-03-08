@@ -237,7 +237,7 @@ export function getSoloistNote(
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
 
                 // --- Call & Response Framework ---
-                if (activeStyle === 'blues') {
+                if (['blues', 'jazz'].includes(activeStyle)) {
                     const wasCall = soloist.phraseContext.role === 'call';
                     const responseProb = wasCall ? 0.7 : 0.2;
                     const nextRole = Math.random() < responseProb ? 'response' : 'call';
@@ -248,7 +248,10 @@ export function getSoloistNote(
 
                     if (nextRole === 'call') {
                         // Pick a new profile for this cycle
-                        const profiles = ['srv', 'monk', 'armstrong', 'miles'];
+                        let profiles = ['srv', 'monk', 'armstrong', 'miles'];
+                        if (activeStyle === 'jazz') {
+                            profiles = ['bird', 'evans', 'coltrane', 'miles'];
+                        }
                         soloist.phraseContext.profile =
                             profiles[Math.floor(Math.random() * profiles.length)]; // @worker-mutation
                     }

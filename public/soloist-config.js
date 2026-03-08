@@ -240,6 +240,45 @@ export const STYLE_CONFIG = {
             ],
         ],
     },
+    jazz: {
+        genreGravityOffset: 0,
+        restBase: 0.08,
+        tensionScale: 0.85,
+        timingJitter: 15,
+        maxNotesPerPhrase: 32,
+        minNotesPerPhrase: 3,
+        doubleStopProb: 0.2,
+        anticipationProb: 0.6,
+        targetExtensions: [2, 6, 9, 11, 13],
+        deviceProb: 0.35,
+        allowedDevices: [
+            'enclosure',
+            'run',
+            'birdFlurry',
+            'chromaticFall',
+            'bebopScale',
+            'quartalStack',
+            'sheetsOfSound',
+        ],
+
+        rhythmicDensity: 0.8,
+        syncopationLikelihood: 0.85,
+        targetAnchoring: 0.5,
+        chromaticism: 0.7,
+        contourSkeletons: [
+            [
+                { interval: 2, durationSteps: 2 },
+                { interval: 4, durationSteps: 2 },
+                { interval: 0, durationSteps: 4 },
+            ],
+            [
+                { interval: 1, durationSteps: 1 },
+                { interval: 2, durationSteps: 1 },
+                { interval: 3, durationSteps: 1 },
+                { interval: 0, durationSteps: 1 },
+            ],
+        ],
+    },
     bird: {
         genreGravityOffset: 0,
         restBase: 0.05,
@@ -534,6 +573,7 @@ export const STYLE_CONFIG = {
 };
 
 export const STYLE_EMPHASIS = {
+    jazz: [0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9],
     scalar: [1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3, 1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3],
     bird: [0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0],
     shred: [1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9],
@@ -550,7 +590,7 @@ export const STYLE_EMPHASIS = {
 
 export const GENRE_STYLE_MAPPING = {
     Rock: 'scalar',
-    Jazz: 'bird',
+    Jazz: 'jazz',
     Funk: 'funk',
     Blues: 'blues',
     'Neo-Soul': 'neo',
