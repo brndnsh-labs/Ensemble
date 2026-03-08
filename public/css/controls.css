@@ -149,6 +149,12 @@
     min-width: 80px; /* Ensure stable width */
 }
 
+@media (max-width: 600px) {
+    #playBtn {
+        min-width: 64px;
+    }
+}
+
 .btn-timer {
     font-family: monospace;
     font-size: 0.75rem;
