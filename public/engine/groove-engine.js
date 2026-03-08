@@ -3,13 +3,18 @@ import { getState } from '../state.js';
 import { calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
 import * as acoustic from './grooves/acoustic.js';
 import * as blues from './grooves/blues.js';
+import * as country from './grooves/country.js';
 import * as disco from './grooves/disco.js';
 import * as funk from './grooves/funk.js';
+import * as hiphop from './grooves/hiphop.js';
 import * as jazz from './grooves/jazz.js';
 import * as latin from './grooves/latin.js';
+import * as metal from './grooves/metal.js';
+import * as minimal from './grooves/minimal.js';
 import * as neoSoul from './grooves/neo-soul.js';
 import * as reggae from './grooves/reggae.js';
 import * as rock from './grooves/rock.js';
+import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG } from './grooves/utils.js';
 
@@ -19,13 +24,17 @@ const strategies = {
     Rock: rock,
     Funk: funk,
     'Neo-Soul': neoSoul,
-    'Hip Hop': neoSoul,
+    'Hip Hop': hiphop,
     Acoustic: acoustic,
     Disco: disco,
     Reggae: reggae,
     'Bossa Nova': latin,
     Latin: latin,
     'Ska-Punk': skaPunk,
+    Country: country,
+    Metal: metal,
+    Minimal: minimal,
+    Shred: shred,
 };
 
 function getStrategy(groove) {

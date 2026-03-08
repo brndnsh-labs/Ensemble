@@ -647,6 +647,9 @@ export const GENRE_STYLE_MAPPING = {
     Country: 'country',
     'Ska-Punk': 'ska',
     Ska: 'ska',
+    Metal: 'metal',
+    Minimal: 'minimal',
+    Shred: 'shred',
 };
 
 /**
