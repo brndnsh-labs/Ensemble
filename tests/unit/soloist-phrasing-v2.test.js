@@ -112,13 +112,14 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
         localState.soloist.phrasingState = 'IMPROV';
-        localState.soloist.activeSteps = 0; // Should want to rest
 
         // Step 1: Not an end of measure
+        localState.soloist.activeSteps = 1; // Will decrement to 0, but not rest
         getSoloistNote(chord, null, 1, 440, 60, 'funk', 1, false);
         expect(localState.soloist.phrasingState).toBe('IMPROV');
 
         // Step 15: End of measure transition point
+        localState.soloist.activeSteps = 1; // Force expiration exactly on resolution
         randomSpy.mockReturnValue(0.01); // Force attack
         getSoloistNote(chord, null, 15, 440, 60, 'funk', 15, false);
         expect(localState.soloist.phrasingState).toBe('rest');

@@ -278,9 +278,7 @@ export function getSoloistNote(
                 const _nextActiveSteps = Math.floor(
                     baseLength * stepsPerBeat * (0.3 + Math.random() * 1.2),
                 );
-                if (soloist.activeSteps === undefined) {
-                    soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
-                }
+                soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
                 logDebug(`Waking up for ~${soloist.activeSteps} steps`);
 
                 // --- Call & Response Framework ---
@@ -376,7 +374,7 @@ export function getSoloistNote(
                 stepInfo,
             );
             soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
-            if (soloist.activeSteps === undefined) {
+            if (soloist.activeSteps === undefined || soloist.activeSteps <= 0) {
                 soloist.activeSteps = planSteps; /* @worker-mutation */
             }
         } else {
