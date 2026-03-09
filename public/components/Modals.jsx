@@ -6,6 +6,7 @@ import { AnalyzerModal } from './AnalyzerModal.jsx';
 import { EditorModal } from './EditorModal.jsx';
 import { ExportModal } from './ExportModal.jsx';
 import { GenerateSongModal } from './GenerateSongModal.jsx';
+import { PerformanceModal } from './PerformanceModal.jsx';
 import { Settings } from './Settings.jsx';
 import { TemplatesModal } from './TemplatesModal.jsx';
 
@@ -47,15 +48,23 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
 
 export function Modals() {
     // Get modal visibility state from global store
-    const { settingsOpen, editorOpen, generateSongOpen, exportOpen, templatesOpen, analyzerOpen } =
-        useEnsembleState((s) => ({
-            settingsOpen: s.playback.modals.settings,
-            editorOpen: s.playback.modals.editor,
-            generateSongOpen: s.playback.modals.generateSong,
-            exportOpen: s.playback.modals.export,
-            templatesOpen: s.playback.modals.templates,
-            analyzerOpen: s.playback.modals.analyzer,
-        }));
+    const {
+        settingsOpen,
+        editorOpen,
+        generateSongOpen,
+        exportOpen,
+        templatesOpen,
+        analyzerOpen,
+        performanceOpen,
+    } = useEnsembleState((s) => ({
+        settingsOpen: s.playback.modals.settings,
+        editorOpen: s.playback.modals.editor,
+        generateSongOpen: s.playback.modals.generateSong,
+        exportOpen: s.playback.modals.export,
+        templatesOpen: s.playback.modals.templates,
+        analyzerOpen: s.playback.modals.analyzer,
+        performanceOpen: s.playback.modals.performance,
+    }));
 
     useEffect(() => {
         const anyOpen =
@@ -64,13 +73,22 @@ export function Modals() {
             generateSongOpen ||
             exportOpen ||
             templatesOpen ||
-            analyzerOpen;
+            analyzerOpen ||
+            performanceOpen;
         if (anyOpen) {
             document.body.classList.add('modal-open');
         } else {
             document.body.classList.remove('modal-open');
         }
-    }, [settingsOpen, editorOpen, generateSongOpen, exportOpen, templatesOpen, analyzerOpen]);
+    }, [
+        settingsOpen,
+        editorOpen,
+        generateSongOpen,
+        exportOpen,
+        templatesOpen,
+        analyzerOpen,
+        performanceOpen,
+    ]);
 
     return (
         <Fragment>
@@ -80,6 +98,7 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={exportOpen} component={ExportModal} />
             <AnimatedModalWrapper isOpen={templatesOpen} component={TemplatesModal} />
             <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
+            <AnimatedModalWrapper isOpen={performanceOpen} component={PerformanceModal} />
         </Fragment>
     );
 }

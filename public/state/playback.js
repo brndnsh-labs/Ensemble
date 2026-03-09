@@ -119,6 +119,7 @@ export const playback = {
         templates: false,
         analyzer: false,
         generateSong: false,
+        performance: false,
     },
 };
 

@@ -113,6 +113,54 @@ export function generateId() {
 }
 
 /**
+ * Calculates MIDI notes for specific scale degrees (Root, 3rd, 5th, 7th, 9th)
+ * based on a given chord object.
+ *
+ * @param {Object} chordObj - The chord object containing rootMidi and quality.
+ * @param {number} baseOctave - The default octave to use (default: 4 for Soloist).
+ * @returns {number[]} Array of MIDI note numbers [Root, 3rd, 5th, 7th, 9th].
+ */
+export function getChordMidiNotes(chordObj, baseOctave = 4) {
+    if (!chordObj || typeof chordObj.rootMidi !== 'number') {
+        return [];
+    }
+
+    // Default root, 3rd, 5th, 7th, 9th intervals (in semitones from root)
+    let intervals = [0, 4, 7, 11, 14]; // Default to Major (M7, M9)
+
+    const quality = chordObj.quality || 'major';
+
+    if (quality === 'minor' || quality === 'm9' || quality === 'm11' || quality === 'm13') {
+        intervals = [0, 3, 7, 10, 14]; // Minor (m3, m7, M9)
+    } else if (
+        quality === 'diminished' ||
+        quality === 'm7b5' ||
+        quality === 'dim7' ||
+        quality === 'half-diminished'
+    ) {
+        intervals = [0, 3, 6, 10, 13]; // Diminished (m3, d5, m7, m9)
+    } else if (quality === 'augmented' || quality === 'aug' || quality === '+') {
+        intervals = [0, 4, 8, 10, 14]; // Augmented (M3, A5, m7, M9)
+    } else if (
+        quality === '7' ||
+        quality === '9' ||
+        quality === '11' ||
+        quality === '13' ||
+        quality === 'dominant'
+    ) {
+        intervals = [0, 4, 7, 10, 14]; // Dominant (M3, P5, m7, M9)
+    }
+
+    // rootMidi from the engine is usually based around C4 = 60
+    // We adjust it based on the baseOctave parameter
+    // Assuming rootMidi is in the 0-11 range + some octave base, we normalize it to pc
+    const pc = chordObj.rootMidi % 12;
+    const baseMidi = (baseOctave + 1) * 12 + pc; // C4 is MIDI 60, so (4+1)*12 = 60
+
+    return intervals.map((interval) => baseMidi + interval);
+}
+
+/**
  * Compresses the sections array into a Base64 string, handling Unicode.
  * @param {Array} sections
  * @returns {string}

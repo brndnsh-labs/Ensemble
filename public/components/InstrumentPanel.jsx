@@ -74,6 +74,20 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                     </button>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;" ref={menuRef}>
+                    {module === 'soloist' && (
+                        <button
+                            class="panel-menu-btn"
+                            aria-label="Open Performance Mode"
+                            onClick={() =>
+                                dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                    modal: 'performance',
+                                    open: true,
+                                })
+                            }
+                        >
+                            🎵
+                        </button>
+                    )}
                     <button
                         class={`panel-menu-btn ${isMenuOpen ? 'active' : ''}`}
                         aria-label={`${title} Settings`}

@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import {
     calculateTimingOffset,
     formatUnicodeSymbols,
+    getChordMidiNotes,
     getFrequency,
     getMidi,
     getStepInfo,
@@ -144,6 +145,39 @@ describe('Utility Functions', () => {
 
         it('should return 60 for 261.63Hz', () => {
             expect(getMidi(261.63)).toBe(60);
+        });
+    });
+
+    describe('getChordMidiNotes', () => {
+        it('should calculate notes for a major chord (default to M7, M9)', () => {
+            const chord = { rootMidi: 60, quality: 'major' }; // C4
+            // Expected: C4, E4, G4, B4, D5 -> 60, 64, 67, 71, 74
+            expect(getChordMidiNotes(chord, 4)).toEqual([60, 64, 67, 71, 74]);
+        });
+
+        it('should calculate notes for a minor chord (m3, m7, M9)', () => {
+            const chord = { rootMidi: 62, quality: 'minor' }; // D4
+            // Expected: D4, F4, A4, C5, E5 -> 62, 65, 69, 72, 76
+            expect(getChordMidiNotes(chord, 4)).toEqual([62, 65, 69, 72, 76]);
+        });
+
+        it('should calculate notes for a diminished chord (m3, d5, m7, m9)', () => {
+            const chord = { rootMidi: 71, quality: 'diminished' }; // B4
+            // pc = 11. baseMidi = (4+1)*12 + 11 = 71
+            // Expected intervals: 0, 3, 6, 10, 13
+            // 71, 74, 77, 81, 84
+            expect(getChordMidiNotes(chord, 4)).toEqual([71, 74, 77, 81, 84]);
+        });
+
+        it('should calculate notes for a dominant chord (M3, P5, m7, M9)', () => {
+            const chord = { rootMidi: 67, quality: 'dominant' }; // G4
+            // Expected: G4, B4, D5, F5, A5 -> 67, 71, 74, 77, 81
+            expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81]);
+        });
+
+        it('should return empty array for invalid input', () => {
+            expect(getChordMidiNotes(null)).toEqual([]);
+            expect(getChordMidiNotes({})).toEqual([]);
         });
     });
 
