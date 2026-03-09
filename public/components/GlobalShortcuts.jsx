@@ -20,14 +20,26 @@ export function GlobalShortcuts() {
             }
 
             // 'E': Toggle Editor
-            if (e.key.toLowerCase() === 'e' && !isTyping && !e.metaKey && !e.ctrlKey) {
+            if (
+                e.key.toLowerCase() === 'e' &&
+                !isTyping &&
+                !anyModalOpen &&
+                !e.metaKey &&
+                !e.ctrlKey
+            ) {
                 e.preventDefault();
                 const isOpen = playback.modals.editor;
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
             // 'S': Toggle Soloist (Trading Fours)
-            if (e.key.toLowerCase() === 's' && !isTyping && !e.metaKey && !e.ctrlKey) {
+            if (
+                e.key.toLowerCase() === 's' &&
+                !isTyping &&
+                !anyModalOpen &&
+                !e.metaKey &&
+                !e.ctrlKey
+            ) {
                 e.preventDefault();
                 import('../instrument-controller.js').then(({ togglePower }) => {
                     togglePower('soloist');
@@ -35,7 +47,7 @@ export function GlobalShortcuts() {
             }
 
             // 1-5: Switch Mobile Tabs
-            if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping) {
+            if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping && !anyModalOpen) {
                 const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
                 const btn = btns[parseInt(e.key, 10) - 1];
                 if (btn) {

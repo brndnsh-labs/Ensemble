@@ -16,14 +16,27 @@ export function PerformanceModal() {
         isMinor: s.arranger.isMinor,
     }));
 
-    // Find current and next chords
-    let currentChord = stepMap[step] || null;
-    let nextChord = null;
+    // Find current and next chords by finding the current step range in stepMap
+    let currentEntry = null;
+    let nextEntry = null;
 
-    let isFallback = false;
+    if (stepMap && stepMap.length > 0) {
+        const currentIdx = stepMap.findIndex((e) => step >= e.start && step < e.end);
+        if (currentIdx !== -1) {
+            currentEntry = stepMap[currentIdx];
+            if (currentIdx + 1 < stepMap.length) {
+                nextEntry = stepMap[currentIdx + 1];
+            } else {
+                nextEntry = stepMap[0]; // Loop around
+            }
+        }
+    }
+
+    let currentChord = currentEntry ? currentEntry.chord : null;
+    let nextChord = nextEntry ? nextEntry.chord : null;
+
     // Fallback: If playback is stopped or no chord is found, default to the global key signature
     if (!isPlaying && !currentChord) {
-        isFallback = true;
         const keyIndex = KEY_ORDER.indexOf(key);
         // Base MIDI for C4 is 60. rootMidi corresponds to the offset from C.
         const rootMidi = 60 + (keyIndex >= 0 ? keyIndex : 0);
@@ -32,16 +45,8 @@ export function PerformanceModal() {
             rootMidi: rootMidi,
             quality: isMinor ? 'minor' : 'major',
         };
-    }
-
-    if (currentChord && !isFallback) {
-        // Find the next chord that is different
-        for (let i = step + 1; i < stepMap.length; i++) {
-            if (stepMap[i] && stepMap[i] !== currentChord) {
-                nextChord = stepMap[i];
-                break;
-            }
-        }
+        // During fallback, nextChord can be null or the same
+        nextChord = null;
     }
 
     const currentNotes = useMemo(() => getChordMidiNotes(currentChord, 4), [currentChord]);
