@@ -1,3 +1,7 @@
+/**
+ * @vitest-environment happy-dom
+ */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveProgression } from '../../../public/arranger-controller.js';
 import { saveDrumPreset } from '../../../public/instrument-controller.js';
