@@ -343,8 +343,6 @@ export class ChordAnalyzerLite {
 
         const beatsPerMeasure = pulse.beatsPerMeasure || 4;
 
-        // console.log(`[Analyzer-Lite] Pulse Detected: ${bpm} BPM, ${beatsPerMeasure}/4 Meter, Offset: ${pulse.downbeatOffset.toFixed(3)}s`);
-
         const sampleRate = audioBuffer.sampleRate;
         let fullSignal = audioBuffer.getChannelData(0); // Mono
 
@@ -398,7 +396,6 @@ export class ChordAnalyzerLite {
         if (options.onProgress) {
             options.onProgress(15);
         }
-        // console.log(`[Analyzer-Lite] Global Key Detected: ${this.notes[globalKey.root]} ${globalKey.type} (Tuning: ${tuningOffset.toFixed(2)} semitones)`);
 
         const results = [];
         let lastChord = 'Rest';
@@ -406,8 +403,6 @@ export class ChordAnalyzerLite {
         // Local Key Tracking
         const rollingChroma = new Float32Array(12).fill(0);
         const ROLL_DECAY = 0.1; // Fast adaptation for rapid modulation (Coltrane changes)
-
-        // console.log(`[Analyzer-Lite] Processing ${beats} beats...`);
 
         // Pre-allocate buffers for analysis loop
         const chromaBuffer = new Float32Array(12);
