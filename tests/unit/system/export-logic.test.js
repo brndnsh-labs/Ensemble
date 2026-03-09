@@ -98,7 +98,8 @@ import { getState } from '../../../public/state.js';
 
 const { arranger, harmony } = getState();
 
-import { handleExport, handleResolution, MidiTrack } from '../../../public/logic-worker.js';
+import { handleExport, MidiTrack } from '../../../public/engine/midi-worker-logic.js';
+import { handleResolution } from '../../../public/logic-worker.js';
 
 describe('Export and Resolution Logic Validation', () => {
     beforeEach(() => {

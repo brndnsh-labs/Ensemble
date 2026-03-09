@@ -1,0 +1,55 @@
+# Ensemble AI Map
+
+This map provides a quick reference for AI agents to understand the responsibilities and key exports of the Ensemble codebase.
+
+## Core Architecture
+
+| Path | Responsibility | Key Exports / Symbols |
+| :--- | :--- | :--- |
+| `public/main.js` | App entry point, worker init, global events. | `init`, `viz` |
+| `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
+| `public/state.js` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
+| `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
+| `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
+| `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
+
+## Generative Engines (Worker Thread)
+
+| Path | Responsibility | Key Logic |
+| :--- | :--- | :--- |
+| `public/soloist.js` | Melodic soloist generation logic. | `getSoloistNote`, `soloistState` |
+| `public/bass.js` | Bass line generation (Walking, Funk). | `getBassNote`, `bassState` |
+| `public/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
+| `public/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
+| `public/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
+
+## Engine Core (Shared)
+
+| Path | Responsibility | Key Exports |
+| :--- | :--- | :--- |
+| `public/engine/scheduler-core.js` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
+| `public/engine/engine.js` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
+| `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
+| `public/engine/groove-engine.js` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
+| `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
+| `public/engine/worker-utils.js` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
+
+## UI Components (Preact)
+
+| Path | Responsibility |
+| :--- | :--- |
+| `public/App.jsx` | Root layout and theme provider. |
+| `public/components/Arranger.jsx` | Chord progression and section manager. |
+| `public/components/Transport.jsx` | Playback controls and tempo. |
+| `public/components/SequencerGrid.jsx` | Interactive drum pattern editor. |
+| `public/components/GroovePanel.jsx` | Genre and vibe selection. |
+
+## Documentation & Standards
+
+| File | Purpose |
+| :--- | :--- |
+| `GEMINI.md` | Primary Project Context (The "What"). |
+| `AI.md` | Operational Protocols (The "How"). |
+| `AI_MAP.md` | Codebase Navigation (The "Where"). |
+| `docs/guides/` | Domain-specific guides (Coordination, Tuning). |
+| `docs/archive/` | Historical reports and completed plans. |

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 globalThis.postMessage = vi.fn();
 
 // Import the worker logic
-import { handleExport } from '../../public/logic-worker.js';
+import { handleExport } from '../../public/engine/midi-worker-logic.js';
 import { getState } from '../../public/state.js';
 
 describe('Export Blocking Performance', () => {

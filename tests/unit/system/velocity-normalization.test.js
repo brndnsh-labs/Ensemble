@@ -71,7 +71,7 @@ import { getState } from '../../../public/state.js';
 
 const { arranger, playback } = getState();
 
-import { handleExport } from '../../../public/logic-worker.js';
+import { handleExport } from '../../../public/engine/midi-worker-logic.js';
 
 describe('Velocity Normalization & MIDI Limits', () => {
     beforeEach(() => {

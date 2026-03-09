@@ -20,6 +20,15 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 *   **State Access**: Read state through the `useEnsembleState` hook in components, or the exported state objects in engine code. **NEVER** modify state objects directly in components. Use `dispatch(ACTIONS.ACTION_TYPE, payload)` from `state.js` using constants from `types.js` to trigger updates.
 *   **Precision Timing**: Use `playback.audio.currentTime` for all audio scheduling. Visual events should be pushed to `playback.drawQueue` for synchronization in `requestAnimationFrame` loop.
 *   **Worker Sync**: State updates that affect engine logic (genre, intensity, chords) are automatically synced to the worker via the `subscribe` mechanism in `main.js`. Use `syncWorker(action, payload)` for explicit delta-based updates.
+
+## Navigation Map
+
+To navigate the codebase efficiently, refer to these specialized guides:
+
+*   **[AI_MAP.md](AI_MAP.md)**: Granular mapping of file responsibilities and key exports. Start here for codebase discovery.
+*   **[AI.md](AI.md)**: Operational protocols, state management rules, and "Musical Intent" coding standards.
+*   **[docs/guides/](docs/guides/)**: Deep-dives into musical coordination, worker contracts, and velocity tuning.
+*   **[docs/archive/](docs/archive/)**: Historical reports and completed architectural plans.
 ...
 *   **Atomic Commits**: STRICTLY avoid "kitchen sink" commits. Break tasks into granular steps:
     1.  **Refactor**: Clean up or restructure code *without* changing behavior. Commit.
