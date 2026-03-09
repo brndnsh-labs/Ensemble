@@ -382,6 +382,12 @@ export function setHarmonyParam(param, value) {
 
 export function instrumentReducer(action, payload) {
     switch (action) {
+        case ACTIONS.SET_MODAL_OPEN:
+            if (payload.modal === 'performance' && payload.open) {
+                soloist.buffer.clear();
+                return true;
+            }
+            return false;
         case ACTIONS.IMPORT_MUSICXML: {
             const currentKey = arranger.key;
             const xmlKey = payload.xmlKey || 'C';

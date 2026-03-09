@@ -144,24 +144,13 @@ export function dispatch(action, payload) {
 
     // 2. Delegate to Reducers
     if (!handled) {
-        if (playbackReducer(action, payload)) {
-            handled = true;
-        }
-        if (arrangerReducer(action, payload)) {
-            handled = true;
-        }
-        if (instrumentReducer(action, payload)) {
-            handled = true;
-        }
-        if (grooveReducer(action, payload, playback)) {
-            handled = true;
-        }
-        if (midiReducer(action, payload)) {
-            handled = true;
-        }
-        if (vizReducer(action, payload)) {
-            handled = true;
-        }
+        const pHandled = playbackReducer(action, payload);
+        const aHandled = arrangerReducer(action, payload);
+        const iHandled = instrumentReducer(action, payload);
+        const gHandled = grooveReducer(action, payload, playback);
+        const mHandled = midiReducer(action, payload);
+        const vHandled = vizReducer(action, payload);
+        handled = pHandled || aHandled || iHandled || gHandled || mHandled || vHandled;
     }
 
     // Always increment version on dispatch to force UI updates for in-place mutations

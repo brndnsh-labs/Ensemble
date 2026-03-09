@@ -157,7 +157,8 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
 
         // 2. Soloist Generation (High Priority)
         let soloResult = null;
-        if (soloist.enabled && step >= sbBufferHead) {
+        const isPerformanceModalOpen = playback.modals?.performance;
+        if (soloist.enabled && !isPerformanceModalOpen && step >= sbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
                 const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
