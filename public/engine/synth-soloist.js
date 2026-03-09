@@ -264,15 +264,6 @@ function playTrumpet(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough or forced
-    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
-        if (vibrato) {
-            vibrato.start(playTime);
-            vibrato.stop(stopTime);
-        }
-    }
-
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
@@ -383,15 +374,6 @@ function playSaxophone(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
     breathLfo.stop(stopTime);
-
-    // Only apply vibrato if note is long enough or forced
-    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
-        if (vibrato) {
-            vibrato.start(playTime);
-            vibrato.stop(stopTime);
-        }
-    }
 
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
@@ -517,15 +499,6 @@ function playClassic(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough or forced
-    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
-        if (vibrato) {
-            vibrato.start(playTime);
-            vibrato.stop(stopTime);
-        }
-    }
-
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
@@ -626,15 +599,6 @@ function playNeoJuno(
     lfo1.stop(stopTime);
     lfo2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough or forced
-    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
-        if (vibrato) {
-            vibrato.start(playTime);
-            vibrato.stop(stopTime);
-        }
-    }
-
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
@@ -714,15 +678,6 @@ function playVowel(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough or forced
-    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
-        if (vibrato) {
-            vibrato.start(playTime);
-            vibrato.stop(stopTime);
-        }
-    }
-
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
@@ -800,15 +755,6 @@ function playShred(
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 
-    // Only apply vibrato if note is long enough or forced
-    if ((duration > 0.15 || vibratoFlag) && soloist.mode !== 'piano') {
-        const vibrato = voiceObj.nodes.find((n) => n.frequency && n.frequency.value < 20); // Find LFO
-        if (vibrato) {
-            vibrato.start(playTime);
-            vibrato.stop(stopTime);
-        }
-    }
-
     osc1.onended = () => safeDisconnect(voiceObj.cleanup.concat(voiceObj.nodes));
 }
 
@@ -857,6 +803,7 @@ function applyPitchEnvelope(
 function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
     const { soloist, playback } = getState();
     const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
+    const intensity = playback.bandIntensity || 0.5;
     const vibrato = ctx.createOscillator();
 
     const bps = (playback.bpm || 120) / 60;
@@ -868,6 +815,14 @@ function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
         vibSpeed = bps * 4;
     }
 
+    // --- Humanization & Intensity Scaling ---
+    // 1. Add slight "jitter" so it isn't perfectly on the grid (+/- 3%)
+    const jitter = 1.0 + (Math.random() * 0.06 - 0.03);
+    vibSpeed *= jitter;
+
+    // 2. Speed pushes slightly with intensity (+10% max)
+    vibSpeed *= 1.0 + intensity * 0.1;
+
     // Style-based adjustments (relative nudge)
     if (style === 'blues') {
         vibSpeed -= 0.5;
@@ -877,7 +832,7 @@ function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
         vibSpeed += 1.2;
     }
 
-    let depthFactor = 0.005;
+    let depthFactor = 0.008; // Base for Rock/Scalar (Increased from 0.005)
     // Base depth offsets
     if (style === 'blues') {
         depthFactor = 0.012;
@@ -885,6 +840,14 @@ function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
         depthFactor = 0.015;
     } else if (style === 'shred') {
         depthFactor = 0.004;
+    }
+
+    // Profile-specific rock boosts
+    const profile = soloist.phraseContext?.profile;
+    if (profile === 'gilmour') {
+        depthFactor *= 1.3; // Lyrical singing leads
+    } else if (profile === 'slash') {
+        depthFactor *= 1.4; // Aggressive wide vibrato
     }
 
     // Apply multiplier from config if present
@@ -910,16 +873,24 @@ function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
 
     const vibGain = ctx.createGain();
     const isLongNote = duration > 0.4 || forceVibrato;
-    const vibDelay = forceVibrato ? 0.1 : 0.15 + Math.random() * 0.1;
-    const finalVibDepth = freq * (isLongNote ? depthFactor : depthFactor * 0.3);
+
+    // Faster "Bloom" (Entry timing)
+    const vibDelay = forceVibrato ? 0.08 : 0.12 + Math.random() * 0.08;
+    const finalVibDepth = freq * (isLongNote ? depthFactor : depthFactor * 0.45);
 
     vibGain.gain.setValueAtTime(0, time);
     vibGain.gain.setValueAtTime(0, time + vibDelay);
-    // Smoothly ramp in the vibrato
+    // Smoothly ramp in the vibrato - faster ramp duration
     vibGain.gain.exponentialRampToValueAtTime(
         Math.max(0.001, finalVibDepth),
-        time + vibDelay + (isLongNote ? 0.5 : 0.2),
+        time + vibDelay + (isLongNote ? 0.35 : 0.18),
     );
+
+    // CENTRALIZED LIFECYCLE: Auto-start LFO if within musical bounds
+    if ((duration > 0.15 || forceVibrato) && soloist.mode !== 'piano') {
+        vibrato.start(time);
+        vibrato.stop(time + duration + 0.2);
+    }
 
     return { vibrato, vibGain };
 }

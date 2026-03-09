@@ -237,6 +237,11 @@ export function generateRhythmPlan(
                     finalSustainProb += 0.2;
                 }
 
+                // 4. Greats Profiles: Gilmour-specific lyrical sustain
+                if (soloistState.phraseContext?.profile === 'gilmour') {
+                    finalSustainProb += 0.2;
+                }
+
                 if (Math.random() < finalSustainProb) {
                     isSustained = true;
                     // Held for a logical amount of time (4 steps = 1 beat, 8 steps = 2 beats)

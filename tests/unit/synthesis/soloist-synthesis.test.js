@@ -142,7 +142,8 @@ describe('Soloist Synthesis', () => {
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
         // Base 120 BPM speed is 6.0. Blues nudge is -0.5. Guitar nudge is +0.4. Total 5.9
-        expect(vibSpeed).toBeCloseTo(5.9);
+        // Account for jitter (+/- 3%) and intensity scaling (approx +5% at default 0.5 intensity)
+        expect(vibSpeed).toBeCloseTo(5.9, 0); // Use 0 precision to allow for wide "musical" variance
     });
 
     it('should reduce vibrato speed for monophonic mode', () => {
@@ -154,7 +155,7 @@ describe('Soloist Synthesis', () => {
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
         // 6.0 (base) - 0.5 (blues) - 0.5 (monophonic) = 5.0
-        expect(vibSpeed).toBe(5.0);
+        expect(vibSpeed).toBeCloseTo(5.0, 0);
     });
 
     it('should disable vibrato and use piano-specific synthesis settings', () => {
