@@ -30,6 +30,7 @@ describe('Security Ledger Verification: DOM Injection', () => {
         // Ignore bundled code and parsers that may need to look at raw HTML/XML
         return (
             !f.includes('public/dist/') &&
+            !f.includes('test-dist/') &&
             !f.includes('audio-analyzer-lite.js') &&
             !f.includes('musicxml-parser.js')
         );

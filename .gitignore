@@ -1,6 +1,7 @@
 node_modules/
 .DS_Store
 dist/
+test-dist/
 *.log
 .gemini/
 #tests/resources/
