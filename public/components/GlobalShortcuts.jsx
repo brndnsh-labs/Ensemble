@@ -1,5 +1,4 @@
 import { useEffect } from 'preact/hooks';
-import { initAudio } from '../engine/engine.js';
 import { switchMeasure } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
@@ -33,7 +32,7 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
-            // 'S': Open Soloist Performance Mode
+            // 'S': Toggle Soloist (Trading Fours)
             if (
                 e.key.toLowerCase() === 's' &&
                 !isTyping &&
@@ -42,13 +41,9 @@ export function GlobalShortcuts() {
                 !e.ctrlKey
             ) {
                 e.preventDefault();
-                if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                }
-                initAudio();
-                setTimeout(() => {
-                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
-                }, 0);
+                import('../instrument-controller.js').then(({ togglePower }) => {
+                    togglePower('soloist');
+                });
             }
 
             // 1-5: Switch Mobile Tabs

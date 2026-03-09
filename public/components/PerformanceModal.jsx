@@ -1,64 +1,19 @@
 import { h } from 'preact';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../config.js';
-import { initAudio, killSoloistNote, playSoloNote, restoreGains } from '../engine/engine.js';
+import { killSoloistNote, playSoloNote } from '../engine/engine.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { formatUnicodeSymbols, getChordMidiNotes, midiToNote } from '../utils.js';
+import { getChordMidiNotes } from '../utils.js';
 
 export function PerformanceModal() {
-    const modalRef = useRef(null);
-    const [currentNoteName, setCurrentNoteName] = useState('');
-
-    // Ensure routing is updated for performance mode and handle focus
-    useLayoutEffect(() => {
-        initAudio();
-        restoreGains();
-        killSoloistNote(); // Immediate silence of any automatic phrases
-
-        // Focus management: Use a multi-stage approach to ensure focus is captured
-        // even if there's a slight delay from animations or first-time interactions.
-        let retryCount = 0;
-        const focusModal = () => {
-            if (modalRef.current) {
-                modalRef.current.focus();
-                // If we're not focused yet, retry in the next frame
-                if (document.activeElement !== modalRef.current && retryCount < 20) {
-                    retryCount++;
-                    requestAnimationFrame(focusModal);
-                }
-            }
-        };
-
-        // Start focus attempts immediately
-        focusModal();
-        // Additional safety checks
-        const t1 = setTimeout(focusModal, 50);
-        const t2 = setTimeout(focusModal, 150);
-        const t3 = setTimeout(focusModal, 300);
-
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-            clearTimeout(t3);
-        };
-    }, []);
-
-    // Ensure routing is updated for performance mode
-    useEffect(() => {
-        restoreGains();
-        return () => {
-            restoreGains();
-        };
-    }, []);
-
-    const { step, stepMap, key, isMinor, totalSteps, notation } = useEnsembleState((s) => ({
+    const { step, stepMap, isPlaying, key, isMinor, notation } = useEnsembleState((s) => ({
         step: s.playback.step,
         stepMap: s.arranger.stepMap,
+        isPlaying: s.playback.isPlaying,
         key: s.arranger.key,
         isMinor: s.arranger.isMinor,
-        totalSteps: s.arranger.totalSteps,
         notation: s.arranger.notation || 'roman',
     }));
 
@@ -67,9 +22,7 @@ export function PerformanceModal() {
     let nextEntry = null;
 
     if (stepMap && stepMap.length > 0) {
-        // Use modulo to wrap the step during song looping
-        const loopStep = totalSteps > 0 ? step % totalSteps : step;
-        const currentIdx = stepMap.findIndex((e) => loopStep >= e.start && loopStep < e.end);
+        const currentIdx = stepMap.findIndex((e) => step >= e.start && step < e.end);
         if (currentIdx !== -1) {
             currentEntry = stepMap[currentIdx];
             if (currentIdx + 1 < stepMap.length) {
@@ -81,165 +34,112 @@ export function PerformanceModal() {
     }
 
     let currentChord = currentEntry ? currentEntry.chord : null;
-    const nextChord = nextEntry ? nextEntry.chord : null;
+    let nextChord = nextEntry ? nextEntry.chord : null;
 
-    // Fallback: If no chord is found (empty song or at boundaries), default to the global key signature
-    if (!currentChord) {
+    // Fallback: If playback is stopped or no chord is found, default to the global key signature
+    if (!isPlaying && !currentChord) {
         const keyIndex = KEY_ORDER.indexOf(key);
         // Base MIDI for C4 is 60. rootMidi corresponds to the offset from C.
         const rootMidi = 60 + (keyIndex >= 0 ? keyIndex : 0);
+        const fallbackName = key + (isMinor ? 'm' : '');
         currentChord = {
-            absName: key + (isMinor ? 'm' : ''),
+            chord: fallbackName,
+            absName: fallbackName,
+            romanName: isMinor ? 'i' : 'I',
+            nnsName: isMinor ? '1m' : '1',
             rootMidi: rootMidi,
             quality: isMinor ? 'minor' : 'major',
         };
+        // During fallback, nextChord can be null or the same
+        nextChord = null;
     }
 
-    const getChordName = (chordObj) => {
-        if (!chordObj) {
+    // Helper to safely get the formatted chord name to display based on user's notation setting
+    const getChordDisplayName = (c) => {
+        if (!c) {
             return '---';
         }
-
-        // 1. Try formatted display name (handles Roman, NNS, Absolute)
-        if (chordObj.display?.[notation]) {
-            const d = chordObj.display[notation];
-            let name = d.root + d.suffix;
-            if (d.bass) {
-                name += `/${d.bass}`;
-            }
-            return formatUnicodeSymbols(name);
-        }
-
-        // 2. Fallback to basic names
-        const basicName = chordObj.absName || chordObj.chord || '---';
-        return formatUnicodeSymbols(basicName);
+        return c[`${notation}Name`] || c.absName || c.chord || '---';
     };
 
     const currentNotes = useMemo(() => getChordMidiNotes(currentChord, 4), [currentChord]);
     const nextNotes = useMemo(() => getChordMidiNotes(nextChord, 4), [nextChord]);
 
-    const currentNotesRef = useRef(currentNotes);
-    const nextNotesRef = useRef(nextNotes);
+    const activeKeysRef = useRef(new Map());
+    const [activeKeys, setActiveKeys] = useState(new Set());
+    const lastPlayedKeyRef = useRef(null);
 
-    useEffect(() => {
-        currentNotesRef.current = currentNotes;
-        nextNotesRef.current = nextNotes;
-    }, [currentNotes, nextNotes]);
-
-    const heldKeysRef = useRef([]); // Stack of { key, midi }
-    const [activeKeys, setActiveKeys] = useState(new Set()); // Keys that are held
-    const [playingKey, setPlayingKey] = useState(null); // The one currently sounding
-
-    // Unified trigger for both keyboard and pointer events
-    const triggerNote = (midiNote, sourceKey, isLegato = false) => {
-        initAudio();
-        restoreGains();
-
+    // Helper to send note to the engine
+    const triggerNote = (midiNote) => {
+        // We use 0 for time (immediate)
         const freq = 440 * 2 ** ((midiNote - 69) / 12);
-        // Use a very long duration (60s) for manual performance to allow sustains
-        playSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
-
-        const noteInfo = midiToNote(midiNote);
-        setCurrentNoteName(`${noteInfo.name}${noteInfo.octave}`);
-        setPlayingKey(sourceKey);
+        const velocity = 0.8;
+        const duration = 2.0; // Sustained note, will be killed on release
+        playSoloNote(freq, 0, duration, velocity);
     };
 
-    const stopNote = (sourceKey = null) => {
-        if (!sourceKey) {
-            // Kill everything
-            killSoloistNote();
-            setCurrentNoteName('');
-            heldKeysRef.current = [];
-            setActiveKeys(new Set());
-            setPlayingKey(null);
-            return;
-        }
-
-        const index = heldKeysRef.current.findIndex((h) => h.key === sourceKey);
-        if (index === -1) {
-            return;
-        }
-
-        const wasPlaying = index === heldKeysRef.current.length - 1;
-        heldKeysRef.current.splice(index, 1);
-
-        // Update UI state
-        const nextHeld = new Set(heldKeysRef.current.map((h) => h.key));
-        setActiveKeys(nextHeld);
-
-        if (heldKeysRef.current.length === 0) {
-            killSoloistNote();
-            setCurrentNoteName('');
-            setPlayingKey(null);
-        } else if (wasPlaying) {
-            // Fallback to the next note in the stack
-            const next = heldKeysRef.current[heldKeysRef.current.length - 1];
-            triggerNote(next.midi, next.key, true);
-        }
+    const stopNote = () => {
+        killSoloistNote();
     };
 
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.repeat) {
                 return;
-            }
+            } // Ignore OS key repeats
+
             const key = e.key.toLowerCase();
-
-            // CHORD TONES (LEFT) | TENSIONS (RIGHT)
-            // Group 1: 0-4 (Left Hand Range)
-            // Group 2: 5-9 (Right Hand Range)
-
-            // Layout per row: [A S D F G] [H J K L ;]
-            const currentKeys = {
-                a: 0,
-                s: 1,
-                d: 2,
-                f: 3,
-                g: 4,
-                h: 5,
-                j: 6,
-                k: 7,
-                l: 8,
-                ';': 9,
-            };
-
-            // Layout per row: [Q W E R T] [Y U I O P]
-            const nextKeys = {
-                q: 0,
-                w: 1,
-                e: 2,
-                r: 3,
-                t: 4,
-                y: 5,
-                u: 6,
-                i: 7,
-                o: 8,
-                p: 9,
-            };
-
             let midiNote = null;
 
-            if (key in currentKeys && currentNotesRef.current.length > 0) {
-                midiNote = currentNotesRef.current[currentKeys[key]];
-            } else if (key in nextKeys && nextNotesRef.current.length > 0) {
-                midiNote = nextNotesRef.current[nextKeys[key]];
+            // Map home row (A S D F G) to current chord
+            const currentMap = { a: 0, s: 1, d: 2, f: 3, g: 4 };
+            // Map top row (Q W E R T) to upcoming chord
+            const nextMap = { q: 0, w: 1, e: 2, r: 3, t: 4 };
+
+            if (key in currentMap && currentNotes.length > 0) {
+                midiNote = currentNotes[currentMap[key]];
+            } else if (key in nextMap && nextNotes.length > 0) {
+                midiNote = nextNotes[nextMap[key]];
             }
 
             if (midiNote !== null) {
                 e.preventDefault();
-                const isLegato = heldKeysRef.current.length > 0;
 
-                // Push to stack
-                heldKeysRef.current.push({ key, midi: midiNote });
-                setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
+                // Note: kill previous note before triggering new one to enforce strict monophonic rule
+                if (activeKeysRef.current.size > 0) {
+                    stopNote();
+                }
 
-                triggerNote(midiNote, key, isLegato);
+                activeKeysRef.current.set(key, midiNote);
+                lastPlayedKeyRef.current = key;
+
+                triggerNote(midiNote);
+
+                // Update UI state
+                setActiveKeys(new Set(activeKeysRef.current.keys()));
             }
         };
 
         const handleKeyUp = (e) => {
             const key = e.key.toLowerCase();
-            stopNote(key);
+            if (activeKeysRef.current.has(key)) {
+                e.preventDefault();
+                activeKeysRef.current.delete(key);
+
+                if (activeKeysRef.current.size === 0) {
+                    stopNote();
+                    lastPlayedKeyRef.current = null;
+                } else if (lastPlayedKeyRef.current === key) {
+                    // Fallback to the most recently pressed remaining key
+                    const remainingKeys = Array.from(activeKeysRef.current.keys());
+                    const fallbackKey = remainingKeys[remainingKeys.length - 1];
+                    lastPlayedKeyRef.current = fallbackKey;
+                    triggerNote(activeKeysRef.current.get(fallbackKey));
+                }
+
+                // Update UI state
+                setActiveKeys(new Set(activeKeysRef.current.keys()));
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -248,141 +148,24 @@ export function PerformanceModal() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
-            stopNote();
+            stopNote(); // Cleanup lingering notes when modal closes
         };
-    }, []);
+    }, [currentNotes, nextNotes]);
 
     const close = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: false });
     };
 
-    const renderKey = (label, midi, sourceKey, colorVar) => {
-        const isHeld = activeKeys.has(sourceKey);
-        const isPlaying = playingKey === sourceKey;
-        const noteInfo = midi ? midiToNote(midi) : null;
-        const noteLabel = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
-
-        return (
-            <button
-                key={sourceKey}
-                onPointerDown={(e) => {
-                    e.preventDefault();
-                    if (!midi) {
-                        return;
-                    }
-                    const isLegato = heldKeysRef.current.length > 0;
-                    heldKeysRef.current.push({ key: sourceKey, midi });
-                    setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
-                    triggerNote(midi, sourceKey, isLegato);
-                }}
-                onPointerUp={(e) => {
-                    e.preventDefault();
-                    stopNote(sourceKey);
-                }}
-                onPointerLeave={(e) => {
-                    e.preventDefault();
-                    if (activeKeys.has(sourceKey)) {
-                        stopNote(sourceKey);
-                    }
-                }}
-                style={`
-                    width: 55px; height: 75px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
-                    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-                    font-weight: bold; cursor: pointer; transition: all 0.1s; font-size: 0.95rem;
-                    ${isPlaying ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : isHeld ? 'background: rgba(255,255,255,0.2); color: #fff;' : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 3px 0 rgba(0,0,0,0.3);'}
-                `}
-            >
-                <span style="font-size: 1.1rem;">{label}</span>
-                <span style="font-size: 0.65rem; opacity: 0.6;">{noteLabel}</span>
-            </button>
-        );
-    };
-
-    const renderDeckRow = (keys, notes, colorVar, chordObj, isNext = false) => {
-        const chordName = getChordName(chordObj);
-        const labelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'}; margin-bottom: 0.5rem;`;
-
-        return (
-            <div
-                class={isNext ? 'upcoming-chord' : 'active-chord'}
-                style="display: flex; flex-direction: column; align-items: center; width: 100%;"
-            >
-                {/* Header Row: Chord Name + Label indicators */}
-                <div style="display: flex; width: 100%; max-width: 650px; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
-                    <div style="flex: 1; text-align: left; padding-left: 10px;">
-                        <div style={labelStyle}>Chord Tones</div>
-                    </div>
-
-                    <div style="text-align: center; margin-bottom: -0.5rem;">
-                        <div
-                            style={`font-size: ${isNext ? '1.5rem' : '2.2rem'}; font-weight: bold; color: ${isNext ? '#cbd5e1' : 'var(--soloist-color)'}; background: ${isNext ? 'rgba(255,255,255,0.05)' : 'rgba(var(--soloist-color-rgb), 0.1)'}; border: ${isNext ? '1px dashed #475569' : '2px solid var(--soloist-color)'}; padding: 0.3rem 1.5rem; border-radius: 10px; min-width: 120px; box-shadow: ${isNext ? 'none' : '0 0 20px rgba(var(--soloist-color-rgb), 0.2)'};`}
-                        >
-                            {chordName}
-                        </div>
-                        <div
-                            style={`font-size: 0.65rem; margin-top: 0.4rem; font-weight: bold; opacity: 0.5; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'};`}
-                        >
-                            {isNext ? 'UPCOMING' : 'CURRENT'}
-                        </div>
-                    </div>
-
-                    <div style="flex: 1; text-align: right; padding-right: 10px;">
-                        <div style={labelStyle}>Scale Tensions</div>
-                    </div>
-                </div>
-
-                {/* Keys Row */}
-                <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
-                    {/* CHORD ZONE */}
-                    <div style="display: flex; gap: 0.5rem;">
-                        {keys
-                            .slice(0, 5)
-                            .map((k, i) => renderKey(k, notes[i], k.toLowerCase(), colorVar))}
-                    </div>
-
-                    {/* DIVIDER */}
-                    <div style="width: 2px; height: 50px; background: rgba(255,255,255,0.1); margin: 0 0.75rem;" />
-
-                    {/* TENSION ZONE */}
-                    <div style="display: flex; gap: 0.5rem;">
-                        {keys
-                            .slice(5)
-                            .map((k, i) => renderKey(k, notes[i + 5], k.toLowerCase(), colorVar))}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <div
-            ref={modalRef}
-            tabIndex={0}
             class="modal-overlay active"
             onClick={close}
-            onPointerEnter={() => {
-                // Focus on hover to ensure immediate readiness
-                if (modalRef.current) {
-                    modalRef.current.focus();
-                }
-            }}
-            onPointerDown={() => {
-                // Ensure focus is restored if the user clicks the overlay
-                if (modalRef.current) {
-                    modalRef.current.focus();
-                }
-            }}
+            style="z-index: 1000; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;"
         >
             <div
                 class="modal PerformanceSurfaceModal"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    // Also ensure focus stays if clicking the inner modal
-                    if (modalRef.current) {
-                        modalRef.current.focus();
-                    }
-                }}
-                style="max-width: 1200px; height: 85vh; max-height: 750px;"
+                onClick={(e) => e.stopPropagation()}
+                style="width: 90vw; max-width: none; height: 85vh; max-height: none; display: flex; flex-direction: column; background: #0f172a; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);"
             >
                 <div class="modal-header">
                     <h2>Soloist Performance Mode</h2>
@@ -393,46 +176,62 @@ export function PerformanceModal() {
 
                 <div
                     class="modal-content"
-                    style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem;"
+                    style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2rem; padding: 2rem;"
                 >
-                    <div style="height: 4rem; display: flex; align-items: center; justify-content: center;">
-                        {currentNoteName && (
-                            <div style="font-size: 4rem; font-weight: 900; color: var(--soloist-color); text-shadow: 0 0 20px rgba(var(--soloist-color-rgb), 0.5); font-family: monospace;">
-                                {currentNoteName}
-                            </div>
-                        )}
-                    </div>
-
                     <div
-                        class="keyboard-layout"
-                        style="display: flex; flex-direction: column; gap: 4rem; width: 100%; align-items: center;"
+                        class="chord-timeline"
+                        style="display: flex; gap: 4rem; align-items: center; width: 100%; justify-content: center;"
                     >
-                        {/* UPCOMING CHORD - TOP ROW */}
-                        {renderDeckRow(
-                            ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-                            nextNotes,
-                            '--text-secondary',
-                            nextChord,
-                            true,
-                        )}
+                        <div class="active-chord" style="text-align: center;">
+                            <h3 style="color: var(--soloist-color); font-size: 1.2rem; margin-bottom: 0.5rem;">
+                                Current Chord
+                            </h3>
+                            <div style="font-size: 3rem; font-weight: bold; padding: 1rem 2rem; background: rgba(var(--soloist-color-rgb), 0.1); border: 2px solid var(--soloist-color); border-radius: 12px; margin-bottom: 1rem;">
+                                {getChordDisplayName(currentChord)}
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                {['A', 'S', 'D', 'F', 'G'].map((k) => (
+                                    <div
+                                        style={`width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; ${activeKeys.has(k.toLowerCase()) ? 'background: var(--soloist-color); color: #fff;' : 'background: rgba(255,255,255,0.1); color: #94a3b8;'}`}
+                                    >
+                                        {k}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
 
-                        {/* CURRENT CHORD - HOME ROW */}
-                        {renderDeckRow(
-                            ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
-                            currentNotes,
-                            '--soloist-color',
-                            currentChord,
-                            false,
-                        )}
+                        <div style="font-size: 2rem; color: #64748b;">➡</div>
+
+                        <div class="upcoming-chord" style="text-align: center; opacity: 0.7;">
+                            <h3 style="color: #94a3b8; font-size: 1rem; margin-bottom: 0.5rem;">
+                                Upcoming Chord
+                            </h3>
+                            <div style="font-size: 2rem; font-weight: bold; padding: 0.75rem 1.5rem; background: rgba(255, 255, 255, 0.05); border: 2px dashed #475569; border-radius: 12px; color: #cbd5e1; margin-bottom: 1rem;">
+                                {getChordDisplayName(nextChord)}
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                                {['Q', 'W', 'E', 'R', 'T'].map((k) => (
+                                    <div
+                                        style={`width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; ${activeKeys.has(k.toLowerCase()) ? 'background: #cbd5e1; color: #000;' : 'background: rgba(255,255,255,0.05); color: #64748b;'}`}
+                                    >
+                                        {k}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div
                         class="keyboard-instructions"
-                        style="text-align: center; color: #475569; font-size: 0.8rem;"
+                        style="text-align: center; color: #94a3b8; max-width: 600px; margin-top: 2rem;"
                     >
                         <p>
-                            Left Side = <strong>Safe Arpeggios</strong> | Right Side ={' '}
-                            <strong>Color Extensions</strong>
+                            <strong>A S D F G</strong> play the Root, 3rd, 5th, 7th, 9th of the{' '}
+                            <strong>Current Chord</strong>
+                        </p>
+                        <p>
+                            <strong>Q W E R T</strong> play the Root, 3rd, 5th, 7th, 9th of the{' '}
+                            <strong>Upcoming Chord</strong>
                         </p>
                     </div>
                 </div>

@@ -91,14 +91,10 @@ export function initAudio() {
         modules.forEach((m) => {
             const gainNode = playback.audio.createGain();
             const isLocalMuted = midi.enabled && midi.muteLocal;
-
-            let isMuted = !m.state.enabled;
-            if (m.state === soloist && playback.modals?.performance) {
-                isMuted = false;
-            }
-
             const targetGain =
-                !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
+                m.state.enabled && !isLocalMuted
+                    ? Math.max(0.0001, m.state.volume * m.mult)
+                    : 0.0001;
             gainNode.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(
                 targetGain,
@@ -312,13 +308,7 @@ export function restoreGains() {
     modules.forEach((m) => {
         if (m.node) {
             const isLocalMuted = midi.enabled && midi.muteLocal;
-
-            let isMuted = !m.state.enabled;
-            if (m.state === soloist && playback.modals?.performance) {
-                isMuted = false;
-            }
-
-            const target = !isMuted && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
+            const target = m.state.enabled && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
             m.node.gain.cancelScheduledValues(t);
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }

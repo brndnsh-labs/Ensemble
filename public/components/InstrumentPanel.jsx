@@ -1,6 +1,5 @@
 import { h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { initAudio } from '../engine/engine.js';
 import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
@@ -12,11 +11,10 @@ import { SoloistSmartTab } from './SoloistSmartTab.jsx';
 import { StyleSelector } from './StyleSelector.jsx';
 
 export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
-    const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState((s) => ({
+    const { activeTab, enabled, tradeMode } = useEnsembleState((s) => ({
         activeTab: s[module].activeTab,
         enabled: s[module].enabled,
         tradeMode: s[module].tradeMode,
-        performanceOpen: s.playback.modals?.performance,
     }));
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -47,8 +45,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
 
     const headerClass = `${module === 'chords' ? 'chord' : module === 'harmony' ? 'harmony' : module}-panel-header`;
     const isWaiting = module === 'soloist' && !enabled && tradeMode !== 'manual';
-    const isPerformanceMode = module === 'soloist' && performanceOpen;
-    const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''} ${isPerformanceMode ? 'performance-active' : ''}`;
+    const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''}`;
 
     return (
         <div
@@ -81,18 +78,12 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                         <button
                             class="panel-menu-btn"
                             aria-label="Open Performance Mode"
-                            onClick={() => {
-                                if (document.activeElement instanceof HTMLElement) {
-                                    document.activeElement.blur();
-                                }
-                                initAudio();
-                                setTimeout(() => {
-                                    dispatch(ACTIONS.SET_MODAL_OPEN, {
-                                        modal: 'performance',
-                                        open: true,
-                                    });
-                                }, 0);
-                            }}
+                            onClick={() =>
+                                dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                    modal: 'performance',
+                                    open: true,
+                                })
+                            }
                         >
                             🎵
                         </button>
