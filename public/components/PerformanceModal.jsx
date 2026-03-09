@@ -1,5 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { KEY_ORDER } from '../config.js';
 import { killSoloistNote, playSoloNote } from '../engine/engine.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -7,16 +8,33 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { getChordMidiNotes } from '../utils.js';
 
 export function PerformanceModal() {
-    const { step, stepMap } = useEnsembleState((s) => ({
+    const { step, stepMap, isPlaying, key, isMinor } = useEnsembleState((s) => ({
         step: s.playback.step,
         stepMap: s.arranger.stepMap,
+        isPlaying: s.playback.isPlaying,
+        key: s.arranger.key,
+        isMinor: s.arranger.isMinor,
     }));
 
     // Find current and next chords
-    const currentChord = stepMap[step] || null;
+    let currentChord = stepMap[step] || null;
     let nextChord = null;
 
-    if (currentChord) {
+    let isFallback = false;
+    // Fallback: If playback is stopped or no chord is found, default to the global key signature
+    if (!isPlaying && !currentChord) {
+        isFallback = true;
+        const keyIndex = KEY_ORDER.indexOf(key);
+        // Base MIDI for C4 is 60. rootMidi corresponds to the offset from C.
+        const rootMidi = 60 + (keyIndex >= 0 ? keyIndex : 0);
+        currentChord = {
+            chord: key + (isMinor ? 'm' : ''),
+            rootMidi: rootMidi,
+            quality: isMinor ? 'minor' : 'major',
+        };
+    }
+
+    if (currentChord && !isFallback) {
         // Find the next chord that is different
         for (let i = step + 1; i < stepMap.length; i++) {
             if (stepMap[i] && stepMap[i] !== currentChord) {
