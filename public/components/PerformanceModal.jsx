@@ -276,8 +276,12 @@ export function PerformanceModal() {
         return (
             <button
                 key={sourceKey}
+                tabIndex={-1}
                 onPointerDown={(e) => {
                     e.preventDefault();
+                    if (modalRef.current) {
+                        modalRef.current.focus({ preventScroll: true });
+                    }
                     if (!midi) {
                         return;
                     }
@@ -300,6 +304,7 @@ export function PerformanceModal() {
                     width: 55px; height: 75px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
                     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
                     font-weight: bold; cursor: pointer; transition: all 0.1s; font-size: 0.95rem;
+                    touch-action: none; -webkit-user-select: none; user-select: none;
                     ${isPlaying ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : isHeld ? 'background: rgba(255,255,255,0.2); color: #fff;' : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 3px 0 rgba(0,0,0,0.3);'}
                 `}
             >
@@ -386,12 +391,15 @@ export function PerformanceModal() {
         >
             <div
                 class="modal PerformanceSurfaceModal"
+                onPointerDown={(e) => {
+                    e.stopPropagation();
+                    // Use pointerdown for immediate focus response on touch devices
+                    if (modalRef.current) {
+                        modalRef.current.focus({ preventScroll: true });
+                    }
+                }}
                 onClick={(e) => {
                     e.stopPropagation();
-                    // Also ensure focus stays if clicking the inner modal
-                    if (modalRef.current) {
-                        modalRef.current.focus();
-                    }
                 }}
                 style="max-width: 1200px; height: 85vh; max-height: 750px;"
             >
@@ -404,7 +412,7 @@ export function PerformanceModal() {
 
                 <div
                     class="modal-content"
-                    style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem;"
+                    style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;"
                 >
                     <div style="height: 4rem; display: flex; align-items: center; justify-content: center;">
                         {currentNoteName && (
