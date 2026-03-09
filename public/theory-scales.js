@@ -249,16 +249,11 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         return SCALE_INTERVALS.NATURAL_MINOR;
     }
 
-    // Jazz/Bossa prefer Lydian for non-diatonic Major chords (e.g. bIImaj7, bVImaj7)
-    if (style === 'bird' || style === 'bossa') {
+    // Jazz/Bossa/Neo prefer Lydian for non-diatonic Major chords (e.g. bIImaj7, bVImaj7) to avoid clash with Key
+    if (['bird', 'bossa', 'jazz', 'neo'].includes(style)) {
         return SCALE_INTERVALS.LYDIAN;
     }
 
-    // Explicitly handle 'rock'/'scalar' style for non-diatonic Major chords to ensure consonance (Ionian/Lydian)
-    // as requested by dissonance prevention logic (e.g. F Major in C Minor).
-    if (style === 'rock' || style === 'scalar') {
-        return SCALE_INTERVALS.MAJOR;
-    }
-
+    // Default to Ionian (Major) for all other styles to ensure consonance
     return SCALE_INTERVALS.MAJOR;
 }
