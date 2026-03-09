@@ -113,34 +113,36 @@ export function generateId() {
 }
 
 /**
- * Calculates MIDI notes for specific scale degrees (Root, 3rd, 5th, 7th, 9th)
+ * Calculates MIDI notes for specific scale degrees (Full 10-note scale)
  * based on a given chord object.
  *
  * @param {Object} chordObj - The chord object containing rootMidi and quality.
  * @param {number} baseOctave - The default octave to use (default: 4 for Soloist).
- * @returns {number[]} Array of MIDI note numbers [Root, 3rd, 5th, 7th, 9th].
+ * @returns {number[]} Array of 10 MIDI note numbers.
+ *                     [0-4]: Odd degrees (1, 3, 5, 7, 9)
+ *                     [5-9]: Even degrees (2, 4, 6, 8, 10)
  */
 export function getChordMidiNotes(chordObj, baseOctave = 4) {
     if (!chordObj || typeof chordObj.rootMidi !== 'number') {
         return [];
     }
 
-    // Default root, 3rd, 5th, 7th, 9th intervals (in semitones from root)
-    let intervals = [0, 4, 7, 11, 14]; // Default to Major (M7, M9)
+    // [Root, 3rd, 5th, 7th, 9th,  2nd, 4th, 6th, Octave, 10th]
+    let intervals = [0, 4, 7, 11, 14, 2, 5, 9, 12, 16]; // Default to Major (M7, M9)
 
     const quality = chordObj.quality || 'major';
 
     if (quality === 'minor' || quality === 'm9' || quality === 'm11' || quality === 'm13') {
-        intervals = [0, 3, 7, 10, 14]; // Minor (m3, m7, M9)
+        intervals = [0, 3, 7, 10, 14, 2, 5, 8, 12, 15]; // Minor (m3, m7, M9) + (P2, P4, b6)
     } else if (
         quality === 'diminished' ||
         quality === 'm7b5' ||
         quality === 'dim7' ||
         quality === 'half-diminished'
     ) {
-        intervals = [0, 3, 6, 10, 13]; // Diminished (m3, d5, m7, m9)
+        intervals = [0, 3, 6, 10, 13, 1, 5, 8, 12, 15]; // Diminished (m3, d5, m7, m9) + (b2, P4, b6)
     } else if (quality === 'augmented' || quality === 'aug' || quality === '+') {
-        intervals = [0, 4, 8, 10, 14]; // Augmented (M3, A5, m7, M9)
+        intervals = [0, 4, 8, 10, 14, 2, 5, 9, 12, 16]; // Augmented (M3, A5, m7, M9) + (P2, P4, P6)
     } else if (
         quality === '7' ||
         quality === '9' ||
@@ -148,7 +150,7 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         quality === '13' ||
         quality === 'dominant'
     ) {
-        intervals = [0, 4, 7, 10, 14]; // Dominant (M3, P5, m7, M9)
+        intervals = [0, 4, 7, 10, 14, 2, 5, 9, 12, 16]; // Dominant (M3, P5, m7, M9) + (P2, P4, P6)
     }
 
     // rootMidi from the engine is usually based around C4 = 60

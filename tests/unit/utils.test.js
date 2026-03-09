@@ -149,30 +149,32 @@ describe('Utility Functions', () => {
     });
 
     describe('getChordMidiNotes', () => {
-        it('should calculate notes for a major chord (default to M7, M9)', () => {
+        it('should calculate notes for a major chord (default to M7, M9) with tensions', () => {
             const chord = { rootMidi: 60, quality: 'major' }; // C4
-            // Expected: C4, E4, G4, B4, D5 -> 60, 64, 67, 71, 74
-            expect(getChordMidiNotes(chord, 4)).toEqual([60, 64, 67, 71, 74]);
+            // Expected Odds: C4, E4, G4, B4, D5 -> 60, 64, 67, 71, 74
+            // Expected Evens: D4, F4, A4, C5, E5 -> 62, 65, 69, 72, 76
+            expect(getChordMidiNotes(chord, 4)).toEqual([60, 64, 67, 71, 74, 62, 65, 69, 72, 76]);
         });
 
-        it('should calculate notes for a minor chord (m3, m7, M9)', () => {
+        it('should calculate notes for a minor chord (m3, m7, M9) with tensions', () => {
             const chord = { rootMidi: 62, quality: 'minor' }; // D4
-            // Expected: D4, F4, A4, C5, E5 -> 62, 65, 69, 72, 76
-            expect(getChordMidiNotes(chord, 4)).toEqual([62, 65, 69, 72, 76]);
+            // Expected Odds: D4, F4, A4, C5, E5 -> 62, 65, 69, 72, 76
+            // Expected Evens: E4, G4, Bb4, D5, F5 -> 64, 67, 70, 74, 77
+            expect(getChordMidiNotes(chord, 4)).toEqual([62, 65, 69, 72, 76, 64, 67, 70, 74, 77]);
         });
 
-        it('should calculate notes for a diminished chord (m3, d5, m7, m9)', () => {
+        it('should calculate notes for a diminished chord (m3, d5, m7, m9) with tensions', () => {
             const chord = { rootMidi: 71, quality: 'diminished' }; // B4
-            // pc = 11. baseMidi = (4+1)*12 + 11 = 71
-            // Expected intervals: 0, 3, 6, 10, 13
-            // 71, 74, 77, 81, 84
-            expect(getChordMidiNotes(chord, 4)).toEqual([71, 74, 77, 81, 84]);
+            // Expected Odds: B4, D5, F5, A5, C6 -> 71, 74, 77, 81, 84
+            // Expected Evens: C5, E5, G5, B5, D6 -> 72, 76, 79, 83, 86
+            expect(getChordMidiNotes(chord, 4)).toEqual([71, 74, 77, 81, 84, 72, 76, 79, 83, 86]);
         });
 
-        it('should calculate notes for a dominant chord (M3, P5, m7, M9)', () => {
+        it('should calculate notes for a dominant chord (M3, P5, m7, M9) with tensions', () => {
             const chord = { rootMidi: 67, quality: 'dominant' }; // G4
-            // Expected: G4, B4, D5, F5, A5 -> 67, 71, 74, 77, 81
-            expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81]);
+            // Expected Odds: G4, B4, D5, F5, A5 -> 67, 71, 74, 77, 81
+            // Expected Evens: A4, C5, E5, G5, B5 -> 69, 72, 76, 79, 83
+            expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81, 69, 72, 76, 79, 83]);
         });
 
         it('should return empty array for invalid input', () => {
