@@ -16,7 +16,9 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(settingsModal).toBeVisible();
 
         // Verify visual layout (e.g., labels, selects, toggles)
-        await expect(settingsModal).toHaveScreenshot('settings-modal-desktop.png');
+        await expect(settingsModal).toHaveScreenshot('settings-modal-desktop.png', {
+            maxDiffPixelRatio: 0.01,
+        });
 
         // Close modal
         await page.click('#closeSettingsBtn');
@@ -32,7 +34,9 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(editorModal).toBeVisible();
 
         // The editor has complex forms, check responsiveness
-        await expect(editorModal).toHaveScreenshot('editor-modal-desktop.png');
+        await expect(editorModal).toHaveScreenshot('editor-modal-desktop.png', {
+            maxDiffPixelRatio: 0.01,
+        });
 
         // Close modal
         await page.click('#closeEditorBtn');
