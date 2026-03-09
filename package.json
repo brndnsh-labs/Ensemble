@@ -10,6 +10,7 @@
         "lint": "biome check .",
         "knip": "knip",
         "format": "biome check --write .",
+        "validate": "npm run format && npm test",
         "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
         "build": "./scripts/deploy-test.sh --dry-run",
         "build:quiet": "./scripts/deploy-test.sh --dry-run --quiet",
@@ -17,17 +18,25 @@
         "test:e2e": "npm run build:quiet && playwright test",
         "test:e2e:update": "npm run build:quiet && playwright test --update-snapshots",
         "deploy:test": "./scripts/deploy-test.sh",
-        "deploy:prod": "./scripts/deploy-prod.sh"
+        "deploy:prod": "./scripts/deploy-prod.sh",
+        "prepare": "husky"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.6",
         "@playwright/test": "^1.58.2",
         "esbuild": "^0.27.3",
         "happy-dom": "^20.8.3",
+        "husky": "^9.1.7",
         "knip": "^5.86.0",
+        "lint-staged": "^16.3.2",
         "vitest": "^4.0.18"
     },
     "dependencies": {
         "preact": "^10.28.4"
+    },
+    "lint-staged": {
+        "**/*.{js,jsx,json,md}": [
+            "biome check --write"
+        ]
     }
 }

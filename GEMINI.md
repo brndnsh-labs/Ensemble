@@ -38,12 +38,11 @@ To navigate the codebase efficiently, refer to these specialized guides:
 
 ## Definition of Done (Mandatory)
 Before concluding any task, an agent MUST:
-1.  Run `npm run format` to ensure Biome standards are met.
-2.  Run `npm test` and ensure all checks pass (State Integrity, Biome Linting/Formatting, and 850+ tests).
-3.  **Run `npm run test:e2e`** if UI changes were made, ensuring no visual regressions occur.
-4.  **Update Visual Snapshots:** If style changes were intentional, run `npm run test:e2e:update` to establish new baselines.
-5.  Verify that no NEW direct state mutations were introduced (check the `npm test` output).
-6.  Fix any new linting warnings or architectural regressions.
+1.  **Run `npm run validate`** and ensure all checks pass (State Integrity, Biome Linting/Formatting, and 1,000+ tests).
+2.  **Run `npm run test:e2e`** if UI changes were made, ensuring no visual regressions occur.
+3.  **Update Visual Snapshots:** If style changes were intentional, run `npm run test:e2e:update` to establish new baselines.
+4.  Verify that no NEW direct state mutations were introduced (check the `npm test` output).
+5.  Fix any new linting warnings or architectural regressions.
 
 *   **Branch Management**: Do NOT delete feature branches until the user has confirmed the implementation works as expected in the UI or through integration tests. Always verify behavior before merging and deleting.
 
