@@ -17,21 +17,28 @@ export function PerformanceModal() {
         restoreGains();
         killSoloistNote(); // Immediate silence of any automatic phrases
 
-        // Focus management: requestAnimationFrame ensures we wait for the browser paint
-        // A slight timeout further ensures any animations don't interfere with focusability
+        // Focus management: Use a multi-stage approach to ensure focus is captured
+        // even if there's a slight delay from animations or first-time interactions.
+        let retryCount = 0;
         const focusModal = () => {
             if (modalRef.current) {
                 modalRef.current.focus();
+                // If we're not focused yet, retry in the next frame
+                if (document.activeElement !== modalRef.current && retryCount < 10) {
+                    retryCount++;
+                    requestAnimationFrame(focusModal);
+                }
             }
         };
 
-        requestAnimationFrame(() => {
-            focusModal();
-            setTimeout(focusModal, 50);
-        });
+        // Start focus attempts immediately
+        focusModal();
+        // And one extra safety check after animations typically finish
+        const timeout = setTimeout(focusModal, 300);
 
         return () => {
             restoreGains();
+            clearTimeout(timeout);
         };
     }, []);
 

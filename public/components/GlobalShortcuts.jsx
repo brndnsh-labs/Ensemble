@@ -1,4 +1,5 @@
 import { useEffect } from 'preact/hooks';
+import { initAudio } from '../engine/engine.js';
 import { switchMeasure } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
@@ -41,10 +42,8 @@ export function GlobalShortcuts() {
                 !e.ctrlKey
             ) {
                 e.preventDefault();
-                import('../engine/engine.js').then(({ initAudio }) => {
-                    initAudio();
-                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
-                });
+                initAudio();
+                dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
             }
 
             // 1-5: Switch Mobile Tabs
