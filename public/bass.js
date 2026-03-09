@@ -453,10 +453,16 @@ export function getBassNote(
 
         // Neo-soul bass should be extremely foundational.
         if (isSecondaryAnchor || isUpbeat) {
-            const hasFlat5 = scale.includes(6) && !scale.includes(7);
-            const hasSharp5 = scale.includes(8) && !scale.includes(7);
-            const fifth = hasFlat5 ? 6 : hasSharp5 ? 8 : 7;
             if (Math.random() < 0.85) {
+                const has7 = scale.includes(7);
+                let fifth = 7;
+                if (!has7) {
+                    if (scale.includes(6)) {
+                        fifth = 6;
+                    } else if (scale.includes(8)) {
+                        fifth = 8;
+                    }
+                }
                 const note = Math.random() < 0.6 ? baseRoot : baseRoot + fifth;
                 return result(getFrequency(clampAndNormalize(note)), null, velocity);
             }
