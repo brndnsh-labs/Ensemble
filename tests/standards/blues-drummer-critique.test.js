@@ -22,7 +22,11 @@ describe('Blues Drummer Critique', () => {
                 lastDrumPreset: 'Blues',
                 instruments: [],
             },
-            arranger: { timeSignature: '4/4', stepMap: [] },
+            arranger: {
+                timeSignature: '4/4',
+                stepMap: [],
+                sectionMap: [{ start: 0, end: numBars * 16 }],
+            },
             soloist: { enabled: false, busySteps: 0 },
             ...stateOverrides,
         };
@@ -32,16 +36,17 @@ describe('Blues Drummer Critique', () => {
         for (let bar = 0; bar < numBars; bar++) {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
-                const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
+                const globalStep = bar * 16 + step;
+                const stepData = { step: globalStep, loopStep: step, instruments: {} };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
                     const info = getStepInfo(
-                        bar * 16 + step,
+                        globalStep,
                         TIME_SIGNATURES['4/4'],
                         [],
                         TIME_SIGNATURES,
                     );
                     const params = {
-                        step: bar * 16 + step,
+                        step: globalStep,
                         inst: { name: instName, muted: false, steps: [] },
                         stepVal: 0,
                         playback: mockState.playback,
@@ -88,6 +93,20 @@ describe('Blues Drummer Critique', () => {
         let totalSnareVelocity = 0;
         let totalGhostVelocity = 0;
 
+        // Velocity Tiering Metrics
+        let totalHiHatBeatVelocity = 0;
+        let totalHiHatAVelocity = 0;
+        let hiHatBeatCount = 0;
+        let hiHatACount = 0;
+
+        let totalKickBeatVelocity = 0;
+        let totalKickAVelocity = 0;
+        let kickBeatCount = 0;
+        let kickACount = 0;
+
+        let kickDownbeatVelocity = 0;
+        let kickDownbeatCount = 0;
+
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
@@ -108,20 +127,35 @@ describe('Blues Drummer Critique', () => {
                     totalGhostVelocity += stepData.instruments.Snare.velocity;
                 }
 
-                // --- CRITIQUE: Kick Solid (1 and 3) ---
-                if ((s === 0 || s === 8) && stepData.instruments.Kick) {
-                    kickSolidHits++;
+                // --- CRITIQUE: Kick Patterns ---
+                if (stepData.instruments.Kick) {
+                    const vel = stepData.instruments.Kick.velocity;
+                    if (s === 0 || s === 8) {
+                        kickSolidHits++;
+                        totalKickBeatVelocity += vel;
+                        kickBeatCount++;
+                        if (s === 0) {
+                            kickDownbeatVelocity += vel;
+                            kickDownbeatCount++;
+                        }
+                    } else if (s === 3 || s === 7 || s === 11 || s === 15) {
+                        totalKickAVelocity += vel;
+                        kickACount++;
+                    }
                 }
 
-                // --- CRITIQUE: Shuffle Grid (0, 3, 4, 7, 8, 11, 12, 15) for HiHat/Open ---
-                // Continuous triplet shuffle momentum (isBeatStart || isAOfBeat)
-                // In 16th notes: beatStart is 0, 4, 8, 12. AOfBeat is 3, 7, 11, 15.
-                if ([0, 3, 4, 7, 8, 11, 12, 15].includes(s)) {
-                    if (stepData.instruments.HiHat || stepData.instruments.Open) {
+                // --- CRITIQUE: HiHat Pulse Hierarchy ---
+                const hat = stepData.instruments.HiHat || stepData.instruments.Open;
+                if (hat) {
+                    if ([0, 4, 8, 12].includes(s)) {
+                        totalHiHatBeatVelocity += hat.velocity;
+                        hiHatBeatCount++;
                         shuffleGridHits++;
-                    }
-                } else {
-                    if (stepData.instruments.HiHat || stepData.instruments.Open) {
+                    } else if ([3, 7, 11, 15].includes(s)) {
+                        totalHiHatAVelocity += hat.velocity;
+                        hiHatACount++;
+                        shuffleGridHits++;
+                    } else {
                         nonShuffleGridHits++;
                     }
                 }
@@ -134,6 +168,12 @@ describe('Blues Drummer Critique', () => {
         const kickScore = kickSolidHits / (totalBars * 2);
         const ghostToBackbeatRatio = totalGhostVelocity / (totalSnareVelocity || 1);
 
+        const avgHatBeat = totalHiHatBeatVelocity / (hiHatBeatCount || 1);
+        const avgHatA = totalHiHatAVelocity / (hiHatACount || 1);
+        const avgKickBeat = totalKickBeatVelocity / (kickBeatCount || 1);
+        const avgKickA = totalKickAVelocity / (kickACount || 1);
+        const avgKickDownbeat = kickDownbeatVelocity / (kickDownbeatCount || 1);
+
         console.log('\n--- BLUES DRUMMER CRITIQUE REPORT ---');
         console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}% (Target: 100%)`);
         console.log(
@@ -145,6 +185,15 @@ describe('Blues Drummer Critique', () => {
         console.log(
             `[Ghost to Backbeat %]  ${(ghostToBackbeatRatio * 100).toFixed(1)}% (Target: <20%)`,
         );
+
+        console.log('\n--- VELOCITY HIERARCHY ---');
+        console.log(
+            `[HiHat Loping]         Beat: ${avgHatBeat.toFixed(2)} vs A: ${avgHatA.toFixed(2)}`,
+        );
+        console.log(
+            `[Kick Dynamics]        Beat: ${avgKickBeat.toFixed(2)} vs A: ${avgKickA.toFixed(2)}`,
+        );
+        console.log(`[Kick Grounding]       Downbeat (1): ${avgKickDownbeat.toFixed(2)}`);
         console.log('------------------------------------\n');
 
         // CRITICAL: Authentic Blues drummer NEVER misses the backbeat on 2 and 4.
@@ -160,6 +209,76 @@ describe('Blues Drummer Critique', () => {
         // MUSICAL: Snare extra hits should not overwhelm the groove.
         expect(snareGhostHits / totalBars).toBeLessThan(1.5);
         expect(ghostToBackbeatRatio).toBeLessThan(0.25);
+
+        // NEW: Velocity Tiering Assertions
+        expect(avgHatBeat).toBeGreaterThan(avgHatA); // Loping feel
+        expect(avgKickBeat).toBeGreaterThan(avgKickA); // Ghosted pushes
+        expect(avgKickDownbeat).toBeGreaterThan(avgKickBeat * 0.98); // Downbeat should be authoritative
+    });
+
+    it('should implement "Four-on-the-Floor" drive at high intensity', () => {
+        const highIntensityPerf = simulatePerformance(32, {
+            playback: { bandIntensity: 0.9 },
+            groove: { creativity: true, genreFeel: 'Blues' },
+        });
+
+        let backbeatKickHits = 0;
+        let backbeatKickVelocity = 0;
+        let primaryKickVelocity = 0;
+
+        highIntensityPerf.forEach((bar) => {
+            bar.forEach((stepData) => {
+                const s = stepData.loopStep;
+                if (stepData.instruments.Kick) {
+                    if (s === 4 || s === 12) {
+                        backbeatKickHits++;
+                        backbeatKickVelocity += stepData.instruments.Kick.velocity;
+                    } else if (s === 0 || s === 8) {
+                        primaryKickVelocity += stepData.instruments.Kick.velocity;
+                    }
+                }
+            });
+        });
+
+        const avgBackbeatKick = backbeatKickVelocity / (backbeatKickHits || 1);
+        const avgPrimaryKick = primaryKickVelocity / (32 * 2);
+
+        console.log(`[Drive Critique] High Intensity Kick Hits on 2/4: ${backbeatKickHits}/64`);
+        console.log(
+            `[Drive Critique] Feathered Velocity: ${avgBackbeatKick.toFixed(2)} vs Primary: ${avgPrimaryKick.toFixed(2)}`,
+        );
+
+        // Assert that at high intensity, we get kicks on the backbeats
+        expect(backbeatKickHits).toBeGreaterThan(32); // At least 50% consistency for four-on-the-floor
+        // Assert they are "feathered" (significantly quieter than primary hits)
+        expect(avgBackbeatKick).toBeLessThan(avgPrimaryKick * 0.9);
+    });
+
+    it('should signal structural transitions with a crash after a turnaround', () => {
+        // We simulate a 4-bar section, so bar 3 is a turnaround, and bar 4 is a new section start
+        const performance = simulatePerformance(8, {
+            playback: { bandIntensity: 0.8 },
+            groove: { creativity: true, genreFeel: 'Blues' },
+            arranger: {
+                timeSignature: '4/4',
+                sectionMap: [
+                    { start: 0, end: 64 }, // Bar 0-3
+                    { start: 64, end: 128 }, // Bar 4-7
+                ],
+            },
+        });
+
+        const bar4Downbeat = performance[4][0];
+        const isCrashOrHighHat = bar4Downbeat.instruments.Open || bar4Downbeat.instruments.HiHat;
+
+        console.log(
+            `[Section Start] Bar 4 Downbeat Sound: ${isCrashOrHighHat?.sound}, Velocity: ${isCrashOrHighHat?.velocity}`,
+        );
+
+        expect(isCrashOrHighHat).toBeDefined();
+        expect(isCrashOrHighHat.velocity).toBeGreaterThan(1.1);
+        // At high intensity, it should prefer Open (Crash)
+        expect(['Open', 'Crash']).toContain(isCrashOrHighHat.sound);
     });
 
     it('should increase rhythmic complexity appropriately with high intensity', () => {

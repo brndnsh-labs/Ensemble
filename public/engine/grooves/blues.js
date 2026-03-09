@@ -65,30 +65,42 @@ export function applyOverrides(context, state) {
     }
 
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        shouldPlay = false;
-        if (activeMotif === 0 || activeMotif === 2 || activeMotif === 3) {
-            if (isBeatStart || isAOfBeat) {
-                shouldPlay = true;
-                soundName = activeMotif === 2 ? 'Open' : 'HiHat';
+        if (!shouldPlay) {
+            if (activeMotif === 0 || activeMotif === 2 || activeMotif === 3) {
+                if (isBeatStart || isAOfBeat) {
+                    shouldPlay = true;
+                    soundName = activeMotif === 2 ? 'Open' : 'HiHat';
 
-                if (isAOfBeat) {
-                    velocity = scaleVelocity(0.6, intensity, 0.1);
-                } else {
-                    velocity = scaleVelocity(0.85, intensity, 0.2);
+                    if (isAOfBeat) {
+                        velocity = scaleVelocity(0.6, intensity, 0.1);
+                    } else {
+                        velocity = scaleVelocity(0.85, intensity, 0.2);
+                    }
                 }
-            }
-        } else if (activeMotif === 1) {
-            if (isBeatStart || isAOfBeat) {
-                shouldPlay = true;
-                velocity = 0.9;
+            } else if (activeMotif === 1) {
+                if (isBeatStart || isAOfBeat) {
+                    shouldPlay = true;
+                    velocity = 0.9;
+                }
             }
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
+
+        // Grounding Beats (1 and 3)
         if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
+            velocity = isDownbeat ? 1.25 : 1.15;
         }
 
+        // Drive Beats (2 and 4) - "Four on the floor" for driving blues
+        // We add these at medium-high intensity to increase momentum
+        if (isBeatStart && isBackbeat && intensity > 0.55) {
+            shouldPlay = true;
+            velocity = scaleVelocity(0.75, intensity, 0.2); // Feathered
+        }
+
+        // Shuffle Pushes (The "and-a" of the shuffle)
         if (activeMotif >= 2) {
             const beatsPerMeasure = stepsPerBar / 4;
             const lastBeatIndex = beatsPerMeasure - 1;
@@ -96,10 +108,11 @@ export function applyOverrides(context, state) {
 
             if (isAOfBeat && (beatIndex === lastBeatIndex || beatIndex === midBeatIndex)) {
                 shouldPlay = true;
+                velocity = scaleVelocity(0.6, intensity, 0.15); // Ghosted push
             }
         }
 
-        if (shouldPlay) {
+        if (shouldPlay && !velocity) {
             velocity = 1.15;
         }
     } else if (inst.name === 'Snare') {
