@@ -7,50 +7,60 @@ set -e
 
 DRY_RUN=false
 MINIFY=true
+QUIET=false
 for arg in "$@"; do
     if [[ "$arg" == "-whatif" || "$arg" == "--dry-run" ]]; then
         DRY_RUN=true
     elif [[ "$arg" == "--no-minify" ]]; then
         MINIFY=false
+    elif [[ "$arg" == "--quiet" ]]; then
+        QUIET=true
     fi
 done
 
-if [ "$DRY_RUN" = true ]; then
-    echo "🚧 DRY RUN MODE: Files will be built but NOT deployed."
+if [ "$QUIET" = false ]; then
+    if [ "$DRY_RUN" = true ]; then
+        echo "🚧 DRY RUN MODE: Files will be built but NOT deployed."
+    fi
+
+    if [ "$MINIFY" = true ]; then
+        echo "📦 Minification ENABLED (default)."
+    else
+        echo "📦 Minification DISABLED."
+    fi
+
+    echo "🚀 Starting deployment to TEST (Bundled)..."
 fi
 
+MINIFY_FLAG=""
 if [ "$MINIFY" = true ]; then
-    echo "📦 Minification ENABLED (default)."
     MINIFY_FLAG="--minify"
-else
-    echo "📦 Minification DISABLED."
-    MINIFY_FLAG=""
 fi
-
-echo "🚀 Starting deployment to TEST (Bundled)..."
 
 # 1. Get version/hash
 REV=$(git rev-parse --short HEAD)
-echo "🚀 Deployment version: $REV"
+if [ "$QUIET" = false ]; then
+    echo "🚀 Deployment version: $REV"
+fi
 
 # 2. Clean and create dist folder
 rm -rf dist
 mkdir -p dist
 
 # 3. Bundle and Minify JavaScript
-echo "📦 Bundling JavaScript..."
+if [ "$QUIET" = false ]; then echo "📦 Bundling JavaScript..."; fi
 ./node_modules/.bin/esbuild public/main.js public/logic-worker.js --bundle $MINIFY_FLAG --sourcemap --outdir=dist --splitting --format=esm --entry-names=[name].$REV --chunk-names=chunk-[hash] --define:WORKER_PATH="'logic-worker.$REV.js'" --jsx=automatic --jsx-import-source=preact
 
 # 4. Bundle and Minify CSS
-echo "🎨 Bundling CSS..."
+if [ "$QUIET" = false ]; then echo "🎨 Bundling CSS..."; fi
 ./node_modules/.bin/esbuild public/styles.css --bundle $MINIFY_FLAG --sourcemap --outfile=dist/styles.$REV.css
 
 # 5. Copy static assets
-echo "📄 Copying static assets..."
+if [ "$QUIET" = false ]; then echo "📄 Copying static assets..."; fi
 cp public/{index.html,manual.html,manual-theme.js,manifest.json,icon.svg,icon-192.png,icon-512.png,sw.js} dist/
 
 # 6. Update HTML and Service Worker
-echo "🔧 Injecting hashes and manifest..."
+if [ "$QUIET" = false ]; then echo "🔧 Injecting hashes and manifest..."; fi
 sed -i "s/styles.css/styles.$REV.css/g" dist/*.html
 sed -i "s/main.js/main.$REV.js/g" dist/*.html
 sed -i "s#/\* CACHE_NAME_PLACEHOLDER \*/#ensemble-test-$REV#" dist/sw.js
@@ -64,13 +74,17 @@ STATIC_ASSETS="'./', './index.html', './manual.html', './manual-theme.js', './st
 sed -i "s#/\* ASSETS_PLACEHOLDER \*/#$STATIC_ASSETS, $JS_FILES#" dist/sw.js
 
 # 8. Report Final Footprint
-echo "📊 Final Bundle Footprint (Excluding Sourcemaps):"
-find dist -type f -not -name "*.map" -exec du -ch {} + | grep total$
+if [ "$QUIET" = false ]; then
+    echo "📊 Final Bundle Footprint (Excluding Sourcemaps):"
+    find dist -type f -not -name "*.map" -exec du -ch {} + | grep total$
+fi
 
 # 9. Deploy to TEST server
 if [ "$DRY_RUN" = true ]; then
-    echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/"
-    echo "✅ Dry run complete."
+    if [ "$QUIET" = false ]; then
+        echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/"
+        echo "✅ Dry run complete."
+    fi
 else
     echo "🚚 Syncing to ensembletest..."
     rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/

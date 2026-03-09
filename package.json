@@ -12,9 +12,10 @@
         "format": "biome check --write .",
         "check-mutations": "grep -rnE \"(playback|chords|bass|soloist|harmony|groove|midi|vizState)\\.[a-zA-Z0-9]+ = \" public/components/ public/*.js | grep -v \"state/\" | grep -v \"reducer\" | grep -v \"@direct-mutation\" | grep -v \"@worker-mutation\" || true",
         "build": "./scripts/deploy-test.sh --dry-run",
+        "build:quiet": "./scripts/deploy-test.sh --dry-run --quiet",
         "preview": "npx serve dist -p 5173",
-        "test:e2e": "npm run build && playwright test",
-        "test:e2e:update": "npm run build && playwright test --update-snapshots",
+        "test:e2e": "npm run build:quiet && playwright test",
+        "test:e2e:update": "npm run build:quiet && playwright test --update-snapshots",
         "deploy:test": "./scripts/deploy-test.sh",
         "deploy:prod": "./scripts/deploy-prod.sh"
     },
