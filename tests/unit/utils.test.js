@@ -149,29 +149,32 @@ describe('Utility Functions', () => {
     });
 
     describe('getChordMidiNotes', () => {
-        it('should calculate linear ascending notes for a major chord (Ionian)', () => {
+        it('should calculate notes grouped by odds then evens for a major chord', () => {
             const chord = { rootMidi: 60, quality: 'major' }; // C4
-            // Expected scale: C4, D4, E4, F4, G4, A4, B4, C5, D5, E5
-            expect(getChordMidiNotes(chord, 4)).toEqual([60, 62, 64, 65, 67, 69, 71, 72, 74, 76]);
+            // Expected Odds: 60, 64, 67, 71, 74 (1, 3, 5, 7, 9)
+            // Expected Evens: 62, 65, 69, 72, 76 (2, 4, 6, 8, 10)
+            expect(getChordMidiNotes(chord, 4)).toEqual([60, 64, 67, 71, 74, 62, 65, 69, 72, 76]);
         });
 
-        it('should calculate linear ascending notes for a minor chord (Aeolian)', () => {
+        it('should calculate notes grouped by odds then evens for a minor chord', () => {
             const chord = { rootMidi: 62, quality: 'minor' }; // D4
-            // Expected scale: D4, E4, F4, G4, A4, Bb4, C5, D5, E5, F5
-            expect(getChordMidiNotes(chord, 4)).toEqual([62, 64, 65, 67, 69, 70, 72, 74, 76, 77]);
+            // Expected Odds: 62, 65, 69, 72, 76 (1, b3, 5, b7, 9)
+            // Expected Evens: 64, 67, 70, 74, 77 (2, 4, b6, 8, b10)
+            expect(getChordMidiNotes(chord, 4)).toEqual([62, 65, 69, 72, 76, 64, 67, 70, 74, 77]);
         });
 
-        it('should calculate linear ascending notes for a diminished chord (Locrian)', () => {
+        it('should calculate notes grouped by odds then evens for a diminished chord', () => {
             const chord = { rootMidi: 71, quality: 'diminished' }; // B4
-            // pc = 11. baseMidi = 71
-            // Intervals: 0, 1, 3, 5, 6, 8, 10, 12, 13, 15
-            expect(getChordMidiNotes(chord, 4)).toEqual([71, 72, 74, 76, 77, 79, 81, 83, 84, 86]);
+            // Expected Odds: 71, 74, 77, 81, 84
+            // Expected Evens: 72, 76, 79, 83, 86
+            expect(getChordMidiNotes(chord, 4)).toEqual([71, 74, 77, 81, 84, 72, 76, 79, 83, 86]);
         });
 
-        it('should calculate linear ascending notes for a dominant chord (Mixolydian)', () => {
+        it('should calculate notes grouped by odds then evens for a dominant chord', () => {
             const chord = { rootMidi: 67, quality: 'dominant' }; // G4
-            // Expected scale: G4, A4, B4, C5, D5, E5, F5, G5, A5, B5
-            expect(getChordMidiNotes(chord, 4)).toEqual([67, 69, 71, 72, 74, 76, 77, 79, 81, 83]);
+            // Expected Odds: 67, 71, 74, 77, 81
+            // Expected Evens: 69, 72, 76, 79, 83
+            expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81, 69, 72, 76, 79, 83]);
         });
 
         it('should return empty array for invalid input', () => {

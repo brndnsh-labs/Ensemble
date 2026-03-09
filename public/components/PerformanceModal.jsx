@@ -135,7 +135,11 @@ export function PerformanceModal() {
             }
             const key = e.key.toLowerCase();
 
-            // HOME ROW: Current Chord (10 keys)
+            // CHORD TONES (LEFT) | TENSIONS (RIGHT)
+            // Group 1: 0-4 (Left Hand Range)
+            // Group 2: 5-9 (Right Hand Range)
+
+            // Layout per row: [A S D F G] [H J K L ;]
             const currentKeys = {
                 a: 0,
                 s: 1,
@@ -149,7 +153,7 @@ export function PerformanceModal() {
                 ';': 9,
             };
 
-            // TOP ROW: Upcoming Chord (10 keys)
+            // Layout per row: [Q W E R T] [Y U I O P]
             const nextKeys = {
                 q: 0,
                 w: 1,
@@ -232,15 +236,38 @@ export function PerformanceModal() {
                     }
                 }}
                 style={`
-                    width: 55px; height: 70px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+                    width: 55px; height: 75px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
                     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-                    font-weight: bold; cursor: pointer; transition: all 0.1s; font-size: 0.9rem;
+                    font-weight: bold; cursor: pointer; transition: all 0.1s; font-size: 0.95rem;
                     ${isPlaying ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : isHeld ? 'background: rgba(255,255,255,0.2); color: #fff;' : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 3px 0 rgba(0,0,0,0.3);'}
                 `}
             >
                 <span style="font-size: 1.1rem;">{label}</span>
-                <span style="font-size: 0.6rem; opacity: 0.6;">{noteLabel}</span>
+                <span style="font-size: 0.65rem; opacity: 0.6;">{noteLabel}</span>
             </button>
+        );
+    };
+
+    const renderDeckRow = (keys, notes, colorVar) => {
+        return (
+            <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
+                {/* CHORD ZONE */}
+                <div style="display: flex; gap: 0.5rem;">
+                    {keys
+                        .slice(0, 5)
+                        .map((k, i) => renderKey(k, notes[i], k.toLowerCase(), colorVar))}
+                </div>
+
+                {/* DIVIDER */}
+                <div style="width: 2px; height: 40px; background: rgba(255,255,255,0.1); margin: 0 0.5rem;" />
+
+                {/* TENSION ZONE */}
+                <div style="display: flex; gap: 0.5rem;">
+                    {keys
+                        .slice(5)
+                        .map((k, i) => renderKey(k, notes[i + 5], k.toLowerCase(), colorVar))}
+                </div>
+            </div>
         );
     };
 
@@ -251,7 +278,7 @@ export function PerformanceModal() {
                 tabIndex={0}
                 class="modal PerformanceSurfaceModal"
                 onClick={(e) => e.stopPropagation()}
-                style="max-width: 1200px; height: 85vh; max-height: 700px;"
+                style="max-width: 1200px; height: 85vh; max-height: 750px;"
             >
                 <div class="modal-header">
                     <h2>Soloist Performance Mode</h2>
@@ -274,45 +301,42 @@ export function PerformanceModal() {
 
                     <div
                         class="keyboard-layout"
-                        style="display: flex; flex-direction: column; gap: 2.5rem; width: 100%; align-items: center;"
+                        style="display: flex; flex-direction: column; gap: 3.5rem; width: 100%; align-items: center;"
                     >
                         {/* UPCOMING CHORD - TOP ROW */}
                         <div style="text-align: center; width: 100%;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 4rem;">
-                                <span style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;">
-                                    Upcoming Chord (Top Row)
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 6rem;">
+                                <span style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; display: flex; gap: 10rem;">
+                                    <span>Chord Tones</span>
+                                    <span>Scale Tensions</span>
                                 </span>
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #cbd5e1; background: rgba(255,255,255,0.05); border: 1px dashed #475569; padding: 0.2rem 1rem; border-radius: 8px; min-width: 100px;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #cbd5e1; background: rgba(255,255,255,0.05); border: 1px dashed #475569; padding: 0.2rem 1.2rem; border-radius: 8px; min-width: 100px;">
                                     {nextChord ? nextChord.chord : '---'}
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                                {['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((k, i) =>
-                                    renderKey(k, nextNotes[i], k.toLowerCase(), '--text-secondary'),
-                                )}
-                            </div>
+                            {renderDeckRow(
+                                ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+                                nextNotes,
+                                '--text-secondary',
+                            )}
                         </div>
 
                         {/* CURRENT CHORD - HOME ROW */}
                         <div style="text-align: center; width: 100%;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 4rem;">
-                                <span style="color: var(--soloist-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;">
-                                    Current Chord (Home Row)
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 6rem;">
+                                <span style="color: var(--soloist-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; display: flex; gap: 10rem;">
+                                    <span>Chord Tones</span>
+                                    <span>Scale Tensions</span>
                                 </span>
-                                <div style="font-size: 2rem; font-weight: bold; color: var(--soloist-color); background: rgba(var(--soloist-color-rgb), 0.1); border: 2px solid var(--soloist-color); padding: 0.2rem 1.5rem; border-radius: 8px; min-width: 120px;">
+                                <div style="font-size: 2.2rem; font-weight: bold; color: var(--soloist-color); background: rgba(var(--soloist-color-rgb), 0.1); border: 2px solid var(--soloist-color); padding: 0.3rem 2rem; border-radius: 8px; min-width: 140px;">
                                     {currentChord ? currentChord.chord : '---'}
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                                {['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'].map((k, i) =>
-                                    renderKey(
-                                        k,
-                                        currentNotes[i],
-                                        k.toLowerCase(),
-                                        '--soloist-color',
-                                    ),
-                                )}
-                            </div>
+                            {renderDeckRow(
+                                ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
+                                currentNotes,
+                                '--soloist-color',
+                            )}
                         </div>
                     </div>
 
@@ -321,9 +345,8 @@ export function PerformanceModal() {
                         style="text-align: center; color: #475569; font-size: 0.8rem;"
                     >
                         <p>
-                            Use <strong>Home Row</strong> for the Current Chord and{' '}
-                            <strong>Top Row</strong> to anticipate the Upcoming Chord. The scale is
-                            laid out linearly from left to right.
+                            Left Side = <strong>Safe Arpeggios</strong> | Right Side ={' '}
+                            <strong>Color Extensions</strong>
                         </p>
                     </div>
                 </div>
