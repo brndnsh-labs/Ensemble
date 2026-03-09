@@ -37,4 +37,5 @@ test.describe('Modals Responsiveness @ui', () => {
         // Close modal
         await page.click('#closeEditorBtn');
         await page.waitForSelector('#editorOverlay', { state: 'hidden' });
-    });});
+    });
+});
