@@ -16,9 +16,20 @@ export function PerformanceModal() {
         initAudio();
         restoreGains();
         killSoloistNote(); // Immediate silence of any automatic phrases
-        if (modalRef.current) {
-            modalRef.current.focus();
-        }
+
+        // Focus management: requestAnimationFrame ensures we wait for the browser paint
+        // A slight timeout further ensures any animations don't interfere with focusability
+        const focusModal = () => {
+            if (modalRef.current) {
+                modalRef.current.focus();
+            }
+        };
+
+        requestAnimationFrame(() => {
+            focusModal();
+            setTimeout(focusModal, 50);
+        });
+
         return () => {
             restoreGains();
         };
@@ -327,6 +338,7 @@ export function PerformanceModal() {
             <div
                 ref={modalRef}
                 tabIndex={0}
+                autoFocus
                 class="modal PerformanceSurfaceModal"
                 onClick={(e) => e.stopPropagation()}
                 style="max-width: 1200px; height: 85vh; max-height: 750px;"
