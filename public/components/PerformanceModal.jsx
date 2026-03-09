@@ -194,17 +194,12 @@ export function PerformanceModal() {
     };
 
     return (
-        <div
-            class="modal-overlay active"
-            onClick={close}
-            style="z-index: 1000; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;"
-        >
+        <div class="modal-overlay active" onClick={close}>
             <div
                 ref={modalRef}
                 tabIndex={0}
                 class="modal PerformanceSurfaceModal"
                 onClick={(e) => e.stopPropagation()}
-                style="width: 90vw; max-width: 1000px; height: 80vh; max-height: 600px; display: flex; flex-direction: column; background: #0f172a; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); outline: none; position: relative;"
             >
                 <div class="modal-header">
                     <h2>Soloist Performance Mode</h2>

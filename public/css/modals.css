@@ -94,13 +94,16 @@ body.modal-open {
 }
 
 .settings-overlay.closing,
-.modal-overlay.closing {
+.modal-overlay.closing,
+.closing .settings-overlay,
+.closing .modal-overlay {
     opacity: 0;
     pointer-events: none;
 }
 
 /* Modal Content Animations */
-.settings-content {
+.settings-content,
+.PerformanceSurfaceModal {
     background: var(--panel-color);
     padding: 2rem;
     border-radius: 12px;
@@ -118,7 +121,18 @@ body.modal-open {
     animation: modal-in var(--anim-normal) var(--anim-ease) forwards;
 }
 
-.closing .settings-content {
+.PerformanceSurfaceModal {
+    width: 90vw;
+    max-width: 1000px;
+    height: 80vh;
+    max-height: 600px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    overflow: hidden; /* Keys handle their own scrolling if needed, but here we want fixed height */
+}
+
+.closing .settings-content,
+.closing .PerformanceSurfaceModal {
     animation: modal-out var(--anim-normal) var(--anim-ease) forwards;
 }
 
