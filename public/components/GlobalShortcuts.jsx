@@ -42,8 +42,13 @@ export function GlobalShortcuts() {
                 !e.ctrlKey
             ) {
                 e.preventDefault();
+                if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
                 initAudio();
-                dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
+                setTimeout(() => {
+                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
+                }, 0);
             }
 
             // 1-5: Switch Mobile Tabs

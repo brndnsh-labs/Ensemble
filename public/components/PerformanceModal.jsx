@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../config.js';
 import { initAudio, killSoloistNote, playSoloNote, restoreGains } from '../engine/engine.js';
 import { dispatch } from '../state.js';
@@ -12,7 +12,7 @@ export function PerformanceModal() {
     const [currentNoteName, setCurrentNoteName] = useState('');
 
     // Ensure routing is updated for performance mode and handle focus
-    useEffect(() => {
+    useLayoutEffect(() => {
         initAudio();
         restoreGains();
         killSoloistNote(); // Immediate silence of any automatic phrases
@@ -24,7 +24,7 @@ export function PerformanceModal() {
             if (modalRef.current) {
                 modalRef.current.focus();
                 // If we're not focused yet, retry in the next frame
-                if (document.activeElement !== modalRef.current && retryCount < 10) {
+                if (document.activeElement !== modalRef.current && retryCount < 20) {
                     retryCount++;
                     requestAnimationFrame(focusModal);
                 }
@@ -33,12 +33,23 @@ export function PerformanceModal() {
 
         // Start focus attempts immediately
         focusModal();
-        // And one extra safety check after animations typically finish
-        const timeout = setTimeout(focusModal, 300);
+        // Additional safety checks
+        const t1 = setTimeout(focusModal, 50);
+        const t2 = setTimeout(focusModal, 150);
+        const t3 = setTimeout(focusModal, 300);
 
         return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearTimeout(t3);
+        };
+    }, []);
+
+    // Ensure routing is updated for performance mode
+    useEffect(() => {
+        restoreGains();
+        return () => {
             restoreGains();
-            clearTimeout(timeout);
         };
     }, []);
 
@@ -341,13 +352,33 @@ export function PerformanceModal() {
     };
 
     return (
-        <div class="modal-overlay active" onClick={close}>
+        <div
+            ref={modalRef}
+            tabIndex={0}
+            class="modal-overlay active"
+            onClick={close}
+            onPointerEnter={() => {
+                // Focus on hover to ensure immediate readiness
+                if (modalRef.current) {
+                    modalRef.current.focus();
+                }
+            }}
+            onPointerDown={() => {
+                // Ensure focus is restored if the user clicks the overlay
+                if (modalRef.current) {
+                    modalRef.current.focus();
+                }
+            }}
+        >
             <div
-                ref={modalRef}
-                tabIndex={0}
-                autoFocus
                 class="modal PerformanceSurfaceModal"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    // Also ensure focus stays if clicking the inner modal
+                    if (modalRef.current) {
+                        modalRef.current.focus();
+                    }
+                }}
                 style="max-width: 1200px; height: 85vh; max-height: 750px;"
             >
                 <div class="modal-header">

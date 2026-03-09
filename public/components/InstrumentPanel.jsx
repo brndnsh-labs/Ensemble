@@ -82,11 +82,16 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                             class="panel-menu-btn"
                             aria-label="Open Performance Mode"
                             onClick={() => {
+                                if (document.activeElement instanceof HTMLElement) {
+                                    document.activeElement.blur();
+                                }
                                 initAudio();
-                                dispatch(ACTIONS.SET_MODAL_OPEN, {
-                                    modal: 'performance',
-                                    open: true,
-                                });
+                                setTimeout(() => {
+                                    dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                        modal: 'performance',
+                                        open: true,
+                                    });
+                                }, 0);
                             }}
                         >
                             🎵
