@@ -1,6 +1,7 @@
 function applyTheme() {
     try {
-        const savedState = JSON.parse(localStorage.getItem('ensemble_currentState') || '{}');
+        const stored = localStorage.getItem('ensemble_currentState');
+        const savedState = JSON.parse(stored || '{}');
         const theme = savedState.theme || 'auto';
         let effectiveTheme = theme;
         if (theme === 'auto') {
@@ -17,7 +18,8 @@ function applyTheme() {
 applyTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     try {
-        const savedState = JSON.parse(localStorage.getItem('ensemble_currentState') || '{}');
+        const stored = localStorage.getItem('ensemble_currentState');
+        const savedState = JSON.parse(stored || '{}');
         if (!savedState.theme || savedState.theme === 'auto') {
             applyTheme();
         }

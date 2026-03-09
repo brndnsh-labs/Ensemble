@@ -23,7 +23,17 @@ export function saveProgression() {
         return;
     }
 
-    const userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
+    let userPresets = [];
+    try {
+        const stored = localStorage.getItem('ensemble_userPresets');
+        userPresets = JSON.parse(stored || '[]');
+        if (!Array.isArray(userPresets)) {
+            userPresets = [];
+        }
+    } catch (e) {
+        console.error('[Arranger] Failed to load user presets:', e);
+        userPresets = [];
+    }
     const newPreset = {
         name: name.substring(0, 32),
         sections: compressSections(arranger.sections),
