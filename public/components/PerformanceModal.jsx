@@ -5,7 +5,7 @@ import { initAudio, killSoloistNote, playSoloNote, restoreGains } from '../engin
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { getChordMidiNotes, midiToNote } from '../utils.js';
+import { formatUnicodeSymbols, getChordMidiNotes, midiToNote } from '../utils.js';
 
 export function PerformanceModal() {
     const modalRef = useRef(null);
@@ -24,12 +24,13 @@ export function PerformanceModal() {
         };
     }, []);
 
-    const { step, stepMap, key, isMinor, totalSteps } = useEnsembleState((s) => ({
+    const { step, stepMap, key, isMinor, totalSteps, notation } = useEnsembleState((s) => ({
         step: s.playback.step,
         stepMap: s.arranger.stepMap,
         key: s.arranger.key,
         isMinor: s.arranger.isMinor,
         totalSteps: s.arranger.totalSteps,
+        notation: s.arranger.notation || 'roman',
     }));
 
     // Find current and next chords by finding the current step range in stepMap
@@ -59,11 +60,31 @@ export function PerformanceModal() {
         // Base MIDI for C4 is 60. rootMidi corresponds to the offset from C.
         const rootMidi = 60 + (keyIndex >= 0 ? keyIndex : 0);
         currentChord = {
-            chord: key + (isMinor ? 'm' : ''),
+            absName: key + (isMinor ? 'm' : ''),
             rootMidi: rootMidi,
             quality: isMinor ? 'minor' : 'major',
         };
     }
+
+    const getChordName = (chordObj) => {
+        if (!chordObj) {
+            return '---';
+        }
+
+        // 1. Try formatted display name (handles Roman, NNS, Absolute)
+        if (chordObj.display?.[notation]) {
+            const d = chordObj.display[notation];
+            let name = d.root + d.suffix;
+            if (d.bass) {
+                name += `/${d.bass}`;
+            }
+            return formatUnicodeSymbols(name);
+        }
+
+        // 2. Fallback to basic names
+        const basicName = chordObj.absName || chordObj.chord || '---';
+        return formatUnicodeSymbols(basicName);
+    };
 
     const currentNotes = useMemo(() => getChordMidiNotes(currentChord, 4), [currentChord]);
     const nextNotes = useMemo(() => getChordMidiNotes(nextChord, 4), [nextChord]);
@@ -311,7 +332,7 @@ export function PerformanceModal() {
                                     <span>Scale Tensions</span>
                                 </span>
                                 <div style="font-size: 1.5rem; font-weight: bold; color: #cbd5e1; background: rgba(255,255,255,0.05); border: 1px dashed #475569; padding: 0.2rem 1.2rem; border-radius: 8px; min-width: 100px;">
-                                    {nextChord ? nextChord.chord : '---'}
+                                    {getChordName(nextChord)}
                                 </div>
                             </div>
                             {renderDeckRow(
@@ -329,7 +350,7 @@ export function PerformanceModal() {
                                     <span>Scale Tensions</span>
                                 </span>
                                 <div style="font-size: 2.2rem; font-weight: bold; color: var(--soloist-color); background: rgba(var(--soloist-color-rgb), 0.1); border: 2px solid var(--soloist-color); padding: 0.3rem 2rem; border-radius: 8px; min-width: 140px;">
-                                    {currentChord ? currentChord.chord : '---'}
+                                    {getChordName(currentChord)}
                                 </div>
                             </div>
                             {renderDeckRow(
