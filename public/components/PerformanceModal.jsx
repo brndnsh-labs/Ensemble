@@ -303,7 +303,10 @@ export function PerformanceModal() {
         const labelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'}; margin-bottom: 0.5rem;`;
 
         return (
-            <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <div
+                class={isNext ? 'upcoming-chord' : 'active-chord'}
+                style="display: flex; flex-direction: column; align-items: center; width: 100%;"
+            >
                 {/* Header Row: Chord Name + Label indicators */}
                 <div style="display: flex; width: 100%; max-width: 650px; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
                     <div style="flex: 1; text-align: left; padding-left: 10px;">
