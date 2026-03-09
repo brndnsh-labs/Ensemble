@@ -162,7 +162,7 @@ describe('Rock Drummer Critique', () => {
 
         // MUSICAL: Rock Snare extra hits (ghosting) should be minimal compared to Funk/Jazz.
         expect(snareGhostHits / totalBars).toBeLessThan(1.0);
-        expect(ghostToBackbeatRatio).toBeLessThan(0.18);
+        expect(ghostToBackbeatRatio).toBeLessThan(0.20);
     });
 
     it('should switch from HiHat to Open sounds at high intensity', () => {

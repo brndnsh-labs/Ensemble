@@ -116,16 +116,16 @@ export function applyOverrides(context, state) {
         }
 
         if (isTurnaround && loopStep >= halfBarStep && drumComplexity > 0.5) {
-            if (isEighthNote && roll(0.4)) {
+            if (isEighthNote && roll(0.4, intensity)) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.8, Math.random(), 0.2);
+                velocity = scaleVelocity(0.7, intensity, 0.2);
             }
         } else if (drumComplexity > 0.5) {
             if (!shouldPlay && ((isAOfBeat && beatIndex === 1) || (isEOfBeat && beatIndex === 2))) {
                 // Restore intensity gate to prevent ghosting at max or min intensities
-                if (intensity > 0.4 && intensity < 0.8 && roll(0.12)) {
+                if (intensity > 0.4 && intensity < 0.8 && roll(0.12, intensity)) {
                     shouldPlay = true;
-                    velocity = scaleVelocity(0.25, Math.random(), 0.2);
+                    velocity = scaleVelocity(0.1, intensity, 0.1);
                 }
             }
         }
