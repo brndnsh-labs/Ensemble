@@ -155,8 +155,8 @@ describe('Soloist Mode Differentiation Logic', () => {
         const extra = note[0];
         const interval = extra.midi - melody.midi;
 
-        // Guitar intervals: [3, 4, 5, 8, 9]
-        expect([3, 4, 5, 8, 9]).toContain(interval);
+        // Guitar intervals (below melody): [-3, -4, -5, -7, -8, -9]
+        expect([-3, -4, -5, -7, -8, -9]).toContain(interval);
     });
 
     it('should generate 3-note block chords in piano mode', () => {
@@ -289,7 +289,7 @@ describe('Soloist Mode Differentiation Logic', () => {
                 const melody = note[note.length - 1];
                 const extra = note[0];
                 const interval = extra.midi - melody.midi;
-                if ([4, 5, 7].includes(interval)) {
+                if ([-3, -4, -5, -7, -8, -9].includes(interval)) {
                     foundHendrixInt = true;
                     break;
                 }

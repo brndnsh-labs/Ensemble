@@ -57,8 +57,8 @@ function init() {
                         }
                         bass.buffer.get(n.step).push(n);
                     } else if (n.module === 'soloist') {
-                        // ENFORCE MONOPHONIC: If double stops are disabled, skip additional notes for the same step
-                        if (!soloist.doubleStops && soloist.buffer.has(n.step)) {
+                        // ENFORCE MONOPHONIC: If mode is monophonic, skip additional notes for the same step
+                        if (soloist.mode === 'monophonic' && soloist.buffer.has(n.step)) {
                             return;
                         }
 

@@ -368,7 +368,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         deviceBuffer = [
             [
                 {
-                    midi: selectedMidi + dsInt,
+                    midi: selectedMidi - dsInt,
                     velocity: devBaseVel * 1.05,
                     durationSteps: 1,
                     style: activeStyle,
@@ -461,12 +461,29 @@ export function generateExtraNotes(ctx) {
             isDoubleStop: true,
         });
     } else if (soloist.mode === 'guitar') {
-        const dsInt =
-            activeStyle === 'blues' || activeStyle === 'neo'
-                ? [5, 7, 5, 4][Math.floor(Math.random() * 4)]
-                : [3, 4, 5, 8, 9][Math.floor(Math.random() * 5)];
+        const currentRoot = currentChord.rootMidi;
+        const validIntervalsDown = [3, 4, 5, 7, 8, 9]; // minor 3rd to major 6th down
+        let foundMidi = null;
+
+        for (let i = 0; i < validIntervalsDown.length; i++) {
+            const dsInt = validIntervalsDown[i];
+            const candidateMidi = selectedMidi - dsInt;
+            const pc = ((candidateMidi % 12) + 12) % 12;
+            const isChordTone = currentChord.intervals.some(
+                (intv) => intv % 12 === (pc - (currentRoot % 12) + 12) % 12,
+            );
+            if (isChordTone) {
+                foundMidi = candidateMidi;
+                break;
+            }
+        }
+
+        if (foundMidi === null) {
+            foundMidi = selectedMidi - (activeStyle === 'blues' ? 5 : 4);
+        }
+
         extraNotes.push({
-            midi: selectedMidi + dsInt,
+            midi: foundMidi,
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
             isDoubleStop: true,
         });

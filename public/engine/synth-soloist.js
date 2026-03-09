@@ -134,15 +134,17 @@ function manageVoices(playTime, soloist) {
     // Clean up finished voices
     soloist.activeVoices = soloist.activeVoices.filter((v) => v.time + v.duration + 1.0 > playTime);
 
-    const VOICE_LIMIT = soloist.mode !== 'monophonic' ? 2 : 1;
-    const isNewGesture =
-        soloist.activeVoices.length > 0 &&
-        Math.abs(playTime - soloist.activeVoices[soloist.activeVoices.length - 1].time) > 0.001;
+    const VOICE_LIMIT = soloist.mode === 'piano' ? 4 : soloist.mode === 'guitar' ? 2 : 1;
 
-    if (isNewGesture || soloist.activeVoices.length >= VOICE_LIMIT) {
-        const voicesToKill = isNewGesture
-            ? soloist.activeVoices.length
-            : soloist.activeVoices.length - VOICE_LIMIT + 1;
+    // Check if the current note is part of the same "simultaneous" attack (polyphonic cluster)
+    // We allow multiple voices for the exact same start time (within a tiny jitter margin)
+    const isPolyphonicCluster =
+        soloist.activeVoices.length > 0 &&
+        Math.abs(playTime - soloist.activeVoices[soloist.activeVoices.length - 1].time) < 0.002;
+
+    if (!isPolyphonicCluster && soloist.activeVoices.length >= VOICE_LIMIT) {
+        // Only kill enough voices to stay under the limit for the NEW gesture
+        const voicesToKill = soloist.activeVoices.length - VOICE_LIMIT + 1;
         for (let i = 0; i < voicesToKill; i++) {
             const oldest = soloist.activeVoices.shift();
             if (oldest) {

@@ -108,7 +108,9 @@ describe('Soloist Legato Articulation', () => {
         playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
         playSoloNote(554, 100.5, 0.5, 0.5, 0, 'scalar', true);
 
-        const voice = soloist.activeVoices[0];
+        // In guitar mode, playTime 100.5 doesn't kill the first voice (100 + 0.5 + 1.0 > 100.5)
+        // So the activeVoices will have 2 voices. The legato glide happens on the SECOND voice.
+        const voice = soloist.activeVoices[1];
         const osc = voice.nodes.find((n) => n.frequency?.setValueAtTime);
 
         // Guitar mode should use 30ms glide
