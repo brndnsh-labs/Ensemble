@@ -22,9 +22,9 @@ export function PerformanceModal() {
         let retryCount = 0;
         const focusModal = () => {
             if (modalRef.current) {
-                modalRef.current.focus();
+                modalRef.current.focus({ preventScroll: true });
                 // If we're not focused yet, retry in the next frame
-                if (document.activeElement !== modalRef.current && retryCount < 20) {
+                if (document.activeElement !== modalRef.current && retryCount < 30) {
                     retryCount++;
                     requestAnimationFrame(focusModal);
                 }
@@ -33,15 +33,17 @@ export function PerformanceModal() {
 
         // Start focus attempts immediately
         focusModal();
-        // Additional safety checks
+        // Additional safety checks with exponential-ish backoff to cover transition durations
         const t1 = setTimeout(focusModal, 50);
         const t2 = setTimeout(focusModal, 150);
         const t3 = setTimeout(focusModal, 300);
+        const t4 = setTimeout(focusModal, 600);
 
         return () => {
             clearTimeout(t1);
             clearTimeout(t2);
             clearTimeout(t3);
+            clearTimeout(t4);
         };
     }, []);
 
@@ -180,6 +182,11 @@ export function PerformanceModal() {
 
     useEffect(() => {
         const handleKeyDown = (e) => {
+            // Ignore if we are closing (AnimatedModalWrapper adds .closing)
+            if (modalRef.current?.closest('.closing')) {
+                return;
+            }
+
             if (e.repeat) {
                 return;
             }
@@ -234,6 +241,10 @@ export function PerformanceModal() {
                 setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
 
                 triggerNote(midiNote, key, isLegato);
+            } else if (key === 'escape' || key === ' ' || key in currentKeys || key in nextKeys) {
+                // Prevent default for keys that might scroll or affect the UI
+                // even if they didn't map to a note (e.g. semicolon or space)
+                e.preventDefault();
             }
         };
 
@@ -242,8 +253,8 @@ export function PerformanceModal() {
             stopNote(key);
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('keydown', handleKeyDown, { passive: false });
+        window.addEventListener('keyup', handleKeyUp, { passive: false });
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
