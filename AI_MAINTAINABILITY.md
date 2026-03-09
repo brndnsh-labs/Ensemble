@@ -70,4 +70,18 @@ To prevent visual regressions (clipping, layout shifts, overlap) that Vitest can
 *   **Mobile-First Verification:** Always include a `@mobile` tag in your test titles and use the `Mobile Safari` project in `playwright.config.js` to verify responsiveness at 390x844.
 *   **CI Artifacts:** If tests fail in GitHub Actions, download the `playwright-report` artifact to view the visual diffs and traces.
 
+### 10. AI-Friendly Best Practices (Meta-Guide)
+
+To maintain a high maintainability score, follow these "AI-friendly" patterns:
+
+1.  **Deterministic Selectors**: When adding or modifying UI elements, prefer using `data-testid="unique-id"` for Playwright/Vitest selectors instead of volatile CSS classes. This makes tests resilient to style-only refactors.
+2.  **Semantic Prop Names**: In Preact components, name props and state variables according to their **domain** (e.g., `isTransportVisible`) rather than their **visual state** (e.g., `isBlue`).
+3.  **The "Musical Intent" rule**: In generative logic (bass, drums, etc.), always add a JSDoc comment explaining **why** a specific probability or offset exists. (e.g., `// 15% probability to add a 'ghost' note on step 14 for Jazz feel`). This prevents future agents from "optimizing" away intentional musical nuances.
+4.  **No Magic Numbers in UI**: Use CSS variables from `variables.css` for all spacing and colors. If a specific component needs a unique value, define it as a local variable within the CSS file.
+5.  **State Atomic Change**: Always perform state updates in a single `dispatch`. If multiple domain slices need to change simultaneously, create a custom action in `types.js` to handle the batch update.
+6.  **Fail Fast in Workers**: When sending data to `logic-worker.js`, validate the payload shape immediately. It's better to log an error and skip a musical beat than to cause a silent worker crash.
+
+### Final Summary
+Ensemble is designed for **autonomous evolution**. By adhering to these standards, you ensure the project remains stable, performant, and understandable for both human developers and future AI collaborators.
+
 

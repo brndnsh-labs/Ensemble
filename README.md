@@ -21,6 +21,12 @@ Ensemble uses Preact with JSX and requires a build step for production. For loca
 ### Local Development
 To run the project locally, it is recommended to use a development server that supports JSX, or build the project using the provided deployment scripts which utilize `esbuild`.
 
+**Previewing Production Build:**
+To view the exact production bundle locally (required for E2E verification):
+```bash
+npm run build && npm run preview
+```
+
 ### Deployment & Bundling
 Ensemble includes scripts for automated deployment to remote servers using `esbuild` for bundling and minification.
 
@@ -42,10 +48,21 @@ You can build the project locally to the `dist/` folder without uploading by usi
 
 ## Testing
 
-Automated unit and integration tests are located in the `tests/` directory and use Vitest.
+Ensemble uses a dual-layer testing strategy:
 
+1.  **Unit & Integration Tests**: Located in `tests/unit/` and `tests/integration/`, powered by Vitest. These verify musical logic, state integrity, and engine performance.
+    ```bash
+    npm test
+    ```
+2.  **Visual Regression & E2E Tests**: Located in `tests/e2e/`, powered by Playwright. These verify UI layout, responsiveness, and interaction flow against "golden" snapshots.
+    ```bash
+    npm run test:e2e
+    ```
+
+**Updating Snapshots:**
+If you intentionally change the UI, update the baseline snapshots:
 ```bash
-npm test
+npm run test:e2e:update
 ```
 
 ## Tech Stack
