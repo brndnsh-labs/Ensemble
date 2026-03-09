@@ -81,6 +81,7 @@ body.modal-open {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    outline: none;
     transition:
         opacity var(--anim-normal) var(--anim-ease),
         visibility var(--anim-normal) var(--anim-ease);

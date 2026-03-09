@@ -22,9 +22,9 @@ export function PerformanceModal() {
         let retryCount = 0;
         const focusModal = () => {
             if (modalRef.current) {
-                modalRef.current.focus();
+                modalRef.current.focus({ preventScroll: true });
                 // If we're not focused yet, retry in the next frame
-                if (document.activeElement !== modalRef.current && retryCount < 20) {
+                if (document.activeElement !== modalRef.current && retryCount < 30) {
                     retryCount++;
                     requestAnimationFrame(focusModal);
                 }
@@ -33,15 +33,17 @@ export function PerformanceModal() {
 
         // Start focus attempts immediately
         focusModal();
-        // Additional safety checks
+        // Additional safety checks with exponential-ish backoff to cover transition durations
         const t1 = setTimeout(focusModal, 50);
         const t2 = setTimeout(focusModal, 150);
         const t3 = setTimeout(focusModal, 300);
+        const t4 = setTimeout(focusModal, 600);
 
         return () => {
             clearTimeout(t1);
             clearTimeout(t2);
             clearTimeout(t3);
+            clearTimeout(t4);
         };
     }, []);
 
@@ -180,6 +182,11 @@ export function PerformanceModal() {
 
     useEffect(() => {
         const handleKeyDown = (e) => {
+            // Ignore if we are closing (AnimatedModalWrapper adds .closing)
+            if (modalRef.current?.closest('.closing')) {
+                return;
+            }
+
             if (e.repeat) {
                 return;
             }
@@ -234,6 +241,10 @@ export function PerformanceModal() {
                 setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
 
                 triggerNote(midiNote, key, isLegato);
+            } else if (key === 'escape' || key === ' ' || key in currentKeys || key in nextKeys) {
+                // Prevent default for keys that might scroll or affect the UI
+                // even if they didn't map to a note (e.g. semicolon or space)
+                e.preventDefault();
             }
         };
 
@@ -242,8 +253,8 @@ export function PerformanceModal() {
             stopNote(key);
         };
 
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('keydown', handleKeyDown, { passive: false });
+        window.addEventListener('keyup', handleKeyUp, { passive: false });
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
@@ -265,8 +276,12 @@ export function PerformanceModal() {
         return (
             <button
                 key={sourceKey}
+                tabIndex={-1}
                 onPointerDown={(e) => {
                     e.preventDefault();
+                    if (modalRef.current) {
+                        modalRef.current.focus({ preventScroll: true });
+                    }
                     if (!midi) {
                         return;
                     }
@@ -289,6 +304,7 @@ export function PerformanceModal() {
                     width: 55px; height: 75px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
                     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
                     font-weight: bold; cursor: pointer; transition: all 0.1s; font-size: 0.95rem;
+                    touch-action: none; -webkit-user-select: none; user-select: none;
                     ${isPlaying ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : isHeld ? 'background: rgba(255,255,255,0.2); color: #fff;' : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 3px 0 rgba(0,0,0,0.3);'}
                 `}
             >
@@ -375,12 +391,15 @@ export function PerformanceModal() {
         >
             <div
                 class="modal PerformanceSurfaceModal"
+                onPointerDown={(e) => {
+                    e.stopPropagation();
+                    // Use pointerdown for immediate focus response on touch devices
+                    if (modalRef.current) {
+                        modalRef.current.focus({ preventScroll: true });
+                    }
+                }}
                 onClick={(e) => {
                     e.stopPropagation();
-                    // Also ensure focus stays if clicking the inner modal
-                    if (modalRef.current) {
-                        modalRef.current.focus();
-                    }
                 }}
                 style="max-width: 1200px; height: 85vh; max-height: 750px;"
             >
@@ -393,7 +412,7 @@ export function PerformanceModal() {
 
                 <div
                     class="modal-content"
-                    style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem;"
+                    style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;"
                 >
                     <div style="height: 4rem; display: flex; align-items: center; justify-content: center;">
                         {currentNoteName && (

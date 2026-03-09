@@ -14,7 +14,11 @@ export function GlobalShortcuts() {
                 e.target.isContentEditable;
 
             // Space: Toggle Play
-            const anyModalOpen = Object.values(playback.modals).some((isOpen) => isOpen);
+            const anyModalOpen =
+                Object.values(playback.modals).some((isOpen) => isOpen) ||
+                document.querySelector('.modal-overlay.closing') !== null ||
+                document.querySelector('.settings-overlay.closing') !== null;
+
             if (e.key === ' ' && !isTyping && !anyModalOpen) {
                 e.preventDefault();
                 dispatch(ACTIONS.TOGGLE_PLAY, { viz: playback.viz });
@@ -70,6 +74,7 @@ export function GlobalShortcuts() {
 
             // Escape: Close Modal / Unmaximize
             if (e.key === 'Escape') {
+                e.preventDefault();
                 if (document.body.classList.contains('chord-maximized')) {
                     document.body.classList.remove('chord-maximized');
                     const btn = document.getElementById('maximizeChordBtn');
