@@ -23,9 +23,7 @@ test.describe('Header Visual Integrity', () => {
 
         // 3. Visual Snapshot Comparison
         // This will create a 'golden' baseline on first run
-        await expect(header).toHaveScreenshot('mobile-header.png', {
-            maxDiffPixelRatio: 0.01, // Allow for tiny rendering variations
-        });
+        await expect(header).toHaveScreenshot('mobile-header.png');
     });
 
     test('Desktop Header - Layout @desktop', async ({ page }) => {

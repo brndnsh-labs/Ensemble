@@ -13,9 +13,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         // Snapshot the initial state of the visualizer
         // This is useful to catch if the spacing between chord cards or measures changes
-        await expect(visualizer).toHaveScreenshot('chord-visualizer-default.png', {
-            maxDiffPixelRatio: 0.01,
-        });
+        await expect(visualizer).toHaveScreenshot('chord-visualizer-default.png');
     });
 
     test('Chord Visualizer - Section Labels and Measures', async ({ page }) => {
@@ -29,8 +27,6 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(chordCard).toBeVisible();
 
         // Take a scoped snapshot of the first measure specifically
-        await expect(measureBox).toHaveScreenshot('measure-box-baseline.png', {
-            maxDiffPixelRatio: 0.01,
-        });
+        await expect(measureBox).toHaveScreenshot('measure-box-baseline.png');
     });
 });

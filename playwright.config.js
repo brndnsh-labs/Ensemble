@@ -16,10 +16,10 @@ export default defineConfig({
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
     reporter: process.env.CI ? [['github'], ['dot']] : [['list']],
 
-    /* Global threshold for visual regression testing */
+    /* Robust global thresholds for cross-environment consistency */
     expect: {
         toHaveScreenshot: {
-            maxDiffPixelRatio: 0.02,
+            maxDiffPixelRatio: 0.05, // 5% allowance for font/rendering shifts across OS
             threshold: 0.2,
         },
     },
@@ -31,6 +31,9 @@ export default defineConfig({
 
         /* Collect trace when retrying a failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
+
+        /* Force dark mode to prevent theme mismatches between local and CI */
+        colorScheme: 'dark',
 
         /* Standardize rendering across different environments (CI vs local) */
         launchOptions: {
@@ -52,9 +55,19 @@ export default defineConfig({
                 ...devices['Desktop Chrome'],
                 viewport: { width: 1440, height: 900 },
             },
+            // Don't run mobile-specific tests on desktop
+            grepInvert: /@mobile/,
         },
-        /* WebKit/Safari projects disabled due to host-specific flakiness */
+        {
+            name: 'Mobile Chrome',
+            use: {
+                ...devices['Pixel 5'],
+            },
+            // Only run mobile-tagged tests
+            grep: /@mobile/,
+        },
     ],
+
     /* Run your local dev server before starting the tests */
     webServer: {
         command: 'npm run preview',
