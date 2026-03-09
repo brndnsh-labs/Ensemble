@@ -76,38 +76,55 @@ export function PerformanceModal() {
         nextNotesRef.current = nextNotes;
     }, [currentNotes, nextNotes]);
 
-    const [activeKeys, setActiveKeys] = useState(new Set());
+    const heldKeysRef = useRef([]); // Stack of { key, midi }
+    const [activeKeys, setActiveKeys] = useState(new Set()); // Keys that are held
+    const [playingKey, setPlayingKey] = useState(null); // The one currently sounding
 
     // Unified trigger for both keyboard and pointer events
-    const triggerNote = (midiNote, sourceKey = null) => {
+    const triggerNote = (midiNote, sourceKey, isLegato = false) => {
         initAudio();
         restoreGains();
 
-        // Enforce strict monophonic rule by killing any existing note
-        killSoloistNote();
-
         const freq = 440 * 2 ** ((midiNote - 69) / 12);
-        playSoloNote(freq, 0, 60.0, 0.8);
+        // Use a very long duration (60s) for manual performance to allow sustains
+        playSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
 
         const noteInfo = midiToNote(midiNote);
         setCurrentNoteName(`${noteInfo.name}${noteInfo.octave}`);
-
-        if (sourceKey) {
-            setActiveKeys((prev) => new Set(prev).add(sourceKey));
-        }
+        setPlayingKey(sourceKey);
     };
 
     const stopNote = (sourceKey = null) => {
-        killSoloistNote();
-        setCurrentNoteName('');
-        if (sourceKey) {
-            setActiveKeys((prev) => {
-                const next = new Set(prev);
-                next.delete(sourceKey);
-                return next;
-            });
-        } else {
+        if (!sourceKey) {
+            // Kill everything
+            killSoloistNote();
+            setCurrentNoteName('');
+            heldKeysRef.current = [];
             setActiveKeys(new Set());
+            setPlayingKey(null);
+            return;
+        }
+
+        const index = heldKeysRef.current.findIndex((h) => h.key === sourceKey);
+        if (index === -1) {
+            return;
+        }
+
+        const wasPlaying = index === heldKeysRef.current.length - 1;
+        heldKeysRef.current.splice(index, 1);
+
+        // Update UI state
+        const nextHeld = new Set(heldKeysRef.current.map((h) => h.key));
+        setActiveKeys(nextHeld);
+
+        if (heldKeysRef.current.length === 0) {
+            killSoloistNote();
+            setCurrentNoteName('');
+            setPlayingKey(null);
+        } else if (wasPlaying) {
+            // Fallback to the next note in the stack
+            const next = heldKeysRef.current[heldKeysRef.current.length - 1];
+            triggerNote(next.midi, next.key, true);
         }
     };
 
@@ -129,17 +146,19 @@ export function PerformanceModal() {
 
             if (midiNote !== null) {
                 e.preventDefault();
-                triggerNote(midiNote, key);
+                const isLegato = heldKeysRef.current.length > 0;
+
+                // Push to stack
+                heldKeysRef.current.push({ key, midi: midiNote });
+                setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
+
+                triggerNote(midiNote, key, isLegato);
             }
         };
 
         const handleKeyUp = (e) => {
             const key = e.key.toLowerCase();
-            const allKeys = ['a', 's', 'd', 'f', 'g', 'q', 'w', 'e', 'r', 't'];
-            if (allKeys.includes(key)) {
-                e.preventDefault();
-                stopNote(key);
-            }
+            stopNote(key);
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -157,7 +176,8 @@ export function PerformanceModal() {
     };
 
     const renderKey = (label, midi, sourceKey, colorVar) => {
-        const isActive = activeKeys.has(sourceKey);
+        const isHeld = activeKeys.has(sourceKey);
+        const isPlaying = playingKey === sourceKey;
         const noteInfo = midi ? midiToNote(midi) : null;
         const noteLabel = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
 
@@ -166,9 +186,13 @@ export function PerformanceModal() {
                 key={sourceKey}
                 onPointerDown={(e) => {
                     e.preventDefault();
-                    if (midi) {
-                        triggerNote(midi, sourceKey);
+                    if (!midi) {
+                        return;
                     }
+                    const isLegato = heldKeysRef.current.length > 0;
+                    heldKeysRef.current.push({ key: sourceKey, midi });
+                    setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
+                    triggerNote(midi, sourceKey, isLegato);
                 }}
                 onPointerUp={(e) => {
                     e.preventDefault();
@@ -184,7 +208,7 @@ export function PerformanceModal() {
                     width: 60px; height: 80px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
                     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
                     font-weight: bold; cursor: pointer; transition: all 0.1s;
-                    ${isActive ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 4px 0 rgba(0,0,0,0.3);'}
+                    ${isPlaying ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : isHeld ? 'background: rgba(255,255,255,0.2); color: #fff;' : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 4px 0 rgba(0,0,0,0.3);'}
                 `}
             >
                 <span style="font-size: 1.2rem;">{label}</span>
