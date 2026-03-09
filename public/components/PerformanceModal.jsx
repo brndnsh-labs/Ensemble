@@ -269,24 +269,54 @@ export function PerformanceModal() {
         );
     };
 
-    const renderDeckRow = (keys, notes, colorVar) => {
+    const renderDeckRow = (keys, notes, colorVar, chordObj, isNext = false) => {
+        const chordName = getChordName(chordObj);
+        const labelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'}; margin-bottom: 0.5rem;`;
+
         return (
-            <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
-                {/* CHORD ZONE */}
-                <div style="display: flex; gap: 0.5rem;">
-                    {keys
-                        .slice(0, 5)
-                        .map((k, i) => renderKey(k, notes[i], k.toLowerCase(), colorVar))}
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                {/* Header Row: Chord Name + Label indicators */}
+                <div style="display: flex; width: 100%; max-width: 650px; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
+                    <div style="flex: 1; text-align: left; padding-left: 10px;">
+                        <div style={labelStyle}>Chord Tones</div>
+                    </div>
+
+                    <div style="text-align: center; margin-bottom: -0.5rem;">
+                        <div
+                            style={`font-size: ${isNext ? '1.5rem' : '2.2rem'}; font-weight: bold; color: ${isNext ? '#cbd5e1' : 'var(--soloist-color)'}; background: ${isNext ? 'rgba(255,255,255,0.05)' : 'rgba(var(--soloist-color-rgb), 0.1)'}; border: ${isNext ? '1px dashed #475569' : '2px solid var(--soloist-color)'}; padding: 0.3rem 1.5rem; border-radius: 10px; min-width: 120px; box-shadow: ${isNext ? 'none' : '0 0 20px rgba(var(--soloist-color-rgb), 0.2)'};`}
+                        >
+                            {chordName}
+                        </div>
+                        <div
+                            style={`font-size: 0.65rem; margin-top: 0.4rem; font-weight: bold; opacity: 0.5; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'};`}
+                        >
+                            {isNext ? 'UPCOMING' : 'CURRENT'}
+                        </div>
+                    </div>
+
+                    <div style="flex: 1; text-align: right; padding-right: 10px;">
+                        <div style={labelStyle}>Scale Tensions</div>
+                    </div>
                 </div>
 
-                {/* DIVIDER */}
-                <div style="width: 2px; height: 40px; background: rgba(255,255,255,0.1); margin: 0 0.5rem;" />
+                {/* Keys Row */}
+                <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
+                    {/* CHORD ZONE */}
+                    <div style="display: flex; gap: 0.5rem;">
+                        {keys
+                            .slice(0, 5)
+                            .map((k, i) => renderKey(k, notes[i], k.toLowerCase(), colorVar))}
+                    </div>
 
-                {/* TENSION ZONE */}
-                <div style="display: flex; gap: 0.5rem;">
-                    {keys
-                        .slice(5)
-                        .map((k, i) => renderKey(k, notes[i + 5], k.toLowerCase(), colorVar))}
+                    {/* DIVIDER */}
+                    <div style="width: 2px; height: 50px; background: rgba(255,255,255,0.1); margin: 0 0.75rem;" />
+
+                    {/* TENSION ZONE */}
+                    <div style="display: flex; gap: 0.5rem;">
+                        {keys
+                            .slice(5)
+                            .map((k, i) => renderKey(k, notes[i + 5], k.toLowerCase(), colorVar))}
+                    </div>
                 </div>
             </div>
         );
@@ -322,43 +352,25 @@ export function PerformanceModal() {
 
                     <div
                         class="keyboard-layout"
-                        style="display: flex; flex-direction: column; gap: 3.5rem; width: 100%; align-items: center;"
+                        style="display: flex; flex-direction: column; gap: 4rem; width: 100%; align-items: center;"
                     >
                         {/* UPCOMING CHORD - TOP ROW */}
-                        <div style="text-align: center; width: 100%;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 6rem;">
-                                <span style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; display: flex; gap: 10rem;">
-                                    <span>Chord Tones</span>
-                                    <span>Scale Tensions</span>
-                                </span>
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #cbd5e1; background: rgba(255,255,255,0.05); border: 1px dashed #475569; padding: 0.2rem 1.2rem; border-radius: 8px; min-width: 100px;">
-                                    {getChordName(nextChord)}
-                                </div>
-                            </div>
-                            {renderDeckRow(
-                                ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-                                nextNotes,
-                                '--text-secondary',
-                            )}
-                        </div>
+                        {renderDeckRow(
+                            ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+                            nextNotes,
+                            '--text-secondary',
+                            nextChord,
+                            true,
+                        )}
 
                         {/* CURRENT CHORD - HOME ROW */}
-                        <div style="text-align: center; width: 100%;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 6rem;">
-                                <span style="color: var(--soloist-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; display: flex; gap: 10rem;">
-                                    <span>Chord Tones</span>
-                                    <span>Scale Tensions</span>
-                                </span>
-                                <div style="font-size: 2.2rem; font-weight: bold; color: var(--soloist-color); background: rgba(var(--soloist-color-rgb), 0.1); border: 2px solid var(--soloist-color); padding: 0.3rem 2rem; border-radius: 8px; min-width: 140px;">
-                                    {getChordName(currentChord)}
-                                </div>
-                            </div>
-                            {renderDeckRow(
-                                ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
-                                currentNotes,
-                                '--soloist-color',
-                            )}
-                        </div>
+                        {renderDeckRow(
+                            ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
+                            currentNotes,
+                            '--soloist-color',
+                            currentChord,
+                            false,
+                        )}
                     </div>
 
                     <div
