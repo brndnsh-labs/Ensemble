@@ -374,12 +374,15 @@ export function playDrumSound(name, time, velocity = 1.0) {
         // 1. Metallic Bank (Ring)
         const ratios = [2.0, 3.0, 4.16, 5.43, 6.79, 8.21];
         const baseFreq = 60 * rr();
-        const oscs = ratios.map((r) => {
+
+        // Optimization: Replace array.map with inline for loop
+        const oscs = new Array(ratios.length);
+        for (let i = 0; i < ratios.length; i++) {
             const o = playback.audio.createOscillator();
             o.type = 'square';
-            o.frequency.setValueAtTime(baseFreq * r, playTime);
-            return o;
-        });
+            o.frequency.setValueAtTime(baseFreq * ratios[i], playTime);
+            oscs[i] = o;
+        }
 
         // 2. The Wash
         const noise = playback.audio.createBufferSource();
