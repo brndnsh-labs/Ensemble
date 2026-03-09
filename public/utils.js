@@ -127,22 +127,22 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         return [];
     }
 
-    // [Root, 3rd, 5th, 7th, 9th,  2nd, 4th, 6th, Octave, 10th]
-    let intervals = [0, 4, 7, 11, 14, 2, 5, 9, 12, 16]; // Default to Major (M7, M9)
+    // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] scale degrees in semitones from root
+    let intervals = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16]; // Default to Major (Ionian)
 
     const quality = chordObj.quality || 'major';
 
     if (quality === 'minor' || quality === 'm9' || quality === 'm11' || quality === 'm13') {
-        intervals = [0, 3, 7, 10, 14, 2, 5, 8, 12, 15]; // Minor (m3, m7, M9) + (P2, P4, b6)
+        intervals = [0, 2, 3, 5, 7, 8, 10, 12, 14, 15]; // Minor (Aeolian)
     } else if (
         quality === 'diminished' ||
         quality === 'm7b5' ||
         quality === 'dim7' ||
         quality === 'half-diminished'
     ) {
-        intervals = [0, 3, 6, 10, 13, 1, 5, 8, 12, 15]; // Diminished (m3, d5, m7, m9) + (b2, P4, b6)
+        intervals = [0, 1, 3, 5, 6, 8, 10, 12, 13, 15]; // Diminished (Locrian)
     } else if (quality === 'augmented' || quality === 'aug' || quality === '+') {
-        intervals = [0, 4, 8, 10, 14, 2, 5, 9, 12, 16]; // Augmented (M3, A5, m7, M9) + (P2, P4, P6)
+        intervals = [0, 2, 4, 6, 8, 10, 11, 12, 14, 16]; // Augmented (Lydian Augmentedish)
     } else if (
         quality === '7' ||
         quality === '9' ||
@@ -150,7 +150,7 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         quality === '13' ||
         quality === 'dominant'
     ) {
-        intervals = [0, 4, 7, 10, 14, 2, 5, 9, 12, 16]; // Dominant (M3, P5, m7, M9) + (P2, P4, P6)
+        intervals = [0, 2, 4, 5, 7, 9, 10, 12, 14, 16]; // Dominant (Mixolydian)
     }
 
     // rootMidi from the engine is usually based around C4 = 60
