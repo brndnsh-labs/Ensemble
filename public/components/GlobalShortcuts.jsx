@@ -32,7 +32,7 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
-            // 'S': Toggle Soloist (Trading Fours)
+            // 'S': Open Soloist Performance Mode
             if (
                 e.key.toLowerCase() === 's' &&
                 !isTyping &&
@@ -41,8 +41,9 @@ export function GlobalShortcuts() {
                 !e.ctrlKey
             ) {
                 e.preventDefault();
-                import('../instrument-controller.js').then(({ togglePower }) => {
-                    togglePower('soloist');
+                import('../engine/engine.js').then(({ initAudio }) => {
+                    initAudio();
+                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
                 });
             }
 
