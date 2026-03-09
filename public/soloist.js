@@ -36,7 +36,7 @@ export function getSoloistNote(
 
     // --- Safety: Initialize phraseContext if missing (for tests/legacy) ---
     if (!soloist.phraseContext) {
-        soloist.phraseContext = {
+        soloist.phraseContext = /* @direct-mutation */ {
             role: 'call',
             skeleton: [],
             lastInterval: null,

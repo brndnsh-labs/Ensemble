@@ -91,7 +91,7 @@ function init() {
         );
 
         viz = new UnifiedVisualizer('unifiedVizContainer');
-        playback.viz = viz;
+        playback.viz = viz; // @direct-mutation
         viz.addTrack('bass', 'var(--success-color)');
         viz.addTrack('soloist', 'var(--soloist-color)');
         viz.addTrack('harmony', 'var(--harmony-color)');
@@ -115,10 +115,11 @@ function init() {
 
         analyzeFormUI();
 
+        subscribe((action, payload) => syncWorker(action, payload));
         syncWorker();
 
         // Signal to E2E tests that hydration and mounting are complete
-        document.documentElement.dataset.hydrated = "true";
+        document.documentElement.dataset.hydrated = 'true';
     } catch (e) {
         console.error('Error during init:', e);
     }
@@ -135,10 +136,10 @@ window.previewChord = (index) => {
         return;
     }
     const wasSustainActive = playback.sustainActive;
-    playback.sustainActive = false;
+    playback.sustainActive = false; // @direct-mutation
     const now = playback.audio.currentTime;
     chord.freqs.forEach((f) => playNote(f, now, 1.0, { vol: 0.15, instrument: 'Piano' }));
-    playback.sustainActive = wasSustainActive;
+    playback.sustainActive = wasSustainActive; // @direct-mutation
     const cards = document.querySelectorAll('.chord-card');
     if (cards[index]) {
         cards[index].classList.add('active');
