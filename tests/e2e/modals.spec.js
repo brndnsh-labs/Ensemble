@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Modals Responsiveness @ui', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('header h1', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
     });
 
     test('Settings Modal - Centering and Content', async ({ page }) => {

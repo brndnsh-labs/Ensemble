@@ -15,6 +15,15 @@ export default defineConfig({
     workers: process.env.CI ? 1 : undefined,
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
     reporter: process.env.CI ? [['github'], ['dot']] : [['list']],
+
+    /* Global threshold for visual regression testing */
+    expect: {
+        toHaveScreenshot: {
+            maxDiffPixelRatio: 0.02,
+            threshold: 0.2,
+        },
+    },
+
     /* Shared settings for all the projects below. See https://playwright.dev/docs/test-use */
     use: {
         /* Base URL to use in actions like `await page.goto('/')`. */
@@ -22,6 +31,17 @@ export default defineConfig({
 
         /* Collect trace when retrying a failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
+
+        /* Standardize rendering across different environments (CI vs local) */
+        launchOptions: {
+            args: [
+                '--font-render-hinting=none',
+                '--disable-font-subpixel-positioning',
+                '--disable-lcd-text',
+                '--disable-gpu',
+                '--use-gl=swiftshader',
+            ],
+        },
     },
 
     /* Configure projects for major browsers */

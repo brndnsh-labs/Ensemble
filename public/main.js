@@ -115,8 +115,10 @@ function init() {
 
         analyzeFormUI();
 
-        subscribe((action, payload) => syncWorker(action, payload));
         syncWorker();
+
+        // Signal to E2E tests that hydration and mounting are complete
+        document.documentElement.dataset.hydrated = "true";
     } catch (e) {
         console.error('Error during init:', e);
     }
