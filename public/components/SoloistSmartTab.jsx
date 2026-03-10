@@ -3,17 +3,15 @@ import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { ButtonGroup, SettingRow } from './UIControls.jsx';
+import { ButtonGroup } from './UIControls.jsx';
 
 export function SoloistSmartTab() {
-    const { phraseContext, lastRenderedFreq, tradeMode, isResting, isWaitingForEntry } =
-        useEnsembleState((s) => ({
-            phraseContext: s.soloist.phraseContext,
-            lastRenderedFreq: s.soloist.lastRenderedFreq,
-            tradeMode: s.soloist.tradeMode,
-            isResting: s.soloist.isResting,
-            isWaitingForEntry: s.soloist.isWaitingForEntry,
-        }));
+    const { phraseContext, tradeMode, isResting, isWaitingForEntry } = useEnsembleState((s) => ({
+        phraseContext: s.soloist.phraseContext,
+        tradeMode: s.soloist.tradeMode,
+        isResting: s.soloist.isResting,
+        isWaitingForEntry: s.soloist.isWaitingForEntry,
+    }));
 
     const updateTradeMode = (mode) => {
         dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
@@ -39,32 +37,20 @@ export function SoloistSmartTab() {
 
     return (
         <div class="smart-tab-layout">
-            <div class="smart-tab-header">
-                <label class="smart-tab-label">Soloist Intelligence</label>
-                <span class="text-mini-muted" style={{ color: statusColor, fontWeight: 'bold' }}>
-                    {statusText}
-                </span>
-            </div>
-
-            <div class="smart-tab-grid" style="margin-bottom: 1rem;">
-                <div class="form-control-compact">
-                    <label>Profile</label>
-                    <span class="text-capitalize">{phraseContext.profile || 'none'}</span>
-                </div>
-                <div class="form-control-compact">
-                    <label>Intensity</label>
-                    <span>{Math.round(phraseContext.intensity * 100)}%</span>
-                </div>
-                <div class="form-control-compact">
-                    <label>Device</label>
-                    <span class="text-capitalize">{phraseContext.device || 'none'}</span>
-                </div>
-            </div>
-
-            <SettingRow
-                label="Trading"
-                description="Auto-enable soloist during specific structural events."
+            <div
+                class="smart-status"
+                style="padding: 0.5rem; background: rgba(var(--soloist-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--soloist-color-rgb), 0.2); text-align: center; margin-bottom: 0.75rem;"
             >
+                <p style="font-size: 0.8rem; margin: 0;">
+                    ✨ <strong>Smart Phrasing</strong>:{' '}
+                    <span style={{ color: statusColor, fontWeight: 'bold' }}>{statusText}</span>
+                </p>
+            </div>
+
+            <div class="flex-between" style="padding: 0 0.25rem;">
+                <label class="smart-tab-label" style="margin: 0;">
+                    Trading
+                </label>
                 <ButtonGroup
                     value={tradeMode}
                     onChange={updateTradeMode}
@@ -74,7 +60,7 @@ export function SoloistSmartTab() {
                         { value: 'loops', label: 'Loops' },
                     ]}
                 />
-            </SettingRow>
+            </div>
         </div>
     );
 }
