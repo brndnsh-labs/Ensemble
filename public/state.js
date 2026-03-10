@@ -18,6 +18,18 @@ import { playback, playbackReducer, setPlaybackParam } from './state/playback.js
 import { setVizParam, vizReducer, vizState } from './state/visualizer.js';
 import { ACTIONS } from './types.js';
 
+// --- Global Export for E2E ---
+if (typeof window !== 'undefined') {
+    import('./chords.js').then(({ validateProgression }) => {
+        window.ensemble = {
+            dispatch,
+            getState,
+            ACTIONS,
+            validateProgression,
+        };
+    });
+}
+
 // Central State Map for Generic PARAM Updates
 const stateMap = {
     playback,

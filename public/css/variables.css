@@ -33,6 +33,9 @@
     --error-color: var(--red);
 
     /* RGB variants for transparency */
+    --yellow-rgb: 181, 137, 0;
+    --cyan-rgb: 42, 161, 152;
+    --magenta-rgb: 211, 54, 130;
     --chords-color-rgb: 38, 139, 210; /* blue */
     --bass-color-rgb: 133, 153, 0; /* green/success */
     --soloist-color-rgb: 211, 54, 130; /* magenta */

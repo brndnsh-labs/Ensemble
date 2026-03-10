@@ -10,7 +10,6 @@ import { midiToNote } from '../utils.js';
  */
 export function PerformanceCanvas({
     noteGroups,
-    isLatched,
     onNoteChange,
     bpm,
     currentNoteName,
@@ -41,10 +40,16 @@ export function PerformanceCanvas({
 
         // Harmonic Palette
         const PALETTE = {
-            safe: '#b58900', // Amber/Gold
-            tense: '#2aa198', // Cyan/Blue
-            chromatic: '#586e75', // Grey
-            bridge: '#d33682', // Magenta/Pink for common tones
+            safe: canvasStyle.getPropertyValue('--yellow').trim() || '#b58900',
+            tense: canvasStyle.getPropertyValue('--cyan').trim() || '#2aa198',
+            chromatic: canvasStyle.getPropertyValue('--base01').trim() || '#586e75',
+            bridge: canvasStyle.getPropertyValue('--magenta').trim() || '#d33682',
+        };
+
+        const COLOR_RGB_MAP = {
+            safe: canvasStyle.getPropertyValue('--yellow-rgb').trim() || '181, 137, 0',
+            tense: canvasStyle.getPropertyValue('--cyan-rgb').trim() || '42, 161, 152',
+            bridge: canvasStyle.getPropertyValue('--magenta-rgb').trim() || '211, 54, 130',
         };
 
         const laneWidth = width / 4;
@@ -89,10 +94,16 @@ export function PerformanceCanvas({
                 const degree = degrees[z];
 
                 // Determine Functional Color
-                let baseColor = isOuter ? PALETTE.safe : PALETTE.tense;
+                let type = isOuter ? 'safe' : 'tense';
                 if (bridgeMidis.has(midi)) {
-                    baseColor = PALETTE.bridge;
+                    type = 'bridge';
                 }
+                const baseColor = PALETTE[type];
+                const rgbColor = COLOR_RGB_MAP[type];
+
+                // Zone background tint
+                ctx.fillStyle = `rgba(${rgbColor}, 0.06)`;
+                ctx.fillRect(x + 2, y + 2, laneWidth - 4, zoneHeight - 4);
 
                 // Check Activity
                 let isActive = false;
@@ -299,11 +310,7 @@ export function PerformanceCanvas({
         });
 
         // Global kill if all touches released
-        if (
-            (!isLatched && e.type === 'touchend') ||
-            e.type === 'touchcancel' ||
-            e.type === 'touchmove'
-        ) {
+        if (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'touchmove') {
             if (nextPointers.size === 0 && activePointers.size > 0) {
                 killSoloistNote();
                 onNoteChange(null);

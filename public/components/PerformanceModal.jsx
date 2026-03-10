@@ -22,7 +22,7 @@ export function PerformanceModal() {
     const modalRef = useRef(null);
     const [currentNoteName, setCurrentNoteName] = useState('');
     const isMobile = useMobile();
-    const [isLatched, setIsLatched] = useState(false);
+    const [showLegend, setShowLegend] = useState(false);
 
     // Ensure routing is updated for performance mode and handle focus
     useLayoutEffect(() => {
@@ -134,6 +134,12 @@ export function PerformanceModal() {
     const currentNotes = useMemo(() => getChordMidiNotes(currentChord, 4), [currentChord]);
     const nextNotes = useMemo(() => getChordMidiNotes(nextChord, 4), [nextChord]);
 
+    const bridgePitchNames = useMemo(() => {
+        const currentNames = new Set(currentNotes.map((n) => midiToNote(n)?.name).filter(Boolean));
+        const nextNames = new Set(nextNotes.map((n) => midiToNote(n)?.name).filter(Boolean));
+        return new Set([...currentNames].filter((x) => nextNames.has(x)));
+    }, [currentNotes, nextNotes]);
+
     const currentNotesRef = useRef(currentNotes);
     const nextNotesRef = useRef(nextNotes);
 
@@ -145,6 +151,17 @@ export function PerformanceModal() {
     const heldKeysRef = useRef([]); // Stack of { key, midi }
     const [activeKeys, setActiveKeys] = useState(new Set()); // Keys that are held
     const [playingKey, setPlayingKey] = useState(null); // The one currently sounding
+
+    const activeNoteNames = useMemo(() => {
+        const names = new Set();
+        heldKeysRef.current.forEach((h) => {
+            const info = midiToNote(h.midi);
+            if (info) {
+                names.add(info.name);
+            }
+        });
+        return names;
+    }, [activeKeys]);
 
     // Unified trigger for both keyboard and pointer events
     const triggerNote = (midiNote, sourceKey, isLegato = false) => {
@@ -281,11 +298,23 @@ export function PerformanceModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: false });
     };
 
-    const renderKey = (label, midi, sourceKey, colorVar) => {
+    const renderKey = (label, midi, sourceKey, type, isNext = false) => {
         const isHeld = activeKeys.has(sourceKey);
         const isPlaying = playingKey === sourceKey;
         const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
         const noteLabel = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
+        const isSympathetic = noteInfo && activeNoteNames.has(noteInfo.name) && !isPlaying;
+
+        const COLOR_MAP = {
+            safe: { var: 'var(--yellow)', rgb: 'var(--yellow-rgb)', hex: '181, 137, 0' },
+            tense: { var: 'var(--cyan)', rgb: 'var(--cyan-rgb)', hex: '42, 161, 152' },
+            bridge: { var: 'var(--magenta)', rgb: 'var(--magenta-rgb)', hex: '211, 54, 130' },
+        };
+
+        const config = COLOR_MAP[type] || COLOR_MAP.safe;
+        const baseColor = config.var;
+        const rgbColor = config.rgb;
+        const shadowColor = `rgba(${config.hex}, 0.4)`;
 
         return (
             <button
@@ -315,22 +344,47 @@ export function PerformanceModal() {
                     }
                 }}
                 style={`
-                    width: 55px; height: 75px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+                    width: 55px; height: 75px; border-radius: 8px; 
                     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-                    font-weight: bold; cursor: pointer; transition: all 0.1s; font-size: 0.95rem;
+                    font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 0.95rem;
                     touch-action: none; -webkit-user-select: none; user-select: none;
-                    ${isPlaying ? `background: var(${colorVar}); color: #fff; transform: translateY(2px); box-shadow: none;` : isHeld ? 'background: rgba(255,255,255,0.2); color: #fff;' : 'background: rgba(255,255,255,0.05); color: #94a3b8; box-shadow: 0 3px 0 rgba(0,0,0,0.3);'}
+                    position: relative; overflow: hidden;
+                    ${
+                        isPlaying
+                            ? `background: ${baseColor}; color: #fff; transform: translateY(2px); box-shadow: 0 0 20px ${shadowColor}; border: 1px solid rgba(255,255,255,0.5);`
+                            : isHeld
+                              ? `background: rgba(${rgbColor}, 0.3); color: #fff; border: 1px solid ${baseColor};`
+                              : isSympathetic
+                                ? `background: rgba(${rgbColor}, 0.2); color: #fff; border: 2px dashed ${baseColor}; transform: scale(1.02);`
+                                : `background: rgba(${rgbColor}, ${isNext ? '0.05' : '0.12'}); color: ${isNext ? '#64748b' : '#94a3b8'}; border: 1px solid rgba(255,255,255,0.05); border-top: 3px solid ${baseColor}; box-shadow: 0 4px 6px rgba(0,0,0,0.3);`
+                    }
                 `}
+                onMouseEnter={(e) => {
+                    if (!isPlaying && !isHeld) {
+                        e.currentTarget.style.background = `rgba(${rgbColor}, 0.25)`;
+                        e.currentTarget.style.color = '#fff';
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!isPlaying && !isHeld && !isSympathetic) {
+                        e.currentTarget.style.background = `rgba(${rgbColor}, ${isNext ? '0.05' : '0.12'})`;
+                        e.currentTarget.style.color = isNext ? '#64748b' : '#94a3b8';
+                    }
+                }}
             >
-                <span style="font-size: 1.1rem;">{label}</span>
-                <span style="font-size: 0.65rem; opacity: 0.6;">{noteLabel}</span>
+                <span style="font-size: 1.1rem; margin-top: 4px;">{label}</span>
+                <span style={`font-size: 0.65rem; opacity: ${isNext ? '0.4' : '0.6'};`}>
+                    {noteLabel}
+                </span>
             </button>
         );
     };
 
-    const renderDeckRow = (keys, notes, colorVar, chordObj, isNext = false) => {
+    const renderDeckRow = (keys, notes, chordObj, isNext = false) => {
         const chordName = getChordName(chordObj);
-        const labelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'}; margin-bottom: 0.5rem;`;
+        const accentColor = isNext ? '#94a3b8' : 'var(--soloist-color)';
+        const safeLabelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--yellow)'}; margin-bottom: 0.5rem;`;
+        const tenseLabelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--cyan)'}; margin-bottom: 0.5rem;`;
 
         return (
             <div
@@ -340,24 +394,36 @@ export function PerformanceModal() {
                 {/* Header Row: Chord Name + Label indicators */}
                 <div style="display: flex; width: 100%; max-width: 650px; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
                     <div style="flex: 1; text-align: left; padding-left: 10px;">
-                        <div style={labelStyle}>Chord Tones</div>
+                        <div style={safeLabelStyle}>Chord Tones</div>
                     </div>
 
-                    <div style="text-align: center; margin-bottom: -0.5rem;">
+                    <div style="text-align: center; margin-bottom: -0.5rem; position: relative;">
                         <div
-                            style={`font-size: ${isNext ? '1.5rem' : '2.2rem'}; font-weight: bold; color: ${isNext ? '#cbd5e1' : 'var(--soloist-color)'}; background: ${isNext ? 'rgba(255,255,255,0.05)' : 'rgba(var(--soloist-color-rgb), 0.1)'}; border: ${isNext ? '1px dashed #475569' : '2px solid var(--soloist-color)'}; padding: 0.3rem 1.5rem; border-radius: 10px; min-width: 120px; box-shadow: ${isNext ? 'none' : '0 0 20px rgba(var(--soloist-color-rgb), 0.2)'};`}
+                            style={`
+                                font-size: ${isNext ? '1.2rem' : '1.5rem'}; font-weight: bold; 
+                                color: ${accentColor}; 
+                                background: rgba(15, 23, 42, 0.9); 
+                                border: 1.5px solid ${accentColor}; 
+                                padding: 0.4rem 2rem; border-radius: 20px; min-width: 140px;
+                                box-shadow: ${isNext ? 'none' : '0 0 15px rgba(var(--soloist-color-rgb), 0.2)'};
+                                backdrop-filter: blur(4px);
+                                display: flex; align-items: center; justify-content: center;
+                            `}
                         >
                             {chordName}
                         </div>
                         <div
-                            style={`font-size: 0.65rem; margin-top: 0.4rem; font-weight: bold; opacity: 0.5; color: ${isNext ? '#94a3b8' : 'var(--soloist-color)'};`}
+                            style={`
+                                font-size: 0.6rem; margin-top: 0.4rem; font-weight: 900; 
+                                letter-spacing: 0.2em; opacity: 0.5; color: ${accentColor};
+                            `}
                         >
                             {isNext ? 'UPCOMING' : 'CURRENT'}
                         </div>
                     </div>
 
                     <div style="flex: 1; text-align: right; padding-right: 10px;">
-                        <div style={labelStyle}>Scale Tensions</div>
+                        <div style={tenseLabelStyle}>Scale Tensions</div>
                     </div>
                 </div>
 
@@ -365,9 +431,13 @@ export function PerformanceModal() {
                 <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
                     {/* CHORD ZONE */}
                     <div style="display: flex; gap: 0.5rem;">
-                        {keys
-                            .slice(0, 5)
-                            .map((k, i) => renderKey(k, notes[i], k.toLowerCase(), colorVar))}
+                        {keys.slice(0, 5).map((k, i) => {
+                            const midi = notes[i];
+                            const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
+                            const type =
+                                noteInfo && bridgePitchNames.has(noteInfo.name) ? 'bridge' : 'safe';
+                            return renderKey(k, midi, k.toLowerCase(), type, isNext);
+                        })}
                     </div>
 
                     {/* DIVIDER */}
@@ -375,9 +445,15 @@ export function PerformanceModal() {
 
                     {/* TENSION ZONE */}
                     <div style="display: flex; gap: 0.5rem;">
-                        {keys
-                            .slice(5)
-                            .map((k, i) => renderKey(k, notes[i + 5], k.toLowerCase(), colorVar))}
+                        {keys.slice(5).map((k, i) => {
+                            const midi = notes[i + 5];
+                            const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
+                            const type =
+                                noteInfo && bridgePitchNames.has(noteInfo.name)
+                                    ? 'bridge'
+                                    : 'tense';
+                            return renderKey(k, midi, k.toLowerCase(), type, isNext);
+                        })}
                     </div>
                 </div>
             </div>
@@ -404,27 +480,87 @@ export function PerformanceModal() {
         return (
             <div style="display: flex; flex-direction: column; width: 100%; height: 100%; position: relative;">
                 {/* Floating Buttons */}
-                <div style="position: absolute; top: 1rem; left: 1rem; z-index: 20;">
+                <div style="position: absolute; top: 1rem; right: 1rem; z-index: 100; display: flex; gap: 0.75rem;">
                     <button
-                        style="width: 40px; height: 40px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(4px);"
+                        style="width: 40px; height: 40px; background: rgba(15, 23, 42, 0.8); border: 1.5px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; cursor: pointer; backdrop-filter: blur(4px);"
+                        onClick={() => setShowLegend(!showLegend)}
+                        aria-label="Toggle Legend"
+                    >
+                        ?
+                    </button>
+                    <button
+                        style="width: 40px; height: 40px; background: rgba(15, 23, 42, 0.8); border: 1.5px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(4px);"
                         onClick={close}
                         aria-label="Close"
                     >
                         ✖
                     </button>
                 </div>
-                <div style="position: absolute; bottom: 1rem; right: 1rem; z-index: 20;">
-                    <button
-                        style={`background: ${isLatched ? 'var(--soloist-color)' : 'rgba(255,255,255,0.1)'}; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;`}
-                        onClick={() => setIsLatched(!isLatched)}
+
+                {showLegend && (
+                    <div
+                        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); z-index: 150; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; color: #fff; text-align: center;"
+                        onClick={() => setShowLegend(false)}
                     >
-                        {isLatched ? 'LATCH ON' : 'LATCH OFF'}
-                    </button>
-                </div>
+                        <h3 style="margin-bottom: 2rem; color: var(--soloist-color); font-size: 1.5rem;">
+                            How to Play
+                        </h3>
+
+                        <div style="display: flex; flex-direction: column; gap: 1.5rem; align-items: flex-start; width: 100%; max-width: 300px;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--yellow);" />
+                                <div style="text-align: left;">
+                                    <div style="font-weight: bold; color: var(--yellow);">
+                                        Safe Arpeggios
+                                    </div>
+                                    <div style="font-size: 0.85rem; opacity: 0.7;">
+                                        Stable chord tones
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--cyan);" />
+                                <div style="text-align: left;">
+                                    <div style="font-weight: bold; color: var(--cyan);">
+                                        Color Extensions
+                                    </div>
+                                    <div style="font-size: 0.85rem; opacity: 0.7;">
+                                        Flavorful scale tensions
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--magenta);" />
+                                <div style="text-align: left;">
+                                    <div style="font-weight: bold; color: var(--magenta);">
+                                        Bridge Tones
+                                    </div>
+                                    <div style="font-size: 0.85rem; opacity: 0.7;">
+                                        Common to both chords
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 1rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); width: 100%;">
+                                <div style="font-size: 0.9rem; font-style: italic; opacity: 0.8; line-height: 1.4;">
+                                    Dashed border = Same note in other octaves
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            style="margin-top: 3rem; padding: 1rem 3rem; border-radius: 12px; background: var(--soloist-color); border: none; color: #fff; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(var(--soloist-color-rgb), 0.3);"
+                            onClick={() => setShowLegend(false)}
+                        >
+                            Got it
+                        </button>
+                    </div>
+                )}
 
                 <PerformanceCanvas
                     noteGroups={noteGroups}
-                    isLatched={isLatched}
                     onNoteChange={handleNoteChange}
                     bpm={bpm}
                     currentNoteName={currentNoteName}
@@ -456,7 +592,6 @@ export function PerformanceModal() {
                 {renderDeckRow(
                     ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
                     nextNotes,
-                    '--text-secondary',
                     nextChord,
                     true,
                 )}
@@ -465,7 +600,6 @@ export function PerformanceModal() {
                 {renderDeckRow(
                     ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
                     currentNotes,
-                    '--soloist-color',
                     currentChord,
                     false,
                 )}
@@ -473,12 +607,27 @@ export function PerformanceModal() {
 
             <div
                 class="keyboard-instructions"
-                style="text-align: center; color: #475569; font-size: 0.8rem;"
+                style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 2rem; background: rgba(15, 23, 42, 0.4); padding: 1rem 2rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);"
             >
-                <p>
-                    Left Side = <strong>Safe Arpeggios</strong> | Right Side ={' '}
-                    <strong>Color Extensions</strong>
-                </p>
+                <div style="display: flex; gap: 2rem; justify-content: center; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--yellow);" />
+                        <span style="color: #cbd5e1;">Safe Arpeggios</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--cyan);" />
+                        <span style="color: #cbd5e1;">Color Extensions</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--magenta); opacity: 0.8;" />
+                        <span style="color: #cbd5e1;">Bridge Tones</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: 1rem; padding-left: 1rem; border-left: 1px solid rgba(255,255,255,0.1);">
+                        <span style="opacity: 0.6; font-style: italic;">
+                            Dashed border = Same note in other octaves
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
     );
