@@ -1,14 +1,27 @@
 import { Fragment, h } from 'preact';
+import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
-import { AnalyzerModal } from './AnalyzerModal.jsx';
-import { EditorModal } from './EditorModal.jsx';
-import { ExportModal } from './ExportModal.jsx';
-import { GenerateSongModal } from './GenerateSongModal.jsx';
-import { PerformanceModal } from './PerformanceModal.jsx';
-import { Settings } from './Settings.jsx';
-import { TemplatesModal } from './TemplatesModal.jsx';
+const AnalyzerModal = lazy(() =>
+    import('./AnalyzerModal.jsx').then((m) => ({ default: m.AnalyzerModal })),
+);
+const EditorModal = lazy(() =>
+    import('./EditorModal.jsx').then((m) => ({ default: m.EditorModal })),
+);
+const ExportModal = lazy(() =>
+    import('./ExportModal.jsx').then((m) => ({ default: m.ExportModal })),
+);
+const GenerateSongModal = lazy(() =>
+    import('./GenerateSongModal.jsx').then((m) => ({ default: m.GenerateSongModal })),
+);
+const PerformanceModal = lazy(() =>
+    import('./PerformanceModal.jsx').then((m) => ({ default: m.PerformanceModal })),
+);
+const Settings = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.Settings })));
+const TemplatesModal = lazy(() =>
+    import('./TemplatesModal.jsx').then((m) => ({ default: m.TemplatesModal })),
+);
 
 /**
  * AnimatedModalWrapper handles the entrance and exit lifecycle for modals.
@@ -41,7 +54,9 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
 
     return (
         <div class={isClosing ? 'closing' : ''}>
-            <Component />
+            <Suspense fallback={null}>
+                <Component />
+            </Suspense>
         </div>
     );
 }
