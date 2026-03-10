@@ -128,7 +128,7 @@ export function ExportModal() {
                     <div class="settings-section">
                         <h3>File Info</h3>
                         <div class="setting-item">
-                            <label class="setting-label">
+                            <label htmlFor="exportFilenameInput" class="setting-label">
                                 <span>Filename</span>
                             </label>
                             <input
@@ -146,23 +146,38 @@ export function ExportModal() {
                     <div class="settings-section">
                         <h3>Tracks to Include</h3>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportChordsCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input type="checkbox" id="exportChordsCheck" checked />
                                 Chords
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportBassCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input type="checkbox" id="exportBassCheck" checked />
                                 Bass
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportSoloistCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input type="checkbox" id="exportSoloistCheck" checked />
                                 Soloist
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportHarmoniesCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input type="checkbox" id="exportHarmoniesCheck" checked />
                                 Harmonies
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportDrumsCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input type="checkbox" id="exportDrumsCheck" checked />
                                 Drums
                             </label>
@@ -172,8 +187,12 @@ export function ExportModal() {
                     <div class="settings-section" style="border-bottom: none;">
                         <h3>Duration</h3>
                         <div style="display: flex; flex-direction: column; gap: 1rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportModeOnce"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
+                                    id="exportModeOnce"
                                     type="radio"
                                     name="exportMode"
                                     value="once"
@@ -182,8 +201,12 @@ export function ExportModal() {
                                 />
                                 <span>Cycle Through Once</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="exportModeTime"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
+                                    id="exportModeTime"
                                     type="radio"
                                     name="exportMode"
                                     value="time"

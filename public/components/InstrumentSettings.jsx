@@ -74,7 +74,10 @@ export function InstrumentSettings({ module }) {
 
                 {module === 'chords' && (
                     <div style="margin-bottom: 1rem;">
-                        <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                        <label
+                            htmlFor="densitySelect"
+                            style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                        >
                             Density
                         </label>
                         <select
@@ -95,7 +98,10 @@ export function InstrumentSettings({ module }) {
 
                 {module === 'harmony' && (
                     <div style="margin-bottom: 1rem;">
-                        <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                        <label
+                            htmlFor="harmonyComplexity"
+                            style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                        >
                             <span>Complexity</span>
                             <span
                                 id="harmonyComplexityValue"
@@ -129,7 +135,10 @@ export function InstrumentSettings({ module }) {
                 {module === 'soloist' && (
                     <Fragment>
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                            <label
+                                htmlFor="soloistComplexity"
+                                style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                            >
                                 <span>Complexity</span>
                                 <span
                                     id="soloistComplexityValue"
@@ -160,7 +169,10 @@ export function InstrumentSettings({ module }) {
                         </div>
 
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                            <label
+                                htmlFor="soloistPresetSelect"
+                                style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                            >
                                 Lead Sound
                             </label>
                             <select
@@ -180,7 +192,10 @@ export function InstrumentSettings({ module }) {
                             </select>
                         </div>
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                            <label
+                                htmlFor="soloistModeSelect"
+                                style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                            >
                                 Phrasing Mode
                             </label>
                             <select
@@ -209,7 +224,10 @@ export function InstrumentSettings({ module }) {
                     Mixer
                 </h4>
                 <div style="margin-bottom: 1rem;">
-                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                    <label
+                        htmlFor={`${moduleName}Volume`}
+                        style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                    >
                         <span>Volume</span>
                         <span style="color: var(--accent-color); font-weight: bold;">
                             {Math.round(state.volume * 100)}%
@@ -229,7 +247,10 @@ export function InstrumentSettings({ module }) {
                     />
                 </div>
                 <div>
-                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;">
+                    <label
+                        htmlFor={`${moduleName}Reverb`}
+                        style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
+                    >
                         <span>Reverb</span>
                         <span style="color: var(--accent-color); font-weight: bold;">
                             {Math.round(state.reverb * 100)}%
@@ -263,6 +284,7 @@ function GrooveControls({ state }) {
         <div>
             <div style="margin-bottom: 1rem;">
                 <label
+                    htmlFor="swingSlider"
                     class="control-label"
                     style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
                 >
@@ -302,6 +324,7 @@ function GrooveControls({ state }) {
             </div>
             <div style="margin-bottom: 1rem;">
                 <label
+                    htmlFor="humanizeSlider"
                     class="control-label"
                     style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
                 >
@@ -326,7 +349,10 @@ function GrooveControls({ state }) {
                 />
             </div>
             <div style="margin-bottom: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <label style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                <label
+                    htmlFor="larsModeCheck"
+                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8; cursor: pointer;"
+                >
                     <span>Lars Mode</span>
                     <input
                         id="larsModeCheck"
@@ -345,7 +371,10 @@ function GrooveControls({ state }) {
                         pointerEvents: state.larsMode ? 'auto' : 'none',
                     }}
                 >
-                    <label style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;">
+                    <label
+                        htmlFor="larsIntensitySlider"
+                        style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;"
+                    >
                         <span>Lars Intensity</span>
                         <span
                             id="larsIntensityValue"

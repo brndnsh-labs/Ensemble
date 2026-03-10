@@ -37,6 +37,7 @@ export function EditorModal() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImportMode, setIsImportMode] = useState(false);
     const [tabText, setTabText] = useState('');
+    const [showConfirmClear, setShowConfirmClear] = useState(false);
 
     const handleImportTab = () => {
         setIsMenuOpen(false);
@@ -192,6 +193,11 @@ export function EditorModal() {
     };
 
     const handleClear = () => {
+        setShowConfirmClear(true);
+    };
+
+    const confirmClear = () => {
+        setShowConfirmClear(false);
         setIsMenuOpen(false);
         pushHistory();
         arranger.sections = [{ id: generateId(), label: 'Intro', value: '' }];
@@ -382,14 +388,36 @@ Em  C  G  D"
                             >
                                 🎲 <span>Randomize</span>
                             </button>
-                            <button
-                                id="clearProgBtn"
-                                title="Clear Progression"
-                                aria-label="Clear All (Progression)"
-                                onClick={handleClear}
-                            >
-                                🗑️ <span>Clear All</span>
-                            </button>
+                            {showConfirmClear ? (
+                                <div style="padding: 0.5rem; background: rgba(255, 0, 0, 0.1); border-radius: 4px; margin: 0 0.5rem;">
+                                    <div style="font-size: 0.8rem; color: var(--text-color); margin-bottom: 0.5rem; text-align: center;">
+                                        Clear entire progression?
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <button
+                                            style="flex: 1; padding: 0.3rem; font-size: 0.8rem; background: var(--red); color: white; border: none; border-radius: 4px; cursor: pointer;"
+                                            onClick={confirmClear}
+                                        >
+                                            Yes
+                                        </button>
+                                        <button
+                                            style="flex: 1; padding: 0.3rem; font-size: 0.8rem; background: transparent; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;"
+                                            onClick={() => setShowConfirmClear(false)}
+                                        >
+                                            No
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    id="clearProgBtn"
+                                    title="Clear Progression"
+                                    aria-label="Clear All (Progression)"
+                                    onClick={handleClear}
+                                >
+                                    🗑️ <span>Clear All</span>
+                                </button>
+                            )}
 
                             <div class="menu-divider" />
                             <div class="menu-section-header">Melody & Intelligence</div>
