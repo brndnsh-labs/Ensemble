@@ -6,10 +6,23 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols, getChordMidiNotes, midiToNote } from '../utils.js';
+import { PerformanceCanvas } from './PerformanceCanvas.jsx';
+
+function useMobile() {
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 900);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    return isMobile;
+}
 
 export function PerformanceModal() {
     const modalRef = useRef(null);
     const [currentNoteName, setCurrentNoteName] = useState('');
+    const isMobile = useMobile();
+    const [isLatched, setIsLatched] = useState(false);
 
     // Ensure routing is updated for performance mode and handle focus
     useLayoutEffect(() => {
@@ -55,13 +68,14 @@ export function PerformanceModal() {
         };
     }, []);
 
-    const { step, stepMap, key, isMinor, totalSteps, notation } = useEnsembleState((s) => ({
+    const { step, stepMap, key, isMinor, totalSteps, notation, bpm } = useEnsembleState((s) => ({
         step: s.playback.step,
         stepMap: s.arranger.stepMap,
         key: s.arranger.key,
         isMinor: s.arranger.isMinor,
         totalSteps: s.arranger.totalSteps,
         notation: s.arranger.notation || 'roman',
+        bpm: s.playback.bpm,
     }));
 
     // Find current and next chords by finding the current step range in stepMap
@@ -370,6 +384,105 @@ export function PerformanceModal() {
         );
     };
 
+    const handleNoteChange = (midi) => {
+        if (!midi) {
+            setCurrentNoteName('');
+            return;
+        }
+        const noteInfo = midiToNote(midi);
+        setCurrentNoteName(`${noteInfo.name}${noteInfo.octave}`);
+    };
+
+    const renderMobileLayout = () => {
+        const noteGroups = [
+            currentNotes.slice(0, 5), // Lane 0: Left Edge (Safe)
+            currentNotes.slice(5, 10), // Lane 1: Left Mid (Color)
+            nextNotes.slice(5, 10), // Lane 2: Right Mid (Color)
+            nextNotes.slice(0, 5), // Lane 3: Right Edge (Safe)
+        ];
+
+        return (
+            <div style="display: flex; flex-direction: column; width: 100%; height: 100%; position: relative;">
+                {/* Floating Buttons */}
+                <div style="position: absolute; bottom: 1rem; left: 1rem; z-index: 20;">
+                    <button
+                        style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;"
+                        onClick={close}
+                    >
+                        QUIT
+                    </button>
+                </div>
+
+                <div style="position: absolute; bottom: 1rem; right: 1rem; z-index: 20;">
+                    <button
+                        style={`background: ${isLatched ? 'var(--soloist-color)' : 'rgba(255,255,255,0.1)'}; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;`}
+                        onClick={() => setIsLatched(!isLatched)}
+                    >
+                        {isLatched ? 'LATCH ON' : 'LATCH OFF'}
+                    </button>
+                </div>
+
+                <PerformanceCanvas
+                    noteGroups={noteGroups}
+                    isLatched={isLatched}
+                    onNoteChange={handleNoteChange}
+                    bpm={bpm}
+                    currentNoteName={currentNoteName}
+                    currentChordName={getChordName(currentChord)}
+                    nextChordName={getChordName(nextChord)}
+                />
+            </div>
+        );
+    };
+
+    const renderDesktopLayout = () => (
+        <div
+            class="modal-content"
+            style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;"
+        >
+            <div style="height: 4rem; display: flex; align-items: center; justify-content: center;">
+                {currentNoteName && (
+                    <div style="font-size: 4rem; font-weight: 900; color: var(--soloist-color); text-shadow: 0 0 20px rgba(var(--soloist-color-rgb), 0.5); font-family: monospace;">
+                        {currentNoteName}
+                    </div>
+                )}
+            </div>
+
+            <div
+                class="keyboard-layout"
+                style="display: flex; flex-direction: column; gap: 4rem; width: 100%; align-items: center;"
+            >
+                {/* UPCOMING CHORD - TOP ROW */}
+                {renderDeckRow(
+                    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+                    nextNotes,
+                    '--text-secondary',
+                    nextChord,
+                    true,
+                )}
+
+                {/* CURRENT CHORD - HOME ROW */}
+                {renderDeckRow(
+                    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
+                    currentNotes,
+                    '--soloist-color',
+                    currentChord,
+                    false,
+                )}
+            </div>
+
+            <div
+                class="keyboard-instructions"
+                style="text-align: center; color: #475569; font-size: 0.8rem;"
+            >
+                <p>
+                    Left Side = <strong>Safe Arpeggios</strong> | Right Side ={' '}
+                    <strong>Color Extensions</strong>
+                </p>
+            </div>
+        </div>
+    );
+
     return (
         <div
             ref={modalRef}
@@ -401,60 +514,22 @@ export function PerformanceModal() {
                 onClick={(e) => {
                     e.stopPropagation();
                 }}
-                style="max-width: 1200px; height: 85vh; max-height: 750px;"
+                style={
+                    isMobile
+                        ? 'width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius: 0; border: none; padding: 0;'
+                        : 'max-width: 1200px; height: 85vh; max-height: 750px;'
+                }
             >
-                <div class="modal-header">
-                    <h2>Soloist Performance Mode</h2>
-                    <button class="icon-btn close-btn" onClick={close} aria-label="Close">
-                        ✖
-                    </button>
-                </div>
-
-                <div
-                    class="modal-content"
-                    style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;"
-                >
-                    <div style="height: 4rem; display: flex; align-items: center; justify-content: center;">
-                        {currentNoteName && (
-                            <div style="font-size: 4rem; font-weight: 900; color: var(--soloist-color); text-shadow: 0 0 20px rgba(var(--soloist-color-rgb), 0.5); font-family: monospace;">
-                                {currentNoteName}
-                            </div>
-                        )}
+                {!isMobile && (
+                    <div class="modal-header">
+                        <h2>Soloist Performance Mode</h2>
+                        <button class="icon-btn close-btn" onClick={close} aria-label="Close">
+                            ✖
+                        </button>
                     </div>
+                )}
 
-                    <div
-                        class="keyboard-layout"
-                        style="display: flex; flex-direction: column; gap: 4rem; width: 100%; align-items: center;"
-                    >
-                        {/* UPCOMING CHORD - TOP ROW */}
-                        {renderDeckRow(
-                            ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-                            nextNotes,
-                            '--text-secondary',
-                            nextChord,
-                            true,
-                        )}
-
-                        {/* CURRENT CHORD - HOME ROW */}
-                        {renderDeckRow(
-                            ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'],
-                            currentNotes,
-                            '--soloist-color',
-                            currentChord,
-                            false,
-                        )}
-                    </div>
-
-                    <div
-                        class="keyboard-instructions"
-                        style="text-align: center; color: #475569; font-size: 0.8rem;"
-                    >
-                        <p>
-                            Left Side = <strong>Safe Arpeggios</strong> | Right Side ={' '}
-                            <strong>Color Extensions</strong>
-                        </p>
-                    </div>
-                </div>
+                {isMobile ? renderMobileLayout() : renderDesktopLayout()}
             </div>
         </div>
     );
