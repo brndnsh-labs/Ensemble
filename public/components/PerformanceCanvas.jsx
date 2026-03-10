@@ -105,32 +105,51 @@ export function PerformanceCanvas({
                 const isSympathetic = !isActive && activeNames.has(noteName);
 
                 if (isActive) {
-                    const grad = ctx.createLinearGradient(x, y, x + laneWidth, y);
-                    grad.addColorStop(0, 'rgba(255,255,255,0)');
-                    grad.addColorStop(0.5, baseColor);
-                    grad.addColorStop(1, 'rgba(255,255,255,0)');
-                    ctx.fillStyle = grad;
-                    ctx.globalAlpha = 0.6;
+                    const centerX = x + laneWidth / 2;
+                    const centerY = y + zoneHeight / 2;
 
-                    // Rounded Highlight
+                    // Organic Radial Glow
+                    const glow = ctx.createRadialGradient(
+                        centerX,
+                        centerY,
+                        0,
+                        centerX,
+                        centerY,
+                        laneWidth * 0.8,
+                    );
+                    glow.addColorStop(0, baseColor);
+                    glow.addColorStop(1, 'rgba(255,255,255,0)');
+
+                    ctx.fillStyle = glow;
+                    ctx.globalAlpha = 0.7;
+
+                    // Rounded "Pill" Shape with more padding to prevent 'cut off' look
+                    const paddingH = laneWidth * 0.15;
+                    const paddingV = zoneHeight * 0.15;
                     ctx.beginPath();
-                    ctx.roundRect(x + 4, y + 4, laneWidth - 8, zoneHeight - 8, 12);
+                    ctx.roundRect(
+                        x + paddingH,
+                        y + paddingV,
+                        laneWidth - paddingH * 2,
+                        zoneHeight - paddingV * 2,
+                        20,
+                    );
                     ctx.fill();
 
-                    ctx.strokeStyle = '#fff';
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+                    ctx.lineWidth = 1.5;
                     ctx.stroke();
                     ctx.globalAlpha = 1.0;
 
-                    ctx.shadowBlur = 25;
+                    ctx.shadowBlur = 30;
                     ctx.shadowColor = baseColor;
                     ctx.fillStyle = '#fff';
                     ctx.font = 'bold 24px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText(noteFullName, x + laneWidth / 2, y + zoneHeight / 2 + 8);
+                    ctx.fillText(noteFullName, centerX, centerY + 8);
 
                     ctx.font = 'bold 10px sans-serif';
-                    ctx.fillText(degree, x + laneWidth / 2, y + zoneHeight / 2 - 18);
+                    ctx.fillText(degree, centerX, centerY - 18);
                     ctx.shadowBlur = 0;
                 } else if (isSympathetic) {
                     // Note Sympathy Highlight (Rounded & Dashed)
