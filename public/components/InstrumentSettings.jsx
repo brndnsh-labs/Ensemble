@@ -7,6 +7,7 @@ const { playback } = getState();
 
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
+import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 export function InstrumentSettings({ module }) {
     const state = useEnsembleState((s) => {
@@ -63,213 +64,155 @@ export function InstrumentSettings({ module }) {
     return (
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
             {/* Left Column: Instrument Specifics */}
-            <div>
-                <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: var(--accent-color);">
-                    {module === 'groove'
+            <SettingGroup
+                title={
+                    module === 'groove'
                         ? 'Feel & Actions'
                         : module === 'chords' || module === 'harmony'
                           ? 'Voicing'
-                          : 'Instrument'}
-                </h4>
-
+                          : 'Instrument'
+                }
+            >
                 {module === 'chords' && (
-                    <div style="margin-bottom: 1rem;">
-                        <label
-                            htmlFor="densitySelect"
-                            style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                        >
-                            Density
-                        </label>
-                        <select
+                    <SettingRow label="Density" id="densitySelect">
+                        <Select
                             id="densitySelect"
                             value={state.density || 'standard'}
-                            onChange={(e) => {
-                                dispatch(ACTIONS.SET_CHORD_DENSITY, e.target.value);
+                            onChange={(val) => {
+                                dispatch(ACTIONS.SET_CHORD_DENSITY, val);
                                 saveCurrentState();
                             }}
-                            aria-label="Voicing Density"
-                        >
-                            <option value="thin">Thin (3 notes)</option>
-                            <option value="standard">Standard (4 notes)</option>
-                            <option value="rich">Rich (5+ notes)</option>
-                        </select>
-                    </div>
+                            options={[
+                                { value: 'thin', label: 'Thin (3 notes)' },
+                                { value: 'standard', label: 'Standard (4 notes)' },
+                                { value: 'rich', label: 'Rich (5+ notes)' },
+                            ]}
+                        />
+                    </SettingRow>
                 )}
 
                 {module === 'harmony' && (
-                    <div style="margin-bottom: 1rem;">
-                        <label
-                            htmlFor="harmonyComplexity"
-                            style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                        >
-                            <span>Complexity</span>
-                            <span
-                                id="harmonyComplexityValue"
-                                style="color: var(--accent-color); font-weight: bold;"
-                            >
-                                {Math.round((state.complexity || 0.5) * 100)}%
-                            </span>
-                        </label>
-                        <input
+                    <SettingRow
+                        label="Complexity"
+                        id="harmonyComplexity"
+                        valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                    >
+                        <Slider
                             id="harmonyComplexity"
-                            type="range"
                             min="0"
                             max="1"
                             step="0.05"
                             value={state.complexity || 0.5}
-                            onInput={(e) => {
-                                const val = parseFloat(e.target.value);
+                            onInput={(val) => {
                                 dispatch(ACTIONS.SET_PARAM, {
                                     module: 'harmony',
                                     param: 'complexity',
-                                    value: val,
+                                    value: parseFloat(val),
                                 });
                                 saveCurrentState();
                             }}
-                            aria-label="Harmony Complexity"
-                            aria-valuetext={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                            ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
                         />
-                    </div>
+                    </SettingRow>
                 )}
 
                 {module === 'soloist' && (
                     <Fragment>
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                htmlFor="soloistComplexity"
-                                style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                            >
-                                <span>Complexity</span>
-                                <span
-                                    id="soloistComplexityValue"
-                                    style="color: var(--accent-color); font-weight: bold;"
-                                >
-                                    {Math.round((state.complexity || 0.5) * 100)}%
-                                </span>
-                            </label>
-                            <input
+                        <SettingRow
+                            label="Complexity"
+                            id="soloistComplexity"
+                            valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                        >
+                            <Slider
                                 id="soloistComplexity"
-                                type="range"
                                 min="0"
                                 max="1"
                                 step="0.05"
                                 value={state.complexity !== undefined ? state.complexity : 0.5}
-                                onInput={(e) => {
-                                    const val = parseFloat(e.target.value);
+                                onInput={(val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'soloist',
                                         param: 'complexity',
-                                        value: val,
+                                        value: parseFloat(val),
                                     });
                                     saveCurrentState();
                                 }}
-                                aria-label="Soloist Complexity"
-                                aria-valuetext={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                                ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
                             />
-                        </div>
+                        </SettingRow>
 
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                htmlFor="soloistPresetSelect"
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                            >
-                                Lead Sound
-                            </label>
-                            <select
+                        <SettingRow label="Lead Sound" id="soloistPresetSelect">
+                            <Select
                                 id="soloistPresetSelect"
                                 value={state.preset || 'classic'}
-                                onChange={(e) => {
-                                    dispatch(ACTIONS.SET_SOLOIST_PRESET, e.target.value);
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
                                     saveCurrentState();
                                 }}
-                                aria-label="Lead Sound Preset"
-                            >
-                                <option value="classic">Classic Sawtooth</option>
-                                <option value="neo">Neo-Juno</option>
-                                <option value="vowel">Vowel Lead</option>
-                                <option value="trumpet">Trumpet</option>
-                                <option value="saxophone">Saxophone</option>
-                            </select>
-                        </div>
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                htmlFor="soloistModeSelect"
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                            >
-                                Phrasing Mode
-                            </label>
-                            <select
+                                options={[
+                                    { value: 'classic', label: 'Classic Sawtooth' },
+                                    { value: 'neo', label: 'Neo-Juno' },
+                                    { value: 'vowel', label: 'Vowel Lead' },
+                                    { value: 'trumpet', label: 'Trumpet' },
+                                    { value: 'saxophone', label: 'Saxophone' },
+                                ]}
+                            />
+                        </SettingRow>
+
+                        <SettingRow label="Phrasing Mode" id="soloistModeSelect">
+                            <Select
                                 id="soloistModeSelect"
                                 value={state.mode || 'monophonic'}
-                                onChange={(e) => {
-                                    dispatch(ACTIONS.SET_SOLOIST_MODE, e.target.value);
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_SOLOIST_MODE, val);
                                     saveCurrentState();
                                 }}
-                                aria-label="Soloist Phrasing Mode"
-                            >
-                                <option value="monophonic">Monophonic</option>
-                                <option value="guitar">Guitar</option>
-                                <option value="piano">Piano</option>
-                            </select>
-                        </div>
+                                options={[
+                                    { value: 'monophonic', label: 'Monophonic' },
+                                    { value: 'guitar', label: 'Guitar' },
+                                    { value: 'piano', label: 'Piano' },
+                                ]}
+                            />
+                        </SettingRow>
                     </Fragment>
                 )}
 
                 {module === 'groove' && <GrooveControls state={state} />}
-            </div>
+            </SettingGroup>
 
             {/* Right Column: Mixer */}
-            <div>
-                <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: var(--accent-color);">
-                    Mixer
-                </h4>
-                <div style="margin-bottom: 1rem;">
-                    <label
-                        htmlFor={`${moduleName}Volume`}
-                        style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                    >
-                        <span>Volume</span>
-                        <span style="color: var(--accent-color); font-weight: bold;">
-                            {Math.round(state.volume * 100)}%
-                        </span>
-                    </label>
-                    <input
+            <SettingGroup title="Mixer">
+                <SettingRow
+                    label="Volume"
+                    id={`${moduleName}Volume`}
+                    valueDisplay={`${Math.round(state.volume * 100)}%`}
+                >
+                    <Slider
                         id={`${moduleName}Volume`}
-                        type="range"
                         min="0"
                         max="1"
                         step="0.05"
                         value={state.volume}
-                        onInput={(e) => updateAudio('volume', e.target.value)}
-                        aria-label={`${module} Volume`}
-                        aria-valuetext={`${Math.round(state.volume * 100)}%`}
-                        style="width: 100%;"
+                        onInput={(val) => updateAudio('volume', val)}
+                        ariaValueText={`${Math.round(state.volume * 100)}%`}
                     />
-                </div>
-                <div>
-                    <label
-                        htmlFor={`${moduleName}Reverb`}
-                        style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                    >
-                        <span>Reverb</span>
-                        <span style="color: var(--accent-color); font-weight: bold;">
-                            {Math.round(state.reverb * 100)}%
-                        </span>
-                    </label>
-                    <input
+                </SettingRow>
+                <SettingRow
+                    label="Reverb"
+                    id={`${moduleName}Reverb`}
+                    valueDisplay={`${Math.round(state.reverb * 100)}%`}
+                >
+                    <Slider
                         id={`${moduleName}Reverb`}
-                        type="range"
                         min="0"
                         max="1"
                         step="0.05"
                         value={state.reverb}
-                        onInput={(e) => updateAudio('reverb', e.target.value)}
-                        aria-label={`${module} Reverb`}
-                        aria-valuetext={`${Math.round(state.reverb * 100)}%`}
-                        style="width: 100%;"
+                        onInput={(val) => updateAudio('reverb', val)}
+                        ariaValueText={`${Math.round(state.reverb * 100)}%`}
                     />
-                </div>
-            </div>
+                </SettingRow>
+            </SettingGroup>
         </div>
     );
 }
@@ -281,125 +224,87 @@ function GrooveControls({ state }) {
     }));
 
     return (
-        <div>
-            <div style="margin-bottom: 1rem;">
-                <label
-                    htmlFor="swingSlider"
-                    class="control-label"
-                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                >
-                    <span>Swing</span>
-                    <span style="color: var(--accent-color); font-weight: bold;">
-                        {swing || 0}%
-                    </span>
-                </label>
+        <Fragment>
+            <SettingRow label="Swing" id="swingSlider" valueDisplay={`${swing || 0}%`}>
                 <div style="display: flex; gap: 0.4rem; align-items: center;">
-                    <input
+                    <Slider
                         id="swingSlider"
-                        type="range"
                         min="0"
                         max="100"
                         value={swing || 0}
-                        onInput={(e) => {
-                            dispatch(ACTIONS.SET_SWING, parseInt(e.target.value, 10));
+                        onInput={(val) => {
+                            dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
                             saveCurrentState();
                         }}
-                        style="flex-grow: 1; height: 4px;"
-                        aria-label="Swing Amount"
-                        aria-valuetext={`${swing || 0}%`}
+                        ariaValueText={`${swing || 0}%`}
                     />
-                    <select
+                    <Select
                         id="swingBaseSelect"
                         value={swingSub || '8th'}
-                        onChange={(e) => {
-                            dispatch(ACTIONS.SET_SWING_SUB, e.target.value);
+                        onChange={(val) => {
+                            dispatch(ACTIONS.SET_SWING_SUB, val);
                             saveCurrentState();
                         }}
-                        aria-label="Swing Base Note"
-                    >
-                        <option value="16th">1/16</option>
-                        <option value="8th">1/8</option>
-                    </select>
+                        options={[
+                            { value: '16th', label: '1/16' },
+                            { value: '8th', label: '1/8' },
+                        ]}
+                    />
                 </div>
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label
-                    htmlFor="humanizeSlider"
-                    class="control-label"
-                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8;"
-                >
-                    <span>Humanize</span>
-                    <span style="color: var(--accent-color); font-weight: bold;">
-                        {state.humanize || 0}%
-                    </span>
-                </label>
-                <input
+            </SettingRow>
+
+            <SettingRow
+                label="Humanize"
+                id="humanizeSlider"
+                valueDisplay={`${state.humanize || 0}%`}
+            >
+                <Slider
                     id="humanizeSlider"
-                    type="range"
                     min="0"
                     max="100"
                     value={state.humanize || 0}
-                    onInput={(e) => {
-                        dispatch(ACTIONS.SET_HUMANIZE, parseInt(e.target.value, 10));
+                    onInput={(val) => {
+                        dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
                         saveCurrentState();
                     }}
-                    style="width: 100%; height: 4px;"
-                    aria-label="Humanize Amount"
-                    aria-valuetext={`${state.humanize || 0}%`}
+                    ariaValueText={`${state.humanize || 0}%`}
                 />
-            </div>
-            <div style="margin-bottom: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <label
-                    htmlFor="larsModeCheck"
-                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8rem; color: #94a3b8; cursor: pointer;"
-                >
-                    <span>Lars Mode</span>
-                    <input
+            </SettingRow>
+
+            <SettingGroup
+                title="Lars Mode"
+                style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;"
+            >
+                <SettingRow label="Enabled" id="larsModeCheck">
+                    <Toggle
                         id="larsModeCheck"
-                        type="checkbox"
                         checked={state.larsMode}
-                        onChange={(e) => {
-                            dispatch(ACTIONS.SET_LARS_MODE, e.target.checked);
+                        onChange={(val) => {
+                            dispatch(ACTIONS.SET_LARS_MODE, val);
                             saveCurrentState();
                         }}
                     />
-                </label>
-                <div
-                    id="larsIntensityContainer"
-                    style={{
-                        opacity: state.larsMode ? '1' : '0.5',
-                        pointerEvents: state.larsMode ? 'auto' : 'none',
-                    }}
-                >
-                    <label
-                        htmlFor="larsIntensitySlider"
-                        style="display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;"
-                    >
-                        <span>Lars Intensity</span>
-                        <span
-                            id="larsIntensityValue"
-                            style="color: var(--accent-color); font-weight: bold;"
-                        >
-                            {Math.round(state.larsIntensity * 100)}%
-                        </span>
-                    </label>
-                    <input
+                </SettingRow>
+                <div class={!state.larsMode ? 'disabled-group' : ''}>
+                    <SettingRow
+                        label="Intensity"
                         id="larsIntensitySlider"
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={Math.round(state.larsIntensity * 100)}
-                        onInput={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            dispatch(ACTIONS.SET_LARS_INTENSITY, val / 100);
-                            saveCurrentState();
-                        }}
-                        style="width: 100%; height: 4px;"
-                        aria-label="Lars Mode Intensity"
-                        aria-valuetext={`${Math.round(state.larsIntensity * 100)}%`}
-                    />
+                        valueDisplay={`${Math.round(state.larsIntensity * 100)}%`}
+                    >
+                        <Slider
+                            id="larsIntensitySlider"
+                            min="0"
+                            max="100"
+                            value={Math.round(state.larsIntensity * 100)}
+                            onInput={(val) => {
+                                dispatch(ACTIONS.SET_LARS_INTENSITY, parseInt(val, 10) / 100);
+                                saveCurrentState();
+                            }}
+                            ariaValueText={`${Math.round(state.larsIntensity * 100)}%`}
+                        />
+                    </SettingRow>
                 </div>
-            </div>
-        </div>
+            </SettingGroup>
+        </Fragment>
     );
 }

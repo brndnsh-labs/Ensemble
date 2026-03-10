@@ -13,6 +13,7 @@ import { restoreGains } from '../engine/engine.js';
 import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
+import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 
 export function Settings() {
     const {
@@ -79,12 +80,12 @@ export function Settings() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
     };
 
-    const handleMasterVolume = (e) => {
-        const val = parseFloat(e.target.value);
-        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: val });
+    const handleMasterVolume = (val) => {
+        const numVal = parseFloat(val);
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
 
         if (playback.masterGain && playback.audio) {
-            const target = Math.max(0.0001, val * MIXER_GAIN_MULTIPLIERS.master);
+            const target = Math.max(0.0001, numVal * MIXER_GAIN_MULTIPLIERS.master);
             playback.masterGain.gain.cancelScheduledValues(playback.audio.currentTime);
             playback.masterGain.gain.setValueAtTime(
                 playback.masterGain.gain.value,
@@ -98,8 +99,7 @@ export function Settings() {
         saveCurrentState();
     };
 
-    const handleMidiEnable = async (e) => {
-        const enabled = e.target.checked;
+    const handleMidiEnable = async (enabled) => {
         if (enabled) {
             const success = await initMIDI();
             if (!success) {
@@ -178,180 +178,129 @@ export function Settings() {
 
                 <div class="settings-controls">
                     {/* Appearance Section */}
-                    <div class="settings-section">
-                        <h3>Appearance</h3>
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                htmlFor="themeSelect"
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
-                            >
-                                Theme
-                            </label>
-                            <select
+                    <SettingGroup title="Appearance">
+                        <SettingRow label="Theme" id="themeSelect">
+                            <Select
                                 id="themeSelect"
                                 value={theme}
-                                onChange={(e) => {
-                                    applyTheme(e.target.value);
+                                onChange={(val) => {
+                                    applyTheme(val);
                                     saveCurrentState();
                                 }}
-                                aria-label="Select Theme"
-                            >
-                                <option value="auto">Auto (System Default)</option>
-                                <option value="dark">Dark</option>
-                                <option value="light">Light</option>
-                            </select>
-                        </div>
+                                options={[
+                                    { value: 'auto', label: 'Auto (System Default)' },
+                                    { value: 'dark', label: 'Dark' },
+                                    { value: 'light', label: 'Light' },
+                                ]}
+                            />
+                        </SettingRow>
 
-                        <div style="margin-bottom: 0;">
-                            <label
-                                htmlFor="notationSelect"
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
-                            >
-                                Chord Notation
-                            </label>
-                            <select
+                        <SettingRow label="Chord Notation" id="notationSelect">
+                            <Select
                                 id="notationSelect"
                                 value={notation}
-                                onChange={(e) => {
-                                    dispatch(ACTIONS.SET_NOTATION, e.target.value);
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_NOTATION, val);
                                     saveCurrentState();
                                 }}
-                                aria-label="Chord Notation"
-                            >
-                                <option value="roman">Roman Numerals (I, vi, IV)</option>
-                                <option value="name">Chord Names (C, Am, F)</option>
-                                <option value="nns">Nashville Numbers (1, 6-, 4)</option>
-                            </select>
-                        </div>
-                    </div>
+                                options={[
+                                    { value: 'roman', label: 'Roman Numerals (I, vi, IV)' },
+                                    { value: 'name', label: 'Chord Names (C, Am, F)' },
+                                    { value: 'nns', label: 'Nashville Numbers (1, 6-, 4)' },
+                                ]}
+                            />
+                        </SettingRow>
+                    </SettingGroup>
 
                     {/* Playback & Performance Section */}
-                    <div class="settings-section">
-                        <h3>Playback & Performance</h3>
-                        <div class="setting-item" style="margin-bottom: 1.5rem;">
-                            <label htmlFor="masterVolume" class="setting-label">
-                                <span>Master Volume</span>
-                            </label>
-                            <input
+                    <SettingGroup title="Playback & Performance">
+                        <SettingRow
+                            label="Master Volume"
+                            id="masterVolume"
+                            valueDisplay={`${Math.round((masterVolume || 0.5) * 100)}%`}
+                        >
+                            <Slider
                                 id="masterVolume"
-                                type="range"
                                 min="0"
                                 max="1"
                                 step="0.05"
                                 value={masterVolume || 0.5}
                                 onInput={handleMasterVolume}
-                                style="width: 100%;"
-                                aria-label="Master Volume"
-                                aria-valuetext={`${Math.round((masterVolume || 0.5) * 100)}%`}
+                                ariaValueText={`${Math.round((masterVolume || 0.5) * 100)}%`}
                             />
-                        </div>
+                        </SettingRow>
 
-                        <div class="setting-item" style="margin-bottom: 1.5rem;">
-                            <label
-                                htmlFor="complexitySlider"
-                                class="setting-label"
-                                style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
-                            >
-                                <span>Global Complexity</span>
-                                <span style="color: var(--accent-color); font-weight: bold;">
-                                    {complexityLabel}
-                                </span>
-                            </label>
-                            <input
+                        <SettingRow
+                            label="Global Complexity"
+                            description="Adjusts syncopation and harmonic density for Soloist, Bass, and Harmony engines."
+                            id="complexitySlider"
+                            valueDisplay={complexityLabel}
+                        >
+                            <Slider
                                 id="complexitySlider"
-                                type="range"
                                 min="0"
                                 max="100"
                                 value={Math.round(complexity * 100)}
-                                onInput={(e) => {
-                                    dispatch(
-                                        ACTIONS.SET_COMPLEXITY,
-                                        parseInt(e.target.value, 10) / 100,
-                                    );
+                                onInput={(val) => {
+                                    dispatch(ACTIONS.SET_COMPLEXITY, parseInt(val, 10) / 100);
                                 }}
-                                style="width: 100%;"
-                                aria-label="Global Complexity"
-                                aria-valuetext={complexityLabel}
+                                ariaValueText={complexityLabel}
                             />
-                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-                                Adjusts syncopation and harmonic density for Soloist, Bass, and
-                                Harmony engines.
-                            </p>
-                        </div>
+                        </SettingRow>
 
                         <div style="margin-bottom: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                            <label
-                                htmlFor="countInCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
+                            <SettingRow label="Count-in" id="countInCheck">
+                                <Toggle
                                     id="countInCheck"
-                                    type="checkbox"
                                     checked={countIn}
-                                    onChange={(e) => {
+                                    onChange={(val) => {
                                         dispatch(ACTIONS.SET_PARAM, {
                                             module: 'playback',
                                             param: 'countIn',
-                                            value: e.target.checked,
+                                            value: val,
                                         });
                                         saveCurrentState();
                                     }}
                                 />
-                                <span>Count-in</span>
-                            </label>
-                            <label
-                                htmlFor="metronomeCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
+                            </SettingRow>
+                            <SettingRow label="Metronome" id="metronomeCheck">
+                                <Toggle
                                     id="metronomeCheck"
-                                    type="checkbox"
                                     checked={metronome}
-                                    onChange={(e) => {
-                                        dispatch(ACTIONS.SET_METRONOME, e.target.checked);
+                                    onChange={(val) => {
+                                        dispatch(ACTIONS.SET_METRONOME, val);
                                         saveCurrentState();
                                     }}
                                 />
-                                <span>Metronome</span>
-                            </label>
-                            <label
-                                htmlFor="visualFlashCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
+                            </SettingRow>
+                            <SettingRow label="Visual Flash" id="visualFlashCheck">
+                                <Toggle
                                     id="visualFlashCheck"
-                                    type="checkbox"
                                     checked={visualFlash}
-                                    onChange={(e) => {
+                                    onChange={(val) => {
                                         dispatch(ACTIONS.SET_PARAM, {
                                             module: 'playback',
                                             param: 'visualFlash',
-                                            value: e.target.checked,
+                                            value: val,
                                         });
                                         saveCurrentState();
                                     }}
                                 />
-                                <span>Visual Flash</span>
-                            </label>
-                            <label
-                                htmlFor="hapticCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
+                            </SettingRow>
+                            <SettingRow label="Haptic Feedback" id="hapticCheck">
+                                <Toggle
                                     id="hapticCheck"
-                                    type="checkbox"
                                     checked={haptic}
-                                    onChange={(e) => {
+                                    onChange={(val) => {
                                         dispatch(ACTIONS.SET_PARAM, {
                                             module: 'playback',
                                             param: 'haptic',
-                                            value: e.target.checked,
+                                            value: val,
                                         });
                                         saveCurrentState();
                                     }}
                                 />
-                                <span>Haptic Feedback</span>
-                            </label>
+                            </SettingRow>
                         </div>
 
                         <div
@@ -359,174 +308,137 @@ export function Settings() {
                             style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 8px;"
                         >
                             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <label
-                                    htmlFor="sessionTimerCheck"
-                                    style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;"
-                                >
-                                    <input
+                                <SettingRow label="Song Mode" id="sessionTimerCheck">
+                                    <Toggle
                                         id="sessionTimerCheck"
-                                        type="checkbox"
                                         checked={songMode}
-                                        onChange={(e) => {
-                                            dispatch(ACTIONS.SET_SONG_MODE, e.target.checked);
+                                        onChange={(val) => {
+                                            dispatch(ACTIONS.SET_SONG_MODE, val);
                                             saveCurrentState();
                                         }}
                                     />
-                                    <span>Song Mode</span>
-                                </label>
+                                </SettingRow>
 
                                 <div
-                                    class="ending-mode-selector"
-                                    style={{
-                                        display: 'flex',
-                                        gap: '0.5rem',
-                                        opacity: songMode ? '1' : '0.4',
-                                        pointerEvents: songMode ? 'auto' : 'none',
-                                    }}
-                                >
-                                    <button
-                                        class={`chip-btn ${loopLimit === 0 ? 'active' : ''}`}
-                                        onClick={() => {
-                                            dispatch(ACTIONS.SET_PARAM, {
-                                                module: 'playback',
-                                                param: 'loopLimit',
-                                                value: 0,
-                                            });
-                                            saveCurrentState();
-                                        }}
-                                        style={{
-                                            padding: '0.4rem 0.8rem',
-                                            borderRadius: '20px',
-                                            border: '1px solid var(--border-color)',
-                                            background:
-                                                loopLimit === 0 ? 'var(--accent-color)' : 'none',
-                                            color: loopLimit === 0 ? 'white' : 'var(--text-color)',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer',
-                                        }}
-                                    >
-                                        Timer
-                                    </button>
-                                    <button
-                                        class={`chip-btn ${loopLimit > 0 ? 'active' : ''}`}
-                                        onClick={() => {
-                                            dispatch(ACTIONS.SET_PARAM, {
-                                                module: 'playback',
-                                                param: 'loopLimit',
-                                                value: 3,
-                                            });
-                                            saveCurrentState();
-                                        }}
-                                        style={{
-                                            padding: '0.4rem 0.8rem',
-                                            borderRadius: '20px',
-                                            border: '1px solid var(--border-color)',
-                                            background:
-                                                loopLimit > 0 ? 'var(--accent-color)' : 'none',
-                                            color: loopLimit > 0 ? 'white' : 'var(--text-color)',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer',
-                                        }}
-                                    >
-                                        Loops
-                                    </button>
-                                </div>
-
-                                <div
-                                    id="sessionTimerDurationContainer"
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        opacity: songMode ? '1' : '0.4',
-                                        pointerEvents: songMode ? 'auto' : 'none',
-                                        transition: 'all 0.2s ease',
-                                    }}
+                                    class={!songMode ? 'disabled-group' : ''}
+                                    style="display: flex; flex-direction: column; gap: 1rem;"
                                 >
                                     <div
-                                        id="sessionTimerStepper"
-                                        class="stepper-control"
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            background: 'var(--input-bg)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                        }}
+                                        class="ending-mode-selector"
+                                        style="display: flex; gap: 0.5rem;"
                                     >
                                         <button
-                                            id="sessionTimerDec"
-                                            class="stepper-btn"
-                                            style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
-                                            aria-label="Decrease song duration"
+                                            class={`chip-btn ${loopLimit === 0 ? 'active' : ''}`}
                                             onClick={() => {
-                                                if (loopLimit > 0) {
-                                                    const next = Math.max(1, loopLimit - 1);
-                                                    dispatch(ACTIONS.SET_PARAM, {
-                                                        module: 'playback',
-                                                        param: 'loopLimit',
-                                                        value: next,
-                                                    });
-                                                } else {
-                                                    const next = Math.max(1, sessionTimer - 1);
-                                                    dispatch(ACTIONS.SET_SESSION_TIMER, next);
-                                                }
+                                                dispatch(ACTIONS.SET_PARAM, {
+                                                    module: 'playback',
+                                                    param: 'loopLimit',
+                                                    value: 0,
+                                                });
                                                 saveCurrentState();
                                             }}
+                                            style={{
+                                                padding: '0.4rem 0.8rem',
+                                                borderRadius: '20px',
+                                                border: '1px solid var(--border-color)',
+                                                background:
+                                                    loopLimit === 0
+                                                        ? 'var(--accent-color)'
+                                                        : 'none',
+                                                color:
+                                                    loopLimit === 0 ? 'white' : 'var(--text-color)',
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer',
+                                            }}
                                         >
-                                            -
+                                            Timer
                                         </button>
-                                        <input
-                                            id="sessionTimerInput"
-                                            type="number"
-                                            value={loopLimit > 0 ? loopLimit : sessionTimer}
-                                            readonly
-                                            style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;"
-                                        />
                                         <button
-                                            id="sessionTimerInc"
-                                            class="stepper-btn"
-                                            style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
-                                            aria-label="Increase song duration"
+                                            class={`chip-btn ${loopLimit > 0 ? 'active' : ''}`}
                                             onClick={() => {
-                                                if (loopLimit > 0) {
-                                                    const next = Math.min(50, loopLimit + 1);
-                                                    dispatch(ACTIONS.SET_PARAM, {
-                                                        module: 'playback',
-                                                        param: 'loopLimit',
-                                                        value: next,
-                                                    });
-                                                } else {
-                                                    const next = Math.min(20, sessionTimer + 1);
-                                                    dispatch(ACTIONS.SET_SESSION_TIMER, next);
-                                                }
+                                                dispatch(ACTIONS.SET_PARAM, {
+                                                    module: 'playback',
+                                                    param: 'loopLimit',
+                                                    value: 3,
+                                                });
                                                 saveCurrentState();
                                             }}
+                                            style={{
+                                                padding: '0.4rem 0.8rem',
+                                                borderRadius: '20px',
+                                                border: '1px solid var(--border-color)',
+                                                background:
+                                                    loopLimit > 0 ? 'var(--accent-color)' : 'none',
+                                                color:
+                                                    loopLimit > 0 ? 'white' : 'var(--text-color)',
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer',
+                                            }}
                                         >
-                                            +
+                                            Loops
                                         </button>
                                     </div>
-                                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
-                                        {loopLimit > 0 ? 'Choruses' : 'Minutes'}
-                                    </span>
-                                </div>
 
-                                {loopLimit > 0 && (
-                                    <div style="font-size: 0.75rem; color: var(--accent-color); font-weight: 500; text-align: right; margin-top: -0.5rem;">
-                                        {(() => {
-                                            const { arranger, playback } = getState();
-                                            const totalSteps = arranger.totalSteps * loopLimit;
-                                            const secPerStep = 60 / playback.bpm / 4;
-                                            const totalSec = totalSteps * secPerStep;
-                                            const mins = Math.floor(totalSec / 60);
-                                            const secs = Math.round(totalSec % 60);
-                                            return `Est. Time: ${mins}:${secs
-                                                .toString()
-                                                .padStart(2, '0')}`;
-                                        })()}
-                                    </div>
-                                )}
+                                    <SettingRow
+                                        label={loopLimit > 0 ? 'Choruses' : 'Minutes'}
+                                        id="sessionTimerStepper"
+                                    >
+                                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+                                            <Stepper
+                                                id="sessionTimer"
+                                                value={loopLimit > 0 ? loopLimit : sessionTimer}
+                                                min={1}
+                                                max={loopLimit > 0 ? 50 : 20}
+                                                decAriaLabel="Decrease song duration"
+                                                incAriaLabel="Increase song duration"
+                                                onDecrement={() => {
+                                                    if (loopLimit > 0) {
+                                                        const next = Math.max(1, loopLimit - 1);
+                                                        dispatch(ACTIONS.SET_PARAM, {
+                                                            module: 'playback',
+                                                            param: 'loopLimit',
+                                                            value: next,
+                                                        });
+                                                    } else {
+                                                        const next = Math.max(1, sessionTimer - 1);
+                                                        dispatch(ACTIONS.SET_SESSION_TIMER, next);
+                                                    }
+                                                    saveCurrentState();
+                                                }}
+                                                onIncrement={() => {
+                                                    if (loopLimit > 0) {
+                                                        const next = Math.min(50, loopLimit + 1);
+                                                        dispatch(ACTIONS.SET_PARAM, {
+                                                            module: 'playback',
+                                                            param: 'loopLimit',
+                                                            value: next,
+                                                        });
+                                                    } else {
+                                                        const next = Math.min(20, sessionTimer + 1);
+                                                        dispatch(ACTIONS.SET_SESSION_TIMER, next);
+                                                    }
+                                                    saveCurrentState();
+                                                }}
+                                            />
+                                            {loopLimit > 0 && (
+                                                <div style="font-size: 0.75rem; color: var(--accent-color); font-weight: 500;">
+                                                    {(() => {
+                                                        const { arranger, playback } = getState();
+                                                        const totalSteps =
+                                                            arranger.totalSteps * loopLimit;
+                                                        const secPerStep = 60 / playback.bpm / 4;
+                                                        const totalSec = totalSteps * secPerStep;
+                                                        const mins = Math.floor(totalSec / 60);
+                                                        const secs = Math.round(totalSec % 60);
+                                                        return `Est. Time: ${mins}:${secs
+                                                            .toString()
+                                                            .padStart(2, '0')}`;
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </SettingRow>
+                                </div>
                             </div>
                             <p
                                 class="performance-ending-footer"
@@ -536,113 +448,75 @@ export function Settings() {
                                 at the end of the final loop once the limit is reached.
                             </p>
                         </div>
-                    </div>
+                    </SettingGroup>
 
                     {/* Library & Presets Section */}
-                    <div class="settings-section">
-                        <h3>Library & Presets</h3>
-                        <div style="margin-bottom: 0;">
-                            <label
-                                htmlFor="applyPresetSettingsCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
-                                    type="checkbox"
-                                    id="applyPresetSettingsCheck"
-                                    checked={applyPresetSettings}
-                                    onChange={(e) => {
-                                        dispatch(
-                                            ACTIONS.SET_PRESET_SETTINGS_MODE,
-                                            e.target.checked,
-                                        );
+                    <SettingGroup title="Library & Presets">
+                        <SettingRow
+                            label="Auto-Apply Preset Settings"
+                            description="Automatically update BPM and Style when loading a library preset."
+                            id="applyPresetSettingsCheck"
+                        >
+                            <Toggle
+                                id="applyPresetSettingsCheck"
+                                checked={applyPresetSettings}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_PRESET_SETTINGS_MODE, val);
+                                    saveCurrentState();
+                                }}
+                            />
+                        </SettingRow>
+                    </SettingGroup>
+
+                    {/* External Section (MIDI) */}
+                    <SettingGroup title="External (MIDI Output)">
+                        <SettingRow
+                            label="Enable Web MIDI Output"
+                            description="Route notes to your DAW or external hardware."
+                            id="midiEnableCheck"
+                        >
+                            <Toggle
+                                id="midiEnableCheck"
+                                checked={midiEnabled}
+                                onChange={handleMidiEnable}
+                            />
+                        </SettingRow>
+
+                        <div class={!midiEnabled ? 'disabled-group' : ''}>
+                            <SettingRow label="Mute Browser Audio" id="midiMuteLocalCheck">
+                                <Toggle
+                                    id="midiMuteLocalCheck"
+                                    checked={midiMuteLocal}
+                                    onChange={(val) => {
+                                        dispatch(ACTIONS.SET_MIDI_CONFIG, {
+                                            muteLocal: val,
+                                        });
+                                        restoreGains();
                                         saveCurrentState();
                                     }}
                                 />
-                                <span>Auto-Apply Preset Settings</span>
-                            </label>
-                            <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem; margin-left: 1.8rem;">
-                                Automatically update BPM and Style when loading a library preset.
-                            </p>
-                        </div>
-                    </div>
+                            </SettingRow>
 
-                    {/* External Section (MIDI) */}
-                    <div class="settings-section">
-                        <h3>External (MIDI Output)</h3>
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                htmlFor="midiEnableCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
-                                    id="midiEnableCheck"
-                                    type="checkbox"
-                                    checked={midiEnabled}
-                                    onChange={handleMidiEnable}
-                                />
-                                <span>Enable Web MIDI Output</span>
-                            </label>
-                            <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem; margin-left: 1.8rem;">
-                                Route notes to your DAW or external hardware.
-                            </p>
-                        </div>
-
-                        <div
-                            id="midiControls"
-                            style={{
-                                opacity: midiEnabled ? '1' : '0.5',
-                                pointerEvents: midiEnabled ? 'auto' : 'none',
-                                transition: 'opacity 0.2s',
-                            }}
-                        >
-                            <div style="margin-bottom: 1.5rem;">
-                                <label
-                                    htmlFor="midiMuteLocalCheck"
-                                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                                >
-                                    <input
-                                        id="midiMuteLocalCheck"
-                                        type="checkbox"
-                                        checked={midiMuteLocal}
-                                        onChange={(e) => {
-                                            dispatch(ACTIONS.SET_MIDI_CONFIG, {
-                                                muteLocal: e.target.checked,
-                                            });
-                                            restoreGains();
-                                            saveCurrentState();
-                                        }}
-                                    />
-                                    <span>Mute Browser Audio</span>
-                                </label>
-                            </div>
-
-                            <div style="margin-bottom: 1.5rem;">
-                                <label
-                                    htmlFor="midiOutputSelect"
-                                    style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
-                                >
-                                    Output Port
-                                </label>
-                                <select
+                            <SettingRow label="Output Port" id="midiOutputSelect">
+                                <Select
                                     id="midiOutputSelect"
                                     value={midiSelectedOutputId || ''}
-                                    onChange={(e) => {
+                                    onChange={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
-                                            selectedOutputId: e.target.value,
+                                            selectedOutputId: val,
                                         });
                                         saveCurrentState();
                                     }}
-                                    style="width: 100%;"
-                                >
-                                    {midiOutputs && midiOutputs.length > 0 ? (
-                                        midiOutputs.map((out) => (
-                                            <option value={out.id}>{out.name}</option>
-                                        ))
-                                    ) : (
-                                        <option value="">No outputs found</option>
-                                    )}
-                                </select>
-                            </div>
+                                    options={
+                                        midiOutputs && midiOutputs.length > 0
+                                            ? midiOutputs.map((out) => ({
+                                                  value: out.id,
+                                                  label: out.name,
+                                              }))
+                                            : [{ value: '', label: 'No outputs found' }]
+                                    }
+                                />
+                            </SettingRow>
 
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                                 {['Chords', 'Bass', 'Soloist', 'Harmony', 'Drums'].map((ch) => (
@@ -697,72 +571,55 @@ export function Settings() {
                                 ))}
                             </div>
 
-                            <div style="margin-bottom: 1rem;">
-                                <label
-                                    htmlFor="midiLatencySlider"
-                                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
-                                >
-                                    <span>Latency Offset</span>
-                                    <span id="midiLatencyValue" style="color: var(--accent-color);">
-                                        {midiLatency}ms
-                                    </span>
-                                </label>
-                                <input
+                            <SettingRow
+                                label="Latency Offset"
+                                id="midiLatencySlider"
+                                valueDisplay={`${midiLatency}ms`}
+                            >
+                                <Slider
                                     id="midiLatencySlider"
-                                    type="range"
                                     min="-100"
                                     max="100"
                                     step="1"
                                     value={midiLatency}
-                                    onInput={(e) => {
+                                    onInput={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
-                                            latency: parseInt(e.target.value, 10),
+                                            latency: parseInt(val, 10),
                                         });
                                         saveCurrentState();
                                     }}
-                                    style="width: 100%;"
-                                    aria-label="MIDI Latency Offset"
-                                    aria-valuetext={`${midiLatency} ms`}
+                                    ariaValueText={`${midiLatency} ms`}
                                 />
-                            </div>
+                            </SettingRow>
 
-                            <div style="margin-bottom: 0;">
-                                <label
-                                    htmlFor="midiVelocitySlider"
-                                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
-                                >
-                                    <span>Velocity Sensitivity</span>
-                                    <span
-                                        id="midiVelocityValue"
-                                        style="color: var(--accent-color);"
-                                    >
-                                        {parseFloat(midiVelocity).toFixed(1)}
-                                    </span>
-                                </label>
-                                <input
+                            <SettingRow
+                                label="Velocity Sensitivity"
+                                id="midiVelocitySlider"
+                                valueDisplay={`${parseFloat(midiVelocity).toFixed(1)}x`}
+                            >
+                                <Slider
                                     id="midiVelocitySlider"
-                                    type="range"
                                     min="0.5"
                                     max="2.0"
                                     step="0.1"
                                     value={midiVelocity}
-                                    onInput={(e) => {
+                                    onInput={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
-                                            velocitySensitivity: parseFloat(e.target.value),
+                                            velocitySensitivity: parseFloat(val),
                                         });
                                         saveCurrentState();
                                     }}
-                                    style="width: 100%;"
-                                    aria-label="MIDI Velocity Sensitivity"
-                                    aria-valuetext={`${parseFloat(midiVelocity).toFixed(1)}x`}
+                                    ariaValueText={`${parseFloat(midiVelocity).toFixed(1)}x`}
                                 />
-                            </div>
+                            </SettingRow>
                         </div>
-                    </div>
+                    </SettingGroup>
 
                     {/* Actions Section */}
-                    <div class="settings-section" style="border-bottom: none; padding-bottom: 0;">
-                        <h3>System Actions</h3>
+                    <SettingGroup
+                        title="System Actions"
+                        style="border-bottom: none; padding-bottom: 0;"
+                    >
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                             <button
                                 id="settingsExportMidiBtn"
@@ -797,34 +654,27 @@ export function Settings() {
                                 <span>🔄</span> Force Refresh
                             </button>
                         </div>
-                    </div>
+                    </SettingGroup>
 
-                    <div class="settings-section">
-                        <h3>Advanced</h3>
-                        <label htmlFor="debugSoloistToggle" class="setting-item toggle">
-                            <div>
-                                <span class="label">Debug Soloist</span>
-                                <span class="setting-description">
-                                    Enable chain-of-thought logging for the Soloist engine. Helpful
-                                    for troubleshooting silence or strange behavior. Logs will
-                                    appear in the browser console.
-                                </span>
-                            </div>
-                            <input
-                                type="checkbox"
+                    <SettingGroup title="Advanced">
+                        <SettingRow
+                            label="Debug Soloist"
+                            description="Enable chain-of-thought logging for the Soloist engine. Helpful for troubleshooting."
+                            id="debugSoloistToggle"
+                        >
+                            <Toggle
                                 id="debugSoloistToggle"
                                 checked={playbackState.debugSoloist}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'debugSoloist',
-                                        value: e.target.checked,
+                                        value: val,
                                     })
                                 }
                             />
-                            <span class="toggle-slider" />
-                        </label>
-                    </div>
+                        </SettingRow>
+                    </SettingGroup>
 
                     <div
                         class="settings-help"

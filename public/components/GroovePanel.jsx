@@ -1,4 +1,4 @@
-import { h } from 'preact';
+import { Fragment, h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
     cloneMeasure,
@@ -14,6 +14,7 @@ import { syncWorker } from '../worker-client.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { SequencerGrid } from './SequencerGrid.jsx';
+import { SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 export function GroovePanel({ isActiveMobile }) {
     const { activeTab, enabled, measures, fillActive } = useEnsembleState((s) => ({
@@ -175,43 +176,41 @@ function IntensitySlider() {
 
     return (
         <div class="smart-control-group" style="margin-bottom: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; align-items: center;">
-                <label htmlFor="intensitySlider" style="font-size: 0.9rem; color: #94a3b8;">
-                    Intensity (Global)
-                </label>
+            <SettingRow
+                label="Intensity (Global)"
+                id="intensitySlider"
+                valueDisplay={`${Math.round(bandIntensity * 100)}%`}
+            >
                 <div style="display: flex; gap: 1rem; align-items: center;">
                     <label
                         htmlFor="autoIntensityCheck"
                         style="font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;"
                     >
-                        <input
+                        <Toggle
                             id="autoIntensityCheck"
-                            type="checkbox"
+                            label="Auto Intensity"
                             checked={autoIntensity}
-                            onChange={(e) => {
-                                dispatch(ACTIONS.SET_AUTO_INTENSITY, e.target.checked);
+                            onChange={(val) => {
+                                dispatch(ACTIONS.SET_AUTO_INTENSITY, val);
                                 saveCurrentState();
                             }}
                         />{' '}
                         Auto
                     </label>
-                    <span style="color: var(--accent-color); font-weight: bold; font-size: 0.9rem;">
-                        {Math.round(bandIntensity * 100)}%
-                    </span>
+                    <div class={autoIntensity ? 'disabled-group' : ''}>
+                        <Slider
+                            id="intensitySlider"
+                            min="0"
+                            max="100"
+                            value={Math.round(bandIntensity * 100)}
+                            onInput={(val) => {
+                                dispatch(ACTIONS.SET_BAND_INTENSITY, parseInt(val, 10) / 100);
+                            }}
+                            ariaValueText={`${Math.round(bandIntensity * 100)}%`}
+                        />
+                    </div>
                 </div>
-            </div>
-            <input
-                id="intensitySlider"
-                type="range"
-                min="0"
-                max="100"
-                value={Math.round(bandIntensity * 100)}
-                onInput={(e) => {
-                    dispatch(ACTIONS.SET_BAND_INTENSITY, parseInt(e.target.value, 10) / 100);
-                }}
-                disabled={autoIntensity}
-                style={{ width: '100%', height: '6px', opacity: autoIntensity ? 0.5 : 1 }}
-            />
+            </SettingRow>
         </div>
     );
 }
@@ -221,25 +220,22 @@ function CreativityToggle() {
 
     return (
         <div class="smart-control-group" style="margin-bottom: 1rem;">
-            <label
-                htmlFor="creativityCheck"
-                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; cursor: pointer;"
+            <SettingRow
+                label="Creativity"
+                description="Enables generative variations and musical risks."
+                id="creativityCheck"
             >
-                <span style="font-size: 0.9rem; color: #94a3b8;">Creativity</span>
-                <input
+                <Toggle
                     id="creativityCheck"
-                    type="checkbox"
+                    label="Creativity"
                     checked={creativity}
-                    onChange={(e) => {
-                        dispatch(ACTIONS.SET_CREATIVITY, e.target.checked);
+                    onChange={(val) => {
+                        dispatch(ACTIONS.SET_CREATIVITY, val);
                         syncWorker();
                         saveCurrentState();
                     }}
                 />
-            </label>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0; line-height: 1.4;">
-                Enables generative variations and musical risks.
-            </p>
+            </SettingRow>
         </div>
     );
 }
