@@ -111,7 +111,15 @@ export function PerformanceCanvas({
                     grad.addColorStop(1, 'rgba(255,255,255,0)');
                     ctx.fillStyle = grad;
                     ctx.globalAlpha = 0.6;
-                    ctx.fillRect(x, y, laneWidth, zoneHeight);
+
+                    // Rounded Highlight
+                    ctx.beginPath();
+                    ctx.roundRect(x + 4, y + 4, laneWidth - 8, zoneHeight - 8, 12);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                     ctx.globalAlpha = 1.0;
 
                     ctx.shadowBlur = 25;
@@ -125,11 +133,13 @@ export function PerformanceCanvas({
                     ctx.fillText(degree, x + laneWidth / 2, y + zoneHeight / 2 - 18);
                     ctx.shadowBlur = 0;
                 } else if (isSympathetic) {
-                    // Note Sympathy Highlight
+                    // Note Sympathy Highlight (Rounded & Dashed)
                     ctx.strokeStyle = baseColor;
                     ctx.lineWidth = 2;
                     ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(x + 5, y + 5, laneWidth - 10, zoneHeight - 10);
+                    ctx.beginPath();
+                    ctx.roundRect(x + 8, y + 8, laneWidth - 16, zoneHeight - 16, 8);
+                    ctx.stroke();
                     ctx.setLineDash([]);
 
                     ctx.fillStyle = baseColor;
