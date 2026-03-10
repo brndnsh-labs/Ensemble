@@ -83,7 +83,7 @@ export function PerformanceCanvas({
             for (let z = 0; z < 5; z++) {
                 const y = (4 - z) * zoneHeight;
                 const midi = group[z];
-                const noteInfo = midi ? midiToNote(midi) : null;
+                const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
                 const noteName = noteInfo ? noteInfo.name : '';
                 const noteFullName = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
                 const degree = degrees[z];
@@ -281,7 +281,7 @@ export function PerformanceCanvas({
             } else {
                 // We entered a new zone or it's a new touch
                 const midi = noteGroups[lane]?.[zone];
-                if (midi) {
+                if (typeof midi === 'number' && Number.isFinite(midi)) {
                     nextPointers.set(touch.identifier, { lane, zone, midi });
                 }
             }

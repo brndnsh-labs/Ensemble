@@ -86,9 +86,13 @@ export function getFrequency(midi) {
  * @returns {{name: string, octave: number}}
  */
 export function midiToNote(midi) {
+    if (typeof midi !== 'number' || !Number.isFinite(midi)) {
+        return { name: '---', octave: 0 };
+    }
     const notes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const idx = Math.floor(midi) % 12;
     return {
-        name: notes[midi % 12],
+        name: notes[idx < 0 ? idx + 12 : idx],
         octave: Math.floor(midi / 12) - 1,
     };
 }
@@ -99,7 +103,7 @@ export function midiToNote(midi) {
  * @returns {number} The MIDI note number.
  */
 export function getMidi(freq) {
-    if (!freq || freq <= 0) {
+    if (!freq || freq <= 0 || !Number.isFinite(freq)) {
         return null;
     }
     return Math.round(12 * Math.log2(freq / 440) + 69);
@@ -123,7 +127,7 @@ export function generateId() {
  *                     [5-9]: Even degrees (2, 4, 6, 8, 10)
  */
 export function getChordMidiNotes(chordObj, baseOctave = 4) {
-    if (!chordObj || typeof chordObj.rootMidi !== 'number') {
+    if (!chordObj || typeof chordObj.rootMidi !== 'number' || !Number.isFinite(chordObj.rootMidi)) {
         return [];
     }
 

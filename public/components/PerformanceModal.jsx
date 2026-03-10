@@ -284,7 +284,7 @@ export function PerformanceModal() {
     const renderKey = (label, midi, sourceKey, colorVar) => {
         const isHeld = activeKeys.has(sourceKey);
         const isPlaying = playingKey === sourceKey;
-        const noteInfo = midi ? midiToNote(midi) : null;
+        const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
         const noteLabel = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
 
         return (
@@ -296,7 +296,7 @@ export function PerformanceModal() {
                     if (modalRef.current) {
                         modalRef.current.focus({ preventScroll: true });
                     }
-                    if (!midi) {
+                    if (midi === null || midi === undefined) {
                         return;
                     }
                     const isLegato = heldKeysRef.current.length > 0;
@@ -385,7 +385,7 @@ export function PerformanceModal() {
     };
 
     const handleNoteChange = (midi) => {
-        if (!midi) {
+        if (midi === null || midi === undefined) {
             setCurrentNoteName('');
             return;
         }

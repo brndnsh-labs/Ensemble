@@ -180,6 +180,45 @@ describe('Utility Functions', () => {
         it('should return empty array for invalid input', () => {
             expect(getChordMidiNotes(null)).toEqual([]);
             expect(getChordMidiNotes({})).toEqual([]);
+            expect(getChordMidiNotes({ rootMidi: NaN })).toEqual([]);
+            expect(getChordMidiNotes({ rootMidi: Infinity })).toEqual([]);
+        });
+    });
+
+    describe('midiToNote', () => {
+        it('should correctly convert valid MIDI numbers to note names and octaves', () => {
+            expect(midiToNote(60)).toEqual({ name: 'C', octave: 4 });
+            expect(midiToNote(61)).toEqual({ name: 'Db', octave: 4 });
+            expect(midiToNote(72)).toEqual({ name: 'C', octave: 5 });
+            expect(midiToNote(21)).toEqual({ name: 'A', octave: 0 });
+            expect(midiToNote(0)).toEqual({ name: 'C', octave: -1 });
+        });
+
+        it('should handle negative MIDI numbers correctly', () => {
+            expect(midiToNote(-1)).toEqual({ name: 'B', octave: -2 });
+            expect(midiToNote(-12)).toEqual({ name: 'C', octave: -2 });
+        });
+
+        it('should return fallback for NaN or non-finite values', () => {
+            expect(midiToNote(NaN)).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote(Infinity)).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote(undefined)).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote(null)).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote('60')).toEqual({ name: '---', octave: 0 });
+        });
+    });
+
+    describe('getMidi', () => {
+        it('should correctly convert frequency to MIDI note', () => {
+            expect(getMidi(440)).toBe(69);
+            expect(getMidi(261.63)).toBe(60);
+        });
+
+        it('should return null for invalid frequency', () => {
+            expect(getMidi(0)).toBe(null);
+            expect(getMidi(-440)).toBe(null);
+            expect(getMidi(NaN)).toBe(null);
+            expect(getMidi(Infinity)).toBe(null);
         });
     });
 
