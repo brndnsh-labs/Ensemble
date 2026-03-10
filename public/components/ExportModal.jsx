@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { exportMIDI } from '../midi-export.js';
+import { exportToMidi } from '../midi-export.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
@@ -53,7 +53,7 @@ export function ExportModal() {
                 addEnding,
                 filename: sanitizedName || 'My Song',
             };
-            await exportMIDI(options);
+            await exportToMidi(options);
             dispatch(ACTIONS.NOTIFY, {
                 message: 'MIDI Export complete!',
                 type: 'success',
