@@ -6,6 +6,7 @@ import { midiToNote } from '../utils.js';
 
 /**
  * PerformanceCanvas - A vertical-first, 4-pillar ribbon interface for mobile.
+ * Includes intelligent melodic guidance and harmonic heatmapping.
  */
 export function PerformanceCanvas({
     noteGroups,
@@ -34,44 +35,66 @@ export function PerformanceCanvas({
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, width, height);
 
-        // Resolve CSS variables
+        // Resolve CSS variables & Palettes
         const canvasStyle = getComputedStyle(canvas);
         const soloistColor = canvasStyle.getPropertyValue('--soloist-color').trim() || '#268bd2';
+
+        // Harmonic Palette
+        const PALETTE = {
+            safe: '#b58900', // Amber/Gold
+            tense: '#2aa198', // Cyan/Blue
+            chromatic: '#586e75', // Grey
+            bridge: '#d33682', // Magenta/Pink for common tones
+        };
 
         const laneWidth = width / 4;
         const zoneHeight = height / 5;
 
-        // 1. Draw Pillars
+        // 1. Identify Sympathetic Notes (Octaves of what's playing)
+        const activeNames = new Set();
+        activePointers.forEach((p) => {
+            const info = midiToNote(p.midi);
+            if (info) {
+                activeNames.add(info.name);
+            }
+        });
+
+        // 2. Identify Bridge Notes (Common between current and next)
+        const currentSet = new Set(noteGroups[0].concat(noteGroups[1]));
+        const nextSet = new Set(noteGroups[2].concat(noteGroups[3]));
+        const bridgeMidis = new Set([...currentSet].filter((x) => nextSet.has(x)));
+
+        // 3. Draw Pillars
         for (let l = 0; l < 4; l++) {
             const x = l * laneWidth;
-            const isLeft = l < 2;
             const isOuter = l === 0 || l === 3;
-            const color = isLeft ? soloistColor : '#94a3b8';
-
-            // Pillar Background - alternating subtle shades
-            ctx.fillStyle = isOuter ? 'rgba(15, 23, 42, 0.4)' : 'rgba(15, 23, 42, 0.6)';
-            ctx.fillRect(x, 0, laneWidth, height);
-
-            // Stronger Pillar Dividers
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-
-            // Zones
             const group = noteGroups[l] || [];
             const degrees = isOuter ? ['1', '3', '5', '7', '9'] : ['2', '4', '6', '8', '10'];
 
+            // Pillar Background
+            ctx.fillStyle = isOuter ? 'rgba(15, 23, 42, 0.4)' : 'rgba(15, 23, 42, 0.6)';
+            ctx.fillRect(x, 0, laneWidth, height);
+
+            // Dividers
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, 0, laneWidth, height);
+
             for (let z = 0; z < 5; z++) {
-                const y = (4 - z) * zoneHeight; // Bottom up
+                const y = (4 - z) * zoneHeight;
                 const midi = group[z];
                 const noteInfo = midi ? midiToNote(midi) : null;
-                const noteName = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
+                const noteName = noteInfo ? noteInfo.name : '';
+                const noteFullName = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
                 const degree = degrees[z];
 
-                // Check if this zone is active
+                // Determine Functional Color
+                let baseColor = isOuter ? PALETTE.safe : PALETTE.tense;
+                if (bridgeMidis.has(midi)) {
+                    baseColor = PALETTE.bridge;
+                }
+
+                // Check Activity
                 let isActive = false;
                 activePointers.forEach((p) => {
                     if (p.lane === l && p.zone === z) {
@@ -79,55 +102,68 @@ export function PerformanceCanvas({
                     }
                 });
 
+                const isSympathetic = !isActive && activeNames.has(noteName);
+
                 if (isActive) {
                     const grad = ctx.createLinearGradient(x, y, x + laneWidth, y);
-                    grad.addColorStop(0, 'rgba(255,255,255,0.1)');
-                    grad.addColorStop(0.5, color);
-                    grad.addColorStop(1, 'rgba(255,255,255,0.1)');
+                    grad.addColorStop(0, 'rgba(255,255,255,0)');
+                    grad.addColorStop(0.5, baseColor);
+                    grad.addColorStop(1, 'rgba(255,255,255,0)');
                     ctx.fillStyle = grad;
                     ctx.globalAlpha = 0.6;
                     ctx.fillRect(x, y, laneWidth, zoneHeight);
                     ctx.globalAlpha = 1.0;
 
-                    // Text Glow
                     ctx.shadowBlur = 25;
-                    ctx.shadowColor = color;
+                    ctx.shadowColor = baseColor;
                     ctx.fillStyle = '#fff';
                     ctx.font = 'bold 24px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText(noteName, x + laneWidth / 2, y + zoneHeight / 2 + 8);
+                    ctx.fillText(noteFullName, x + laneWidth / 2, y + zoneHeight / 2 + 8);
 
-                    // Degree tag when active
                     ctx.font = 'bold 10px sans-serif';
                     ctx.fillText(degree, x + laneWidth / 2, y + zoneHeight / 2 - 18);
                     ctx.shadowBlur = 0;
+                } else if (isSympathetic) {
+                    // Note Sympathy Highlight
+                    ctx.strokeStyle = baseColor;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(x + 5, y + 5, laneWidth - 10, zoneHeight - 10);
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = baseColor;
+                    ctx.font = 'bold 16px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(noteFullName, x + laneWidth / 2, y + zoneHeight / 2 + 6);
                 } else {
-                    // Larger, clearer inactive labels
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                    // Standard Inactive
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
                     ctx.font = '14px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText(noteName, x + laneWidth / 2, y + zoneHeight / 2 + 5);
+                    ctx.fillText(noteFullName, x + laneWidth / 2, y + zoneHeight / 2 + 5);
 
-                    // Subtle degree indicator
-                    ctx.font = '8px sans-serif';
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-                    ctx.fillText(degree, x + laneWidth / 2, y + zoneHeight / 2 - 12);
+                    // Subtle functional dot
+                    ctx.fillStyle = baseColor;
+                    ctx.beginPath();
+                    ctx.arc(x + laneWidth / 2, y + zoneHeight / 2 - 15, 2, 0, Math.PI * 2);
+                    ctx.fill();
                 }
             }
         }
 
-        // 2. Wing Headers (Chord Names with pill background)
+        // 4. Wing Headers
         const drawHeader = (name, x, color) => {
             const textWidth = ctx.measureText(name).width + 30;
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
             ctx.beginPath();
-            ctx.roundRect(x - textWidth / 2, 8, textWidth, 30, 15);
+            ctx.roundRect(x - textWidth / 2, 10, textWidth, 28, 14);
             ctx.fill();
             ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            ctx.font = 'bold 14px sans-serif';
+            ctx.font = 'bold 12px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = color;
             ctx.fillText(name, x, 28);
@@ -136,21 +172,21 @@ export function PerformanceCanvas({
         drawHeader(currentChordName, width * 0.25, soloistColor);
         drawHeader(nextChordName, width * 0.75, '#94a3b8');
 
-        // 3. Center Status (Active Note & BPM)
+        // 5. Center Status
         if (currentNoteName) {
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 20;
             ctx.shadowColor = soloistColor;
             ctx.fillStyle = '#fff';
-            ctx.font = '900 56px monospace';
+            ctx.font = '900 64px monospace';
             ctx.textAlign = 'center';
             ctx.fillText(currentNoteName, width / 2, height / 2);
             ctx.shadowBlur = 0;
         }
 
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.font = 'bold 10px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${bpm} BPM`, width / 2, height - 20);
+        ctx.fillText(`${bpm} BPM`, width / 2, height - 15);
     };
 
     useLayoutEffect(() => {
@@ -211,11 +247,9 @@ export function PerformanceCanvas({
             }
         }
 
-        // Diff pointers
         const currentMidis = new Set([...nextPointers.values()].map((p) => p.midi));
         const prevMidis = new Set([...activePointers.values()].map((p) => p.midi));
 
-        // Trigger new
         currentMidis.forEach((midi) => {
             if (!prevMidis.has(midi)) {
                 const freq = 440 * 2 ** ((midi - 69) / 12);
@@ -225,7 +259,6 @@ export function PerformanceCanvas({
             }
         });
 
-        // Kill released (unless latched)
         if (
             !isLatched &&
             (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'touchmove')
