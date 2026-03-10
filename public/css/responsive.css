@@ -49,7 +49,7 @@
             "arranger sidebar"
             "visualizer sidebar";
         gap: 1rem;
-        align-items: start;
+        align-items: stretch;
         max-width: 1800px;
         padding: 1.5rem;
     }
