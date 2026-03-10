@@ -6,7 +6,7 @@ import { midiToNote } from '../utils.js';
 
 /**
  * PerformanceCanvas - A vertical-first, 4-pillar ribbon interface for mobile.
- * Includes intelligent melodic guidance and harmonic heatmapping.
+ * Includes intelligent melodic guidance and sticky-zone sustain logic.
  */
 export function PerformanceCanvas({
     noteGroups,
@@ -123,7 +123,7 @@ export function PerformanceCanvas({
                     ctx.fillStyle = glow;
                     ctx.globalAlpha = 0.7;
 
-                    // Rounded "Pill" Shape with more padding to prevent 'cut off' look
+                    // Rounded "Pill" Shape
                     const paddingH = laneWidth * 0.15;
                     const paddingV = zoneHeight * 0.15;
                     ctx.beginPath();
@@ -269,30 +269,42 @@ export function PerformanceCanvas({
 
             const lane = Math.min(3, Math.max(0, Math.floor(tx / laneWidth)));
             const zone = Math.min(4, Math.max(0, 4 - Math.floor(ty / zoneHeight)));
-            const midi = noteGroups[lane]?.[zone];
 
-            if (midi) {
-                nextPointers.set(touch.identifier, { lane, zone, midi });
+            // Check if we already have a pointer for this touch
+            const prev = activePointers.get(touch.identifier);
+
+            // STICKY LOGIC:
+            // If the finger is still in the same physical zone, keep the pitch the same
+            // even if the underlying noteGroups has changed (chord transition).
+            if (prev && prev.lane === lane && prev.zone === zone) {
+                nextPointers.set(touch.identifier, prev);
+            } else {
+                // We entered a new zone or it's a new touch
+                const midi = noteGroups[lane]?.[zone];
+                if (midi) {
+                    nextPointers.set(touch.identifier, { lane, zone, midi });
+                }
             }
         }
 
-        const currentMidis = new Set([...nextPointers.values()].map((p) => p.midi));
-        const prevMidis = new Set([...activePointers.values()].map((p) => p.midi));
-
-        currentMidis.forEach((midi) => {
-            if (!prevMidis.has(midi)) {
-                const freq = 440 * 2 ** ((midi - 69) / 12);
+        // Trigger notes for any NEW or CHANGED midis
+        nextPointers.forEach((data, id) => {
+            const prevData = activePointers.get(id);
+            if (!prevData || prevData.midi !== data.midi) {
+                const freq = 440 * 2 ** ((data.midi - 69) / 12);
                 const isLegato = activePointers.size > 0;
                 playSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
-                onNoteChange(midi);
+                onNoteChange(data.midi);
             }
         });
 
+        // Global kill if all touches released
         if (
-            !isLatched &&
-            (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'touchmove')
+            (!isLatched && e.type === 'touchend') ||
+            e.type === 'touchcancel' ||
+            e.type === 'touchmove'
         ) {
-            if (nextPointers.size === 0 && prevMidis.size > 0) {
+            if (nextPointers.size === 0 && activePointers.size > 0) {
                 killSoloistNote();
                 onNoteChange(null);
             }
