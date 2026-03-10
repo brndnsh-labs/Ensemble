@@ -23,10 +23,10 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
         const canvas = page.locator('.PerformanceSurfaceModal canvas');
         await expect(canvas).toBeVisible();
 
-        // Verify QUIT and LATCH buttons
-        const quitBtn = page.locator('button').filter({ hasText: 'QUIT' });
+        // Verify Close and LATCH buttons
+        const closeBtn = page.locator('button[aria-label="Close"]');
         const latchBtn = page.locator('button').filter({ hasText: /LATCH/ });
-        await expect(quitBtn).toBeVisible();
+        await expect(closeBtn).toBeVisible();
         await expect(latchBtn).toBeVisible();
 
         // Test LATCH toggle
@@ -36,8 +36,8 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
         // Verify snapshot
         await expect(modal).toHaveScreenshot('performance-modal-pillars-mobile.png');
 
-        // Test QUIT
-        await quitBtn.click();
+        // Test Close
+        await closeBtn.click();
         await expect(modal).toBeHidden();
     });
 

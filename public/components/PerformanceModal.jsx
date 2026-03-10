@@ -404,15 +404,15 @@ export function PerformanceModal() {
         return (
             <div style="display: flex; flex-direction: column; width: 100%; height: 100%; position: relative;">
                 {/* Floating Buttons */}
-                <div style="position: absolute; bottom: 1rem; left: 1rem; z-index: 20;">
+                <div style="position: absolute; top: 1rem; left: 1rem; z-index: 20;">
                     <button
-                        style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;"
+                        style="width: 40px; height: 40px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(4px);"
                         onClick={close}
+                        aria-label="Close"
                     >
-                        QUIT
+                        ✖
                     </button>
                 </div>
-
                 <div style="position: absolute; bottom: 1rem; right: 1rem; z-index: 20;">
                     <button
                         style={`background: ${isLatched ? 'var(--soloist-color)' : 'rgba(255,255,255,0.1)'}; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;`}
