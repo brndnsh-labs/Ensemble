@@ -1017,15 +1017,27 @@ export class ExportProcessor {
             ...writeInt16(finalTrackList.length),
             ...writeInt16(PPQ),
         ]);
-        const trackChunks = finalTrackList.map((t) => t.compile());
-        const totalSize = header.length + trackChunks.reduce((acc, c) => acc + c.length, 0);
+
+        // Optimization: Pre-allocate array and avoid reduce for compiling chunks
+        const tLen = finalTrackList.length;
+        const trackChunks = new Array(tLen);
+        let chunksTotalSize = 0;
+
+        for (let i = 0; i < tLen; i++) {
+            const chunk = finalTrackList[i].compile();
+            trackChunks[i] = chunk;
+            chunksTotalSize += chunk.length;
+        }
+
+        const totalSize = header.length + chunksTotalSize;
         const result = new Uint8Array(totalSize);
         result.set(header, 0);
         let offset = header.length;
-        trackChunks.forEach((c) => {
-            result.set(c, offset);
-            offset += c.length;
-        });
+
+        for (let i = 0; i < tLen; i++) {
+            result.set(trackChunks[i], offset);
+            offset += trackChunks[i].length;
+        }
 
         const finalFilename = `${(this.filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '')}.mid`;
         postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
