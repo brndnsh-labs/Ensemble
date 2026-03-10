@@ -29,16 +29,29 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/engine/scheduler-core.js` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
 | `public/engine/engine.js` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
+| `public/engine/synth-utils.js` | Shared WebAudio boilerplate (ramping, voices). | `rampGain`, `killActiveVoices` |
 | `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/groove-engine.js` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
 | `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/worker-utils.js` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
+
+## Data Modules (static)
+
+| Path | Responsibility | Key Data |
+| :--- | :--- | :--- |
+| `public/data/drum-presets.js` | Drum patterns and expansion logic. | `DRUM_PRESETS` |
+| `public/data/smart-genres.js` | High-level genre configurations. | `SMART_GENRES` |
+| `public/data/chord-presets.js` | Library chord progressions. | `CHORD_PRESETS` |
+| `public/data/song-templates.js` | Full song structure templates. | `SONG_TEMPLATES` |
+| `public/data/instrument-styles.js` | Engine-specific style definitions. | `CHORD_STYLES`, `BASS_STYLES`, etc. |
 
 ## UI Components (Preact)
 
 | Path | Responsibility |
 | :--- | :--- |
 | `public/App.jsx` | Root layout and theme provider. |
+| `public/components/UIControls.jsx` | Reusable UI toolkit (SettingRow, Toggle, etc.). |
+| `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
 | `public/components/Arranger.jsx` | Chord progression and section manager. |
 | `public/components/Transport.jsx` | Playback controls and tempo. |
 | `public/components/SequencerGrid.jsx` | Interactive drum pattern editor. |
