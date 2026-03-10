@@ -180,8 +180,12 @@ function IntensitySlider() {
                     Intensity (Global)
                 </label>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <label style="font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
+                    <label
+                        htmlFor="autoIntensityCheck"
+                        style="font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;"
+                    >
                         <input
+                            id="autoIntensityCheck"
                             type="checkbox"
                             checked={autoIntensity}
                             onChange={(e) => {
@@ -217,7 +221,10 @@ function CreativityToggle() {
 
     return (
         <div class="smart-control-group" style="margin-bottom: 1rem;">
-            <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; cursor: pointer;">
+            <label
+                htmlFor="creativityCheck"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; cursor: pointer;"
+            >
                 <span style="font-size: 0.9rem; color: #94a3b8;">Creativity</span>
                 <input
                     id="creativityCheck"

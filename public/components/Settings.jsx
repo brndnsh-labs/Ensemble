@@ -181,7 +181,10 @@ export function Settings() {
                     <div class="settings-section">
                         <h3>Appearance</h3>
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+                            <label
+                                htmlFor="themeSelect"
+                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
+                            >
                                 Theme
                             </label>
                             <select
@@ -200,7 +203,10 @@ export function Settings() {
                         </div>
 
                         <div style="margin-bottom: 0;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+                            <label
+                                htmlFor="notationSelect"
+                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
+                            >
                                 Chord Notation
                             </label>
                             <select
@@ -223,7 +229,7 @@ export function Settings() {
                     <div class="settings-section">
                         <h3>Playback & Performance</h3>
                         <div class="setting-item" style="margin-bottom: 1.5rem;">
-                            <label class="setting-label">
+                            <label htmlFor="masterVolume" class="setting-label">
                                 <span>Master Volume</span>
                             </label>
                             <input
@@ -242,6 +248,7 @@ export function Settings() {
 
                         <div class="setting-item" style="margin-bottom: 1.5rem;">
                             <label
+                                htmlFor="complexitySlider"
                                 class="setting-label"
                                 style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
                             >
@@ -273,7 +280,10 @@ export function Settings() {
                         </div>
 
                         <div style="margin-bottom: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="countInCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
                                     id="countInCheck"
                                     type="checkbox"
@@ -289,7 +299,10 @@ export function Settings() {
                                 />
                                 <span>Count-in</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="metronomeCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
                                     id="metronomeCheck"
                                     type="checkbox"
@@ -301,7 +314,10 @@ export function Settings() {
                                 />
                                 <span>Metronome</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="visualFlashCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
                                     id="visualFlashCheck"
                                     type="checkbox"
@@ -317,7 +333,10 @@ export function Settings() {
                                 />
                                 <span>Visual Flash</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="hapticCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
                                     id="hapticCheck"
                                     type="checkbox"
@@ -340,7 +359,10 @@ export function Settings() {
                             style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 8px;"
                         >
                             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;">
+                                <label
+                                    htmlFor="sessionTimerCheck"
+                                    style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;"
+                                >
                                     <input
                                         id="sessionTimerCheck"
                                         type="checkbox"
@@ -520,7 +542,10 @@ export function Settings() {
                     <div class="settings-section">
                         <h3>Library & Presets</h3>
                         <div style="margin-bottom: 0;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="applyPresetSettingsCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
                                     type="checkbox"
                                     id="applyPresetSettingsCheck"
@@ -545,7 +570,10 @@ export function Settings() {
                     <div class="settings-section">
                         <h3>External (MIDI Output)</h3>
                         <div style="margin-bottom: 1rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="midiEnableCheck"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
                                     id="midiEnableCheck"
                                     type="checkbox"
@@ -568,7 +596,10 @@ export function Settings() {
                             }}
                         >
                             <div style="margin-bottom: 1.5rem;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <label
+                                    htmlFor="midiMuteLocalCheck"
+                                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                                >
                                     <input
                                         id="midiMuteLocalCheck"
                                         type="checkbox"
@@ -586,7 +617,10 @@ export function Settings() {
                             </div>
 
                             <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+                                <label
+                                    htmlFor="midiOutputSelect"
+                                    style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
+                                >
                                     Output Port
                                 </label>
                                 <select
@@ -613,7 +647,10 @@ export function Settings() {
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                                 {['Chords', 'Bass', 'Soloist', 'Harmony', 'Drums'].map((ch) => (
                                     <div class="midi-ch-group" key={ch}>
-                                        <label style="display: block; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;">
+                                        <label
+                                            htmlFor={`midi${ch}Channel`}
+                                            style="display: block; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;"
+                                        >
                                             {ch}
                                         </label>
                                         <div style="display: flex; gap: 0.25rem;">
@@ -661,7 +698,10 @@ export function Settings() {
                             </div>
 
                             <div style="margin-bottom: 1rem;">
-                                <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+                                <label
+                                    htmlFor="midiLatencySlider"
+                                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
+                                >
                                     <span>Latency Offset</span>
                                     <span id="midiLatencyValue" style="color: var(--accent-color);">
                                         {midiLatency}ms
@@ -687,7 +727,10 @@ export function Settings() {
                             </div>
 
                             <div style="margin-bottom: 0;">
-                                <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+                                <label
+                                    htmlFor="midiVelocitySlider"
+                                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; color: #94a3b8;"
+                                >
                                     <span>Velocity Sensitivity</span>
                                     <span
                                         id="midiVelocityValue"
@@ -758,7 +801,7 @@ export function Settings() {
 
                     <div class="settings-section">
                         <h3>Advanced</h3>
-                        <label class="setting-item toggle">
+                        <label htmlFor="debugSoloistToggle" class="setting-item toggle">
                             <div>
                                 <span class="label">Debug Soloist</span>
                                 <span class="setting-description">

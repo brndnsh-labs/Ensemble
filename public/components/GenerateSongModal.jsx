@@ -183,8 +183,12 @@ export function GenerateSongModal() {
                             class="setting-item"
                             style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;"
                         >
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <label
+                                htmlFor="gen-use-seed"
+                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                            >
                                 <input
+                                    id="gen-use-seed"
                                     type="checkbox"
                                     checked={useSeed}
                                     onChange={(e) => setUseSeed(e.target.checked)}

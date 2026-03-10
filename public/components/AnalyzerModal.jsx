@@ -548,10 +548,12 @@ export function AnalyzerModal() {
                         style="display: flex; gap: 8px; margin: 1rem 0; background: var(--input-bg); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);"
                     >
                         <label
+                            htmlFor="analyzerModeChords"
                             class={`mode-option ${mode === 'chords' ? 'active' : ''}`}
                             style={getModeStyle(mode === 'chords')}
                         >
                             <input
+                                id="analyzerModeChords"
                                 type="radio"
                                 name="analyzerMode"
                                 value="chords"
@@ -565,10 +567,12 @@ export function AnalyzerModal() {
                             </span>
                         </label>
                         <label
+                            htmlFor="analyzerModeMelody"
                             class={`mode-option ${mode === 'melody' ? 'active' : ''}`}
                             style={getModeStyle(mode === 'melody')}
                         >
                             <input
+                                id="analyzerModeMelody"
                                 type="radio"
                                 name="analyzerMode"
                                 value="melody"
@@ -624,7 +628,7 @@ export function AnalyzerModal() {
                             <label
                                 class="analyzer-drop-zone"
                                 id="analyzerDropZone"
-                                for="analyzerFileInput"
+                                htmlFor="analyzerFileInput"
                                 onDragOver={handleDragOver}
                                 onDrop={handleDrop}
                             >
@@ -675,8 +679,12 @@ export function AnalyzerModal() {
                                 >
                                     Key: {formatUnicodeSymbols(detectedKey)}
                                 </span>
-                                <label style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                                <label
+                                    htmlFor="lockKeyCheck"
+                                    style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.3rem;"
+                                >
                                     <input
+                                        id="lockKeyCheck"
                                         type="checkbox"
                                         checked={forceKey}
                                         onChange={(e) => setForceKey(e.target.checked)}
@@ -702,8 +710,12 @@ export function AnalyzerModal() {
                                 >
                                     Add Chord (Space)
                                 </button>
-                                <label style="font-size: 0.9rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;">
+                                <label
+                                    htmlFor="autoAddCheck"
+                                    style="font-size: 0.9rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;"
+                                >
                                     <input
+                                        id="autoAddCheck"
                                         type="checkbox"
                                         checked={autoAdd}
                                         onChange={(e) => setAutoAdd(e.target.checked)}
@@ -714,7 +726,10 @@ export function AnalyzerModal() {
 
                             <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; text-align: left;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                    <label style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+                                    <label
+                                        id="progressionLabel"
+                                        style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;"
+                                    >
                                         Your Progression
                                     </label>
                                     <div style="display: flex; gap: 0.5rem;">
@@ -779,8 +794,11 @@ export function AnalyzerModal() {
                             </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                                 <div class="setting-item">
-                                    <label class="setting-label">Start (sec)</label>
+                                    <label htmlFor="trimStartInput" class="setting-label">
+                                        Start (sec)
+                                    </label>
                                     <input
+                                        id="trimStartInput"
                                         type="number"
                                         value={trimRange.start}
                                         min="0"
@@ -796,8 +814,11 @@ export function AnalyzerModal() {
                                     />
                                 </div>
                                 <div class="setting-item">
-                                    <label class="setting-label">End (sec)</label>
+                                    <label htmlFor="trimEndInput" class="setting-label">
+                                        End (sec)
+                                    </label>
                                     <input
+                                        id="trimEndInput"
                                         type="number"
                                         value={trimRange.end}
                                         min={trimRange.start + 1}
@@ -821,8 +842,12 @@ export function AnalyzerModal() {
                             </p>
 
                             <div style="margin-bottom: 1rem;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-secondary); cursor: pointer;">
+                                <label
+                                    htmlFor="useArrangerKeyCheck"
+                                    style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-secondary); cursor: pointer;"
+                                >
                                     <input
+                                        id="useArrangerKeyCheck"
                                         type="checkbox"
                                         checked={forceKey}
                                         onChange={(e) => setForceKey(e.target.checked)}
@@ -868,6 +893,7 @@ export function AnalyzerModal() {
 
                             <div id="bpmCandidateContainer" style="margin-bottom: 1.5rem;">
                                 <label
+                                    id="detectedTempoLabel"
                                     class="setting-label"
                                     style="display: block; margin-bottom: 0.5rem;"
                                 >
@@ -888,7 +914,10 @@ export function AnalyzerModal() {
                             <div class="suggested-sections-container">
                                 {analysisData.mode === 'melody' ? (
                                     <div class="harmonizer-options-list">
-                                        <label class="setting-label">
+                                        <label
+                                            id="harmonizationStrategyLabel"
+                                            class="setting-label"
+                                        >
                                             Select Harmonization Strategy:
                                         </label>
                                         {analysisData.options.map((opt, idx) => (
@@ -967,8 +996,12 @@ export function AnalyzerModal() {
                                 class="analyzer-actions"
                                 style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;"
                             >
-                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 1rem; cursor: pointer;">
+                                <label
+                                    htmlFor="replaceExistingCheck"
+                                    style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 1rem; cursor: pointer;"
+                                >
                                     <input
+                                        id="replaceExistingCheck"
                                         type="checkbox"
                                         checked={replaceExisting}
                                         onChange={(e) => setReplaceExisting(e.target.checked)}

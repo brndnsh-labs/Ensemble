@@ -14,3 +14,11 @@
 ## 2025-02-17 - Dynamic Text and ARIA
 **Learning:** Adding a static `aria-label` or `aria-pressed` to buttons with dynamically changing text (like a play/stop button with a timer) hides that critical dynamic information from screen readers.
 **Action:** Only use `aria-pressed` on buttons whose accessible name/text doesn't change when toggled (e.g. icon-only instrument power buttons). Rely on the changing text for explicit state (e.g. 'START' vs 'STOP').
+
+## 2025-03-05 - Confirm Destructive Actions
+**Learning:** Destructive actions without a confirmation dialog, like "Clear All" in the Editor Modal, can lead to accidental data loss. This violates user expectations for safety, especially on mobile where fat-finger taps are common.
+**Action:** Always wrap destructive single-click buttons with an inline or modal confirmation step, ensuring that the critical data clear is an explicit, deliberate user action.
+
+## 2025-03-05 - Label Association for Form Inputs
+**Learning:** Labels that are visually adjacent to inputs (like checkboxes or ranges) but lack an `htmlFor` attribute that explicitly matches the input's `id` degrade the experience for screen reader users and remove the ability to click the label to toggle/focus the input.
+**Action:** Always ensure that `<label>` tags use the `htmlFor` attribute pointing directly to the `id` of their associated `<input>`, `<select>`, or `<textarea>`, even if the input is nested inside the label, to guarantee full click-target and accessibility support.
