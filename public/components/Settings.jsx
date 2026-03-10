@@ -164,11 +164,11 @@ export function Settings() {
             }}
         >
             <div class="settings-content" onClick={(e) => e.stopPropagation()}>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                <div class="modal-header-shared">
                     <h2>Settings</h2>
                     <button
                         id="closeSettingsBtn"
-                        style="background: none; border: none; font-size: 1.5rem;"
+                        class="close-btn"
                         aria-label="Close Settings"
                         onClick={closeSettings}
                     >
@@ -248,7 +248,7 @@ export function Settings() {
                             />
                         </SettingRow>
 
-                        <div style="margin-bottom: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                        <div class="flex-row" style="flex-wrap: wrap; margin-bottom: 1rem;">
                             <SettingRow label="Count-in" id="countInCheck">
                                 <Toggle
                                     id="countInCheck"
@@ -303,11 +303,8 @@ export function Settings() {
                             </SettingRow>
                         </div>
 
-                        <div
-                            class="performance-ending-section"
-                            style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 8px;"
-                        >
-                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="performance-ending-section">
+                            <div class="flex-col">
                                 <SettingRow label="Song Mode" id="sessionTimerCheck">
                                     <Toggle
                                         id="sessionTimerCheck"
@@ -319,14 +316,8 @@ export function Settings() {
                                     />
                                 </SettingRow>
 
-                                <div
-                                    class={!songMode ? 'disabled-group' : ''}
-                                    style="display: flex; flex-direction: column; gap: 1rem;"
-                                >
-                                    <div
-                                        class="ending-mode-selector"
-                                        style="display: flex; gap: 0.5rem;"
-                                    >
+                                <div class={`flex-col ${!songMode ? 'disabled-group' : ''}`}>
+                                    <div class="flex-row">
                                         <button
                                             class={`chip-btn ${loopLimit === 0 ? 'active' : ''}`}
                                             onClick={() => {
@@ -336,19 +327,6 @@ export function Settings() {
                                                     value: 0,
                                                 });
                                                 saveCurrentState();
-                                            }}
-                                            style={{
-                                                padding: '0.4rem 0.8rem',
-                                                borderRadius: '20px',
-                                                border: '1px solid var(--border-color)',
-                                                background:
-                                                    loopLimit === 0
-                                                        ? 'var(--accent-color)'
-                                                        : 'none',
-                                                color:
-                                                    loopLimit === 0 ? 'white' : 'var(--text-color)',
-                                                fontSize: '0.8rem',
-                                                cursor: 'pointer',
                                             }}
                                         >
                                             Timer
@@ -363,17 +341,6 @@ export function Settings() {
                                                 });
                                                 saveCurrentState();
                                             }}
-                                            style={{
-                                                padding: '0.4rem 0.8rem',
-                                                borderRadius: '20px',
-                                                border: '1px solid var(--border-color)',
-                                                background:
-                                                    loopLimit > 0 ? 'var(--accent-color)' : 'none',
-                                                color:
-                                                    loopLimit > 0 ? 'white' : 'var(--text-color)',
-                                                fontSize: '0.8rem',
-                                                cursor: 'pointer',
-                                            }}
                                         >
                                             Loops
                                         </button>
@@ -383,7 +350,7 @@ export function Settings() {
                                         label={loopLimit > 0 ? 'Choruses' : 'Minutes'}
                                         id="sessionTimerStepper"
                                     >
-                                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+                                        <div class="flex-col" style="align-items: flex-end;">
                                             <Stepper
                                                 id="sessionTimer"
                                                 value={loopLimit > 0 ? loopLimit : sessionTimer}
@@ -421,7 +388,10 @@ export function Settings() {
                                                 }}
                                             />
                                             {loopLimit > 0 && (
-                                                <div style="font-size: 0.75rem; color: var(--accent-color); font-weight: 500;">
+                                                <div
+                                                    class="text-mini-muted"
+                                                    style="color: var(--accent-color); font-weight: 500;"
+                                                >
                                                     {(() => {
                                                         const { arranger, playback } = getState();
                                                         const totalSteps =
@@ -440,10 +410,7 @@ export function Settings() {
                                     </SettingRow>
                                 </div>
                             </div>
-                            <p
-                                class="performance-ending-footer"
-                                style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;"
-                            >
+                            <p class="performance-ending-footer">
                                 The band will evolve the energy naturally and perform a resolution
                                 at the end of the final loop once the limit is reached.
                             </p>
@@ -518,16 +485,11 @@ export function Settings() {
                                 />
                             </SettingRow>
 
-                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                            <div class="midi-grid">
                                 {['Chords', 'Bass', 'Soloist', 'Harmony', 'Drums'].map((ch) => (
                                     <div class="midi-ch-group" key={ch}>
-                                        <label
-                                            htmlFor={`midi${ch}Channel`}
-                                            style="display: block; margin-bottom: 0.3rem; font-size: 0.75rem; color: #64748b;"
-                                        >
-                                            {ch}
-                                        </label>
-                                        <div style="display: flex; gap: 0.25rem;">
+                                        <label htmlFor={`midi${ch}Channel`}>{ch}</label>
+                                        <div class="flex-row">
                                             <input
                                                 id={`midi${ch}Channel`}
                                                 type="number"
@@ -543,7 +505,6 @@ export function Settings() {
                                                     });
                                                     saveCurrentState();
                                                 }}
-                                                style="width: 50%;"
                                                 title="Channel"
                                                 aria-label={`${ch} MIDI Channel`}
                                             />
@@ -562,7 +523,6 @@ export function Settings() {
                                                     });
                                                     saveCurrentState();
                                                 }}
-                                                style="width: 50%;"
                                                 title="Octave Offset"
                                                 aria-label={`${ch} MIDI Octave Offset`}
                                             />
@@ -620,35 +580,34 @@ export function Settings() {
                         title="System Actions"
                         style="border-bottom: none; padding-bottom: 0;"
                     >
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <div class="grid-actions">
                             <button
                                 id="settingsExportMidiBtn"
-                                class="secondary-btn"
-                                style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem 0.5rem;"
+                                class="secondary-btn flex-row"
+                                style="justify-content: center;"
                                 onClick={openExportModal}
                             >
                                 <span>🎹</span> Export MIDI
                             </button>
                             <button
                                 id="installAppBtn"
-                                class="secondary-btn"
-                                style="display: none; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem 0.5rem;"
+                                class="secondary-btn flex-row"
+                                style="display: none; justify-content: center;"
                                 onClick={handleInstall}
                             >
                                 <span>📲</span> Install App
                             </button>
                             <button
                                 id="resetSettingsBtn"
-                                class="secondary-btn"
-                                style="color: var(--error-color); background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); padding: 0.8rem 0.5rem;"
+                                class="secondary-btn danger-btn"
                                 onClick={handleReset}
                             >
                                 <span>🗑️</span> Reset All
                             </button>
                             <button
                                 id="refreshAppBtn"
-                                class="secondary-btn"
-                                style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem 0.5rem;"
+                                class="secondary-btn flex-row"
+                                style="justify-content: center;"
                                 onClick={() => window.location.reload()}
                             >
                                 <span>🔄</span> Force Refresh
@@ -676,21 +635,16 @@ export function Settings() {
                         </SettingRow>
                     </SettingGroup>
 
-                    <div
-                        class="settings-help"
-                        style="margin-top: 1rem; border-top: 1px solid #334155; padding-top: 1rem; border-top: none;"
-                    >
+                    <div class="settings-help">
                         <details open>
-                            <summary style="cursor: pointer; font-weight: bold; color: var(--text-primary); list-style: none; display: flex; align-items: center; justify-content: space-between;">
+                            <summary>
                                 <span>Help & Instructions</span>
-                                <span style="font-size: 0.8em;">▼</span>
+                                <span class="summary-arrow">▼</span>
                             </summary>
-                            <div style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6;">
-                                <div style="margin-bottom: 1.5rem; background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
-                                    <h4 style="color: var(--accent-color); margin-top: 0; margin-bottom: 0.5rem;">
-                                        Need more help?
-                                    </h4>
-                                    <p style="margin-bottom: 0.8rem;">
+                            <div class="help-content">
+                                <div class="help-card">
+                                    <h4>Need more help?</h4>
+                                    <p>
                                         For a deep dive into notation, soloing styles, and MIDI
                                         export, check out the full manual.
                                     </p>
@@ -698,17 +652,14 @@ export function Settings() {
                                         href="manual.html"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        style="color: white; background: var(--accent-color); padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;"
+                                        class="manual-link"
                                     >
                                         Open User Manual
                                     </a>
                                 </div>
                             </div>
                         </details>
-                        <div
-                            id="appVersion"
-                            style="text-align: center; margin-top: 1.5rem; color: var(--text-muted); font-size: 0.8rem; opacity: 0.7;"
-                        >
+                        <div id="appVersion" class="app-version-display">
                             Ensemble v{APP_VERSION}
                         </div>
                     </div>

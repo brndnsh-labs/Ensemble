@@ -205,7 +205,8 @@ body.modal-open {
     height: 100vh; /* Fill screen on mobile */
 }
 
-.modal-header {
+.modal-header,
+.modal-header-shared {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -215,12 +216,170 @@ body.modal-open {
     flex-shrink: 0;
 }
 
-.modal-header h2 {
+.modal-header h2,
+.modal-header-shared h2 {
     margin: 0;
     font-size: 0.9rem;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+}
+
+/* --- Analyzer Specifics --- */
+.analyzer-modes {
+    display: flex;
+    gap: 8px;
+    margin: 1rem 0;
+    background: var(--input-bg);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.analyzer-mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.analyzer-mode-btn.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.analyzer-drop-zone {
+    display: block;
+    text-align: center;
+    padding: 2rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border: 2px dashed var(--border-color);
+    transition: all 0.2s;
+}
+
+.analyzer-drop-zone.active {
+    border-color: var(--green);
+    background: rgba(var(--success-color-rgb), 0.1);
+}
+
+.analyzer-freq-display {
+    font-size: 4rem;
+    margin: 0.5rem 0 1rem 0;
+    color: var(--green);
+    text-shadow: 0 0 20px rgba(133, 153, 0, 0.4);
+    min-height: 1.2em;
+    font-family: var(--font-mono);
+    text-align: center;
+}
+
+.analyzer-results-box {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.analyzer-chord-list {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    color: white;
+    min-height: 1.5em;
+    word-break: break-all;
+    line-height: 1.6;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close-btn:hover {
+    color: var(--text-color);
+}
+
+.midi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.midi-ch-group label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.settings-help {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.5rem;
+}
+
+.settings-help summary {
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--text-color);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.settings-help summary::-webkit-details-marker {
+    display: none;
+}
+
+.summary-arrow {
+    font-size: 0.8em;
+    color: var(--accent-color);
+}
+
+.help-content {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.help-card {
+    background: rgba(var(--accent-color-rgb), 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(var(--accent-color-rgb), 0.2);
+}
+
+.help-card h4 {
+    color: var(--accent-color);
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.manual-link {
+    color: white;
+    background: var(--accent-color);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.app-version-display {
+    text-align: center;
+    margin-top: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    opacity: 0.7;
 }
 
 .editor-scroll-area {
@@ -719,7 +878,8 @@ input[type="range"] {
     flex-wrap: wrap;
 }
 
-.section-setting-item {
+.section-setting-item,
+.form-control-compact {
     display: flex;
     align-items: center;
     background: var(--input-bg);

@@ -62,7 +62,7 @@ export function InstrumentSettings({ module }) {
     };
 
     return (
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <div class="grid-2-col">
             {/* Left Column: Instrument Specifics */}
             <SettingGroup
                 title={
@@ -226,7 +226,7 @@ function GrooveControls({ state }) {
     return (
         <Fragment>
             <SettingRow label="Swing" id="swingSlider" valueDisplay={`${swing || 0}%`}>
-                <div style="display: flex; gap: 0.4rem; align-items: center;">
+                <div class="flex-row">
                     <Slider
                         id="swingSlider"
                         min="0"

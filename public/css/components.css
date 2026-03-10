@@ -6,335 +6,61 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
-    transition: all var(--anim-normal) var(--anim-ease);
     cursor: pointer;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.power-btn.active {
-    background-color: var(--success-color);
-    border-color: #bef264;
-    color: var(--base03);
-    box-shadow:
-        0 0 15px rgba(133, 153, 0, 0.6),
-        inset 0 1px 2px rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
-}
-
-.power-btn.waiting {
-    background-color: var(--yellow);
-    border-color: #fde047;
-    color: var(--base03);
-    box-shadow:
-        0 0 12px rgba(181, 137, 0, 0.5),
-        inset 0 1px 2px rgba(255, 255, 255, 0.3);
-    transform: scale(1.02);
-    animation: waiting-pulse 1s infinite alternate var(--anim-ease);
-}
-
-.power-btn.performance-active {
-    background-color: var(--cyan);
-    border-color: #67e8f9;
-    color: var(--base03);
-    box-shadow:
-        0 0 15px rgba(42, 161, 152, 0.6),
-        inset 0 1px 2px rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
-}
-
-@keyframes waiting-pulse {
-    from {
-        opacity: 0.8;
-        transform: scale(1.02);
-        box-shadow: 0 0 8px rgba(181, 137, 0, 0.4);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1.1);
-        box-shadow: 0 0 16px rgba(181, 137, 0, 0.7);
-    }
+    transition: all 0.2s ease;
+    font-size: 1rem;
+    padding: 0;
 }
 
 .power-btn:hover {
-    border-color: var(--text-secondary);
-    transform: scale(1.1);
+    color: var(--text-color);
+    border-color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.05);
 }
 
-.power-btn.active:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 20px rgba(133, 153, 0, 0.8);
+.power-btn.active {
+    color: var(--green);
+    border-color: var(--green);
+    background: rgba(133, 153, 0, 0.1);
+    box-shadow: 0 0 10px rgba(133, 153, 0, 0.2);
 }
 
-/* Ensure mobile tab power buttons are sized correctly */
-.tab-item .power-btn,
-.mobile-tabs-nav .power-btn {
-    width: 24px;
-    height: 24px;
-    font-size: 0.75rem;
-    border-width: 1px;
+/* Dashboard Specific Layout Utilities */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
-/* Update Banner */
-.update-banner {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%) translateY(-200%);
+.panel {
     background: var(--panel-color);
-    border: 1px solid var(--accent-color);
-    padding: 1rem;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    z-index: var(--z-toast);
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.update-banner.show {
-    transform: translateX(-50%) translateY(0);
-}
-
-.update-banner span {
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-#updateRefreshBtn {
-    background: var(--accent-color);
-    color: white;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.85rem;
-    cursor: pointer;
-}
-
-#updateRefreshBtn:hover {
-    background: var(--accent-hover);
-}
-
-@media (max-width: 600px) {
-    .update-banner {
-        left: 10px;
-        right: 10px;
-        top: 10px;
-        transform: translateY(-200%);
-        flex-direction: column;
-        align-items: stretch;
-        text-align: center;
-    }
-
-    .update-banner.show {
-        transform: translateY(0);
-    }
-}
-
-/* --- Audio Analyzer --- */
-.analyzer-drop-zone {
-    border: 2px dashed var(--border-color);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 3rem 2rem;
-    text-align: center;
-    background: rgba(59, 130, 246, 0.08);
-    transition: all 0.2s ease;
-    cursor: pointer;
-    margin: 1rem 0;
-    display: block;
-}
-
-.analyzer-drop-zone:hover,
-.analyzer-drop-zone.drag-over {
-    border-color: var(--accent-color);
-    background: rgba(59, 130, 246, 0.05);
-}
-
-.drop-icon {
-    font-size: 3rem;
-    display: block;
-    margin-bottom: 1rem;
-}
-
-.drop-subtext {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
-.analyzer-processing {
-    text-align: center;
-    padding: 2rem;
-}
-
-.progress-bar-container {
-    width: 100%;
-    height: 8px;
-    background: var(--input-bg);
-    border-radius: 4px;
-    margin-top: 1rem;
-    overflow: hidden;
-}
-
-.progress-bar {
-    width: 0%;
-    height: 100%;
-    background: var(--accent-color);
-    transition: width 0.3s ease;
-}
-
-.spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: var(--accent-color);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1rem;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.analyzer-results {
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    margin-top: 1rem;
-}
-
-/* --- Waveform Visualizer --- */
-.analyzer-trim-view {
-    padding: 1rem 0;
-}
-
-.waveform-container {
+    padding: 1.5rem;
     position: relative;
-    width: 100%;
-    height: 120px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
     overflow: hidden;
-    border: 1px solid var(--border-color);
 }
 
-#analyzerWaveformCanvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.waveform-selection {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    background: rgba(59, 130, 246, 0.2);
-    border-left: 2px solid var(--accent-color);
-    border-right: 2px solid var(--accent-color);
-    pointer-events: none;
-    transition:
-        left 0.1s ease,
-        width 0.1s ease;
-}
-
-.suggested-sections-list {
-    max-height: 300px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.suggested-sections-list h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.8rem;
-    color: var(--accent-color);
-    text-transform: uppercase;
-}
-
-.suggested-section-item {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.75rem;
-}
-
-.ss-header {
+.panel-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
 }
 
-.ss-repeat {
-    color: var(--accent-color);
-    font-weight: bold;
-}
-
-.ss-value {
-    font-family: monospace;
-    font-size: 0.9rem;
+.panel-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
     color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-/* Disabled state for grouped UI elements */
-.disabled-group {
-    opacity: 0.4;
-    pointer-events: none;
-    filter: grayscale(1);
-    transition: all 0.3s ease;
-}
-
-/* --- Utility Toggle Buttons --- */
-.mini-toggle-btn {
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-muted);
-    padding: 0.3rem 0.2rem;
-    font-size: 0.65rem;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.2s;
-    font-weight: 600;
-}
-
-.mini-toggle-btn:hover {
-    background: var(--card-bg-hover);
-    border-color: var(--text-secondary);
-}
-
-.mini-toggle-btn.active {
-    background: var(--soloist-color);
-    color: white;
-    border-color: var(--soloist-color);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Accessibility Focus Styles --- */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-[role="button"]:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-.stepper-btn:focus-visible {
-    outline-offset: -2px;
-}
-
-/* Accessibility Utilities */
+/* Visibility Helpers */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -481,4 +207,114 @@ input:focus-visible + .toggle-slider {
 /* Range/Slider Control Overrides */
 .setting-control input[type="range"] {
     width: 120px;
+}
+
+/* Shared Utility: Action Grids */
+.grid-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+/* Shared Utility: Compact Form Controls */
+.form-control-compact {
+    display: flex;
+    align-items: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    height: 28px;
+}
+
+/* Shared Utility: Smart Tab Layouts */
+.smart-tab-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+}
+
+.smart-tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+
+.smart-tab-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.smart-tab-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.25rem;
+}
+
+/* Notification Box */
+.notification-box {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 280px;
+    max-width: 90vw;
+}
+
+/* Layout Utilities */
+.flex-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flex-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.text-mini-muted {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.text-capitalize {
+    text-transform: capitalize;
+}
+
+.danger-btn {
+    color: var(--error-color);
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
 }

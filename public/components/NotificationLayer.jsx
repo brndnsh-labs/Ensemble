@@ -1,77 +1,33 @@
-import { Fragment, h } from 'preact';
-import React, { useEffect, useState } from 'preact/compat';
+import { h } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
-import { PWAUpdateBanner } from './PWAUpdateBanner.jsx';
-
-/**
- * ToastItem handles the animation lifecycle for an individual toast.
- */
-function ToastItem({ message }) {
-    const [isClosing, setIsClosing] = useState(false);
-
-    useEffect(() => {
-        // We know the toast will be unmounted by the state manager after 2s.
-        // We trigger the closing animation slightly before that.
-        const timer = setTimeout(() => {
-            setIsClosing(true);
-        }, 1700); // Start exit animation before unmount (2000ms - 300ms)
-
-        return () => clearTimeout(timer);
-    }, []);
-
-    return (
-        <div class={`toast ${isClosing ? 'closing' : ''}`} role="status" aria-live="polite">
-            {message}
-        </div>
-    );
-}
 
 export function NotificationLayer() {
-    const { toasts, flashIntensity } = useEnsembleState((s) => ({
-        toasts: s.playback.toasts,
-        flashIntensity: s.playback.flashIntensity,
-    }));
+    const notifications = useEnsembleState((s) => s.playback.notifications);
+    const [visibleNotify, setVisibleNotify] = useState([]);
+
+    useEffect(() => {
+        // Track unique IDs to manage exit animations if needed,
+        // but for now we just filter the active ones from state.
+        setVisibleNotify(notifications);
+    }, [notifications]);
+
+    if (!visibleNotify || visibleNotify.length === 0) {
+        return null;
+    }
 
     return (
-        <Fragment>
-            <PWAUpdateBanner />
-            {/* Flash Overlay */}
-            <div
-                id="flashOverlay"
-                style={{
-                    opacity: flashIntensity,
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: 'white',
-                    pointerEvents: 'none',
-                    zIndex: 9999,
-                    transition: flashIntensity > 0 ? 'none' : 'opacity 0.1s ease-out',
-                }}
-            />
-
-            {/* Toasts Container */}
-            <div
-                class="toasts-container"
-                style={{
-                    position: 'fixed',
-                    bottom: '2rem',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 10000,
-                    display: 'flex',
-                    flexDirection: 'column-reverse', // Newest at bottom
-                    gap: '0.5rem',
-                    pointerEvents: 'none',
-                    alignItems: 'center',
-                }}
-            >
-                {toasts.map((toast) => (
-                    <ToastItem key={toast.id} message={toast.message} />
-                ))}
-            </div>
-        </Fragment>
+        <div id="notificationLayer" class="notification-layer">
+            {visibleNotify.map((n) => (
+                <div key={n.id} class="notification-box">
+                    <span class="notification-icon">
+                        {n.type === 'error' ? '⚠️' : n.type === 'success' ? '✅' : 'ℹ️'}
+                    </span>
+                    <div class="notification-content">
+                        <div class="notification-message">{n.message}</div>
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }

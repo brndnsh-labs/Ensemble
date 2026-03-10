@@ -30,7 +30,7 @@ vi.mock('../../../public/state.js', () => ({
 }));
 
 vi.mock('../../../public/midi-export.js', () => ({
-    exportToMidi: mockExportToMidi,
+    exportMIDI: mockExportToMidi,
 }));
 
 import { ExportModal } from '../../../public/components/ExportModal.jsx';

@@ -5,39 +5,40 @@ import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
 export function SoloistSmartTab() {
-    const { tradeMode } = useEnsembleState((s) => ({
-        tradeMode: s.soloist.tradeMode,
+    const { phraseContext, lastRenderedFreq } = useEnsembleState((s) => ({
+        phraseContext: s.soloist.phraseContext,
+        lastRenderedFreq: s.soloist.lastRenderedFreq,
     }));
 
-    const setTradeMode = (mode) => {
-        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
-        saveCurrentState();
-    };
+    if (!phraseContext) {
+        return (
+            <div class="smart-tab-empty">
+                <p>Play to see soloist intelligence...</p>
+            </div>
+        );
+    }
 
     return (
-        <div
-            class="soloist-smart-controls"
-            style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.25rem 0;"
-        >
-            <div class="trade-mode-group">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                    <label style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Trade Mode
-                    </label>
-                    <span style="font-size: 0.7rem; opacity: 0.5; font-style: italic;">
-                        {tradeMode === 'manual' ? 'Manual Control' : `Autoswitch: ${tradeMode}`}
-                    </span>
+        <div class="smart-tab-layout">
+            <div class="smart-tab-header">
+                <label class="smart-tab-label">Current Phrase</label>
+                <span class="text-mini-muted">
+                    {lastRenderedFreq ? `${Math.round(lastRenderedFreq)}Hz` : '--'}
+                </span>
+            </div>
+
+            <div class="smart-tab-grid">
+                <div class="form-control-compact">
+                    <label>Profile</label>
+                    <span class="text-capitalize">{phraseContext.profile || 'none'}</span>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.25rem;">
-                    {['manual', 'sections', 'loops'].map((mode) => (
-                        <button
-                            class={`mini-toggle-btn ${tradeMode === mode ? 'active' : ''}`}
-                            style="text-transform: capitalize;"
-                            onClick={() => setTradeMode(mode)}
-                        >
-                            {mode}
-                        </button>
-                    ))}
+                <div class="form-control-compact">
+                    <label>Intensity</label>
+                    <span>{Math.round(phraseContext.intensity * 100)}%</span>
+                </div>
+                <div class="form-control-compact">
+                    <label>Device</label>
+                    <span class="text-capitalize">{phraseContext.device || 'none'}</span>
                 </div>
             </div>
         </div>

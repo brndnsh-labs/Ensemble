@@ -38,6 +38,9 @@ vi.mock('../../../public/audio-analyzer-lite.js', () => ({
             identifySimpleKey: vi.fn(),
             identifyPulse: vi.fn().mockResolvedValue({ bpm: 120 }),
             analyze: vi.fn().mockResolvedValue({ chords: [], pulse: { bpm: 120 } }),
+            init: vi.fn().mockResolvedValue(undefined),
+            stop: vi.fn(),
+            close: vi.fn(),
         };
     }),
 }));
@@ -87,7 +90,6 @@ vi.stubGlobal('navigator', {
 });
 
 import { AnalyzerModal } from '../../../public/components/AnalyzerModal.jsx';
-import { showToast } from '../../../public/ui.js';
 
 describe('AnalyzerModal Component', () => {
     let container;
@@ -112,6 +114,7 @@ describe('AnalyzerModal Component', () => {
                     sessionStartTime: 0,
                 },
                 arranger: {
+                    sections: [{ id: 's1', progression: 'C' }],
                     key: 'C',
                 },
                 ...overrides,

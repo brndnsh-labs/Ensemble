@@ -1,21 +1,26 @@
 import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { exportToMidi } from '../midi-export.js';
-import { dispatch, getState } from '../state.js';
-import { useEnsembleState } from '../ui-bridge.js';
-
-const { arranger, playback } = getState();
-
+import { exportMIDI } from '../midi-export.js';
+import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-
-// Optimization: Expand the regex to include parentheses, reducing the need for multiple regexes
-const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
+import { useDispatch, useEnsembleState } from '../ui-bridge.js';
+import { Stepper, Toggle } from './UIControls.jsx';
 
 export function ExportModal() {
     const isOpen = useEnsembleState((s) => s.playback.modals.export);
-    const [filename, setFilename] = useState('Ensemble Export');
+    const [isExporting, setIsExporting] = useState(false);
+    const [includeSolo, setIncludeSolo] = useState(true);
+    const [includeBass, setIncludeBass] = useState(true);
+    const [includeChords, setIncludeChords] = useState(true);
+    const [includeHarmony, setIncludeHarmony] = useState(true);
+    const [includeDrums, setIncludeDrums] = useState(true);
+    const [numLoops, setNumLoops] = useState(1);
+    const [addEnding, setAddEnding] = useState(true);
+    const [filename, setFilename] = useState('My Song');
+
     const overlayRef = useRef(null);
+    const dispatch = useDispatch();
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
@@ -28,241 +33,180 @@ export function ExportModal() {
         }
     }, [isOpen]);
 
-    useEffect(() => {
-        if (isOpen) {
-            let defaultName = arranger.lastChordPreset || 'Ensemble Export';
-            defaultName = defaultName.replace(FILENAME_CLEANUP_PATTERN, '').trim();
-            setFilename(`${defaultName} - ${arranger.key} - ${playback.bpm}bpm`);
-        }
-    }, [isOpen]);
-
-    const close = () => {
+    const closeModal = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'export', open: false });
     };
 
-    const adjustExportDuration = (delta) => {
-        const input = document.getElementById('exportDurationInput');
-        if (!input) {
-            return;
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            // Sanitize filename for safety
+            const sanitizedName = filename.replace(/[^a-zA-Z0-9\s\-_()]/g, '').trim();
+
+            const options = {
+                includeSolo,
+                includeBass,
+                includeChords,
+                includeHarmony,
+                includeDrums,
+                numLoops,
+                addEnding,
+                filename: sanitizedName || 'My Song',
+            };
+            await exportMIDI(options);
+            dispatch(ACTIONS.NOTIFY, {
+                message: 'MIDI Export complete!',
+                type: 'success',
+            });
+            closeModal();
+        } catch (err) {
+            console.error('Export failed:', err);
+            dispatch(ACTIONS.NOTIFY, {
+                message: 'Export failed. Check console for details.',
+                type: 'error',
+            });
+        } finally {
+            setIsExporting(false);
         }
-        const current = parseInt(input.value, 10);
-        const next = Math.max(1, Math.min(20, current + delta));
-        input.value = next;
     };
 
-    const handleModeChange = (e) => {
-        const isTime = e.target.value === 'time';
-        const container = document.getElementById('exportDurationContainer');
-        const stepper = document.getElementById('exportDurationStepper');
-        if (container) {
-            container.style.opacity = isTime ? '1' : '0.5';
-            container.style.pointerEvents = isTime ? 'auto' : 'none';
-        }
-        if (stepper) {
-            stepper.style.borderColor = isTime ? 'var(--accent-color)' : 'var(--border-color)';
-            stepper.style.backgroundColor = isTime ? 'var(--card-bg)' : 'var(--input-bg)';
-        }
-    };
-
-    const handleConfirmExport = () => {
-        const includedTracks = [];
-        if (document.getElementById('exportChordsCheck')?.checked) {
-            includedTracks.push('chords');
-        }
-        if (document.getElementById('exportBassCheck')?.checked) {
-            includedTracks.push('bass');
-        }
-        if (document.getElementById('exportSoloistCheck')?.checked) {
-            includedTracks.push('soloist');
-        }
-        if (document.getElementById('exportHarmoniesCheck')?.checked) {
-            includedTracks.push('harmonies');
-        }
-        if (document.getElementById('exportDrumsCheck')?.checked) {
-            includedTracks.push('drums');
-        }
-
-        const loopMode =
-            document.querySelector('input[name="exportMode"]:checked')?.value || 'once';
-        const targetDurationInput = document.getElementById('exportDurationInput');
-        const targetDuration = targetDurationInput ? parseFloat(targetDurationInput.value) : 1;
-        // Sanitize filename to prevent XSS and file system issues (defense in depth)
-        // Optimization: Use module constant for filename cleanup to reduce regex recompilation overhead
-        const safeFilename = (filename || 'Ensemble Export')
-            .replace(FILENAME_CLEANUP_PATTERN, '')
-            .substring(0, 64)
-            .trim();
-
-        const finalFilename = safeFilename || 'Ensemble Export';
-
-        close();
-        exportToMidi({ includedTracks, loopMode, targetDuration, filename: finalFilename });
-    };
+    if (!isOpen) {
+        return null;
+    }
 
     return (
         <div
             id="exportOverlay"
             ref={overlayRef}
-            class={`settings-overlay ${isOpen ? 'active' : ''}`}
-            aria-hidden={!isOpen ? 'true' : 'false'}
+            class={`modal-overlay ${isOpen ? 'active' : ''}`}
             onClick={(e) => {
                 if (e.target.id === 'exportOverlay') {
-                    close();
+                    closeModal();
                 }
             }}
         >
-            <div class="settings-content" onClick={(e) => e.stopPropagation()}>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; align-items: center;">
-                    <h2>MIDI Export Options</h2>
-                    <button
-                        id="closeExportBtn"
-                        class="primary-btn"
-                        style="padding: 0.4rem 1rem; font-size: 0.9rem; background: transparent; border: 1px solid var(--border-color); color: var(--text-color);"
-                        onClick={close}
-                    >
-                        Cancel
+            <div class="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div class="modal-header-shared">
+                    <h2>MIDI Export</h2>
+                    <button class="close-btn" aria-label="Close" onClick={closeModal}>
+                        &times;
                     </button>
                 </div>
 
-                <div class="settings-controls">
+                <div class="modal-body">
                     <div class="settings-section">
-                        <h3>File Info</h3>
-                        <div class="setting-item">
-                            <label htmlFor="exportFilenameInput" class="setting-label">
-                                <span>Filename</span>
+                        <h3>Export Settings</h3>
+                        <div class="flex-col">
+                            <label
+                                class="form-control-compact"
+                                style="height: auto; padding: 0.5rem;"
+                            >
+                                <div class="flex-col w-full" style="gap: 0.25rem;">
+                                    <span class="text-mini-muted">Filename</span>
+                                    <input
+                                        id="exportFilenameInput"
+                                        type="text"
+                                        value={filename}
+                                        onInput={(e) => setFilename(e.target.value)}
+                                        maxLength="64"
+                                        class="w-full"
+                                        style="background: transparent; border: none; border-bottom: 1px solid var(--border-color); color: var(--text-color); font-weight: bold;"
+                                    />
+                                </div>
                             </label>
-                            <input
-                                type="text"
-                                id="exportFilenameInput"
-                                value={filename}
-                                maxLength={64}
-                                onInput={(e) => setFilename(e.target.value)}
-                                style="width: 100%; padding: 0.5rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px;"
-                                spellcheck="false"
-                            />
                         </div>
                     </div>
 
                     <div class="settings-section">
-                        <h3>Tracks to Include</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <label
-                                htmlFor="exportChordsCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input type="checkbox" id="exportChordsCheck" checked />
-                                Chords
+                        <h3>Included Tracks</h3>
+                        <div class="grid-actions" style="grid-template-columns: 1fr 1fr 1fr;">
+                            <label class="form-control-compact">
+                                <Toggle
+                                    id="exportSolo"
+                                    checked={includeSolo}
+                                    onChange={setIncludeSolo}
+                                />
+                                <span>Solo</span>
                             </label>
-                            <label
-                                htmlFor="exportBassCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input type="checkbox" id="exportBassCheck" checked />
-                                Bass
+                            <label class="form-control-compact">
+                                <Toggle
+                                    id="exportBass"
+                                    checked={includeBass}
+                                    onChange={setIncludeBass}
+                                />
+                                <span>Bass</span>
                             </label>
-                            <label
-                                htmlFor="exportSoloistCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input type="checkbox" id="exportSoloistCheck" checked />
-                                Soloist
+                            <label class="form-control-compact">
+                                <Toggle
+                                    id="exportChords"
+                                    checked={includeChords}
+                                    onChange={setIncludeChords}
+                                />
+                                <span>Chords</span>
                             </label>
-                            <label
-                                htmlFor="exportHarmoniesCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input type="checkbox" id="exportHarmoniesCheck" checked />
-                                Harmonies
+                            <label class="form-control-compact">
+                                <Toggle
+                                    id="exportHarmony"
+                                    checked={includeHarmony}
+                                    onChange={setIncludeHarmony}
+                                />
+                                <span>Harmony</span>
                             </label>
-                            <label
-                                htmlFor="exportDrumsCheck"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input type="checkbox" id="exportDrumsCheck" checked />
-                                Drums
+                            <label class="form-control-compact">
+                                <Toggle
+                                    id="exportDrums"
+                                    checked={includeDrums}
+                                    onChange={setIncludeDrums}
+                                />
+                                <span>Drums</span>
                             </label>
                         </div>
                     </div>
 
                     <div class="settings-section" style="border-bottom: none;">
                         <h3>Duration</h3>
-                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="flex-col">
                             <label
-                                htmlFor="exportModeOnce"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
+                                class="form-control-compact"
+                                style="height: auto; padding: 0.5rem;"
                             >
-                                <input
-                                    id="exportModeOnce"
-                                    type="radio"
-                                    name="exportMode"
-                                    value="once"
-                                    checked
-                                    onChange={handleModeChange}
-                                />
-                                <span>Cycle Through Once</span>
-                            </label>
-                            <label
-                                htmlFor="exportModeTime"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
-                                    id="exportModeTime"
-                                    type="radio"
-                                    name="exportMode"
-                                    value="time"
-                                    onChange={handleModeChange}
-                                />
-                                <span>Target Duration (Minutes)</span>
-                            </label>
-                            <div
-                                id="exportDurationContainer"
-                                style="margin-left: 1.8rem; opacity: 0.5; pointer-events: none; transition: opacity 0.2s;"
-                            >
-                                <div
-                                    id="exportDurationStepper"
-                                    class="stepper-control"
-                                    style="display: flex; align-items: center; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; width: fit-content;"
-                                >
-                                    <button
-                                        id="exportDurationDec"
-                                        aria-label="Decrease Duration"
-                                        class="stepper-btn"
-                                        style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;"
-                                        onClick={() => adjustExportDuration(-1)}
-                                    >
-                                        -
-                                    </button>
-                                    <input
-                                        type="number"
-                                        id="exportDurationInput"
-                                        value="3"
-                                        min="1"
-                                        max="20"
-                                        readonly
-                                        style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;"
+                                <div class="flex-between w-full">
+                                    <span>Repeat Loops</span>
+                                    <Stepper
+                                        value={numLoops}
+                                        min={1}
+                                        max={32}
+                                        onDecrement={() => setNumLoops(Math.max(1, numLoops - 1))}
+                                        onIncrement={() => setNumLoops(Math.min(32, numLoops + 1))}
                                     />
-                                    <button
-                                        id="exportDurationInc"
-                                        aria-label="Increase Duration"
-                                        class="stepper-btn"
-                                        style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;"
-                                        onClick={() => adjustExportDuration(1)}
-                                    >
-                                        +
-                                    </button>
                                 </div>
-                            </div>
+                            </label>
+
+                            <label
+                                class="form-control-compact"
+                                style="height: auto; padding: 0.5rem;"
+                            >
+                                <div class="flex-between w-full">
+                                    <span>Add Resolution Ending</span>
+                                    <Toggle
+                                        id="exportEnding"
+                                        checked={addEnding}
+                                        onChange={setAddEnding}
+                                    />
+                                </div>
+                            </label>
                         </div>
                     </div>
 
                     <div style="margin-top: 1.5rem;">
                         <button
                             id="confirmExportBtn"
-                            class="primary-btn"
-                            style="width: 100%; padding: 1rem;"
-                            onClick={handleConfirmExport}
+                            class="primary-btn w-full"
+                            onClick={handleExport}
+                            disabled={isExporting}
+                            style="padding: 1rem;"
                         >
-                            Download MIDI
+                            {isExporting ? 'Generating File...' : 'Download MIDI (.mid)'}
                         </button>
                     </div>
                 </div>
