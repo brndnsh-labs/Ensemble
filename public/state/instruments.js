@@ -330,6 +330,9 @@ export function setSoloistParam(param, value) {
         case 'phrasingIntensity':
             soloist.phrasingIntensity = value;
             break;
+        case 'tradeMode':
+            soloist.tradeMode = value;
+            break;
         default:
             console.warn(`[State] Unknown soloist param: ${param}`);
             break;

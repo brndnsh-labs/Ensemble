@@ -140,3 +140,31 @@ export function Stepper({
         </div>
     );
 }
+
+/**
+ * Reusable ButtonGroup for mutually exclusive options (chips).
+ */
+export function ButtonGroup({ options, value, onChange }) {
+    return (
+        <div class="flex-row" style="gap: 0.25rem;">
+            {options.map((opt) => (
+                <button
+                    key={opt.value}
+                    class={`chip-btn ${value === opt.value ? 'active' : ''}`}
+                    onClick={() => onChange(opt.value)}
+                    style={{
+                        padding: '0.25rem 0.6rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '4px',
+                        background: value === opt.value ? 'var(--accent-color)' : 'var(--input-bg)',
+                        color: value === opt.value ? 'white' : 'var(--text-color)',
+                        border: '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                    }}
+                >
+                    {opt.label}
+                </button>
+            ))}
+        </div>
+    );
+}
