@@ -30,12 +30,14 @@ vi.mock('../../../public/state.js', () => {
                 exponentialRampToValueAtTime: vi.fn(),
             },
             connect: vi.fn(),
+            stop: vi.fn(),
         })),
         createBiquadFilter: vi.fn(() => ({
             type: '',
             frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
             Q: { value: 0 },
             connect: vi.fn(),
+            stop: vi.fn(),
         })),
         createBufferSource: vi.fn(() => ({
             buffer: null,
@@ -52,6 +54,7 @@ vi.mock('../../../public/state.js', () => {
         createDelay: vi.fn(() => ({
             delayTime: { value: 0, setValueAtTime: vi.fn() },
             connect: vi.fn(),
+            stop: vi.fn(),
         })),
         createBuffer: vi.fn(() => ({
             getChannelData: vi.fn(() => new Float32Array(44100 * 4)),
@@ -60,6 +63,7 @@ vi.mock('../../../public/state.js', () => {
         createStereoPanner: vi.fn(() => ({
             pan: { setValueAtTime: vi.fn(), value: 0 },
             connect: vi.fn(),
+            stop: vi.fn(),
         })),
     };
 

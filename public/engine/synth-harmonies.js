@@ -1,5 +1,6 @@
 import { getState } from '../state.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
+import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
 
 /**
  * Polyphonic Synthesizer for the Harmony Module (harmony).
@@ -8,18 +9,7 @@ import { clampFreq, safeDisconnect } from '../utils.js';
 
 export function killHarmonyNote(fadeTime = 0.05) {
     const { playback, harmony } = getState();
-    if (harmony.activeVoices && harmony.activeVoices.length > 0) {
-        harmony.activeVoices.forEach((voice) => {
-            try {
-                const g = voice.gain.gain;
-                g.cancelScheduledValues(playback.audio.currentTime);
-                g.setTargetAtTime(0, playback.audio.currentTime, fadeTime);
-            } catch {
-                /* ignore error */
-            }
-        });
-        harmony.activeVoices = [];
-    }
+    killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
 }
 
 /**
@@ -53,26 +43,27 @@ export function playHarmonyNote(
     // Remove expired voices
     harmony.activeVoices = harmony.activeVoices.filter((v) => v.time + v.duration + 0.1 > playTime);
 
-    // Pitch-aware Stealing: If this exact MIDI note is already playing, kill it immediately
+    // Pitch-aware Stealing
     if (midi !== null) {
         const existing = harmony.activeVoices.find((v) => v.midi === midi);
         if (existing) {
-            existing.gain.gain.cancelScheduledValues(playTime);
-            existing.gain.gain.setTargetAtTime(0, playTime, 0.005);
+            killActiveVoices([existing], playTime, 0.005);
+            // harmony.activeVoices update is handled by killActiveVoices if passed whole array,
+            // but here we pass a slice, so we need to manually filter if the utility clears the passed array.
+            // Actually killActiveVoices clears the array passed to it.
+            // Let's re-filter to be safe.
             harmony.activeVoices = harmony.activeVoices.filter((v) => v !== existing);
         }
     }
 
-    // Polyphonic Limit (Max 3 voices for clarity and ensemble focus)
+    // Polyphonic Limit (Max 3 voices)
     if (harmony.activeVoices.length >= 3) {
         const oldest = harmony.activeVoices.shift();
         if (oldest) {
-            oldest.gain.gain.cancelScheduledValues(playTime);
-            oldest.gain.gain.setTargetAtTime(0, playTime, 0.01);
+            killActiveVoices([oldest], playTime, 0.01);
         }
     }
 
-    // Module-Level Polyphony Scaling
     const polyphonyDucking = harmony.activeVoices.length > 1 ? 0.85 : 1.0;
     const finalVol = vol * polyphonyDucking;
 
@@ -82,34 +73,25 @@ export function playHarmonyNote(
     const filter = playback.audio.createBiquadFilter();
     filter.type = 'lowpass';
 
-    // --- Articulation: Stereo Stage Bloom ---
-    // Widens the ensemble as intensity builds.
-    // Low intensity = centered/focused. High intensity = wide/orchestral.
-    const panner = playback.audio.createStereoPanner ? playback.audio.createStereoPanner() : null;
-    if (panner) {
-        // Random slight pan per voice, depth scales with intensity
-        const panRange = 0.1 + playback.bandIntensity * 0.7;
-        const panValue = (Math.random() * 2 - 1) * panRange;
-        panner.pan.setValueAtTime(panValue, playTime);
-    }
+    const panRange = 0.1 + playback.bandIntensity * 0.7;
+    const panValue = (Math.random() * 2 - 1) * panRange;
+    const panner = createSimplePanner(playback.audio, panValue, playTime);
 
-    // Synthesis: Multi-oscillator setup for "Ensemble" feel
     const osc1 = playback.audio.createOscillator();
     const osc2 = playback.audio.createOscillator();
 
-    // --- Lane Protection: Sub-Oscillator ---
-    // Only use the sub-oscillator if the main frequency is high enough
-    // to keep the sub-octave out of the primary bass territory.
-    const useSub = freq > 250; // Raised from 200 to clear the bass
+    const useSub = freq > 250;
     const sub = useSub ? playback.audio.createOscillator() : null;
 
-    // --- Articulation: Vibrato (LFO) ---
+    const voiceNodes = [gain, filter, panner, osc1, osc2];
+    if (sub) {
+        voiceNodes.push(sub);
+    }
+
     let lfo = null;
     let lfoGain = null;
     let tremoloLfo = null;
     let tremoloGain = null;
-
-    // Organ-specific nodes (lifted for cleanup)
     let fifthOsc = null;
     let click = null;
     let clickGain = null;
@@ -117,28 +99,25 @@ export function playHarmonyNote(
     let subGain = null;
     let hp = null;
 
-    // Organ Leslie Effect: Combined Pitch and Amplitude Modulation
     if (style === 'organ') {
-        const leslieSpeed = 6.2; // Fast Leslie setting
-
-        // Saturation (Tube Grit) - Initialize early to avoid connection errors
+        const leslieSpeed = 6.2;
         saturator = playback.audio.createWaveShaper();
         saturator.curve = (() => {
             const n = 44100;
             const curve = new Float32Array(n);
-            const k = 2; // Subtle drive
+            const k = 2;
             for (let i = 0; i < n; ++i) {
                 const x = (i * 2) / n - 1;
                 curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
             }
             return curve;
         })();
+        voiceNodes.push(saturator);
 
-        // 1. Pitch Modulation (Doppler)
         lfo = playback.audio.createOscillator();
         lfoGain = playback.audio.createGain();
         lfo.frequency.setValueAtTime(leslieSpeed, playTime);
-        lfoGain.gain.setValueAtTime(5, playTime); // Reduced from 10 to stop "warbling"
+        lfoGain.gain.setValueAtTime(5, playTime);
         lfo.connect(lfoGain);
         lfoGain.connect(osc1.frequency);
         lfoGain.connect(osc2.frequency);
@@ -146,28 +125,25 @@ export function playHarmonyNote(
             lfoGain.connect(sub.frequency);
         }
         lfo.start(playTime);
+        voiceNodes.push(lfo, lfoGain);
 
-        // 2. Amplitude Modulation (Tremolo)
         tremoloLfo = playback.audio.createOscillator();
         tremoloGain = playback.audio.createGain();
         tremoloLfo.type = 'sine';
         tremoloLfo.frequency.setValueAtTime(leslieSpeed, playTime);
-
-        // Tremolo depth (0.1 to 0.3 is natural)
         const tremDepth = 0.2;
         tremoloGain.gain.setValueAtTime(1.0 - tremDepth, playTime);
         const tremAmp = playback.audio.createGain();
         tremAmp.gain.setValueAtTime(tremDepth, playTime);
         tremoloLfo.connect(tremAmp);
-        tremAmp.connect(gain.gain); // Modulate the main gain
-
+        tremAmp.connect(gain.gain);
         tremoloLfo.start(playTime);
+        voiceNodes.push(tremoloLfo, tremoloGain, tremAmp);
     } else if (vibrato && vibrato.rate > 0 && vibrato.depth > 0) {
         lfo = playback.audio.createOscillator();
         lfoGain = playback.audio.createGain();
         lfo.frequency.setValueAtTime(vibrato.rate, playTime);
         lfoGain.gain.setValueAtTime(vibrato.depth, playTime);
-
         lfo.connect(lfoGain);
         lfoGain.connect(osc1.frequency);
         lfoGain.connect(osc2.frequency);
@@ -175,10 +151,10 @@ export function playHarmonyNote(
             lfoGain.connect(sub.frequency);
         }
         lfo.start(playTime);
+        voiceNodes.push(lfo, lfoGain);
     }
 
     if (feel === 'Rock' || feel === 'Metal') {
-        // Aggressive Brass/Synth: Bright Sawtooths
         osc1.type = 'sawtooth';
         osc2.type = 'sawtooth';
         osc2.detune.setValueAtTime(15, playTime);
@@ -187,7 +163,6 @@ export function playHarmonyNote(
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
         }
     } else if (feel === 'Neo-Soul' || feel === 'Acoustic') {
-        // Warm/Soulful: Multi-Triangle for clarity
         osc1.type = 'triangle';
         osc2.type = 'triangle';
         osc2.detune.setValueAtTime(2, playTime);
@@ -196,56 +171,50 @@ export function playHarmonyNote(
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
         }
     } else if (style === 'organ') {
-        // B3 Drawbar Simulation (888 Setting): Root + Fifth + Octave + Sub
-        osc1.type = 'sine'; // 8' (Fundamental)
-
-        osc2.type = 'sine'; // 4' (Octave up)
+        osc1.type = 'sine';
+        osc2.type = 'sine';
         osc2.frequency.setValueAtTime(freq * 2, playTime);
-
-        // 3rd Drawbar: 5 1/3' (Fifth above fundamental)
         fifthOsc = playback.audio.createOscillator();
         fifthOsc.type = 'sine';
         fifthOsc.frequency.setValueAtTime(freq * 1.5, playTime);
+        voiceNodes.push(fifthOsc);
 
         if (sub) {
-            sub.type = 'sine'; // 16' (Sub-fundamental)
+            sub.type = 'sine';
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
-
             subGain = playback.audio.createGain();
-            subGain.gain.setValueAtTime(0.5, playTime); // Sub is 50% volume of fundamental
+            subGain.gain.setValueAtTime(0.5, playTime);
             sub.connect(subGain);
             if (saturator) {
                 subGain.connect(saturator);
             }
+            voiceNodes.push(subGain);
         }
 
-        // Key Click (Percussion) - made slightly louder
         click = playback.audio.createOscillator();
         clickGain = playback.audio.createGain();
         click.type = 'square';
         click.frequency.setValueAtTime(freq * 4, playTime);
         clickGain.gain.setValueAtTime(finalVol * 0.6, playTime);
         clickGain.gain.exponentialRampToValueAtTime(0.001, playTime + 0.04);
-
         click.connect(clickGain);
         clickGain.connect(gain);
         click.start(playTime);
         click.stop(playTime + 0.1);
+        voiceNodes.push(click, clickGain);
 
         if (saturator) {
             osc1.connect(saturator);
             osc2.connect(saturator);
             fifthOsc.connect(saturator);
-
             hp = playback.audio.createBiquadFilter();
             hp.type = 'highpass';
-            hp.frequency.setValueAtTime(120, playTime); // Strict roll-off below 120Hz
-
+            hp.frequency.setValueAtTime(120, playTime);
             saturator.connect(filter);
             filter.connect(hp);
             hp.connect(gain);
+            voiceNodes.push(hp);
         } else {
-            // Fallback if saturator failed
             osc1.connect(filter);
             osc2.connect(filter);
             fifthOsc.connect(filter);
@@ -258,7 +227,6 @@ export function playHarmonyNote(
             lfoGain.connect(fifthOsc.frequency);
         }
     } else if (style === 'plucks') {
-        // Modern EDM Pluck: Short, resonant, punchy
         osc1.type = 'sawtooth';
         osc2.type = 'square';
         osc2.detune.setValueAtTime(5, playTime);
@@ -267,7 +235,6 @@ export function playHarmonyNote(
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
         }
     } else if (style === 'disco') {
-        // Disco Synth Stab: Punchy but with more body than plucks
         osc1.type = 'triangle';
         osc2.type = 'sawtooth';
         osc2.detune.setValueAtTime(4, playTime);
@@ -276,12 +243,10 @@ export function playHarmonyNote(
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
         }
     } else if (style === 'counter') {
-        // Cello/Trombone hybrid: Sawtooth with heavy filtering
         osc1.type = 'sawtooth';
         osc2.type = 'triangle';
         osc2.detune.setValueAtTime(4, playTime);
     } else if (style === 'stabs') {
-        // Horn-like: Bright Sawtooth with body
         osc1.type = 'sawtooth';
         osc2.type = 'triangle';
         osc2.detune.setValueAtTime(12, playTime);
@@ -290,7 +255,6 @@ export function playHarmonyNote(
             sub.frequency.setValueAtTime(freq * 0.5, playTime);
         }
     } else {
-        // Lush Strings: Mixed waveforms
         osc1.type = 'triangle';
         osc2.type = 'sawtooth';
         osc2.detune.setValueAtTime(8, playTime);
@@ -300,7 +264,7 @@ export function playHarmonyNote(
         }
     }
 
-    // --- Articulation: Slides ---
+    // Slides
     if (slideInterval !== 0 && slideDuration > 0) {
         const startFreq = freq * 2 ** (slideInterval / 12);
         osc1.frequency.setValueAtTime(startFreq, playTime);
@@ -308,7 +272,6 @@ export function playHarmonyNote(
         if (sub) {
             sub.frequency.setValueAtTime(startFreq * 0.5, playTime);
         }
-
         osc1.frequency.exponentialRampToValueAtTime(freq, playTime + slideDuration);
         osc2.frequency.exponentialRampToValueAtTime(freq, playTime + slideDuration);
         if (sub) {
@@ -322,10 +285,9 @@ export function playHarmonyNote(
         }
     }
 
-    // --- Articulation: Timbral Bloom ---
-    // Brightness scales with intensity.
+    // Bloom
     const intensity = playback.bandIntensity;
-    const brightnessMult = 1.0 + intensity * 2.0; // Up to 3x brightness increase
+    const brightnessMult = 1.0 + intensity * 2.0;
 
     if (style === 'stabs') {
         const qVal = feel === 'Rock' || feel === 'Metal' ? 5 + intensity * 5 : 3 + intensity * 2;
@@ -337,24 +299,20 @@ export function playHarmonyNote(
         );
         filter.Q.setValueAtTime(qVal, playTime);
     } else if (style === 'plucks') {
-        // "Bubble" envelope
         filter.frequency.setValueAtTime(clampFreq(freq * 8), playTime);
-        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.1); // Fast snap (Reduced from 0.15)
-        filter.Q.setValueAtTime(5 + intensity * 5, playTime); // High resonance
+        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.1);
+        filter.Q.setValueAtTime(5 + intensity * 5, playTime);
     } else if (style === 'disco') {
-        // Warm punchy envelope
         filter.frequency.setValueAtTime(clampFreq(freq * 6), playTime);
         filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2), playTime + 0.12);
-        filter.Q.setValueAtTime(2 + intensity * 3, playTime); // Lower resonance than plucks
+        filter.Q.setValueAtTime(2 + intensity * 3, playTime);
     } else if (style === 'counter') {
-        // Expressive swell
         const start = freq * 1.5;
         const peak = freq * 3.0 * brightnessMult;
         filter.frequency.setValueAtTime(clampFreq(start), playTime);
-        filter.frequency.linearRampToValueAtTime(clampFreq(peak), playTime + duration * 0.6); // Swell
+        filter.frequency.linearRampToValueAtTime(clampFreq(peak), playTime + duration * 0.6);
         filter.Q.setValueAtTime(1.0, playTime);
     } else {
-        // Swell for pads
         const cutoff =
             feel === 'Neo-Soul' ? freq * 1.5 * brightnessMult : freq * 3 * brightnessMult;
         filter.frequency.setValueAtTime(clampFreq(cutoff), playTime);
@@ -366,11 +324,10 @@ export function playHarmonyNote(
         filter.Q.setValueAtTime(1 + intensity, playTime);
     }
 
-    // Amplitude Envelope
+    // Envelope
     const isFastAttack = style === 'stabs' || style === 'plucks' || style === 'organ';
     const baseAttack = isFastAttack ? 0.01 : 0.2;
     const attack = Math.max(0.005, baseAttack - finalVol * 0.15);
-    // Refined release: Plucks need to be super tight (0.02), Stabs (0.1), Pads (0.5)
     let release = 0.5;
     if (style === 'stabs') {
         release = 0.1;
@@ -395,21 +352,14 @@ export function playHarmonyNote(
         }
         filter.connect(gain);
     }
-    // Organ handles its own routing (via saturator -> filter -> hp) to gain
 
-    if (panner) {
-        gain.connect(panner);
-        if (playback.harmoniesGain) {
-            panner.connect(playback.harmoniesGain);
-        }
-    } else {
-        if (playback.harmoniesGain) {
-            gain.connect(playback.harmoniesGain);
-        }
+    gain.connect(panner);
+    if (playback.harmoniesGain) {
+        panner.connect(playback.harmoniesGain);
     }
 
     // Register active voice
-    const voiceRefs = { gain, time: playTime, duration, midi };
+    const voiceRefs = { gain, time: playTime, duration, midi, nodes: voiceNodes };
     harmony.activeVoices.push(voiceRefs);
 
     osc1.start(playTime);
@@ -428,21 +378,5 @@ export function playHarmonyNote(
         lfo.stop(stopTime);
     }
 
-    // Enhanced Cleanup for complex styles
-    osc1.onended = () => {
-        safeDisconnect([gain, filter, osc1, osc2, sub, lfo, lfoGain, panner, hp, subGain]);
-        // Clean up Organ/Tremolo specific nodes if they exist (they are closure-scoped)
-        if (tremoloLfo) {
-            safeDisconnect([tremoloLfo, tremoloGain]);
-        }
-        if (fifthOsc) {
-            safeDisconnect([fifthOsc]);
-        }
-        if (click) {
-            safeDisconnect([click, clickGain]);
-        }
-        if (saturator) {
-            safeDisconnect([saturator]);
-        }
-    };
+    osc1.onended = () => safeDisconnect(voiceNodes);
 }

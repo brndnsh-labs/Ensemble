@@ -1,18 +1,19 @@
 import { getState } from '../state.js';
 import { safeDisconnect } from '../utils.js';
+import { createSimplePanner, rampGain } from './synth-utils.js';
 
 /**
  * Instrument definitions for the chord engine.
  */
 export const INSTRUMENT_PRESETS = {
     Warm: {
-        attack: 0.03, // Slightly softer attack
-        decay: 0.6, // Shortened from 0.8 for better clarity
-        filterBase: 600, // Darker base
+        attack: 0.03,
+        decay: 0.6,
+        filterBase: 600,
         filterDepth: 1800,
-        resonance: 2.2, // Increased for a "sweet" bloom
+        resonance: 2.2,
         tine: true,
-        fundamental: 'triangle', // Swapped from sine for more body
+        fundamental: 'triangle',
         harmonic: 'sine',
         fifth: 'sine',
         weights: [1.2, 0.3, 0.1],
@@ -20,20 +21,18 @@ export const INSTRUMENT_PRESETS = {
         gainMult: 1.0,
     },
     Piano: {
-        attack: 0.001, // Faster transient for more immediate "hit"
+        attack: 0.001,
         decay: 5.0,
-        filterBase: 400, // Lower base for a warmer tone
-        filterDepth: 2400, // Reduced from 4200 to significantly cut harsh high-end
-        resonance: 1.2, // Smoother resonance
-        gainMult: 1.25, // Boosted from 1.1 to anchor the mix
+        filterBase: 400,
+        filterDepth: 2400,
+        resonance: 1.2,
+        gainMult: 1.25,
     },
 };
 
 function createPianoWave(audioCtx) {
-    // Fourier coefficients: [fundamental, 2nd, 3rd, 4th, 5th, ...]
-    // Grand pianos have strong early harmonics and a rich mid-spectrum.
     const real = new Float32Array([0, 1, 0.6, 0.4, 0.25, 0.15, 0.1, 0.08, 0.05, 0.03]);
-    const imag = new Float32Array(real.length).fill(0); // Sine-based components
+    const imag = new Float32Array(real.length).fill(0);
     return audioCtx.createPeriodicWave(real, imag);
 }
 
@@ -50,7 +49,6 @@ export function updateSustain(active, time = null) {
     playback.sustainActive = active;
 
     if (!active && playback.heldNotes) {
-        // Release all held notes
         playback.heldNotes.forEach((note) => {
             note.stop(scheduleTime);
         });
@@ -77,15 +75,6 @@ export function killAllPianoNotes() {
 
 /**
  * Plays a musical note with advanced synthesis based on instrument presets.
- * @param {number} freq - Frequency in Hz.
- * @param {number} time - AudioContext start time.
- * @param {number} duration - Note duration in seconds.
- * @param {Object} options - Synthesis options.
- * @param {number} [options.vol=0.1] - Velocity/Volume.
- * @param {number} [options.index=0] - Note index in chord for strumming.
- * @param {string} [options.instrument='Piano'] - Preset name.
- * @param {boolean} [options.muted=false] - Whether this is a muted strum.
- * @param {number} [options.numVoices=1] - Total voices in the chord for normalization.
  */
 export function playNote(
     freq,
@@ -98,19 +87,14 @@ export function playNote(
         return;
     }
 
-    // Normalize volume based on chord density (Anti-Clutter Scaling)
-    // Formula: v = base_v * (1 / sqrt(num_voices))
-    // This ensures a 5-note chord has the same perceived energy as a 1-note melody.
     const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
     const finalVol = vol * polyphonyComp;
 
-    // Ensure heldNotes exists on playback
     if (!playback.heldNotes) {
         playback.heldNotes = new Set();
     }
 
     try {
-        // Fallback safety for legacy instruments
         if (instrument !== 'Piano' && instrument !== 'Warm') {
             instrument = 'Piano';
         }
@@ -124,15 +108,13 @@ export function playNote(
             pianoWave = createPianoWave(playback.audio);
         }
 
-        // 1. The "Strum" Offset
         const staggerMult = muted ? 0.4 : 1.0;
         const stagger = index * (0.005 + Math.random() * 0.01) * staggerMult;
         const startTime = baseTime + stagger;
 
-        // Intensity-aware brightness mapping (Wide Range for Alternative Loop)
         const intensity = playback.bandIntensity;
-        const intensityShift = (intensity - 0.5) * 2400; // Expanded from 1200
-        const intensityDepthMult = 0.5 + intensity * 2.5; // 0.5x to 3.0x depth (Expanded from 0.5-2.0)
+        const intensityShift = (intensity - 0.5) * 2400;
+        const intensityDepthMult = 0.5 + intensity * 2.5;
         const velocityCutoff = Math.max(
             100,
             preset.filterBase + intensityShift + finalVol * preset.filterDepth * intensityDepthMult,
@@ -150,7 +132,7 @@ export function playNote(
             strikeFilter.Q.setValueAtTime(1.5, startTime);
 
             strikeGain.gain.setValueAtTime(0, startTime);
-            strikeGain.gain.setTargetAtTime(finalVol * 0.15, startTime, 0.001); // Reduced from 0.25
+            strikeGain.gain.setTargetAtTime(finalVol * 0.15, startTime, 0.001);
             strikeGain.gain.setTargetAtTime(0, startTime + 0.01, 0.01);
 
             strike.connect(strikeFilter);
@@ -177,7 +159,7 @@ export function playNote(
 
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(velocityCutoff, startTime);
-        filter.frequency.setTargetAtTime(preset.filterBase, startTime, isPiano ? 0.35 : 0.1); // Reduced from 0.8 for faster tonal decay
+        filter.frequency.setTargetAtTime(preset.filterBase, startTime, isPiano ? 0.35 : 0.1);
         filter.Q.setValueAtTime(preset.resonance, startTime);
 
         mainGain.gain.setValueAtTime(0, startTime);
@@ -188,14 +170,12 @@ export function playNote(
         );
 
         const stopNote = (t, isPanic = false) => {
-            mainGain.gain.cancelScheduledValues(t);
-            // Sharp damping for staccato, smoother for sustained, very fast for panic
             const dampingConstant = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
-            mainGain.gain.setTargetAtTime(0, t, dampingConstant);
+            rampGain(mainGain.gain, 0, t, dampingConstant);
             try {
                 osc.stop(t + 0.5);
             } catch {
-                /* ignore already stopped */
+                /* ignore */
             }
         };
 
@@ -209,19 +189,16 @@ export function playNote(
             }
         } else {
             const actualDuration = muted ? 0.015 : duration;
-            // Immediate damping at end of duration
-            mainGain.gain.setTargetAtTime(0, startTime + actualDuration, 0.03);
+            rampGain(mainGain.gain, 0, startTime + actualDuration, 0.03);
         }
 
         osc.connect(filter);
 
-        // --- Intensity-driven Crunch (>= 0.8) ---
         let lastNode = filter;
         if (intensity >= 0.8 && !muted) {
             const shaper = playback.audio.createWaveShaper();
-            const drive = 1.0 + (intensity - 0.8) * 10.0; // 1.0 to 3.0
+            const drive = 1.0 + (intensity - 0.8) * 10.0;
 
-            // Optimization: Cache curve if drive is similar (saves allocs)
             if (!cachedShaperCurve || Math.abs(drive - cachedShaperDrive) > 0.01) {
                 const n_samples = 44100;
                 cachedShaperCurve = new Float32Array(n_samples);
@@ -241,17 +218,11 @@ export function playNote(
 
         lastNode.connect(mainGain);
 
-        // --- Mix Separation: HPF & Panning ---
         const hpf = playback.audio.createBiquadFilter();
         hpf.type = 'highpass';
         hpf.frequency.setValueAtTime(150, startTime);
 
-        const panner = playback.audio.createStereoPanner
-            ? playback.audio.createStereoPanner()
-            : playback.audio.createGain();
-        if (playback.audio.createStereoPanner) {
-            panner.pan.setValueAtTime(-0.2, startTime); // Slight Left
-        }
+        const panner = createSimplePanner(playback.audio, -0.2, startTime);
 
         mainGain.connect(hpf);
         hpf.connect(panner);
@@ -262,7 +233,7 @@ export function playNote(
             osc.stop(startTime + (muted ? 0.1 : duration + 1.0));
         }
 
-        osc.onended = () => safeDisconnect([osc, filter, mainGain]);
+        osc.onended = () => safeDisconnect([osc, filter, mainGain, hpf, panner]);
     } catch (err) {
         console.error('playNote error:', err);
     }
@@ -270,8 +241,6 @@ export function playNote(
 
 /**
  * Plays a percussive "scratch" or muted strum sound for chord rhythms.
- * @param {number} time - AudioContext time to play.
- * @param {number} vol - Volume multiplier.
  */
 export function playChordScratch(time, vol = 0.1) {
     const { playback, groove } = getState();
@@ -289,7 +258,6 @@ export function playChordScratch(time, vol = 0.1) {
         filter.Q.value = 1.5;
         filter.Q.setValueAtTime(1.5, time);
 
-        gain.gain.value = 0;
         gain.gain.setValueAtTime(0, time);
         gain.gain.setTargetAtTime(randomizedVol, time, 0.005);
         gain.gain.setTargetAtTime(0, time + 0.02, 0.02);
