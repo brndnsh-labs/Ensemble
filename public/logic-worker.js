@@ -1,6 +1,7 @@
 import { compingState, getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass.js';
 import { TIME_SIGNATURES } from './config.js';
+import { DRUM_PRESETS } from './data/drum-presets.js';
 import {
     createCoordinationContext,
     enforceRegisterSlotting,
@@ -12,7 +13,6 @@ import { getChordAtStep, resetCursors, safeSync } from './engine/worker-utils.js
 import { generateProceduralFill } from './fills.js';
 import { analyzeForm } from './form-analysis.js';
 import { getHarmonyNotes } from './harmonies.js';
-import { DRUM_PRESETS } from './presets.js';
 import { generateResolutionNotes } from './resolution.js';
 import { getSoloistNote } from './soloist.js';
 import { getState } from './state.js';

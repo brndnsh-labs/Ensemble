@@ -14,9 +14,14 @@ import { SequencerGrid } from './components/SequencerGrid.jsx';
 import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
 import { APP_VERSION } from './config.js';
+import {
+    BASS_STYLES,
+    CHORD_STYLES,
+    HARMONY_STYLES,
+    SOLOIST_STYLES,
+} from './data/instrument-styles.js';
 import { togglePower } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
-import { BASS_STYLES, CHORD_STYLES, HARMONY_STYLES, SOLOIST_STYLES } from './presets.js';
 import { triggerInstall } from './pwa.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';

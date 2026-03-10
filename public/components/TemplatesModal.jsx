@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
-import { SONG_TEMPLATES } from '../presets.js';
+import { SONG_TEMPLATES } from '../data/song-templates.js';
 import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';

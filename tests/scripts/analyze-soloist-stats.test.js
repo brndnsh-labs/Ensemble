@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { SMART_GENRES } from '../../public/presets.js';
+import { SMART_GENRES } from '../../public/data/smart-genres.js';
 import { getSoloistNote } from '../../public/soloist.js';
 
 // --- MOCKS ---

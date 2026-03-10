@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
-import { DRUM_PRESETS } from '../../public/presets.js';
+import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 
 describe('Preset Data Integrity', () => {
     it('should have expanded all drum pattern strings into numeric arrays', () => {

@@ -1,6 +1,7 @@
 import { applyTheme } from './app-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from './config.js';
-import { CHORD_STYLES, SMART_GENRES } from './presets.js';
+import { CHORD_STYLES } from './data/instrument-styles.js';
+import { SMART_GENRES } from './data/smart-genres.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
 import {

@@ -264,7 +264,7 @@ function GenreSelector() {
     ];
 
     const handleGenreClick = (genre) => {
-        import('../presets.js').then(({ SMART_GENRES }) => {
+        import('../data/smart-genres.js').then(({ SMART_GENRES }) => {
             const config = SMART_GENRES[genre];
             if (config) {
                 dispatch(ACTIONS.SET_GENRE_FEEL, {

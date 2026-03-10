@@ -88,7 +88,8 @@ import { getScaleForChord } from '../../public/theory-scales.js';
 
 const { arranger, groove, soloist } = getState();
 
-import { CHORD_PRESETS, SONG_TEMPLATES } from '../../public/presets.js';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { SONG_TEMPLATES } from '../../public/data/song-templates.js';
 
 describe('Progression Audit: Verifying All Library Presets', () => {
     const allTemplates = [...CHORD_PRESETS, ...SONG_TEMPLATES];

@@ -6,6 +6,7 @@ import {
     updateLarsTempo,
 } from '../conductor.js';
 import { TIME_SIGNATURES } from '../config.js';
+import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import {
     normalizeMidiVelocity,
@@ -22,7 +23,6 @@ import {
     lockAudio,
     unlockAudio,
 } from '../platform.js';
-import { DRUM_PRESETS } from '../presets.js';
 import { getSoloistNote } from '../soloist.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';

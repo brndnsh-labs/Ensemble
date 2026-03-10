@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
 import { KEY_ORDER, ROMAN_VALS } from '../../public/config.js';
-import { CHORD_PRESETS, SONG_TEMPLATES } from '../../public/presets.js';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { SONG_TEMPLATES } from '../../public/data/song-templates.js';
 
 const SAMPLE_RATE = 44100;
 const OUTPUT_DIR = 'tests/resources/synthetic_presets';

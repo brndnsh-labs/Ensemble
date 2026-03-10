@@ -1,3 +1,4 @@
+import { DRUM_PRESETS } from './data/drum-presets.js';
 import {
     killAllPianoNotes,
     killBassBus,
@@ -12,7 +13,6 @@ import {
     restoreGains,
 } from './engine/engine.js';
 import { saveCurrentState } from './persistence.js';
-import { DRUM_PRESETS } from './presets.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
