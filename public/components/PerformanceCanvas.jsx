@@ -48,25 +48,28 @@ export function PerformanceCanvas({
             const isOuter = l === 0 || l === 3;
             const color = isLeft ? soloistColor : '#94a3b8';
 
-            // Pillar Background
-            ctx.fillStyle = isOuter ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)';
+            // Pillar Background - alternating subtle shades
+            ctx.fillStyle = isOuter ? 'rgba(15, 23, 42, 0.4)' : 'rgba(15, 23, 42, 0.6)';
             ctx.fillRect(x, 0, laneWidth, height);
 
-            // Pillar Border
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.lineWidth = 1;
+            // Stronger Pillar Dividers
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(x + laneWidth, 0);
-            ctx.lineTo(x + laneWidth, height);
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
             ctx.stroke();
 
             // Zones
             const group = noteGroups[l] || [];
+            const degrees = isOuter ? ['1', '3', '5', '7', '9'] : ['2', '4', '6', '8', '10'];
+
             for (let z = 0; z < 5; z++) {
                 const y = (4 - z) * zoneHeight; // Bottom up
                 const midi = group[z];
                 const noteInfo = midi ? midiToNote(midi) : null;
-                const label = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
+                const noteName = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
+                const degree = degrees[z];
 
                 // Check if this zone is active
                 let isActive = false;
@@ -78,38 +81,60 @@ export function PerformanceCanvas({
 
                 if (isActive) {
                     const grad = ctx.createLinearGradient(x, y, x + laneWidth, y);
-                    grad.addColorStop(0, 'rgba(255,255,255,0)');
+                    grad.addColorStop(0, 'rgba(255,255,255,0.1)');
                     grad.addColorStop(0.5, color);
-                    grad.addColorStop(1, 'rgba(255,255,255,0)');
+                    grad.addColorStop(1, 'rgba(255,255,255,0.1)');
                     ctx.fillStyle = grad;
-                    ctx.globalAlpha = 0.4;
+                    ctx.globalAlpha = 0.6;
                     ctx.fillRect(x, y, laneWidth, zoneHeight);
                     ctx.globalAlpha = 1.0;
 
-                    // Glow Effect
-                    ctx.shadowBlur = 20;
+                    // Text Glow
+                    ctx.shadowBlur = 25;
                     ctx.shadowColor = color;
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 16px monospace';
+                    ctx.font = 'bold 24px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText(label, x + laneWidth / 2, y + zoneHeight / 2 + 6);
+                    ctx.fillText(noteName, x + laneWidth / 2, y + zoneHeight / 2 + 8);
+
+                    // Degree tag when active
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.fillText(degree, x + laneWidth / 2, y + zoneHeight / 2 - 18);
                     ctx.shadowBlur = 0;
                 } else {
-                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                    ctx.font = '10px monospace';
+                    // Larger, clearer inactive labels
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                    ctx.font = '14px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText(label, x + laneWidth / 2, y + zoneHeight / 2 + 4);
+                    ctx.fillText(noteName, x + laneWidth / 2, y + zoneHeight / 2 + 5);
+
+                    // Subtle degree indicator
+                    ctx.font = '8px sans-serif';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.fillText(degree, x + laneWidth / 2, y + zoneHeight / 2 - 12);
                 }
             }
         }
 
-        // 2. Wing Headers (Chord Names)
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = soloistColor;
-        ctx.fillText(currentChordName, width * 0.25, 25);
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(nextChordName, width * 0.75, 25);
+        // 2. Wing Headers (Chord Names with pill background)
+        const drawHeader = (name, x, color) => {
+            const textWidth = ctx.measureText(name).width + 30;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+            ctx.beginPath();
+            ctx.roundRect(x - textWidth / 2, 8, textWidth, 30, 15);
+            ctx.fill();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = color;
+            ctx.fillText(name, x, 28);
+        };
+
+        drawHeader(currentChordName, width * 0.25, soloistColor);
+        drawHeader(nextChordName, width * 0.75, '#94a3b8');
 
         // 3. Center Status (Active Note & BPM)
         if (currentNoteName) {
