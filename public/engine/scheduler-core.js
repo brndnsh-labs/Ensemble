@@ -743,13 +743,20 @@ function scheduleBass(chordData, step, time) {
                 const finalVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
                 if (vizState.enabled && playback.viz) {
                     playback.viz.truncateNotes('bass', adjustedTime);
+
+                    const fLen = chord.freqs.length;
+                    const chordNotes = new Array(fLen);
+                    for (let i = 0; i < fLen; i++) {
+                        chordNotes[i] = getMidi(chord.freqs[i]);
+                    }
+
                     playback.drawQueue.push({
                         type: 'bass_vis',
                         name,
                         octave,
                         midi: midiNum,
                         time: adjustedTime,
-                        chordNotes: chord.freqs.map((f) => getMidi(f)),
+                        chordNotes,
                         duration,
                     });
                 }
@@ -867,13 +874,20 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                     if (isMono) {
                         playback.viz.truncateNotes('soloist', playTime);
                     }
+
+                    const fLen = chord.freqs.length;
+                    const chordNotes = new Array(fLen);
+                    for (let i = 0; i < fLen; i++) {
+                        chordNotes[i] = getMidi(chord.freqs[i]);
+                    }
+
                     playback.drawQueue.push({
                         type: 'soloist_vis',
                         name,
                         octave,
                         midi: midiNum,
                         time: playTime,
-                        chordNotes: chord.freqs.map((f) => getMidi(f)),
+                        chordNotes,
                         duration,
                         noteType,
                     });
@@ -887,12 +901,19 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
 export function scheduleChordVisuals(chordData, t) {
     const { playback } = getState();
     if (chordData.stepInChord === 0) {
+        const freqs = chordData.chord.freqs;
+        const fLen = freqs.length;
+        const chordNotes = new Array(fLen);
+        for (let i = 0; i < fLen; i++) {
+            chordNotes[i] = getMidi(freqs[i]);
+        }
+
         // Push visual event for UI highlighting, even if canvas viz is disabled
         playback.drawQueue.push({
             type: 'chord_vis',
             time: t,
             index: chordData.chordIndex,
-            chordNotes: chordData.chord.freqs.map((f) => getMidi(f)),
+            chordNotes,
             rootMidi: chordData.chord.rootMidi,
             intervals: chordData.chord.intervals,
             duration: chordData.chord.beats * (60 / playback.bpm),
