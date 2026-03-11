@@ -271,16 +271,11 @@ function GrooveControls({ state }) {
                 />
             </SettingRow>
 
-            <div
-                class="setting-group-divider"
+            <SettingGroup
+                title="Lars Mode"
+                className="kebab-style-override"
                 style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;"
             >
-                <div
-                    class="setting-group-title"
-                    style="margin-bottom: 0.5rem; color: var(--accent-color);"
-                >
-                    Lars Mode
-                </div>
                 <SettingRow label="Enabled" id="larsModeCheck">
                     <Toggle
                         id="larsModeCheck"
@@ -310,7 +305,7 @@ function GrooveControls({ state }) {
                         />
                     </SettingRow>
                 </div>
-            </div>
+            </SettingGroup>
         </Fragment>
     );
 }

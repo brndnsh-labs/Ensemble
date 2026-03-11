@@ -10,7 +10,7 @@
     position: relative;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
-    overflow: visible;
+    overflow: visible !important;
     min-width: 0;
 }
 
@@ -456,7 +456,7 @@ h2 {
 }
 
 /* Override InstrumentSettings inline styles if present */
-.panel-settings-menu .setting-group.setting-group[style*="margin-top"] {
+.panel-settings-menu .setting-group.kebab-style-override[style*="margin-top"] {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
 }
