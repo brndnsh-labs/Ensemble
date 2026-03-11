@@ -29,6 +29,6 @@
         "vitest": "^4.0.18"
     },
     "dependencies": {
-        "preact": "^10.28.4"
+        "preact": "^10.29.0"
     }
 }
