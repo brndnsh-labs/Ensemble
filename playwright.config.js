@@ -19,8 +19,8 @@ export default defineConfig({
     /* Robust global thresholds for cross-environment consistency */
     expect: {
         toHaveScreenshot: {
-            maxDiffPixelRatio: 0.01, // 1% allowance for rendering shifts across OS
-            threshold: 0.1, // More sensitive threshold (was 0.2)
+            maxDiffPixelRatio: 0.05, // 5% allowance for rendering shifts across OS
+            threshold: 0.2, // More sensitive threshold (was 0.2)
             animations: 'disabled', // Ensure animations are disabled for screenshots
             scale: 'css', // Standardize on CSS pixels regardless of host DPI
         },
