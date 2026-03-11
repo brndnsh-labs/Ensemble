@@ -271,11 +271,7 @@ function GrooveControls({ state }) {
                 />
             </SettingRow>
 
-            <SettingGroup
-                title="Lars Mode"
-                className="kebab-style-override"
-                style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;"
-            >
+            <SettingGroup title="Lars Mode" className="divider-top">
                 <SettingRow label="Enabled" id="larsModeCheck">
                     <Toggle
                         id="larsModeCheck"

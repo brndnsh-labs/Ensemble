@@ -3,9 +3,9 @@ import { Fragment, h } from 'preact';
 /**
  * SettingGroup wraps a set of related settings with a consistent title and spacing.
  */
-export function SettingGroup({ title, children, style = '' }) {
+export function SettingGroup({ title, children, style = '', className = '' }) {
     return (
-        <div class="setting-group" style={style}>
+        <div class={`setting-group ${className}`} style={style}>
             {title && <h3 class="setting-group-title">{title}</h3>}
             {children}
         </div>

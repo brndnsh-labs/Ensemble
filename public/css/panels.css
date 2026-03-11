@@ -455,8 +455,8 @@ h2 {
     width: 125px;
 }
 
-/* Override InstrumentSettings inline styles if present */
-.panel-settings-menu .setting-group.kebab-style-override[style*="margin-top"] {
+/* Override InstrumentSettings spacing for compactness in menus */
+.panel-settings-menu .divider-top {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
 }
