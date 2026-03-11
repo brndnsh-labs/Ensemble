@@ -7,9 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -22,11 +21,45 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests
+      - name: Run unit and lint tests
         run: npm test
 
+  e2e-tests:
+    runs-on: ubuntu-latest
+    # Needs unit tests to pass first for efficiency, but could be run in parallel
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
+
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
+
+      - name: Install Playwright Dependencies (Ubuntu)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps
 
       - name: Run Playwright tests
         run: npm run test:e2e

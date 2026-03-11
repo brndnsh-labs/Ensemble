@@ -2,19 +2,21 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
     test.beforeEach(async ({ page }) => {
-        // Set mobile viewport
-        await page.setViewportSize({ width: 400, height: 800 });
         await page.goto('/');
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
     });
 
     test('Performance Modal renders mobile canvas pillars', async ({ page }) => {
         // Switch to Soloist tab on mobile
-        await page.click('.mobile-tabs-nav .tab-soloist');
-        await page.waitForTimeout(500); // Wait for tab transition
+        const soloistTab = page.locator('.mobile-tabs-nav .tab-soloist');
+        await soloistTab.click();
 
         // Open performance modal
-        await page.click('[data-id="soloist"] [aria-label="Open Performance Mode"]');
+        const performanceBtn = page.locator(
+            '[data-id="soloist"] [aria-label="Open Performance Mode"]',
+        );
+        await expect(performanceBtn).toBeVisible();
+        await performanceBtn.click();
 
         const modal = page.locator('.PerformanceSurfaceModal');
         await expect(modal).toBeVisible();
@@ -37,10 +39,15 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
 
     test('Canvas interaction triggers note display', async ({ page }) => {
         await page.click('.mobile-tabs-nav .tab-soloist');
-        await page.waitForTimeout(500);
-        await page.click('[data-id="soloist"] [aria-label="Open Performance Mode"]');
+
+        const performanceBtn = page.locator(
+            '[data-id="soloist"] [aria-label="Open Performance Mode"]',
+        );
+        await expect(performanceBtn).toBeVisible();
+        await performanceBtn.click();
 
         const canvas = page.locator('.PerformanceSurfaceModal canvas');
+        await expect(canvas).toBeVisible();
 
         // Dispatch a touch event to the far left lane (Current Safe)
         await canvas.dispatchEvent('touchstart', {

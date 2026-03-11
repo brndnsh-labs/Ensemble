@@ -2,6 +2,21 @@
     box-sizing: border-box;
 }
 
+/* --- E2E STABILIZATION --- */
+/* Force immediate rendering by disabling all transitions and animations during tests. */
+/* Also standardizes fonts to avoid OS-specific rendering discrepancies. */
+[data-e2e-mode="true"],
+[data-e2e-mode="true"] *,
+[data-e2e-mode="true"] *::before,
+[data-e2e-mode="true"] *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    font-family: "DejaVu Sans", "Helvetica", "Arial", sans-serif !important;
+}
+
 body {
     font-family: "Inter", system-ui, -apple-system, sans-serif;
     background-color: var(--bg-color);
