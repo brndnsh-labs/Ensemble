@@ -52,7 +52,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
 
     return (
         <div
-            class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''}`}
+            class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''}`}
             id={id}
             data-id={module}
         >

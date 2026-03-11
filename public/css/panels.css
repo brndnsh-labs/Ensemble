@@ -10,8 +10,13 @@
     position: relative;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
-    overflow: visible !important;
+    overflow: visible;
     min-width: 0;
+}
+
+.dashboard-panel.settings-open {
+    overflow: visible;
+    z-index: var(--z-panel-header); /* Lift above other panels when menu open */
 }
 
 .dashboard-panel.collapsed {
@@ -37,6 +42,7 @@
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--border-color);
     gap: 0.5rem;
+    overflow: visible;
 }
 
 /* Measure numbers in maximized view */
