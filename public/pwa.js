@@ -58,6 +58,12 @@ export function initPWA() {
     }
 }
 
+export function skipWaiting() {
+    if (newWorker) {
+        newWorker.postMessage({ type: 'SKIP_WAITING' });
+    }
+}
+
 export async function triggerInstall() {
     if (deferredPrompt) {
         deferredPrompt.prompt();

@@ -10,6 +10,7 @@ import { KeySignatureControls } from './components/KeySignatureControls.jsx';
 import { Modals } from './components/Modals.jsx';
 import { NotificationLayer } from './components/NotificationLayer.jsx';
 import { PresetLibrary } from './components/PresetLibrary.jsx';
+import { PWAUpdateBanner } from './components/PWAUpdateBanner.jsx';
 import { SequencerGrid } from './components/SequencerGrid.jsx';
 import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
@@ -49,6 +50,7 @@ export function App() {
 
             <Modals />
             <NotificationLayer />
+            <PWAUpdateBanner />
         </Fragment>
     );
 }

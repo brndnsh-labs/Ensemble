@@ -391,15 +391,29 @@ h2 {
 }
 
 /* Contextual title colors based on module */
-.chords-settings-menu .setting-group-title:first-child { color: var(--accent-color); }
-.groove-settings-menu .setting-group-title:first-child { color: var(--yellow); }
-.bass-settings-menu .setting-group-title:first-child { color: var(--success-color); }
-.soloist-settings-menu .setting-group-title:first-child { color: var(--soloist-color); }
-.harmony-settings-menu .setting-group-title:first-child { color: var(--harmony-color); }
+.chords-settings-menu .setting-group-title:first-child {
+    color: var(--accent-color);
+}
+.groove-settings-menu .setting-group-title:first-child {
+    color: var(--yellow);
+}
+.bass-settings-menu .setting-group-title:first-child {
+    color: var(--success-color);
+}
+.soloist-settings-menu .setting-group-title:first-child {
+    color: var(--soloist-color);
+}
+.harmony-settings-menu .setting-group-title:first-child {
+    color: var(--harmony-color);
+}
 
 /* Ensure colors stay readable in light mode (Solarized adjustments) */
-[data-theme="light"] .chords-settings-menu .setting-group-title:first-child { filter: brightness(0.85); }
-[data-theme="light"] .bass-settings-menu .setting-group-title:first-child { filter: brightness(0.8); }
+[data-theme="light"] .chords-settings-menu .setting-group-title:first-child {
+    filter: brightness(0.85);
+}
+[data-theme="light"] .bass-settings-menu .setting-group-title:first-child {
+    filter: brightness(0.8);
+}
 
 .panel-settings-menu .setting-row {
     margin-bottom: 0.4rem;

@@ -9,13 +9,13 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
     test('Chords Kebab Menu - Layout & Content @desktop', async ({ page }) => {
         const chordPanel = page.locator('#panel-chords');
         const kebabBtn = chordPanel.locator('.panel-menu-btn').filter({ hasText: '⋮' });
-        
+
         await expect(kebabBtn).toBeVisible();
         await kebabBtn.click();
 
         const settingsMenu = chordPanel.locator('.panel-settings-menu');
         await expect(settingsMenu).toBeVisible();
-        
+
         // Check for specific content to ensure it's the right menu
         await expect(settingsMenu).toContainText('Voicing');
         await expect(settingsMenu).toContainText('Mixer');
@@ -27,13 +27,13 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
     test('Grooves Kebab Menu - Layout & Content @desktop', async ({ page }) => {
         const groovePanel = page.locator('#panel-grooves');
         const kebabBtn = groovePanel.locator('.panel-menu-btn').filter({ hasText: '⋮' });
-        
+
         await expect(kebabBtn).toBeVisible();
         await kebabBtn.click();
 
         const settingsMenu = groovePanel.locator('.panel-settings-menu');
         await expect(settingsMenu).toBeVisible();
-        
+
         await expect(settingsMenu).toContainText('Feel & Actions');
         await expect(settingsMenu).toContainText('Mixer');
 
@@ -43,20 +43,20 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
     test('Soloist Kebab Menu - Alignment & Compactness @desktop', async ({ page }) => {
         const soloistPanel = page.locator('#panel-soloist');
         const kebabBtn = soloistPanel.locator('.panel-menu-btn').filter({ hasText: '⋮' });
-        
+
         await expect(kebabBtn).toBeVisible();
         await kebabBtn.click();
 
         const settingsMenu = soloistPanel.locator('.panel-settings-menu');
         await expect(settingsMenu).toBeVisible();
-        
+
         await expect(settingsMenu).toContainText('Instrument');
         await expect(settingsMenu).toContainText('Mixer');
 
         // Verify "Trumpet" or other long text isn't cut off by checking height/visibility
         const select = settingsMenu.locator('select').first();
         await expect(select).toBeVisible();
-        
+
         await expect(settingsMenu).toHaveScreenshot('soloist-settings-menu-desktop.png');
     });
 });
