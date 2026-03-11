@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import React from 'preact/compat';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -119,10 +119,8 @@ export function Settings() {
     };
 
     const handleReset = () => {
-        if (confirm('Reset all settings and progress? This cannot be undone.')) {
-            localStorage.clear();
-            window.location.reload();
-        }
+        localStorage.clear();
+        window.location.reload();
     };
 
     const handleInstall = async () => {
@@ -133,6 +131,8 @@ export function Settings() {
             }
         }
     };
+
+    const [showConfirmReset, setShowConfirmReset] = useState(false);
 
     const isOpen = useEnsembleState((s) => s.playback.modals.settings);
     const notation = useEnsembleState((s) => s.arranger.notation);
@@ -597,13 +597,59 @@ export function Settings() {
                             >
                                 <span>📲</span> Install App
                             </button>
-                            <button
-                                id="resetSettingsBtn"
-                                class="secondary-btn danger-btn"
-                                onClick={handleReset}
-                            >
-                                <span>🗑️</span> Reset All
-                            </button>
+                            {showConfirmReset ? (
+                                <div
+                                    class="confirm-reset-panel danger-bg"
+                                    style="grid-column: 1 / -1; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; display: flex; flex-direction: column; gap: 0.5rem;"
+                                >
+                                    <div style="font-size: 0.8rem; color: var(--text-color); text-align: center;">
+                                        Reset all settings and progress?
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <button
+                                            id="confirmResetBtn"
+                                            class="primary-btn"
+                                            style="flex: 1; padding: 0.4rem; font-size: 0.8rem; background: var(--red); color: white; border: none; font-weight: bold;"
+                                            onClick={handleReset}
+                                        >
+                                            Yes, Reset
+                                        </button>
+                                        <button
+                                            id="cancelResetBtn"
+                                            class="secondary-btn"
+                                            style="flex: 1; padding: 0.4rem; font-size: 0.8rem; border-color: var(--border-color); color: var(--text-color); background: transparent;"
+                                            onClick={() => {
+                                                setShowConfirmReset(false);
+                                                setTimeout(() => {
+                                                    const btn =
+                                                        document.getElementById('resetSettingsBtn');
+                                                    if (btn) {
+                                                        btn.focus();
+                                                    }
+                                                }, 50);
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    id="resetSettingsBtn"
+                                    class="secondary-btn danger-btn"
+                                    onClick={() => {
+                                        setShowConfirmReset(true);
+                                        setTimeout(() => {
+                                            const btn = document.getElementById('cancelResetBtn');
+                                            if (btn) {
+                                                btn.focus();
+                                            }
+                                        }, 50);
+                                    }}
+                                >
+                                    <span>🗑️</span> Reset All
+                                </button>
+                            )}
                             <button
                                 id="refreshAppBtn"
                                 class="secondary-btn flex-row"
