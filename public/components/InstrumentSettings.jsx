@@ -181,7 +181,7 @@ export function InstrumentSettings({ module }) {
             </SettingGroup>
 
             {/* Right Column: Mixer */}
-            <SettingGroup title="Mixer">
+            <SettingGroup title="Mixer" className="divider-top">
                 <SettingRow
                     label="Volume"
                     id={`${moduleName}Volume`}
