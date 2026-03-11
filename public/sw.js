@@ -17,14 +17,15 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (e) => {
     e.waitUntil(
         caches.keys().then((keys) => {
-            return Promise.all(
-                keys.map((key) => {
+            return Promise.all([
+                ...keys.map((key) => {
                     if (key !== CACHE_NAME) {
                         return caches.delete(key);
                     }
                     return Promise.resolve();
                 }),
-            );
+                self.clients.claim(),
+            ]);
         }),
     );
 });
