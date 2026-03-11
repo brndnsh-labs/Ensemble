@@ -10,7 +10,7 @@
     position: relative;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
-    overflow: visible !important;
+    overflow: visible;
     min-width: 0;
 }
 
@@ -456,9 +456,9 @@ h2 {
 }
 
 /* Override InstrumentSettings inline styles if present */
-.panel-settings-menu .setting-group[style*="margin-top"] {
-    margin-top: 0.5rem !important;
-    padding-top: 0.5rem !important;
+.panel-settings-menu .setting-group.setting-group[style*="margin-top"] {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
 }
 
 @media (max-width: 500px) {

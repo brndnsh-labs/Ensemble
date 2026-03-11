@@ -666,7 +666,7 @@ export function PerformanceModal() {
                 style={
                     isMobile
                         ? 'width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius: 0; border: none; padding: 0;'
-                        : 'max-width: 1200px; height: 85vh; max-height: 750px;'
+                        : 'max-width: 1200px; height: 85vh; max-height: 700px; overflow-y: auto;'
                 }
             >
                 {!isMobile && (

@@ -23,7 +23,7 @@ export function initPWA() {
         dispatch(ACTIONS.SHOW_TOAST, 'App installed successfully!');
     });
 
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && !navigator.webdriver) {
         navigator.serviceWorker
             .register('./sw.js', { updateViaCache: 'none' })
             .then((reg) => {
