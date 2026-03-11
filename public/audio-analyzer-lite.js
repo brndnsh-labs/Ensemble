@@ -886,7 +886,11 @@ export class ChordAnalyzerLite {
 
         // Half-wave rectification and normalization of flux
         const maxFlux = max(...flux);
-        const onsets = flux.map((v) => v / (maxFlux || 1));
+        const onsets = new Float32Array(flux.length);
+        const invMaxFlux = 1 / (maxFlux || 1);
+        for (let i = 0; i < flux.length; i++) {
+            onsets[i] = flux[i] * invMaxFlux;
+        }
 
         if (options.onProgress) {
             options.onProgress(5);
@@ -1094,10 +1098,10 @@ export class ChordAnalyzerLite {
             }
         });
 
-        const candidates = Array.from(candidatesMap.entries()).map(([bpm, score]) => ({
-            bpm,
-            score,
-        }));
+        const candidates = [];
+        for (const [bpm, score] of candidatesMap.entries()) {
+            candidates.push({ bpm, score });
+        }
         const primaryCandidate = candidates.find((c) => c.bpm === primaryBPM);
 
         // If we have a structural match, give it an overwhelming score boost to ensure it wins

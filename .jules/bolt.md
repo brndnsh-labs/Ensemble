@@ -1,3 +1,3 @@
-## 2025-05-27 - [Map Closure and Pre-allocation]
-**Learning:** Replaced chained and inline `.map()` and `.reduce()` calls in hot paths (like audio scheduling and MIDI export chunking) with standard `for` loops, notably utilizing pre-allocated arrays (`new Array(length)`) to avoid dynamic resizing costs.
-**Action:** When replacing `.map()` in highly iterated code, pre-allocate the target array using `new Array(length)` to avoid dynamic array resizing performance penalties.
+## 2025-02-12 - Bolt: Eliminate Map Allocations in audio-analyzer-lite.js
+**Learning:** In V8 Node environments and performance-sensitive loops, chaining methods like `Array.from(Map.entries()).map(...)` creates multiple intermediate array allocations that significantly drag down performance, especially in inner processing chunks for audio analysis. Using `.map()` on large numerical arrays (like `flux`) also incurs unnecessary closure creation and array allocation overhead.
+**Action:** Replace `Array.prototype.map()` on large number arrays with pre-allocated `Float32Array` or `Int32Array` loops. Convert `.from().map()` chains directly into explicit `for...of` loops that push to a final array to avoid temporary garbage collection spikes.

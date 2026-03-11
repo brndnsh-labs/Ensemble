@@ -144,7 +144,11 @@ export function handleTap(setBpmRef) {
         for (let i = 1; i < tapTimes.length; i++) {
             intervals.push(tapTimes[i] - tapTimes[i - 1]);
         }
-        const avg = intervals.reduce((a, b) => a + b) / intervals.length;
+        let sum = 0;
+        for (let i = 0; i < intervals.length; i++) {
+            sum += intervals[i];
+        }
+        const avg = sum / intervals.length;
         setBpmRef(Math.round(60000 / avg));
     }
 }
