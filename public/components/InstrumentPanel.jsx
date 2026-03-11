@@ -106,7 +106,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                     >
                         ⋮
                     </button>
-                    <div class={`panel-settings-menu ${isMenuOpen ? 'open' : ''}`}>
+                    <div class={`panel-settings-menu ${module}-settings-menu ${isMenuOpen ? 'open' : ''}`}>
                         <InstrumentSettings module={module} />
                     </div>
                     <button

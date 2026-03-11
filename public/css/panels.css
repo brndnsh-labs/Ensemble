@@ -335,10 +335,10 @@ h2 {
     background: var(--panel-color);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 0.75rem; /* Further reduced */
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     z-index: var(--z-panel-header);
-    width: 320px;
+    width: 300px; /* Increased back to 300 to prevent label/dropdown clipping */
     max-width: calc(100% - 2rem);
     backdrop-filter: blur(12px);
     animation: menuFadeIn 0.15s ease-out;
@@ -349,20 +349,107 @@ h2 {
 }
 
 .grooves-settings-menu {
-    width: 450px;
+    width: 360px; /* Adjusted slightly */
 }
 
-.grooves-menu-grid {
-    grid-template-columns: 1fr 1fr;
+/* Force single column in kebab menus to prevent control overflow */
+.panel-settings-menu .grid-2-col {
+    grid-template-columns: 1fr;
+    gap: 0.75rem; /* Tighter gap between groups */
+}
+
+/* Compact overrides for menu content */
+.panel-settings-menu .setting-group {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0;
+}
+
+/* Give the Mixer section a distinct "footer" look for better organization */
+.panel-settings-menu .setting-group:last-child {
+    background: var(--input-bg); /* Use theme-aware input background */
+    margin: 0.5rem -0.75rem -0.75rem -0.75rem; /* Pull into footer area */
+    padding: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+/* Light mode specific footer adjustment for clarity */
+[data-theme="light"] .panel-settings-menu .setting-group:last-child {
+    background: rgba(0, 0, 0, 0.03);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.panel-settings-menu .setting-group-title {
+    font-size: 0.65rem;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.25rem;
+    letter-spacing: 0.1em; /* Pro-label look */
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color); /* Use standard border for better theme sync */
+    opacity: 0.8;
+}
+
+/* Contextual title colors based on module */
+.chords-settings-menu .setting-group-title:first-child { color: var(--accent-color); }
+.groove-settings-menu .setting-group-title:first-child { color: var(--yellow); }
+.bass-settings-menu .setting-group-title:first-child { color: var(--success-color); }
+.soloist-settings-menu .setting-group-title:first-child { color: var(--soloist-color); }
+.harmony-settings-menu .setting-group-title:first-child { color: var(--harmony-color); }
+
+/* Ensure colors stay readable in light mode (Solarized adjustments) */
+[data-theme="light"] .chords-settings-menu .setting-group-title:first-child { filter: brightness(0.85); }
+[data-theme="light"] .bass-settings-menu .setting-group-title:first-child { filter: brightness(0.8); }
+
+.panel-settings-menu .setting-row {
+    margin-bottom: 0.4rem;
+    min-height: 1.5rem;
+    gap: 0.75rem;
+    transition: background 0.2s;
+    border-radius: 4px;
+}
+
+/* Subtle row hover for a more interactive feel */
+.panel-settings-menu .setting-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.panel-settings-menu .setting-label {
+    font-size: 0.75rem; /* Slightly smaller for cleaner look */
+    font-weight: 500;
+}
+
+.panel-settings-menu .setting-value-display {
+    font-size: 0.75rem;
+    min-width: 2.2rem;
+}
+
+/* Slightly more compact sliders in popover menus */
+.panel-settings-menu input[type="range"] {
+    width: 90px;
+}
+
+.panel-settings-menu select {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    height: 32px; /* Increased to 32px to fully clear descenders */
+    line-height: 1.2;
+}
+
+/* Ensure standalone dropdowns align with Slider + Value Display footprint */
+.panel-settings-menu .setting-control > select {
+    width: 125px;
+}
+
+/* Override InstrumentSettings inline styles if present */
+.panel-settings-menu .setting-group[style*="margin-top"] {
+    margin-top: 0.5rem !important;
+    padding-top: 0.5rem !important;
 }
 
 @media (max-width: 500px) {
     .grooves-settings-menu {
         width: 320px;
-    }
-
-    .grooves-menu-grid {
-        grid-template-columns: 1fr;
     }
 }
 
