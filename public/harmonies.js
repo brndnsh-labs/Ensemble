@@ -481,10 +481,15 @@ export function getHarmonyNotes(
                         const isDownbeat = stepInfo
                             ? stepInfo.isBeatStart
                             : measureStep % ts.stepsPerBeat === 0;
+
+                        // Align syncopation ratio with genre swing type
+                        const is8thSwingGenre = ['Jazz', 'Blues', 'Acoustic'].includes(feel);
+                        const syncRatio = is8thSwingGenre ? 0.5 : 0.75;
+
                         const isAnticipation = stepInfo
                             ? stepInfo.mStep % ts.stepsPerBeat ===
-                              Math.floor(ts.stepsPerBeat * 0.75)
-                            : measureStep % 4 === 3;
+                              Math.floor(ts.stepsPerBeat * syncRatio)
+                            : measureStep % 4 === (is8thSwingGenre ? 2 : 3);
 
                         if (isDownbeat) {
                             durationSteps = 3;

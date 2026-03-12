@@ -138,6 +138,8 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
 
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
         const type = Math.random();
+        // 8th-note swing and Bossa use the 'and' (0.5 ratio) for syncopation
+        const syncRatio = 0.5;
 
         if (type > 0.6) {
             // Charleston: 1 and &2
@@ -147,28 +149,28 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
             }
         } else if (type > 0.4) {
             // Reverse Charleston: &1 and 3
-            hit(getBeatStep(0, Math.floor(spb * 0.75)));
+            hit(getBeatStep(0, Math.floor(spb * syncRatio)));
             if (vibe !== 'sparse') {
                 hit(getBeatStep(2));
             }
         } else if (type > 0.25) {
             // Syncopated "Ands": &2 and &4
-            hit(getBeatStep(1, Math.floor(spb * 0.75)));
+            hit(getBeatStep(1, Math.floor(spb * syncRatio)));
             if (vibe !== 'sparse') {
                 const last = ts.beats - 1;
-                hit(getBeatStep(last, Math.floor(spb * 0.75)));
+                hit(getBeatStep(last, Math.floor(spb * syncRatio)));
             }
         } else if (type > 0.1) {
             // Red Garland Lite: 1, &2, &3
             hit(0);
-            hit(getBeatStep(1, Math.floor(spb * 0.75)));
+            hit(getBeatStep(1, Math.floor(spb * syncRatio)));
             if (vibe === 'active') {
-                hit(getBeatStep(2, Math.floor(spb * 0.75)));
+                hit(getBeatStep(2, Math.floor(spb * syncRatio)));
             }
         } else {
             // Sparse Anticipation: &4
             const last = ts.beats - 1;
-            hit(getBeatStep(last, Math.floor(spb * 0.75)));
+            hit(getBeatStep(last, Math.floor(spb * syncRatio)));
         }
 
         if (vibe === 'active') {

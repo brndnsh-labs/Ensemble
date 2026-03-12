@@ -57,8 +57,8 @@ describe('Jazz Piano Critique', () => {
                 totalStabs++;
                 const midis = notes.map((n) => n.midi);
 
-                // 1. Rhythmic Alignment (Charleston focus on 0, 7)
-                if (stepInMeasure === 0 || stepInMeasure === 7) {
+                // 1. Rhythmic Alignment (Charleston focus on 0, 6)
+                if (stepInMeasure === 0 || stepInMeasure === 6) {
                     charlestonHits++;
                 }
 

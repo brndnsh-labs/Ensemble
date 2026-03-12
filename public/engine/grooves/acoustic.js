@@ -45,7 +45,6 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
-        isAOfBeat,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -86,7 +85,7 @@ export function applyOverrides(context, state) {
 
         // Occasional ghost notes at high intensity
         if (intensity > 0.8 && activeMotif === 3) {
-            if (isAOfBeat && roll(0.25)) {
+            if (isOffbeat && roll(0.25)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.2, intensity, 0.2);
                 soundName = 'Sidestick';
