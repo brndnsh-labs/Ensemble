@@ -77,12 +77,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         }
         return BOSSA_STEPS.includes(step % 16);
     }
-    if (
-        style === 'quarter' ||
-        groove.genreFeel === 'Jazz' ||
-        groove.genreFeel === 'Blues' ||
-        groove.genreFeel === 'Acoustic'
-    ) {
+    if (style === 'quarter' || groove.genreFeel === 'Jazz' || groove.genreFeel === 'Acoustic') {
         if (isQuarter) {
             return true;
         }

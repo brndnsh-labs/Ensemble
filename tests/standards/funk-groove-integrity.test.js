@@ -70,12 +70,17 @@ describe('Funk Groove Integrity', () => {
             // Force a seed that maps to Motif 1 (0.2 - 0.5)
             mockState.groove.sectionSeedMap['1'] = 0.3;
 
+            // Force math.random to ensure the 'roll' succeeds
+            const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.01);
+
             const stepGhost = 6; // step 6 is an offbeat (non-beatStart)
             const resultSnare = applyGrooveOverrides(createParams(stepGhost, 'Snare'));
 
             // The ghost note should play, but with low velocity
             expect(resultSnare.shouldPlay).toBe(true);
             expect(resultSnare.velocity).toBeLessThan(0.5);
+
+            mockMath.mockRestore();
         });
 
         it('should displace the backbeat for Motif 2 (Cold Sweat Style)', () => {
