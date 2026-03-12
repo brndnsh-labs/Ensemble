@@ -146,9 +146,11 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
 
         // The Lope: Play on the 'ah' of the beat (shuffle)
         if (stepInfo?.isAOfBeat) {
-            // High intensity / complexity required for consistent lope
-            const baseProb = playback.bandIntensity * 0.5 + playback.complexity * 0.4;
-            const shuffleProb = Math.max(0, baseProb - 0.2); // Offset to ensure silence at very low levels
+            // Steeper sensitivity curve: Intensity is the primary driver
+            const intensityWeight = playback.bandIntensity ** 1.2;
+            const complexityWeight = playback.complexity * 0.3;
+            // High consistency (>90%) at high levels, very sparse at low levels
+            const shuffleProb = intensityWeight + complexityWeight;
             if (Math.random() < shuffleProb) {
                 return true;
             }
@@ -554,23 +556,20 @@ export function getBassNote(
                 targetInterval = randomScaleNote;
             }
 
+            // Longer duration for the downbeat note to sustain into the lope
             return result(
                 getFrequency(clampAndNormalize(baseRoot + targetInterval)),
-                null,
+                ts.stepsPerBeat * 0.65,
                 velocity,
             );
         }
 
         // 3. The Shuffle Lope (The 'ah')
         if (isUpbeat) {
-            // Usually repeat the previous note or use a chromatic approach to the next beat
-            let note = prevMidi || baseRoot;
-            if (Math.random() < 0.4 + intensity * 0.3) {
-                // Chromatic approach to the NEXT quarter note
-                // We'll just use a simple leading note for now
-                note = Math.random() < 0.5 ? baseRoot + 4 : baseRoot + 7;
-            }
-            return result(getFrequency(clampAndNormalize(note)), 1, velocity * 0.8, true);
+            // Strictly repeat the previous note for an authentic 'long-short' identity
+            const note = prevMidi || baseRoot;
+            // Short, punchy duration for the upbeat
+            return result(getFrequency(clampAndNormalize(note)), 0.8, velocity * 0.8, true);
         }
     }
 

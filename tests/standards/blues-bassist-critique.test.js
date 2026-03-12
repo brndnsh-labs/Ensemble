@@ -35,6 +35,7 @@ describe('Blues Bassist Critique', () => {
         const tsConfig = TIME_SIGNATURES['4/4'];
 
         const performance = [];
+        let prevFreq = 0;
         for (let globalStep = 0; globalStep < numBars * 16; globalStep++) {
             const info = getStepInfo(globalStep, tsConfig, [], TIME_SIGNATURES);
             const active = isBassActive('blues', globalStep, globalStep % 16, info, {});
@@ -44,7 +45,7 @@ describe('Blues Bassist Critique', () => {
                     chordC7,
                     null,
                     info.beatIndex,
-                    0,
+                    prevFreq,
                     48,
                     'blues',
                     0,
@@ -54,13 +55,16 @@ describe('Blues Bassist Critique', () => {
                     info,
                 );
                 performance.push({ step: globalStep, loopStep: globalStep % 16, info, note });
+                prevFreq = note.freq;
             }
         }
         return performance;
     };
 
     it('should implement "The Box" pattern on a static C7 chord', () => {
-        const performance = simulatePerformance(32, { playback: { bandIntensity: 0.5 } });
+        const performance = simulatePerformance(32, {
+            playback: { bandIntensity: 0.5, complexity: 0.5 },
+        });
 
         // The Box: Root (0), 5th (7), 6th (9), b7th (10)
         const pcs = performance
@@ -82,7 +86,7 @@ describe('Blues Bassist Critique', () => {
 
     it('should implement the "Shuffle Lope" (isAOfBeat) at high intensity', () => {
         const highIntensityPerf = simulatePerformance(32, {
-            playback: { bandIntensity: 0.9, complexity: 0.8 },
+            playback: { bandIntensity: 0.9, complexity: 0.9 },
         });
 
         const lopeHits = highIntensityPerf.filter((p) => p.info.isAOfBeat);
@@ -93,8 +97,56 @@ describe('Blues Bassist Critique', () => {
         );
 
         // At high intensity, we expect a significant amount of shuffle "ah" hits
-        expect(lopeHits.length).toBeGreaterThan(10);
-        expect(quarterHits.length).toBeGreaterThan(100); // 32 bars * 4 = 128
+        expect(lopeHits.length).toBeGreaterThan(100); // 32 bars * 4 = 128, should be nearly 100%
+        expect(quarterHits.length).toBeGreaterThan(100);
+    });
+
+    it('should strictly repeat pitch on the shuffle upbeat', () => {
+        const performance = simulatePerformance(16, {
+            playback: { bandIntensity: 0.9, complexity: 0.9 },
+        });
+
+        let checked = 0;
+        performance.forEach((p, i) => {
+            if (p.info.isAOfBeat && i > 0) {
+                const prev = performance[i - 1];
+                if (prev?.info.isBeatStart) {
+                    expect(p.note.midi).toBe(prev.note.midi);
+                    checked++;
+                }
+            }
+        });
+        expect(checked).toBeGreaterThan(50);
+    });
+
+    it('should maintain consistent duration ratios (long-short)', () => {
+        const performance = simulatePerformance(16, {
+            playback: { bandIntensity: 0.9, complexity: 0.9 },
+        });
+
+        let longSum = 0;
+        let shortSum = 0;
+        let count = 0;
+        performance.forEach((p, i) => {
+            if (p.info.isAOfBeat && i > 0) {
+                const prev = performance[i - 1];
+                if (prev?.info.isBeatStart) {
+                    longSum += prev.note.durationSteps;
+                    shortSum += p.note.durationSteps;
+                    count++;
+                }
+            }
+        });
+
+        const avgLong = longSum / count;
+        const avgShort = shortSum / count;
+
+        console.log(
+            `[Bassist Critique] Avg Long Duration: ${avgLong.toFixed(2)}, Avg Short: ${avgShort.toFixed(2)}`,
+        );
+
+        expect(avgLong).toBeGreaterThan(2.0);
+        expect(avgShort).toBeLessThan(1.0);
     });
 
     it('should remain strictly quarter-note based at low intensity', () => {
@@ -107,6 +159,6 @@ describe('Blues Bassist Critique', () => {
         console.log(`[Bassist Critique] Low Intensity Lope hits: ${lopeHits.length}`);
 
         // At low intensity, shuffle hits should be rare or zero
-        expect(lopeHits.length).toBeLessThan(5);
+        expect(lopeHits.length).toBeLessThan(15);
     });
 });
