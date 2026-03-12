@@ -50,7 +50,7 @@ export const SMART_GENRES = {
         harmony: 'smart',
     },
     Blues: {
-        swing: 100,
+        swing: 66,
         sub: '8th',
         drum: 'Blues Shuffle',
         feel: 'Blues',
@@ -100,7 +100,7 @@ export const SMART_GENRES = {
         harmony: 'strings',
     },
     Country: {
-        swing: 55,
+        swing: 50,
         sub: '16th',
         drum: 'Country (Two-Step)',
         feel: 'Country',

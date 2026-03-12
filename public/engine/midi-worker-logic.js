@@ -215,7 +215,10 @@ export class ExportProcessor {
                 if (groove.swingSub === '16th') {
                     duration += i % 2 === 0 ? shift : -shift;
                 } else {
-                    duration += i % 4 < 2 ? shift : -shift;
+                    // 8th note swing: Weighted 'Loping' distribution across 4 subdivisions
+                    const subIndex = i % 4;
+                    const weights = [1.5, 0.5, -0.5, -1.5];
+                    duration += shift * weights[subIndex];
                 }
             }
             accumulatedSeconds += duration;

@@ -486,14 +486,14 @@ function advanceGlobalStep() {
         const ts = TIME_SIGNATURES[sInfo.tsName] || TIME_SIGNATURES['4/4'];
         if (ts.stepsPerBeat === 4) {
             const shift = (sixteenth / 3) * (groove.swing / 100);
-            duration +=
-                groove.swingSub === '16th'
-                    ? playback.step % 2 === 0
-                        ? shift
-                        : -shift
-                    : playback.step % (ts.stepsPerBeat * 1) < ts.stepsPerBeat / 2
-                      ? shift
-                      : -shift; // 8th note swing logic generalized for any meter with 4 steps per beat
+            if (groove.swingSub === '16th') {
+                duration += playback.step % 2 === 0 ? shift : -shift;
+            } else {
+                // 8th note swing logic: Weighted 'Loping' distribution across 4 subdivisions
+                const subIndex = playback.step % ts.stepsPerBeat;
+                const weights = [1.5, 0.5, -0.5, -1.5];
+                duration += shift * weights[subIndex];
+            }
         } else if (ts.stepsPerBeat === 3) {
             const shift = (sixteenth / 3) * (groove.swing / 100);
             duration +=
