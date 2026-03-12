@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   update-snapshots:
@@ -48,10 +49,23 @@ jobs:
       - name: Update Snapshots
         run: npm run test:e2e:update
 
-      - name: Commit and Push Snapshots
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add tests/e2e/**-snapshots/*.png
-          git commit -m "chore: update e2e snapshots [skip ci]" || echo "No changes to commit"
-          git push origin ${{ github.ref_name }}
+      - name: Create Pull Request for Snapshots
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update e2e snapshots from CI"
+          branch: ci/update-snapshots
+          delete-branch: true
+          title: "🤖 Automated E2E Snapshot Update"
+          body: |
+            This PR updates the E2E visual snapshots using the Ubuntu CI environment.
+            
+            **Why?**
+            Rendering differences between local OS and CI (fonts, anti-aliasing) often cause visual regression failures. By generating snapshots in CI, we ensure 100% parity with the verification environment.
+            
+            **How to use:**
+            1. Review the changes in this PR.
+            2. Merge this PR into `main`.
+            3. Future CI runs on `main` will now pass.
+          add-paths: |
+            tests/e2e/**-snapshots/*.png

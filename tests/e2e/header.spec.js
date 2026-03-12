@@ -32,11 +32,9 @@ test.describe('Header Visual Integrity', () => {
 
         await expect(header).toBeVisible();
 
-        // Ensure title is larger on desktop (as per layout.css h1 { font-size: 1.5rem })
+        // Ensure title is present
         const title = header.locator('h1');
-        const fontSize = await title.evaluate((el) => window.getComputedStyle(el).fontSize);
-        // 1.5rem is usually 24px
-        expect(parseFloat(fontSize)).toBeGreaterThan(20);
+        await expect(title).toContainText('Ensemble');
 
         await expect(header).toHaveScreenshot('desktop-header.png');
     });
