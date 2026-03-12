@@ -4,7 +4,7 @@
 
 /* --- E2E STABILIZATION --- */
 /* Force immediate rendering by disabling all transitions and animations during tests. */
-/* Also standardizes fonts to avoid OS-specific rendering discrepancies. */
+/* Also standardizes fonts and vertical metrics to avoid OS-specific rendering discrepancies. */
 [data-e2e-mode="true"],
 [data-e2e-mode="true"] *,
 [data-e2e-mode="true"] *::before,
@@ -15,6 +15,12 @@
     animation: none !important;
     /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
     font-family: "DejaVu Sans", "Helvetica", "Arial", sans-serif !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    line-height: 1.2 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    vertical-align: middle !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    box-sizing: border-box !important;
 }
 
 body {
