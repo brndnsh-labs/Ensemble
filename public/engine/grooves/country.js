@@ -59,18 +59,21 @@ export function applyOverrides(context, state) {
         if (activeMotif > 0) {
             shouldPlay = true;
 
+            // Add a small amount of random jitter to all snare hits to prevent "machine gun" effect
+            const jitter = (Math.random() - 0.5) * 0.08;
+
             if (isBackbeat) {
                 // Strong accent on 2 and 4
                 soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
-                velocity = scaleVelocity(0.95, intensity, 0.1);
+                velocity = scaleVelocity(0.95, intensity, 0.1) + jitter;
             } else if (isBeatStart) {
                 // Quarter note foundation (non-backbeat)
                 soundName = 'Snare';
-                velocity = scaleVelocity(0.4, intensity, 0.15);
+                velocity = scaleVelocity(0.35, intensity, 0.1) + jitter;
             } else if (isOffbeat) {
                 // Eighth note offbeats
                 soundName = 'Snare';
-                velocity = scaleVelocity(0.35, intensity, 0.15);
+                velocity = scaleVelocity(0.3, intensity, 0.1) + jitter;
             } else if (isEOfBeat || isAOfBeat) {
                 // The "chicka" ghosts (16ths)
                 // Probability scales with intensity
@@ -78,7 +81,7 @@ export function applyOverrides(context, state) {
                 if (roll(ghostProb)) {
                     shouldPlay = true;
                     soundName = 'Snare';
-                    velocity = scaleVelocity(0.2, intensity, 0.1);
+                    velocity = scaleVelocity(0.15, intensity, 0.08) + jitter;
                 } else {
                     shouldPlay = false;
                 }
