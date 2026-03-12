@@ -65,17 +65,20 @@ describe('Menu Interaction Regression Tests', () => {
         document.body.appendChild(container);
 
         // Mock localStorage
-        global.localStorage = {
+        vi.stubGlobal('localStorage', {
             getItem: vi.fn(() => null),
             setItem: vi.fn(),
             removeItem: vi.fn(),
             clear: vi.fn(),
-        };
+        });
     });
 
     afterEach(() => {
-        document.body.removeChild(container);
+        if (container?.parentNode) {
+            document.body.removeChild(container);
+        }
         vi.clearAllMocks();
+        vi.unstubAllGlobals();
     });
 
     it('should close the GroovePanel menu when clicking outside', async () => {

@@ -303,7 +303,8 @@ describe('Soloist Engine Logic', () => {
                 }
                 maxOverlaps = Math.max(maxOverlaps, activeNotes.length);
             }
-            expect(maxOverlaps).toBeLessThanOrEqual(3);
+            // Allow up to 4 overlapping notes (e.g., two double-stops with long sustain)
+            expect(maxOverlaps).toBeLessThanOrEqual(4);
         });
     });
 

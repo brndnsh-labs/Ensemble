@@ -84,11 +84,8 @@ describe('Security: Hydration & Storage Resilience', () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
-        // Setup localStorage mock
-        Object.defineProperty(window, 'localStorage', {
-            value: mockStorage,
-            writable: true,
-        });
+        // Setup localStorage mock using Vitest stubbing
+        vi.stubGlobal('localStorage', mockStorage);
         mockStorage.clear();
 
         // Reset state defaults
@@ -106,6 +103,10 @@ describe('Security: Hydration & Storage Resilience', () => {
         state.groove.humanize = 20;
         state.bass.volume = 0.5;
         state.soloist.reverb = 0.6;
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     describe('State Hydration Validation & Clamping', () => {

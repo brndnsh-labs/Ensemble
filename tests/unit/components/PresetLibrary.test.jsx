@@ -72,20 +72,28 @@ describe('PresetLibrary Component', () => {
 
         // Mock localStorage
         const storage = {};
-        global.localStorage = {
-            getItem: (key) => storage[key] || null,
-            setItem: (key, value) => {
+        vi.stubGlobal('localStorage', {
+            getItem: vi.fn((key) => storage[key] || null),
+            setItem: vi.fn((key, value) => {
                 storage[key] = value;
-            },
-            removeItem: (key) => {
+            }),
+            removeItem: vi.fn((key) => {
                 delete storage[key];
-            },
-        };
+            }),
+            clear: vi.fn(() => {
+                for (const key in storage) {
+                    delete storage[key];
+                }
+            }),
+        });
     });
 
     afterEach(() => {
-        document.body.removeChild(container);
+        if (container?.parentNode) {
+            document.body.removeChild(container);
+        }
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     it('should show chord preset as active when isDirty is false', () => {

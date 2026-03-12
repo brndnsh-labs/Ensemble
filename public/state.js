@@ -75,7 +75,7 @@ export {
 // Persistence Helpers
 export const storage = {
     get: (key) => {
-        if (typeof localStorage === 'undefined') {
+        if (typeof localStorage === 'undefined' || !localStorage?.getItem) {
             return [];
         }
         try {
@@ -86,10 +86,14 @@ export const storage = {
         }
     },
     save: (key, val) => {
-        if (typeof localStorage === 'undefined') {
+        if (typeof localStorage === 'undefined' || !localStorage?.setItem) {
             return;
         }
-        localStorage.setItem(`ensemble_${key}`, JSON.stringify(val));
+        try {
+            localStorage.setItem(`ensemble_${key}`, JSON.stringify(val));
+        } catch (e) {
+            console.warn(`[State] Failed to save ${key} to storage:`, e);
+        }
     },
 };
 

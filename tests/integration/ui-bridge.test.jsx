@@ -24,6 +24,10 @@ vi.mock('../../public/state.js', async (importOriginal) => {
                 unsubscribe();
             };
         }),
+        storage: {
+            get: vi.fn(() => []),
+            save: vi.fn(),
+        },
     };
 });
 

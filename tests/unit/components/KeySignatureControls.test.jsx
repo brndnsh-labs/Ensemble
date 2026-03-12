@@ -141,14 +141,18 @@ describe('KeySignatureControls Component', () => {
 
         // Ensure Preact processes the state update
         keySelect.value = 'G';
-        await act(async () => {
+        act(() => {
             keySelect.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
-        // Wait for dynamic import promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // Use vi.waitFor to wait for the dynamic import and subsequent state change
+        await vi.waitFor(
+            () => {
+                expect(mockArranger.key).toBe('G');
+            },
+            { timeout: 1000, interval: 5 },
+        );
 
-        expect(mockArranger.key).toBe('G');
         expect(validateAndAnalyze).toHaveBeenCalled();
         expect(saveCurrentState).toHaveBeenCalled();
         expect(mockDispatch).toHaveBeenCalledWith('KEY_CHANGE');
@@ -162,14 +166,18 @@ describe('KeySignatureControls Component', () => {
         const timeSigSelect = container.querySelector('#timeSigSelect');
 
         timeSigSelect.value = '3/4';
-        await act(async () => {
+        act(() => {
             timeSigSelect.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
-        // Wait for dynamic import promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // Use vi.waitFor to wait for the dynamic import and subsequent state change
+        await vi.waitFor(
+            () => {
+                expect(mockArranger.timeSignature).toBe('3/4');
+            },
+            { timeout: 1000, interval: 5 },
+        );
 
-        expect(mockArranger.timeSignature).toBe('3/4');
         expect(mockArranger.grouping).toBeNull();
         expect(loadDrumPreset).not.toHaveBeenCalled();
         expect(validateAndAnalyze).toHaveBeenCalled();
@@ -191,14 +199,18 @@ describe('KeySignatureControls Component', () => {
 
         const timeSigSelect = container.querySelector('#timeSigSelect');
 
-        await act(async () => {
+        act(() => {
             timeSigSelect.value = '3/4';
             timeSigSelect.dispatchEvent(new Event('change'));
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await vi.waitFor(
+            () => {
+                expect(loadDrumPreset).toHaveBeenCalledWith('Jazz Kit');
+            },
+            { timeout: 1000, interval: 5 },
+        );
 
-        expect(loadDrumPreset).toHaveBeenCalledWith('Jazz Kit');
         expect(mockDispatch).toHaveBeenCalledWith('TIME_SIG_CHANGE');
     });
 
@@ -223,15 +235,19 @@ describe('KeySignatureControls Component', () => {
         const groupingLabel = container.querySelector('#groupingLabel');
         expect(groupingLabel.textContent).toBe('3+2');
 
-        await act(async () => {
+        act(() => {
             groupingLabel.dispatchEvent(new Event('click', { bubbles: true }));
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await vi.waitFor(
+            () => {
+                // 5/4 options are [[3, 2], [2, 3]]
+                // It should advance from [3, 2] to [2, 3]
+                expect(mockArranger.grouping).toEqual([2, 3]);
+            },
+            { timeout: 1000, interval: 5 },
+        );
 
-        // 5/4 options are [[3, 2], [2, 3]]
-        // It should advance from [3, 2] to [2, 3]
-        expect(mockArranger.grouping).toEqual([2, 3]);
         expect(flushBuffers).toHaveBeenCalled();
         expect(syncWorker).toHaveBeenCalled();
         expect(saveCurrentState).toHaveBeenCalled();
