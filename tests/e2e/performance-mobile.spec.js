@@ -27,7 +27,7 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
 
         // Verify Close button
         const closeBtn = page.locator('button[aria-label="Close"]');
-        if (await closeBtn.count() === 0) {
+        if ((await closeBtn.count()) === 0) {
             // Fallback to generic close btn if aria-label is different
             await expect(page.locator('.PerformanceSurfaceModal .close-btn')).toBeVisible();
         } else {
@@ -35,7 +35,10 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
         }
 
         // Test Close
-        const closeTrigger = (await closeBtn.count() > 0) ? closeBtn : page.locator('.PerformanceSurfaceModal .close-btn');
+        const closeTrigger =
+            (await closeBtn.count()) > 0
+                ? closeBtn
+                : page.locator('.PerformanceSurfaceModal .close-btn');
         await closeTrigger.click();
         await expect(modal).toBeHidden();
     });
