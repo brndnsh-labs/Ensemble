@@ -22,6 +22,9 @@ const Settings = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.S
 const TemplatesModal = lazy(() =>
     import('./TemplatesModal.jsx').then((m) => ({ default: m.TemplatesModal })),
 );
+const ManualModal = lazy(() =>
+    import('./ManualModal.jsx').then((m) => ({ default: m.ManualModal })),
+);
 
 /**
  * AnimatedModalWrapper handles the entrance and exit lifecycle for modals.
@@ -71,6 +74,7 @@ export function Modals() {
         templatesOpen,
         analyzerOpen,
         performanceOpen,
+        manualOpen,
     } = useEnsembleState((s) => ({
         settingsOpen: s.playback.modals.settings,
         editorOpen: s.playback.modals.editor,
@@ -79,6 +83,7 @@ export function Modals() {
         templatesOpen: s.playback.modals.templates,
         analyzerOpen: s.playback.modals.analyzer,
         performanceOpen: s.playback.modals.performance,
+        manualOpen: s.playback.modals.manual,
     }));
 
     useEffect(() => {
@@ -89,7 +94,8 @@ export function Modals() {
             exportOpen ||
             templatesOpen ||
             analyzerOpen ||
-            performanceOpen;
+            performanceOpen ||
+            manualOpen;
         if (anyOpen) {
             document.body.classList.add('modal-open');
         } else {
@@ -103,6 +109,7 @@ export function Modals() {
         templatesOpen,
         analyzerOpen,
         performanceOpen,
+        manualOpen,
     ]);
 
     return (
@@ -114,6 +121,7 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={templatesOpen} component={TemplatesModal} />
             <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
             <AnimatedModalWrapper isOpen={performanceOpen} component={PerformanceModal} />
+            <AnimatedModalWrapper isOpen={manualOpen} component={ManualModal} />
         </Fragment>
     );
 }

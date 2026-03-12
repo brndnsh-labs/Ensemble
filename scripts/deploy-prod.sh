@@ -31,7 +31,7 @@ echo "🎨 Bundling CSS..."
 
 # 5. Copy static assets
 echo "📄 Copying static assets..."
-cp public/{index.html,manual.html,manual-theme.js,manifest.json,icon.svg,icon-192.png,icon-512.png,sw.js} dist/
+cp public/{index.html,MANUAL.md,manifest.json,icon.svg,icon-192.png,icon-512.png,sw.js} dist/
 
 # 6. Update HTML and Service Worker
 echo "🔧 Injecting hashes and manifest..."
@@ -40,11 +40,11 @@ sed -i "s/main.js/main.$REV.js/g" dist/*.html
 sed -i "s#/\* CACHE_NAME_PLACEHOLDER \*/#ensemble-$REV#" dist/sw.js
 
 # Generate dynamic asset list (excluding sw and maps)
-JS_FILES=$(find dist -name "*.js" -not -name "sw.js" -not -name "manual-theme.js" -printf "'./%f', ")
+JS_FILES=$(find dist -name "*.js" -not -name "sw.js" -printf "'./%f', ")
 # Remove trailing comma and space from JS_FILES
 JS_FILES=${JS_FILES%, }
 
-STATIC_ASSETS="'./', './index.html', './manual.html', './manual-theme.js', './styles.$REV.css', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'"
+STATIC_ASSETS="'./', './index.html', './MANUAL.md', './styles.$REV.css', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'"
 sed -i "s#/\* ASSETS_PLACEHOLDER \*/#$STATIC_ASSETS, $JS_FILES#" dist/sw.js
 
 # 8. Report Final Footprint

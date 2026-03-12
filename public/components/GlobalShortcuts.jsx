@@ -1,10 +1,17 @@
 import { useEffect } from 'preact/hooks';
+import { SHORTCUT_CONFIG } from '../data/shortcut-config.js';
 import { initAudio } from '../engine/engine.js';
 import { switchMeasure } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 
+/**
+ * Global Keyboard Shortcut Listener
+ *
+ * Logic is kept direct and low-overhead for performance.
+ * For a description of these shortcuts, see public/data/shortcut-config.js.
+ */
 export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (e) => {

@@ -702,14 +702,18 @@ export function Settings() {
                                         For a deep dive into notation, soloing styles, and MIDI
                                         export, check out the full manual.
                                     </p>
-                                    <a
-                                        href="manual.html"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    <button
+                                        onClick={() =>
+                                            dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                                modal: 'manual',
+                                                open: true,
+                                            })
+                                        }
                                         class="manual-link"
+                                        style="border: none; cursor: pointer; width: 100%; text-align: center;"
                                     >
                                         Open User Manual
-                                    </a>
+                                    </button>
                                 </div>
                             </div>
                         </details>

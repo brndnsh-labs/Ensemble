@@ -50,9 +50,17 @@ Always pass the `CoordinationContext` to instrument generators. In `logic-worker
 *   **Chords:** 52–84
 *   **Soloist:** 60–90
 
+## 4. Manual & Documentation
+
+### A. The "Self-Building" Manual
+Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written task guides with auto-generated technical tables.
+*   **Technical Appendix:** Placeholders like `{{GENRE_TABLE}}` and `{{BASS_STYLES}}` are automatically populated by `manual-metadata.js`. Adding a new style to the JS config files will update these tables automatically.
+*   **Task Guides:** If you add a major new feature (e.g., a new "Audio Workbench" tool), you **MUST** add a corresponding "Recipe" or "Pro-Tip" to the Markdown guide in `public/MANUAL.md`.
+*   **Deep Links:** Maintain the "Style Gallery" in the manual. If you create a new signature genre, consider adding a deep link example (e.g., `index.html?genre=MyNewStyle`) to the gallery.
+
 ---
 
-## 4. Testing & Verification
+## 5. Testing & Verification
 
 ### A. Vitest (Logic & Unit)
 *   **Globals Enabled:** `describe`, `it`, and `expect` are available globally.

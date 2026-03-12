@@ -120,6 +120,7 @@ export const playback = {
         analyzer: false,
         generateSong: false,
         performance: false,
+        manual: false,
     },
 };
 
