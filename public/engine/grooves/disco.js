@@ -44,6 +44,7 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
+        isEOfBeat,
         isAOfBeat,
         beatIndex,
         drumComplexity,
@@ -105,27 +106,34 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         // Core Offbeat Open Hat (The Disco "And")
+        // Strictly enforced across all motifs for the foundation
         if (isOffbeat) {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = scaleVelocity(1.1, intensity, 0.2);
+            velocity = scaleVelocity(1.15, intensity, 0.1);
         }
 
-        // Motif 1: Shimmering 16th closed hats
+        // Motif 1 & 3: Shimmering 16th closed hats
         if (activeMotif === 1 || activeMotif === 3) {
-            if (isEighthNote && soundName !== 'Open') {
-                shouldPlay = true;
-                soundName = 'HiHat';
-                velocity = scaleVelocity(0.8, intensity, 0.15);
+            // Fill in the quarter notes and syncopations around the open hat
+            if (!isOffbeat && (isBeatStart || isEOfBeat || isAOfBeat)) {
+                // High probability for texture, but lower velocity
+                const shimmerProb = 0.6 + intensity * 0.4;
+                if (roll(shimmerProb)) {
+                    shouldPlay = true;
+                    soundName = 'HiHat';
+                    // Texture velocity: soft hiss
+                    velocity = scaleVelocity(0.55, intensity, 0.1);
+                }
             }
         }
 
         // Motif 2: Syncopated hat barks
-        if (activeMotif === 2) {
+        if (activeMotif === 2 && !shouldPlay) {
             if (isOffbeat && beatIndex === 3) {
                 shouldPlay = true;
                 soundName = 'Open';
-                velocity = 1.2;
+                velocity = 1.25;
             }
         }
     } else if (inst.name === 'Perc' || inst.name.includes('Cowbell')) {

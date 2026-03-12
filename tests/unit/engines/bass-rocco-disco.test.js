@@ -135,15 +135,19 @@ describe('Bass Engine - Rocco & Disco', () => {
         });
 
         it('should play Octave on Upbeat (Step 2)', () => {
+            const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
             const result = getBassNote(chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
             expect(result).not.toBeNull();
             expect(result.midi).toBe(48); // C3 (36 + 12)
+            spy.mockRestore();
         });
 
         it('should handle range clamping correctly for octaves', () => {
             // Verify standard octave behavior works.
+            const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
             const result = getBassNote(chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
             expect(result.midi).toBe(48);
+            spy.mockRestore();
         });
     });
 });

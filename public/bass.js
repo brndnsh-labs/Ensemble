@@ -885,33 +885,46 @@ export function getBassNote(
         return null;
     }
 
-    // --- DISCO STYLE (Octaves) ---
+    // --- DISCO STYLE (Dynamic Octaves / Pulse) ---
     if (style === 'disco') {
         const stepInBeat = step % ts.stepsPerBeat;
+        const isOffbeatAnd = stepInBeat === Math.floor(ts.stepsPerBeat / 2);
 
-        // 1. Downbeats (1, 2, 3, 4) -> Root
+        // 1. Downbeats (1, 2, 3, 4) -> Solid Root
         if (isBeatStart) {
-            return result(getFrequency(baseRoot), 0.9, 1.2);
+            return result(getFrequency(baseRoot), 0.9, 1.25);
         }
 
-        // 2. Upbeats (&) -> Octave
-        if (stepInBeat === Math.floor(ts.stepsPerBeat / 2)) {
-            let note = baseRoot + 12;
-            // Preservative clamping
-            if (note > absMax) {
-                note = baseRoot - 12;
-            }
-            if (note < absMin) {
-                note = baseRoot;
-            }
+        // 2. Upbeats (&) -> Dynamic Octave
+        if (isOffbeatAnd) {
+            // Probability of octave increases with intensity
+            const octaveProb = 0.4 + intensity * 0.6;
+            if (Math.random() < octaveProb) {
+                let note = baseRoot + 12;
+                // Smart Octave Flipping: stay within bass slot (28-51)
+                if (note > 51) {
+                    note = baseRoot - 12;
+                }
+                // Final safety
+                if (note < 28) {
+                    note = baseRoot;
+                }
 
-            return result(getFrequency(note), 0.9, 1.15);
+                return result(getFrequency(note), 0.8, 1.15);
+            }
+            // Fallback to repeating root
+            return result(getFrequency(baseRoot), 0.8, 1.0);
         }
 
-        // 3. 16ths -> Occasional ghost skips at high intensity
-        if (stepInBeat % 2 !== 0 && intensity > 0.6) {
-            if (Math.random() < intensity - 0.5) {
-                return result(getFrequency(baseRoot), 0.5, 0.7, true);
+        // 3. The "Gallop" (16th skips on 'e' or 'a')
+        if (stepInBeat % 2 !== 0) {
+            // Only at higher complexity and intensity
+            const gallopProb = intensity ** 2 * 0.4 + playback.complexity * 0.3;
+            if (Math.random() < gallopProb - 0.1) {
+                // Usually repeat the root or octave ghosted
+                const note = Math.random() < 0.7 ? baseRoot : baseRoot + 12;
+                const finalNote = note > 51 ? baseRoot : note;
+                return result(getFrequency(finalNote), 0.5, 0.6, true);
             }
         }
 
