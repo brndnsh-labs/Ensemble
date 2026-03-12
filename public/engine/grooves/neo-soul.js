@@ -55,15 +55,15 @@ export function applyOverrides(context, state) {
 
     // --- 1. THE EXPRESSIVE DRAG (Dilla Micro-timing) ---
     // At high intensity, we push/pull the boundaries further for that "leaning" feel.
-    const snareDrag = 0.004 + intensity * 0.008; // Up to +0.012s delay
-    const hiHatPush = -0.006 - intensity * 0.009; // Up to -0.015s rush
+    const snareDrag = 0.006 + intensity * 0.012; // Up to +0.018s delay
+    const hiHatPush = -0.008 - intensity * 0.012; // Up to -0.020s rush
 
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         instTimeOffset += hiHatPush;
     } else if (inst.name === 'Snare') {
         instTimeOffset += snareDrag;
     } else if (inst.name === 'Kick') {
-        instTimeOffset += 0.005; // Standard kick weight
+        instTimeOffset += 0.008; // Heavy kick weight
     }
 
     if (inst.muted) {
@@ -72,19 +72,36 @@ export function applyOverrides(context, state) {
 
     // --- 2. DRUNKEN JITTER ---
     // Non-backbeat steps drift noticeably as intensity rises.
-    const drunkenFactor = intensity * 0.015;
+    const drunkenFactor = 0.005 + intensity * 0.02;
 
-    if (!isBackbeat && !isBeatStart) {
-        instTimeOffset += (Math.random() - 0.5) * drunkenFactor;
+    if (!isBackbeat) {
+        // Even beats drift too, but less than subdivisions
+        const multiplier = isBeatStart ? 0.3 : 1.0;
+        instTimeOffset += (Math.random() - 0.5) * drunkenFactor * multiplier;
     }
 
     // --- 3. HI-HAT DYNAMICS ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        if (shouldPlay) {
-            // Subtle shuffle on 16ths
-            if (!isBeatStart && !isOffbeat) {
-                velocity *= 0.75 - intensity * 0.1; // Softer 16ths as it gets "lazier"
+        // High intensity: 16th note shimmer becomes "lazy" and tiered
+        if (intensity > 0.6) {
+            shouldPlay = true;
+            soundName = 'HiHat';
+            if (isBeatStart) {
+                velocity = scaleVelocity(0.85, intensity, 0.15);
+            } else if (isOffbeat) {
+                velocity = scaleVelocity(0.7, intensity, 0.1);
+            } else {
+                velocity = scaleVelocity(0.4, intensity, 0.1);
+                // Subdivisions drag even more than the main hats
+                instTimeOffset += 0.005;
             }
+        }
+
+        // Offbeat Barks
+        if (isOffbeat && roll(0.3 * intensity)) {
+            shouldPlay = true;
+            soundName = 'Open';
+            velocity = 1.1;
         }
     } else if (inst.name === 'Snare') {
         shouldPlay = false;

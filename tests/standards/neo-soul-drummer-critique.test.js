@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
+import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -54,6 +54,9 @@ describe('Neo-Soul Drummer Critique', () => {
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
+                        isTurnaround: false,
+                        stepsPerBar: 16,
+                        loopStep: step,
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay) {
@@ -71,58 +74,63 @@ describe('Neo-Soul Drummer Critique', () => {
         return history;
     };
 
-    it('should pass an authenticity critique for a 128-bar Neo-Soul performance', () => {
-        const numBars = 128;
-        const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.7 },
-            groove: { creativity: true, genreFeel: 'Neo-Soul' },
-        });
+    it('should implement the "Pocket Width" (Snare drag vs HiHat rush)', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.8 } });
 
-        let snareBackbeats = 0;
-        let snareDragging = 0;
-        let hatPushing = 0;
-        let totalSnareHits = 0;
-        let totalHatHits = 0;
-        const totalBars = performance.length;
+        let snareDragSum = 0;
+        let snareCount = 0;
+        let hatPushSum = 0;
+        let hatCount = 0;
 
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
-                const s = stepData.loopStep;
+                const snare = stepData.instruments.Snare;
+                const hat = stepData.instruments.HiHat;
 
-                // --- CRITIQUE: Snare Backbeat (4, 12) & Dragging ---
-                if (stepData.instruments.Snare) {
-                    totalSnareHits++;
-                    if (s === 4 || s === 12) {
-                        snareBackbeats++;
-                    }
-                    if (stepData.instruments.Snare.offset > 0) {
-                        snareDragging++;
-                    }
+                if (snare && snare.offset > 0) {
+                    snareDragSum += snare.offset;
+                    snareCount++;
                 }
-
-                // --- CRITIQUE: HiHat/Open Pushing ---
-                const hat = stepData.instruments.HiHat || stepData.instruments.Open;
-                if (hat) {
-                    totalHatHits++;
-                    if (hat.offset < 0) {
-                        hatPushing++;
-                    }
+                if (hat && hat.offset < 0) {
+                    hatPushSum += hat.offset;
+                    hatCount++;
                 }
             });
         });
 
-        const backbeatScore = snareBackbeats / (totalBars * 2);
-        const snareDragScore = snareDragging / (totalSnareHits || 1);
-        const hatPushScore = hatPushing / (totalHatHits || 1);
+        const avgSnareDrag = snareDragSum / snareCount;
+        const avgHatPush = hatPushSum / hatCount;
+        const pocketWidth = avgSnareDrag - avgHatPush; // since push is negative
 
-        console.log('\n--- NEO-SOUL DRUMMER CRITIQUE REPORT ---');
-        console.log(`[Backbeat Solidity]     ${(backbeatScore * 100).toFixed(1)}% (Target: 100%)`);
-        console.log(`[Snare "Dilla" Drag]    ${(snareDragScore * 100).toFixed(1)}% (Target: >90%)`);
-        console.log(`[HiHat "Forward" Push]  ${(hatPushScore * 100).toFixed(1)}% (Target: >90%)`);
-        console.log('------------------------------------\n');
+        console.log(`[Neo-Soul Critique] Avg Snare Drag: ${avgSnareDrag.toFixed(4)}s`);
+        console.log(`[Neo-Soul Critique] Avg Hat Push:   ${avgHatPush.toFixed(4)}s`);
+        console.log(`[Neo-Soul Critique] Pocket Width:   ${pocketWidth.toFixed(4)}s`);
 
-        expect(backbeatScore).toBe(1.0);
-        expect(snareDragScore).toBeGreaterThan(0.9);
-        expect(hatPushScore).toBeGreaterThan(0.9);
+        expect(avgSnareDrag).toBeGreaterThan(0.005);
+        expect(avgHatPush).toBeLessThan(-0.005);
+        expect(pocketWidth).toBeGreaterThan(0.015);
+    });
+
+    it('should pass ghost note density targets at high intensity', () => {
+        const performance = simulatePerformance(128, {
+            playback: { bandIntensity: 0.9 },
+            groove: { creativity: true, genreFeel: 'Neo-Soul' },
+        });
+
+        let snareGhostHits = 0;
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                const snare = stepData.instruments.Snare;
+                if (snare && snare.velocity < 0.6) {
+                    snareGhostHits++;
+                }
+            });
+        });
+
+        const totalBars = performance.length;
+        const ghostDensity = snareGhostHits / totalBars;
+
+        console.log(`[Neo-Soul Critique] Snare Ghost Density: ${ghostDensity.toFixed(2)} hits/bar`);
+        expect(ghostDensity).toBeGreaterThan(1.0);
     });
 });

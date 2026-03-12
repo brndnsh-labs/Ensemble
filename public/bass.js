@@ -466,35 +466,64 @@ export function getBassNote(
             // More jumps at high intensity
             const direction = note > 48 ? -1 : Math.random() < 0.5 ? 1 : -1;
             const shifted = note + 12 * direction;
-            // Restrict jumps to stay below MIDI 55 to avoid clashing with Piano LH
-            if (shifted >= 36 && shifted <= 55) {
+
+            // Restrict jumps to stay below MIDI 55 (General) or 42 (Neo-Soul)
+            const ceiling = style === 'neo' || groove.genreFeel === 'Neo-Soul' ? 42 : 55;
+            if (shifted >= 36 && shifted <= ceiling) {
                 return shifted;
             }
         }
         return note;
     };
 
-    // --- NEO-SOUL POCKET ---
+    // --- NEO-SOUL POCKET (The Dilla Foundation) ---
     if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
-        const isSecondaryAnchor = isBeatStart && intBeat === 2;
         const isUpbeat = step % ts.stepsPerBeat !== 0;
+        const isSecondaryAnchor = isBeatStart && intBeat === 2; // Beat 3
 
-        // Neo-soul bass should be extremely foundational.
-        if (isSecondaryAnchor || isUpbeat) {
-            if (Math.random() < 0.85) {
-                const has7 = scale.includes(7);
-                let fifth = 7;
-                if (!has7) {
-                    if (scale.includes(6)) {
-                        fifth = 6;
-                    } else if (scale.includes(8)) {
-                        fifth = 8;
-                    }
+        // 1. Fundamental Anchor (Beat 1 & 3)
+        if (isDownbeat || isSecondaryAnchor) {
+            // Strong foundational slap
+            return result(getFrequency(baseRoot), 0.9, 1.15 + intensity * 0.1);
+        }
+
+        // 2. Syncopated "Lazy" Hits
+        if (isUpbeat) {
+            const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
+            const complexityFactor = playback.complexity || 0.5;
+
+            // Higher probability for syncopated hits at high complexity
+            const hitProb = 0.2 + intensity * 0.4 + complexityFactor * 0.3;
+
+            if (Math.random() < hitProb && !isSoloistBusy) {
+                // Choice: Repeat root, 5th, or hammer-on (2nd)
+                const rand = Math.random();
+                let note = baseRoot;
+                let isGhost = false;
+                let dur = 0.4;
+
+                if (rand > 0.7) {
+                    note = baseRoot + 7; // The 5th
+                } else if (rand > 0.4 && complexityFactor > 0.6) {
+                    // Hammer-on/Slur: Step 2nd or b7
+                    note = scale.includes(2) ? baseRoot + 2 : baseRoot + 10;
+                    dur = 0.2;
+                } else {
+                    isGhost = true;
                 }
-                const note = Math.random() < 0.6 ? baseRoot : baseRoot + fifth;
-                return result(getFrequency(clampAndNormalize(note)), null, velocity);
+
+                const res = result(
+                    getFrequency(clampAndNormalize(note)),
+                    dur,
+                    velocity * (isGhost ? 0.6 : 0.9),
+                    isGhost,
+                );
+                // Extra lazy lag for the upbeat
+                res.timingOffset += 0.01 + intensity * 0.01;
+                return res;
             }
         }
+        return null;
     }
 
     const isSameAsPrev = (midi) => {
