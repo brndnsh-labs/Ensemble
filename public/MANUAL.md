@@ -42,9 +42,9 @@ These two sliders are the most powerful tools in the app:
 - **Complexity:** Controls "how much" the band plays. Higher values add jazzy chord extensions, walking bass variations, and rhythmic "pockets."
 
 ### Smart Interaction
-The band actually "listens" to you:
-- **Yielding:** When you activate the **Soloist**, the Chords and Bass will automatically simplify their parts to give you more "spectral space."
-- **Pocket:** The Bass is hard-wired to the Kick Drum. They will always land on the "1" together for a professional, tight low-end.
+The virtual band members "listen" to each other to coordinate their performance in real-time:
+- **Yielding:** When you activate the AI **Soloist**, the Chords and Bass instruments automatically simplify their parts to give the lead voice more "spectral space."
+- **Pocket:** The Bass is hard-wired to the Kick Drum. They coordinate to always land on the "1" together for a professional, tight low-end.
 
 ---
 
