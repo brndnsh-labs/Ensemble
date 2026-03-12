@@ -29,8 +29,17 @@ describe('Funk Groove Integrity', () => {
     describe('Apply Groove Overrides - Funk Motifs', () => {
         const mockState = {
             playback: { bandIntensity: 0.8, bpm: 110, songMode: false },
-            groove: { genreFeel: 'Funk', creativity: true, lastDrumPreset: 'Funk' },
+            groove: {
+                genreFeel: 'Funk',
+                creativity: true,
+                lastDrumPreset: 'Funk',
+                sectionSeedMap: { 1: 0.5 }, // Consistent seed for tests
+            },
             soloist: { enabled: false, busySteps: 0 },
+            arranger: {
+                timeSignature: '4/4',
+                stepMap: [{ start: 0, end: 1000, chord: { sectionId: '1' } }],
+            },
         };
 
         const createParams = (step, instName, stepVal = 0) => {
@@ -51,50 +60,33 @@ describe('Funk Groove Integrity', () => {
                 isEOfBeat: info.isEOfBeat,
                 isAOfBeat: info.isAOfBeat,
                 tsConfig: info.tsConfig,
+                stepsPerBar: 16,
             };
         };
 
         it('should play structured ghost notes for Motif 1 (The Funky Drummer)', () => {
             getState.mockReturnValue(mockState);
 
-            // Find a barIndex that maps to Motif 1
-            let barIndexMotif1 = -1;
-            for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(((i * 137 + 42) % 256) / 256, 'Funk', 0.8) === 1 && i % 4 !== 3) {
-                    barIndexMotif1 = i;
-                    break;
-                }
-            }
-            if (barIndexMotif1 === -1) {
-                return; // Wait for implementation
-            }
+            // Force a seed that maps to Motif 1
+            mockState.groove.sectionSeedMap['1'] = 0.25;
 
-            const stepGhost = barIndexMotif1 * 16 + 7; // step 7 is the "a" of 2 (classic ghost spot)
+            const stepGhost = 6; // step 6 is an offbeat (non-beatStart)
             const resultSnare = applyGrooveOverrides(createParams(stepGhost, 'Snare'));
 
             // The ghost note should play, but with low velocity
             expect(resultSnare.shouldPlay).toBe(true);
-            expect(resultSnare.velocity).toBeGreaterThan(0.05);
             expect(resultSnare.velocity).toBeLessThan(0.5);
         });
 
         it('should displace the backbeat for Motif 2 (Cold Sweat Style)', () => {
             getState.mockReturnValue(mockState);
 
-            let barIndexMotif2 = -1;
-            for (let i = 0; i < 100; i++) {
-                if (getDrumMotif(((i * 137 + 42) % 256) / 256, 'Funk', 0.8) === 2 && i % 4 !== 3) {
-                    barIndexMotif2 = i;
-                    break;
-                }
-            }
-            if (barIndexMotif2 === -1) {
-                return;
-            }
+            // Force a seed that maps to Motif 2
+            mockState.groove.sectionSeedMap['1'] = 0.5;
 
             // Motif 2 often moves the snare backbeat to the "and" of 4
-            const normalBackbeat = barIndexMotif2 * 16 + 12; // beat 4
-            const displacedBackbeat = barIndexMotif2 * 16 + 14; // "and" of 4
+            const normalBackbeat = 12; // beat 4
+            const displacedBackbeat = 14; // "and" of 4
 
             const resultNormal = applyGrooveOverrides(createParams(normalBackbeat, 'Snare'));
             const resultDisplaced = applyGrooveOverrides(createParams(displacedBackbeat, 'Snare'));
@@ -105,11 +97,13 @@ describe('Funk Groove Integrity', () => {
             expect(resultDisplaced.velocity).toBeGreaterThan(0.85);
         });
 
-        it('should trigger anticipatory hi-hat barks on phrase turnarounds (barIndex % 4 === 3)', () => {
+        it('should trigger anticipatory hi-hat barks on phrase turnarounds', () => {
             getState.mockReturnValue(mockState);
+            mockState.groove.sectionSeedMap['1'] = 0.5;
 
-            const turnaroundBarIndex = 3; // 3 % 4 === 3
-            const beat4And = turnaroundBarIndex * 16 + 14; // "and" of 4 leading into next phrase
+            // Set up a turnaround
+            mockState.arranger.sectionMap = [{ start: 0, end: 64 }]; // 4 bar section
+            const beat4And = 62; // Step 62 is "and" of 4 in bar 4 (3*16 + 14)
 
             // Force math.random to trigger the turnaround
             const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.1);

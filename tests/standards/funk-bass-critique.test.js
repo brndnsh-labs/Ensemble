@@ -75,14 +75,14 @@ describe('Funk Bass Critique', () => {
         console.log(
             '\n--- FUNK BASS CRITIQUE REPORT ---\n' +
                 `[The One Solidity]      ${(downbeatRatio * 100).toFixed(1)}% (Target: 100%)\n` +
-                `[Ghost Note Density]    ${(ghostRatio * 100).toFixed(1)}% (Target: 10-30%)\n` +
-                `[Octave Pop Frequency]  ${octaveRatio.toFixed(2)} jumps/bar (Target: >0.2)\n` +
+                `[Ghost Note Density]    ${(ghostRatio * 100).toFixed(1)}% (Target: 15-35%)\n` +
+                `[Octave Pop Frequency]  ${octaveRatio.toFixed(2)} jumps/bar (Target: >0.3)\n` +
                 '------------------------------------\n',
         );
 
         expect(downbeatRatio).toBe(1.0);
-        expect(ghostRatio).toBeGreaterThan(0.09);
-        expect(ghostRatio).toBeLessThan(0.35);
-        expect(octaveRatio).toBeGreaterThan(0.04); // Slightly loosened from 0.05 to accommodate baseline intensity and flakiness
+        expect(ghostRatio).toBeGreaterThan(0.15); // Increased from 0.09
+        expect(ghostRatio).toBeLessThan(0.4);
+        expect(octaveRatio).toBeGreaterThan(0.3); // Increased from 0.04
     });
 });

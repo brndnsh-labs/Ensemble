@@ -3,6 +3,7 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 export const config = {
     ...DEFAULT_CONFIG,
     backbeatCrack: true,
+    entropyMultiplier: 0.06, // Tight but expressive
 };
 
 /**
@@ -14,38 +15,30 @@ export const config = {
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Grounded pocket at low intensity
+        return 0; // Grounded pocket
     }
 
-    if (intensity < 0.75) {
-        // Mid Intensity: Mix of Standard, Ghost Note Heavy, and Displaced
-        if (seed < 0.4) {
+    if (intensity < 0.7) {
+        if (seed < 0.5) {
             return 0;
         }
-        if (seed < 0.75) {
-            return 1;
-        }
-        return 2;
+        return 1; // Ghost heavy
     }
 
-    // High Intensity: Full variety including Busy Linear
-    if (seed < 0.25) {
-        return 0;
+    // High Intensity
+    if (seed < 0.3) {
+        return 1; // Ghost heavy
     }
-    if (seed < 0.5) {
-        return 1;
+    if (seed < 0.6) {
+        return 2; // Displaced
     }
-    if (seed < 0.75) {
-        return 2;
-    }
-    return 3;
+    return 3; // Linear
 }
 
 export function applyOverrides(context, state) {
     const {
         inst,
         playback,
-        stepVal,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -67,176 +60,136 @@ export function applyOverrides(context, state) {
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
-    // --- "The One" Reinforcement ---
+    // --- "The One" Absolute Reinforcement ---
     if (inst.name === 'Kick' && isDownbeat) {
         shouldPlay = true;
-        velocity = scaleVelocity(1.3, intensity, 0.1); // Scale reinforcement with intensity
+        velocity = scaleVelocity(1.35, intensity, 0.1);
     }
 
     // --- Hi-Hat & Open Dynamics ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        // Standard Turnaround Bark on the "&" of the last beat (e.g., beat 4 in 4/4)
+        shouldPlay = false;
+
+        // 16th note shimmer (Texture)
+        if (intensity > 0.5) {
+            shouldPlay = true;
+            soundName = 'HiHat';
+            // Tiered velocity for the shimmer
+            if (isBeatStart) {
+                velocity = scaleVelocity(0.85, intensity, 0.15);
+            } else if (isOffbeat) {
+                velocity = scaleVelocity(0.7, intensity, 0.1);
+            } else {
+                velocity = scaleVelocity(0.45, intensity, 0.1);
+            }
+        } else if (isBeatStart || isOffbeat) {
+            shouldPlay = true;
+            soundName = 'HiHat';
+            velocity = isBeatStart ? 0.8 : 0.6;
+        }
+
+        // Barks (Open Hat syncopation)
+        const barkProb = (activeMotif === 2 ? 0.6 : 0.2) * intensity;
+        if (isOffbeat && roll(barkProb)) {
+            shouldPlay = true;
+            soundName = 'Open';
+            velocity = 1.1;
+        }
+
+        // Turnaround Bark
         if (isTurnaround && isOffbeat && beatIndex >= 3) {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = 1.15;
-        } else if (shouldPlay) {
-            // Pulse shaping
-            if (isBeatStart) {
-                velocity *= 1.1;
-            } else if (isEOfBeat || isAOfBeat) {
-                velocity *= 0.8;
-            }
-
-            // Occasional open barks at higher intensities on the "&" of beats 2 and 3
-            const barkProb = intensity > 0.6 ? 0.3 * intensity : 0.05;
-            if (
-                activeMotif >= 2 &&
-                isOffbeat &&
-                (beatIndex === 1 || beatIndex === 2) &&
-                roll(barkProb)
-            ) {
-                soundName = 'Open';
-                velocity *= 1.1;
-            }
+            velocity = 1.2;
         }
-    } else if (inst.name === 'Snare') {
+    }
+    // --- Snare Pocket ---
+    else if (inst.name === 'Snare') {
         shouldPlay = false;
 
-        // --- Motif Snare Patterns ---
-        if (activeMotif === 0) {
-            // Standard Syncopated Funk
-            if (isBackbeat) {
-                shouldPlay = true;
-            }
-            if (stepVal === 0 && isAOfBeat && beatIndex === 1) {
-                shouldPlay = true; // "a" of 2 ghost
-                velocity = scaleVelocity(0.12, intensity, 0.1);
-            }
-        } else if (activeMotif === 1) {
-            // The Funky Drummer (Ghost Note Heavy)
-            if (isBackbeat) {
-                shouldPlay = true;
-            } else if (
-                (isAOfBeat && (beatIndex === 0 || beatIndex === 1 || beatIndex === 2)) ||
-                (isOffbeat && beatIndex === 2)
-            ) {
-                shouldPlay = true;
-                velocity = scaleVelocity(0.06, intensity, 0.15) + Math.random() * 0.1;
-            }
-        } else if (activeMotif === 2) {
-            // Displaced Backbeats ("Cold Sweat")
+        // Fundamental Backbeat
+        if (activeMotif === 2) {
+            // Displaced: Beat 2 is normal, but beat 4 is displaced to "&"
             if (isBackbeat && beatIndex === 1) {
-                shouldPlay = true; // Solid on beat 2
+                shouldPlay = true;
             }
             if (isOffbeat && beatIndex === 3) {
-                shouldPlay = true; // Displaced to "and" of 4
+                shouldPlay = true; // Displaced hit
                 velocity = 1.1;
             }
-            if ((isAOfBeat && beatIndex === 1) || (isEOfBeat && beatIndex === 2)) {
-                shouldPlay = true;
-                velocity = scaleVelocity(0.1, intensity, 0.1);
-            }
-        } else if (activeMotif === 3) {
-            // Busy Linear (Garibaldi)
+        } else {
             if (isBackbeat) {
                 shouldPlay = true;
-                velocity = 1.15;
-            } else if (
-                (isOffbeat && (beatIndex === 0 || beatIndex === 3)) ||
-                (isEOfBeat && (beatIndex === 1 || beatIndex === 2))
-            ) {
-                shouldPlay = true;
-                velocity = scaleVelocity(0.1, intensity, 0.1);
             }
         }
 
-        // --- Snare Turnaround Fills ---
-        if (isTurnaround && intensity > 0.75) {
-            // Fill on the 16ths of the last beat
-            if (beatIndex >= 3 && !isBeatStart && roll(0.7)) {
+        if (shouldPlay) {
+            soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+            velocity = scaleVelocity(1.2, intensity, 0.1);
+        }
+
+        // Motif 1: The Funky Drummer (Dense Ghosting)
+        if (activeMotif === 1 && !shouldPlay) {
+            // High probability for ghosting on all non-beat steps
+            if (!isBeatStart && roll(0.6 + intensity * 0.3)) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.6, intensity, 0.4);
-                if (isAOfBeat) {
-                    velocity = 1.2; // Strong lead back into the One
+                soundName = 'Sidestick';
+                velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
+            }
+        }
+
+        // Motif 3: Linear Snare (interlocking)
+        if (activeMotif === 3 && !shouldPlay) {
+            if (isAOfBeat && (beatIndex === 0 || beatIndex === 2)) {
+                if (roll(0.7, intensity)) {
+                    shouldPlay = true;
+                    soundName = 'Sidestick';
+                    velocity = 0.5;
                 }
             }
         }
 
-        if (shouldPlay) {
-            // Ensure strong backbeats and specific displaced accents
-            if (isBackbeat || (isOffbeat && beatIndex >= 3)) {
-                velocity = Math.max(velocity, 1.1);
-            }
-            // Low intensity sidestick fallback
-            if (intensity < 0.4 && velocity > 0.8) {
-                soundName = 'Sidestick';
-            }
-        }
-    } else if (inst.name === 'Kick') {
-        shouldPlay = false;
-
-        // --- Motif Kick Patterns ---
-        if (activeMotif === 0) {
-            if (isBeatStart && !isBackbeat) {
-                shouldPlay = true;
-            }
-            if (isOffbeat && beatIndex === 2 && (drumComplexity > 0.5 || intensity > 0.6)) {
-                shouldPlay = true; // "and" of 3
-            }
-        } else if (activeMotif === 1) {
-            if (isDownbeat || (isOffbeat && (beatIndex === 1 || beatIndex === 2))) {
-                shouldPlay = true;
-            }
-            if (isEOfBeat && beatIndex === 3 && roll(0.5, intensity)) {
-                shouldPlay = true; // pickup
-            }
-        } else if (activeMotif === 2) {
-            if ((isBeatStart && !isBackbeat) || (isAOfBeat && beatIndex === 2)) {
-                shouldPlay = true;
-            }
-        } else if (activeMotif === 3) {
-            // Busy Linear kick
-            if (
-                isDownbeat ||
-                (isAOfBeat && (beatIndex === 0 || beatIndex === 1)) ||
-                (isOffbeat && beatIndex === 2)
-            ) {
-                shouldPlay = true;
-            }
-            // Extra ghost kicks at peak intensity on the last 16th
-            if (intensity > 0.9 && isAOfBeat && beatIndex >= 3) {
-                shouldPlay = true;
-                velocity = 0.4;
+        // General Syncopation (The "& of 4" or "a of 2")
+        if (intensity > 0.6 && !shouldPlay) {
+            if ((isAOfBeat && beatIndex === 1) || (isOffbeat && beatIndex === 3)) {
+                if (roll(0.4)) {
+                    shouldPlay = true;
+                    soundName = intensity > 0.8 ? 'Snare' : 'Sidestick';
+                    velocity = 0.7;
+                }
             }
         }
 
-        if (shouldPlay) {
-            velocity = scaleVelocity(1.1, intensity, 0.1) + Math.random() * 0.1;
+        // Low intensity fallback
+        if (shouldPlay && intensity < 0.35 && velocity > 0.8) {
+            soundName = 'Sidestick';
         }
     }
+    // --- Kick Drum ---
+    else if (inst.name === 'Kick') {
+        shouldPlay = false;
 
-    // --- Global Timing & Gain Polish ---
-    if (shouldPlay) {
-        if (inst.name === 'HiHat' || inst.name === 'Open') {
-            if (stepVal === 2 && intensity > 0.6) {
-                velocity = 1.0;
-            } else if (stepVal !== 2 && soundName !== 'Open') {
-                velocity = Math.min(velocity, scaleVelocity(0.75, intensity, 0.1));
+        // Grounding
+        if (isDownbeat || (isBeatStart && beatIndex === 2)) {
+            shouldPlay = true;
+            velocity = isDownbeat ? 1.3 : 1.1;
+        }
+
+        // Motif 3: Linear Kick
+        if (activeMotif === 3) {
+            if (isEOfBeat && (beatIndex === 1 || beatIndex === 3)) {
+                shouldPlay = true;
+                velocity = 0.9;
             }
         }
-        if (inst.name === 'Snare') {
-            if (intensity < 0.35) {
-                soundName = 'Sidestick';
+
+        // General Syncopation
+        if (intensity > 0.7 && !shouldPlay) {
+            const syncProb = activeMotif === 1 ? 0.5 : 0.2;
+            if (isOffbeat && roll(syncProb)) {
+                shouldPlay = true;
+                velocity = 0.85;
             }
-            // Drive the backbeat slightly as intensity increases
-            if (isBackbeat) {
-                instTimeOffset -= 0.004 + intensity * 0.002;
-            }
-        }
-        // General gain boost for strong accents
-        if (stepVal === 2) {
-            velocity *= 1.1;
         }
     }
 

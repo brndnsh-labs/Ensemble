@@ -787,51 +787,62 @@ export function getBassNote(
         return null;
     }
 
-    // --- FUNK STYLE ---
+    // --- FUNK STYLE (Slap & Pop) ---
     if (style === 'funk') {
         const stepInBeat = step % ts.stepsPerBeat;
         const isOne = stepInChord === 0;
+        const isSecondarySlap = isBeatStart && intBeat === 2; // Beat 3
 
-        // 1. "The One" is the anchor - Always strong
-        if (isOne) {
-            return result(getFrequency(withOctaveJump(baseRoot)), 0.9, 1.25);
+        // 1. "The One" (and Beat 3) - Primary Slaps
+        if (isOne || isSecondarySlap) {
+            const slapVel = 1.2 + intensity * 0.2;
+            return result(getFrequency(withOctaveJump(baseRoot)), 0.9, slapVel);
         }
 
-        // 2. The "And" (8th notes) - Prime candidates for Octave Pops
+        // 2. The "And" (8th notes) - Aggressive Pops
         if (stepInBeat === Math.floor(ts.stepsPerBeat / 2)) {
-            const octavePopProb = 0.4 + intensity * 0.4;
-            if (Math.random() < octavePopProb) {
+            // Higher octave pop probability than before
+            const popProb = 0.6 + intensity * 0.4;
+            if (Math.random() < popProb) {
                 const note = baseRoot + 12;
-                // Pop velocity: triggers brighter synth mode
-                const popVel = 1.15 + intensity * 0.15;
-                return result(getFrequency(clampAndNormalize(note)), 0.4, popVel);
-            }
-            // Occasional 5th or Octave down for variety
-            if (Math.random() < 0.3) {
-                const note = Math.random() < 0.5 ? baseRoot + 7 : baseRoot - 12;
-                return result(getFrequency(clampAndNormalize(note)), 0.6, 0.9);
+                // Pop velocity: triggers bright, snappy tone
+                const popVel = 1.25 + intensity * 0.2;
+                return result(getFrequency(clampAndNormalize(note)), 0.3, popVel);
             }
         }
 
-        // 3. High Intensity: Melodic Walking / Chromatic Approaches
-        if (intensity > 0.6) {
-            // Approach to next beat
-            if (stepInBeat === ts.stepsPerBeat - 1 && Math.random() < 0.5) {
-                const target = nextChord ? normalizeToRange(nextChord.rootMidi) : baseRoot;
-                const approach = Math.random() < 0.5 ? target - 1 : target + 1;
-                return result(getFrequency(clampAndNormalize(approach)), 0.5, 1.05);
+        // 3. Syncopated "Pushes" & "Gallops" (16ths)
+        if (stepInBeat % 2 !== 0) {
+            // High complexity "Pop" on the 'a'
+            if (
+                stepInBeat === 3 &&
+                playback.complexity > 0.7 &&
+                Math.random() < 0.3 + intensity * 0.3
+            ) {
+                const note = baseRoot + 12;
+                const finalNote = note > 51 ? baseRoot : note;
+                return result(getFrequency(finalNote), 0.2, 1.15);
+            }
+
+            // Dead-note/Ghost chucks to maintain engine
+            const chuckProb = 0.2 + intensity * 0.4;
+            if (Math.random() < chuckProb) {
+                // Usually repeat root or previous note as a ghost
+                return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, true);
+            }
+
+            // High complexity melodic "Double Slap" or "Hammer-on"
+            if (playback.complexity > 0.7 && intensity > 0.6 && Math.random() < 0.3) {
+                const hammerNote = scale.includes(2) ? baseRoot + 2 : baseRoot + 1;
+                return result(getFrequency(clampAndNormalize(hammerNote)), 0.2, 1.1);
             }
         }
 
-        // 4. Ghost Note "Peeling"
-        if (!isSoloistBusy && stepInBeat % 2 !== 0 && Math.random() < 0.1 + intensity * 0.3) {
-            // Muted "chucks" to keep the 16th engine moving
-            return result(getFrequency(prevMidi || baseRoot), 0.2, 0.4, true);
-        }
-
-        // 5. Mid-phrase stability (Beat 3)
-        if (intBeat === 2 && isBeatStart) {
-            return result(getFrequency(withOctaveJump(baseRoot)), 0.8, 1.0);
+        // 4. Harmonic Approaches
+        if (intensity > 0.75 && stepInBeat === ts.stepsPerBeat - 1 && Math.random() < 0.6) {
+            const target = nextChord ? normalizeToRange(nextChord.rootMidi) : baseRoot;
+            const approach = Math.random() < 0.5 ? target - 1 : target + 1;
+            return result(getFrequency(clampAndNormalize(approach)), 0.4, 1.1);
         }
 
         return null;

@@ -56,7 +56,11 @@ describe('Funk Drummer Critique', () => {
                         tsConfig: info.tsConfig,
                     };
                     const result = applyGrooveOverrides(params);
-                    if (result.shouldPlay && result.soundName === instName) {
+                    if (
+                        result.shouldPlay &&
+                        (result.soundName === instName ||
+                            (instName === 'Snare' && result.soundName === 'Sidestick'))
+                    ) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,
                             sound: result.soundName,
@@ -159,7 +163,7 @@ describe('Funk Drummer Critique', () => {
         // MUSICAL: Ghost notes are essential for Funk
         expect(snareGhostHits / totalBars).toBeGreaterThan(1.0);
         expect(ghostToBackbeatRatio).toBeGreaterThan(0.1);
-        expect(ghostToBackbeatRatio).toBeLessThan(0.45);
+        expect(ghostToBackbeatRatio).toBeLessThan(0.7); // Increased from 0.45 to allow dense ghosting
 
         // MUSICAL: Kick should be syncopated
         expect(totalSyncopatedKickHits / totalBars).toBeGreaterThan(0.5);
