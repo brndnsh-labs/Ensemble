@@ -3,37 +3,39 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 export const config = {
     ...DEFAULT_CONFIG,
     exemptFromPulseShaping: true,
+    entropyMultiplier: 0.04, // Rock solid fast timing
 };
 
 /**
  * Maps intensity to motif complexity for Ska-Punk.
- * 0: Classic Ska (Understated/Offbeat emphasis)
- * 1: Driving 2-Step (Standard punk beat)
- * 2: D-Beat (Aggressive driving rhythm)
- * 3: Double Time (Maximum energy Skate Punk)
+ * 0: Classic Ska (Grounded 1/3 kick, dominant offbeat hats)
+ * 1: Driving 2-Step (Fast Punk feel)
+ * 2: Double-Time / Skate Punk (Maximum energy)
+ * 3: D-Beat (Syncopated driving feel)
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Pure Ska feel at low intensity
+        return 0; // Pure Ska foundation
     }
 
-    // Stable seed ranges for core motifs
-    if (seed < 0.25) {
-        return 0; // Ska foundation always reachable
-    }
-    if (seed < 0.55) {
-        return 1; // 2-Step reachable at mid intensity
-    }
-
-    // For seeds > 0.55, allow more energetic styles at higher intensity
-    if (intensity < 0.7) {
-        return seed < 0.8 ? 0 : 1;
+    if (intensity < 0.6) {
+        if (seed < 0.6) {
+            return 0;
+        }
+        return 1; // 2-Step
     }
 
+    // High Intensity
+    if (seed < 0.2) {
+        return 0;
+    }
+    if (seed < 0.5) {
+        return 1; // 2-Step
+    }
     if (seed < 0.8) {
-        return 2; // D-Beat
+        return 2; // Double-Time
     }
-    return 3; // Double Time
+    return 3; // D-Beat
 }
 
 export function applyOverrides(context, state) {
@@ -48,6 +50,7 @@ export function applyOverrides(context, state) {
         isBackbeat,
         isOffbeat,
         isAOfBeat,
+        isEOfBeat,
         beatIndex,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
@@ -58,63 +61,59 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const isEighthNote = isBeatStart || isOffbeat;
+    const _isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. ENERGETIC PUSH (Micro-timing) ---
-    // Increase the "rush" as intensity rises to drive the band harder.
-    instTimeOffset -= 0.005 + intensity * 0.007;
+    // Rushing the beat drives the Ska-Punk energy.
+    instTimeOffset -= 0.006 + intensity * 0.008;
 
-    // --- 2. HI-HAT / OPEN DYNAMICS (The "Ska Skank") ---
+    // --- 2. HI-HAT / OPEN DYNAMICS ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
 
-        // Core Offbeat Emphasis
+        // The Skank: Mandatory offbeat focus
         if (isOffbeat) {
             shouldPlay = true;
-            velocity = scaleVelocity(1.3, intensity, 0.2); // Extra emphasis
-
-            // Splashy Open Hats as intensity rises
-            if (intensity > 0.6 && roll(0.4, intensity)) {
+            // Offbeats are accented and crisp
+            velocity = scaleVelocity(1.3, intensity, 0.1);
+            if (intensity > 0.7 && roll(0.4)) {
                 soundName = 'Open';
             }
-        } else if (activeMotif >= 1 && isEighthNote) {
-            // Constant 8th notes for 2-step/D-Beat
+        } else if (isBeatStart && (activeMotif >= 1 || intensity > 0.6)) {
+            // Keep the eighth notes moving for punk motifs
             shouldPlay = true;
-            velocity = scaleVelocity(0.85, intensity, 0.1);
+            velocity = scaleVelocity(0.8, intensity, 0.1);
         }
 
-        // Occasional Crash on the One
-        if (isDownbeat && intensity > 0.85 && roll(0.3)) {
+        // Crash on the One for section energy
+        if (isDownbeat && intensity > 0.8 && roll(0.4)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.4;
         }
-    } else if (inst.name === 'Kick') {
+    }
+    // --- 3. KICK DRUM ---
+    else if (inst.name === 'Kick') {
         shouldPlay = false;
 
-        // --- Kick Motif Logic ---
         if (activeMotif === 0) {
-            // Classic Ska: 1 and 3 (isBeatStart && !isBackbeat)
+            // Classic Ska: 1 and 3
             if (isBeatStart && !isBackbeat) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 1) {
-            // Driving 2-Step
+        } else if (activeMotif === 1 || activeMotif === 2) {
+            // 2-Step & Double-Time: Every quarter note
             if (isBeatStart) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 2) {
-            // D-Beat (Driving syncopation)
-            if (
-                (isBeatStart && !isBackbeat) ||
-                (isAOfBeat && (beatIndex === 0 || beatIndex === 2)) ||
-                (isOffbeat && (beatIndex === 1 || beatIndex === 3))
-            ) {
-                shouldPlay = true;
-            }
         } else if (activeMotif === 3) {
-            // Double Time
-            if (isEighthNote) {
+            // D-Beat / Syncopated
+            if (
+                isDownbeat ||
+                (isAOfBeat && beatIndex === 0) ||
+                (isBeatStart && beatIndex === 2) ||
+                (isOffbeat && beatIndex === 3)
+            ) {
                 shouldPlay = true;
             }
         }
@@ -122,26 +121,35 @@ export function applyOverrides(context, state) {
         if (shouldPlay) {
             velocity = scaleVelocity(1.2, intensity, 0.15);
         }
-    } else if (inst.name === 'Snare') {
+    }
+    // --- 4. SNARE POCKET ---
+    else if (inst.name === 'Snare') {
         shouldPlay = false;
 
-        // Solid Backbeat (Critique requirement)
-        if (isBackbeat) {
-            shouldPlay = true;
-            velocity = scaleVelocity(1.15, intensity, 0.15);
-        }
-
-        // --- Turnaround Fills ---
-        if (isTurnaround && intensity > 0.7) {
-            // Rapid snare fill
-            if (beatIndex >= 3 && !isBeatStart) {
+        if (activeMotif === 2) {
+            // Double Time: Snare on the offbeats!
+            if (isOffbeat) {
                 shouldPlay = true;
-                velocity = 1.1;
+            }
+        } else {
+            // Standard Backbeat
+            if (isBackbeat) {
+                shouldPlay = true;
             }
         }
 
         if (shouldPlay) {
-            soundName = intensity > 0.35 ? 'Snare' : 'Sidestick';
+            velocity = scaleVelocity(1.2, intensity, 0.1);
+            soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+        }
+
+        // Turnaround Fill
+        if (isTurnaround && intensity > 0.7 && !shouldPlay) {
+            if (beatIndex >= 3 && (isEOfBeat || isAOfBeat)) {
+                shouldPlay = true;
+                soundName = 'Snare';
+                velocity = 1.1;
+            }
         }
     }
 

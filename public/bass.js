@@ -1057,36 +1057,51 @@ export function getBassNote(
         return null;
     }
 
-    // --- WALKING SKA STYLE (Fast 8ths) ---
+    // --- WALKING SKA STYLE (Fast 8ths / Bouncy) ---
     if (style === 'walking-ska') {
-        const is8th = step % (ts.stepsPerBeat / 2) === 0;
+        const is8th = step % Math.floor(ts.stepsPerBeat / 2) === 0;
         if (!is8th) {
             return null;
         }
 
-        // 1. Foundation: Downbeats are usually Root or 5th
-        if (isBeatStart && intBeat % 2 === 0) {
-            const note = intBeat === 0 || Math.random() > 0.4 ? baseRoot : baseRoot + 7;
-            return result(getFrequency(clampAndNormalize(withOctaveJump(note))), 1, 1.1);
+        // Bouncy Pattern Logic (Root, 5th, 6th, Octave)
+        const patternIndex = intBeat % 4;
+        let targetInterval = 0; // Default Root
+
+        if (patternIndex === 1) {
+            targetInterval = 7; // 5th
+        } else if (patternIndex === 2) {
+            targetInterval = 9; // 6th
+        } else if (patternIndex === 3) {
+            targetInterval = 12; // Octave
         }
 
-        // 2. High Intensity: Melodic 8th note walking
-        if (intensity > 0.5) {
-            if (!isBeatStart) {
-                const nextTargetMidi = nextChord ? nextChord.rootMidi : baseRoot;
-                const target = normalizeToRange(nextTargetMidi);
-                const approachNote = Math.random() < 0.5 ? target - 1 : target + 1;
-                return result(
-                    getFrequency(clampAndNormalize(withOctaveJump(approachNote))),
-                    0.8,
-                    1.0,
-                );
-            }
+        // High Intensity: Add melodic variation and chromatic runs
+        if (intensity > 0.6 && Math.random() < 0.4) {
+            const randomScaleNote = scale[Math.floor(Math.random() * scale.length)];
+            targetInterval = randomScaleNote;
         }
 
-        const noteIdx = Math.floor(Math.random() * scale.length);
-        const walkNote = baseRoot + scale[noteIdx];
-        return result(getFrequency(clampAndNormalize(withOctaveJump(walkNote))), 0.8, 0.95);
+        // Chromatic approach to next chord on the last eighth note
+        const isLastEighth = step % 16 === 14;
+        if (isLastEighth && nextChord && nextChord.rootMidi !== chord.rootMidi && intensity > 0.5) {
+            const nextTarget = normalizeToRange(nextChord.rootMidi);
+            const approach = Math.random() < 0.5 ? nextTarget - 1 : nextTarget + 1;
+            const res = result(getFrequency(clampAndNormalize(approach)), 0.8, 1.2);
+            res.timingOffset -= 0.005; // Rush the transition
+            return res;
+        }
+
+        // Fundamental Pulse
+        const res = result(
+            getFrequency(clampAndNormalize(baseRoot + targetInterval)),
+            0.8,
+            1.0 + intensity * 0.2,
+        );
+
+        // Micro-timing: Rush slightly at high intensity to drive the energy
+        res.timingOffset -= 0.004 + intensity * 0.004;
+        return res;
     }
 
     // --- QUARTER NOTE (WALKING) STYLE ---

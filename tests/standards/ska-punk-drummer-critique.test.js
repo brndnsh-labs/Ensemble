@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
+import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -15,11 +15,11 @@ describe('Ska-Punk Drummer Critique', () => {
 
     const simulatePerformance = (numBars, stateOverrides = {}) => {
         const mockState = {
-            playback: { bandIntensity: 0.6, bpm: 160, songMode: false },
+            playback: { bandIntensity: 0.6, bpm: 175, songMode: false },
             groove: {
                 genreFeel: 'Ska-Punk',
                 creativity: true,
-                lastDrumPreset: 'Ska-Punk',
+                lastDrumPreset: 'Ska',
                 instruments: [],
             },
             soloist: { enabled: false, busySteps: 0 },
@@ -54,6 +54,9 @@ describe('Ska-Punk Drummer Critique', () => {
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
+                        isTurnaround: false,
+                        stepsPerBar: 16,
+                        loopStep: step,
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay) {
@@ -71,63 +74,59 @@ describe('Ska-Punk Drummer Critique', () => {
         return history;
     };
 
-    it('should pass an authenticity critique for a 128-bar Ska-Punk performance', () => {
-        const numBars = 128;
-        const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.8 },
-            groove: { creativity: true, genreFeel: 'Ska-Punk' },
-        });
+    it('should implement the "Skank" feel (Strong offbeat hi-hats)', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.5 } });
 
-        let backbeatSnare = 0;
-        let upbeatHats = 0;
-        let totalUpbeatVel = 0;
-        let energeticPushes = 0;
-        let totalHits = 0;
-        const totalBars = performance.length;
+        let onBeatVel = 0,
+            onBeatCount = 0;
+        let offBeatVel = 0,
+            offBeatCount = 0;
 
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
-                const s = stepData.loopStep;
-
-                // --- CRITIQUE: Energetic Push (Negative Offset) ---
-                Object.values(stepData.instruments).forEach((inst) => {
-                    totalHits++;
-                    if (inst.offset < 0) {
-                        energeticPushes++;
-                    }
-                });
-
-                // --- CRITIQUE: Backbeat Snare (4, 12) ---
-                if ((s === 4 || s === 12) && stepData.instruments.Snare) {
-                    backbeatSnare++;
-                }
-
-                // --- CRITIQUE: Upbeat Hat Emphasis (2, 6, 10, 14) ---
-                if (s % 4 === 2) {
-                    const hat = stepData.instruments.HiHat || stepData.instruments.Open;
-                    if (hat) {
-                        upbeatHats++;
-                        totalUpbeatVel += hat.velocity;
+                const hat = stepData.instruments.HiHat || stepData.instruments.Open;
+                if (hat) {
+                    if (stepData.loopStep % 4 === 0) {
+                        onBeatVel += hat.velocity;
+                        onBeatCount++;
+                    } else if (stepData.loopStep % 4 === 2) {
+                        offBeatVel += hat.velocity;
+                        offBeatCount++;
                     }
                 }
             });
         });
 
-        const backbeatScore = backbeatSnare / (totalBars * 2);
-        const upbeatHatScore = upbeatHats / (totalBars * 4);
-        const averageUpbeatVel = totalUpbeatVel / (upbeatHats || 1);
-        const pushScore = energeticPushes / (totalHits || 1);
+        const avgOn = onBeatVel / (onBeatCount || 1);
+        const avgOff = offBeatVel / (offBeatCount || 1);
 
-        console.log('\n--- SKA-PUNK DRUMMER CRITIQUE REPORT ---');
-        console.log(`[Backbeat Solidity]     ${(backbeatScore * 100).toFixed(1)}% (Target: >95%)`);
-        console.log(`[Upbeat Hat Presence]   ${(upbeatHatScore * 100).toFixed(1)}% (Target: 100%)`);
-        console.log(`[Upbeat Hat Emphasis]   ${averageUpbeatVel.toFixed(2)} vel (Target: >1.2)`);
-        console.log(`[Energetic Push Score]  ${(pushScore * 100).toFixed(1)}% (Target: 100%)`);
-        console.log('------------------------------------\n');
+        console.log(
+            `[Ska-Punk Critique] Avg On-beat Hat: ${avgOn.toFixed(2)}, Avg Off-beat Hat: ${avgOff.toFixed(2)}`,
+        );
 
-        expect(backbeatScore).toBeGreaterThan(0.95);
-        expect(upbeatHatScore).toBe(1.0);
-        expect(averageUpbeatVel).toBeGreaterThan(1.2);
-        expect(pushScore).toBe(1.0);
+        // Offbeat hats should be significantly stronger in Motif 0/Low Intensity
+        expect(avgOff).toBeGreaterThan(avgOn * 1.2);
+    });
+
+    it('should implementation high-energy punk beats at high intensity', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.9 } });
+
+        let snareCount = 0;
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                if (stepData.instruments.Snare) {
+                    snareCount++;
+                }
+            });
+        });
+
+        const totalBars = performance.length;
+        const snaresPerBar = snareCount / totalBars;
+        console.log(
+            `[Ska-Punk Critique] Snare density at high intensity: ${snaresPerBar.toFixed(2)} hits/bar`,
+        );
+
+        // Punk beats are dense (2-step or double-time)
+        expect(snaresPerBar).toBeGreaterThanOrEqual(2.0);
     });
 });

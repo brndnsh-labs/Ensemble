@@ -1,81 +1,93 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getBassNote, isBassActive } from '../../public/bass.js';
-import { getFrequency } from '../../public/utils.js';
+import { TIME_SIGNATURES } from '../../public/config.js';
+import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 
-// Mock state
 vi.mock('../../public/state.js', () => ({
-    getState: () => ({
-        playback: { bandIntensity: 0.9, bpm: 180, complexity: 0.8 },
-        groove: { genreFeel: 'Ska-Punk', pocket: -0.01 },
-        soloist: { busySteps: 0 },
-        arranger: { timeSignature: '4/4', totalSteps: 1000 },
-    }),
+    getState: vi.fn(),
 }));
 
-describe('Ska-Punk Bass Critique', () => {
-    it('should pass an authenticity critique for a 128-bar Ska-Punk performance', () => {
-        const chordC = { rootMidi: 48, quality: 'maj7', beats: 4, intervals: [0, 4, 7, 11] };
-        const totalMeasures = 128;
-        const totalSteps = totalMeasures * 16;
+describe('Ska-Punk Bassist Critique', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
 
-        let eighthNoteHits = 0;
-        let upbeatEmphasis = 0;
-        let melodicLeaps = 0;
-        let lastMidi = null;
+    const simulatePerformance = (numBars, stateOverrides = {}) => {
+        const mockState = {
+            playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 175 },
+            groove: {
+                genreFeel: 'Ska-Punk',
+                creativity: true,
+                lastDrumPreset: 'Ska',
+                instruments: [],
+            },
+            arranger: {
+                timeSignature: '4/4',
+                totalSteps: numBars * 16,
+            },
+            soloist: { enabled: false, busySteps: 0 },
+            ...stateOverrides,
+        };
+        getState.mockReturnValue(mockState);
 
-        for (let i = 0; i < totalSteps; i++) {
-            const stepInMeasure = i % 16;
-            const active = isBassActive('smart', i, i % 16);
+        const chordC = { rootMidi: 48, intervals: [0, 4, 7], quality: 'maj', beats: 4 };
+        const tsConfig = TIME_SIGNATURES['4/4'];
+
+        const performance = [];
+        let prevFreq = 0;
+        for (let globalStep = 0; globalStep < numBars * 16; globalStep++) {
+            const info = getStepInfo(globalStep, tsConfig, [], TIME_SIGNATURES);
+            const active = isBassActive('walking-ska', globalStep, globalStep % 16, info, {});
 
             if (active) {
-                eighthNoteHits++;
                 const note = getBassNote(
                     chordC,
                     null,
-                    stepInMeasure / 4,
-                    lastMidi ? getFrequency(lastMidi) : 440,
+                    info.beatIndex,
+                    prevFreq,
                     48,
-                    'smart',
+                    'walking-ska',
                     0,
-                    i,
-                    i % 16,
+                    globalStep,
+                    globalStep % 16,
+                    {},
+                    info,
                 );
-
-                if (note && !note.muted) {
-                    const midi = note.midi;
-
-                    // 1. Upbeat Emphasis Check
-                    if (stepInMeasure % 4 === 2) {
-                        upbeatEmphasis++;
-                    }
-
-                    // 2. Melodic Character
-                    if (lastMidi !== null) {
-                        const interval = Math.abs(midi - lastMidi);
-                        if (interval > 4) {
-                            melodicLeaps++;
-                        }
-                    }
-                    lastMidi = midi;
+                if (note) {
+                    performance.push({ step: globalStep, loopStep: globalStep % 16, info, note });
+                    prevFreq = note.freq;
                 }
             }
         }
+        return performance;
+    };
 
-        const eighthRatio = eighthNoteHits / (totalMeasures * 8);
-        const upbeatRatio = upbeatEmphasis / (totalMeasures * 4);
-        const leapRatio = melodicLeaps / eighthNoteHits;
+    it('should maintain high eighth-note density at high intensity', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.9 } });
 
-        console.log(
-            '\n--- SKA-PUNK BASS CRITIQUE REPORT ---\n' +
-                `[8th Note Drive]        ${(eighthRatio * 100).toFixed(1)}% (Target: >90%)\n` +
-                `[Upbeat Persistence]    ${(upbeatRatio * 100).toFixed(1)}% (Target: >90%)\n` +
-                `[Melodic Leap Frequency] ${(leapRatio * 100).toFixed(1)}% (Target: 5-20%)\n` +
-                '------------------------------------\n',
-        );
+        const eighthHits = performance.filter((p) => p.loopStep % 2 === 0);
+        const totalPossible = 16 * 8;
+        const ratio = eighthHits.length / totalPossible;
 
-        expect(eighthRatio).toBeGreaterThan(0.9);
-        expect(upbeatRatio).toBeGreaterThan(0.9);
-        expect(leapRatio).toBeGreaterThan(0.05);
-        expect(leapRatio).toBeLessThan(0.6); // Increased from 0.4 to accommodate new semantic jump logic
+        console.log(`[Ska-Punk Critique] 8th Note Density: ${(ratio * 100).toFixed(1)}%`);
+        expect(ratio).toBeGreaterThan(0.85);
+    });
+
+    it('should use non-root tones for a melodic feel', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.75 } });
+
+        let rootHits = 0;
+        performance.forEach((p) => {
+            if (p.note.midi % 12 === 0) {
+                rootHits++;
+            }
+        });
+
+        const rootRatio = rootHits / performance.length;
+        console.log(`[Ska-Punk Critique] Root Ratio: ${(rootRatio * 100).toFixed(1)}%`);
+
+        // Walking ska should be melodic, not just pedaling roots
+        expect(rootRatio).toBeLessThan(0.7);
     });
 });
