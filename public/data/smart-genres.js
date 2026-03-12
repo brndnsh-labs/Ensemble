@@ -55,7 +55,7 @@ export const SMART_GENRES = {
         drum: 'Blues Shuffle',
         feel: 'Blues',
         chord: 'jazz',
-        bass: 'quarter',
+        bass: 'blues',
         soloist: 'blues',
         harmony: 'horns',
     },

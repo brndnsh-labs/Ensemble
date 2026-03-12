@@ -24,6 +24,7 @@ export const BASS_STYLES = [
     { id: 'dub', name: 'Dub (Reggae)', category: 'World/Latin' },
     { id: 'neo', name: 'Neo-Soul', category: 'Soul/R&B' },
     { id: 'bossa', name: 'Bossa Nova', category: 'World/Latin' },
+    { id: 'blues', name: 'Blues (Shuffle/Box)', category: 'Blues' },
     { id: 'walking-ska', name: 'Walking (Ska)', category: 'Pop/Rock' },
 ];
 

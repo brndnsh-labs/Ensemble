@@ -34,7 +34,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
             'Neo-Soul': 'neo',
             'Bossa Nova': 'bossa',
             Afrobeat: 'funk',
-            Blues: 'quarter',
+            Blues: 'blues',
             Acoustic: 'rock',
             Country: 'country',
             Metal: 'metal',
@@ -138,6 +138,23 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     if (style === 'metal') {
         return is8th;
     }
+    if (style === 'blues') {
+        // Foundation: Always play on quarter notes
+        if (isQuarter) {
+            return true;
+        }
+
+        // The Lope: Play on the 'ah' of the beat (shuffle)
+        if (stepInfo?.isAOfBeat) {
+            // High intensity / complexity required for consistent lope
+            const baseProb = playback.bandIntensity * 0.5 + playback.complexity * 0.4;
+            const shuffleProb = Math.max(0, baseProb - 0.2); // Offset to ensure silence at very low levels
+            if (Math.random() < shuffleProb) {
+                return true;
+            }
+        }
+        return false;
+    }
     if (style === 'walking-ska') {
         if (playback.bpm > 185 && !isQuarter && Math.random() < 0.3) {
             return false;
@@ -178,7 +195,7 @@ export function getBassNote(
             Country: 'country',
             Metal: 'metal',
             Afrobeat: 'funk',
-            Blues: 'quarter',
+            Blues: 'blues',
             Acoustic: 'rock',
             'Ska-Punk': 'walking-ska',
             Ska: 'walking-ska',
@@ -381,7 +398,7 @@ export function getBassNote(
                 style === 'quarter'
             ) {
                 durationSteps =
-                    style === 'quarter'
+                    style === 'quarter' || style === 'blues'
                         ? ts.stepsPerBeat * 0.4
                         : style === 'neo'
                           ? ts.stepsPerBeat * 0.5
@@ -501,6 +518,59 @@ export function getBassNote(
         }
         if (Math.random() < 0.3) {
             return result(getFrequency(baseRoot), 1, 0.4, true);
+        }
+    }
+
+    // --- BLUES STYLE (Box Pattern / Shuffle) ---
+    if (style === 'blues') {
+        const isUpbeat = stepInfo?.isAOfBeat;
+
+        // 1. Interaction: Lock to Kick Drum if available
+        if (hasKickTrigger) {
+            const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
+            const kickVel = kickStepVal === 2 ? 1.25 : 1.15;
+            const dynamicKickVel = Math.max(0.8, kickVel * (0.7 + intensity * 0.3));
+            return result(getFrequency(baseRoot), null, dynamicKickVel);
+        }
+
+        // 2. The Box Pattern (Root, 5th, 6th, b7th)
+        // Usually played as quarter notes on stable chords.
+        if (isBeatStart && !isUpbeat) {
+            const beatInPattern = intBeat % 4;
+            let targetInterval = 0; // Default Root
+
+            // Classic Blues Box: 1, 5, 6, b7
+            if (beatInPattern === 1) {
+                targetInterval = scale.includes(7) ? 7 : scale.includes(6) ? 6 : 7;
+            } else if (beatInPattern === 2) {
+                targetInterval = scale.includes(9) ? 9 : 7;
+            } else if (beatInPattern === 3) {
+                targetInterval = scale.includes(10) ? 10 : 9;
+            }
+
+            // High intensity: Add more melodic walking variation to the box
+            if (intensity > 0.7 && Math.random() < 0.4) {
+                const randomScaleNote = scale[Math.floor(Math.random() * scale.length)];
+                targetInterval = randomScaleNote;
+            }
+
+            return result(
+                getFrequency(clampAndNormalize(baseRoot + targetInterval)),
+                null,
+                velocity,
+            );
+        }
+
+        // 3. The Shuffle Lope (The 'ah')
+        if (isUpbeat) {
+            // Usually repeat the previous note or use a chromatic approach to the next beat
+            let note = prevMidi || baseRoot;
+            if (Math.random() < 0.4 + intensity * 0.3) {
+                // Chromatic approach to the NEXT quarter note
+                // We'll just use a simple leading note for now
+                note = Math.random() < 0.5 ? baseRoot + 4 : baseRoot + 7;
+            }
+            return result(getFrequency(clampAndNormalize(note)), 1, velocity * 0.8, true);
         }
     }
 
