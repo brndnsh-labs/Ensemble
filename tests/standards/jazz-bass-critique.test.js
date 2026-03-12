@@ -1,15 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getBassNote, isBassActive } from '../../public/bass.js';
-import { getFrequency } from '../../public/utils.js';
+import { TIME_SIGNATURES } from '../../public/config.js';
+import { getFrequency, getStepInfo } from '../../public/utils.js';
 
 // Mock state
+const mockState = {
+    playback: { bandIntensity: 0.9, bpm: 120, complexity: 0.9 },
+    groove: { genreFeel: 'Jazz', pocket: 0, instruments: [] },
+    soloist: { busySteps: 0, tension: 0.5 },
+    arranger: {
+        timeSignature: '4/4',
+        totalSteps: 1000,
+        stepMap: [],
+    },
+};
+
 vi.mock('../../public/state.js', () => ({
-    getState: () => ({
-        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5 },
-        groove: { genreFeel: 'Jazz', pocket: 0 },
-        soloist: { busySteps: 0 },
-        arranger: { timeSignature: '4/4', totalSteps: 1000 },
-    }),
+    getState: () => mockState,
 }));
 
 describe('Jazz Bass Critique', () => {
@@ -19,12 +26,20 @@ describe('Jazz Bass Critique', () => {
         const chordD = { rootMidi: 50, quality: 'm7', beats: 4, intervals: [0, 3, 7, 10] };
         const chordDb = { rootMidi: 49, quality: '7', beats: 4, intervals: [0, 4, 7, 10] };
 
-        const progression = [chordC, chordEb, chordD, chordDb]; // standard chromatic turnaround
+        const progression = [chordC, chordEb, chordD, chordDb];
         const totalMeasures = 128;
         const totalSteps = totalMeasures * 16;
+        const tsConfig = TIME_SIGNATURES['4/4'];
 
-        let _activeSteps = 0;
-        let _downbeatHits = 0;
+        // Build stepMap
+        for (let m = 0; m < totalMeasures; m++) {
+            mockState.arranger.stepMap.push({
+                start: m * 16,
+                end: (m + 1) * 16,
+                chord: { ...progression[m % 4], sectionId: '1' },
+            });
+        }
+
         let quarterNoteHits = 0;
         let stepwiseMotion = 0;
         let chromaticApproaches = 0;
@@ -33,60 +48,59 @@ describe('Jazz Bass Critique', () => {
         let totalTransitions = 0;
 
         for (let i = 0; i < totalSteps; i++) {
-            const measure = Math.floor(i / 16);
             const stepInMeasure = i % 16;
-            const chordIdx = Math.floor(measure % 4);
-            const currentChord = progression[chordIdx];
-            const nextChord = progression[(chordIdx + 1) % 4];
-            const beatInMeasure = stepInMeasure / 4;
+            const measure = Math.floor(i / 16);
+            const currentChord = progression[measure % 4];
 
-            const active = isBassActive('smart', i, i % (currentChord.beats * 4));
+            // Critical: Engine logic for nextChord
+            let nextChord = currentChord;
+            const stepsPerBeat = 4;
+            const isEndOfChord = stepInMeasure / stepsPerBeat >= currentChord.beats - 1;
+            if (isEndOfChord) {
+                nextChord = progression[(measure + 1) % 4];
+            }
+
+            const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
+            const active = isBassActive('quarter', i, stepInMeasure, info);
 
             if (active) {
-                _activeSteps++;
                 const note = getBassNote(
                     currentChord,
                     nextChord,
-                    beatInMeasure,
-                    lastMidi ? getFrequency(lastMidi) : 440,
+                    Math.floor(stepInMeasure / 4),
+                    lastMidi ? getFrequency(lastMidi) : 0,
                     48,
-                    'smart',
-                    chordIdx,
+                    'quarter',
+                    0,
                     i,
-                    i % (currentChord.beats * 4),
+                    stepInMeasure,
+                    {},
+                    info,
                 );
 
                 if (note && !note.muted) {
                     const midi = note.midi;
 
-                    // 1. Check Quarter Note Pulse
                     if (stepInMeasure % 4 === 0) {
                         quarterNoteHits++;
                         if (stepInMeasure === 0) {
-                            _downbeatHits++;
+                            if (midi % 12 === currentChord.rootMidi % 12) {
+                                rootResolutions++;
+                            }
                         }
                     }
 
-                    // 2. Harmonic Resolution (Root on Beat 1 of new chord)
-                    if (stepInMeasure === 0) {
-                        if (midi % 12 === currentChord.rootMidi % 12) {
-                            rootResolutions++;
-                        }
-                    }
-
-                    // 3. Melodic Motion
                     if (lastMidi !== null) {
                         totalTransitions++;
-                        const interval = Math.abs(midi - lastMidi);
-                        if (interval <= 2) {
+                        if (Math.abs(midi - lastMidi) <= 2) {
                             stepwiseMotion++;
                         }
 
-                        // Chromatic approach to any beat boundary
-                        if ([3, 7, 11, 15].includes(stepInMeasure)) {
-                            const nextTargetMidi =
-                                stepInMeasure === 15 ? nextChord.rootMidi : currentChord.rootMidi;
-                            const diff = Math.abs((midi % 12) - (nextTargetMidi % 12));
+                        // Verify chromatic approach
+                        if ([2, 6, 10, 14].includes(stepInMeasure)) {
+                            const targetStep = i + 2;
+                            const targetChord = progression[Math.floor(targetStep / 16) % 4];
+                            const diff = Math.abs((midi % 12) - (targetChord.rootMidi % 12));
                             if (diff === 1 || diff === 11) {
                                 chromaticApproaches++;
                             }
@@ -99,7 +113,7 @@ describe('Jazz Bass Critique', () => {
 
         const quarterNoteRatio = quarterNoteHits / (totalMeasures * 4);
         const rootResRatio = rootResolutions / totalMeasures;
-        const stepwiseRatio = stepwiseMotion / totalTransitions;
+        const stepwiseRatio = stepwiseMotion / (totalTransitions || 1);
         const chromaticRatio = chromaticApproaches / (totalMeasures * 4);
 
         console.log(

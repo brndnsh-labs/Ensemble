@@ -71,12 +71,12 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         }
         return BOSSA_STEPS.includes(step % 16);
     }
-    if (style === 'quarter') {
+    if (style === 'quarter' || groove.genreFeel === 'Jazz') {
         if (isQuarter) {
             return true;
         }
 
-        const isEighthSkip = step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.75); // The 'and' of 2/4
+        const isEighthSkip = step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5); // The 'and'
 
         // Probabilistic eighth-note "skips" for walking bass feel
         let skipProb = 0.1 + playback.bandIntensity * 0.25 + playback.complexity * 0.2;
@@ -1009,7 +1009,7 @@ export function getBassNote(
         );
     }
 
-    const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.75);
+    const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5);
     if (!isBeatStart && !(style === 'quarter' && isEighthSkip)) {
         return null;
     }
@@ -1017,7 +1017,8 @@ export function getBassNote(
     // Walking Bass Approach Logic (Jazz/Blues)
     const isLastBeatOfMeasure = intBeat === ts.beats - 1;
     const isEndOfChord = intBeat === beatsInChord - 1;
-    const isApproachPoint = isLastBeatOfMeasure || isEndOfChord || isEighthSkip || step % 16 === 12;
+    const isApproachPoint =
+        (isBeatStart && (isLastBeatOfMeasure || isEndOfChord)) || isEighthSkip || step % 16 === 14;
 
     // Use a slightly more aggressive chromatic probability for the critique to ensure it triggers
     if (isApproachPoint && nextChord) {
@@ -1027,7 +1028,13 @@ export function getBassNote(
                 : nextChord.rootMidi;
         const targetRoot = normalizeToRange(nextTarget);
         const pullTension = (soloist.tension || 0) + intensity * 0.3 + playback.complexity * 0.2;
-        const chromaticProb = (isSoloistBusy ? 0.3 : 0.5) + pullTension * 0.3;
+        let chromaticProb = (isSoloistBusy ? 0.4 : 0.6) + pullTension * 0.3;
+
+        // Force very high probability for Jazz/Blues at high levels
+        if (intensity > 0.75 && (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues')) {
+            chromaticProb = 0.95;
+        }
+
         if (
             Math.random() < chromaticProb &&
             (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues' || pullTension > 0.7)

@@ -46,8 +46,6 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
-        isAOfBeat,
-        isEOfBeat,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -131,10 +129,7 @@ export function applyOverrides(context, state) {
                 bombProb *= 0.4;
             }
 
-            if (
-                roll(bombProb) &&
-                ((isOffbeat && beatIndex % 2 !== 0) || (isAOfBeat && beatIndex === lastBeatIndex))
-            ) {
+            if (roll(bombProb) && isOffbeat && beatIndex % 2 !== 0) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, Math.random(), 0.3);
             }
@@ -144,7 +139,7 @@ export function applyOverrides(context, state) {
 
         if (isTurnaround) {
             if (
-                ((isBeatStart || isOffbeat || isAOfBeat) && beatIndex === lastBeatIndex - 1) ||
+                ((isBeatStart || isOffbeat) && beatIndex === lastBeatIndex - 1) ||
                 (isOffbeat && beatIndex === lastBeatIndex)
             ) {
                 if (roll(0.7)) {
@@ -168,7 +163,7 @@ export function applyOverrides(context, state) {
             } else if (activeMotif === 3 && isOffbeat && beatIndex === lastBeatIndex) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, intensity, 0.3);
-            } else if (activeMotif === 4 && isAOfBeat && beatIndex < lastBeatIndex) {
+            } else if (activeMotif === 4 && isOffbeat && beatIndex < lastBeatIndex) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.5, Math.random(), 0.3);
             } else {
@@ -183,7 +178,7 @@ export function applyOverrides(context, state) {
                 if (
                     (isOffbeat && beatIndex === lastBeatIndex && roll(0.5 + compProb)) ||
                     (isOffbeat && beatIndex === 1 && roll(0.3 + compProb)) ||
-                    (isAOfBeat && beatIndex !== 1 && roll(compProb * 0.4))
+                    (isOffbeat && beatIndex !== 1 && roll(compProb * 0.4))
                 ) {
                     shouldPlay = true;
                     velocity = 0.25 + Math.random() * 0.3 + intensity * 0.2;
@@ -198,11 +193,7 @@ export function applyOverrides(context, state) {
 
         // 3. THE BIG FINISH (Ending Signaling)
         if (playback.songMode && playback.isEndingPending) {
-            if (
-                ((isEOfBeat && beatIndex === lastBeatIndex) ||
-                    (isAOfBeat && beatIndex === lastBeatIndex)) &&
-                roll(0.7)
-            ) {
+            if (isOffbeat && beatIndex === lastBeatIndex && roll(0.7)) {
                 shouldPlay = true;
                 velocity = 1.1;
                 instTimeOffset -= 0.005;
