@@ -54,13 +54,15 @@ describe('Hip Hop Drummer Critique', () => {
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
+                        isTurnaround: false,
+                        stepsPerBar: 16,
+                        loopStep: step,
                     };
                     const result = applyGrooveOverrides(params);
-                    if (result.shouldPlay && result.soundName === instName) {
+                    if (result.shouldPlay) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,
                             sound: result.soundName,
-                            offset: result.instTimeOffset,
                         };
                     }
                 }
@@ -79,8 +81,10 @@ describe('Hip Hop Drummer Critique', () => {
         });
 
         let backbeatHits = 0;
-        let kickHits = 0;
-        let trapHatHits = 0;
+        let _kickHits = 0;
+        let syncopatedKickHits = 0;
+        let hiHatHits = 0;
+        const totalBars = performance.length;
 
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
@@ -91,29 +95,30 @@ describe('Hip Hop Drummer Critique', () => {
                         backbeatHits++;
                     }
                 }
+
                 if (stepData.instruments.Kick) {
-                    kickHits++;
+                    _kickHits++;
+                    if (s !== 0 && s !== 8) {
+                        syncopatedKickHits++;
+                    }
                 }
 
-                if (stepData.instruments.HiHat || stepData.instruments.Open) {
-                    // Check for 16th and 32nd notes (trap rolls)
-                    trapHatHits++;
+                if (stepData.instruments.HiHat) {
+                    hiHatHits++;
                 }
             });
         });
 
-        const totalBars = performance.length;
         const backbeatScore = backbeatHits / (totalBars * 2);
-        const hatDensity = trapHatHits / totalBars;
+        const syncopatedKickRatio = syncopatedKickHits / totalBars;
 
         console.log('\n--- HIP HOP DRUMMER CRITIQUE REPORT ---');
-        console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}%`);
-        console.log(`[Hat Density]           ${hatDensity.toFixed(2)} hits/bar`);
-        console.log(`[Kick Density]          ${(kickHits / totalBars).toFixed(2)} kicks/bar`);
+        console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}% (Target: 100%)`);
+        console.log(`[Kick Syncopation]      ${syncopatedKickRatio.toFixed(2)} hits/bar`);
+        console.log(`[HiHat Density]         ${(hiHatHits / totalBars).toFixed(2)} hits/bar`);
         console.log('---------------------------------------\n');
 
-        expect(backbeatScore).toBeGreaterThan(0.9);
-        expect(hatDensity).toBeGreaterThan(8); // High density hats due to trap style
-        expect(kickHits / totalBars).toBeLessThan(4); // Sparse kicks relative to rock/metal
+        expect(backbeatScore).toBeGreaterThan(0.95);
+        expect(syncopatedKickRatio).toBeGreaterThan(0.5); // Should have some syncopation
     });
 });

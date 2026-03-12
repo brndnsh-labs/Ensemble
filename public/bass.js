@@ -36,6 +36,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
             Afrobeat: 'funk',
             Blues: 'blues',
             Acoustic: 'acoustic',
+            'Hip Hop': 'hiphop',
             Country: 'country',
             Metal: 'metal',
             'Ska-Punk': 'walking-ska',
@@ -124,8 +125,13 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     if (style === 'disco') {
         return true;
     }
-    if (style === 'dub') {
-        return true;
+    if (style === 'hiphop') {
+        // Lower intensity = Grounded half notes
+        if (playback.bandIntensity < 0.4) {
+            return stepInChord % (ts.stepsPerBeat * 2) === 0;
+        }
+        // Higher intensity = Standard foundations (1, 2&, 3, 4&)
+        return isQuarter || step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
     }
 
     if (style === 'acoustic') {
@@ -726,7 +732,35 @@ export function getBassNote(
         return result(getFrequency(note), 2, pluckVel); // Plucky duration
     }
 
-    // --- ACOUSTIC STYLE (Warm & Supportive) ---
+    // --- HIP HOP STYLE (Sub-Bass / 808) ---
+    if (style === 'hiphop') {
+        const deepRoot = clampAndNormalize(baseRoot - 12);
+        // Force ultra-deep register for Hip Hop (Strictly 24-36 if possible)
+        let finalDeepRoot = deepRoot;
+        while (finalDeepRoot > 36) {
+            finalDeepRoot -= 12;
+        }
+        // Timing: Heavy lazy lag
+        const lag = 0.01 + intensity * 0.01;
+
+        let note = finalDeepRoot;
+        let dur = ts.stepsPerBeat * 0.9; // Warm, long sustain
+
+        if (intensity < 0.4) {
+            dur = ts.stepsPerBeat * 1.95; // Extreme sustain for sub-chugs
+        } else {
+            // High complexity: Probabilistic 808-style melodic glides
+            if (playback.complexity > 0.7 && !isBeatStart && Math.random() < 0.5) {
+                const glideNote = Math.random() < 0.6 ? finalDeepRoot + 12 : finalDeepRoot + 7;
+                note = clampAndNormalize(glideNote);
+                dur = 0.5;
+            }
+        }
+
+        const res = result(getFrequency(note), dur, 1.0 + intensity * 0.2);
+        res.timingOffset += lag;
+        return res;
+    }
     if (style === 'acoustic') {
         // Lay-back timing for acoustic feel
         const lag = 0.01 + intensity * 0.005;

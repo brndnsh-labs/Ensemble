@@ -45,7 +45,7 @@ export const SMART_GENRES = {
         drum: 'Hip Hop',
         feel: 'Hip Hop',
         chord: 'smart',
-        bass: 'neo',
+        bass: 'hiphop',
         soloist: 'neo',
         harmony: 'smart',
     },

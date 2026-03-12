@@ -2,23 +2,39 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 
 export const config = {
     ...DEFAULT_CONFIG,
-    entropyMultiplier: 0.1,
+    entropyMultiplier: 0.08,
     blockAdjacentSnare: true,
     backbeatCrack: true,
     exemptFromPulseShaping: true, // Trap hats need exact velocities
 };
 
-export function getMotif(seed, complexity, _intensity = 1.0) {
-    if (complexity < 0.3) {
-        return 0; // Simple boom bap
+/**
+ * Maps intensity to motif complexity for Hip Hop.
+ * 0: Classic Boom Bap (MPC Style)
+ * 1: Trap Foundation (Consistent 16ths)
+ * 2: Trap Skitter (Hi-hat rolls)
+ * 3: Modern Hybrid (Syncopated & Busy)
+ */
+export function getMotif(seed, complexity, intensity = 1.0) {
+    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
+        return 0; // Solid Boom Bap foundation
     }
-    if (seed < 0.33) {
-        return 1; // Trap style 1
+
+    if (intensity < 0.65) {
+        if (seed < 0.6) {
+            return 0;
+        }
+        return 1; // Trap
     }
-    if (seed < 0.66) {
-        return 2; // Trap style 2
+
+    // High Intensity
+    if (seed < 0.3) {
+        return 1; // Trap Foundation
     }
-    return 3; // Heavily syncopated
+    if (seed < 0.7) {
+        return 2; // Trap Skitters
+    }
+    return 3; // Hybrid
 }
 
 export function applyOverrides(context, state) {
@@ -34,8 +50,6 @@ export function applyOverrides(context, state) {
         beatIndex,
         drumComplexity,
         sectionSeed,
-        stepsPerBar,
-        loopStep,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
@@ -45,71 +59,91 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const safeIsOffbeat = isOffbeat !== undefined ? isOffbeat : loopStep % (stepsPerBar / 8) === 2;
-    const isEighthNote = isBeatStart || safeIsOffbeat;
-    const subdivision = stepsPerBar / 4;
 
+    // --- 1. KICK (808 vs Boom Bap) ---
     if (inst.name === 'Kick') {
         shouldPlay = false;
-        // Sparse kicks
-        if (isDownbeat) {
-            shouldPlay = true;
-        } else if (activeMotif === 0) {
-            if (loopStep === subdivision * 2.5) {
-                // 'and' of 3
+
+        if (activeMotif === 0) {
+            // Boom Bap: Grounded 1, optional & of 3
+            if (isDownbeat) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 1) {
-            if (loopStep === subdivision * 1.5 || loopStep === subdivision * 2.5) {
+            if (isOffbeat && beatIndex === 2 && roll(0.7, intensity)) {
                 shouldPlay = true;
             }
-        } else if (activeMotif >= 2) {
-            if (
-                loopStep === subdivision * 1.75 ||
-                loopStep === subdivision * 2.5 ||
-                loopStep === subdivision * 3.25
-            ) {
+        } else {
+            // Trap: Highly syncopated
+            if (isDownbeat) {
+                shouldPlay = true;
+            } else if (isOffbeat && (beatIndex === 1 || beatIndex === 2)) {
+                if (roll(0.6, intensity)) {
+                    shouldPlay = true;
+                }
+            } else if (isAOfBeat && roll(0.4 * intensity)) {
                 shouldPlay = true;
             }
         }
+
         if (shouldPlay) {
-            velocity = scaleVelocity(0.9, intensity, 0.2);
+            velocity = scaleVelocity(1.1, intensity, 0.15);
+            // Kicks in Hip Hop are slightly lazy (behind)
+            instTimeOffset += 0.005 + intensity * 0.005;
         }
-    } else if (inst.name === 'Snare') {
+    }
+    // --- 2. SNARE / CLAP ---
+    else if (inst.name === 'Snare') {
         shouldPlay = false;
         soundName = intensity < 0.4 ? 'Sidestick' : 'Snare';
 
         if (isBackbeat) {
             shouldPlay = true;
-            velocity = 1.0;
-        } else if (activeMotif === 3 && loopStep === subdivision * 3.75) {
-            // syncopated snare hit
-            shouldPlay = true;
-            velocity = 0.7;
+            velocity = scaleVelocity(1.1, intensity, 0.1);
         }
-    } else if (inst.name === 'HiHat' || inst.name === 'Open') {
-        // Trap-style hats
-        shouldPlay = isEighthNote;
-        velocity = isBeatStart ? 0.8 : 0.6;
-        soundName = 'HiHat';
 
-        if (activeMotif > 0 && intensity > 0.4) {
-            // Add 16th notes
-            if (!shouldPlay && (isEOfBeat || isAOfBeat)) {
-                if (activeMotif === 1 && beatIndex === 2) {
+        // Occasional ghosting / chatter for Boom Bap
+        if (activeMotif === 0 && !shouldPlay && intensity > 0.6 && isOffbeat && roll(0.3)) {
+            shouldPlay = true;
+            soundName = 'Sidestick';
+            velocity = 0.4;
+        }
+    }
+    // --- 3. HI-HATS (The Engine) ---
+    else if (inst.name === 'HiHat' || inst.name === 'Open') {
+        shouldPlay = false;
+
+        // Foundation: 8ths or 16ths
+        if (isBeatStart || isOffbeat) {
+            shouldPlay = true;
+            soundName = 'HiHat';
+            velocity = isBeatStart ? 0.85 : 0.65;
+        } else if (activeMotif >= 1 && intensity > 0.5) {
+            // Fill 16ths for Trap
+            shouldPlay = true;
+            soundName = 'HiHat';
+            velocity = 0.45;
+        }
+
+        // Skitters (32nd note rolls) for Motif 2 & 3
+        if (activeMotif >= 2 && !shouldPlay && intensity > 0.7) {
+            // Target the 'e' or 'a' for a rapid roll
+            if (isEOfBeat || isAOfBeat) {
+                const skitterProb = activeMotif === 2 ? 0.6 : 0.3;
+                if (roll(skitterProb)) {
                     shouldPlay = true;
-                }
-                if (activeMotif === 2 && (beatIndex === 1 || beatIndex === 3)) {
-                    shouldPlay = true;
-                }
-                if (activeMotif === 3) {
-                    shouldPlay = true; // full 16ths in some beats
+                    soundName = 'HiHat';
+                    velocity = 0.35;
+                    // Move the skitter slightly to separate it from the grid
+                    instTimeOffset += (Math.random() - 0.5) * 0.005;
                 }
             }
-            // Add 32nd note rolls (simulated by playing very fast/low vel)
-            if (shouldPlay && roll(0.1)) {
-                velocity = 0.9; // Accent the start of a roll
-            }
+        }
+
+        // Offbeat Barks (Open)
+        if (isOffbeat && beatIndex === 3 && intensity > 0.65 && roll(0.4)) {
+            shouldPlay = true;
+            soundName = 'Open';
+            velocity = 1.05;
         }
     }
 
