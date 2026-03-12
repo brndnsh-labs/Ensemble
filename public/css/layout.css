@@ -7,7 +7,7 @@
 /* Also standardizes fonts and vertical metrics to avoid OS-specific rendering discrepancies. */
 [data-e2e-mode="true"],
 [data-e2e-mode="true"] *,
-/* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+[data-e2e-mode="true"] *::before,
 [data-e2e-mode="true"] *::after {
     /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
     transition: none !important;
@@ -23,8 +23,8 @@
     box-sizing: border-box !important;
 }
 
-/* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
 html[data-e2e-mode="true"] {
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
     font-size: 16px !important;
 }
 
