@@ -569,7 +569,10 @@ export function getBassNote(
             // Strictly repeat the previous note for an authentic 'long-short' identity
             const note = prevMidi || baseRoot;
             // Short, punchy duration for the upbeat
-            return result(getFrequency(clampAndNormalize(note)), 0.8, velocity * 0.8, true);
+            const res = result(getFrequency(clampAndNormalize(note)), 0.8, velocity * 0.8, true);
+            // Add a subtle 'lay-back' offset for the shuffle lope
+            res.timingOffset += 0.005;
+            return res;
         }
     }
 
