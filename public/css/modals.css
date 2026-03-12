@@ -172,6 +172,10 @@ body.modal-open {
     }
 }
 
+.settings-controls {
+    margin-top: 1.5rem;
+}
+
 /* Settings Grid for Desktop */
 @media (min-width: 900px) {
     .settings-controls {
