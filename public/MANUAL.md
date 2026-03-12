@@ -46,12 +46,27 @@ The virtual band members "listen" to each other to coordinate their performance 
 - **Yielding:** When you activate the AI **Soloist**, the Chords and Bass instruments automatically simplify their parts to give the lead voice more "spectral space."
 - **Pocket:** The Bass is hard-wired to the Kick Drum. They coordinate to always land on the "1" together for a professional, tight low-end.
 
+## 🎼 Arranger & Chord Notation
+
+### Standard Notation
+The arranger supports standard notation formats like **Absolute** (`Cmaj7`), **Roman** (`Imaj7`), and **Nashville** (`1maj7`). 
+
+### Measures & Beats
+Use the pipe (`|`) character to separate measures. Chords are distributed evenly across the bar:
+- `C | F G |` = 1 bar of C (4 beats), 1 bar of F then G (2 beats each).
+
+### Common Song Forms
+Standard forms like the **12-Bar Blues** can be written cleanly using measure markers:
+- `I7 | I7 | I7 | I7 | IV7 | IV7 | I7 | I7 | V7 | IV7 | I7 | V7`
+- *✨ **Pro Tip:** Each line in the text area is treated as a continuation of the progression.*
+
 ---
 
 ## 🎨 Style Gallery (Deep Links)
 Click any of these to instantly load a curated preset:
 - [🎸 **Stadium Rock**](index.html?prog=I+vi+IV+V&genre=Rock&bpm=120)
 - [🎷 **Bebop Jazz**](index.html?prog=ii7+V7+Imaj7&genre=Jazz&bpm=110)
+- [🎸 **12-Bar Blues**](index.html?prog=I7+|++I7+|++I7+|++I7+|++IV7+|++IV7+|++I7+|++I7+|++V7+|++IV7+|++I7+|++V7&genre=Blues&bpm=100)
 - [☕ **Neo-Soul Chill**](index.html?prog=IVmaj9+III7%239+vi11+V9sus4&genre=Neo-Soul&bpm=85)
 - [🕺 **70s Disco**](index.html?prog=i7+IV7&genre=Disco&bpm=124)
 
