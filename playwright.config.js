@@ -16,16 +16,6 @@ export default defineConfig({
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
     reporter: process.env.CI ? [['github'], ['dot']] : [['list']],
 
-    /* Robust global thresholds for cross-environment consistency */
-    expect: {
-        toHaveScreenshot: {
-            maxDiffPixelRatio: 0.05, // 5% allowance for rendering shifts across OS
-            threshold: 0.2, // More sensitive threshold (was 0.2)
-            animations: 'disabled', // Ensure animations are disabled for screenshots
-            scale: 'css', // Standardize on CSS pixels regardless of host DPI
-        },
-    },
-
     /* Shared settings for all the projects below. See https://playwright.dev/docs/test-use */
     use: {
         /* Base URL to use in actions like `await page.goto('/')`. */

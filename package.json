@@ -16,7 +16,6 @@
         "build:quiet": "./scripts/deploy-test.sh --dry-run --quiet",
         "preview": "npx serve dist -p 5173",
         "test:e2e": "npm run build:quiet && playwright test",
-        "test:e2e:update": "npm run build:quiet && playwright test --update-snapshots",
         "deploy:test": "./scripts/deploy-test.sh",
         "deploy:prod": "./scripts/deploy-prod.sh"
     },

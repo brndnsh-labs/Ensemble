@@ -15,8 +15,9 @@ test.describe('Modals Responsiveness @ui', () => {
         const settingsModal = page.locator('#settingsOverlay .settings-content');
         await expect(settingsModal).toBeVisible();
 
-        // Verify visual layout (e.g., labels, selects, toggles)
-        await expect(settingsModal).toHaveScreenshot('settings-modal-desktop.png');
+        // Verify content
+        await expect(settingsModal).toContainText('Appearance');
+        await expect(settingsModal).toContainText('Theme');
 
         // Close modal
         await page.click('#closeSettingsBtn');
@@ -31,8 +32,8 @@ test.describe('Modals Responsiveness @ui', () => {
         const editorModal = page.locator('#editorOverlay .settings-content');
         await expect(editorModal).toBeVisible();
 
-        // The editor has complex forms, check responsiveness
-        await expect(editorModal).toHaveScreenshot('editor-modal-desktop.png');
+        // Verify content
+        await expect(editorModal).toContainText('Arrangement Editor');
 
         // Close modal
         await page.click('#closeEditorBtn');

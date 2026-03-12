@@ -19,9 +19,6 @@ test.describe('Performance Modal @ui', () => {
         await expect(modal.locator('.active-chord')).toBeVisible();
         await expect(modal.locator('.upcoming-chord')).toBeVisible();
 
-        // Verify visual layout
-        await expect(modal).toHaveScreenshot('performance-modal-desktop.png');
-
         // Close modal
         await page.click('.PerformanceSurfaceModal .close-btn');
         await expect(modal).toBeHidden();

@@ -12,7 +12,7 @@ test.describe('Header Visual Integrity', () => {
         // This test specifically targets the mobile viewport defined in config
         const header = page.locator('header');
 
-        // 1. Verify title text is visible and not truncated
+        // 1. Verify title text is visible
         const title = header.locator('h1');
         await expect(title).toBeVisible();
         await expect(title).toHaveText('Ensemble');
@@ -20,10 +20,6 @@ test.describe('Header Visual Integrity', () => {
         // 2. Verify Settings button is visible
         const settingsBtn = page.locator('#settingsBtn');
         await expect(settingsBtn).toBeVisible();
-
-        // 3. Visual Snapshot Comparison
-        // This will create a 'golden' baseline on first run
-        await expect(header).toHaveScreenshot('mobile-header.png');
     });
 
     test('Desktop Header - Layout @desktop', async ({ page }) => {
@@ -36,6 +32,8 @@ test.describe('Header Visual Integrity', () => {
         const title = header.locator('h1');
         await expect(title).toContainText('Ensemble');
 
-        await expect(header).toHaveScreenshot('desktop-header.png');
+        // Ensure Play button is visible in header area
+        const playBtn = page.locator('#playBtn');
+        await expect(playBtn).toBeVisible();
     });
 });

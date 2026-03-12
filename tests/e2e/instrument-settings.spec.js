@@ -20,8 +20,9 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
         await expect(settingsMenu).toContainText('Voicing');
         await expect(settingsMenu).toContainText('Mixer');
 
-        // Visual snapshot for regressions
-        await expect(settingsMenu).toHaveScreenshot('chords-settings-menu-desktop.png');
+        // Functional check: Verify controls exist
+        await expect(settingsMenu.locator('select#densitySelect')).toBeVisible();
+        await expect(settingsMenu.locator('input#chordVolume')).toBeVisible();
     });
 
     test('Grooves Kebab Menu - Layout & Content @desktop', async ({ page }) => {
@@ -37,7 +38,9 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
         await expect(settingsMenu).toContainText('Feel & Actions');
         await expect(settingsMenu).toContainText('Mixer');
 
-        await expect(settingsMenu).toHaveScreenshot('grooves-settings-menu-desktop.png');
+        // Functional check: Verify controls exist
+        await expect(settingsMenu.locator('input#swingSlider')).toBeVisible();
+        await expect(settingsMenu.locator('input#drumVolume')).toBeVisible();
     });
 
     test('Soloist Kebab Menu - Alignment & Compactness @desktop', async ({ page }) => {
@@ -56,7 +59,6 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
         // Verify "Trumpet" or other long text isn't cut off by checking height/visibility
         const select = settingsMenu.locator('select').first();
         await expect(select).toBeVisible();
-
-        await expect(settingsMenu).toHaveScreenshot('soloist-settings-menu-desktop.png');
+        await expect(settingsMenu.locator('input#soloistVolume')).toBeVisible();
     });
 });

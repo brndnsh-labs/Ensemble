@@ -14,11 +14,12 @@ This directory contains the automated tests for the Ensemble application, powere
 *   **`standards/`**: Musical validity checks.
     *   *Examples:* Ensuring generated bass lines adhere to genre rules (e.g., Reggae "One Drop") over thousands of measures.
     *   *Critique Tests:* Advanced statistical analysis of musical authenticity (e.g., Jazz Charleston frequency, Soloist melodic smoothness). See [Critique Guidelines](./standards/CRITIQUE_GUIDELINES.md) for details.
-*   **`e2e/`**: Visual Regression and End-to-End tests powered by [Playwright](https://playwright.dev/).
-    *   *Examples:* Mobile header title visibility, Modal centering, Sequencer Grid responsiveness.
+*   **`e2e/`**: Functional Smoke tests powered by [Playwright](https://playwright.dev/).
+    *   *Examples:* Mobile header title visibility, Modal opening/closing, Performance Modal interaction.
     *   *Decision Matrix:*
         *   **Use Vitest** for structural logic, component state changes, and accessibility (A11y).
-        *   **Use Playwright** for visual appearance, clipping, layout shifts, and cross-browser (WebKit/Safari) rendering issues.
+        *   **Use Playwright** for functional user flows, cross-browser behavior, and verifying that elements are visible and interactive.
+        *   **Note:** We avoid pixel-perfect visual regression (snapshots) to prevent CI flakiness across different OS environments.
 
 ## Running Tests
 
@@ -27,13 +28,10 @@ This directory contains the automated tests for the Ensemble application, powere
 npm test
 ```
 
-### Run Visual Suite (Playwright)
+### Run Functional E2E Suite (Playwright)
 ```bash
-# Requires local dev server (started automatically)
+# Requires local build (started automatically via npm run build:quiet)
 npm run test:e2e
-
-# Update visual snapshots if changes were intentional
-npm run test:e2e:update
 ```
 
 ### Run Specific Tests

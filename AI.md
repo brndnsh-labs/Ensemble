@@ -8,9 +8,8 @@ This document is the primary operational guide for AI agents working on the Ense
 > **Before every task, verify these five pillars:**
 > 1. **State Writes:** ALWAYS use `dispatch(ACTIONS.TYPE, payload)`. NEVER mutate `state` objects directly.
 > 2. **UI Updates:** Check `public/components/` first. Use Preact components; avoid direct DOM manipulation.
-> 3. **Testing:** Run `npm test` (Logic) AND `npm run test:e2e` (UI) before concluding any task.
-> 4. **Visuals:** If UI changes are intentional, update baselines via `npm run test:e2e:update`.
-> 5. **Refactoring:** `grep` the entire project for usages before moving code. Update all imports immediately.
+3. **Testing:** Run `npm test` (Logic) AND `npm run test:e2e` (UI) before concluding any task.
+4. **Refactoring:** `grep` the entire project for usages before moving code. Update all imports immediately.
 
 ---
 
@@ -60,9 +59,10 @@ Always pass the `CoordinationContext` to instrument generators. In `logic-worker
 *   **Mocking:** Use `vi.mock()` to isolate dependencies, especially for global state or browser APIs.
 *   **Logic Updates:** If you intentionally change musical behavior, you **MUST** update the test expectations. Do not leave tests failing.
 
-### B. Playwright (Visual & E2E)
+### B. Playwright (Functional E2E)
 *   **Mobile-First:** Use the `@mobile` tag and verify at 390x844.
-*   **Snapshots:** Review `diff.png` if tests fail. Only run `npm run test:e2e:update` if the change was intentional.
+*   **Functional Only:** We focus on functional smoke tests (visibility, interactions, state updates) rather than pixel-perfect snapshots to avoid cross-OS flakiness.
+*   **Stabilization:** Use `data-e2e-mode="true"` to disable heavy animations during tests.
 
 ### C. Biome (Linting & Formatting)
 *   **Single Pass:** Biome handles both linting and formatting.
