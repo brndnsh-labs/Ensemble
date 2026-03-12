@@ -389,7 +389,11 @@ Em  C  G  D"
                                 🎲 <span>Randomize</span>
                             </button>
                             {showConfirmClear ? (
-                                <div style="padding: 0.5rem; background: rgba(255, 0, 0, 0.1); border-radius: 4px; margin: 0 0.5rem;">
+                                <div
+                                    role="alert"
+                                    aria-live="polite"
+                                    style="padding: 0.5rem; background: rgba(255, 0, 0, 0.1); border-radius: 4px; margin: 0 0.5rem;"
+                                >
                                     <div style="font-size: 0.8rem; color: var(--text-color); margin-bottom: 0.5rem; text-align: center;">
                                         Clear entire progression?
                                     </div>

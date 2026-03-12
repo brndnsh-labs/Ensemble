@@ -606,6 +606,8 @@ export function Settings() {
                             {showConfirmReset ? (
                                 <div
                                     class="confirm-reset-panel danger-bg"
+                                    role="alert"
+                                    aria-live="polite"
                                     style="grid-column: 1 / -1; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; display: flex; flex-direction: column; gap: 0.5rem;"
                                 >
                                     <div style="font-size: 0.8rem; color: var(--text-color); text-align: center;">
