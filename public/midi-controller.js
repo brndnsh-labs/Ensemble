@@ -298,7 +298,7 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
                 if (output) {
                     // Calculate MIDI timestamp for cutoff
                     // time param is AudioContext time.
-                    // midiTime = (cutoffTime - playback.audio.currentTime) * 1000 + performance.now()
+
                     const midiTime =
                         (cutoffTime - playback.audio.currentTime) * 1000 +
                         performance.now() +
