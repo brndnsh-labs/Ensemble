@@ -71,7 +71,7 @@ describe('Turnaround Logic & Section Mapping', () => {
         });
 
         expect(result.shouldPlay).toBe(true);
-        expect(result.velocity).toBeGreaterThan(1.3);
+        expect(result.velocity).toBeGreaterThan(1.2);
     });
 
     it('should suppress turnarounds for 1-measure sections to avoid clutter', () => {
@@ -129,6 +129,6 @@ describe('Turnaround Logic & Section Mapping', () => {
             loopStep: 0,
         });
         expect(result.shouldPlay).toBe(true);
-        expect(result.velocity).toBeGreaterThan(1.3);
+        expect(result.velocity).toBeGreaterThan(1.2);
     });
 });

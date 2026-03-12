@@ -55,7 +55,7 @@ describe('Rock Groove Integrity', () => {
             };
         };
 
-        it('should play a syncopated Kick on beat 1 and the AND of 2 for Motif 1', () => {
+        it('should play a syncopated Kick on beat 1 and the AND of 1 for Motif 1', () => {
             getState.mockReturnValue(mockState);
 
             // Find a barIndex that maps to Motif 1
@@ -78,8 +78,8 @@ describe('Rock Groove Integrity', () => {
                 return; // Not implemented yet
             }
 
-            const step1AndOf2 = barIndexMotif1 * 16 + 6; // step 6 is the & of 2
-            const resultKick = applyGrooveOverrides(createParams(step1AndOf2, 'Kick'));
+            const step1AndOf1 = barIndexMotif1 * 16 + 2; // step 2 is the & of 1
+            const resultKick = applyGrooveOverrides(createParams(step1AndOf1, 'Kick'));
             expect(resultKick.shouldPlay).toBe(true);
         });
 

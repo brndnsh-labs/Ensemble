@@ -152,6 +152,10 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         // The Lope: Play on the swung offbeat (shuffle)
         if (stepInfo?.isOffbeat) {
             // Steeper sensitivity curve: Intensity is the primary driver
+            // Add a threshold gate to ensure low intensity is strictly quarter-note based
+            if (playback.bandIntensity < 0.3) {
+                return false;
+            }
             const intensityWeight = playback.bandIntensity ** 1.2;
             const complexityWeight = playback.complexity * 0.3;
             // High consistency (>90%) at high levels, very sparse at low levels
@@ -702,39 +706,51 @@ export function getBassNote(
         return null;
     }
 
-    // --- ROCK STYLE (8th Note Pedal) ---
+    // --- ROCK STYLE (Driving 8ths) ---
     if (style === 'rock') {
-        const dur = 0.7;
-        const is8th = step % (ts.stepsPerBeat / 2) === 0;
+        const is8th = step % Math.floor(ts.stepsPerBeat / 2) === 0;
         if (!is8th) {
             return null;
         }
 
+        // 1. Kick Locking: Mirror the drummer's kick pattern at high complexity
+        if (hasKickTrigger && (playback.complexity > 0.6 || intensity > 0.7)) {
+            const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
+            if (kickStepVal > 0) {
+                const kickVel = kickStepVal === 2 ? 1.25 : 1.1;
+                return result(getFrequency(baseRoot), 0.8, kickVel * (0.8 + intensity * 0.2));
+            }
+        }
+
+        // 2. Fundamental Pulse: Quarter notes are solid roots
+        if (isBeatStart) {
+            const isPushPoint = intBeat === ts.beats - 1 && Math.random() < 0.4 + intensity * 0.3;
+            if (isPushPoint && nextChord && nextChord.rootMidi !== chord.rootMidi) {
+                // Harmonic Anticipation: Play the NEXT root early
+                const nextRoot = normalizeToRange(nextChord.rootMidi);
+                return result(getFrequency(nextRoot), 0.8, 1.2, true);
+            }
+            return result(getFrequency(baseRoot), 0.8, 1.1 + intensity * 0.1);
+        }
+
+        // 3. Syncopation: Eighth note "ands"
         // Low Intensity: Switch to Quarter Notes
         if (intensity < 0.35) {
-            if (!isBeatStart) {
-                return null; // Only play on beat
-            }
+            return null;
         }
 
-        const velocityRock = (isGroupStart || isBeatStart ? 1.15 : 1.0) * (0.7 + intensity * 0.4);
-        const lastBeatIndex = ts.beats - 1;
-
-        // Fill logic (High Intensity only)
-        if (intBeat === lastBeatIndex && Math.random() < 0.4 && intensity > 0.5) {
-            if (isBeatStart) {
-                const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-                const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
-                const fifthOffset = hasFlat5 ? 6 : hasSharp5 ? 8 : 7;
-                const fillNote = Math.random() < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
-                return result(
-                    getFrequency(clampAndNormalize(withOctaveJump(fillNote))),
-                    dur,
-                    velocityRock * 1.1,
-                );
-            }
+        // High Intensity: Add variation (5ths or Octaves)
+        let note = baseRoot;
+        let vel = 0.95 + intensity * 0.15;
+        if (intensity > 0.65 && Math.random() < 0.3 + intensity * 0.2) {
+            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
+            const fifthOffset = hasFlat5 ? 6 : 7;
+            note = Math.random() < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
+            note = clampAndNormalize(note);
+            vel *= 1.1;
         }
-        return result(getFrequency(withOctaveJump(baseRoot)), dur, velocityRock);
+
+        return result(getFrequency(note), 0.7, vel);
     }
 
     // --- BOSSA NOVA / SAMBA STYLE ---
