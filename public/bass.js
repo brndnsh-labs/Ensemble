@@ -627,38 +627,44 @@ export function getBassNote(
 
     // --- COUNTRY STYLE (Root-Five) ---
     if (style === 'country') {
-        // Root on beat 1, Fifth on beat 3 (in 4/4) or alternating based on pulse
-        const backbeatArray = ts.backbeat || [1, 3];
-        const isPulseStep = backbeatArray.includes(intBeat) || isDownbeat;
-
-        // Low intensity: Simplify to just Root on One?
-        if (intensity < 0.3 && !isDownbeat) {
+        // Strictly Root on 1 & 3, Fifth on 2 & 4 (in 4/4)
+        if (!isBeatStart) {
             return null;
         }
 
+        // Simplify to just Root on 1 at very low intensity
+        if (intensity < 0.2 && !isDownbeat) {
+            return null;
+        }
+
+        const _isRootBeat = intBeat === 0 || intBeat === 2;
+        const isFifthBeat = intBeat === 1 || intBeat === 3;
+
         let note = baseRoot;
-        if (isPulseStep && !isDownbeat) {
-            // Alternate bass
-            note = normalizeToRange(baseRoot - 5); // Down a fourth (or up a fifth)
+        if (isFifthBeat) {
+            // Authentic Country: Prefer the fifth BELOW the root if possible
+            note = normalizeToRange(baseRoot - 5); // Perfect 4th down = Perfect 5th interval
             if (note > baseRoot) {
-                note -= 12; // Prefer lower 5th
+                note -= 12; // Force below
+            }
+            // Absolute floor check
+            if (note < 28) {
+                note += 12;
             }
         }
 
-        // Occasional walk-up on the last beat
+        // Occasional walk-up on the last beat of a section
         const isLastBeat = intBeat === ts.beats - 1;
-        if (isBeatStart && isLastBeat && Math.random() < 0.4 && intensity > 0.4) {
-            const nextTarget = nextChord ? nextChord.rootMidi : baseRoot;
-            const approach = normalizeToRange(nextTarget - 1);
-            return result(getFrequency(approach), 1, 1.1);
+        if (isLastBeat && intensity > 0.5 && nextChord && nextChord.rootMidi !== chord.rootMidi) {
+            if (Math.random() < 0.4) {
+                const nextTarget = normalizeToRange(nextChord.rootMidi);
+                const approach = normalizeToRange(nextTarget - 1);
+                return result(getFrequency(approach), 1, 1.1);
+            }
         }
 
-        if (!isPulseStep && !isDownbeat) {
-            return null;
-        }
-
-        const pluckVel = 0.9 + intensity * 0.3;
-        return result(getFrequency(note), 2, pluckVel); // Plucky
+        const pluckVel = 0.95 + intensity * 0.3;
+        return result(getFrequency(note), 2, pluckVel); // Plucky duration
     }
 
     // --- METAL STYLE (Pedal Point / Gallop) ---

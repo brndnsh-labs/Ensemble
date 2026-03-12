@@ -2,25 +2,31 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 
 export const config = {
     ...DEFAULT_CONFIG,
-    entropyMultiplier: 0.05,
+    entropyMultiplier: 0.04, // Rock solid timing
     blockAdjacentSnare: false,
     backbeatCrack: false,
 };
 
+/**
+ * Motifs for Country:
+ * 0: Traditional Two-Step (Kick on 1/3, Snare on 2/4)
+ * 1: Train Beat Light (Brushes/Ghost 16ths)
+ * 2: Full Heavy Train Beat
+ */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Simple Two-Step
+        return 0;
     }
     if (intensity < 0.6) {
-        return seed < 0.5 ? 0 : 1; // 1 = Train Beat Light
+        return seed < 0.6 ? 0 : 1;
     }
     if (seed < 0.3) {
         return 0;
     }
-    if (seed < 0.7) {
-        return 1; // Train Beat
+    if (seed < 0.8) {
+        return 1;
     }
-    return 2; // Driving Train Beat
+    return 2;
 }
 
 export function applyOverrides(context, state) {
@@ -36,8 +42,6 @@ export function applyOverrides(context, state) {
         beatIndex,
         drumComplexity,
         sectionSeed,
-        stepsPerBar,
-        loopStep,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
@@ -47,74 +51,76 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const safeIsOffbeat = isOffbeat !== undefined ? isOffbeat : loopStep % (stepsPerBar / 8) === 2;
-    const isEighthNote = isBeatStart || safeIsOffbeat;
 
     if (inst.name === 'Snare') {
         shouldPlay = false;
-        soundName = intensity < 0.5 ? 'Sidestick' : 'Snare';
 
-        if (activeMotif === 0) {
-            // Standard 2-step backbeat
+        // Train Beat snare is consistent 16ths
+        if (activeMotif > 0) {
+            shouldPlay = true;
+
             if (isBackbeat) {
-                shouldPlay = true;
-                velocity = scaleVelocity(0.85, intensity, 0.15);
+                // Strong accent on 2 and 4
+                soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+                velocity = scaleVelocity(0.95, intensity, 0.1);
+            } else if (isBeatStart) {
+                // Quarter note foundation (non-backbeat)
+                soundName = 'Snare';
+                velocity = scaleVelocity(0.4, intensity, 0.15);
+            } else if (isOffbeat) {
+                // Eighth note offbeats
+                soundName = 'Snare';
+                velocity = scaleVelocity(0.35, intensity, 0.15);
+            } else if (isEOfBeat || isAOfBeat) {
+                // The "chicka" ghosts (16ths)
+                // Probability scales with intensity
+                const ghostProb = 0.5 + intensity * 0.5;
+                if (roll(ghostProb)) {
+                    shouldPlay = true;
+                    soundName = 'Snare';
+                    velocity = scaleVelocity(0.2, intensity, 0.1);
+                } else {
+                    shouldPlay = false;
+                }
             }
         } else {
-            // Train beat
+            // Motif 0: Standard Two-Step
             if (isBackbeat) {
                 shouldPlay = true;
+                soundName = intensity < 0.4 ? 'Sidestick' : 'Snare';
                 velocity = scaleVelocity(0.9, intensity, 0.1);
-            } else if (isBeatStart) {
-                // Ghost note on beat
-                shouldPlay = true;
-                velocity = scaleVelocity(0.3, intensity, 0.2);
-            } else if (isEOfBeat || isAOfBeat) {
-                // Ghost notes on e and a
-                shouldPlay = true;
-                velocity = scaleVelocity(0.2, intensity, 0.15);
-                soundName = 'Snare'; // Train beat brushes/ghosts usually snare
-            } else if (safeIsOffbeat) {
-                // Ghost on offbeat
-                shouldPlay = true;
-                velocity = scaleVelocity(0.4, intensity, 0.2);
             }
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
-        if (isDownbeat || (isBeatStart && beatIndex === 2)) {
-            shouldPlay = true; // 1 and 3
-        } else if (activeMotif > 0 && isBeatStart && (beatIndex === 1 || beatIndex === 3)) {
-            // 2 and 4 at higher intensity
-            if (intensity > 0.6) {
-                shouldPlay = true;
-            }
-        } else if (activeMotif === 2 && safeIsOffbeat && roll(0.3)) {
-            shouldPlay = true; // slight syncopation
-        }
 
-        if (shouldPlay) {
-            velocity = isDownbeat ? 1.0 : 0.85;
+        // Foundation: 1 and 3
+        if (isDownbeat || (isBeatStart && beatIndex === 2)) {
+            shouldPlay = true;
+            velocity = isDownbeat ? 1.25 : 1.1;
+        }
+        // Four-on-the-floor drive at high intensity
+        else if (isBeatStart && intensity > 0.8 && roll(0.8)) {
+            shouldPlay = true;
+            velocity = scaleVelocity(0.6, intensity, 0.1); // Feathered
         }
     } else if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
-        // In train beat, hats often just do 8ths or are ignored in favor of snare
+
+        // Hats are secondary in a train beat
         if (activeMotif === 0) {
-            if (isEighthNote) {
+            // Simple eighths for two-step
+            if (isBeatStart || isOffbeat) {
                 shouldPlay = true;
                 velocity = isBeatStart ? 0.8 : 0.6;
                 soundName = 'HiHat';
             }
         } else {
-            // Train beat - hats play quarter notes or offbeats
+            // Quarter note "clicks" to cut through the snare
             if (isBeatStart) {
                 shouldPlay = true;
-                velocity = 0.7;
-                soundName = intensity > 0.7 ? 'Open' : 'HiHat';
-            } else if (safeIsOffbeat && intensity > 0.5) {
-                shouldPlay = true;
-                velocity = 0.5;
-                soundName = 'HiHat';
+                velocity = 0.75;
+                soundName = intensity > 0.75 ? 'Open' : 'HiHat';
             }
         }
     }

@@ -74,24 +74,33 @@ describe('Country Drummer Critique', () => {
     it('should pass an authenticity critique for a 128-bar Country performance', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.75 },
+            playback: { bandIntensity: 0.8 },
             groove: { creativity: true, genreFeel: 'Country' },
         });
 
         let backbeatHits = 0;
         let kickHits = 0;
-        let trainBeatSnareHits = 0;
+        let snare16thHits = 0;
+        let _totalSnareVelocity = 0;
+        let backbeatSnareVelocity = 0;
+        let ghostSnareVelocity = 0;
+        let ghostCount = 0;
 
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
+                const snare = stepData.instruments.Snare;
 
-                if (s === 4 || s === 12) {
-                    if (stepData.instruments.Snare) {
+                if (snare) {
+                    snare16thHits++;
+                    _totalSnareVelocity += snare.velocity;
+                    if (s === 4 || s === 12) {
                         backbeatHits++;
+                        backbeatSnareVelocity += snare.velocity;
+                    } else {
+                        ghostCount++;
+                        ghostSnareVelocity += snare.velocity;
                     }
-                } else if (stepData.instruments.Snare) {
-                    trainBeatSnareHits++;
                 }
 
                 if (stepData.instruments.Kick) {
@@ -102,15 +111,25 @@ describe('Country Drummer Critique', () => {
 
         const totalBars = performance.length;
         const backbeatScore = backbeatHits / (totalBars * 2);
+        const snareContinuity = snare16thHits / (totalBars * 16);
+        const avgBackbeatVel = backbeatSnareVelocity / (backbeatHits || 1);
+        const avgGhostVel = ghostSnareVelocity / (ghostCount || 1);
 
         console.log('\n--- COUNTRY DRUMMER CRITIQUE REPORT ---');
         console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}%`);
-        console.log(`[Train Beat/Ghost Snares] ${trainBeatSnareHits} total hits`);
+        console.log(
+            `[Snare Continuity]      ${(snareContinuity * 100).toFixed(1)}% (Target: >70% for Train Beat)`,
+        );
+        console.log(
+            `[Velocity Tiering]      Backbeat: ${avgBackbeatVel.toFixed(2)} vs Ghost: ${avgGhostVel.toFixed(2)}`,
+        );
         console.log(`[Kick Density]         ${(kickHits / totalBars).toFixed(2)} kicks/bar`);
         console.log('---------------------------------------\n');
 
-        expect(backbeatScore).toBeGreaterThan(0.9);
-        expect(trainBeatSnareHits).toBeGreaterThan(100); // Expecting train beat elements
-        expect(kickHits / totalBars).toBeGreaterThan(1.5);
+        // Authentic Country Train Beat has nearly continuous snare work at high intensity
+        expect(backbeatScore).toBeGreaterThan(0.95);
+        expect(snareContinuity).toBeGreaterThan(0.7);
+        expect(avgBackbeatVel).toBeGreaterThan(avgGhostVel * 1.5);
+        expect(kickHits / totalBars).toBeGreaterThan(1.8);
     });
 });
