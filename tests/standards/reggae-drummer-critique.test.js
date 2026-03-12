@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
+import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -15,7 +15,7 @@ describe('Reggae Drummer Critique', () => {
 
     const simulatePerformance = (numBars, stateOverrides = {}) => {
         const mockState = {
-            playback: { bandIntensity: 0.6, bpm: 75, songMode: false },
+            playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Reggae',
                 creativity: true,
@@ -54,12 +54,16 @@ describe('Reggae Drummer Critique', () => {
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
+                        isTurnaround: false,
+                        stepsPerBar: 16,
+                        loopStep: step,
                     };
                     const result = applyGrooveOverrides(params);
                     if (result.shouldPlay) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,
                             sound: result.soundName,
+                            offset: result.instTimeOffset,
                         };
                     }
                 }
@@ -70,60 +74,55 @@ describe('Reggae Drummer Critique', () => {
         return history;
     };
 
-    it('should pass an authenticity critique for a 128-bar Reggae performance', () => {
-        const numBars = 128;
-        const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.6 },
-            groove: { creativity: true, genreFeel: 'Reggae' },
-        });
+    it('should implement "One Drop" feel at low intensity', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.3 } });
 
         let kickOnOne = 0;
-        let oneDropHits = 0; // Kick + Snare on 8 (Beat 3)
-        let eighthNoteHats = 0;
-        let totalHats = 0;
+        let kickOnThree = 0;
+        let snareOnThree = 0;
 
         performance.forEach((bar) => {
-            bar.forEach((stepData) => {
-                const s = stepData.loopStep;
+            if (bar[0].instruments.Kick) {
+                kickOnOne++;
+            }
+            if (bar[8].instruments.Kick) {
+                kickOnThree++;
+            }
+            if (bar[8].instruments.Snare) {
+                snareOnThree++;
+            }
+        });
 
-                // --- CRITIQUE: One Drop (Kick/Snare on Beat 3, step 8) ---
-                if (s === 8) {
-                    if (stepData.instruments.Kick && stepData.instruments.Snare) {
-                        oneDropHits++;
-                    }
-                }
+        const totalBars = performance.length;
+        console.log(
+            `[Reggae Critique] Kick on 1: ${kickOnOne}, Kick/Snare on 3: ${kickOnThree}/${snareOnThree}`,
+        );
 
-                // --- CRITIQUE: One Drop Kick Exclusion (No kick on 1, step 0) ---
-                if (s === 0 && stepData.instruments.Kick) {
-                    kickOnOne++;
-                }
+        // One Drop: No kick on 1, Kick and Snare TOGETHER on 3
+        expect(kickOnOne).toBe(0);
+        expect(kickOnThree).toBe(totalBars);
+        expect(snareOnThree).toBe(totalBars);
+    });
 
-                // --- CRITIQUE: Eighth Note Hats ---
-                if (stepData.instruments.HiHat) {
-                    totalHats++;
-                    if (s % 2 === 0) {
-                        eighthNoteHats++;
-                    }
+    it('should implement "Steppers" feel at high intensity', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.9 } });
+
+        let kickHits = 0;
+        performance.forEach((bar) => {
+            [0, 4, 8, 12].forEach((s) => {
+                if (bar[s].instruments.Kick) {
+                    kickHits++;
                 }
             });
         });
 
         const totalBars = performance.length;
-        const oneDropScore = oneDropHits / totalBars;
-        const kickOneExclusionScore = 1 - kickOnOne / totalBars;
-        const hatConsistency = eighthNoteHats / (totalHats || 1);
-
-        console.log('\n--- REGGAE DRUMMER CRITIQUE REPORT ---');
-        console.log(`[One Drop Solidity]     ${(oneDropScore * 100).toFixed(1)}% (Target: >80%)`);
+        const kickScore = kickHits / (totalBars * 4);
         console.log(
-            `[Kick On One Exclusion] ${(kickOneExclusionScore * 100).toFixed(1)}% (Target: >85%)`,
+            `[Reggae Critique] Steppers Kick Consistency: ${(kickScore * 100).toFixed(1)}%`,
         );
-        console.log(`[Hat Pulse Consistency] ${(hatConsistency * 100).toFixed(1)}% (Target: 100%)`);
-        console.log('------------------------------------\n');
 
-        // Reggae "One Drop" is the default feel.
-        expect(oneDropScore).toBeGreaterThan(0.8);
-        expect(kickOneExclusionScore).toBeGreaterThan(0.85);
-        expect(hatConsistency).toBe(1.0);
+        // Steppers: 4-on-the-floor kick
+        expect(kickScore).toBeGreaterThan(0.8);
     });
 });

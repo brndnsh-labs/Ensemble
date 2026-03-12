@@ -19,17 +19,20 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     }
 
     if (intensity < 0.7) {
-        if (seed < 0.5) {
+        if (seed < 0.4) {
             return 0;
         }
         return 1; // Ghost heavy
     }
 
     // High Intensity
-    if (seed < 0.3) {
+    if (seed < 0.2) {
+        return 0;
+    }
+    if (seed < 0.5) {
         return 1; // Ghost heavy
     }
-    if (seed < 0.6) {
+    if (seed < 0.75) {
         return 2; // Displaced
     }
     return 3; // Linear

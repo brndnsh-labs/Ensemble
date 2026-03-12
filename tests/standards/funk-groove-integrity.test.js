@@ -67,8 +67,8 @@ describe('Funk Groove Integrity', () => {
         it('should play structured ghost notes for Motif 1 (The Funky Drummer)', () => {
             getState.mockReturnValue(mockState);
 
-            // Force a seed that maps to Motif 1
-            mockState.groove.sectionSeedMap['1'] = 0.25;
+            // Force a seed that maps to Motif 1 (0.2 - 0.5)
+            mockState.groove.sectionSeedMap['1'] = 0.3;
 
             const stepGhost = 6; // step 6 is an offbeat (non-beatStart)
             const resultSnare = applyGrooveOverrides(createParams(stepGhost, 'Snare'));

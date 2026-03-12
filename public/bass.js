@@ -1002,27 +1002,50 @@ export function getBassNote(
 
     // --- DUB STYLE (Reggae) ---
     if (style === 'dub') {
-        const deepRoot = clampAndNormalize(baseRoot - 12);
-        let selectedRiddim = 'One Drop';
-        if (intensity > 0.8) {
-            selectedRiddim = 'Steppers';
-        } else if (intensity > 0.6) {
-            selectedRiddim = 'Stalag';
-        } else if (intensity > 0.4) {
-            selectedRiddim = '54-46';
-        } else if (intensity > 0.2) {
-            selectedRiddim = 'Real Rock';
+        const isOne = stepInChord === 0 || isDownbeat;
+
+        // 1. One Drop Logic: Highly probabilistic silence on Beat 1
+        // Traditional One Drop leaves the 1 completely empty for the guitar/drums.
+        if (isOne && intensity < 0.7 && Math.random() < 0.8) {
+            return null;
         }
+
+        const deepRoot = clampAndNormalize(baseRoot - 12);
+        // Force deep register for Dub (Strictly 28-38)
+        let finalDeepRoot = deepRoot;
+        while (finalDeepRoot > 38) {
+            finalDeepRoot -= 12;
+        }
+        while (finalDeepRoot < 28) {
+            finalDeepRoot += 12;
+        }
+
+        let selectedRiddim = 'One Drop';
+        if (intensity > 0.85) {
+            selectedRiddim = 'Steppers';
+        } else if (intensity > 0.65) {
+            selectedRiddim = 'Stalag';
+        } else if (intensity > 0.45) {
+            selectedRiddim = '54-46';
+        } else {
+            selectedRiddim = 'One Drop';
+        }
+
         const riddim = REGGAE_RIDDIMS[selectedRiddim];
         const match = riddim.find((r) => r[0] === stepInMeasure);
+
         if (match) {
             const [, interval, vel, dur] = match;
-            const tunedVel = vel * 0.7;
-            return result(
-                getFrequency(clampAndNormalize(deepRoot + interval)),
+            const tunedVel = vel * (0.8 + intensity * 0.3);
+
+            // Add extra 'lay-back' for the lazy Reggae feel
+            const res = result(
+                getFrequency(clampAndNormalize(finalDeepRoot + interval)),
                 dur,
                 tunedVel * (0.95 + Math.random() * 0.1),
             );
+            res.timingOffset += 0.01 + intensity * 0.01;
+            return res;
         }
         return null;
     }

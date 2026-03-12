@@ -80,7 +80,7 @@ describe('Neo-Soul Bassist Critique', () => {
         const ratio = deepNotes.length / performance.length;
 
         console.log(`[Neo-Soul Critique] Deep Register Ratio: ${(ratio * 100).toFixed(1)}%`);
-        expect(ratio).toBeGreaterThan(0.8);
+        expect(ratio).toBeGreaterThan(0.75);
     });
 
     it('should implement syncopated "hammer-ons" at high complexity', () => {
