@@ -15,11 +15,11 @@ describe('Metal Drummer Critique', () => {
 
     const simulatePerformance = (numBars, stateOverrides = {}) => {
         const mockState = {
-            playback: { bandIntensity: 0.9, bpm: 160, songMode: false },
+            playback: { bandIntensity: 0.6, bpm: 140, songMode: false },
             groove: {
                 genreFeel: 'Metal',
                 creativity: true,
-                lastDrumPreset: 'Metal',
+                lastDrumPreset: 'Metal (Speed)',
                 instruments: [],
             },
             soloist: { enabled: false, busySteps: 0 },
@@ -54,13 +54,15 @@ describe('Metal Drummer Critique', () => {
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
+                        isTurnaround: false,
+                        stepsPerBar: 16,
+                        loopStep: step,
                     };
                     const result = applyGrooveOverrides(params);
-                    if (result.shouldPlay && result.soundName === instName) {
+                    if (result.shouldPlay) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,
                             sound: result.soundName,
-                            offset: result.instTimeOffset,
                         };
                     }
                 }
@@ -71,44 +73,50 @@ describe('Metal Drummer Critique', () => {
         return history;
     };
 
-    it('should pass an authenticity critique for a 128-bar Metal performance', () => {
-        const numBars = 128;
-        const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.95 },
-            groove: { creativity: true, genreFeel: 'Metal' },
-        });
+    it('should implement high-speed Double Kick at maximum intensity', () => {
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.95 } });
 
-        let _backbeatHits = 0;
         let kickHits = 0;
-        let blastBeatSnares = 0;
-
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
-                const s = stepData.loopStep;
-
-                if (s === 4 || s === 12) {
-                    if (stepData.instruments.Snare) {
-                        _backbeatHits++;
-                    }
-                } else if (stepData.instruments.Snare) {
-                    blastBeatSnares++;
-                }
-
                 if (stepData.instruments.Kick) {
                     kickHits++;
                 }
             });
         });
 
-        const totalBars = performance.length;
-        const kickDensity = kickHits / totalBars;
+        const totalSteps = 16 * 16;
+        const kickDensity = kickHits / totalSteps;
+        console.log(
+            `[Metal Critique] Kick Density at Max Intensity: ${(kickDensity * 100).toFixed(1)}%`,
+        );
 
-        console.log('\n--- METAL DRUMMER CRITIQUE REPORT ---');
-        console.log(`[Kick Density (Double Bass)] ${kickDensity.toFixed(2)} kicks/bar`);
-        console.log(`[Blast Beat/Extra Snares]    ${blastBeatSnares} hits`);
-        console.log('-------------------------------------\n');
+        // Double kick should be nearly continuous at max intensity
+        expect(kickDensity).toBeGreaterThan(0.7);
+    });
 
-        // Intense double bass
-        expect(kickDensity).toBeGreaterThan(6);
+    it('should pass a Blast Beat alignment check at max intensity', () => {
+        const performance = simulatePerformance(128, {
+            playback: { bandIntensity: 0.95 },
+            groove: { creativity: true, genreFeel: 'Metal' },
+        });
+
+        let blastBars = 0;
+        performance.forEach((bar) => {
+            // A blast beat has snare and kick on most 16th or 8th subdivisions
+            let snareKickLocks = 0;
+            bar.forEach((stepData) => {
+                if (stepData.instruments.Snare && stepData.instruments.Kick) {
+                    snareKickLocks++;
+                }
+            });
+            // We expect at least some bars to exhibit blast behavior
+            if (snareKickLocks >= 4) {
+                blastBars++;
+            }
+        });
+
+        console.log(`[Metal Critique] Blast Beat segments observed: ${blastBars}/128 bars`);
+        expect(blastBars).toBeGreaterThan(5);
     });
 });

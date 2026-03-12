@@ -147,7 +147,12 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         return step % (ts.stepsPerBeat * 2) === 0; // Alternating beats (1 and 3 in 4/4)
     }
     if (style === 'metal') {
-        return is8th;
+        if (is8th) {
+            return true;
+        }
+        // Gallop/Chug: 16th note subdivisions at higher intensity/complexity
+        const gallopProb = (playback.bandIntensity > 0.6 ? 0.5 : 0.1) + playback.complexity * 0.4;
+        return Math.random() < gallopProb;
     }
     if (style === 'blues') {
         // Foundation: Always play on quarter notes
@@ -711,33 +716,57 @@ export function getBassNote(
         return result(getFrequency(note), 2, pluckVel); // Plucky duration
     }
 
-    // --- METAL STYLE (Pedal Point / Gallop) ---
+    // --- METAL STYLE (Pedal Point / Gallop / Chug) ---
     if (style === 'metal') {
-        const subDiv = ts.stepsPerBeat / 2;
-        const isEighth = step % subDiv === 0;
+        const stepInBeat = step % ts.stepsPerBeat;
+        const isEighth = stepInBeat % 2 === 0;
 
-        // Low Intensity: Simplify to Quarter Notes (Downbeats only)
-        if (intensity < 0.35 && !isBeatStart) {
-            return null;
+        // 1. The "One" (and Beat 3) - Heavy Anchor
+        if (isDownbeat || (isBeatStart && intBeat === 2)) {
+            return result(getFrequency(baseRoot), 0.9, 1.25 + intensity * 0.1);
         }
 
-        if (isEighth) {
-            const note = baseRoot; // Chug on root
+        // 2. Rhythmic Foundation: 8th Note Roots (Pedal)
+        if (isEighth && !isBeatStart) {
+            return result(getFrequency(baseRoot), 0.7, 1.1 + intensity * 0.1);
+        }
 
-            // Accent logic
-            const vel = (isBeatStart ? 1.1 : 0.9) * (0.8 + intensity * 0.4);
+        // 3. The "Gallop" (16-16-8 feel)
+        // Occurs on 'e' and 'a' subdivisions at medium-high intensity
+        if (!isEighth) {
+            const gallopProb = (intensity > 0.6 ? 0.6 : 0.2) + playback.complexity * 0.3;
+            if (Math.random() < gallopProb) {
+                // Choice: Chug on root or chromatic approach to next beat
+                let note = baseRoot;
+                let isGhost = false;
 
-            // Riffing on later beats (high intensity)
-            if (intensity > 0.7 && intBeat >= ts.beats / 2) {
-                if (Math.random() < 0.3) {
-                    const idx = Math.floor(Math.random() * 3); // Root, 2nd, b3
-                    const riffNote = normalizeToRange(baseRoot + scale[idx]);
-                    return result(getFrequency(riffNote), 0.5, vel);
+                // Chromatic Leading Note
+                if (intensity > 0.75 && Math.random() < 0.4) {
+                    const target = baseRoot;
+                    note = Math.random() < 0.5 ? target - 1 : target + 1;
+                } else {
+                    isGhost = intensity < 0.8;
                 }
-            }
 
-            return result(getFrequency(note), 0.5, vel);
+                const res = result(
+                    getFrequency(clampAndNormalize(note)),
+                    0.3,
+                    velocity * (isGhost ? 0.7 : 1.0),
+                    isGhost,
+                );
+                // Tight, aggressive timing
+                res.timingOffset -= 0.002;
+                return res;
+            }
         }
+
+        // 4. Fill Logic: Fast 16th runs at max intensity
+        if (intensity > 0.9 && Math.random() < 0.3) {
+            const idx = Math.floor(Math.random() * scale.length);
+            const walkNote = baseRoot + scale[idx];
+            return result(getFrequency(clampAndNormalize(walkNote)), 0.2, 1.1);
+        }
+
         return null;
     }
 
