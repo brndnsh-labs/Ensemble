@@ -63,12 +63,27 @@ Standard forms like the **12-Bar Blues** can be written cleanly using measure ma
 ---
 
 ## 🎨 Style Gallery (Deep Links)
-Click any of these to instantly load a curated preset:
-- [🎸 **Stadium Rock**](index.html?prog=I+vi+IV+V&genre=Rock&bpm=120)
-- [🎷 **Bebop Jazz**](index.html?prog=ii7+V7+Imaj7&genre=Jazz&bpm=110)
-- [🎸 **12-Bar Blues**](index.html?prog=I7+|++I7+|++I7+|++I7+|++IV7+|++IV7+|++I7+|++I7+|++V7+|++IV7+|++I7+|++V7&genre=Blues&bpm=100)
-- [☕ **Neo-Soul Chill**](index.html?prog=IVmaj9+III7%239+vi11+V9sus4&genre=Neo-Soul&bpm=85)
-- [🕺 **70s Disco**](index.html?prog=i7+IV7&genre=Disco&bpm=124)
+Click any of these to instantly load a curated preset. These are perfect for practice, analysis, or as a starting point for your own arrangements.
+
+### 🎷 Standards & Jazz
+- [🎺 **Jazz Blues in Bb**](index.html?prog=I7+%7C+IV7+%7C+I7+%7C+I7+%7C+IV7+%7C+IV7+%7C+I7+%7C+I7+%7C+ii7+%7C+V7+%7C+I7+%7C+V7&genre=Jazz&bpm=120&key=Bb) — Classic 12-bar jazz blues with a walking bass and swinging drums.
+- [🍂 **Autumn Jazz (ii-V-I)**](index.html?prog=ii%C3%B87+%7C+V7+%7C+i+%7C+i+%7C+ii%C3%B87+%7C+V7+%7C+i+%7C+i&genre=Jazz&bpm=110&key=Cm) — Soulful minor jazz standard with a focus on harmonic resolution.
+- [🌴 **Bossa Nova Morning**](index.html?prog=Imaj7+%7C+Imaj7+%7C+II7+%7C+II7+%7C+ii7+%7C+V7+%7C+Imaj7+%7C+V7&genre=Bossa&bpm=124) — Sophisticated Brazilian harmony with authentic syncopation.
+
+### ☕ Modern & Soulful
+- [🌆 **Neo-Soul Sunset**](index.html?prog=IVmaj9+%7C+III7%239+%7C+vi11+%7C+V9sus4&genre=Neo-Soul&bpm=82) — Lush extensions and a deep, laid-back rhythmic pocket.
+- [🔥 **Funk & Soul Vamp**](index.html?prog=i7+%7C+i7+%7C+IV7+%7C+IV7+%7C+i7+%7C+i7+%7C+IV7+%7C+IV7&genre=Funk&bpm=98) — Tight, high-energy interplay with a focus on rhythmic syncopation.
+- [🎧 **Lo-Fi Study Loop**](index.html?prog=vi+%7C+IV+%7C+ii+%7C+V&genre=Hip+Hop&bpm=88) — Smooth, repetitive progression for a relaxed, focused vibe.
+
+### 🎸 Rock & Metal
+- [🏟️ **Stadium Rock Anthem**](index.html?prog=I+%7C+V+%7C+vi+%7C+IV&genre=Rock&bpm=118) — Massive power chords and driving eighth-note bass energy.
+- [🏁 **Ska-Punk Skank**](index.html?prog=I+%7C+III7+%7C+vi+%7C+V&genre=Ska-Punk&bpm=165) — Fast-paced upstroke chords and an agile walking bass.
+- [🤘 **Power Metal Core**](index.html?prog=i+%7C+VI+%7C+i+%7C+V&genre=Metal&bpm=145) — Tight, rhythmic palm-muting and aggressive low-end gallops.
+
+### ⛺ Acoustic & Folk
+- [🚜 **Country Two-Step**](index.html?prog=I+%7C+I+%7C+IV+%7C+V&genre=Country&bpm=115) — Classic root-five bass movement and honky-tonk piano flair.
+- [🏕️ **Campfire Folk**](index.html?prog=I+%7C+V+%7C+vi+%7C+IV+%7C+I+%7C+V+%7C+IV+%7C+IV&genre=Acoustic&bpm=92) — Intimate, strummed accompaniment for singer-songwriters.
+- [💃 **Flamenco Fusion**](index.html?prog=i+%7C+VII+%7C+VI+%7C+V7&genre=Bossa&bpm=110) — Spanish-influenced harmonic descent over a syncopated groove.
 
 ---
 
