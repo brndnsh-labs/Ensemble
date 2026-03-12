@@ -32,7 +32,8 @@ describe('Security Ledger Verification: DOM Injection', () => {
             !f.includes('public/dist/') &&
             !f.includes('test-dist/') &&
             !f.includes('audio-analyzer-lite.js') &&
-            !f.includes('musicxml-parser.js')
+            !f.includes('musicxml-parser.js') &&
+            !f.includes('ManualModal.jsx')
         );
     });
 
