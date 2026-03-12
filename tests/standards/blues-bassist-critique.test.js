@@ -68,7 +68,7 @@ describe('Blues Bassist Critique', () => {
 
         // The Box: Root (0), 5th (7), 6th (9), b7th (10)
         const pcs = performance
-            .filter((p) => p.info.isBeatStart && !p.info.isAOfBeat)
+            .filter((p) => p.info.isBeatStart && !p.info.isOffbeat)
             .map((p) => p.note.midi % 12);
 
         const hasRoot = pcs.includes(0);
@@ -84,12 +84,12 @@ describe('Blues Bassist Critique', () => {
         expect(hasFlat7).toBe(true);
     });
 
-    it('should implement the "Shuffle Lope" (isAOfBeat) at high intensity', () => {
+    it('should implement the "Shuffle Lope" (isOffbeat) at high intensity', () => {
         const highIntensityPerf = simulatePerformance(32, {
             playback: { bandIntensity: 0.9, complexity: 0.9 },
         });
 
-        const lopeHits = highIntensityPerf.filter((p) => p.info.isAOfBeat);
+        const lopeHits = highIntensityPerf.filter((p) => p.info.isOffbeat);
         const quarterHits = highIntensityPerf.filter((p) => p.info.isBeatStart);
 
         console.log(
@@ -108,7 +108,7 @@ describe('Blues Bassist Critique', () => {
 
         let checked = 0;
         performance.forEach((p, i) => {
-            if (p.info.isAOfBeat && i > 0) {
+            if (p.info.isOffbeat && i > 0) {
                 const prev = performance[i - 1];
                 if (prev?.info.isBeatStart) {
                     expect(p.note.midi).toBe(prev.note.midi);
@@ -128,7 +128,7 @@ describe('Blues Bassist Critique', () => {
         let shortSum = 0;
         let count = 0;
         performance.forEach((p, i) => {
-            if (p.info.isAOfBeat && i > 0) {
+            if (p.info.isOffbeat && i > 0) {
                 const prev = performance[i - 1];
                 if (prev?.info.isBeatStart) {
                     longSum += prev.note.durationSteps;
@@ -145,7 +145,7 @@ describe('Blues Bassist Critique', () => {
             `[Bassist Critique] Avg Long Duration: ${avgLong.toFixed(2)}, Avg Short: ${avgShort.toFixed(2)}`,
         );
 
-        expect(avgLong).toBeGreaterThan(2.0);
+        expect(avgLong).toBeGreaterThan(1.5); // Adjusted for the new 0.45 duration
         expect(avgShort).toBeLessThan(1.0);
     });
 
@@ -154,7 +154,7 @@ describe('Blues Bassist Critique', () => {
             playback: { bandIntensity: 0.1, complexity: 0.1 },
         });
 
-        const lopeHits = lowIntensityPerf.filter((p) => p.info.isAOfBeat);
+        const lopeHits = lowIntensityPerf.filter((p) => p.info.isOffbeat);
 
         console.log(`[Bassist Critique] Low Intensity Lope hits: ${lopeHits.length}`);
 

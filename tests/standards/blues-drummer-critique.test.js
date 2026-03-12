@@ -129,7 +129,7 @@ describe('Blues Drummer Critique', () => {
                     }
                 } else if (stepData.instruments.Snare) {
                     // --- CRITIQUE: Snare Ghost/Entropy ---
-                    if (s === 3 || s === 7 || s === 11 || s === 15) {
+                    if (s === 2 || s === 6 || s === 10 || s === 14) {
                         snareGhostHits++;
                         totalGhostVelocity += stepData.instruments.Snare.velocity;
                     }
@@ -146,7 +146,8 @@ describe('Blues Drummer Critique', () => {
                             kickDownbeatVelocity += vel;
                             kickDownbeatCount++;
                         }
-                    } else if (s === 15) {
+                    } else if (s === 14) {
+                        // The 'ah' of 4 push is now on the swung offbeat
                         totalKickAVelocity += vel;
                         kickACount++;
                     }
@@ -162,16 +163,16 @@ describe('Blues Drummer Critique', () => {
                         totalHiHatBeatVelocity += hat.velocity;
                         hiHatBeatCount++;
                         shuffleGridHits++;
-                    } else if ([3, 7, 11, 15].includes(s)) {
+                    } else if ([2, 6, 10, 14].includes(s)) {
                         totalHiHatAVelocity += hat.velocity;
                         hiHatACount++;
                         shuffleGridHits++;
 
-                        if (s === 3 || s === 11) {
+                        if (s === 2 || s === 10) {
                             hatDownbeatAVelocity += hat.velocity;
                             hatDownbeatACount++;
-                        } else if (s === 7) {
-                            // Only use step 7 for backbeat-ah to avoid step 15 turnaround inflation
+                        } else if (s === 6) {
+                            // Only use step 6 for backbeat-ah to avoid step 14 turnaround inflation
                             hatBackbeatAVelocity += hat.velocity;
                             hatBackbeatACount++;
                         }
@@ -251,7 +252,7 @@ describe('Blues Drummer Critique', () => {
         });
 
         let backbeatKickHits = 0; // Kicks on 2 and 4
-        let pushKickHits = 0; // Kicks on the 'a' of 4 (step 15)
+        let pushKickHits = 0; // Kicks on the swung offbeat of 4 (step 14)
         let backbeatKickVelocity = 0;
         let primaryKickVelocity = 0;
 
@@ -263,7 +264,7 @@ describe('Blues Drummer Critique', () => {
                     if (s === 4 || s === 12) {
                         backbeatKickHits++;
                         backbeatKickVelocity += vel;
-                    } else if (s === 15) {
+                    } else if (s === 14) {
                         pushKickHits++;
                     } else if (s === 0 || s === 8) {
                         primaryKickVelocity += vel;

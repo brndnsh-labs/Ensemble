@@ -47,7 +47,7 @@ export function applyOverrides(context, state) {
         isDownbeat,
         isBeatStart,
         isBackbeat,
-        isAOfBeat,
+        isOffbeat,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -76,10 +76,10 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
 
-        // The core shuffle pattern: downbeats and the delayed 'a'
-        if (isBeatStart || isAOfBeat) {
-            // Spang-a-lang: Occasionally omit the 'ah' on beats 1 and 3 at lower complexity
-            if (isAOfBeat && !isBackbeat && drumComplexity < 0.5 && roll(0.4)) {
+        // The core shuffle pattern: downbeats and the swung offbeat
+        if (isBeatStart || isOffbeat) {
+            // Spang-a-lang: Occasionally omit the offbeat on beats 1 and 3 at lower complexity
+            if (isOffbeat && !isBackbeat && drumComplexity < 0.5 && roll(0.4)) {
                 return { shouldPlay: false, velocity, soundName, instTimeOffset };
             }
 
@@ -97,15 +97,15 @@ export function applyOverrides(context, state) {
                 const accent = isBackbeatBeat ? 1.1 : 1.0;
                 velocity = scaleVelocity(0.9 * accent, intensity, 0.15);
             } else {
-                // The 'ah' is lighter, and even lighter when leading into a backbeat
+                // The offbeat is lighter, and even lighter when leading into a backbeat
                 // or following one to create the "circular" lope.
                 const isBackbeatBeat = beatIndex === 1 || beatIndex === 3;
                 const lopeWeight = isBackbeatBeat ? 0.8 : 1.0;
                 velocity = scaleVelocity(0.5 * lopeWeight, intensity, 0.1);
             }
 
-            // Turnaround Open Hat on the 'a' of 4
-            if (isAOfBeat && beatIndex === lastBeatIndex && activeMotif >= 1 && roll(0.4)) {
+            // Turnaround Open Hat on the offbeat of 4
+            if (isOffbeat && beatIndex === lastBeatIndex && activeMotif >= 1 && roll(0.4)) {
                 soundName = 'Open';
                 velocity = scaleVelocity(0.7, intensity, 0.1);
             }
@@ -121,8 +121,8 @@ export function applyOverrides(context, state) {
             velocity = isDownbeat ? 1.3 : 1.15;
         }
 
-        // The Shuffle Push (ONLY on the 'a' of 4)
-        if (isAOfBeat && beatIndex === lastBeatIndex && activeMotif >= 1) {
+        // The Shuffle Push (ONLY on the offbeat of 4)
+        if (isOffbeat && beatIndex === lastBeatIndex && activeMotif >= 1) {
             shouldPlay = true;
             velocity = scaleVelocity(0.65, intensity, 0.1);
         }
@@ -144,16 +144,16 @@ export function applyOverrides(context, state) {
             velocity = 1.2;
         }
 
-        // Texas Shuffle snare participation (isAOfBeat ghosting)
+        // Texas Shuffle snare participation (isOffbeat ghosting)
         // Now more pervasive at high complexity/intensity
         const texasProb = activeMotif === 3 ? 0.7 : intensity > 0.7 ? 0.3 : 0;
-        if (isAOfBeat && !isBackbeat && drumComplexity > 0.6) {
+        if (isOffbeat && !isBackbeat && drumComplexity > 0.6) {
             if (roll(texasProb)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.35, intensity, 0.1);
                 instTimeOffset += 0.008; // Lay it back for the 'shuffle' feel
             }
-        } else if (activeMotif >= 2 && !isAOfBeat && !isBeatStart) {
+        } else if (activeMotif >= 2 && !isOffbeat && !isBeatStart) {
             // Very occasional 16th ghost notes at high intensity
             // EXCEPTION: Avoid steps immediately after the backbeat (5 and 13) to maintain clarity
             const stepInMeasure = context.step % context.stepsPerBar;

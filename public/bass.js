@@ -144,8 +144,8 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
             return true;
         }
 
-        // The Lope: Play on the 'ah' of the beat (shuffle)
-        if (stepInfo?.isAOfBeat) {
+        // The Lope: Play on the swung offbeat (shuffle)
+        if (stepInfo?.isOffbeat) {
             // Steeper sensitivity curve: Intensity is the primary driver
             const intensityWeight = playback.bandIntensity ** 1.2;
             const complexityWeight = playback.complexity * 0.3;
@@ -525,7 +525,7 @@ export function getBassNote(
 
     // --- BLUES STYLE (Box Pattern / Shuffle) ---
     if (style === 'blues') {
-        const isUpbeat = stepInfo?.isAOfBeat;
+        const isUpbeat = stepInfo?.isOffbeat;
 
         // 1. Interaction: Lock to Kick Drum if available
         if (hasKickTrigger) {
@@ -556,15 +556,15 @@ export function getBassNote(
                 targetInterval = randomScaleNote;
             }
 
-            // Longer duration for the downbeat note to sustain into the lope
+            // Standard duration, global swing will push the next note back so we don't need to artificially lengthen this
             return result(
                 getFrequency(clampAndNormalize(baseRoot + targetInterval)),
-                ts.stepsPerBeat * 0.65,
+                ts.stepsPerBeat * 0.45,
                 velocity,
             );
         }
 
-        // 3. The Shuffle Lope (The 'ah')
+        // 3. The Shuffle Lope (The swung offbeat)
         if (isUpbeat) {
             // Strictly repeat the previous note for an authentic 'long-short' identity
             const note = prevMidi || baseRoot;
