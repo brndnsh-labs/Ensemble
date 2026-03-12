@@ -41,9 +41,7 @@ export function initAudio() {
         playback.audio = new (window.AudioContext || window.webkitAudioContext)();
 
         playback.audio.onstatechange = () => {
-            // console.log(`[DSP] AudioContext state changed to: ${playback.audio.state}`);
             if (playback.audio.state === 'suspended' && playback.isPlaying) {
-                // console.log("[DSP] Unexpected suspension. Attempting auto-resume...");
                 playback.audio.resume().catch((e) => console.error('[DSP] Auto-resume failed:', e));
             }
         };
@@ -224,8 +222,6 @@ export function initAudio() {
             data[i] = Math.random() * 2 - 1;
         }
         groove.audioBuffers.noise = buffer;
-
-        // console.log(`[DSP] Audio Context Initialized: SampleRate=${playback.audio.sampleRate}, Latency=${(playback.audio.baseLatency * 1000).toFixed(1)}ms`);
     }
     if (playback.audio.state === 'suspended') {
         playback.audio.resume();

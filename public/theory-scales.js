@@ -199,7 +199,6 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     // --- MAJOR CHORD HANDLING ---
 
     if (quality === 'major' || quality.startsWith('maj')) {
-        // if (style === 'bossa') return SCALE_INTERVALS.MAJOR; // Removed to allow Lydian fallback
         if ((style === 'blues' || style === 'funk') && !quality.includes('maj7')) {
             return SCALE_INTERVALS.MAJOR_BLUES;
         }
