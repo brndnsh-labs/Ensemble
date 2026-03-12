@@ -813,11 +813,14 @@ export function getBassNote(
 
         // 3. Syncopated "Pushes" & "Gallops" (16ths)
         if (stepInBeat % 2 !== 0) {
+            const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
+
             // High complexity "Pop" on the 'a'
             if (
                 stepInBeat === 3 &&
                 playback.complexity > 0.7 &&
-                Math.random() < 0.3 + intensity * 0.3
+                Math.random() < 0.3 + intensity * 0.3 &&
+                !isSoloistBusy
             ) {
                 const note = baseRoot + 12;
                 const finalNote = note > 51 ? baseRoot : note;
@@ -825,14 +828,19 @@ export function getBassNote(
             }
 
             // Dead-note/Ghost chucks to maintain engine
-            const chuckProb = 0.2 + intensity * 0.4;
-            if (Math.random() < chuckProb) {
+            const chuckProb = (isSoloistBusy ? 0.1 : 0.2) + intensity * 0.4;
+            if (Math.random() < chuckProb && !isSoloistBusy) {
                 // Usually repeat root or previous note as a ghost
                 return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, true);
             }
 
             // High complexity melodic "Double Slap" or "Hammer-on"
-            if (playback.complexity > 0.7 && intensity > 0.6 && Math.random() < 0.3) {
+            if (
+                playback.complexity > 0.7 &&
+                intensity > 0.6 &&
+                Math.random() < 0.3 &&
+                !isSoloistBusy
+            ) {
                 const hammerNote = scale.includes(2) ? baseRoot + 2 : baseRoot + 1;
                 return result(getFrequency(clampAndNormalize(hammerNote)), 0.2, 1.1);
             }

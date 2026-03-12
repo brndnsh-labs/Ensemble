@@ -130,6 +130,7 @@ describe('Bass Engine Logic', () => {
 
         it('should reduce complexity when the soloist is busy', () => {
             groove.genreFeel = 'Funk';
+            soloist.enabled = true;
             soloist.busySteps = 4;
             expect(getBassNote(chordC, null, 0.25, 110, 38, 'funk', 0, 1, 1)).toBeNull();
 

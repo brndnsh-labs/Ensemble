@@ -825,6 +825,18 @@ export function getAccompanimentNotes(
         }
     }
 
+    // --- NEW: Conversational Comping ---
+    // If the drummer is comping, the piano should sometimes join or answer
+    if (
+        !isHit &&
+        chords.style === 'smart' &&
+        (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues')
+    ) {
+        if ((coordination.snareHit || coordination.kickHit) && Math.random() < 0.4) {
+            isHit = true;
+        }
+    }
+
     // --- NEW: Harmony Interlocking ---
     // If backgrounds are busy, the main accompanist should find gaps.
     if (isHit && harmony.enabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {

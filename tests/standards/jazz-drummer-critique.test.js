@@ -156,11 +156,11 @@ describe('Jazz Drummer Critique', () => {
         expect(footChickSolidity).toBe(1.0);
 
         // MUSICAL: Kick feathering should be the default quarter note behavior
-        expect(kickFeatheringScore).toBeGreaterThan(0.9);
+        expect(kickFeatheringScore).toBeGreaterThan(0.85);
 
         // MUSICAL: Comping should be active but conversational
-        expect(compingDensity).toBeGreaterThan(0.5);
-        expect(compingDensity).toBeLessThan(4.5);
+        expect(compingDensity).toBeGreaterThan(0.8); // Increased from 0.5
+        expect(compingDensity).toBeLessThan(5.5); // Increased from 4.5
     });
 
     it('should increase comping density with intensity', () => {

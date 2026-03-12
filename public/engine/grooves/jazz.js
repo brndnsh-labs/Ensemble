@@ -103,35 +103,39 @@ export function applyOverrides(context, state) {
         if (isBackbeat) {
             shouldPlay = true;
             velocity = 1.0;
+            // Humanize the foot chick: slightly ahead of the beat for driving energy
+            instTimeOffset -= 0.005 + Math.random() * 0.005;
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
         if (isBeatStart) {
             shouldPlay = true;
-            velocity = scaleVelocity(0.15, intensity, 0.1);
+            // Kick feathering: almost inaudible but felt
+            velocity = scaleVelocity(0.12, intensity, 0.08);
         }
 
         if (isTurnaround && isBeatStart && beatIndex === lastBeatIndex) {
             shouldPlay = true;
-            velocity = 0.9;
+            velocity = 0.95;
         } else if (activeMotif === 1 && isOffbeat && beatIndex === 1 && sectionSeed > 0.5) {
             shouldPlay = true;
-            velocity = scaleVelocity(0.7, intensity, 0.2);
+            velocity = scaleVelocity(0.75, intensity, 0.2);
         } else if (activeMotif === 4 && isOffbeat && beatIndex >= 2) {
             shouldPlay = true;
-            velocity = scaleVelocity(0.8, Math.random(), 0.2);
-        } else if (activeMotif === 0) {
-            let bombProb = intensity * 0.15;
+            velocity = scaleVelocity(0.85, Math.random(), 0.2);
+        } else {
+            // General Kick Bombs
+            let bombProb = intensity * 0.12;
             if (isSoloistBusy) {
-                bombProb *= 1.5;
+                bombProb *= 1.4;
             }
-            if (playback.bpm > 170) {
-                bombProb *= 0.4;
+            if (playback.bpm > 175) {
+                bombProb *= 0.3;
             }
 
             if (roll(bombProb) && isOffbeat && beatIndex % 2 !== 0) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.8, Math.random(), 0.3);
+                velocity = scaleVelocity(0.85, Math.random(), 0.25);
             }
         }
     } else if (inst.name === 'Snare') {
