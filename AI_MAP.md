@@ -44,6 +44,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/data/chord-presets.js` | Library chord progressions. | `CHORD_PRESETS` |
 | `public/data/song-templates.js` | Full song structure templates. | `SONG_TEMPLATES` |
 | `public/data/instrument-styles.js` | Engine-specific style definitions. | `CHORD_STYLES`, `BASS_STYLES`, etc. |
+| `public/data/shortcut-config.js` | Centralized keyboard shortcut definitions. | `SHORTCUT_CONFIG` |
 
 ## UI Components (Preact)
 
@@ -52,6 +53,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/App.jsx` | Root layout and theme provider. |
 | `public/components/UIControls.jsx` | Reusable UI toolkit (SettingRow, Toggle, etc.). |
 | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
+| `public/components/ManualModal.jsx` | Self-building documentation viewer. |
 | `public/components/Arranger.jsx` | Chord progression and section manager. |
 | `public/components/Transport.jsx` | Playback controls and tempo. |
 | `public/components/SequencerGrid.jsx` | Interactive drum pattern editor. |
