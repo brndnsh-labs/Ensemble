@@ -78,7 +78,7 @@ describe('Acoustic Drummer Critique', () => {
         });
 
         let kickOnOne = 0;
-        let snareActive = 0;
+        let _snareActive = 0;
         let highIntensitySnareSound = 0;
         let constantHats = 0;
         const totalBars = performance.length;
@@ -94,9 +94,11 @@ describe('Acoustic Drummer Critique', () => {
 
                 // --- CRITIQUE: Snare/Sidestick Presence ---
                 if (stepData.instruments.Snare) {
-                    snareActive++;
-                    if (stepData.instruments.Snare.sound === 'Snare') {
-                        highIntensitySnareSound++;
+                    _snareActive++;
+                    if (s % 4 === 0) {
+                        if (stepData.instruments.Snare.sound === 'Snare') {
+                            highIntensitySnareSound++;
+                        }
                     }
                 }
 
@@ -108,7 +110,18 @@ describe('Acoustic Drummer Critique', () => {
         });
 
         const kickScore = kickOnOne / totalBars;
-        const snareSoundScore = highIntensitySnareSound / (snareActive || 1);
+
+        // Count how many snare hits occurred on main beats (quarter notes)
+        let mainSnareHits = 0;
+        performance.forEach((bar) => {
+            bar.forEach((s) => {
+                if (s.loopStep % 4 === 0 && s.instruments.Snare) {
+                    mainSnareHits++;
+                }
+            });
+        });
+
+        const snareSoundScore = highIntensitySnareSound / (mainSnareHits || 1);
         const hatDensity = constantHats / (totalBars * 16);
 
         console.log('\n--- ACOUSTIC DRUMMER CRITIQUE REPORT ---');

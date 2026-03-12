@@ -85,7 +85,7 @@ export const SMART_GENRES = {
         drum: 'Acoustic',
         feel: 'Acoustic',
         chord: 'pad',
-        bass: 'half',
+        bass: 'acoustic',
         soloist: 'minimal',
         harmony: 'strings',
     },

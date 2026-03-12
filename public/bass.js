@@ -35,7 +35,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
             'Bossa Nova': 'bossa',
             Afrobeat: 'funk',
             Blues: 'blues',
-            Acoustic: 'rock',
+            Acoustic: 'acoustic',
             Country: 'country',
             Metal: 'metal',
             'Ska-Punk': 'walking-ska',
@@ -77,7 +77,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         }
         return BOSSA_STEPS.includes(step % 16);
     }
-    if (style === 'quarter' || groove.genreFeel === 'Jazz' || groove.genreFeel === 'Acoustic') {
+    if (style === 'quarter' || groove.genreFeel === 'Jazz') {
         if (isQuarter) {
             return true;
         }
@@ -126,6 +126,15 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     }
     if (style === 'dub') {
         return true;
+    }
+
+    if (style === 'acoustic') {
+        // Lower intensity = Half notes (Roots)
+        if (playback.bandIntensity < 0.4) {
+            return stepInChord % (ts.stepsPerBeat * 2) === 0;
+        }
+        // Higher intensity = Quarter notes (Supportive)
+        return isQuarter;
     }
 
     if (style === 'neo') {
@@ -213,7 +222,7 @@ export function getBassNote(
             Metal: 'metal',
             Afrobeat: 'funk',
             Blues: 'blues',
-            Acoustic: 'rock',
+            Acoustic: 'acoustic',
             'Ska-Punk': 'walking-ska',
             Ska: 'walking-ska',
         };
@@ -442,8 +451,14 @@ export function getBassNote(
         const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
 
         // Universal Overlap Protection: Force gaps for legato-heavy styles
+        // Acoustic and long styles (whole/half) are allowed to sustain longer
+        const isLongStyle = ['acoustic', 'whole', 'half'].includes(style);
         const maxSafeDuration =
-            style === 'quarter' ? ts.stepsPerBeat * 0.45 : ts.stepsPerBeat * 0.95;
+            style === 'quarter'
+                ? ts.stepsPerBeat * 0.45
+                : isLongStyle
+                  ? ts.stepsPerBeat * 1.95
+                  : ts.stepsPerBeat * 0.95;
         const safeDuration = Math.min(durationSteps, maxSafeDuration);
 
         return {
@@ -711,7 +726,34 @@ export function getBassNote(
         return result(getFrequency(note), 2, pluckVel); // Plucky duration
     }
 
-    // --- METAL STYLE (Pedal Point / Gallop / Chug) ---
+    // --- ACOUSTIC STYLE (Warm & Supportive) ---
+    if (style === 'acoustic') {
+        // Lay-back timing for acoustic feel
+        const lag = 0.01 + intensity * 0.005;
+
+        // Note Logic: Root on downbeats, 5th/8th on secondary beats
+        let note = baseRoot;
+        let dur = ts.stepsPerBeat * 0.8; // Warm sustain
+
+        if (intensity < 0.4) {
+            dur = ts.stepsPerBeat * 1.8; // Long half-note sustain
+        } else {
+            const isSecondary = intBeat === 1 || intBeat === 3;
+            if (isSecondary) {
+                // Occasional 5th or Octave at higher intensity
+                if (Math.random() < 0.4 + intensity * 0.3) {
+                    const fifthOffset =
+                        chord.quality.includes('dim') || chord.quality.includes('halfdim') ? 6 : 7;
+                    note = Math.random() < 0.6 ? baseRoot + fifthOffset : baseRoot + 12;
+                    dur = ts.stepsPerBeat * 0.6; // Slightly shorter for secondary hits
+                }
+            }
+        }
+
+        const res = result(getFrequency(clampAndNormalize(note)), dur, 0.95 + intensity * 0.15);
+        res.timingOffset += lag;
+        return res;
+    }
     if (style === 'metal') {
         const stepInBeat = step % ts.stepsPerBeat;
         const isEighth = stepInBeat % 2 === 0;
