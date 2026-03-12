@@ -22,3 +22,7 @@
 ## 2025-03-05 - Label Association for Form Inputs
 **Learning:** Labels that are visually adjacent to inputs (like checkboxes or ranges) but lack an `htmlFor` attribute that explicitly matches the input's `id` degrade the experience for screen reader users and remove the ability to click the label to toggle/focus the input.
 **Action:** Always ensure that `<label>` tags use the `htmlFor` attribute pointing directly to the `id` of their associated `<input>`, `<select>`, or `<textarea>`, even if the input is nested inside the label, to guarantee full click-target and accessibility support.
+
+## 2024-03-12 - Alert Roles for Inline Confirmations
+**Learning:** Inline confirmation dialogs replacing native window.confirm() must use role="alert" and aria-live="polite" so screen readers actively announce the destructive action warning without requiring manual focus shifts.
+**Action:** Always wrap dynamic inline warning text in a container with role="alert" and aria-live="polite" when toggled.
