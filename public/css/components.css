@@ -208,9 +208,10 @@ input:focus-visible + .toggle-slider {
 }
 
 /* Select Control Overrides */
-.setting-control select {
+.setting-control > select {
     padding: 0.4rem 0.6rem;
     font-size: 0.85rem;
+    width: 220px;
 }
 
 /* Range/Slider Control Overrides */
