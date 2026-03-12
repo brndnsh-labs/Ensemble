@@ -78,6 +78,11 @@ export function applyOverrides(context, state) {
 
         // The core shuffle pattern: downbeats and the delayed 'a'
         if (isBeatStart || isAOfBeat) {
+            // Spang-a-lang: Occasionally omit the 'ah' on beats 1 and 3 at lower complexity
+            if (isAOfBeat && !isBackbeat && drumComplexity < 0.5 && roll(0.4)) {
+                return { shouldPlay: false, velocity, soundName, instTimeOffset };
+            }
+
             shouldPlay = true;
 
             if (activeMotif >= 2 || intensity > 0.85) {
@@ -87,10 +92,16 @@ export function applyOverrides(context, state) {
             }
 
             if (isBeatStart) {
-                velocity = scaleVelocity(0.9, intensity, 0.15);
+                // Macro-dynamics: Slight accent on the backbeat ride hits (2 and 4)
+                const isBackbeatBeat = beatIndex === 1 || beatIndex === 3;
+                const accent = isBackbeatBeat ? 1.1 : 1.0;
+                velocity = scaleVelocity(0.9 * accent, intensity, 0.15);
             } else {
-                // The 'a' is always lighter to create the "loping" feel
-                velocity = scaleVelocity(0.5, intensity, 0.1);
+                // The 'ah' is lighter, and even lighter when leading into a backbeat
+                // or following one to create the "circular" lope.
+                const isBackbeatBeat = beatIndex === 1 || beatIndex === 3;
+                const lopeWeight = isBackbeatBeat ? 0.8 : 1.0;
+                velocity = scaleVelocity(0.5 * lopeWeight, intensity, 0.1);
             }
 
             // Turnaround Open Hat on the 'a' of 4
@@ -104,17 +115,23 @@ export function applyOverrides(context, state) {
     else if (inst.name === 'Kick') {
         shouldPlay = false;
 
-        // Strictly 1 and 3 for the main weight
+        // Foundation Beats (1 and 3)
         if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
             velocity = isDownbeat ? 1.3 : 1.15;
         }
 
         // The Shuffle Push (ONLY on the 'a' of 4)
-        // Feathered to lead into the downbeat without being "nervous"
         if (isAOfBeat && beatIndex === lastBeatIndex && activeMotif >= 1) {
             shouldPlay = true;
             velocity = scaleVelocity(0.65, intensity, 0.1);
+        }
+
+        // "Four-on-the-Floor" Drive (High intensity only)
+        // Re-introduced but strictly feathered (quiet) to anchor the walking bass
+        if (isBeatStart && isBackbeat && intensity > 0.8 && roll(0.7, intensity)) {
+            shouldPlay = true;
+            velocity = scaleVelocity(0.55, intensity, 0.1); // Significantly quieter than primary hits
         }
     }
     // --- Snare (The Pocket) ---
@@ -127,21 +144,29 @@ export function applyOverrides(context, state) {
             velocity = 1.2;
         }
 
-        // Texas Double Shuffle (Motif 3) - Snare follows the hi-hat shuffle
-        if (activeMotif === 3) {
-            if (isAOfBeat && !isBackbeat) {
-                // Reduced probability to keep it from getting too cluttered
-                if (roll(0.7, intensity)) {
-                    shouldPlay = true;
-                    velocity = scaleVelocity(0.35, intensity, 0.1);
-                    instTimeOffset += 0.008; // Lay it back more
-                }
-            }
-        } else if (activeMotif >= 2) {
-            // Very occasional ghost notes at high intensity
-            if (isAOfBeat && (beatIndex === 0 || beatIndex === 2) && roll(0.3, intensity)) {
+        // Texas Shuffle snare participation (isAOfBeat ghosting)
+        // Now more pervasive at high complexity/intensity
+        const texasProb = activeMotif === 3 ? 0.7 : intensity > 0.7 ? 0.3 : 0;
+        if (isAOfBeat && !isBackbeat && drumComplexity > 0.6) {
+            if (roll(texasProb)) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.3, intensity, 0.1);
+                velocity = scaleVelocity(0.35, intensity, 0.1);
+                instTimeOffset += 0.008; // Lay it back for the 'shuffle' feel
+            }
+        } else if (activeMotif >= 2 && !isAOfBeat && !isBeatStart) {
+            // Very occasional 16th ghost notes at high intensity
+            // EXCEPTION: Avoid steps immediately after the backbeat (5 and 13) to maintain clarity
+            const stepInMeasure = context.step % context.stepsPerBar;
+            if (
+                stepInMeasure !== 1 &&
+                stepInMeasure !== 5 &&
+                stepInMeasure !== 9 &&
+                stepInMeasure !== 13
+            ) {
+                if (roll(0.2, intensity)) {
+                    shouldPlay = true;
+                    velocity = scaleVelocity(0.25, intensity, 0.1);
+                }
             }
         }
     }
