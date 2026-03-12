@@ -16,7 +16,7 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(settingsModal).toBeVisible();
 
         // Verify content
-        await expect(settingsModal).toContainText('Appearance');
+        await expect(settingsModal).toContainText('Visuals & Interface');
         await expect(settingsModal).toContainText('Theme');
 
         // Close modal

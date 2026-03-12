@@ -177,8 +177,53 @@ export function Settings() {
                 </div>
 
                 <div class="settings-controls">
-                    {/* Appearance Section */}
-                    <SettingGroup title="Appearance">
+                    {/* Audio & Setup Section */}
+                    <SettingGroup title="Audio & Setup">
+                        <SettingRow
+                            label="Master Volume"
+                            id="masterVolume"
+                            valueDisplay={`${Math.round((masterVolume || 0.5) * 100)}%`}
+                        >
+                            <Slider
+                                id="masterVolume"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={masterVolume || 0.5}
+                                onInput={handleMasterVolume}
+                                ariaValueText={`${Math.round((masterVolume || 0.5) * 100)}%`}
+                            />
+                        </SettingRow>
+
+                        <SettingRow label="Metronome" id="metronomeCheck">
+                            <Toggle
+                                id="metronomeCheck"
+                                checked={metronome}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_METRONOME, val);
+                                    saveCurrentState();
+                                }}
+                            />
+                        </SettingRow>
+
+                        <SettingRow label="Count-in" id="countInCheck">
+                            <Toggle
+                                id="countInCheck"
+                                checked={countIn}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_PARAM, {
+                                        module: 'playback',
+                                        param: 'countIn',
+                                        value: val,
+                                    });
+                                    saveCurrentState();
+                                }}
+                            />
+                        </SettingRow>
+                    </SettingGroup>
+
+                    {/* Visuals & Interface Section */}
+                    <SettingGroup title="Visuals & Interface">
                         <SettingRow label="Theme" id="themeSelect">
                             <Select
                                 id="themeSelect"
@@ -210,26 +255,40 @@ export function Settings() {
                                 ]}
                             />
                         </SettingRow>
-                    </SettingGroup>
 
-                    {/* Playback & Performance Section */}
-                    <SettingGroup title="Playback & Performance">
-                        <SettingRow
-                            label="Master Volume"
-                            id="masterVolume"
-                            valueDisplay={`${Math.round((masterVolume || 0.5) * 100)}%`}
-                        >
-                            <Slider
-                                id="masterVolume"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={masterVolume || 0.5}
-                                onInput={handleMasterVolume}
-                                ariaValueText={`${Math.round((masterVolume || 0.5) * 100)}%`}
+                        <SettingRow label="Visual Flash" id="visualFlashCheck">
+                            <Toggle
+                                id="visualFlashCheck"
+                                checked={visualFlash}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_PARAM, {
+                                        module: 'playback',
+                                        param: 'visualFlash',
+                                        value: val,
+                                    });
+                                    saveCurrentState();
+                                }}
                             />
                         </SettingRow>
 
+                        <SettingRow label="Haptic Feedback" id="hapticCheck">
+                            <Toggle
+                                id="hapticCheck"
+                                checked={haptic}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_PARAM, {
+                                        module: 'playback',
+                                        param: 'haptic',
+                                        value: val,
+                                    });
+                                    saveCurrentState();
+                                }}
+                            />
+                        </SettingRow>
+                    </SettingGroup>
+
+                    {/* Performance Engine Section */}
+                    <SettingGroup title="Performance Engine">
                         <SettingRow
                             label="Global Complexity"
                             description="Adjusts syncopation and harmonic density for Soloist, Bass, and Harmony engines."
@@ -248,61 +307,6 @@ export function Settings() {
                             />
                         </SettingRow>
 
-                        <div class="flex-row" style="flex-wrap: wrap; margin-bottom: 1rem;">
-                            <SettingRow label="Count-in" id="countInCheck">
-                                <Toggle
-                                    id="countInCheck"
-                                    checked={countIn}
-                                    onChange={(val) => {
-                                        dispatch(ACTIONS.SET_PARAM, {
-                                            module: 'playback',
-                                            param: 'countIn',
-                                            value: val,
-                                        });
-                                        saveCurrentState();
-                                    }}
-                                />
-                            </SettingRow>
-                            <SettingRow label="Metronome" id="metronomeCheck">
-                                <Toggle
-                                    id="metronomeCheck"
-                                    checked={metronome}
-                                    onChange={(val) => {
-                                        dispatch(ACTIONS.SET_METRONOME, val);
-                                        saveCurrentState();
-                                    }}
-                                />
-                            </SettingRow>
-                            <SettingRow label="Visual Flash" id="visualFlashCheck">
-                                <Toggle
-                                    id="visualFlashCheck"
-                                    checked={visualFlash}
-                                    onChange={(val) => {
-                                        dispatch(ACTIONS.SET_PARAM, {
-                                            module: 'playback',
-                                            param: 'visualFlash',
-                                            value: val,
-                                        });
-                                        saveCurrentState();
-                                    }}
-                                />
-                            </SettingRow>
-                            <SettingRow label="Haptic Feedback" id="hapticCheck">
-                                <Toggle
-                                    id="hapticCheck"
-                                    checked={haptic}
-                                    onChange={(val) => {
-                                        dispatch(ACTIONS.SET_PARAM, {
-                                            module: 'playback',
-                                            param: 'haptic',
-                                            value: val,
-                                        });
-                                        saveCurrentState();
-                                    }}
-                                />
-                            </SettingRow>
-                        </div>
-
                         <div class="performance-ending-section">
                             <div class="flex-col">
                                 <SettingRow label="Song Mode" id="sessionTimerCheck">
@@ -317,34 +321,36 @@ export function Settings() {
                                 </SettingRow>
 
                                 <div class={`flex-col ${!songMode ? 'disabled-group' : ''}`}>
-                                    <div class="flex-row">
-                                        <button
-                                            class={`chip-btn ${loopLimit === 0 ? 'active' : ''}`}
-                                            onClick={() => {
-                                                dispatch(ACTIONS.SET_PARAM, {
-                                                    module: 'playback',
-                                                    param: 'loopLimit',
-                                                    value: 0,
-                                                });
-                                                saveCurrentState();
-                                            }}
-                                        >
-                                            Timer
-                                        </button>
-                                        <button
-                                            class={`chip-btn ${loopLimit > 0 ? 'active' : ''}`}
-                                            onClick={() => {
-                                                dispatch(ACTIONS.SET_PARAM, {
-                                                    module: 'playback',
-                                                    param: 'loopLimit',
-                                                    value: 3,
-                                                });
-                                                saveCurrentState();
-                                            }}
-                                        >
-                                            Loops
-                                        </button>
-                                    </div>
+                                    <SettingRow label="Duration Type" id="durationTypeSelect">
+                                        <div class="flex-row">
+                                            <button
+                                                class={`chip-btn ${loopLimit === 0 ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    dispatch(ACTIONS.SET_PARAM, {
+                                                        module: 'playback',
+                                                        param: 'loopLimit',
+                                                        value: 0,
+                                                    });
+                                                    saveCurrentState();
+                                                }}
+                                            >
+                                                Timer
+                                            </button>
+                                            <button
+                                                class={`chip-btn ${loopLimit > 0 ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    dispatch(ACTIONS.SET_PARAM, {
+                                                        module: 'playback',
+                                                        param: 'loopLimit',
+                                                        value: 3,
+                                                    });
+                                                    saveCurrentState();
+                                                }}
+                                            >
+                                                Loops
+                                            </button>
+                                        </div>
+                                    </SettingRow>
 
                                     <SettingRow
                                         label={loopLimit > 0 ? 'Choruses' : 'Minutes'}
