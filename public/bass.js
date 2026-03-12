@@ -45,6 +45,9 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     }
 
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const intBeat = stepInfo
+        ? stepInfo.beatIndex
+        : Math.floor((step % (ts.beats * ts.stepsPerBeat)) / ts.stepsPerBeat);
     const isQuarter = stepInfo ? stepInfo.isBeatStart : step % ts.stepsPerBeat === 0;
     const is8th = step % (ts.stepsPerBeat / 2) === 0;
 
@@ -61,12 +64,15 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         return is8th;
     }
     if (style === 'bossa') {
-        // Semantic: 1, 2&, 3, 4&
+        // Semantic Bossa: 1, 2&, 3, 4&
         if (stepInfo) {
+            const isOffbeatAnd =
+                stepInfo.mStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
+            // In 4/4: Steps 0, 6, 8, 14
             return (
-                stepInfo.isDownbeat ||
-                stepInfo.isBackbeat ||
-                stepInfo.mStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2)
+                stepInfo.isMeasureStart || // Step 0
+                (stepInfo.isBeatStart && intBeat === 2) || // Step 8
+                (isOffbeatAnd && (intBeat === 1 || intBeat === 3)) // Steps 6, 14
             );
         }
         return BOSSA_STEPS.includes(step % 16);
@@ -785,34 +791,35 @@ export function getBassNote(
     // --- BOSSA NOVA / SAMBA STYLE ---
     if (style === 'bossa') {
         const root = baseRoot;
-        const fifth = clampAndNormalize(root + (chord.quality.includes('dim') ? 6 : 7));
+        const hasFlat5 = chord.quality.includes('dim') || chord.quality.includes('halfdim');
+        const fifth = clampAndNormalize(root + (hasFlat5 ? 6 : 7));
 
-        // Semantic Bossa: 1, 2&, 3, 4&
-        const isOneOrThree = isBeatStart && (intBeat === 0 || intBeat === 2);
-        const isTwoOrFour = isBeatStart && (intBeat === 1 || intBeat === 3);
-        const isOffbeatTwoOrFour =
-            stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) &&
-            (intBeat === 1 || intBeat === 3);
+        // 1. Foundation: 1, 2&, 3, 4&
+        const isOne = isBeatStart && intBeat === 0;
+        const isThree = isBeatStart && intBeat === 2;
+        const isOffbeatTwo =
+            step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === 1;
+        const isOffbeatFour =
+            step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === 3;
 
-        if (intensity > 0.65) {
-            if (isOneOrThree) {
-                return result(getFrequency(root), 2, 1.1);
-            }
-            if (isTwoOrFour) {
-                return result(getFrequency(root), 2, 0.95);
-            }
-            if (isOffbeatTwoOrFour) {
-                const note = Math.random() < 0.7 ? fifth : root + 12;
-                return result(getFrequency(clampAndNormalize(note)), 2, 1.25);
-            }
-        } else {
-            if (isOneOrThree) {
-                return result(getFrequency(root), 4, 1.05);
-            }
-            if (isOffbeatTwoOrFour) {
-                return result(getFrequency(fifth), 2, 1.1);
-            }
+        // Bossa Timing: Subtle lay-back
+        const lag = 0.01 + intensity * 0.005;
+
+        // Note Logic: Root on downbeats, Fifth on upbeats
+        if (isOne || isThree) {
+            // Warm, long sustained root
+            const res = result(getFrequency(root), ts.stepsPerBeat * 0.6, 1.1 + intensity * 0.1);
+            res.timingOffset += lag;
+            return res;
         }
+
+        if (isOffbeatTwo || isOffbeatFour) {
+            // Punchy, short fifth on the 'and'
+            const res = result(getFrequency(fifth), 0.8, 1.0 + intensity * 0.15);
+            res.timingOffset += lag + 0.005; // Upbeats often lag even more
+            return res;
+        }
+
         return null;
     }
 

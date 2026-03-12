@@ -7,7 +7,7 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Latin / Bossa.
- * 0: Classic Bossa Nova (Understated/Grounded)
+ * 0: Classic 2-Bar Bossa (Deterministic Clave)
  * 1: Busy Bossa / Songo Style (Increased Syncopation)
  * 2: Driving Samba (High 16th Density)
  * 3: Partido Alto (Syncopated Displacement)
@@ -17,19 +17,21 @@ export function getMotif(seed, complexity, intensity = 1.0) {
         return 0; // Pure Bossa Nova at low intensity
     }
 
-    // Stable seed ranges for core motifs
-    if (seed < 0.2) {
-        return 0;
-    }
-    if (seed < 0.5) {
+    if (intensity < 0.6) {
+        if (seed < 0.7) {
+            return 0;
+        }
         return 1;
     }
 
-    if (intensity < 0.75) {
-        return seed < 0.8 ? 0 : 1;
+    // High Intensity
+    if (seed < 0.3) {
+        return 0;
     }
-
-    if (seed < 0.8) {
+    if (seed < 0.6) {
+        return 1;
+    }
+    if (seed < 0.85) {
         return 2; // Samba
     }
     return 3; // Partido Alto
@@ -40,18 +42,14 @@ export function applyOverrides(context, state) {
         step,
         inst,
         playback,
-        groove,
         drumComplexity,
         sectionSeed,
         isTurnaround,
-        isDownbeat,
         isBeatStart,
         isOffbeat,
-        isEOfBeat,
         isAOfBeat,
         beatIndex,
         stepsPerBar,
-        tsConfig,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
@@ -62,171 +60,121 @@ export function applyOverrides(context, state) {
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
-    const midBeatIndex = tsConfig.isCompound
-        ? Math.floor(tsConfig.grouping.length / 2)
-        : Math.floor(tsConfig.beats / 2);
-    const quarterBeatIndex = Math.floor(midBeatIndex / 2);
-    const lastBeatIndex = tsConfig.isCompound ? tsConfig.grouping.length - 1 : tsConfig.beats - 1;
+    // --- Lay-back: Bossa is relaxed ---
+    instTimeOffset += 0.005 + intensity * 0.005;
 
     // --- 1. KICK PATTERNS (Surdo Feel) ---
     if (inst.name === 'Kick') {
         shouldPlay = false;
-        // Basic Bossa/Samba Kick: 1, pickup to 2, 3, pickup to 4
-        if (
-            isDownbeat ||
-            (isAOfBeat && beatIndex === 0) ||
-            (isBeatStart && beatIndex === midBeatIndex) ||
-            (isAOfBeat && beatIndex === midBeatIndex)
-        ) {
+        // Foundation: 1 and 3 (Surdo heart)
+        if (isBeatStart && (beatIndex === 0 || beatIndex === 2)) {
             shouldPlay = true;
-            velocity = isBeatStart
-                ? scaleVelocity(1.1, intensity, 0.1)
-                : scaleVelocity(0.85, intensity, 0.1);
-        }
-
-        if (intensity > 0.75 && (activeMotif === 2 || activeMotif === 3)) {
-            if (isAOfBeat && (beatIndex === midBeatIndex - 1 || beatIndex === lastBeatIndex)) {
-                shouldPlay = true;
-                velocity = scaleVelocity(0.7, intensity, 0.2);
+            // The hit on 3 is often heavier or more "open" in feel
+            const accent = beatIndex === 2 ? 1.15 : 1.0;
+            velocity = scaleVelocity(1.1 * accent, intensity, 0.1);
+            // Extra "weight" (lag) on the second surdo hit
+            if (beatIndex === 2) {
+                instTimeOffset += 0.005;
             }
         }
-    } else if (inst.name === 'Snare') {
+
+        // Samba variation: Add 16th note pushes
+        if (activeMotif >= 2 && !shouldPlay) {
+            if (isAOfBeat && (beatIndex === 0 || beatIndex === 2)) {
+                if (roll(0.6, intensity)) {
+                    shouldPlay = true;
+                    velocity = scaleVelocity(0.7, intensity, 0.1);
+                }
+            }
+        }
+    }
+    // --- 2. CLAVE (Sidestick) ---
+    else if (inst.name === 'Snare') {
         shouldPlay = false;
         soundName = 'Sidestick';
 
-        if (activeMotif === 0) {
-            if (
-                isDownbeat ||
-                (isAOfBeat && beatIndex === 0) ||
-                (isOffbeat && beatIndex === quarterBeatIndex) ||
-                (isOffbeat && beatIndex === midBeatIndex) ||
-                (isEOfBeat && beatIndex === lastBeatIndex)
-            ) {
-                shouldPlay = true;
+        // 2-Bar Clave Logic
+        const barIndex = Math.floor(step / stepsPerBar);
+        const isBar1 = barIndex % 2 === 0;
+        const stepInBar = step % stepsPerBar;
+
+        if (activeMotif === 0 || activeMotif === 1) {
+            // Authentic 3-2 Bossa Clave
+            // Bar 1 (3-side): 1, & of 2, 4
+            // Bar 2 (2-side): & of 1, 3
+            if (isBar1) {
+                if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
+                    shouldPlay = true;
+                }
+            } else {
+                if (stepInBar === 2 || stepInBar === 8) {
+                    shouldPlay = true;
+                }
             }
-        } else if (activeMotif === 1) {
-            if (
-                (isOffbeat && beatIndex === 0) ||
-                (isEOfBeat && beatIndex === quarterBeatIndex) ||
-                (isBeatStart && beatIndex === midBeatIndex) ||
-                (isAOfBeat && beatIndex === midBeatIndex) ||
-                (isOffbeat && beatIndex === lastBeatIndex)
-            ) {
-                shouldPlay = true;
+
+            // Add a bit of chatter if complexity is high
+            if (!shouldPlay && drumComplexity > 0.7 && intensity > 0.6) {
+                if (isOffbeat && roll(0.3)) {
+                    shouldPlay = true;
+                    velocity = 0.5;
+                }
             }
         } else if (activeMotif === 2) {
-            if (
-                isDownbeat ||
-                (isBeatStart && beatIndex === quarterBeatIndex) ||
-                (isAOfBeat && beatIndex === quarterBeatIndex) ||
-                (isBeatStart && beatIndex === midBeatIndex) ||
-                (isAOfBeat && beatIndex === midBeatIndex) ||
-                (isEOfBeat && beatIndex === lastBeatIndex) ||
-                (isAOfBeat && beatIndex === lastBeatIndex)
-            ) {
-                shouldPlay = true;
+            // Samba (Busy cross-stick)
+            if (isBeatStart || isOffbeat) {
+                if (roll(0.7, intensity)) {
+                    shouldPlay = true;
+                }
             }
-        } else if (activeMotif === 3) {
-            if (
-                isDownbeat ||
-                (isAOfBeat && beatIndex === 0) ||
-                (isOffbeat && beatIndex === quarterBeatIndex) ||
-                (isOffbeat && beatIndex === midBeatIndex) ||
-                (isBeatStart && beatIndex === lastBeatIndex)
-            ) {
+        } else {
+            // Partido Alto
+            // Typical syncopation: &1, 2, &3, 4 | 1, &2, 3, &4
+            const partidoPattern = isBar1 ? [2, 4, 10, 12] : [0, 6, 8, 14];
+            if (partidoPattern.includes(stepInBar)) {
                 shouldPlay = true;
             }
         }
 
         if (isTurnaround && intensity > 0.8) {
-            if (beatIndex === lastBeatIndex) {
+            if (beatIndex === 3) {
                 shouldPlay = true;
-                velocity = 1.0 + Math.random() * 0.2;
+                velocity = 1.1;
                 soundName = 'Snare';
             }
         }
 
-        if (shouldPlay) {
-            velocity = 0.9 + intensity * 0.1 + Math.random() * 0.2;
-            if (intensity > 0.85 && roll(0.4)) {
-                soundName = 'Snare';
-                velocity *= 1.15;
-            }
+        if (shouldPlay && soundName === 'Sidestick') {
+            velocity = scaleVelocity(0.9, intensity, 0.1) + (Math.random() - 0.5) * 0.1;
         }
-
-        if (groove.lastDrumPreset === 'Bossa Nova') {
-            soundName = 'Sidestick';
-            const bossaStep = step % (stepsPerBar * 2);
-            const isFirstBar = bossaStep < stepsPerBar;
-            if (isFirstBar) {
-                if (
-                    isDownbeat ||
-                    (isAOfBeat && beatIndex === 0) ||
-                    (isOffbeat && beatIndex === quarterBeatIndex) ||
-                    (isOffbeat && beatIndex === midBeatIndex) ||
-                    (isEOfBeat && beatIndex === lastBeatIndex)
-                ) {
-                    shouldPlay = true;
-                    velocity = scaleVelocity(0.9, intensity, 0.15);
-                }
-            } else {
-                if (
-                    (isBeatStart && beatIndex === 0) ||
-                    (isAOfBeat && beatIndex === 0) ||
-                    (isOffbeat && beatIndex === quarterBeatIndex) ||
-                    (isEOfBeat && beatIndex === midBeatIndex) ||
-                    (isEOfBeat && beatIndex === lastBeatIndex)
-                ) {
-                    shouldPlay = true;
-                    velocity = scaleVelocity(0.9, intensity, 0.15);
-                }
-            }
-        }
-    } else if (inst.name === 'Shaker') {
-        shouldPlay = true;
-        velocity =
-            isBeatStart || isOffbeat
-                ? scaleVelocity(0.8, intensity, 0.15)
-                : scaleVelocity(0.4, intensity, 0.3);
-        if (isBeatStart) {
-            velocity *= 1.15;
-        }
-    } else if (inst.name === 'Conga') {
-        if (
-            (isBeatStart && beatIndex === quarterBeatIndex) ||
-            (isAOfBeat && beatIndex === midBeatIndex) ||
-            (isBeatStart && beatIndex === lastBeatIndex) ||
-            (isAOfBeat && beatIndex === lastBeatIndex)
-        ) {
+    }
+    // --- 3. HI-HAT (Steady 8ths) ---
+    else if (inst.name === 'HiHat' || inst.name === 'Open') {
+        shouldPlay = false;
+        if (isBeatStart || isOffbeat) {
             shouldPlay = true;
-            if (isBeatStart && beatIndex === lastBeatIndex) {
-                soundName = 'CongaHighSlap';
-                velocity = scaleVelocity(0.8, intensity, 0.25);
-            } else if (isAOfBeat && beatIndex === lastBeatIndex) {
-                soundName = 'CongaHigh';
-                velocity = scaleVelocity(0.7, intensity, 0.1);
-            } else {
-                soundName = 'CongaHighMute';
-                velocity = 0.6;
-            }
+            soundName = 'HiHat';
+            velocity = isBeatStart ? 0.8 : 0.6;
         }
-    } else if (inst.name === 'Agogo' || inst.name.includes('Cowbell')) {
-        if (intensity > 0.8 && (activeMotif === 2 || activeMotif === 3)) {
-            if (
-                ((isAOfBeat && beatIndex === 0) ||
-                    (isOffbeat && beatIndex === quarterBeatIndex) ||
-                    (isAOfBeat && beatIndex === midBeatIndex) ||
-                    (isOffbeat && beatIndex === lastBeatIndex)) &&
-                roll(0.25, intensity)
-            ) {
-                shouldPlay = true;
-                velocity = 0.9;
-                soundName = beatIndex < midBeatIndex ? 'CowbellHigh' : 'CowbellLow';
-            }
+    }
+    // --- 4. PERCUSSION (Ganza/Shaker) ---
+    else if (inst.name === 'Shaker' || inst.name === 'Perc') {
+        shouldPlay = true;
+        // Consistent 16th note shimmer with tiered pulse
+        if (isBeatStart) {
+            velocity = scaleVelocity(0.95, intensity, 0.1);
+        } else if (isOffbeat) {
+            velocity = scaleVelocity(0.75, intensity, 0.1);
+        } else {
+            velocity = scaleVelocity(0.45, intensity, 0.1);
+        }
+
+        if (inst.name === 'Perc') {
+            shouldPlay = activeMotif >= 2 && roll(0.4, intensity);
+            soundName = 'AgogoHigh';
         }
     }
 
-    if (shouldPlay && inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
+    if (shouldPlay && inst.name === 'Snare' && intensity < 0.4) {
         soundName = 'Sidestick';
     }
 

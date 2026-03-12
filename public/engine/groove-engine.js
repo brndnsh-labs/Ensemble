@@ -148,7 +148,9 @@ export function applyGrooveOverrides({
     const sectionId = chordEntry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
     if (sectionSeed === undefined) {
-        sectionSeed = ((barIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
+        // Latin/Bossa requires 2-bar stability for authentic Clave motifs
+        const seedBarIndex = config.isLatin ? Math.floor(barIndex / 2) * 2 : barIndex;
+        sectionSeed = ((seedBarIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
     }
 
     if (justFinishedTurnaround && isDownbeat) {

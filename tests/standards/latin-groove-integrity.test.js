@@ -56,11 +56,11 @@ describe('Latin Groove Integrity', () => {
             };
         };
 
-        it('should play the Surdo "heartbeat" on Kick (0, 3, 8, 11)', () => {
+        it('should play the Surdo pulse on Kick (0, 8)', () => {
             getState.mockReturnValue(mockState);
 
-            // Typical Bossa kick steps
-            const heartbeatSteps = [0, 3, 8, 11];
+            // Surdo Kick: 0, 8
+            const heartbeatSteps = [0, 8];
             for (const step of heartbeatSteps) {
                 const result = applyGrooveOverrides(createParams(step, 'Kick'));
                 expect(result.shouldPlay).toBe(true);
@@ -76,10 +76,11 @@ describe('Latin Groove Integrity', () => {
             getState.mockReturnValue(mockState);
 
             let barIndexMotif0 = -1;
+            // Find an EVEN bar index for Bar 1 check
             for (let i = 0; i < 100; i++) {
                 if (
                     getDrumMotif(((i * 137 + 42) % 256) / 256, 'Bossa Nova', 0.8) === 0 &&
-                    i % 4 !== 3
+                    i % 2 === 0
                 ) {
                     barIndexMotif0 = i;
                     break;
@@ -89,9 +90,17 @@ describe('Latin Groove Integrity', () => {
                 return;
             }
 
-            // 3-2 Bossa Clave: 0, 3, 6, 10, 13
-            const claveSteps = [0, 3, 6, 10, 13].map((s) => barIndexMotif0 * 16 + s);
-            for (const step of claveSteps) {
+            // Bar 1 (3-side): 0, 6, 12
+            const bar1Steps = [0, 6, 12].map((s) => barIndexMotif0 * 16 + s);
+            for (const step of bar1Steps) {
+                const result = applyGrooveOverrides(createParams(step, 'Snare'));
+                expect(result.shouldPlay).toBe(true);
+                expect(result.soundName).toBe('Sidestick');
+            }
+
+            // Bar 2 (2-side): 2, 8
+            const bar2Steps = [2, 8].map((s) => (barIndexMotif0 + 1) * 16 + s);
+            for (const step of bar2Steps) {
                 const result = applyGrooveOverrides(createParams(step, 'Snare'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Sidestick');

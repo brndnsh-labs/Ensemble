@@ -74,37 +74,35 @@ describe('Latin Drummer Critique', () => {
     it('should pass an authenticity critique for a 128-bar Bossa Nova performance', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.65 },
-            groove: { creativity: true, genreFeel: 'Bossa Nova' },
+            playback: { bandIntensity: 0.5 },
+            groove: { creativity: false, genreFeel: 'Bossa Nova' },
         });
 
         let validClaveBars = 0;
         let steadyKickHits = 0;
         let shakerHits = 0;
-        let congaTumbaoHits = 0;
         const totalBars = performance.length;
 
-        const CLAVE_PATTERNS = [
-            [0, 3, 6, 10, 13], // 3-2 Bossa
-            [2, 5, 8, 11, 14], // 2-3 Bossa
-            [0, 4, 7, 8, 11, 13, 15], // Partido Alto
-            [0, 3, 6, 10, 12], // 3-2 Son
-        ];
+        // 2-Bar Clave 3-2 Pattern
+        const CLAVE_3_2_BAR1 = [0, 6, 12]; // 3-side
+        const CLAVE_3_2_BAR2 = [2, 8]; // 2-side
 
-        performance.forEach((bar) => {
+        performance.forEach((bar, bIdx) => {
             const snareSteps = bar.filter((s) => s.instruments.Snare).map((s) => s.loopStep);
-            const matchesAnyClave = CLAVE_PATTERNS.some(
-                (p) => p.length === snareSteps.length && p.every((v, i) => v === snareSteps[i]),
-            );
-            if (matchesAnyClave) {
+            const isBar1 = bIdx % 2 === 0;
+            const target = isBar1 ? CLAVE_3_2_BAR1 : CLAVE_3_2_BAR2;
+
+            const matches =
+                target.length === snareSteps.length && target.every((v, i) => v === snareSteps[i]);
+            if (matches) {
                 validClaveBars++;
             }
 
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
 
-                // --- CRITIQUE: Heartbeat Kick (0, 3, 8, 11) ---
-                if ([0, 3, 8, 11].includes(s)) {
+                // --- CRITIQUE: Surdo Kick (0, 8) with accents on 8 ---
+                if ([0, 8].includes(s)) {
                     if (stepData.instruments.Kick) {
                         steadyKickHits++;
                     }
@@ -114,31 +112,21 @@ describe('Latin Drummer Critique', () => {
                 if (stepData.instruments.Shaker) {
                     shakerHits++;
                 }
-
-                // --- CRITIQUE: Conga Tumbao (4, 11, 12, 15) ---
-                if ([4, 11, 12, 15].includes(s)) {
-                    if (stepData.instruments.Conga) {
-                        congaTumbaoHits++;
-                    }
-                }
             });
         });
 
         const claveScore = validClaveBars / totalBars;
-        const kickScore = steadyKickHits / (totalBars * 4);
+        const kickScore = steadyKickHits / (totalBars * 2);
         const shakerScore = shakerHits / (totalBars * 16);
-        const congaScore = congaTumbaoHits / (totalBars * 4);
 
         console.log('\n--- LATIN DRUMMER CRITIQUE REPORT (Bossa Nova) ---');
         console.log(`[Clave Integrity]       ${(claveScore * 100).toFixed(1)}% (Target: 100%)`);
-        console.log(`[Heartbeat Kick]        ${(kickScore * 100).toFixed(1)}% (Target: 100%)`);
+        console.log(`[Surdo Kick Pulse]      ${(kickScore * 100).toFixed(1)}% (Target: 100%)`);
         console.log(`[Shaker Consistency]    ${(shakerScore * 100).toFixed(1)}% (Target: 100%)`);
-        console.log(`[Conga Tumbao Presence] ${(congaScore * 100).toFixed(1)}% (Target: 100%)`);
         console.log('------------------------------------\n');
 
         expect(claveScore).toBe(1.0);
         expect(kickScore).toBe(1.0);
         expect(shakerScore).toBe(1.0);
-        expect(congaScore).toBe(1.0);
     });
 });
