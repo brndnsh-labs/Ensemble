@@ -144,6 +144,14 @@ export function selectPitchAndDevices(
     const searchMin = Math.max(minMidi, lastMidi - 14);
     const searchMax = Math.min(maxMidi, lastMidi + 14);
 
+    // Optimization: Pre-compute stylistic boolean checks to avoid allocating arrays and calling .includes() inside the hot loop
+    const isBluesOrJazz = activeStyle === 'blues' || activeStyle === 'jazz';
+    const isGreatsProfileEnabled = ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle);
+    const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
+    const isCallResponse =
+        isGreatsProfileEnabled && soloistState.phraseContext?.role === 'response';
+    const isFunkOrSka = activeStyle === 'funk' || activeStyle === 'ska';
+
     for (let m = searchMin; m <= searchMax; m++) {
         const pc = ((m % 12) + 12) % 12;
         const interval = (pc - (rootMidi % 12) + 12) % 12;
@@ -151,10 +159,7 @@ export function selectPitchAndDevices(
 
         const isScaleTone = (scaleMask >> interval) & 1;
         let isBlueNote = false;
-        if (
-            ['blues', 'jazz'].includes(activeStyle) &&
-            (interval === 3 || interval === 6 || interval === 10)
-        ) {
+        if (isBluesOrJazz && (interval === 3 || interval === 6 || interval === 10)) {
             isBlueNote = true;
         }
         if (!isScaleTone && !isBlueNote) {
@@ -162,10 +167,7 @@ export function selectPitchAndDevices(
         }
 
         // --- Greats Stylistic Profiles ---
-        if (
-            ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle) &&
-            soloistState.phraseContext?.profile
-        ) {
+        if (hasGreatsProfile) {
             const profile = soloistState.phraseContext.profile;
             switch (profile) {
                 case 'srv':
@@ -258,11 +260,8 @@ export function selectPitchAndDevices(
         }
 
         // --- Call & Response: Melodic Resolution ---
-        if (
-            ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle) &&
-            soloistState.phraseContext?.role === 'response'
-        ) {
-            const isResolutionTone = [0, 7].includes(interval); // Root and 5th
+        if (isCallResponse) {
+            const isResolutionTone = interval === 0 || interval === 7; // Root and 5th
             if (isResolutionTone) {
                 weight *= 8.0; // Aggressively favor strong resolution
             }
@@ -273,7 +272,7 @@ export function selectPitchAndDevices(
 
         const dist = Math.abs(m - lastMidi);
         if (dist === 0) {
-            if (['funk', 'ska'].includes(activeStyle)) {
+            if (isFunkOrSka) {
                 weight *= 0.5;
             } else {
                 continue;
