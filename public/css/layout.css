@@ -4,52 +4,15 @@
 
 /* --- E2E STABILIZATION --- */
 /* Force immediate rendering by disabling all transitions and animations during tests. */
-/* Also standardizes fonts and vertical metrics to avoid OS-specific rendering discrepancies. */
+/* This prevents race conditions during functional smoke tests. */
 [data-e2e-mode="true"],
 [data-e2e-mode="true"] *,
 [data-e2e-mode="true"] *::before,
 [data-e2e-mode="true"] *::after {
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for test reliability */
     transition: none !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
+    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for test reliability */
     animation: none !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    font-family: "DejaVu Sans", "Helvetica", "Arial", sans-serif !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    line-height: 1.2 !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    vertical-align: middle !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    box-sizing: border-box !important;
-}
-
-html[data-e2e-mode="true"] {
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    font-size: 16px !important;
-}
-
-/* Force absolute pixel heights for setting elements to bypass font metric shifts */
-[data-e2e-mode="true"] .setting-group-title {
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    height: 24px !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    margin-bottom: 16px !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    padding-bottom: 8px !important;
-}
-
-[data-e2e-mode="true"] .setting-row {
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    margin-bottom: 20px !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    min-height: 40px !important;
-}
-
-[data-e2e-mode="true"] .divider-top {
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    margin-top: 16px !important;
-    /* biome-ignore lint/complexity/noImportantStyles: Mandatory for snapshot stability */
-    padding-top: 16px !important;
 }
 
 body {
