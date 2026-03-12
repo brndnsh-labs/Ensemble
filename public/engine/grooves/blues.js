@@ -2,35 +2,43 @@ import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js
 
 export const config = {
     ...DEFAULT_CONFIG,
-    entropyMultiplier: 0.08,
+    entropyMultiplier: 0.05, // Slightly tighter entropy for a solid shuffle pocket
     blockAdjacentSnare: true,
     backbeatCrack: false,
 };
 
+/**
+ * Motifs represent different "feels" within the Blues Shuffle universe.
+ * 0: Standard tight shuffle (closed hats)
+ * 1: Driving shuffle (more kick pushes)
+ * 2: Heavy shuffle (open hats/ride focus)
+ * 3: Texas Double Shuffle (intense snare ghosting)
+ */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0;
+        return 0; // Keep it simple at low complexity/intensity
     }
     if (intensity < 0.6) {
-        return seed < 0.8 ? 0 : 2;
+        return seed < 0.7 ? 0 : 1;
     }
     if (intensity < INTENSITY_BANDS.HIGH) {
-        if (seed < 0.5) {
+        if (seed < 0.4) {
             return 0;
         }
-        if (seed < 0.8) {
+        if (seed < 0.7) {
+            return 1;
+        }
+        if (seed < 0.9) {
             return 2;
         }
-        return 1;
+        return 3;
     }
+    // High intensity
     if (seed < 0.3) {
-        return 0;
-    }
-    if (seed < 0.6) {
-        return 2;
-    }
-    if (seed < 0.75) {
         return 1;
+    }
+    if (seed < 0.7) {
+        return 2;
     }
     return 3;
 }
@@ -56,35 +64,50 @@ export function applyOverrides(context, state) {
 
     const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const beatsPerMeasure = stepsPerBar / 4;
+    const lastBeatIndex = beatsPerMeasure - 1;
 
-    if (inst.name === 'Open' && isDownbeat && intensity > 0.8 && roll(0.25)) {
+    // --- Crashes ---
+    if (inst.name === 'Open' && isDownbeat && intensity > 0.7 && roll(0.3)) {
         shouldPlay = true;
         velocity = 1.2;
         soundName = 'Crash';
         return { shouldPlay, velocity, soundName, instTimeOffset };
     }
 
+    // --- HiHat / Ride (The Shuffle Engine) ---
     if (inst.name === 'HiHat' || inst.name === 'Open') {
-        if (!shouldPlay) {
-            if (activeMotif === 0 || activeMotif === 2 || activeMotif === 3) {
-                if (isBeatStart || isAOfBeat) {
-                    shouldPlay = true;
-                    soundName = activeMotif === 2 ? 'Open' : 'HiHat';
+        shouldPlay = false;
 
-                    if (isAOfBeat) {
-                        velocity = scaleVelocity(0.6, intensity, 0.1);
-                    } else {
-                        velocity = scaleVelocity(0.85, intensity, 0.2);
-                    }
-                }
-            } else if (activeMotif === 1) {
-                if (isBeatStart || isAOfBeat) {
-                    shouldPlay = true;
-                    velocity = 0.9;
-                }
+        // The core shuffle pattern: downbeats and the delayed 'a'
+        if (isBeatStart || isAOfBeat) {
+            shouldPlay = true;
+
+            // Choose the voicing based on intensity and motif
+            if (activeMotif >= 2 || intensity > 0.8) {
+                // Heavier/Ride feel
+                soundName = 'Ride';
+            } else {
+                // Standard closed shuffle
+                soundName = 'HiHat';
+            }
+
+            // Dynamics: Strong on the beat, ghosted on the 'a'
+            if (isBeatStart) {
+                velocity = scaleVelocity(0.85, intensity, 0.2);
+            } else {
+                velocity = scaleVelocity(0.55, intensity, 0.15);
+            }
+
+            // Occasionally open the hat on the 'a' of 4 for a turnaround feel
+            if (isAOfBeat && beatIndex === lastBeatIndex && activeMotif >= 1 && roll(0.5)) {
+                soundName = 'Open';
+                velocity = 0.8;
             }
         }
-    } else if (inst.name === 'Kick') {
+    }
+    // --- Kick Drum (The Anchor) ---
+    else if (inst.name === 'Kick') {
         shouldPlay = false;
 
         // Grounding Beats (1 and 3)
@@ -93,56 +116,53 @@ export function applyOverrides(context, state) {
             velocity = isDownbeat ? 1.25 : 1.15;
         }
 
-        // Drive Beats (2 and 4) - "Four on the floor" for driving blues
-        // We add these at medium-high intensity to increase momentum
-        if (isBeatStart && isBackbeat && intensity > 0.55) {
+        // The Shuffle Push (The 'a' leading into the downbeat)
+        if (isAOfBeat && beatIndex === lastBeatIndex) {
             shouldPlay = true;
-            velocity = scaleVelocity(0.75, intensity, 0.2); // Feathered
+            velocity = scaleVelocity(0.7, intensity, 0.1); // Ghosted push
         }
 
-        // Shuffle Pushes (The "and-a" of the shuffle)
-        if (activeMotif >= 2) {
-            const beatsPerMeasure = stepsPerBar / 4;
-            const lastBeatIndex = beatsPerMeasure - 1;
-            const midBeatIndex = Math.floor(beatsPerMeasure / 2) - 1;
-
-            if (isAOfBeat && (beatIndex === lastBeatIndex || beatIndex === midBeatIndex)) {
+        // Extra pushes for driving motifs
+        if (activeMotif >= 1 && isAOfBeat && beatIndex === Math.floor(beatsPerMeasure / 2) - 1) {
+            if (roll(0.6, intensity)) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.6, intensity, 0.15); // Ghosted push
+                velocity = scaleVelocity(0.6, intensity, 0.1);
             }
         }
-
-        if (shouldPlay && !velocity) {
-            velocity = 1.15;
-        }
-    } else if (inst.name === 'Snare') {
+    }
+    // --- Snare (The Pocket) ---
+    else if (inst.name === 'Snare') {
         shouldPlay = false;
+
+        // Solid backbeat on 2 and 4
         if (isBackbeat) {
             shouldPlay = true;
             velocity = 1.15;
         }
 
-        if (activeMotif >= 2) {
-            const beatsPerMeasure = stepsPerBar / 4;
-            const midBeatIndex = Math.floor(beatsPerMeasure / 2);
-            // Targeting the beatIndex immediately preceding a backbeat.
-            // In 4/4, backbeats are on index 1 and 3, so we trigger ghost notes
-            // on the isAOfBeat of index 0 and 2.
-
-            if (
-                isAOfBeat &&
-                (beatIndex === 0 || beatIndex === midBeatIndex) &&
-                roll(0.6, intensity)
-            ) {
+        // Texas Double Shuffle (Motif 3) or complex ghosting
+        if (activeMotif === 3) {
+            // Ghost notes mimicking the hi-hat shuffle on the snare
+            if (isAOfBeat && !isBackbeat && beatIndex !== lastBeatIndex) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.4, intensity, 0.1);
-                instTimeOffset += 0.005;
+                instTimeOffset += 0.005; // Slightly lay back the ghost note
+            }
+        } else if (activeMotif >= 1) {
+            // Standard ghost note leading into the backbeat (e.g., 'a' of 1 and 3)
+            if (isAOfBeat && (beatIndex === 0 || beatIndex === 2)) {
+                if (roll(0.4, intensity)) {
+                    shouldPlay = true;
+                    velocity = scaleVelocity(0.35, intensity, 0.1);
+                }
             }
         }
     }
 
-    if (shouldPlay && inst.name === 'Snare' && intensity < 0.35) {
+    // Use Sidestick for low intensity backbeats
+    if (shouldPlay && inst.name === 'Snare' && isBackbeat && intensity < 0.35) {
         soundName = 'Sidestick';
+        velocity = scaleVelocity(0.9, intensity, 0.1);
     }
 
     return { shouldPlay, velocity, soundName, instTimeOffset };
