@@ -18,7 +18,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
 | `public/soloist.js` | Melodic soloist generation logic. | `getSoloistNote`, `soloistState` |
-| `public/bass.js` | Bass line generation (Walking, Funk). | `getBassNote`, `bassState` |
+| `public/bass.js` | Bass line generation (Walking, Funk). | `getBassNote`, `hiphop`, `acoustic`, `dub`, `blues`, `metal` |
 | `public/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
@@ -58,6 +58,15 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/components/Transport.jsx` | Playback controls and tempo. |
 | `public/components/SequencerGrid.jsx` | Interactive drum pattern editor. |
 | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
+
+## Testing
+
+| Path | Responsibility |
+| :--- | :--- |
+| `tests/unit/` | Low-level logic verification. |
+| `tests/standards/` | **Expert Critiques** (Authenticity Audit) and security ledgers. |
+| `tests/integration/` | Cross-module behavioral tests. |
+| `tests/e2e/` | Visual regression and UI flow tests. |
 
 ## Documentation & Standards
 

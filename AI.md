@@ -62,7 +62,13 @@ Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written ta
 
 ## 5. Testing & Verification
 
-### A. Vitest (Logic & Unit)
+### A. Expert Critiques (Authenticity Audit)
+*   **The Standard:** Critique tests in `tests/standards/` are the **Definition of Done** for musicality.
+*   **Mandatory Run:** When modifying a musical engine (Bass, Drums, etc.), you **MUST** run the corresponding critique test (e.g., `npx vitest tests/standards/funk-bass-critique.test.js`).
+*   **Musical Intent:** These tests use statistical ranges (e.g., "Snare drag should be > 0.010s"). Never replace these with rigid binary snapshots.
+*   **Reporting:** Always check the "Critique Report" output in the console to ensure the feel is authentically balanced.
+
+### B. Vitest (Logic & Unit)
 *   **Globals Enabled:** `describe`, `it`, and `expect` are available globally.
 *   **Mocking:** Use `vi.mock()` to isolate dependencies, especially for global state or browser APIs.
 *   **Logic Updates:** If you intentionally change musical behavior, you **MUST** update the test expectations. Do not leave tests failing.
