@@ -243,20 +243,14 @@ export function DrumPadModal() {
                         : 'max-width: 800px; height: auto; max-height: 90vh; overflow-y: auto; padding: 2rem;'
                 }
             >
-                <div
-                    class="modal-header-shared"
-                    style="margin-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;"
-                >
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                        <span style="font-size: 1.5rem;">🥁</span>
-                        <h2 style="margin: 0; color: #fff; text-transform: none; letter-spacing: normal; font-size: 1.2rem;">
-                            Drum Pad & Diagnostic Lab
-                        </h2>
+                {!isMobile && (
+                    <div class="modal-header">
+                        <h2>Drum Performance Mode</h2>
+                        <button class="icon-btn close-btn" onClick={close} aria-label="Close">
+                            ✖
+                        </button>
                     </div>
-                    <button class="icon-btn close-btn" onClick={close} aria-label="Close">
-                        ✖
-                    </button>
-                </div>
+                )}
 
                 <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2.5rem; align-items: center; width: 100%;">
                     {/* Upper Deck */}
