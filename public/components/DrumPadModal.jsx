@@ -64,30 +64,76 @@ export function DrumPadModal() {
         }, 100);
     };
 
-    const DRUM_PADS = [
-        { name: 'Kick', label: 'Kick', key: ' ', keyHint: 'SPACE', color: 'var(--soloist-color)' },
-        { name: 'Snare', label: 'Snare', key: 's', keyHint: 'S', color: 'var(--soloist-color)' },
-        { name: 'Sidestick', label: 'Rim', key: 'a', keyHint: 'A', color: 'var(--soloist-color)' },
-        { name: 'HiHat', label: 'Hi-Hat', key: 'd', keyHint: 'D', color: 'var(--chords-color)' },
-        { name: 'Open', label: 'Open Hat', key: 'f', keyHint: 'F', color: 'var(--chords-color)' },
-        { name: 'Ride', label: 'Ride', key: ';', keyHint: ';', color: 'var(--chords-color)' },
-        { name: 'Crash', label: 'Crash', key: 'i', keyHint: 'I', color: 'var(--chords-color)' },
-        {
-            name: 'TomHigh',
-            label: 'High Tom',
-            key: 'l',
-            keyHint: 'L',
-            color: 'var(--soloist-color)',
-        },
-        { name: 'TomMid', label: 'Mid Tom', key: 'k', keyHint: 'K', color: 'var(--soloist-color)' },
-        {
-            name: 'TomLow',
-            label: 'Floor Tom',
-            key: 'j',
-            keyHint: 'J',
-            color: 'var(--soloist-color)',
-        },
-    ];
+    const PAD_GROUPS = {
+        upper: [
+            {
+                name: 'TomHigh',
+                label: 'High Tom',
+                key: 'r',
+                keyHint: 'R',
+                color: 'var(--soloist-color)',
+            },
+            {
+                name: 'TomMid',
+                label: 'Mid Tom',
+                key: 't',
+                keyHint: 'T',
+                color: 'var(--soloist-color)',
+            },
+            {
+                name: 'TomLow',
+                label: 'Floor Tom',
+                key: 'y',
+                keyHint: 'Y',
+                color: 'var(--soloist-color)',
+            },
+            { name: 'Crash', label: 'Crash', key: 'u', keyHint: 'U', color: 'var(--chords-color)' },
+        ],
+        left: [
+            {
+                name: 'Sidestick',
+                label: 'Rim',
+                key: 'd',
+                keyHint: 'D',
+                color: 'var(--soloist-color)',
+            },
+            {
+                name: 'Snare',
+                label: 'Snare',
+                key: 'f',
+                keyHint: 'F',
+                color: 'var(--soloist-color)',
+            },
+        ],
+        right: [
+            {
+                name: 'HiHat',
+                label: 'Hi-Hat',
+                key: 'j',
+                keyHint: 'J',
+                color: 'var(--chords-color)',
+            },
+            { name: 'Ride', label: 'Ride', key: 'k', keyHint: 'K', color: 'var(--chords-color)' },
+            {
+                name: 'Open',
+                label: 'Open Hat',
+                key: 'l',
+                keyHint: 'L',
+                color: 'var(--chords-color)',
+            },
+        ],
+        kick: [
+            {
+                name: 'Kick',
+                label: 'Kick',
+                key: ' ',
+                keyHint: 'SPACE',
+                color: 'var(--soloist-color)',
+            },
+        ],
+    };
+
+    const ALL_PADS = Object.values(PAD_GROUPS).flat();
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -99,7 +145,7 @@ export function DrumPadModal() {
             }
 
             const key = e.key.toLowerCase();
-            const pad = DRUM_PADS.find((p) => p.key === key);
+            const pad = ALL_PADS.find((p) => p.key === key);
 
             if (pad) {
                 e.preventDefault();
@@ -180,8 +226,74 @@ export function DrumPadModal() {
                     </button>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 2.5rem;">
-                    {DRUM_PADS.map(renderPad)}
+                <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2.5rem; align-items: center; width: 100%;">
+                    {/* Upper Deck */}
+                    <div style="display: flex; gap: 1rem; justify-content: center; width: 100%; max-width: 500px;">
+                        {PAD_GROUPS.upper.map((pad) => (
+                            <div key={pad.name} style="flex: 1; min-width: 80px; max-width: 120px;">
+                                {renderPad(pad)}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Home Row: Left & Right */}
+                    <div style="display: flex; gap: 2rem; justify-content: center; width: 100%; max-width: 600px;">
+                        <div style="display: flex; gap: 1rem; flex: 1; justify-content: flex-end;">
+                            {PAD_GROUPS.left.map((pad) => (
+                                <div key={pad.name} style="width: 100%; max-width: 120px;">
+                                    {renderPad(pad)}
+                                </div>
+                            ))}
+                        </div>
+                        <div style="display: flex; gap: 1rem; flex: 1.5; justify-content: flex-start;">
+                            {PAD_GROUPS.right.map((pad) => (
+                                <div key={pad.name} style="width: 100%; max-width: 120px;">
+                                    {renderPad(pad)}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Kick */}
+                    <div style="display: flex; justify-content: center; width: 100%;">
+                        <div style="width: 100%; max-width: 400px; height: 80px;">
+                            <button
+                                class={`drum-pad ${activePads.has('Kick') ? 'active' : ''}`}
+                                onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    triggerDrum('Kick');
+                                }}
+                                style={`
+                                    background: ${activePads.has('Kick') ? PAD_GROUPS.kick[0].color : 'rgba(255,255,255,0.05)'};
+                                    color: ${activePads.has('Kick') ? '#fff' : '#94a3b8'};
+                                    border: 1.5px solid ${activePads.has('Kick') ? '#fff' : 'rgba(255,255,255,0.1)'};
+                                    border-top: 4px solid ${PAD_GROUPS.kick[0].color};
+                                    border-radius: 12px;
+                                    display: flex;
+                                    flex-direction: column;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-weight: bold;
+                                    font-size: 1.1rem;
+                                    cursor: pointer;
+                                    transition: all 0.1s;
+                                    width: 100%;
+                                    height: 100%;
+                                    touch-action: none;
+                                    box-shadow: ${activePads.has('Kick') ? `0 0 20px ${PAD_GROUPS.kick[0].color}` : '0 4px 6px rgba(0,0,0,0.2)'};
+                                    transform: ${activePads.has('Kick') ? 'scale(0.98) translateY(2px)' : 'none'};
+                                    position: relative;
+                                `}
+                            >
+                                {PAD_GROUPS.kick[0].label}
+                                {!isMobile && (
+                                    <span style="position: absolute; bottom: 6px; right: 12px; font-size: 0.6rem; opacity: 0.5; font-family: var(--font-mono);">
+                                        {PAD_GROUPS.kick[0].keyHint}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="background: rgba(15, 23, 42, 0.4); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
