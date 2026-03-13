@@ -19,7 +19,17 @@ If you want to start playing immediately:
 Ensemble is built for improvisation. 
 - **Trade Mode:** In the Soloist settings, enable **Trade Sections**. The band will play for one section, then "hand off" the lead to you for the next.
 - **Status Indicator:** Watch the Soloist power button (⏻). **Green** means the AI is playing; **Yellow** means it's your turn!
-- **Complexity:** Crank the **Complexity** slider in Settings to hear more syncopated and advanced rhythms from the band.
+- **Soloist Performance:** Press `S` to open the Performance Card. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
+
+### "I want to play the drums manually"
+If you want to take over the rhythm section or just troubleshoot the kit:
+- **Drum Pad:** Press `D` (or click the 🥁 icon in the Grooves panel) to open the **Drum Pad & Diagnostic Lab**.
+- **Performance Mode:** When the Drum Pad is open, the automatic drum patterns will stop, giving you full manual control.
+- **Ergonomic Layout:** The pads are mapped to your home row:
+    - **Kick:** `Space`
+    - **Pocket (Left Hand):** `F` (Snare), `D` (Rim)
+    - **Pulse (Right Hand):** `J` (Hi-Hat), `K` (Ride), `L` (Open Hat)
+    - **Fills:** `R`, `T`, `Y` (Toms) and `U` (Crash)
 
 ### "I'm writing a new song"
 Use the **Audio Workbench** to bridge your ideas with the AI.
