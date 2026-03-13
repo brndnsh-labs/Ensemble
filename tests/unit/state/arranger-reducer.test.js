@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { arranger, arrangerReducer, setArrangerParam } from '../../../public/state/arranger.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Arranger Reducer', () => {
@@ -30,19 +30,53 @@ describe('Arranger Reducer', () => {
         expect(arranger.sections).toEqual(newSections);
     });
 
-    it('should handle MusicXML import with chords', () => {
+    it('should handle MusicXML import', () => {
         const payload = {
             hasChords: true,
-            sections: [{ id: 'xml1', label: 'A', value: 'Cmaj7' }],
+            sections: [{ id: 'xml1', label: 'A', value: 'Cmaj7' }]
         };
         arrangerReducer(ACTIONS.IMPORT_MUSICXML, payload);
         expect(arranger.sections).toEqual(payload.sections);
         expect(arranger.isDirty).toBe(true);
         expect(arranger.notation).toBe('name');
-    });
 
-    it('should handle MusicXML import without chords (silent update)', () => {
+        // Silent update if no chords
         arrangerReducer(ACTIONS.IMPORT_MUSICXML, { hasChords: false });
         expect(arranger.isDirty).toBe(true);
+    });
+
+    describe('setArrangerParam', () => {
+        it('should update all supported parameters', () => {
+            const params = {
+                sections: [],
+                progression: [{ c: 1 }],
+                key: 'F#',
+                timeSignature: '3/4',
+                grouping: [3, 2],
+                isMinor: true,
+                notation: 'name',
+                valid: true,
+                totalSteps: 128,
+                stepMap: [{ s: 1 }],
+                measureMap: [{ m: 1 }],
+                sectionMap: [{ id: '1' }],
+                history: ['{}'],
+                lastInteractedSectionId: 's2',
+                lastChordPreset: 'Jazz',
+                mutatedSectionId: 's1',
+                isDirty: true
+            };
+
+            for (const [param, value] of Object.entries(params)) {
+                setArrangerParam(param, value);
+                expect(arranger[param]).toEqual(value);
+            }
+        });
+
+        it('should log warning for unknown parameters', () => {
+            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            setArrangerParam('ghost', 'val');
+            expect(spy).toHaveBeenCalled();
+        });
     });
 });
