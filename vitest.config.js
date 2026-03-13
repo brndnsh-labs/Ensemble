@@ -5,8 +5,8 @@ export default defineConfig({
     plugins: [preact()],
     test: {
         globals: true,
-        environment: 'happy-dom',
-        pool: 'forks',
+        environment: 'node',
+        pool: 'threads',
         exclude: [
             '**/node_modules/**',
             '**/dist/**',
