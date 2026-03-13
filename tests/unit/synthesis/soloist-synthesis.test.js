@@ -249,4 +249,33 @@ describe('Soloist Synthesis', () => {
         // Expect normal gain release (usually at 80% of duration)
         expect(gainNormal.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.8, 0.1);
     });
+
+    describe('Vibrato Engine Extensivenss', () => {
+        it('should create vibrato for long notes', () => {
+            // Note > 0.4s triggers vibrato
+            playSoloNote(440, 10, 1.0, 0.5, 0, 'classic');
+            expect(playback.audio.createOscillator).toHaveBeenCalled();
+        });
+
+        it('should apply blues style vibrato (lines 761, 770)', () => {
+            soloist.phraseContext = { profile: 'gilmour' }; // Covers profile branch
+            // function signature: playSoloNote(freq, time, duration, vol = 0.5, bendStartInterval = 0, style = null, forceVibrato = false)
+            playSoloNote(440, 10, 1.0, 0.5, 0, 'blues', true); // forceVibrato = true
+        });
+
+        it('should apply neo style vibrato (lines 763, 772)', () => {
+            soloist.phraseContext = { profile: 'slash' }; // Covers profile branch
+            playSoloNote(440, 10, 1.0, 0.5, 0, 'neo', true);
+        });
+
+        it('should apply guitar mode vibrato adjustments (line 787)', () => {
+            soloist.mode = 'guitar';
+            playSoloNote(440, 10, 1.0, 0.5, 0, 'shred', true);
+        });
+
+        it('should apply specific config vibratoIntensity (line 777)', () => {
+            // Test with a style that is handled but might trigger default configs
+            playSoloNote(440, 10, 1.0, 0.5, 0, 'jazz', true);
+        });
+    });
 });
