@@ -21,6 +21,7 @@ export function DrumPadModal() {
     const isMobile = useMobile();
     const [velocity, setVelocity] = useState(1.0);
     const [activePads, setActivePads] = useState(new Set());
+    const timeoutsRef = useRef({});
 
     useLayoutEffect(() => {
         initAudio();
@@ -30,6 +31,11 @@ export function DrumPadModal() {
         if (modalRef.current) {
             modalRef.current.focus({ preventScroll: true });
         }
+
+        return () => {
+            // Cleanup timeouts on unmount
+            Object.values(timeoutsRef.current).forEach(clearTimeout);
+        };
     }, []);
 
     const { swing, bpm, lastSmartGenre } = useEnsembleState((s) => ({
@@ -55,13 +61,18 @@ export function DrumPadModal() {
             return next;
         });
 
-        setTimeout(() => {
+        if (timeoutsRef.current[name]) {
+            clearTimeout(timeoutsRef.current[name]);
+        }
+
+        timeoutsRef.current[name] = setTimeout(() => {
             setActivePads((prev) => {
                 const next = new Set(prev);
                 next.delete(name);
                 return next;
             });
-        }, 100);
+            delete timeoutsRef.current[name];
+        }, 120);
     };
 
     const PAD_GROUPS = {
@@ -169,6 +180,18 @@ export function DrumPadModal() {
                     e.preventDefault();
                     triggerDrum(pad.name);
                 }}
+                onMouseEnter={(e) => {
+                    if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!isActive) {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }
+                }}
                 style={`
                     background: ${isActive ? pad.color : 'rgba(255,255,255,0.05)'};
                     color: ${isActive ? '#fff' : '#94a3b8'};
@@ -262,6 +285,18 @@ export function DrumPadModal() {
                                 onPointerDown={(e) => {
                                     e.preventDefault();
                                     triggerDrum('Kick');
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!activePads.has('Kick')) {
+                                        e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!activePads.has('Kick')) {
+                                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                                    }
                                 }}
                                 style={`
                                     background: ${activePads.has('Kick') ? PAD_GROUPS.kick[0].color : 'rgba(255,255,255,0.05)'};

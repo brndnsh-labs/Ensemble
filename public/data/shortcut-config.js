@@ -11,8 +11,14 @@ export const SHORTCUT_CONFIG = [
     },
     {
         key: 'S',
-        action: 'Trade Lead / Performance',
-        description: 'Open the Soloist Performance modal or toggle Trade mode.',
+        action: 'Soloist Performance',
+        description: 'Open the Soloist Performance modal.',
+        category: 'Performance',
+    },
+    {
+        key: 'D',
+        action: 'Drum Performance',
+        description: 'Open the Drum Pad Performance modal.',
         category: 'Performance',
     },
     {

@@ -62,6 +62,24 @@ export function GlobalShortcuts() {
                 }, 0);
             }
 
+            // 'D': Open Drum Pad Performance Mode
+            if (
+                e.key.toLowerCase() === 'd' &&
+                !isTyping &&
+                !anyModalOpen &&
+                !e.metaKey &&
+                !e.ctrlKey
+            ) {
+                e.preventDefault();
+                if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
+                initAudio();
+                setTimeout(() => {
+                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'drumPad', open: true });
+                }, 0);
+            }
+
             // 1-5: Switch Mobile Tabs
             if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping && !anyModalOpen) {
                 const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
