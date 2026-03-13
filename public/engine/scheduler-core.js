@@ -287,11 +287,24 @@ export function scheduler() {
         }
 
         while (playback.nextNoteTime < playback.audio.currentTime + playback.scheduleAheadTime) {
+            console.log('DEBUG loop:', {
+                step: playback.step,
+                totalSteps: arranger.totalSteps,
+                isEndingPending: playback.isEndingPending,
+                isCountingIn: !!playback.isCountingIn,
+                pendingGenre: !!groove.pendingGenreFeel,
+            });
             if (playback.isCountingIn) {
                 scheduleCountIn(playback.countInBeat, playback.nextNoteTime);
                 advanceCountIn();
             } else {
                 const spm = getStepsPerMeasure(arranger.timeSignature);
+                console.log('DEBUG loop check:', {
+                    step: playback.step,
+                    spm,
+                    mod: playback.step % spm,
+                    pending: !!groove.pendingGenreFeel,
+                });
 
                 // --- Session Timer Check ---
                 if (playback.songMode && playback.sessionTimer > 0 && !playback.isEndingPending) {
@@ -344,6 +357,7 @@ export function scheduler() {
 function applyPendingGenre() {
     const { groove, playback } = getState();
     const payload = groove.pendingGenreFeel;
+    console.log('DEBUG applyPendingGenre:', { payload });
     if (!payload) {
         return;
     }
