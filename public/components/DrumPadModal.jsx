@@ -20,6 +20,7 @@ export function DrumPadModal() {
     const modalRef = useRef(null);
     const isMobile = useMobile();
     const [velocity, setVelocity] = useState(1.0);
+    const [autoVelocity, setAutoVelocity] = useState(true);
     const [activePads, setActivePads] = useState(new Set());
     const timeoutsRef = useRef({});
 
@@ -53,7 +54,15 @@ export function DrumPadModal() {
         restoreGains();
         const { playback } = useEnsembleState.getState();
         const time = playback.audio?.currentTime || 0;
-        playDrumSound(name, time, velocity);
+
+        let finalVelocity = velocity;
+        if (autoVelocity) {
+            // Scale velocity by band intensity, ensuring it stays musical (0.5 to 1.5 multiplier range)
+            const intensityMultiplier = 0.5 + playback.bandIntensity;
+            finalVelocity = velocity * intensityMultiplier;
+        }
+
+        playDrumSound(name, time, finalVelocity);
 
         setActivePads((prev) => {
             const next = new Set(prev);
@@ -334,10 +343,30 @@ export function DrumPadModal() {
                 <div style="background: rgba(15, 23, 42, 0.4); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
                     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                            <div style="flex: 1; min-width: 200px;">
-                                <label style="display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    Test Velocity (Timbre Shift: {Math.round(velocity * 100)}%)
-                                </label>
+                            <div style="flex: 1; min-width: 250px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <label style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
+                                        {autoVelocity ? 'Max Velocity Ceiling' : 'Test Velocity'}{' '}
+                                        (Timbre Shift: {Math.round(velocity * 100)}%)
+                                    </label>
+                                    <button
+                                        onClick={() => setAutoVelocity(!autoVelocity)}
+                                        style={`
+                                            background: ${autoVelocity ? 'var(--soloist-color)' : 'rgba(255,255,255,0.1)'};
+                                            color: ${autoVelocity ? '#fff' : '#94a3b8'};
+                                            border: none;
+                                            padding: 0.2rem 0.6rem;
+                                            border-radius: 4px;
+                                            font-size: 0.7rem;
+                                            font-weight: bold;
+                                            cursor: pointer;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.05em;
+                                        `}
+                                    >
+                                        {autoVelocity ? '✓ Auto Velocity' : 'Auto Velocity'}
+                                    </button>
+                                </div>
                                 <Slider
                                     min="10"
                                     max="150"
