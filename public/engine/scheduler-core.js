@@ -27,7 +27,14 @@ import { getSoloistNote } from '../soloist.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
-import { getFrequency, getMidi, getStepInfo, getStepsPerMeasure, midiToNote } from '../utils.js';
+import {
+    binarySearchMap,
+    getFrequency,
+    getMidi,
+    getStepInfo,
+    getStepsPerMeasure,
+    midiToNote,
+} from '../utils.js';
 import {
     flushWorker,
     requestBuffer,
@@ -1190,7 +1197,7 @@ export function scheduleGlobalEvent(step, swungTime) {
 
         // --- Port Turnaround Logic from Worker ---
         const stepsPerBar = spm;
-        const entry = arranger.sectionMap?.find((e) => step >= e.start && step < e.end);
+        const entry = binarySearchMap(arranger.sectionMap || [], step);
         let isTurnaround = false;
         if (groove.creativity) {
             let measuresInSection = 4;

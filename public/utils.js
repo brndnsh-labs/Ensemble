@@ -282,6 +282,35 @@ export function getStepsPerMeasure(ts) {
 }
 
 /**
+ * Optimized binary search for arrays containing objects with `start` and `end` properties.
+ * Useful for fast O(log N) lookups in `arranger.stepMap`, `sectionMap`, and `measureMap`.
+ *
+ * @param {Array<{start: number, end: number}>} mapArray - A sorted array of range objects.
+ * @param {number} step - The global step to find.
+ * @returns {object|null} The matching element, or null if not found.
+ */
+export function binarySearchMap(mapArray, step) {
+    if (!mapArray || mapArray.length === 0) {
+        return null;
+    }
+    let low = 0;
+    let high = mapArray.length - 1;
+
+    while (low <= high) {
+        const mid = (low + high) >>> 1;
+        const m = mapArray[mid];
+        if (step >= m.start && step < m.end) {
+            return m;
+        } else if (step < m.start) {
+            high = mid - 1;
+        } else {
+            low = mid + 1;
+        }
+    }
+    return null;
+}
+
+/**
  * Returns detailed structural information about a specific step in a measure.
  * @param {number} step - The global step counter.
  * @param {Object} tsConfig - The global time signature configuration (fallback).
@@ -321,22 +350,7 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
 
     if (measureMap && measureMap.length > 0) {
         // Binary search for O(log N) lookup instead of O(N) find
-        let measure = null;
-        let low = 0;
-        let high = measureMap.length - 1;
-
-        while (low <= high) {
-            const mid = (low + high) >>> 1;
-            const m = measureMap[mid];
-            if (step >= m.start && step < m.end) {
-                measure = m;
-                break;
-            } else if (step < m.start) {
-                high = mid - 1;
-            } else {
-                low = mid + 1;
-            }
-        }
+        const measure = binarySearchMap(measureMap, step);
 
         if (measure) {
             tsName = measure.ts || tsName;

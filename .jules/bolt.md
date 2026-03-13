@@ -1,3 +1,7 @@
+## 2025-10-24 - Bolt: Optimize Range Lookups with binarySearchMap
+**Learning:** `Array.prototype.find()` on large, sorted arrays of step ranges (like `arranger.stepMap` and `arranger.sectionMap`) inside hot loops (e.g., inside generative engine workers per step) creates O(N) linear overhead.
+**Action:** Replace linear `.find((e) => step >= e.start && step < e.end)` lookups with a custom `binarySearchMap` function to achieve O(log N) lookups, greatly reducing CPU time in tight audio calculation loops.
+
 ## 2025-02-12 - Bolt: Eliminate Map Allocations in audio-analyzer-lite.js
 **Learning:** In V8 Node environments and performance-sensitive loops, chaining methods like `Array.from(Map.entries()).map(...)` creates multiple intermediate array allocations that significantly drag down performance, especially in inner processing chunks for audio analysis. Using `.map()` on large numerical arrays (like `flux`) also incurs unnecessary closure creation and array allocation overhead.
 **Action:** Replace `Array.prototype.map()` on large number arrays with pre-allocated `Float32Array` or `Int32Array` loops. Convert `.from().map()` chains directly into explicit `for...of` loops that push to a final array to avoid temporary garbage collection spikes.
