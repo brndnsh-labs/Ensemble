@@ -55,7 +55,7 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
 /**
  * Reusable Slider component.
  */
-export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValueText }) {
+export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValueText, disabled }) {
     return (
         <input
             type="range"
@@ -67,6 +67,7 @@ export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValu
             onInput={(e) => onInput(e.target.value)}
             aria-label={ariaLabel || id}
             aria-valuetext={ariaValueText}
+            disabled={disabled}
         />
     );
 }

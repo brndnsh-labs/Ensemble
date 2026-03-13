@@ -354,11 +354,14 @@ export function DrumPadModal() {
                             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                                 <div style="flex: 1; min-width: 250px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                        <label style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
+                                        <label
+                                            style={`font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; opacity: ${autoVelocity ? 0.4 : 1}; transition: opacity 0.2s;`}
+                                        >
                                             {autoVelocity
-                                                ? 'Max Velocity Ceiling'
+                                                ? 'Auto Intensity Scaling'
                                                 : 'Test Velocity'}{' '}
-                                            (Timbre Shift: {Math.round(velocity * 100)}%)
+                                            {!autoVelocity &&
+                                                `(Timbre Shift: ${Math.round(velocity * 100)}%)`}
                                         </label>
                                         <button
                                             onClick={() => setAutoVelocity(!autoVelocity)}
@@ -378,12 +381,17 @@ export function DrumPadModal() {
                                             {autoVelocity ? '✓ Auto Velocity' : 'Auto Velocity'}
                                         </button>
                                     </div>
-                                    <Slider
-                                        min="10"
-                                        max="150"
-                                        value={Math.round(velocity * 100)}
-                                        onInput={(val) => setVelocity(parseInt(val, 10) / 100)}
-                                    />
+                                    <div
+                                        style={`opacity: ${autoVelocity ? 0.3 : 1}; transition: opacity 0.2s; pointer-events: ${autoVelocity ? 'none' : 'auto'};`}
+                                    >
+                                        <Slider
+                                            min="10"
+                                            max="150"
+                                            value={Math.round(velocity * 100)}
+                                            onInput={(val) => setVelocity(parseInt(val, 10) / 100)}
+                                            disabled={autoVelocity}
+                                        />
+                                    </div>{' '}
                                 </div>
                                 <div style="display: flex; gap: 2rem; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 2rem;">
                                     <div>
