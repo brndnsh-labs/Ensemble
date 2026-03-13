@@ -10,3 +10,4 @@ test-dist/
 /playwright-report/
 /test-results/
 /playwright/.cache/
+coverage
