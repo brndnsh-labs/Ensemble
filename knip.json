@@ -4,7 +4,6 @@
         "public/main.js",
         "public/sw.js",
         "public/ui-root.jsx",
-        "public/manual-theme.js",
         "scripts/*.js",
         "tests/scripts/*.js"
     ],

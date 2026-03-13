@@ -26,6 +26,11 @@ describe('Disco Genre Integrity', () => {
         instTimeOffset: 0,
     });
 
+    it('should have a valid genre config', () => {
+        expect(Disco.config).toBeDefined();
+        expect(Disco.config.entropyMultiplier).toBe(0.08);
+    });
+
     it('should handle muted instruments (line 59)', () => {
         const context = createBaseContext({ inst: { name: 'Kick', muted: true } });
         const state = createBaseState();

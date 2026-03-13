@@ -27,6 +27,11 @@ describe('HipHop Genre Integrity', () => {
         instTimeOffset: 0,
     });
 
+    it('should have a valid genre config', () => {
+        expect(HipHop.config).toBeDefined();
+        expect(HipHop.config.entropyMultiplier).toBe(0.08);
+    });
+
     it('should handle muted instruments (line 57)', () => {
         const context = createBaseContext({ inst: { name: 'Kick', muted: true } });
         const state = createBaseState();
