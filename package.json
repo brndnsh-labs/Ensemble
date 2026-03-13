@@ -1,6 +1,6 @@
 {
     "name": "ensemble",
-    "description": "Generative musical accompaniment and chord visualization PWA",
+    "description": "Ultra-lightweight Virtual Band & generative songwriting toolkit",
     "version": "1.2.2",
     "license": "AGPL-3.0-only",
     "type": "module",

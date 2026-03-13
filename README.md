@@ -1,78 +1,64 @@
-# Ensemble
+# Ensemble: The Intelligent Virtual Band
 
-Ensemble is a Progressive Web App (PWA) designed for musicians to practice and experiment with chord progressions and drum grooves. It combines a generative "Virtual Band" with a sophisticated chord visualizer and drum sequencer in a unified, responsive interface.
+**Ensemble** is an ultra-lightweight (under 500KB), high-performance Virtual Band in your browser. It’s an intelligent "beyond-the-metronome" toolkit for musicians that generates real-time, reactive backing tracks—drums, bass, and chords—that adapt to your style, intensity, and genre.
 
-## Key Features
+Whether you're practicing a `ii-V-I` progression, sketching a new song idea, or exporting MIDI for a DAW, Ensemble provides a "pro-level" rhythm section that understands the pocket.
 
-*   🖋️ **Advanced Arranger**: Build complex song structures using Roman Numerals, Nashville Numbers, or Absolute chord names. Features include song templates, drag-and-drop reordering, section duplication, and a compact kebab-style symbol menu.
-*   🎤 **Audio Workbench**: A unified tool for analyzing existing audio files or live performances. Supports high-precision **Chord Detection** (polyphonic) and a specialized **Melody Harmonizer** (monophonic) that generates backing tracks from sung or played melodies.
-*   🧠 **Loop-Back Training**: The Harmonizer engine automatically "trains" itself by extracting musical knowledge from the Band's internal Soloist and Harmony modules, ensuring generated progressions are perfectly calibrated for the band's playing style.
-*   🎸 **Generative Virtual Band**: Intelligent **Bassist**, **Soloist**, and **Harmony** engines that utilize "Expressive Musicality" logic to generate human-like, intensity-aware accompaniment in real-time. Features advanced **Melodic Devices** (Enclosures, Quartal Harmony, Call & Response), a streamlined **ACTIVE/RESTING** phrasing model, and a **Smart Genres** system that coordinates all instruments for a cohesive feel.
-*   🥁 **Smart Drum Machine**: A multi-level velocity step sequencer with built-in genre presets and adjustable swing/humanization. Integrated with a procedural fill engine.
-*   📊 **Unified Visualizer**: A multi-track harmonic monitor that superimposes instrumental performance over chord data, with real-time interval analysis and retractable UI.
-*   🎹 **Pro Accompaniment**: Highly optimized voicing engine with adjustable density, styles (Pad, Funk, Reggae, Ska, Organ, Disco, Counterpoint), and intelligent relative key transposition.
-*   📁 **Workflow Tools**: Real-time Web MIDI output for DAW integration, MIDI file export, auto-save persistence, URL-based sharing, and a comprehensive user library for custom presets.
-*   📱 **PWA Ready**: Fully responsive, installable, and works offline with native Solarized theme support.
+---
 
-## Usage
+## 🚀 Why Ensemble?
 
-Ensemble uses Preact with JSX and requires a build step for production. For local development, you can serve the project, but note that modern browsers do not natively support `.jsx` files without a transformer.
+*   **Ultra-Lean & Fast**: At less than 500KB total transfer size, Ensemble is smaller than a single high-res photo. It's a full-featured PWA that loads instantly and works anywhere—even offline.
+*   **Generative, Not Static**: Unlike a standard backing track (which is just a recording), Ensemble generates every note on the fly. This means the "pocket" is alive, with micro-timing (like Dilla-style lag or Reggae lay-back) that makes it feel like a human rhythm section.
+*   **Creative Speed**: Rapidly input chord progressions using Roman Numerals, Nashville Numbers, or Absolute chord names. Dial up the intensity and hear your song idea performed instantly.
+*   **Pro Connectivity**: Seamlessly drag-and-drop your generated arrangements into any DAW via MIDI export, or connect your MIDI controller to play along with the engine.
+
+## 🎹 Key Features
+
+*   **Intensity-Aware Phrasing**: Dial the "energy" of the band up or down. Watch the drummer move from subtle cross-sticks to driving fills, and the bass transition from simple roots to complex chromatic walking lines.
+*   **Musical Coordination**: A centralized "Coordination Context" ensures the band plays together. The Bass locks to the Kick drum, and the Accompaniment engine intelligently yields sonic space when the Soloist is active.
+*   **Smart Genres**: Expert-tuned musical rules for 32+ genres (Jazz, Neo-Soul, Ska-Punk, Reggae, Funk, and more).
+*   **Audio Workbench**: Analyze existing audio files or live performances with high-precision Chord Detection and a specialized Melody Harmonizer.
+*   **Unified Visualizer**: A multi-track harmonic monitor that superimposes instrumental performance over chord data with real-time interval analysis.
+
+## 🛠 Tech Stack
+
+*   **UI**: **Preact (v10)** for a snappy, reactive interface with zero bloat.
+*   **Audio Engine**: Custom synthesis engines and a precision `scheduler-core.js` for rock-solid timing.
+*   **Background Processing**: Web Workers (`logic-worker.js`) handle all generative logic to ensure a glitch-free experience even on low-end devices.
+*   **Build System**: `esbuild` for ultra-fast JSX transformation and bundling.
+
+---
+
+## 🏃 Quickstart
 
 ### Local Development
-To run the project locally, it is recommended to use a development server that supports JSX, or build the project using the provided deployment scripts which utilize `esbuild`.
-
-**Previewing Production Build:**
-To view the exact production bundle locally (required for E2E verification):
+To run the project locally, it is recommended to use a development server that supports JSX. To view the exact production bundle:
 ```bash
 npm run build && npm run preview
 ```
 
-### Deployment & Bundling
-Ensemble includes scripts for automated deployment to remote servers using `esbuild` for bundling and minification.
-
-To build and deploy to the test environment:
+### Deployment
+Ensemble includes scripts for automated deployment using `esbuild`.
 ```bash
-npm run deploy:test
+npm run deploy:test   # Build and deploy to test
+npm run deploy:prod   # Build and deploy to production
 ```
 
-To build and deploy to the production environment:
-```bash
-npm run deploy:prod
-```
-
-**Dry Run / Local Build:**
-You can build the project locally to the `dist/` folder without uploading by using the `--dry-run` flag:
-```bash
-./scripts/deploy-test.sh --dry-run
-```
-
-## Testing
+## 🧪 Testing
 
 Ensemble uses a dual-layer testing strategy:
-
-1.  **Unit & Integration Tests**: Located in `tests/unit/` and `tests/integration/`, powered by Vitest. These verify musical logic, state integrity, and engine performance.
+1.  **Unit & Integration**: Powered by Vitest to verify musical logic and engine integrity.
     ```bash
     npm test
     ```
-2.  **Visual Regression & E2E Tests**: Located in `tests/e2e/`, powered by Playwright. These verify UI layout, responsiveness, and interaction flow against "golden" snapshots.
+2.  **E2E & Visual Regression**: Powered by Playwright to verify UI layout and interaction.
     ```bash
     npm run test:e2e
     ```
 
-**Updating Snapshots:**
-If you intentionally change the UI, update the baseline snapshots:
-```bash
-npm run test:e2e:update
-```
+---
 
-## Tech Stack
-
-*   **Engine**: Vanilla JavaScript (ES Modules) & Web Audio API. Modularized core for high-precision scheduling and synthesis.
-*   **Background Processing**: Web Workers (`logic-worker.js`) for glitch-free algorithmic generation.
-*   **UI**: **Preact (v10)** component-based architecture. Hybrid state bridge for reactive updates while maintaining high-performance audio engine sync.
-*   **State**: Centralized reactive state with formalized action types and domain-specific slices.
-*   **Build System**: `esbuild` for JSX transformation, bundling, and minification.
-
-## License
+## 📜 License
 
 GNU Affero General Public License v3.0 (AGPLv3). See [LICENSE](LICENSE) for details.
