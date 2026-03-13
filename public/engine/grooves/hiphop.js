@@ -117,26 +117,24 @@ export function applyOverrides(context, state) {
             shouldPlay = true;
             soundName = 'HiHat';
             velocity = isBeatStart ? 0.85 : 0.65;
-        } else if (activeMotif >= 1 && intensity > 0.5) {
+        } else if (activeMotif >= 2 && intensity > 0.7 && (isEOfBeat || isAOfBeat)) {
+            // Skitters (32nd note rolls) for Motif 2 & 3
+            // Priority over simple 16th fills
+            const skitterProb = activeMotif === 2 ? 0.6 : 0.3;
+            if (roll(skitterProb)) {
+                shouldPlay = true;
+                soundName = 'HiHat';
+                velocity = 0.35;
+                // Move the skitter slightly to separate it from the grid
+                instTimeOffset += (Math.random() - 0.5) * 0.005;
+            }
+        }
+
+        if (!shouldPlay && activeMotif >= 1 && intensity > 0.5 && (isEOfBeat || isAOfBeat)) {
             // Fill 16ths for Trap
             shouldPlay = true;
             soundName = 'HiHat';
             velocity = 0.45;
-        }
-
-        // Skitters (32nd note rolls) for Motif 2 & 3
-        if (activeMotif >= 2 && !shouldPlay && intensity > 0.7) {
-            // Target the 'e' or 'a' for a rapid roll
-            if (isEOfBeat || isAOfBeat) {
-                const skitterProb = activeMotif === 2 ? 0.6 : 0.3;
-                if (roll(skitterProb)) {
-                    shouldPlay = true;
-                    soundName = 'HiHat';
-                    velocity = 0.35;
-                    // Move the skitter slightly to separate it from the grid
-                    instTimeOffset += (Math.random() - 0.5) * 0.005;
-                }
-            }
         }
 
         // Offbeat Barks (Open)
