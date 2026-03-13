@@ -318,12 +318,20 @@ export function AnalyzerModal() {
                     <div class="analyzer-settings">
                         <div class="grid-2-col">
                             <div class="form-control-compact">
-                                <label>Input Gain</label>
-                                <input type="range" min="0" max="2" step="0.1" defaultValue="1" />
+                                <label htmlFor="analyzer-input-gain">Input Gain</label>
+                                <input
+                                    id="analyzer-input-gain"
+                                    type="range"
+                                    min="0"
+                                    max="2"
+                                    step="0.1"
+                                    defaultValue="1"
+                                />
                             </div>
                             <div class="form-control-compact">
-                                <label>Sensitivity</label>
+                                <label htmlFor="analyzer-sensitivity">Sensitivity</label>
                                 <input
+                                    id="analyzer-sensitivity"
                                     type="range"
                                     min="0"
                                     max="1"
