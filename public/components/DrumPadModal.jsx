@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { initAudio, playDrumSound, restoreGains } from '../engine/engine.js';
+import { initAudio, killDrumNote, playDrumSound, restoreGains } from '../engine/engine.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -25,6 +25,7 @@ export function DrumPadModal() {
     useLayoutEffect(() => {
         initAudio();
         restoreGains();
+        killDrumNote(); // Silence automatic drums immediately
 
         if (modalRef.current) {
             modalRef.current.focus({ preventScroll: true });
@@ -64,17 +65,53 @@ export function DrumPadModal() {
     };
 
     const DRUM_PADS = [
-        { name: 'Kick', label: 'Kick', color: 'var(--soloist-color)' },
-        { name: 'Snare', label: 'Snare', color: 'var(--soloist-color)' },
-        { name: 'Sidestick', label: 'Rim', color: 'var(--soloist-color)' },
-        { name: 'HiHat', label: 'Hi-Hat', color: 'var(--chords-color)' },
-        { name: 'Open', label: 'Open Hat', color: 'var(--chords-color)' },
-        { name: 'Ride', label: 'Ride', color: 'var(--chords-color)' },
-        { name: 'Crash', label: 'Crash', color: 'var(--chords-color)' },
-        { name: 'TomHigh', label: 'High Tom', color: 'var(--soloist-color)' },
-        { name: 'TomMid', label: 'Mid Tom', color: 'var(--soloist-color)' },
-        { name: 'TomLow', label: 'Floor Tom', color: 'var(--soloist-color)' },
+        { name: 'Kick', label: 'Kick', key: ' ', keyHint: 'SPACE', color: 'var(--soloist-color)' },
+        { name: 'Snare', label: 'Snare', key: 's', keyHint: 'S', color: 'var(--soloist-color)' },
+        { name: 'Sidestick', label: 'Rim', key: 'a', keyHint: 'A', color: 'var(--soloist-color)' },
+        { name: 'HiHat', label: 'Hi-Hat', key: 'd', keyHint: 'D', color: 'var(--chords-color)' },
+        { name: 'Open', label: 'Open Hat', key: 'f', keyHint: 'F', color: 'var(--chords-color)' },
+        { name: 'Ride', label: 'Ride', key: ';', keyHint: ';', color: 'var(--chords-color)' },
+        { name: 'Crash', label: 'Crash', key: 'i', keyHint: 'I', color: 'var(--chords-color)' },
+        {
+            name: 'TomHigh',
+            label: 'High Tom',
+            key: 'l',
+            keyHint: 'L',
+            color: 'var(--soloist-color)',
+        },
+        { name: 'TomMid', label: 'Mid Tom', key: 'k', keyHint: 'K', color: 'var(--soloist-color)' },
+        {
+            name: 'TomLow',
+            label: 'Floor Tom',
+            key: 'j',
+            keyHint: 'J',
+            color: 'var(--soloist-color)',
+        },
     ];
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (modalRef.current?.closest('.closing')) {
+                return;
+            }
+            if (e.repeat) {
+                return;
+            }
+
+            const key = e.key.toLowerCase();
+            const pad = DRUM_PADS.find((p) => p.key === key);
+
+            if (pad) {
+                e.preventDefault();
+                triggerDrum(pad.name);
+            } else if (key === 'escape') {
+                close();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown, { passive: false });
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [velocity]); // Re-bind if velocity changes to ensure triggerDrum has latest state
 
     const renderPad = (pad) => {
         const isActive = activePads.has(pad.name);
@@ -104,9 +141,15 @@ export function DrumPadModal() {
                     touch-action: none;
                     box-shadow: ${isActive ? `0 0 20px ${pad.color}` : '0 4px 6px rgba(0,0,0,0.2)'};
                     transform: ${isActive ? 'scale(0.95) translateY(2px)' : 'none'};
+                    position: relative;
                 `}
             >
                 {pad.label}
+                {!isMobile && (
+                    <span style="position: absolute; bottom: 6px; right: 8px; font-size: 0.6rem; opacity: 0.5; font-family: var(--font-mono);">
+                        {pad.keyHint}
+                    </span>
+                )}
             </button>
         );
     };

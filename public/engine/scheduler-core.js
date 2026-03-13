@@ -576,6 +576,12 @@ function scheduleDrums(params) {
     } = params;
 
     const { playback, groove, vizState, midi, arranger } = getState();
+
+    // PERFORMANCE MODE: Skip automatic drums if manual pad is active
+    if (playback.modals?.drumPad) {
+        return;
+    }
+
     const conductorVel = playback.conductorVelocity || 1.0;
     const finalTime = time + calculatePocketOffset(playback, groove);
     const stepsPerBar = getStepsPerMeasure(arranger.timeSignature);
@@ -696,6 +702,12 @@ function scheduleDrums(params) {
  */
 function scheduleDrumsFromBuffer(step, time) {
     const { groove, playback, vizState, midi } = getState();
+
+    // PERFORMANCE MODE: Skip automatic drums if manual pad is active
+    if (playback.modals?.drumPad) {
+        return;
+    }
+
     const notes = groove.buffer.get(step);
     groove.buffer.delete(step);
 

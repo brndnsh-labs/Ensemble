@@ -94,6 +94,9 @@ export function initAudio() {
             if (m.state === soloist && playback.modals?.performance) {
                 isMuted = false;
             }
+            if (m.name === 'drums' && playback.modals?.drumPad) {
+                isMuted = false;
+            }
 
             const targetGain =
                 !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
@@ -311,6 +314,9 @@ export function restoreGains() {
 
             let isMuted = !m.state.enabled;
             if (m.state === soloist && playback.modals?.performance) {
+                isMuted = false;
+            }
+            if (m.name === 'drums' && playback.modals?.drumPad) {
                 isMuted = false;
             }
 
