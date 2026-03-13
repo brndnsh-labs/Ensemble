@@ -54,6 +54,10 @@ vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 
+vi.mock('../../public/engine/engine.js', () => ({
+    initAudio: vi.fn(),
+}));
+
 import { GroovePanel } from '../../public/components/GroovePanel.jsx';
 import { InstrumentPanel } from '../../public/components/InstrumentPanel.jsx';
 
@@ -86,7 +90,7 @@ describe('Menu Interaction Regression Tests', () => {
             render(<GroovePanel isActiveMobile={false} />, container);
         });
 
-        const kebabBtn = container.querySelector('.panel-menu-btn');
+        const kebabBtn = container.querySelector('.panel-menu-btn[aria-label="Grooves Settings"]');
         const settingsMenu = container.querySelector('.grooves-settings-menu');
 
         // Initially closed

@@ -121,6 +121,7 @@ export const playback = {
         generateSong: false,
         performance: false,
         manual: false,
+        drumPad: false,
     },
 };
 

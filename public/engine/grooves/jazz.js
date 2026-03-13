@@ -67,6 +67,7 @@ export function applyOverrides(context, state) {
 
     if (inst.name === 'Open') {
         shouldPlay = false;
+        soundName = 'Ride';
         const isSkipBeat = isOffbeat && beatIndex % 2 !== 0;
         const isRideStep = isBeatStart || isSkipBeat;
 

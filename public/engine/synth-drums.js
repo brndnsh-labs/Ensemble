@@ -19,6 +19,10 @@ export function killDrumNote() {
         rampGain(groove.lastHatGain.gain, 0, playback.audio.currentTime, 0.005);
         groove.lastHatGain = null;
     }
+    if (groove.lastRideGain) {
+        rampGain(groove.lastRideGain.gain, 0, playback.audio.currentTime, 0.05);
+        groove.lastRideGain = null;
+    }
 }
 
 // Internal mix state for density-aware normalization
@@ -257,7 +261,11 @@ export function playDrumSound(name, time, velocity = 1.0) {
         // New: Closed (0.85), Open (0.75), Ride (0.8)
         const vol = masterVol * (isOpen ? 0.75 : isRide ? 0.8 : 0.85) * rr();
 
-        if (groove.lastHatGain && !isRide) {
+        if (isRide) {
+            if (groove.lastRideGain) {
+                rampGain(groove.lastRideGain.gain, 0, playTime, 0.05);
+            }
+        } else if (groove.lastHatGain) {
             rampGain(groove.lastHatGain.gain, 0, playTime, 0.005);
         }
 
@@ -271,15 +279,14 @@ export function playDrumSound(name, time, velocity = 1.0) {
 
         const bpFilter = playback.audio.createBiquadFilter();
         bpFilter.type = 'bandpass';
-        // Lowered cutoffs for more "body" (Old: 10000)
-        // Higher velocity = More high-end shimmer
-        const bpFreq = (isRide ? 6000 : 8000) + velocity * 1500;
+        // Cap frequencies to prevent brittle/splashy high-end
+        const bpFreq = Math.min(9200, (isRide ? 6000 : 8000) + velocity * 1500);
         bpFilter.frequency.setValueAtTime(bpFreq, playTime);
         bpFilter.Q.value = isRide ? 0.5 : 1.0;
 
         const hpFilter = playback.audio.createBiquadFilter();
         hpFilter.type = 'highpass';
-        const hpFreq = (isRide ? 3000 : 4500) + velocity * 500;
+        const hpFreq = Math.min(5500, (isRide ? 3000 : 4500) + velocity * 500);
         hpFilter.frequency.setValueAtTime(hpFreq, playTime);
 
         const gain = playback.audio.createGain();
@@ -290,13 +297,17 @@ export function playDrumSound(name, time, velocity = 1.0) {
             gain.gain.setTargetAtTime(0, playTime + 0.02, (0.35 + velocity * 0.1) * rr());
         } else if (isRide) {
             gain.gain.setTargetAtTime(vol, playTime, 0.005);
-            gain.gain.setTargetAtTime(0, playTime + 0.05, (0.8 + velocity * 0.2) * rr()); // Longer ride decay
+            // Tapered decay multiplier for high velocities to keep it focused
+            const decayMult = velocity > 1.0 ? 0.12 : 0.2;
+            gain.gain.setTargetAtTime(0, playTime + 0.05, (0.8 + velocity * decayMult) * rr());
         } else {
             gain.gain.setTargetAtTime(vol, playTime, 0.002);
             gain.gain.setTargetAtTime(0, playTime + 0.005, (0.05 + velocity * 0.02) * rr());
         }
 
-        if (!isRide) {
+        if (isRide) {
+            groove.lastRideGain = gain;
+        } else {
             groove.lastHatGain = gain;
         }
 
@@ -309,7 +320,11 @@ export function playDrumSound(name, time, velocity = 1.0) {
         source.stop(playTime + (isOpen ? 2.0 : isRide ? 3.0 : 0.4));
 
         source.onended = () => {
-            if (!isRide && groove.lastHatGain === gain) {
+            if (isRide) {
+                if (groove.lastRideGain === gain) {
+                    groove.lastRideGain = null;
+                }
+            } else if (groove.lastHatGain === gain) {
                 groove.lastHatGain = null;
             }
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);

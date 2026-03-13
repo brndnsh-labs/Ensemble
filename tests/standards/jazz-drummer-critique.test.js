@@ -56,8 +56,8 @@ describe('Jazz Drummer Critique', () => {
                         tsConfig: info.tsConfig,
                     };
                     const result = applyGrooveOverrides(params);
-                    if (result.shouldPlay && result.soundName === instName) {
-                        stepData.instruments[instName] = {
+                    if (result.shouldPlay) {
+                        stepData.instruments[result.soundName || instName] = {
                             velocity: result.velocity,
                             sound: result.soundName,
                             offset: result.instTimeOffset,
@@ -91,8 +91,8 @@ describe('Jazz Drummer Critique', () => {
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
 
-                // --- CRITIQUE: Ride Pattern (Open) ---
-                if (stepData.instruments.Open) {
+                // --- CRITIQUE: Ride Pattern (Now Ride soundName) ---
+                if (stepData.instruments.Ride) {
                     rideHits++;
                     if ([0, 4, 8, 12].includes(s)) {
                         quarterRideHits++;

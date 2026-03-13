@@ -1,5 +1,6 @@
 import { Fragment, h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { initAudio } from '../engine/engine.js';
 import {
     cloneMeasure,
     saveDrumPreset,
@@ -77,6 +78,24 @@ export function GroovePanel({ isActiveMobile }) {
                     </button>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;" ref={menuRef}>
+                    <button
+                        class="panel-menu-btn"
+                        aria-label="Open Drum Pad"
+                        onClick={() => {
+                            if (document.activeElement instanceof HTMLElement) {
+                                document.activeElement.blur();
+                            }
+                            initAudio();
+                            setTimeout(() => {
+                                dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                    modal: 'drumPad',
+                                    open: true,
+                                });
+                            }, 0);
+                        }}
+                    >
+                        🥁
+                    </button>
                     <button
                         class={`panel-menu-btn ${isMenuOpen ? 'active' : ''}`}
                         aria-label="Grooves Settings"
