@@ -401,12 +401,6 @@ export function DrumPadModal() {
                                 </div>
                             </div>
                         </div>
-
-                        <div style="font-size: 0.75rem; color: #64748b; line-height: 1.4; font-style: italic;">
-                            Tip: High velocity (&gt;100%) triggers sharper filter cutoffs and longer
-                            decays. Use this lab to verify that the Ride and Open Hat remain focused
-                            without spectral buildup.
-                        </div>
                     </div>
                 </div>
             </div>
