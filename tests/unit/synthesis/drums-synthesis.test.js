@@ -138,11 +138,19 @@ describe('Drum Synthesis', () => {
         expect(wiresFilter).toBeDefined();
     });
 
-    it('should use Sidestick synthesis when name is Sidestick', () => {
-        playDrumSound('Sidestick', 10, 1.0);
+    it('should implement a 4-layer model for Toms (Stick, Body, Skin, Shell)', () => {
+        playDrumSound('High Tom', 10, 1.0);
 
-        // Sidestick has 3 layers: Click (Osc), Body (Osc), Snap (Noise)
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(2);
+        // Layers: Stick (Osc), Body (Osc), Shell (Osc) + Skin (Noise)
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
         expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
+    });
+
+    it('should implement Ride cymbal synthesis', () => {
+        playDrumSound('Ride', 10, 1.0);
+
+        // Ride should use BufferSource (metallic) + Filter + Gain + Panner
+        expect(playback.audio.createBufferSource).toHaveBeenCalled();
+        expect(playback.audio.createGain).toHaveBeenCalled();
     });
 });

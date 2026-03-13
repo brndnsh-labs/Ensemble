@@ -64,29 +64,30 @@ export function playDrumSound(name, time, velocity = 1.0) {
     if (name === 'Kick') {
         const vol = masterVol * rr();
 
-        // 1. Beater Snap
+        // 1. Beater Snap: Higher velocity = Sharper snap
         const beater = playback.audio.createOscillator();
         const beaterGain = playback.audio.createGain();
         beaterGain.gain.setValueAtTime(0, playTime);
         beater.type = 'sine';
-        beater.frequency.setValueAtTime(3000 * rr(), playTime);
+        const snapFreq = (3000 + velocity * 1500) * rr();
+        beater.frequency.setValueAtTime(snapFreq, playTime);
         beater.frequency.exponentialRampToValueAtTime(600, playTime + 0.005);
         beaterGain.gain.setTargetAtTime(vol * 0.4, playTime, 0.001);
         beaterGain.gain.setTargetAtTime(0, playTime + 0.005, 0.003);
 
-        // 2. Head "Skin"
+        // 2. Head "Skin": Higher velocity = More high-frequency noise
         const skin = playback.audio.createBufferSource();
         skin.buffer = groove.audioBuffers.noise;
         const skinFilter = playback.audio.createBiquadFilter();
         const skinGain = playback.audio.createGain();
         skinFilter.type = 'bandpass';
-        skinFilter.frequency.value = 1000;
+        skinFilter.frequency.value = 1000 + velocity * 500;
         skinFilter.Q.value = 1.0;
         skinGain.gain.setValueAtTime(0, playTime);
         skinGain.gain.setTargetAtTime(vol * 0.2, playTime, 0.002);
         skinGain.gain.setTargetAtTime(0, playTime + 0.01, 0.01);
 
-        // 3. The "Knock"
+        // 3. The "Knock": Fundamental impact
         const knock = playback.audio.createOscillator();
         const knockGain = playback.audio.createGain();
         knockGain.gain.setValueAtTime(0, playTime);
@@ -96,7 +97,7 @@ export function playDrumSound(name, time, velocity = 1.0) {
         knockGain.gain.setTargetAtTime(vol * 1.3, playTime, 0.001);
         knockGain.gain.setTargetAtTime(0, playTime + 0.015, 0.03);
 
-        // 4. The "Shell"
+        // 4. The "Shell": Deep resonance
         const shell = playback.audio.createOscillator();
         const shellGain = playback.audio.createGain();
         shellGain.gain.setValueAtTime(0, playTime);
@@ -225,13 +226,14 @@ export function playDrumSound(name, time, velocity = 1.0) {
         const noiseFilter = playback.audio.createBiquadFilter();
         const noiseGain = playback.audio.createGain();
         noiseFilter.type = 'bandpass';
-        const centerFreq = 1500 + velocity * 1000;
+        // Higher velocity = Crisper high-end wires
+        const centerFreq = 1200 + velocity * 1500;
         const finalFreq = centerFreq * rr();
         noiseFilter.frequency.value = finalFreq;
         noiseFilter.frequency.setValueAtTime(finalFreq, playTime);
         noiseFilter.Q.value = 1.2;
         noiseFilter.Q.setValueAtTime(1.2, playTime);
-        noiseGain.gain.setTargetAtTime(vol * 1.25, playTime, 0.001);
+        noiseGain.gain.setTargetAtTime(vol * (1.0 + velocity * 0.5), playTime, 0.001);
         noiseGain.gain.setTargetAtTime(0, playTime + 0.01, 0.08);
         noise.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
@@ -246,11 +248,16 @@ export function playDrumSound(name, time, velocity = 1.0) {
 
         noise.onended = () =>
             safeDisconnect([tone1, tone2, toneGain, noise, noiseFilter, noiseGain, panner]);
-    } else if (name === 'HiHat' || name === 'Open') {
+    } else if (name === 'HiHat' || name === 'Open' || name === 'Ride') {
         const isOpen = name === 'Open';
-        const vol = masterVol * (isOpen ? 0.5 : 0.7) * rr();
+        const isRide = name === 'Ride';
 
-        if (groove.lastHatGain) {
+        // Rebalanced multipliers for better kit presence
+        // Old: Closed (0.7), Open (0.5)
+        // New: Closed (0.85), Open (0.75), Ride (0.8)
+        const vol = masterVol * (isOpen ? 0.75 : isRide ? 0.8 : 0.85) * rr();
+
+        if (groove.lastHatGain && !isRide) {
             rampGain(groove.lastHatGain.gain, 0, playTime, 0.005);
         }
 
@@ -260,29 +267,38 @@ export function playDrumSound(name, time, velocity = 1.0) {
 
         const source = playback.audio.createBufferSource();
         source.buffer = groove.audioBuffers.hihatMetal;
-        source.playbackRate.value = rr(0.05);
+        source.playbackRate.value = isRide ? 0.6 * rr(0.05) : rr(0.05); // Ride is lower pitched
 
         const bpFilter = playback.audio.createBiquadFilter();
         bpFilter.type = 'bandpass';
-        bpFilter.frequency.setValueAtTime(10000, playTime);
-        bpFilter.Q.value = 1.0;
+        // Lowered cutoffs for more "body" (Old: 10000)
+        // Higher velocity = More high-end shimmer
+        const bpFreq = (isRide ? 6000 : 8000) + velocity * 1500;
+        bpFilter.frequency.setValueAtTime(bpFreq, playTime);
+        bpFilter.Q.value = isRide ? 0.5 : 1.0;
 
         const hpFilter = playback.audio.createBiquadFilter();
         hpFilter.type = 'highpass';
-        hpFilter.frequency.setValueAtTime(4800, playTime);
+        const hpFreq = (isRide ? 3000 : 4500) + velocity * 500;
+        hpFilter.frequency.setValueAtTime(hpFreq, playTime);
 
         const gain = playback.audio.createGain();
         gain.gain.setValueAtTime(0, playTime);
 
         if (isOpen) {
             gain.gain.setTargetAtTime(vol, playTime, 0.015);
-            gain.gain.setTargetAtTime(0, playTime + 0.02, 0.35 * rr());
+            gain.gain.setTargetAtTime(0, playTime + 0.02, (0.35 + velocity * 0.1) * rr());
+        } else if (isRide) {
+            gain.gain.setTargetAtTime(vol, playTime, 0.005);
+            gain.gain.setTargetAtTime(0, playTime + 0.05, (0.8 + velocity * 0.2) * rr()); // Longer ride decay
         } else {
             gain.gain.setTargetAtTime(vol, playTime, 0.002);
-            gain.gain.setTargetAtTime(0, playTime + 0.005, 0.05 * rr());
+            gain.gain.setTargetAtTime(0, playTime + 0.005, (0.05 + velocity * 0.02) * rr());
         }
 
-        groove.lastHatGain = gain;
+        if (!isRide) {
+            groove.lastHatGain = gain;
+        }
 
         source.connect(bpFilter);
         bpFilter.connect(hpFilter);
@@ -290,10 +306,10 @@ export function playDrumSound(name, time, velocity = 1.0) {
         gain.connect(panner);
 
         source.start(playTime);
-        source.stop(playTime + (isOpen ? 2.0 : 0.4));
+        source.stop(playTime + (isOpen ? 2.0 : isRide ? 3.0 : 0.4));
 
         source.onended = () => {
-            if (groove.lastHatGain === gain) {
+            if (!isRide && groove.lastHatGain === gain) {
                 groove.lastHatGain = null;
             }
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
@@ -500,33 +516,78 @@ export function playDrumSound(name, time, velocity = 1.0) {
         const isMid = name.includes('Mid');
         const freq = isHigh ? 180 : isMid ? 135 : 90;
 
-        const tone = playback.audio.createOscillator();
-        const toneGain = playback.audio.createGain();
-        tone.type = 'sine';
-        tone.frequency.setValueAtTime(freq * 1.2 * rr(), playTime);
-        tone.frequency.exponentialRampToValueAtTime(freq, playTime + 0.05);
-        toneGain.gain.setValueAtTime(0, playTime);
-        toneGain.gain.setTargetAtTime(vol, playTime, 0.002);
-        toneGain.gain.setTargetAtTime(0, playTime + 0.05, 0.2);
-        tone.connect(toneGain);
-        toneGain.connect(panner);
-
+        // 1. Stick Impact (The "Thwack")
         const stick = playback.audio.createOscillator();
         const stickGain = playback.audio.createGain();
-        stick.type = 'square';
-        stick.frequency.setValueAtTime(freq * 2.5, playTime);
-        stick.frequency.exponentialRampToValueAtTime(freq, playTime + 0.01);
+        stick.type = 'sine';
+        stick.frequency.setValueAtTime(freq * (3.0 + velocity * 2.0) * rr(), playTime);
+        stick.frequency.exponentialRampToValueAtTime(freq, playTime + 0.015);
         stickGain.gain.setValueAtTime(0, playTime);
-        stickGain.gain.setTargetAtTime(vol * 0.3, playTime, 0.001);
-        stickGain.gain.setTargetAtTime(0, playTime + 0.005, 0.01);
-        stick.connect(stickGain);
-        stickGain.connect(panner);
+        stickGain.gain.setTargetAtTime(vol * 0.4, playTime, 0.001);
+        stickGain.gain.setTargetAtTime(0, playTime + 0.01, 0.01);
 
-        tone.start(playTime);
+        // 2. Head "Skin" Noise
+        const skin = playback.audio.createBufferSource();
+        skin.buffer = groove.audioBuffers.noise;
+        const skinFilter = playback.audio.createBiquadFilter();
+        const skinGain = playback.audio.createGain();
+        skinFilter.type = 'bandpass';
+        skinFilter.frequency.setValueAtTime(freq * 10, playTime);
+        skinFilter.Q.value = 1.5;
+        skinGain.gain.setValueAtTime(0, playTime);
+        skinGain.gain.setTargetAtTime(vol * 0.25 * velocity, playTime, 0.002);
+        skinGain.gain.setTargetAtTime(0, playTime + 0.015, 0.02);
+
+        // 3. Resonant Body
+        const body = playback.audio.createOscillator();
+        const bodyGain = playback.audio.createGain();
+        body.type = 'triangle';
+        body.frequency.setValueAtTime(freq * 1.15 * rr(), playTime);
+        body.frequency.exponentialRampToValueAtTime(freq, playTime + 0.05);
+        bodyGain.gain.setValueAtTime(0, playTime);
+        bodyGain.gain.setTargetAtTime(vol * 1.1, playTime, 0.002);
+        bodyGain.gain.setTargetAtTime(0, playTime + 0.05, 0.15);
+
+        // 4. Shell Resonance
+        const shell = playback.audio.createOscillator();
+        const shellGain = playback.audio.createGain();
+        shell.type = 'sine';
+        shell.frequency.setValueAtTime(freq * rr(0.01), playTime);
+        shellGain.gain.setValueAtTime(0, playTime);
+        shellGain.gain.setTargetAtTime(vol * 0.8, playTime, 0.01);
+        shellGain.gain.setTargetAtTime(0, playTime + 0.1, 0.4 * rr());
+
+        // Connections
+        stick.connect(stickGain);
+        skin.connect(skinFilter);
+        skinFilter.connect(skinGain);
+        body.connect(bodyGain);
+        shell.connect(shellGain);
+        [stickGain, skinGain, bodyGain, shellGain].forEach((g) => g.connect(panner));
+
         stick.start(playTime);
-        tone.stop(playTime + 1.0);
+        skin.start(playTime);
+        body.start(playTime);
+        shell.start(playTime);
+
         stick.stop(playTime + 0.1);
-        tone.onended = () => safeDisconnect([tone, toneGain, stick, stickGain, panner]);
+        skin.stop(playTime + 0.2);
+        body.stop(playTime + 0.5);
+        shell.stop(playTime + 1.5);
+
+        shell.onended = () =>
+            safeDisconnect([
+                stick,
+                stickGain,
+                skin,
+                skinFilter,
+                skinGain,
+                body,
+                bodyGain,
+                shell,
+                shellGain,
+                panner,
+            ]);
     }
 }
 
