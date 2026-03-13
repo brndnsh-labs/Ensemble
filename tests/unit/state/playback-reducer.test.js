@@ -83,7 +83,11 @@ describe('Playback Reducer', () => {
         expect(playback.theme).toBe('dark');
 
         // Other module (hits line 174)
-        const result = playbackReducer(ACTIONS.SET_PARAM, { module: 'not_playback', param: 'theme', value: 'light' });
+        const result = playbackReducer(ACTIONS.SET_PARAM, {
+            module: 'not_playback',
+            param: 'theme',
+            value: 'light',
+        });
         expect(result).toBe(false);
     });
 
@@ -122,7 +126,7 @@ describe('Playback Reducer', () => {
         const payload = {
             velocity: 0.7,
             lyricalBias: 0.3,
-            intent: { density: 0.8 }
+            intent: { density: 0.8 },
         };
         playbackReducer(ACTIONS.UPDATE_CONDUCTOR_DECISION, payload);
         expect(playback.conductorVelocity).toBe(0.7);
@@ -196,7 +200,7 @@ describe('Playback Reducer', () => {
                 modals: { settings: true },
                 soloistEQ: { eq: 1 },
                 harmoniesGain: { g: 1 },
-                harmoniesEQ: { eq: 1 }
+                harmoniesEQ: { eq: 1 },
             };
 
             for (const [param, value] of Object.entries(allParams)) {

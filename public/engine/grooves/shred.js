@@ -1,3 +1,13 @@
-import { applyOverrides, config, getMotif } from './metal.js';
+/**
+ * Shred Genre Engine
+ * Currently inherits from Metal, but allows for independent specialization of
+ * high-intensity melodic-driven patterns.
+ */
+import * as Metal from './metal.js';
 
-export { applyOverrides, config, getMotif };
+export const config = {
+    ...Metal.config,
+};
+
+export const getMotif = Metal.getMotif;
+export const applyOverrides = Metal.applyOverrides;

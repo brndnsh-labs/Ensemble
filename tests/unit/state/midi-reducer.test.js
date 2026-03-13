@@ -23,7 +23,7 @@ describe('MIDI State Reducer', () => {
                 syncOut: true,
                 channels: { chords: 1 },
                 access: { a: 1 },
-                noteToEngineMap: { n: 1 }
+                noteToEngineMap: { n: 1 },
             };
 
             for (const [param, value] of Object.entries(params)) {

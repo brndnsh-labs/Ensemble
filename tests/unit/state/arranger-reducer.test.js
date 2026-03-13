@@ -33,7 +33,7 @@ describe('Arranger Reducer', () => {
     it('should handle MusicXML import', () => {
         const payload = {
             hasChords: true,
-            sections: [{ id: 'xml1', label: 'A', value: 'Cmaj7' }]
+            sections: [{ id: 'xml1', label: 'A', value: 'Cmaj7' }],
         };
         arrangerReducer(ACTIONS.IMPORT_MUSICXML, payload);
         expect(arranger.sections).toEqual(payload.sections);
@@ -64,7 +64,7 @@ describe('Arranger Reducer', () => {
                 lastInteractedSectionId: 's2',
                 lastChordPreset: 'Jazz',
                 mutatedSectionId: 's1',
-                isDirty: true
+                isDirty: true,
             };
 
             for (const [param, value] of Object.entries(params)) {

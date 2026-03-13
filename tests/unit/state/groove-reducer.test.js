@@ -21,7 +21,7 @@ describe('Groove Reducer', () => {
         steps[0] = 1;
         grooveReducer(ACTIONS.SET_GROOVE_STEPS, { instrument: 'Kick', steps });
         expect(groove.instruments.find((i) => i.name === 'Kick').steps[0]).toBe(1);
-        
+
         // Invalid instrument
         const result = grooveReducer(ACTIONS.SET_GROOVE_STEPS, { instrument: 'Invalid', steps });
         expect(result).toBe(false);
@@ -49,7 +49,7 @@ describe('Groove Reducer', () => {
         expect(groove.volume).toBe(0.7);
         grooveReducer(ACTIONS.SET_REVERB, { module: 'drum', value: 0.3 });
         expect(groove.reverb).toBe(0.3);
-        
+
         const result = grooveReducer(ACTIONS.SET_VOLUME, { module: 'other', value: 0.1 });
         expect(result).toBe(false);
     });
@@ -68,7 +68,7 @@ describe('Groove Reducer', () => {
         expect(groove.creativity).toBe(true);
         grooveReducer(ACTIONS.SET_GENRE_COUNTDOWN, 4);
         expect(groove.genreSwitchCountdown).toBe(4);
-        
+
         // Setting same value returns false
         const result = grooveReducer(ACTIONS.SET_GENRE_COUNTDOWN, 4);
         expect(result).toBe(false);
@@ -77,7 +77,7 @@ describe('Groove Reducer', () => {
     it('should handle SET_ACTIVE_TAB for groove', () => {
         grooveReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'grid' });
         expect(groove.activeTab).toBe('grid');
-        
+
         const result = grooveReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'other', tab: 'grid' });
         expect(result).toBe(false);
     });
@@ -151,7 +151,7 @@ describe('Groove Reducer', () => {
                 snareMask: 123,
                 pendingCrash: true,
                 creativity: true,
-                gridVersion: 99
+                gridVersion: 99,
             };
 
             for (const [param, value] of Object.entries(params)) {

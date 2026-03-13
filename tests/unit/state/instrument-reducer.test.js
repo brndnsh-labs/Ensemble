@@ -5,11 +5,11 @@ import {
     chords,
     harmony,
     instrumentReducer,
-    soloist,
-    setChordsParam,
     setBassParam,
+    setChordsParam,
+    setHarmonyParam,
     setSoloistParam,
-    setHarmonyParam
+    soloist,
 } from '../../../public/state/instruments.js';
 import { ACTIONS } from '../../../public/types.js';
 
@@ -31,7 +31,7 @@ describe('Instrument Reducer', () => {
         soloist.buffer.set(1, {});
         instrumentReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
         expect(soloist.buffer.size).toBe(0);
-        
+
         // Should return false for other modals
         const result = instrumentReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
         expect(result).toBe(false);
@@ -41,7 +41,7 @@ describe('Instrument Reducer', () => {
         arranger.key = 'G';
         const payload = {
             xmlKey: 'C',
-            leadSheetMelody: [{ step: 0, midi: 60 }]
+            leadSheetMelody: [{ step: 0, midi: 60 }],
         };
         instrumentReducer(ACTIONS.IMPORT_MUSICXML, payload);
         expect(soloist.style).toBe('lead_sheet');
@@ -59,7 +59,7 @@ describe('Instrument Reducer', () => {
     it('should set style for modules', () => {
         instrumentReducer(ACTIONS.SET_STYLE, { module: 'bass', style: 'funk' });
         expect(bass.style).toBe('funk');
-        
+
         // Invalid module
         instrumentReducer(ACTIONS.SET_STYLE, { module: 'invalid', style: 'funk' });
     });
@@ -127,7 +127,10 @@ describe('Instrument Reducer', () => {
         const result = instrumentReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'grid' });
         expect(result).toBe(false);
         // Invalid module
-        const invalidResult = instrumentReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'invalid', tab: 'grid' });
+        const invalidResult = instrumentReducer(ACTIONS.SET_ACTIVE_TAB, {
+            module: 'invalid',
+            tab: 'grid',
+        });
         expect(invalidResult).toBe(true); // Since it hits the default return true at the end of the block
     });
 
@@ -157,7 +160,7 @@ describe('Instrument Reducer', () => {
                 tremoloDepth: 0.5,
                 chorusRate: 1,
                 chorusDepth: 0.5,
-                octaveShift: -1
+                octaveShift: -1,
             };
             for (const [p, v] of Object.entries(params)) {
                 setChordsParam(p, v);
@@ -181,7 +184,7 @@ describe('Instrument Reducer', () => {
                 glide: 0.5,
                 drive: 0.5,
                 release: 0.5,
-                pocketOffset: 0.1
+                pocketOffset: 0.1,
             };
             for (const [p, v] of Object.entries(params)) {
                 setBassParam(p, v);
@@ -218,7 +221,7 @@ describe('Instrument Reducer', () => {
                 recentNotes: [],
                 phraseStartStep: 0,
                 phrasingIntensity: 0.8,
-                tradeMode: 'auto'
+                tradeMode: 'auto',
             };
             for (const [p, v] of Object.entries(params)) {
                 setSoloistParam(p, v);
@@ -244,7 +247,7 @@ describe('Instrument Reducer', () => {
                 release: 0.2,
                 filterCutoff: 2000,
                 glide: 0.1,
-                pocketOffset: -0.05
+                pocketOffset: -0.05,
             };
             for (const [p, v] of Object.entries(params)) {
                 setHarmonyParam(p, v);
