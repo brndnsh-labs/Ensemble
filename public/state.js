@@ -55,21 +55,21 @@ export function getState() {
 
 // Export individual state slices for dynamic imports
 export {
-    playback,
     arranger,
-    chords,
-    bass,
-    soloist,
-    harmony,
-    groove,
-    midi,
-    vizState,
-    playbackReducer,
     arrangerReducer,
-    instrumentReducer,
+    bass,
+    chords,
+    groove,
     grooveReducer,
+    harmony,
+    instrumentReducer,
+    midi,
     midiReducer,
+    playback,
+    playbackReducer,
+    soloist,
     vizReducer,
+    vizState,
 };
 
 // Persistence Helpers

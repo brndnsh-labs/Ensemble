@@ -16,11 +16,21 @@ import { killDrumNote, playDrumSound } from './synth-drums.js';
 import { killHarmonyNote, playHarmonyNote } from './synth-harmonies.js';
 import { killSoloistNote, playSoloNote } from './synth-soloist.js';
 
-export { playNote, playChordScratch, updateSustain, killAllPianoNotes, INSTRUMENT_PRESETS };
-export { playBassNote, killBassNote };
-export { playSoloNote, killSoloistNote };
-export { playHarmonyNote, killHarmonyNote };
-export { playDrumSound, killDrumNote };
+export {
+    INSTRUMENT_PRESETS,
+    killAllPianoNotes,
+    killBassNote,
+    killDrumNote,
+    killHarmonyNote,
+    killSoloistNote,
+    playBassNote,
+    playChordScratch,
+    playDrumSound,
+    playHarmonyNote,
+    playNote,
+    playSoloNote,
+    updateSustain,
+};
 
 let isChromium = null;
 export function _resetChromiumCheck() {

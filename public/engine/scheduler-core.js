@@ -642,7 +642,7 @@ function scheduleDrums(params) {
         let stepVal = inst.steps[step];
 
         // If creativity is on and we have a valid preset variation, override the step value
-        if (groove.creativity && preset && preset.variations && preset.variations[seedIdx]) {
+        if (groove.creativity && preset?.variations?.[seedIdx]) {
             const varInst = preset.variations[seedIdx][inst.name];
             if (varInst) {
                 stepVal = varInst[step];
