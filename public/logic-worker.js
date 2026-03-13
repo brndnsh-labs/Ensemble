@@ -16,7 +16,7 @@ import { getHarmonyNotes } from './harmonies.js';
 import { generateResolutionNotes } from './resolution.js';
 import { getSoloistNote } from './soloist.js';
 import { getState } from './state.js';
-import { getFrequency, getMidi, getStepInfo } from './utils.js';
+import { binarySearchMap, getFrequency, getMidi, getStepInfo } from './utils.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
 // --- WORKER STATE ---
@@ -103,7 +103,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         const preset = DRUM_PRESETS[groove.lastDrumPreset];
 
         // --- Calculate Turnaround State ---
-        const sectionEntry = arranger.sectionMap?.find((e) => step >= e.start && step < e.end);
+        const sectionEntry = binarySearchMap(arranger.sectionMap || [], step);
         let measuresInSection = 4;
         let startStep = 0;
         if (sectionEntry) {

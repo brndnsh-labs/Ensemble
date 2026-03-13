@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getState } from '../state.js';
-import { calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
+import { binarySearchMap, calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
 import * as acoustic from './grooves/acoustic.js';
 import * as blues from './grooves/blues.js';
 import * as country from './grooves/country.js';
@@ -102,7 +102,7 @@ export function applyGrooveOverrides({
     const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
-    const sectionEntry = arrangerState.sectionMap?.find((e) => step >= e.start && step < e.end);
+    const sectionEntry = binarySearchMap(arrangerState.sectionMap || [], step);
     let measuresInSection = 4; // default
     let startStep = 0;
     if (sectionEntry) {
@@ -119,9 +119,7 @@ export function applyGrooveOverrides({
 
     // Check if the PREVIOUS bar was a turnaround to determine if we should crash now
     const prevStep = step - stepsPerBar;
-    const prevSectionEntry = arrangerState.sectionMap?.find(
-        (e) => prevStep >= e.start && prevStep < e.end,
-    );
+    const prevSectionEntry = binarySearchMap(arrangerState.sectionMap || [], prevStep);
     let prevMeasuresInSection = 4;
     let prevStartStep = 0;
     if (prevSectionEntry) {
@@ -144,7 +142,7 @@ export function applyGrooveOverrides({
 
     const justFinishedTurnaround = prevWasTurnaround && isFirstStepOfNewBar;
 
-    const chordEntry = arrangerState.stepMap?.find((e) => step >= e.start && step < e.end);
+    const chordEntry = binarySearchMap(arrangerState.stepMap || [], step);
     const sectionId = chordEntry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
     if (sectionSeed === undefined) {

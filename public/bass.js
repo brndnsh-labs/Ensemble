@@ -1,7 +1,7 @@
 import { REGGAE_RIDDIMS, TIME_SIGNATURES } from './config.js';
 import { getState } from './state.js';
 import { getScaleForChord } from './theory-scales.js';
-import { calculateTimingOffset, getFrequency, getMidi } from './utils.js';
+import { binarySearchMap, calculateTimingOffset, getFrequency, getMidi } from './utils.js';
 
 const BOSSA_STEPS = [0, 6, 8, 14];
 
@@ -262,15 +262,28 @@ export function getBassNote(
         _sectionProgress =
             sectionLength > 0 ? (loopStep - context.sectionStart) / sectionLength : 0;
     } else if (arranger.stepMap && arranger.stepMap.length > 0) {
-        // Fallback: O(N) Lookup
-        const entry = arranger.stepMap.find((e) => loopStep >= e.start && loopStep < e.end);
+        // Fallback: O(log N) Lookup for entry, O(log N) for section
+        const entry = binarySearchMap(arranger.stepMap, loopStep);
         if (entry) {
-            const currentSectionId = entry.chord.sectionId;
-            const sectionEntries = arranger.stepMap.filter(
-                (e) => e.chord.sectionId === currentSectionId,
-            );
-            const sectionStart = sectionEntries[0].start;
-            const sectionEnd = sectionEntries[sectionEntries.length - 1].end;
+            let sectionStart = 0;
+            let sectionEnd = arranger.totalSteps;
+            if (arranger.sectionMap && arranger.sectionMap.length > 0) {
+                const sectionEntry = binarySearchMap(arranger.sectionMap, loopStep);
+                if (sectionEntry) {
+                    sectionStart = sectionEntry.start;
+                    sectionEnd = sectionEntry.end;
+                }
+            } else {
+                // Slower fallback if sectionMap is missing (should not happen in normal flow)
+                const currentSectionId = entry.chord.sectionId;
+                const sectionEntries = arranger.stepMap.filter(
+                    (e) => e.chord.sectionId === currentSectionId,
+                );
+                if (sectionEntries.length > 0) {
+                    sectionStart = sectionEntries[0].start;
+                    sectionEnd = sectionEntries[sectionEntries.length - 1].end;
+                }
+            }
             const sectionLength = sectionEnd - sectionStart;
             _sectionProgress = sectionLength > 0 ? (loopStep - sectionStart) / sectionLength : 0;
         }

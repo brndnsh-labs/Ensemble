@@ -4,6 +4,7 @@ import { debounceSaveState, saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
 import { triggerFlash } from './ui.js';
+import { binarySearchMap } from './utils.js';
 
 export const conductorState = {
     target: 0.35,
@@ -83,7 +84,7 @@ export function applyConductor() {
 
     // Section Overrides (Smoothed)
     const modStep = arranger.totalSteps > 0 ? playback.step % arranger.totalSteps : 0;
-    const currentEntry = arranger.stepMap.find((e) => modStep >= e.start && modStep < e.end);
+    const currentEntry = binarySearchMap(arranger.stepMap || [], modStep);
     if (currentEntry) {
         const label = currentEntry.chord.sectionLabel.toLowerCase();
         let sectionBias = 0.5;
@@ -223,7 +224,7 @@ export function updateLarsTempo(currentStep) {
         return;
     }
     const modStep = currentStep % total;
-    const entry = arranger.stepMap.find((e) => modStep >= e.start && modStep < e.end);
+    const entry = binarySearchMap(arranger.stepMap || [], modStep);
     if (!entry) {
         return;
     }
@@ -336,9 +337,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
         // This is crucial for Jazz Blues or split-bar turnarounds where the last chord
         // of the measure is different from the first.
         const effectiveStep = measureEnd - 1;
-        const entry = arranger.stepMap.find(
-            (e) => effectiveStep >= e.start && effectiveStep < e.end,
-        );
+        const entry = binarySearchMap(arranger.stepMap || [], effectiveStep);
 
         if (!entry) {
             return;

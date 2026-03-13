@@ -8,7 +8,7 @@ import { getHarmonyNotes } from '../harmonies.js';
 import { generateResolutionNotes } from '../resolution.js';
 import { getSoloistNote } from '../soloist.js';
 import { getState } from '../state.js';
-import { getFrequency, getMidi, getStepInfo } from '../utils.js';
+import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import {
     createCoordinationContext,
@@ -315,7 +315,7 @@ export class ExportProcessor {
             playback.currentLoopCount = this.exportConductor.loopCount; // @worker-mutation
         }
 
-        const entry = arranger.stepMap.find((e) => modStep >= e.start && modStep < e.end);
+        const entry = binarySearchMap(arranger.stepMap || [], modStep);
         if (!entry) {
             return;
         }
@@ -411,9 +411,7 @@ export class ExportProcessor {
 
         // --- Calculate Turnaround State (Match main engine) ---
         const stepsPerBar = this.stepsPerMeasure;
-        const sectionEntry = arranger.sectionMap?.find(
-            (e) => globalStep >= e.start && globalStep < e.end,
-        );
+        const sectionEntry = binarySearchMap(arranger.sectionMap || [], globalStep);
         let measuresInSection = 4;
         let startStep = 0;
         if (sectionEntry) {
@@ -504,9 +502,9 @@ export class ExportProcessor {
             if (stepInChord === 0) {
                 const pulse = this.toPulses(stepTimeS);
                 const modStep = globalStep % this.totalStepsOneLoop;
-                const section = arranger.sectionMap?.find((s) => s.start === modStep);
+                const section = binarySearchMap(arranger.sectionMap || [], modStep);
 
-                if (section) {
+                if (section && section.start === modStep) {
                     this.metaTrack.marker(pulse, `--- ${section.label} ---`);
                 }
                 this.metaTrack.marker(pulse, chord.absName || 'Chord');
