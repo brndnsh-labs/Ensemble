@@ -6,6 +6,7 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'happy-dom',
+        pool: 'forks',
         exclude: [
             '**/node_modules/**',
             '**/dist/**',
