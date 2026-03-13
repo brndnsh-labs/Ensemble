@@ -8,6 +8,16 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
+
+// Mock side-effect modules to prevent EnvironmentTeardownErrors from dynamic imports in state.js
+vi.mock('../../public/app-controller.js', () => ({
+    setBpm: vi.fn(),
+    applyTheme: vi.fn(),
+}));
+vi.mock('../../public/engine/scheduler-core.js', () => ({
+    togglePlay: vi.fn(),
+}));
+
 // We'll test the ui-bridge.js logic directly
 import { useEnsembleState } from '../../public/ui-bridge.js';
 

@@ -10,6 +10,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // but we want to use the real implementation mostly.
 import * as stateModule from '../../public/state.js';
 
+// Mock side-effect modules to prevent EnvironmentTeardownErrors from dynamic imports in state.js
+vi.mock('../../public/app-controller.js', () => ({
+    setBpm: vi.fn(),
+    applyTheme: vi.fn(),
+}));
+vi.mock('../../public/engine/scheduler-core.js', () => ({
+    togglePlay: vi.fn(),
+}));
+
 const activeListeners = new Set();
 
 vi.mock('../../public/state.js', async (importOriginal) => {
