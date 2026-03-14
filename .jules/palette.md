@@ -26,3 +26,4 @@
 ## 2024-03-12 - Alert Roles for Inline Confirmations
 **Learning:** Inline confirmation dialogs replacing native window.confirm() must use role="alert" and aria-live="polite" so screen readers actively announce the destructive action warning without requiring manual focus shifts.
 **Action:** Always wrap dynamic inline warning text in a container with role="alert" and aria-live="polite" when toggled.
+\n## 2025-03-14 - Dynamic Overlay ARIA Roles\n**Learning:** Temporary or dynamic overlays like notification banners and inline confirmations must include `role="alert"` and `aria-live="polite"` to ensure screen readers actively announce their appearance.\n**Action:** Always add ARIA live regions to notification components like `PWAUpdateBanner.jsx` and `NotificationLayer.jsx`.
