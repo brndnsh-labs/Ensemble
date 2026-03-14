@@ -6,9 +6,9 @@ Welcome to Ensemble, your AI-powered virtual band. Whether you're practicing sol
 
 ## 🚀 The 30-Second Jam
 If you want to start playing immediately:
-1.  **Pick a Genre:** Select a style from the **Drums** panel (e.g., Jazz, Rock, or Funk).
+1.  **Pick a Genre:** Select a style from the **Grooves** panel (e.g., Jazz, Rock, or Funk).
 2.  **Type Chords:** Enter your progression in the **Arranger** (e.g., `C | F G`).
-3.  **Press Space:** The band will instantly begin playing.
+3.  **Press Start:** The band will instantly begin playing.
 *✨ **Pro Tip:** Click the **Dice Icon** for an instant, musically coherent song structure!*
 
 ---
