@@ -502,7 +502,12 @@ export function selectPitchAndDevices(
             selectedMidi,
         });
         if (extra && extra.length > 0) {
-            const polyResult = [...extra.map((n) => ({ ...result, ...n })), result];
+            // Optimization: Replace spread and map with pre-allocated loop to avoid closure overhead and intermediate arrays
+            const polyResult = new Array(extra.length + 1);
+            for (let i = 0; i < extra.length; i++) {
+                polyResult[i] = { ...result, ...extra[i] };
+            }
+            polyResult[extra.length] = result;
 
             // We set busy steps for polyResult because they are playing simultaneously? No, wait.
             // In the original code, `soloist.busySteps = result.durationSteps - 1` was done for polyphony too,
