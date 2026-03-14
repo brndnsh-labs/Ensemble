@@ -20,7 +20,7 @@ export function GenerateSongModal() {
     const lastInteractedId = useEnsembleState((s) => s.arranger.lastInteractedSectionId);
     const sections = useEnsembleState((s) => s.arranger.sections);
     const isDirty = useEnsembleState((s) => s.arranger.isDirty);
-    
+
     const overlayRef = useRef(null);
 
     // Internal component state for form values
@@ -93,9 +93,12 @@ export function GenerateSongModal() {
             dispatch(ACTIONS.SET_ARRANGER_CONFIG, {
                 sections: newSections,
                 key: (newSections[0]?.key !== 'Random' ? newSections[0]?.key : key) || 'C',
-                timeSignature: (newSections[0]?.timeSignature !== 'Random' ? newSections[0]?.timeSignature : timeSignature) || '4/4',
+                timeSignature:
+                    (newSections[0]?.timeSignature !== 'Random'
+                        ? newSections[0]?.timeSignature
+                        : timeSignature) || '4/4',
                 isMinor: isMinor,
-                isDirty: true
+                isDirty: true,
             });
 
             clearChordPresetHighlight();
@@ -103,13 +106,12 @@ export function GenerateSongModal() {
             validateAndAnalyze();
 
             setProcessState('success');
-            
+
             // Auto-close after success
             setTimeout(() => {
                 close();
                 setTimeout(() => showToast('Generated new inspiration!'), 200);
             }, 1500);
-
         } catch (e) {
             console.error('Generation failed:', e);
             setProcessState('idle');
@@ -162,25 +164,33 @@ export function GenerateSongModal() {
                             zIndex: 100,
                             borderRadius: '12px',
                             textAlign: 'center',
-                            padding: '2rem'
+                            padding: '2rem',
                         }}
                     >
-                        <div class="animate-bounce" style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>
+                        <div
+                            class="animate-bounce"
+                            style={{ fontSize: '4rem', marginBottom: '1.5rem' }}
+                        >
                             {processState === 'generating' ? '⌛' : '✨'}
                         </div>
                         <h2 style={{ color: 'var(--accent-color)', margin: '0 0 0.5rem 0' }}>
-                            {processState === 'generating' ? 'Harmonizing...' : 'Arrangement Ready!'}
+                            {processState === 'generating'
+                                ? 'Harmonizing...'
+                                : 'Arrangement Ready!'}
                         </h2>
-                        <p class="text-mini-muted" style={{ marginBottom: processState === 'success' ? '2rem' : '0' }}>
-                            {processState === 'generating' 
-                                ? 'Building musical structures...' 
+                        <p
+                            class="text-mini-muted"
+                            style={{ marginBottom: processState === 'success' ? '2rem' : '0' }}
+                        >
+                            {processState === 'generating'
+                                ? 'Building musical structures...'
                                 : 'Applying to your workspace...'}
                         </p>
-                        
+
                         {processState === 'success' && (
-                            <button 
-                                class="primary-btn animate-in" 
-                                onClick={close} 
+                            <button
+                                class="primary-btn animate-in"
+                                onClick={close}
                                 style="padding: 0.75rem 2.5rem; font-weight: bold;"
                             >
                                 Done
@@ -232,7 +242,11 @@ export function GenerateSongModal() {
                         <SettingRow label="Key Quality" description="Major or Minor mode">
                             <div class="flex-row" style="gap: 0.5rem; align-items: center;">
                                 <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
-                                <Toggle checked={isMinor} onChange={setIsMinor} disabled={isProcessing} />
+                                <Toggle
+                                    checked={isMinor}
+                                    onChange={setIsMinor}
+                                    disabled={isProcessing}
+                                />
                                 <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
                             </div>
                         </SettingRow>
@@ -312,7 +326,11 @@ export function GenerateSongModal() {
                             label="Seed from Current"
                             description="Use active section as a motif"
                         >
-                            <Toggle checked={useSeed} onChange={setUseSeed} disabled={isProcessing} />
+                            <Toggle
+                                checked={useSeed}
+                                onChange={setUseSeed}
+                                disabled={isProcessing}
+                            />
                         </SettingRow>
 
                         {useSeed && (
