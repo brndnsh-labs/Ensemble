@@ -103,8 +103,10 @@ export function GenerateSongModal() {
             clearChordPresetHighlight();
             refreshArrangerUI();
 
-            showToast('✨ Arrangement Ready!');
-            setHasGenerated(true);
+            setTimeout(() => {
+                showToast('✨ Arrangement Ready!');
+                setHasGenerated(true);
+            }, 50);
         } catch (e) {
             console.error('Generation failed explicitly:', e);
             showToast('Generation failed. Check console for details.');
