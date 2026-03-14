@@ -22,7 +22,12 @@ export function PWAUpdateBanner() {
     }
 
     return (
-        <div id="updateBanner" class={`update-banner ${isVisible ? 'show' : ''}`}>
+        <div
+            id="updateBanner"
+            class={`update-banner ${isVisible ? 'show' : ''}`}
+            role="alert"
+            aria-live="polite"
+        >
             <span>A new version is available.</span>
             <button id="updateRefreshBtn" onClick={skipWaiting}>
                 Refresh

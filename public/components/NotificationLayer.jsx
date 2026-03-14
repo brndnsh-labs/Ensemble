@@ -17,7 +17,7 @@ export function NotificationLayer() {
     }
 
     return (
-        <div id="notificationLayer" class="notification-layer">
+        <div id="notificationLayer" class="notification-layer" role="alert" aria-live="polite">
             {visibleNotify.map((n) => (
                 <div key={n.id} class="notification-box">
                     <span class="notification-icon">
