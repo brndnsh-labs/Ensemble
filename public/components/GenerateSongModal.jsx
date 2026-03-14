@@ -32,6 +32,7 @@ export function GenerateSongModal() {
     const [complexity, setComplexity] = useState(0.3);
     const [useSeed, setUseSeed] = useState(false);
     const [seedType, setSeedType] = useState('Verse');
+    const [hasGenerated, setHasGenerated] = useState(false);
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
@@ -41,6 +42,7 @@ export function GenerateSongModal() {
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
             }
+            setHasGenerated(false);
         }
     }, [isOpen]);
 
@@ -49,6 +51,11 @@ export function GenerateSongModal() {
     };
 
     const handleConfirm = () => {
+        if (hasGenerated) {
+            close();
+            return;
+        }
+
         if (isDirty && sections.length > 1) {
             if (!confirm('Replace current arrangement with generated song?')) {
                 return;
@@ -97,7 +104,7 @@ export function GenerateSongModal() {
             refreshArrangerUI();
 
             showToast('✨ Arrangement Ready!');
-            close();
+            setHasGenerated(true);
         } catch (e) {
             console.error('Generation failed explicitly:', e);
             showToast('Generation failed. Check console for details.');
@@ -272,11 +279,11 @@ export function GenerateSongModal() {
                     </SettingGroup>
 
                     <button
-                        class="primary-btn"
+                        class={hasGenerated ? "primary-btn animate-in" : "primary-btn"}
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
                     >
-                        ✨ Generate New Arrangement
+                        {hasGenerated ? '👍 Done' : '✨ Generate New Arrangement'}
                     </button>
                 </div>
             </div>
