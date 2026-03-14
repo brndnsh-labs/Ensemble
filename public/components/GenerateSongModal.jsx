@@ -90,8 +90,10 @@ export function GenerateSongModal() {
 
             pushHistory();
 
-            arranger.sections = newSections;
-
+            // Set global state using available actions to trigger proper reactivity
+            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
+            
+            // Mutate remaining non-reactive params directly, as is standard in this app
             if (newSections.length > 0) {
                 const first = newSections[0];
                 if (first.key && first.key !== 'Random') {
@@ -117,9 +119,9 @@ export function GenerateSongModal() {
                 setTimeout(() => showToast('Generated new inspiration!'), 200);
             }, 1500);
         } catch (e) {
-            console.error('Generation failed:', e);
+            console.error('Generation failed explicitly:', e);
             setProcessState('idle');
-            showToast('Generation failed. Please try again.');
+            showToast('Generation failed. Check console for details.');
         }
     };
 
