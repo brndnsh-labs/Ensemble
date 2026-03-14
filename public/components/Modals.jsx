@@ -9,9 +9,7 @@ const AnalyzerModal = lazy(() =>
 const EditorModal = lazy(() =>
     import('./EditorModal.jsx').then((m) => ({ default: m.EditorModal })),
 );
-const ExportModal = lazy(() =>
-    import('./ExportModal.jsx').then((m) => ({ default: m.ExportModal })),
-);
+const ShareModal = lazy(() => import('./ShareModal.jsx').then((m) => ({ default: m.ShareModal })));
 const GenerateSongModal = lazy(() =>
     import('./GenerateSongModal.jsx').then((m) => ({ default: m.GenerateSongModal })),
 );
@@ -73,7 +71,7 @@ export function Modals() {
         settingsOpen,
         editorOpen,
         generateSongOpen,
-        exportOpen,
+        shareOpen,
         templatesOpen,
         analyzerOpen,
         performanceOpen,
@@ -83,7 +81,7 @@ export function Modals() {
         settingsOpen: s.playback.modals.settings,
         editorOpen: s.playback.modals.editor,
         generateSongOpen: s.playback.modals.generateSong,
-        exportOpen: s.playback.modals.export,
+        shareOpen: s.playback.modals.share,
         templatesOpen: s.playback.modals.templates,
         analyzerOpen: s.playback.modals.analyzer,
         performanceOpen: s.playback.modals.performance,
@@ -96,7 +94,7 @@ export function Modals() {
             settingsOpen ||
             editorOpen ||
             generateSongOpen ||
-            exportOpen ||
+            shareOpen ||
             templatesOpen ||
             analyzerOpen ||
             performanceOpen ||
@@ -111,7 +109,7 @@ export function Modals() {
         settingsOpen,
         editorOpen,
         generateSongOpen,
-        exportOpen,
+        shareOpen,
         templatesOpen,
         analyzerOpen,
         performanceOpen,
@@ -124,7 +122,7 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={settingsOpen} component={Settings} />
             <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
             <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
-            <AnimatedModalWrapper isOpen={exportOpen} component={ExportModal} />
+            <AnimatedModalWrapper isOpen={shareOpen} component={ShareModal} />
             <AnimatedModalWrapper isOpen={templatesOpen} component={TemplatesModal} />
             <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
             <AnimatedModalWrapper isOpen={performanceOpen} component={PerformanceModal} />

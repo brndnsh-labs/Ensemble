@@ -216,11 +216,6 @@ export function EditorModal() {
         saveProgression();
     };
 
-    const handleShare = () => {
-        setIsMenuOpen(false);
-        shareProgression();
-    };
-
     const handleClearLeadSeed = () => {
         setIsMenuOpen(false);
         dispatch(ACTIONS.CLEAR_LEAD_SHEET);
@@ -490,14 +485,6 @@ Em  C  G  D"
                                 onClick={handleSave}
                             >
                                 💾 <span>Save</span>
-                            </button>
-                            <button
-                                id="shareBtn"
-                                title="Share Progression"
-                                aria-label="Share (Progression)"
-                                onClick={handleShare}
-                            >
-                                🔗 <span>Share</span>
                             </button>
                         </div>
                     </div>

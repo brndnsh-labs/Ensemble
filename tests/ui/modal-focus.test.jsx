@@ -65,11 +65,11 @@ describe('Modal Accessibility Focus', () => {
             <button id="clearProgBtn"></button>
             <button id="saveBtn"></button>
             <button id="saveDrumBtn"></button>
-            <button id="shareBtn"></button>
+            <button id="shareHubBtn"></button>
             <button id="installAppBtn"></button>
             <button id="refreshAppBtn"></button>
             <button id="exportMidiBtn"></button>
-            <button id="settingsExportMidiBtn"></button>
+            <button id="settingsShareHubBtn"></button>
             <button id="confirmExportBtn"></button>
             <input id="exportChordsCheck" type="checkbox">
             <input id="exportBassCheck" type="checkbox">

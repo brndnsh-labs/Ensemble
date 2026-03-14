@@ -2,20 +2,89 @@ import { getState } from './state.js';
 import { showToast } from './ui.js';
 import { compressSections } from './utils.js';
 
-export function shareProgression() {
+/**
+ * Compresses the full band/mixer state into a Base64 string.
+ */
+function compressBandSettings(options = {}) {
+    const { soloist, bass, chords, harmony, groove } = getState();
+
+    const band = {
+        s: {
+            e: (options.includeSolo !== undefined ? options.includeSolo : soloist.enabled) ? 1 : 0,
+            s: soloist.style,
+            p: soloist.preset,
+            o: soloist.octave,
+            v: parseFloat(soloist.volume.toFixed(2)),
+            r: parseFloat(soloist.reverb.toFixed(2)),
+            m: soloist.mode,
+        },
+        b: {
+            e: (options.includeBass !== undefined ? options.includeBass : bass.enabled) ? 1 : 0,
+            s: bass.style,
+            o: bass.octave,
+            v: parseFloat(bass.volume.toFixed(2)),
+            r: parseFloat(bass.reverb.toFixed(2)),
+        },
+        c: {
+            e: (options.includeChords !== undefined ? options.includeChords : chords.enabled) ? 1 : 0,
+            s: chords.style,
+            o: chords.octave,
+            v: parseFloat(chords.volume.toFixed(2)),
+            r: parseFloat(chords.reverb.toFixed(2)),
+            p: chords.pianoRoots ? 1 : 0,
+            d: chords.density,
+        },
+        h: {
+            e: (options.includeHarmony !== undefined ? options.includeHarmony : harmony.enabled) ? 1 : 0,
+            s: harmony.style,
+            o: harmony.octave,
+            v: parseFloat(harmony.volume.toFixed(2)),
+            r: parseFloat(harmony.reverb.toFixed(2)),
+            c: parseFloat(harmony.complexity.toFixed(2)),
+        },
+        g: {
+            e: (options.includeDrums !== undefined ? options.includeDrums : groove.enabled) ? 1 : 0,
+            v: parseFloat(groove.volume.toFixed(2)),
+            r: parseFloat(groove.reverb.toFixed(2)),
+            sw: groove.swing,
+            ss: groove.swingSub,
+            hu: groove.humanize,
+        },
+    };
+
+    const json = JSON.stringify(band);
+    const bytes = new TextEncoder().encode(json);
+    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
+    return btoa(binString);
+}
+
+export function generateShareUrl(options = {}) {
     const { arranger, chords, groove, playback } = getState();
+    const params = new URLSearchParams();
+    params.set('s', compressSections(arranger.sections));
+    params.set('key', arranger.key);
+    params.set('ts', arranger.timeSignature);
+    params.set('bpm', playback.bpm);
+    params.set('style', chords.style);
+    params.set('genre', groove.genreFeel);
+    params.set('int', playback.bandIntensity.toFixed(2));
+    params.set('comp', playback.complexity.toFixed(2));
+    params.set('notation', arranger.notation);
+
+    // Add target duration if provided
+    if (options.targetDuration > 0) {
+        params.set('tmr', options.targetDuration);
+    }
+
+    // High-fidelity band settings
+    params.set('bnd', compressBandSettings(options));
+
+    return `${window.location.origin + window.location.pathname}?${params.toString()}`;
+}
+
+export function shareProgression() {
     try {
-        const params = new URLSearchParams();
-        params.set('s', compressSections(arranger.sections));
-        params.set('key', arranger.key);
-        params.set('ts', arranger.timeSignature);
-        params.set('bpm', playback.bpm);
-        params.set('style', chords.style);
-        params.set('genre', groove.genreFeel);
-        params.set('int', playback.bandIntensity.toFixed(2));
-        params.set('comp', playback.complexity.toFixed(2));
-        params.set('notation', arranger.notation);
-        const url = `${window.location.origin + window.location.pathname}?${params.toString()}`;
+        const url = generateShareUrl();
 
         navigator.clipboard
             .writeText(url)

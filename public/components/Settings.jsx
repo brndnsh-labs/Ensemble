@@ -113,11 +113,6 @@ export function Settings() {
         saveCurrentState();
     };
 
-    const openExportModal = () => {
-        closeSettings();
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'export', open: true });
-    };
-
     const handleReset = () => {
         localStorage.clear();
         window.location.reload();
@@ -588,12 +583,18 @@ export function Settings() {
                     >
                         <div class="grid-actions">
                             <button
-                                id="settingsExportMidiBtn"
+                                id="settingsShareHubBtn"
                                 class="secondary-btn flex-row"
                                 style="justify-content: center;"
-                                onClick={openExportModal}
+                                onClick={() => {
+                                    closeSettings();
+                                    dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                        modal: 'share',
+                                        open: true,
+                                    });
+                                }}
                             >
-                                <span>🎹</span> Export MIDI
+                                <span>📤</span> Share & Export
                             </button>
                             <button
                                 id="installAppBtn"

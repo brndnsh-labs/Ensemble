@@ -121,4 +121,34 @@ describe('Sharing & Hydration Round-trip', () => {
         expect(groove.genreFeel).toBe('Jazz'); // Verified state update directly
         expect(playback.bandIntensity).toBe(0.4);
     });
+
+    it('should hydrate high-fidelity band settings (volume, reverb) from bnd parameter', () => {
+        const { soloist, bass } = getState();
+        // 1. Setup specific band state
+        soloist.volume = 0.8;
+        soloist.reverb = 0.7;
+        bass.volume = 0.3;
+        bass.style = 'funk';
+
+        // 2. Generate Share URL
+        shareProgression();
+        const urlString = vi.mocked(navigator.clipboard.writeText).mock.calls[0][0];
+        expect(urlString).toContain('bnd=');
+
+        // 3. Reset State
+        soloist.volume = 0.5;
+        soloist.reverb = 0.6;
+        bass.volume = 0.45;
+        bass.style = 'walking';
+
+        // 4. Simulate Load from that URL
+        vi.stubGlobal('location', new URL(urlString));
+        loadFromUrl();
+
+        // 5. Verify restored high-fidelity state
+        expect(soloist.volume).toBe(0.8);
+        expect(soloist.reverb).toBe(0.7);
+        expect(bass.volume).toBe(0.3);
+        expect(bass.style).toBe('funk');
+    });
 });

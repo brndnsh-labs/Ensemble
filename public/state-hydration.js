@@ -1,6 +1,11 @@
 import { applyTheme } from './app-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from './config.js';
-import { CHORD_STYLES } from './data/instrument-styles.js';
+import {
+    BASS_STYLES,
+    CHORD_STYLES,
+    HARMONY_STYLES,
+    SOLOIST_STYLES,
+} from './data/instrument-styles.js';
 import { SMART_GENRES } from './data/smart-genres.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
@@ -13,12 +18,7 @@ import {
 } from './utils.js';
 
 /**
- * Helper to safely clamp numeric values from storage.
- * @param {*} val - The value to check.
- * @param {number} min - Minimum allowed value.
- * @param {number} max - Maximum allowed value.
- * @param {number} defaultVal - Default if invalid.
- * @returns {number}
+ * Helper to safely clamp numeric values.
  */
 const clamp = (val, min, max, defaultVal) => {
     const num = parseFloat(val);
@@ -29,18 +29,28 @@ const clamp = (val, min, max, defaultVal) => {
 };
 
 /**
+ * Decompresses the Base64 band settings string.
+ */
+function decompressBandSettings(str) {
+    try {
+        const binString = atob(str);
+        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+        const json = new TextDecoder().decode(bytes);
+        return JSON.parse(json);
+    } catch (e) {
+        console.error('Failed to decompress band settings', e);
+        return null;
+    }
+}
+
+/**
  * Validates and sanitizes sections array from untrusted source.
- * @param {Array} sections
- * @returns {Array}
  */
 function validateSections(sections) {
     if (!Array.isArray(sections)) {
         return [];
     }
-
-    // 1. Limit number of sections (DoS prevention)
     const safeSections = sections.slice(0, 500);
-
     return safeSections.map((s, i) => {
         if (!s || typeof s !== 'object') {
             return {
@@ -54,20 +64,17 @@ function validateSections(sections) {
             };
         }
 
-        // 2. Sanitize Label (XSS prevention)
         let safeLabel = escapeHTML(s.label || `Section ${i + 1}`);
         if (safeLabel.length > 100) {
             safeLabel = safeLabel.substring(0, 100);
         }
 
-        // 3. Sanitize Value (XSS prevention)
         let safeValue = typeof s.value === 'string' ? s.value : '';
         if (safeValue.length > 1000) {
             safeValue = safeValue.substring(0, 1000);
         }
         safeValue = stripDangerousChars(safeValue);
 
-        // 4. Sanitize Key
         let safeKey = '';
         if (s.key && typeof s.key === 'string') {
             const normKey = normalizeKey(s.key);
@@ -95,7 +102,6 @@ export function hydrateState() {
     const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
     const savedState = storage.get('currentState');
     if (savedState?.sections) {
-        // --- SECURITY VALIDATION ---
         const validatedSections = validateSections(savedState.sections);
 
         let validatedKey = 'C';
@@ -115,7 +121,6 @@ export function hydrateState() {
         const validatedNotation = validNotations.includes(savedState.notation)
             ? savedState.notation
             : 'roman';
-        // ---------------------------
 
         Object.assign(arranger, {
             sections: validatedSections,
@@ -146,14 +151,14 @@ export function hydrateState() {
             stopAtEnd: false,
         });
 
-        vizState.enabled = savedState.vizEnabled !== undefined ? savedState.vizEnabled : false; // @worker-mutation
+        vizState.enabled = savedState.vizEnabled !== undefined ? savedState.vizEnabled : false;
 
         if (savedState.chords) {
             Object.assign(chords, {
                 enabled: savedState.chords.enabled !== undefined ? savedState.chords.enabled : true,
                 style: savedState.chords.style || 'smart',
                 instrument: 'Piano',
-                octave: clamp(savedState.chords.octave, 0, 127, 48), // Reasonable MIDI range
+                octave: clamp(savedState.chords.octave, 0, 127, 48),
                 density: savedState.chords.density,
                 volume: clamp(savedState.chords.volume, 0, 1, 0.5),
                 reverb: clamp(savedState.chords.reverb, 0, 1, 0.3),
@@ -293,13 +298,14 @@ export function hydrateState() {
     } else {
         applyTheme('auto');
     }
-    dispatch('HYDRATE'); // Notify UI of all changes
+    dispatch('HYDRATE');
 }
 
 export function loadFromUrl() {
-    const { arranger, groove } = getState();
+    const { arranger, groove, soloist, bass, chords, harmony } = getState();
     const params = new URLSearchParams(window.location.search);
     let hasParams = false;
+
     if (params.get('s')) {
         arranger.sections = decompressSections(params.get('s'));
         hasParams = true;
@@ -312,9 +318,11 @@ export function loadFromUrl() {
         arranger.sections = [{ id: generateId(), label: 'Main', value: prog }];
         hasParams = true;
     }
+
     if (hasParams) {
         clearChordPresetHighlight();
     }
+
     if (params.get('key')) {
         const rawKey = normalizeKey(params.get('key'));
         if (KEY_ORDER.includes(rawKey)) {
@@ -338,7 +346,6 @@ export function loadFromUrl() {
 
     if (params.get('style')) {
         const style = params.get('style');
-        // Validate style against available presets
         if (CHORD_STYLES.some((s) => s.id === style)) {
             dispatch(ACTIONS.SET_STYLE, { module: 'chords', style });
         }
@@ -346,10 +353,9 @@ export function loadFromUrl() {
 
     if (params.get('genre')) {
         const genre = params.get('genre');
-        // Validate genre
         if (SMART_GENRES[genre]) {
-            groove.lastSmartGenre = genre; // @worker-mutation
-            groove.genreFeel = genre; // @worker-mutation
+            groove.lastSmartGenre = genre;
+            groove.genreFeel = genre;
         }
     }
 
@@ -373,8 +379,73 @@ export function loadFromUrl() {
             arranger.notation = not;
         }
     }
+
+    if (params.get('tmr')) {
+        const tmr = parseInt(params.get('tmr'), 10);
+        if (!Number.isNaN(tmr)) {
+            dispatch(ACTIONS.SET_SESSION_TIMER, clamp(tmr, 0, 60, 0));
+        }
+    }
+
+    // High-fidelity band settings
+    if (params.get('bnd')) {
+        const band = decompressBandSettings(params.get('bnd'));
+        if (band) {
+            if (band.s) {
+                Object.assign(soloist, {
+                    enabled: !!band.s.e,
+                    style: SOLOIST_STYLES.some((s) => s.id === band.s.s) ? band.s.s : soloist.style,
+                    preset: band.s.p || soloist.preset,
+                    octave: clamp(band.s.o, 0, 127, 72),
+                    volume: clamp(band.s.v, 0, 1, 0.5),
+                    reverb: clamp(band.s.r, 0, 1, 0.6),
+                    mode: ['monophonic', 'guitar', 'polyphonic'].includes(band.s.m)
+                        ? band.s.m
+                        : soloist.mode,
+                });
+            }
+            if (band.b) {
+                Object.assign(bass, {
+                    enabled: !!band.b.e,
+                    style: BASS_STYLES.some((s) => s.id === band.b.s) ? band.b.s : bass.style,
+                    octave: clamp(band.b.o, 0, 127, 36),
+                    volume: clamp(band.b.v, 0, 1, 0.45),
+                    reverb: clamp(band.b.r, 0, 1, 0.05),
+                });
+            }
+            if (band.c) {
+                Object.assign(chords, {
+                    enabled: !!band.c.e,
+                    style: CHORD_STYLES.some((s) => s.id === band.c.s) ? band.c.s : chords.style,
+                    octave: clamp(band.c.o, 0, 127, 48),
+                    volume: clamp(band.c.v, 0, 1, 0.5),
+                    reverb: clamp(band.c.r, 0, 1, 0.3),
+                    pianoRoots: !!band.c.p,
+                    density: clamp(band.c.d, 0, 1, 0.5),
+                });
+            }
+            if (band.h) {
+                Object.assign(harmony, {
+                    enabled: !!band.h.e,
+                    style: HARMONY_STYLES.some((s) => s.id === band.h.s) ? band.h.s : harmony.style,
+                    octave: clamp(band.h.o, 0, 127, 60),
+                    volume: clamp(band.h.v, 0, 1, 0.4),
+                    reverb: clamp(band.h.r, 0, 1, 0.4),
+                    complexity: clamp(band.h.c, 0, 1, 0.5),
+                });
+            }
+            if (band.g) {
+                Object.assign(groove, {
+                    enabled: !!band.g.e,
+                    volume: clamp(band.g.v, 0, 1, 0.5),
+                    reverb: clamp(band.g.r, 0, 1, 0.2),
+                    swing: clamp(band.g.sw, 0, 100, 0),
+                    swingSub: [4, 8, 16].includes(band.g.ss) ? band.g.ss : 8,
+                    humanize: clamp(band.g.hu, 0, 100, 20),
+                });
+            }
+        }
+    }
 }
 
-function clearChordPresetHighlight() {
-    // DOM manipulation not needed here as UI will reflect state
-}
+function clearChordPresetHighlight() {}

@@ -39,4 +39,22 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.click('#closeEditorBtn');
         await page.waitForSelector('#editorOverlay', { state: 'hidden' });
     });
+
+    test('Share & Export Modal - Content and Consolidation', async ({ page }) => {
+        // Open share modal from the dashboard
+        await page.click('#shareHubBtn');
+
+        await page.waitForSelector('#shareOverlay', { state: 'visible' });
+        const shareModal = page.locator('#shareOverlay .modal-content');
+        await expect(shareModal).toBeVisible();
+
+        // Verify consolidated content
+        await expect(shareModal).toContainText('Share & Export');
+        await expect(shareModal).toContainText('Configure Content');
+        await expect(shareModal).toContainText('Select Destination');
+
+        // Close modal
+        await page.click('#shareOverlay .close-btn');
+        await page.waitForSelector('#shareOverlay', { state: 'hidden' });
+    });
 });

@@ -102,14 +102,24 @@ function ArrangerPanel() {
 
             <div id="activeSectionLabel" class="active-section-label" />
 
-            <div style="margin-bottom: 1.5rem;">
+            <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem;">
                 <button
                     id="editArrangementBtn"
                     class="primary-btn"
-                    style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;"
+                    style="flex: 3; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"
                     onClick={openEditor}
                 >
                     <span>✏️</span> Edit Arrangement
+                </button>
+                <button
+                    id="shareHubBtn"
+                    class="secondary-btn"
+                    style="flex: 2; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0;"
+                    title="Share & Export"
+                    aria-label="Share and Export"
+                    onClick={() => dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'share', open: true })}
+                >
+                    <span>📤</span> Share & Export
                 </button>
             </div>
 

@@ -77,7 +77,7 @@ const setupMinimalDOM = () => {
             <button id="undoBtn"></button>
             <button id="clearProgBtn"></button>
             <button id="saveBtn"></button>
-            <button id="shareBtn"></button>
+            <button id="shareHubBtn"></button>
             <div id="chordPresets"></div>
             <div id="userPresetsContainer"></div>
             <div id="chordStylePresets"></div>
@@ -97,8 +97,8 @@ const setupMinimalDOM = () => {
             <select id="themeSelect"></select>
             <input id="pianoRootsCheck" type="checkbox" />
             <button id="exportMidiBtn"></button>
-            <button id="settingsExportMidiBtn"></button>
-            <div id="exportOverlay" aria-hidden="true"></div>
+            <button id="settingsShareHubBtn"></button>
+            <div id="shareOverlay" aria-hidden="true"></div>
             <button id="closeExportBtn"></button>
             <button id="confirmExportBtn"></button>
             <input id="exportChordsCheck" type="checkbox" />
