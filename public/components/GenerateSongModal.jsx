@@ -159,18 +159,23 @@ export function GenerateSongModal() {
                             zIndex: 100,
                             borderRadius: '12px',
                             textAlign: 'center',
-                            padding: '2rem'
+                            padding: '2rem',
                         }}
                     >
-                        <div class="animate-bounce" style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>
+                        <div
+                            class="animate-bounce"
+                            style={{ fontSize: '4rem', marginBottom: '1.5rem' }}
+                        >
                             {processState === 'generating' ? '⌛' : '✨'}
                         </div>
                         <h2 style={{ color: 'var(--accent-color)', margin: '0 0 0.5rem 0' }}>
-                            {processState === 'generating' ? 'Harmonizing...' : 'Arrangement Ready!'}
+                            {processState === 'generating'
+                                ? 'Harmonizing...'
+                                : 'Arrangement Ready!'}
                         </h2>
                         <p class="text-mini-muted">
-                            {processState === 'generating' 
-                                ? 'Building musical structures...' 
+                            {processState === 'generating'
+                                ? 'Building musical structures...'
                                 : 'Applying to your workspace...'}
                         </p>
                     </div>
