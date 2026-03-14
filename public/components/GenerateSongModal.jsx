@@ -279,7 +279,7 @@ export function GenerateSongModal() {
                     </SettingGroup>
 
                     <button
-                        class={hasGenerated ? "primary-btn animate-in" : "primary-btn"}
+                        class={hasGenerated ? 'primary-btn animate-in' : 'primary-btn'}
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
                     >
