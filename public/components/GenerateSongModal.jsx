@@ -29,6 +29,10 @@ export function GenerateSongModal() {
     const [useSeed, setUseSeed] = useState(false);
     const [seedType, setSeedType] = useState('Verse');
 
+    // UI Feedback State
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+
     useEffect(() => {
         if (isOpen && overlayRef.current) {
             const focusable = overlayRef.current.querySelector(
@@ -37,6 +41,9 @@ export function GenerateSongModal() {
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
             }
+            // Reset feedback states when opening
+            setIsGenerating(false);
+            setShowSuccess(false);
         }
     }, [isOpen]);
 
@@ -44,7 +51,18 @@ export function GenerateSongModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
     };
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
+        if (arranger.isDirty && arranger.sections.length > 1) {
+            if (!confirm('Replace current arrangement with generated song?')) {
+                return;
+            }
+        }
+
+        setIsGenerating(true);
+
+        // Artificial delay for "musical deliberation"
+        await new Promise((resolve) => setTimeout(resolve, 600));
+
         let seed = null;
         if (useSeed) {
             const targetId = arranger.lastInteractedSectionId;
@@ -55,8 +73,6 @@ export function GenerateSongModal() {
                     type: seedType,
                     value: section.value,
                 };
-            } else {
-                showToast('No section found to seed from.');
             }
         }
 
@@ -70,12 +86,6 @@ export function GenerateSongModal() {
         });
 
         pushHistory();
-
-        if (arranger.isDirty && arranger.sections.length > 1) {
-            if (!confirm('Replace current arrangement with generated song?')) {
-                return;
-            }
-        }
 
         arranger.sections = newSections;
 
@@ -96,8 +106,14 @@ export function GenerateSongModal() {
         refreshArrangerUI();
         validateAndAnalyze();
 
-        close();
-        showToast('Generated new inspiration!');
+        setIsGenerating(false);
+        setShowSuccess(true);
+
+        // Brief delay to show success before closing
+        setTimeout(() => {
+            close();
+            showToast('Generated new inspiration!');
+        }, 800);
     };
 
     const structureOptions = [
@@ -119,12 +135,38 @@ export function GenerateSongModal() {
             aria-modal="true"
             aria-labelledby="generate-song-title"
             onClick={(e) => {
-                if (e.target.id === 'generateSongOverlay') {
+                if (e.target.id === 'generateSongOverlay' && !isGenerating && !showSuccess) {
                     close();
                 }
             }}
         >
             <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
+                {/* Success Overlay */}
+                {showSuccess && (
+                    <div
+                        class="modal-success-overlay"
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'var(--panel-color)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 100,
+                            borderRadius: '12px',
+                            animation: 'fadeIn 0.3s ease-out',
+                        }}
+                    >
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
+                        <h2 style={{ color: 'var(--accent-color)', margin: 0 }}>Arrangement Ready!</h2>
+                        <p class="text-mini-muted">Closing in a moment...</p>
+                    </div>
+                )}
+
                 <div class="modal-header-shared">
                     <h2 id="generate-song-title">Inspiration Hub</h2>
                     <button
@@ -132,12 +174,13 @@ export function GenerateSongModal() {
                         class="close-btn"
                         aria-label="Close"
                         onClick={close}
+                        disabled={isGenerating || showSuccess}
                     >
                         &times;
                     </button>
                 </div>
 
-                <div class="modal-body" style="padding: 1.5rem;">
+                <div class="modal-body" style="padding: 1.5rem; position: relative;">
                     {/* --- FOUNDATION --- */}
                     <SettingGroup title="1. Foundation">
                         <SettingRow label="Root Key" description="Starting key for the song">
@@ -146,6 +189,7 @@ export function GenerateSongModal() {
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
                                 style="min-width: 100px;"
+                                disabled={isGenerating || showSuccess}
                             >
                                 <option value="Random">Random</option>
                                 <option value="C">C</option>
@@ -166,7 +210,7 @@ export function GenerateSongModal() {
                         <SettingRow label="Key Quality" description="Major or Minor mode">
                             <div class="flex-row" style="gap: 0.5rem; align-items: center;">
                                 <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
-                                <Toggle checked={isMinor} onChange={setIsMinor} />
+                                <Toggle checked={isMinor} onChange={setIsMinor} disabled={isGenerating || showSuccess} />
                                 <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
                             </div>
                         </SettingRow>
@@ -177,6 +221,7 @@ export function GenerateSongModal() {
                                 value={timeSignature}
                                 onChange={(e) => setTimeSignature(e.target.value)}
                                 style="min-width: 100px;"
+                                disabled={isGenerating || showSuccess}
                             >
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option>
@@ -192,15 +237,13 @@ export function GenerateSongModal() {
 
                     {/* --- VIBE & STYLE --- */}
                     <SettingGroup title="2. Vibe & Style" style="margin-top: 1rem;">
-                        <SettingRow
-                            label="Structure"
-                            description="The architectural form of the song"
-                        >
+                        <SettingRow label="Structure" description="The architectural form of the song">
                             <select
                                 id="gen-structure"
                                 value={structure}
                                 onChange={(e) => setStructure(e.target.value)}
                                 style="min-width: 150px;"
+                                disabled={isGenerating || showSuccess}
                             >
                                 {structureOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>
@@ -233,30 +276,26 @@ export function GenerateSongModal() {
                                 value={complexity}
                                 onInput={(e) => setComplexity(parseFloat(e.target.value))}
                                 style="width: 100px;"
+                                disabled={isGenerating || showSuccess}
                             />
                         </SettingRow>
                     </SettingGroup>
 
                     {/* --- ADVANCED --- */}
                     <SettingGroup title="3. Seeds" style="margin-top: 1rem; border-bottom: none;">
-                        <SettingRow
-                            label="Seed from Current"
-                            description="Use active section as a motif"
-                        >
-                            <Toggle checked={useSeed} onChange={setUseSeed} />
+                        <SettingRow label="Seed from Current" description="Use active section as a motif">
+                            <Toggle checked={useSeed} onChange={setUseSeed} disabled={isGenerating || showSuccess} />
                         </SettingRow>
 
                         {useSeed && (
                             <div class="animate-in" style="margin-top: 0.5rem;">
-                                <SettingRow
-                                    label="Treat Seed as..."
-                                    description="Section type for the seed"
-                                >
+                                <SettingRow label="Treat Seed as..." description="Section type for the seed">
                                     <select
                                         id="gen-seed-type"
                                         value={seedType}
                                         onChange={(e) => setSeedType(e.target.value)}
                                         style="min-width: 100px;"
+                                        disabled={isGenerating || showSuccess}
                                     >
                                         <option value="Verse">Verse</option>
                                         <option value="Chorus">Chorus</option>
@@ -272,8 +311,9 @@ export function GenerateSongModal() {
                         class="primary-btn"
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
+                        disabled={isGenerating || showSuccess}
                     >
-                        ✨ Generate New Arrangement
+                        {isGenerating ? '⌛ Harmonizing...' : '✨ Generate New Arrangement'}
                     </button>
                 </div>
             </div>
