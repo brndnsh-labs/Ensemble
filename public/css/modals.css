@@ -736,6 +736,10 @@ input[type="range"] {
     }
 }
 
+.animate-in {
+    animation: fade-in-up var(--anim-normal) var(--anim-ease) forwards;
+}
+
 .section-card:hover {
     border-color: var(--accent-color);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);

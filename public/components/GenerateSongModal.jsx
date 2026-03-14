@@ -108,6 +108,11 @@ export function GenerateSongModal() {
                 setHasGenerated(true);
             }, 50);
         } catch (e) {
+            if (e.name === 'TypeError' && e.message.includes('currentTime')) {
+                // Audio not initialized, ignore this error as it's expected if no user gesture yet
+                setHasGenerated(true);
+                return;
+            }
             console.error('Generation failed explicitly:', e);
             showToast('Generation failed. Check console for details.');
         }
@@ -150,143 +155,178 @@ export function GenerateSongModal() {
                 </div>
 
                 <div class="modal-body" style="padding: 1.5rem;">
-                    {/* --- FOUNDATION --- */}
-                    <SettingGroup title="1. Foundation">
-                        <SettingRow label="Root Key" description="Starting key for the song">
-                            <select
-                                id="gen-root-key"
-                                value={key}
-                                onChange={(e) => setKey(e.target.value)}
-                                style="min-width: 100px;"
+                    {hasGenerated ? (
+                        <div
+                            class="animate-in"
+                            style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 0; text-align: center;"
+                        >
+                            <div
+                                style="font-size: 4rem; margin-bottom: 1rem; filter: drop-shadow(0 0 10px var(--accent-color));"
+                                aria-hidden="true"
                             >
-                                <option value="Random">Random</option>
-                                <option value="C">C</option>
-                                <option value="Db">Db</option>
-                                <option value="D">D</option>
-                                <option value="Eb">Eb</option>
-                                <option value="E">E</option>
-                                <option value="F">F</option>
-                                <option value="Gb">Gb</option>
-                                <option value="G">G</option>
-                                <option value="Ab">Ab</option>
-                                <option value="A">A</option>
-                                <option value="Bb">Bb</option>
-                                <option value="B">B</option>
-                            </select>
-                        </SettingRow>
-
-                        <SettingRow label="Key Quality" description="Major or Minor mode">
-                            <div class="flex-row" style="gap: 0.5rem; align-items: center;">
-                                <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
-                                <Toggle checked={isMinor} onChange={setIsMinor} />
-                                <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
+                                ✨
                             </div>
-                        </SettingRow>
-
-                        <SettingRow label="Time Signature" description="Rhythmic meter">
-                            <select
-                                id="gen-time-sig"
-                                value={timeSignature}
-                                onChange={(e) => setTimeSignature(e.target.value)}
-                                style="min-width: 100px;"
+                            <h3 style="margin-bottom: 0.5rem; color: var(--accent-color);">
+                                Arrangement Ready!
+                            </h3>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem;">
+                                Your new song has been generated and is ready to play.
+                            </p>
+                            <button
+                                class="primary-btn"
+                                style="width: 100%; padding: 1rem; font-size: 1rem;"
+                                onClick={close}
                             >
-                                <option value="Random">Random</option>
-                                <option value="4/4">4/4</option>
-                                <option value="3/4">3/4</option>
-                                <option value="2/4">2/4</option>
-                                <option value="5/4">5/4</option>
-                                <option value="6/8">6/8</option>
-                                <option value="7/8">7/8</option>
-                                <option value="12/8">12/8</option>
-                            </select>
-                        </SettingRow>
-                    </SettingGroup>
-
-                    {/* --- VIBE & STYLE --- */}
-                    <SettingGroup title="2. Vibe & Style" style="margin-top: 1rem;">
-                        <SettingRow
-                            label="Structure"
-                            description="The architectural form of the song"
-                        >
-                            <select
-                                id="gen-structure"
-                                value={structure}
-                                onChange={(e) => setStructure(e.target.value)}
-                                style="min-width: 150px;"
-                            >
-                                {structureOptions.map((opt) => (
-                                    <option key={opt.id} value={opt.id}>
-                                        {opt.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </SettingRow>
-
-                        <SettingRow
-                            label="Complexity"
-                            description="Influences chord extensions (7ths, 9ths)"
-                            valueDisplay={
-                                <span
-                                    style={{
-                                        color: 'var(--accent-color)',
-                                        fontWeight: 'bold',
-                                        marginRight: '0.5rem',
-                                    }}
-                                >
-                                    {Math.round(complexity * 100)}%
-                                </span>
-                            }
-                        >
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={complexity}
-                                onInput={(e) => setComplexity(parseFloat(e.target.value))}
-                                style="width: 100px;"
-                            />
-                        </SettingRow>
-                    </SettingGroup>
-
-                    {/* --- ADVANCED --- */}
-                    <SettingGroup title="3. Seeds" style="margin-top: 1rem; border-bottom: none;">
-                        <SettingRow
-                            label="Seed from Current"
-                            description="Use active section as a motif"
-                        >
-                            <Toggle checked={useSeed} onChange={setUseSeed} />
-                        </SettingRow>
-
-                        {useSeed && (
-                            <div class="animate-in" style="margin-top: 0.5rem;">
+                                👍 Done
+                            </button>
+                        </div>
+                    ) : (
+                        <div class="generate-form">
+                            {/* --- FOUNDATION --- */}
+                            <SettingGroup title="1. Foundation">
                                 <SettingRow
-                                    label="Treat Seed as..."
-                                    description="Section type for the seed"
+                                    label="Root Key"
+                                    description="Starting key for the song"
                                 >
                                     <select
-                                        id="gen-seed-type"
-                                        value={seedType}
-                                        onChange={(e) => setSeedType(e.target.value)}
+                                        id="gen-root-key"
+                                        value={key}
+                                        onChange={(e) => setKey(e.target.value)}
                                         style="min-width: 100px;"
                                     >
-                                        <option value="Verse">Verse</option>
-                                        <option value="Chorus">Chorus</option>
-                                        <option value="Bridge">Bridge</option>
-                                        <option value="Intro">Intro</option>
+                                        <option value="Random">Random</option>
+                                        <option value="C">C</option>
+                                        <option value="Db">Db</option>
+                                        <option value="D">D</option>
+                                        <option value="Eb">Eb</option>
+                                        <option value="E">E</option>
+                                        <option value="F">F</option>
+                                        <option value="Gb">Gb</option>
+                                        <option value="G">G</option>
+                                        <option value="Ab">Ab</option>
+                                        <option value="A">A</option>
+                                        <option value="Bb">Bb</option>
+                                        <option value="B">B</option>
                                     </select>
                                 </SettingRow>
-                            </div>
-                        )}
-                    </SettingGroup>
 
-                    <button
-                        class={hasGenerated ? 'primary-btn animate-in' : 'primary-btn'}
-                        style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
-                        onClick={handleConfirm}
-                    >
-                        {hasGenerated ? '👍 Done' : '✨ Generate New Arrangement'}
-                    </button>
+                                <SettingRow label="Key Quality" description="Major or Minor mode">
+                                    <div class="flex-row" style="gap: 0.5rem; align-items: center;">
+                                        <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
+                                        <Toggle checked={isMinor} onChange={setIsMinor} />
+                                        <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
+                                    </div>
+                                </SettingRow>
+
+                                <SettingRow label="Time Signature" description="Rhythmic meter">
+                                    <select
+                                        id="gen-time-sig"
+                                        value={timeSignature}
+                                        onChange={(e) => setTimeSignature(e.target.value)}
+                                        style="min-width: 100px;"
+                                    >
+                                        <option value="Random">Random</option>
+                                        <option value="4/4">4/4</option>
+                                        <option value="3/4">3/4</option>
+                                        <option value="2/4">2/4</option>
+                                        <option value="5/4">5/4</option>
+                                        <option value="6/8">6/8</option>
+                                        <option value="7/8">7/8</option>
+                                        <option value="12/8">12/8</option>
+                                    </select>
+                                </SettingRow>
+                            </SettingGroup>
+
+                            {/* --- VIBE & STYLE --- */}
+                            <SettingGroup title="2. Vibe & Style" style="margin-top: 1rem;">
+                                <SettingRow
+                                    label="Structure"
+                                    description="The architectural form of the song"
+                                >
+                                    <select
+                                        id="gen-structure"
+                                        value={structure}
+                                        onChange={(e) => setStructure(e.target.value)}
+                                        style="min-width: 150px;"
+                                    >
+                                        {structureOptions.map((opt) => (
+                                            <option key={opt.id} value={opt.id}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </SettingRow>
+
+                                <SettingRow
+                                    label="Complexity"
+                                    description="Influences chord extensions (7ths, 9ths)"
+                                    valueDisplay={
+                                        <span
+                                            style={{
+                                                color: 'var(--accent-color)',
+                                                fontWeight: 'bold',
+                                                marginRight: '0.5rem',
+                                            }}
+                                        >
+                                            {Math.round(complexity * 100)}%
+                                        </span>
+                                    }
+                                >
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="1"
+                                        step="0.1"
+                                        value={complexity}
+                                        onInput={(e) => setComplexity(parseFloat(e.target.value))}
+                                        style="width: 100px;"
+                                    />
+                                </SettingRow>
+                            </SettingGroup>
+
+                            {/* --- ADVANCED --- */}
+                            <SettingGroup
+                                title="3. Seeds"
+                                style="margin-top: 1rem; border-bottom: none;"
+                            >
+                                <SettingRow
+                                    label="Seed from Current"
+                                    description="Use active section as a motif"
+                                >
+                                    <Toggle checked={useSeed} onChange={setUseSeed} />
+                                </SettingRow>
+
+                                {useSeed && (
+                                    <div class="animate-in" style="margin-top: 0.5rem;">
+                                        <SettingRow
+                                            label="Treat Seed as..."
+                                            description="Section type for the seed"
+                                        >
+                                            <select
+                                                id="gen-seed-type"
+                                                value={seedType}
+                                                onChange={(e) => setSeedType(e.target.value)}
+                                                style="min-width: 100px;"
+                                            >
+                                                <option value="Verse">Verse</option>
+                                                <option value="Chorus">Chorus</option>
+                                                <option value="Bridge">Bridge</option>
+                                                <option value="Intro">Intro</option>
+                                            </select>
+                                        </SettingRow>
+                                    </div>
+                                )}
+                            </SettingGroup>
+
+                            <button
+                                class="primary-btn"
+                                style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
+                                onClick={handleConfirm}
+                            >
+                                ✨ Generate New Arrangement
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
