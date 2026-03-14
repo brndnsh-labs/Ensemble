@@ -22,20 +22,23 @@ vi.mock('../../../public/ui-bridge.js', () => ({
 
 vi.mock('../../../public/state.js', () => ({
     getState: () => ({
-        arranger: { lastChordPreset: 'My Song', key: 'C' },
-        playback: { bpm: 120 },
+        arranger: { lastChordPreset: 'My Song', key: 'C', progression: [] },
+        playback: { bpm: 120, modals: { share: true } },
     }),
     dispatch: mockDispatch,
-    ACTIONS: { SET_MODAL_OPEN: 'SET_MODAL_OPEN' },
+    ACTIONS: {
+        SET_MODAL_OPEN: 'SET_MODAL_OPEN',
+        NOTIFY: 'NOTIFY',
+    },
 }));
 
 vi.mock('../../../public/midi-export.js', () => ({
     exportToMidi: mockExportToMidi,
 }));
 
-import { ExportModal } from '../../../public/components/ExportModal.jsx';
+import { ShareModal } from '../../../public/components/ShareModal.jsx';
 
-describe('ExportModal Security', () => {
+describe('ShareModal Security', () => {
     let container;
 
     beforeEach(() => {
@@ -52,7 +55,7 @@ describe('ExportModal Security', () => {
 
     it('should have maxLength attribute on filename input', () => {
         act(() => {
-            render(<ExportModal />, container);
+            render(<ShareModal />, container);
         });
 
         const input = container.querySelector('#exportFilenameInput');
@@ -60,13 +63,15 @@ describe('ExportModal Security', () => {
         expect(input.getAttribute('maxLength')).toBe('64');
     });
 
-    it('should sanitize filename before calling exportToMidi', () => {
+    it('should sanitize filename before calling exportToMidi', async () => {
         act(() => {
-            render(<ExportModal />, container);
+            render(<ShareModal />, container);
         });
 
         const input = container.querySelector('#exportFilenameInput');
-        const confirmBtn = container.querySelector('#confirmExportBtn');
+        const downloadBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+            b.textContent.includes('Download .mid'),
+        );
 
         // Simulate malicious input
         act(() => {
@@ -74,8 +79,8 @@ describe('ExportModal Security', () => {
             input.dispatchEvent(new Event('input', { bubbles: true }));
         });
 
-        act(() => {
-            confirmBtn.click();
+        await act(async () => {
+            downloadBtn.click();
         });
 
         // Expect strict sanitization - removed unsafe chars
@@ -86,7 +91,6 @@ describe('ExportModal Security', () => {
         expect(filename).not.toContain('<script>');
         expect(filename).not.toContain('../');
         expect(filename).not.toContain('/');
-        // Assuming we replace unwanted chars with nothing or sanitize them
         // Expected behavior: clean filename
         expect(filename).toMatch(/^[a-zA-Z0-9\s\-_()]+$/);
     });

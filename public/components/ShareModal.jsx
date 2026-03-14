@@ -283,10 +283,12 @@ export function ShareModal() {
                                 </p>
                                 <div class="flex-col" style="gap: 0.75rem;">
                                     <input
+                                        id="exportFilenameInput"
                                         type="text"
                                         value={filename}
                                         onInput={(e) => setFilename(e.target.value)}
                                         placeholder="Filename..."
+                                        maxLength="64"
                                         class="w-full"
                                         style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; color: var(--text-color);"
                                     />

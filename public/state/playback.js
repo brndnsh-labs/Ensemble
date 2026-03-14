@@ -115,7 +115,6 @@ export const playback = {
     modals: {
         settings: false,
         editor: false,
-        export: false,
         share: false,
         templates: false,
         analyzer: false,
