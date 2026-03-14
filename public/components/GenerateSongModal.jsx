@@ -92,7 +92,7 @@ export function GenerateSongModal() {
 
             // Set global state using available actions to trigger proper reactivity
             dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
-            
+
             // Mutate remaining non-reactive params directly, as is standard in this app
             if (newSections.length > 0) {
                 const first = newSections[0];

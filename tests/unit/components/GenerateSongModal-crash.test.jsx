@@ -15,9 +15,9 @@ vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../../public/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
 vi.mock('../../../public/conductor.js', () => ({ analyzeFormUI: vi.fn() }));
-vi.mock('../../../public/chords.js', () => ({ 
+vi.mock('../../../public/chords.js', () => ({
     validateProgression: vi.fn((cb) => cb()),
-    transformRelativeProgression: vi.fn() 
+    transformRelativeProgression: vi.fn(),
 }));
 
 describe('GenerateSongModal Crash Test', () => {
@@ -31,21 +31,21 @@ describe('GenerateSongModal Crash Test', () => {
     it('should generate song without throwing errors', async () => {
         const root = document.getElementById('app');
         render(<GenerateSongModal />, root);
-        
+
         const btn = document.querySelector('.primary-btn');
         expect(btn).not.toBeNull();
-        
+
         const consoleErrorSpy = vi.spyOn(console, 'error');
-        
+
         await btn.click();
-        
+
         // Wait for the simulated 800ms generation delay
-        await new Promise(r => setTimeout(r, 1000));
-        
+        await new Promise((r) => setTimeout(r, 1000));
+
         if (consoleErrorSpy.mock.calls.length > 0) {
             console.log('Error caught:', consoleErrorSpy.mock.calls[0]);
         }
-        
+
         expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 });
