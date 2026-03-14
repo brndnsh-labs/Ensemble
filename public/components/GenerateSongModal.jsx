@@ -15,6 +15,7 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
 export function GenerateSongModal() {
+    const { arranger } = getState();
     const dispatch = useDispatch();
     const isOpen = useEnsembleState((s) => s.playback.modals.generateSong);
     const lastInteractedId = useEnsembleState((s) => s.arranger.lastInteractedSectionId);
@@ -89,17 +90,20 @@ export function GenerateSongModal() {
 
             pushHistory();
 
-            // Perform updates via dispatcher to ensure atomic state change
-            dispatch(ACTIONS.SET_ARRANGER_CONFIG, {
-                sections: newSections,
-                key: (newSections[0]?.key !== 'Random' ? newSections[0]?.key : key) || 'C',
-                timeSignature:
-                    (newSections[0]?.timeSignature !== 'Random'
-                        ? newSections[0]?.timeSignature
-                        : timeSignature) || '4/4',
-                isMinor: isMinor,
-                isDirty: true,
-            });
+            arranger.sections = newSections;
+
+            if (newSections.length > 0) {
+                const first = newSections[0];
+                if (first.key && first.key !== 'Random') {
+                    arranger.key = first.key;
+                }
+                if (first.timeSignature && first.timeSignature !== 'Random') {
+                    arranger.timeSignature = first.timeSignature;
+                }
+            }
+
+            arranger.isMinor = isMinor;
+            arranger.isDirty = true;
 
             clearChordPresetHighlight();
             refreshArrangerUI();
