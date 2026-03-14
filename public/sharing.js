@@ -26,7 +26,9 @@ function compressBandSettings(options = {}) {
             r: parseFloat(bass.reverb.toFixed(2)),
         },
         c: {
-            e: (options.includeChords !== undefined ? options.includeChords : chords.enabled) ? 1 : 0,
+            e: (options.includeChords !== undefined ? options.includeChords : chords.enabled)
+                ? 1
+                : 0,
             s: chords.style,
             o: chords.octave,
             v: parseFloat(chords.volume.toFixed(2)),
@@ -35,7 +37,9 @@ function compressBandSettings(options = {}) {
             d: chords.density,
         },
         h: {
-            e: (options.includeHarmony !== undefined ? options.includeHarmony : harmony.enabled) ? 1 : 0,
+            e: (options.includeHarmony !== undefined ? options.includeHarmony : harmony.enabled)
+                ? 1
+                : 0,
             s: harmony.style,
             o: harmony.octave,
             v: parseFloat(harmony.volume.toFixed(2)),

@@ -145,7 +145,12 @@ export function ShareModal() {
             <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
                 <div class="modal-header-shared">
                     <h2>Share & Export</h2>
-                    <button id="closeShareBtn" class="close-btn" aria-label="Close" onClick={closeModal}>
+                    <button
+                        id="closeShareBtn"
+                        class="close-btn"
+                        aria-label="Close"
+                        onClick={closeModal}
+                    >
                         &times;
                     </button>
                 </div>
@@ -154,31 +159,52 @@ export function ShareModal() {
                     {/* --- SECTION 1: CONFIGURE CONTENT --- */}
                     <SettingGroup title="1. Configure Content">
                         <div class="instrument-selection-grid">
-                            <div class="flex-row" style="gap: 0.75rem; cursor: pointer; align-items: center;">
+                            <div
+                                class="flex-row"
+                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
+                            >
                                 <div style="flex-shrink: 0; display: flex;">
                                     <Toggle checked={includeSolo} onChange={setIncludeSolo} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">🎺 Soloist</span>
+                                <span style="font-weight: 500; white-space: nowrap;">
+                                    🎺 Soloist
+                                </span>
                             </div>
-                            <div class="flex-row" style="gap: 0.75rem; cursor: pointer; align-items: center;">
+                            <div
+                                class="flex-row"
+                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
+                            >
                                 <div style="flex-shrink: 0; display: flex;">
                                     <Toggle checked={includeBass} onChange={setIncludeBass} />
                                 </div>
                                 <span style="font-weight: 500; white-space: nowrap;">🎸 Bass</span>
                             </div>
-                            <div class="flex-row" style="gap: 0.75rem; cursor: pointer; align-items: center;">
+                            <div
+                                class="flex-row"
+                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
+                            >
                                 <div style="flex-shrink: 0; display: flex;">
                                     <Toggle checked={includeChords} onChange={setIncludeChords} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">🎹 Chords</span>
+                                <span style="font-weight: 500; white-space: nowrap;">
+                                    🎹 Chords
+                                </span>
                             </div>
-                            <div class="flex-row" style="gap: 0.75rem; cursor: pointer; align-items: center;">
+                            <div
+                                class="flex-row"
+                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
+                            >
                                 <div style="flex-shrink: 0; display: flex;">
                                     <Toggle checked={includeHarmony} onChange={setIncludeHarmony} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">🎻 Harmony</span>
+                                <span style="font-weight: 500; white-space: nowrap;">
+                                    🎻 Harmony
+                                </span>
                             </div>
-                            <div class="flex-row" style="gap: 0.75rem; cursor: pointer; align-items: center;">
+                            <div
+                                class="flex-row"
+                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
+                            >
                                 <div style="flex-shrink: 0; display: flex;">
                                     <Toggle checked={includeDrums} onChange={setIncludeDrums} />
                                 </div>
@@ -187,10 +213,14 @@ export function ShareModal() {
                         </div>
 
                         <div class="flex-col" style="gap: 0.5rem;">
-                            <SettingRow 
-                                label="Loops" 
+                            <SettingRow
+                                label="Loops"
                                 description="Number of times to repeat the arrangement"
-                                valueDisplay={<span style="color: var(--accent-color); font-weight: bold; margin-right: 0.5rem;">{durationDisplay}</span>}
+                                valueDisplay={
+                                    <span style="color: var(--accent-color); font-weight: bold; margin-right: 0.5rem;">
+                                        {durationDisplay}
+                                    </span>
+                                }
                             >
                                 <Stepper
                                     value={numLoops}
@@ -201,7 +231,10 @@ export function ShareModal() {
                                 />
                             </SettingRow>
 
-                            <SettingRow label="Resolution Ending" description="Add a final chord to resolve the song">
+                            <SettingRow
+                                label="Resolution Ending"
+                                description="Add a final chord to resolve the song"
+                            >
                                 <Toggle checked={addEnding} onChange={setAddEnding} />
                             </SettingRow>
                         </div>
@@ -215,14 +248,23 @@ export function ShareModal() {
                             <div class="help-card" style="margin: 0; padding: 1.25rem;">
                                 <h4 style="margin-bottom: 0.5rem;">🔗 Cloud Link</h4>
                                 <p class="text-mini-muted" style="margin-bottom: 1rem;">
-                                    Generates a unique URL containing your exact mixer levels and instrument choices.
+                                    Generates a unique URL containing your exact mixer levels and
+                                    instrument choices.
                                 </p>
                                 <div class="flex-row" style="gap: 0.75rem;">
-                                    <button class="primary-btn flex-1" onClick={handleCopyLink} style="padding: 0.75rem;">
+                                    <button
+                                        class="primary-btn flex-1"
+                                        onClick={handleCopyLink}
+                                        style="padding: 0.75rem;"
+                                    >
                                         Copy Link
                                     </button>
                                     {canNativeShare && (
-                                        <button class="secondary-btn" onClick={handleNativeShare} style="padding: 0.75rem;">
+                                        <button
+                                            class="secondary-btn"
+                                            onClick={handleNativeShare}
+                                            style="padding: 0.75rem;"
+                                        >
                                             📤 Share
                                         </button>
                                     )}
@@ -230,10 +272,14 @@ export function ShareModal() {
                             </div>
 
                             {/* MIDI Card */}
-                            <div class="help-card" style="margin: 0; padding: 1.25rem; border-color: rgba(var(--accent-color-rgb), 0.3);">
+                            <div
+                                class="help-card"
+                                style="margin: 0; padding: 1.25rem; border-color: rgba(var(--accent-color-rgb), 0.3);"
+                            >
                                 <h4 style="margin-bottom: 0.5rem;">🎹 DAW MIDI File</h4>
                                 <p class="text-mini-muted" style="margin-bottom: 1rem;">
-                                    Download a multi-track MIDI file for use in Logic, Ableton, or other DAWs.
+                                    Download a multi-track MIDI file for use in Logic, Ableton, or
+                                    other DAWs.
                                 </p>
                                 <div class="flex-col" style="gap: 0.75rem;">
                                     <input
