@@ -5,3 +5,7 @@
 ## 2025-02-12 - Bolt: Eliminate Map Allocations in audio-analyzer-lite.js
 **Learning:** In V8 Node environments and performance-sensitive loops, chaining methods like `Array.from(Map.entries()).map(...)` creates multiple intermediate array allocations that significantly drag down performance, especially in inner processing chunks for audio analysis. Using `.map()` on large numerical arrays (like `flux`) also incurs unnecessary closure creation and array allocation overhead.
 **Action:** Replace `Array.prototype.map()` on large number arrays with pre-allocated `Float32Array` or `Int32Array` loops. Convert `.from().map()` chains directly into explicit `for...of` loops that push to a final array to avoid temporary garbage collection spikes.
+
+## 2025-02-12 - Bolt: Eliminate Array Spread with Map in Hot Loops
+**Learning:** In performance-critical hot loops evaluating audio engine steps (such as `selectPitchAndDevices`), constructing arrays using a combination of the spread operator and `.map()` with object spread (e.g., `[...extra.map((n) => ({ ...result, ...n })), result]`) incurs a double-penalty: creating intermediate array allocations that must be immediately re-iterated by the spread operator, plus closure instantiation overhead.
+**Action:** In high-frequency generative engine paths, replace `[...arr.map(fn), item]` with a pre-allocated array via `new Array(arr.length + 1)` and a standard `for` loop to manually populate properties, eliminating both the intermediate array allocation and function execution overhead.
