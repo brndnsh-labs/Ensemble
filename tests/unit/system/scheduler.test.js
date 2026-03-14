@@ -163,6 +163,7 @@ vi.mock('../../../public/conductor.js', () => ({
     checkSectionTransition: vi.fn(),
 }));
 
+import * as Engine from '../../../public/engine/engine.js';
 import {
     scheduleChordVisuals,
     scheduleGlobalEvent,
@@ -170,7 +171,6 @@ import {
     togglePlay,
 } from '../../../public/engine/scheduler-core.js';
 import { dispatch, getState } from '../../../public/state.js';
-import * as Engine from '../../../public/engine/engine.js';
 
 const { arranger, playback, vizState, groove, midi, soloist, chords, bass, harmony } = getState();
 
@@ -327,30 +327,34 @@ describe('Scheduler Core System', () => {
         it('should handle chord sustain CC events (lines 1005-1015)', () => {
             midi.enabled = true;
             midi.selectedOutputId = 'mock';
-            const chordNotes = [{ 
-                freq: 261, 
-                velocity: 0.8, 
-                ccEvents: [{ controller: 64, value: 127, timingOffset: 0.01 }] 
-            }];
+            const chordNotes = [
+                {
+                    freq: 261,
+                    velocity: 0.8,
+                    ccEvents: [{ controller: 64, value: 127, timingOffset: 0.01 }],
+                },
+            ];
             chords.buffer.set(0, chordNotes);
-            
+
             // Trigger chord scheduling via global event
             scheduleGlobalEvent(0, 10.0);
-            
+
             expect(Engine.updateSustain).toHaveBeenCalledWith(true, expect.any(Number));
         });
 
         it('should handle harmony voice killing on chord start (lines 1043-1046)', () => {
-            const harmonyNotes = [{ 
-                freq: 440, 
-                velocity: 0.5, 
-                isChordStart: true, 
-                killFade: 0.1 
-            }];
+            const harmonyNotes = [
+                {
+                    freq: 440,
+                    velocity: 0.5,
+                    isChordStart: true,
+                    killFade: 0.1,
+                },
+            ];
             harmony.buffer.set(0, harmonyNotes);
-            
+
             scheduleGlobalEvent(0, 10.0);
-            
+
             expect(Engine.killHarmonyNote).toHaveBeenCalledWith(0.1);
             expect(Engine.playHarmonyNote).toHaveBeenCalled();
         });
@@ -358,14 +362,14 @@ describe('Scheduler Core System', () => {
         it('should push harmony and soloist visual events (lines 1083-1093)', () => {
             vizState.enabled = true;
             playback.viz = { pushNote: vi.fn(), truncateNotes: vi.fn() };
-            
+
             soloist.buffer.set(0, [{ freq: 880, velocity: 0.9, durationSteps: 4 }]);
             harmony.buffer.set(0, [{ freq: 440, velocity: 0.5, durationSteps: 4 }]);
-            
+
             scheduleGlobalEvent(0, 10.0);
-            
-            const soloistVis = playback.drawQueue.find(e => e.type === 'soloist_vis');
-            const harmonyVis = playback.drawQueue.find(e => e.type === 'harmony_vis');
+
+            const soloistVis = playback.drawQueue.find((e) => e.type === 'soloist_vis');
+            const harmonyVis = playback.drawQueue.find((e) => e.type === 'harmony_vis');
             expect(soloistVis).toBeDefined();
             expect(harmonyVis).toBeDefined();
         });
@@ -375,16 +379,16 @@ describe('Scheduler Core System', () => {
         it('should push visual flash events (lines 1198-1205)', () => {
             playback.visualFlash = true;
             groove.enabled = true;
-            
+
             // Step 0 is Measure Start (Flash intensity 0.2)
             scheduleGlobalEvent(0, 10.0);
-            const flash0 = playback.drawQueue.find(e => e.type === 'flash');
+            const flash0 = playback.drawQueue.find((e) => e.type === 'flash');
             expect(flash0.intensity).toBe(0.2);
 
             // Step 8 is Group Start in 4/4 (Flash intensity 0.15)
             playback.drawQueue.length = 0;
             scheduleGlobalEvent(8, 11.0);
-            const flash8 = playback.drawQueue.find(e => e.type === 'flash');
+            const flash8 = playback.drawQueue.find((e) => e.type === 'flash');
             expect(flash8.intensity).toBe(0.15);
         });
         it('should emit a key-updated event when playhead crosses section threshold', () => {
