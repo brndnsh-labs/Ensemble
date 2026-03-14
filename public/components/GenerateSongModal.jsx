@@ -33,9 +33,6 @@ export function GenerateSongModal() {
     const [useSeed, setUseSeed] = useState(false);
     const [seedType, setSeedType] = useState('Verse');
 
-    // UI Feedback State: 'idle' | 'generating' | 'success'
-    const [processState, setProcessState] = useState('idle');
-
     useEffect(() => {
         if (isOpen && overlayRef.current) {
             const focusable = overlayRef.current.querySelector(
@@ -44,18 +41,14 @@ export function GenerateSongModal() {
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
             }
-            // Only reset if we are coming from a closed state
-            // (processState might already be 'success' or 'generating' if we re-render)
         }
     }, [isOpen]);
 
     const close = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
-        // Reset process state only after a small delay to allow close animation
-        setTimeout(() => setProcessState('idle'), 300);
     };
 
-    const handleConfirm = async () => {
+    const handleConfirm = () => {
         if (isDirty && sections.length > 1) {
             if (!confirm('Replace current arrangement with generated song?')) {
                 return;
@@ -63,11 +56,6 @@ export function GenerateSongModal() {
         }
 
         try {
-            setProcessState('generating');
-
-            // Artificial delay for "musical deliberation"
-            await new Promise((resolve) => setTimeout(resolve, 800));
-
             let seed = null;
             if (useSeed) {
                 const section = sections.find((s) => s.id === lastInteractedId) || sections[0];
@@ -90,10 +78,8 @@ export function GenerateSongModal() {
 
             pushHistory();
 
-            // Set global state using available actions to trigger proper reactivity
             dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
 
-            // Mutate remaining non-reactive params directly, as is standard in this app
             if (newSections.length > 0) {
                 const first = newSections[0];
                 if (first.key && first.key !== 'Random') {
@@ -109,22 +95,14 @@ export function GenerateSongModal() {
 
             clearChordPresetHighlight();
             refreshArrangerUI();
-            validateAndAnalyze();
 
-            setProcessState('success');
-
-            // Auto-close after success
-            setTimeout(() => {
-                close();
-                setTimeout(() => showToast('Generated new inspiration!'), 200);
-            }, 1500);
+            showToast('✨ Arrangement Ready!');
+            close();
         } catch (e) {
             console.error('Generation failed explicitly:', e);
-            setProcessState('idle');
             showToast('Generation failed. Check console for details.');
         }
     };
-
     const structureOptions = [
         { id: 'pop', label: 'Pop 🎤', desc: 'Standard Verse-Chorus-Bridge' },
         { id: 'jazz', label: 'Jazz 🎷', desc: 'AABA Standard Form' },
@@ -133,8 +111,6 @@ export function GenerateSongModal() {
         { id: 'simple', label: 'Simple 🎵', desc: 'Basic Verse-Chorus' },
         { id: 'loop', label: 'Loop 🔄', desc: 'Short 4-Bar Phrase' },
     ];
-
-    const isProcessing = processState !== 'idle';
 
     return (
         <div
@@ -146,65 +122,12 @@ export function GenerateSongModal() {
             aria-modal="true"
             aria-labelledby="generate-song-title"
             onClick={(e) => {
-                if (e.target.id === 'generateSongOverlay' && !isProcessing) {
+                if (e.target.id === 'generateSongOverlay') {
                     close();
                 }
             }}
         >
             <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
-                {/* Processing/Success Overlay */}
-                {isProcessing && (
-                    <div
-                        class="modal-success-overlay"
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'var(--panel-color)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 100,
-                            borderRadius: '12px',
-                            textAlign: 'center',
-                            padding: '2rem',
-                        }}
-                    >
-                        <div
-                            class="animate-bounce"
-                            style={{ fontSize: '4rem', marginBottom: '1.5rem' }}
-                        >
-                            {processState === 'generating' ? '⌛' : '✨'}
-                        </div>
-                        <h2 style={{ color: 'var(--accent-color)', margin: '0 0 0.5rem 0' }}>
-                            {processState === 'generating'
-                                ? 'Harmonizing...'
-                                : 'Arrangement Ready!'}
-                        </h2>
-                        <p
-                            class="text-mini-muted"
-                            style={{ marginBottom: processState === 'success' ? '2rem' : '0' }}
-                        >
-                            {processState === 'generating'
-                                ? 'Building musical structures...'
-                                : 'Applying to your workspace...'}
-                        </p>
-
-                        {processState === 'success' && (
-                            <button
-                                class="primary-btn animate-in"
-                                onClick={close}
-                                style="padding: 0.75rem 2.5rem; font-weight: bold;"
-                            >
-                                Done
-                            </button>
-                        )}
-                    </div>
-                )}
-
                 <div class="modal-header-shared">
                     <h2 id="generate-song-title">Inspiration Hub</h2>
                     <button
@@ -212,7 +135,6 @@ export function GenerateSongModal() {
                         class="close-btn"
                         aria-label="Close"
                         onClick={close}
-                        disabled={isProcessing}
                     >
                         &times;
                     </button>
@@ -227,7 +149,6 @@ export function GenerateSongModal() {
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
                                 style="min-width: 100px;"
-                                disabled={isProcessing}
                             >
                                 <option value="Random">Random</option>
                                 <option value="C">C</option>
@@ -251,8 +172,7 @@ export function GenerateSongModal() {
                                 <Toggle
                                     checked={isMinor}
                                     onChange={setIsMinor}
-                                    disabled={isProcessing}
-                                />
+                                    />
                                 <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
                             </div>
                         </SettingRow>
@@ -263,7 +183,7 @@ export function GenerateSongModal() {
                                 value={timeSignature}
                                 onChange={(e) => setTimeSignature(e.target.value)}
                                 style="min-width: 100px;"
-                                disabled={isProcessing}
+                                
                             >
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option>
@@ -288,7 +208,7 @@ export function GenerateSongModal() {
                                 value={structure}
                                 onChange={(e) => setStructure(e.target.value)}
                                 style="min-width: 150px;"
-                                disabled={isProcessing}
+                                
                             >
                                 {structureOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>
@@ -321,7 +241,7 @@ export function GenerateSongModal() {
                                 value={complexity}
                                 onInput={(e) => setComplexity(parseFloat(e.target.value))}
                                 style="width: 100px;"
-                                disabled={isProcessing}
+                                
                             />
                         </SettingRow>
                     </SettingGroup>
@@ -335,7 +255,7 @@ export function GenerateSongModal() {
                             <Toggle
                                 checked={useSeed}
                                 onChange={setUseSeed}
-                                disabled={isProcessing}
+                                
                             />
                         </SettingRow>
 
@@ -350,7 +270,7 @@ export function GenerateSongModal() {
                                         value={seedType}
                                         onChange={(e) => setSeedType(e.target.value)}
                                         style="min-width: 100px;"
-                                        disabled={isProcessing}
+                                        
                                     >
                                         <option value="Verse">Verse</option>
                                         <option value="Chorus">Chorus</option>
@@ -366,7 +286,7 @@ export function GenerateSongModal() {
                         class="primary-btn"
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
-                        disabled={isProcessing}
+                        
                     >
                         ✨ Generate New Arrangement
                     </button>
