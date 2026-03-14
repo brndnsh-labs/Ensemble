@@ -49,6 +49,18 @@ export function GenerateSongModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
     };
 
+    // Auto-close effect when success is reached
+    useEffect(() => {
+        if (processState === 'success') {
+            const timer = setTimeout(() => {
+                close();
+                // Show toast after modal starts closing
+                setTimeout(() => showToast('Generated new inspiration!'), 200);
+            }, 1200);
+            return () => clearTimeout(timer);
+        }
+    }, [processState]);
+
     const handleConfirm = async () => {
         if (arranger.isDirty && arranger.sections.length > 1) {
             if (!confirm('Replace current arrangement with generated song?')) {
@@ -56,62 +68,61 @@ export function GenerateSongModal() {
             }
         }
 
-        setProcessState('generating');
+        try {
+            setProcessState('generating');
 
-        // Artificial delay for "musical deliberation"
-        await new Promise((resolve) => setTimeout(resolve, 800));
+            // Artificial delay for "musical deliberation"
+            await new Promise((resolve) => setTimeout(resolve, 600));
 
-        let seed = null;
-        if (useSeed) {
-            const targetId = arranger.lastInteractedSectionId;
-            const section =
-                arranger.sections.find((s) => s.id === targetId) || arranger.sections[0];
-            if (section?.value) {
-                seed = {
-                    type: seedType,
-                    value: section.value,
-                };
+            let seed = null;
+            if (useSeed) {
+                const targetId = arranger.lastInteractedSectionId;
+                const section =
+                    arranger.sections.find((s) => s.id === targetId) || arranger.sections[0];
+                if (section?.value) {
+                    seed = {
+                        type: seedType,
+                        value: section.value,
+                    };
+                }
             }
+
+            const newSections = generateSong({
+                key,
+                isMinor,
+                timeSignature,
+                structure,
+                complexity,
+                seed,
+            });
+
+            pushHistory();
+
+            arranger.sections = newSections;
+
+            if (newSections.length > 0) {
+                const first = newSections[0];
+                if (first.key && first.key !== 'Random') {
+                    arranger.key = first.key;
+                }
+                if (first.timeSignature && first.timeSignature !== 'Random') {
+                    arranger.timeSignature = first.timeSignature;
+                }
+            }
+
+            arranger.isMinor = isMinor;
+            arranger.isDirty = true;
+
+            clearChordPresetHighlight();
+            refreshArrangerUI();
+            validateAndAnalyze();
+
+            setProcessState('success');
+        } catch (e) {
+            console.error('Generation failed:', e);
+            setProcessState('idle');
+            showToast('Generation failed. Please try again.');
         }
-
-        const newSections = generateSong({
-            key,
-            isMinor,
-            timeSignature,
-            structure,
-            complexity,
-            seed,
-        });
-
-        pushHistory();
-
-        arranger.sections = newSections;
-
-        if (newSections.length > 0) {
-            const first = newSections[0];
-            if (first.key && first.key !== 'Random') {
-                arranger.key = first.key;
-            }
-            if (first.timeSignature && first.timeSignature !== 'Random') {
-                arranger.timeSignature = first.timeSignature;
-            }
-        }
-
-        arranger.isMinor = isMinor;
-        arranger.isDirty = true;
-
-        clearChordPresetHighlight();
-        refreshArrangerUI();
-        validateAndAnalyze();
-
-        setProcessState('success');
-
-        // Brief delay to show success before closing
-        setTimeout(() => {
-            close();
-            // Small extra delay before toast to ensure modal is gone
-            setTimeout(() => showToast('Generated new inspiration!'), 100);
-        }, 1000);
     };
 
     const structureOptions = [
@@ -159,25 +170,30 @@ export function GenerateSongModal() {
                             zIndex: 100,
                             borderRadius: '12px',
                             textAlign: 'center',
-                            padding: '2rem',
+                            padding: '2rem'
                         }}
                     >
-                        <div
-                            class="animate-bounce"
-                            style={{ fontSize: '4rem', marginBottom: '1.5rem' }}
-                        >
+                        <div class="animate-bounce" style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>
                             {processState === 'generating' ? '⌛' : '✨'}
                         </div>
                         <h2 style={{ color: 'var(--accent-color)', margin: '0 0 0.5rem 0' }}>
-                            {processState === 'generating'
-                                ? 'Harmonizing...'
-                                : 'Arrangement Ready!'}
+                            {processState === 'generating' ? 'Harmonizing...' : 'Arrangement Ready!'}
                         </h2>
-                        <p class="text-mini-muted">
-                            {processState === 'generating'
-                                ? 'Building musical structures...'
+                        <p class="text-mini-muted" style={{ marginBottom: processState === 'success' ? '2rem' : '0' }}>
+                            {processState === 'generating' 
+                                ? 'Building musical structures...' 
                                 : 'Applying to your workspace...'}
                         </p>
+                        
+                        {processState === 'success' && (
+                            <button 
+                                class="primary-btn animate-in" 
+                                onClick={close} 
+                                style="padding: 0.75rem 2.5rem; font-weight: bold;"
+                            >
+                                Done
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -203,6 +219,7 @@ export function GenerateSongModal() {
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
                                 style="min-width: 100px;"
+                                disabled={isProcessing}
                             >
                                 <option value="Random">Random</option>
                                 <option value="C">C</option>
@@ -223,7 +240,7 @@ export function GenerateSongModal() {
                         <SettingRow label="Key Quality" description="Major or Minor mode">
                             <div class="flex-row" style="gap: 0.5rem; align-items: center;">
                                 <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
-                                <Toggle checked={isMinor} onChange={setIsMinor} />
+                                <Toggle checked={isMinor} onChange={setIsMinor} disabled={isProcessing} />
                                 <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
                             </div>
                         </SettingRow>
@@ -234,6 +251,7 @@ export function GenerateSongModal() {
                                 value={timeSignature}
                                 onChange={(e) => setTimeSignature(e.target.value)}
                                 style="min-width: 100px;"
+                                disabled={isProcessing}
                             >
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option>
@@ -258,6 +276,7 @@ export function GenerateSongModal() {
                                 value={structure}
                                 onChange={(e) => setStructure(e.target.value)}
                                 style="min-width: 150px;"
+                                disabled={isProcessing}
                             >
                                 {structureOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>
@@ -290,6 +309,7 @@ export function GenerateSongModal() {
                                 value={complexity}
                                 onInput={(e) => setComplexity(parseFloat(e.target.value))}
                                 style="width: 100px;"
+                                disabled={isProcessing}
                             />
                         </SettingRow>
                     </SettingGroup>
@@ -300,7 +320,7 @@ export function GenerateSongModal() {
                             label="Seed from Current"
                             description="Use active section as a motif"
                         >
-                            <Toggle checked={useSeed} onChange={setUseSeed} />
+                            <Toggle checked={useSeed} onChange={setUseSeed} disabled={isProcessing} />
                         </SettingRow>
 
                         {useSeed && (
@@ -314,6 +334,7 @@ export function GenerateSongModal() {
                                         value={seedType}
                                         onChange={(e) => setSeedType(e.target.value)}
                                         style="min-width: 100px;"
+                                        disabled={isProcessing}
                                     >
                                         <option value="Verse">Verse</option>
                                         <option value="Chorus">Chorus</option>
@@ -329,6 +350,7 @@ export function GenerateSongModal() {
                         class="primary-btn"
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
+                        disabled={isProcessing}
                     >
                         ✨ Generate New Arrangement
                     </button>
