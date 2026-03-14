@@ -12,13 +12,22 @@ import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
-import { normalizeKey } from '../utils.js';
+import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
 export function GenerateSongModal() {
     const { arranger } = getState();
     const dispatch = useDispatch();
     const isOpen = useEnsembleState((s) => s.playback.modals.generateSong);
     const overlayRef = useRef(null);
+
+    // Internal component state for form values
+    const [key, setKey] = useState('Random');
+    const [isMinor, setIsMinor] = useState(false);
+    const [timeSignature, setTimeSignature] = useState('Random');
+    const [structure, setStructure] = useState('pop');
+    const [complexity, setComplexity] = useState(0.3);
+    const [useSeed, setUseSeed] = useState(false);
+    const [seedType, setSeedType] = useState('Verse');
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
@@ -30,13 +39,6 @@ export function GenerateSongModal() {
             }
         }
     }, [isOpen]);
-
-    // Internal component state for form values
-    const [key, setKey] = useState('Random');
-    const [timeSignature, setTimeSignature] = useState('Random');
-    const [structure, setStructure] = useState('pop');
-    const [useSeed, setUseSeed] = useState(false);
-    const [seedType, setSeedType] = useState('Verse');
 
     const close = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
@@ -55,11 +57,17 @@ export function GenerateSongModal() {
                 };
             } else {
                 showToast('No section found to seed from.');
-                // We'll continue anyway, just without the seed
             }
         }
 
-        const newSections = generateSong({ key, timeSignature, structure, seed });
+        const newSections = generateSong({
+            key,
+            isMinor,
+            timeSignature,
+            structure,
+            complexity,
+            seed,
+        });
 
         pushHistory();
 
@@ -81,7 +89,7 @@ export function GenerateSongModal() {
             }
         }
 
-        arranger.isMinor = false;
+        arranger.isMinor = isMinor;
         arranger.isDirty = true;
 
         clearChordPresetHighlight();
@@ -89,8 +97,17 @@ export function GenerateSongModal() {
         validateAndAnalyze();
 
         close();
-        showToast('Generated new song!');
+        showToast('Generated new inspiration!');
     };
+
+    const structureOptions = [
+        { id: 'pop', label: 'Pop 🎤', desc: 'Standard Verse-Chorus-Bridge' },
+        { id: 'jazz', label: 'Jazz 🎷', desc: 'AABA Standard Form' },
+        { id: 'blues', label: 'Blues 🎸', desc: '12-Bar Blues Form' },
+        { id: 'ballad', label: 'Ballad 🎹', desc: 'Melodic & Sentimental' },
+        { id: 'simple', label: 'Simple 🎵', desc: 'Basic Verse-Chorus' },
+        { id: 'loop', label: 'Loop 🔄', desc: 'Short 4-Bar Phrase' },
+    ];
 
     return (
         <div
@@ -108,26 +125,27 @@ export function GenerateSongModal() {
             }}
         >
             <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
-                <button
-                    class="close-modal-btn"
-                    id="closeGenerateSongBtn"
-                    aria-label="Close Generator"
-                    onClick={close}
-                >
-                    ✕
-                </button>
-                <h3 id="generate-song-title">Song Generator</h3>
+                <div class="modal-header-shared">
+                    <h2 id="generate-song-title">Inspiration Hub</h2>
+                    <button
+                        id="closeGenerateSongBtn"
+                        class="close-btn"
+                        aria-label="Close"
+                        onClick={close}
+                    >
+                        &times;
+                    </button>
+                </div>
 
-                <div class="settings-controls">
-                    <div class="settings-section">
-                        <div class="setting-item">
-                            <label htmlFor="gen-root-key" class="setting-label">
-                                Root Key
-                            </label>
+                <div class="modal-body" style="padding: 1.5rem;">
+                    {/* --- FOUNDATION --- */}
+                    <SettingGroup title="1. Foundation">
+                        <SettingRow label="Root Key" description="Starting key for the song">
                             <select
                                 id="gen-root-key"
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
+                                style="min-width: 100px;"
                             >
                                 <option value="Random">Random</option>
                                 <option value="C">C</option>
@@ -143,15 +161,22 @@ export function GenerateSongModal() {
                                 <option value="Bb">Bb</option>
                                 <option value="B">B</option>
                             </select>
-                        </div>
-                        <div class="setting-item">
-                            <label htmlFor="gen-time-sig" class="setting-label">
-                                Time Signature
-                            </label>
+                        </SettingRow>
+
+                        <SettingRow label="Key Quality" description="Major or Minor mode">
+                            <div class="flex-row" style="gap: 0.5rem; align-items: center;">
+                                <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
+                                <Toggle checked={isMinor} onChange={setIsMinor} />
+                                <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
+                            </div>
+                        </SettingRow>
+
+                        <SettingRow label="Time Signature" description="Rhythmic meter">
                             <select
                                 id="gen-time-sig"
                                 value={timeSignature}
                                 onChange={(e) => setTimeSignature(e.target.value)}
+                                style="min-width: 100px;"
                             >
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option>
@@ -162,70 +187,95 @@ export function GenerateSongModal() {
                                 <option value="7/8">7/8</option>
                                 <option value="12/8">12/8</option>
                             </select>
-                        </div>
-                        <div class="setting-item">
-                            <label htmlFor="gen-structure" class="setting-label">
-                                Structure
-                            </label>
+                        </SettingRow>
+                    </SettingGroup>
+
+                    {/* --- VIBE & STYLE --- */}
+                    <SettingGroup title="2. Vibe & Style" style="margin-top: 1rem;">
+                        <SettingRow
+                            label="Structure"
+                            description="The architectural form of the song"
+                        >
                             <select
                                 id="gen-structure"
                                 value={structure}
                                 onChange={(e) => setStructure(e.target.value)}
+                                style="min-width: 150px;"
                             >
-                                <option value="pop">Pop (Verse-Chorus-Bridge)</option>
-                                <option value="blues">12-Bar Blues</option>
-                                <option value="jazz">Jazz Standard (AABA)</option>
-                                <option value="loop">Short Loop (4 Bars)</option>
+                                {structureOptions.map((opt) => (
+                                    <option key={opt.id} value={opt.id}>
+                                        {opt.label}
+                                    </option>
+                                ))}
                             </select>
-                        </div>
+                        </SettingRow>
 
-                        <div
-                            class="setting-item"
-                            style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;"
-                        >
-                            <label
-                                htmlFor="gen-use-seed"
-                                style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;"
-                            >
-                                <input
-                                    id="gen-use-seed"
-                                    type="checkbox"
-                                    checked={useSeed}
-                                    onChange={(e) => setUseSeed(e.target.checked)}
-                                />
-                                <span class="setting-label" style="margin: 0;">
-                                    Seed from current section
+                        <SettingRow
+                            label="Complexity"
+                            description="Influences chord extensions (7ths, 9ths)"
+                            valueDisplay={
+                                <span
+                                    style={{
+                                        color: 'var(--accent-color)',
+                                        fontWeight: 'bold',
+                                        marginRight: '0.5rem',
+                                    }}
+                                >
+                                    {Math.round(complexity * 100)}%
                                 </span>
-                            </label>
-                        </div>
+                            }
+                        >
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.1"
+                                value={complexity}
+                                onInput={(e) => setComplexity(parseFloat(e.target.value))}
+                                style="width: 100px;"
+                            />
+                        </SettingRow>
+                    </SettingGroup>
+
+                    {/* --- ADVANCED --- */}
+                    <SettingGroup title="3. Seeds" style="margin-top: 1rem; border-bottom: none;">
+                        <SettingRow
+                            label="Seed from Current"
+                            description="Use active section as a motif"
+                        >
+                            <Toggle checked={useSeed} onChange={setUseSeed} />
+                        </SettingRow>
 
                         {useSeed && (
-                            <div class="setting-item animate-in">
-                                <label htmlFor="gen-seed-type" class="setting-label">
-                                    Seed as...
-                                </label>
-                                <select
-                                    id="gen-seed-type"
-                                    value={seedType}
-                                    onChange={(e) => setSeedType(e.target.value)}
+                            <div class="animate-in" style="margin-top: 0.5rem;">
+                                <SettingRow
+                                    label="Treat Seed as..."
+                                    description="Section type for the seed"
                                 >
-                                    <option value="Verse">Verse</option>
-                                    <option value="Chorus">Chorus</option>
-                                    <option value="Bridge">Bridge</option>
-                                    <option value="Intro">Intro</option>
-                                </select>
+                                    <select
+                                        id="gen-seed-type"
+                                        value={seedType}
+                                        onChange={(e) => setSeedType(e.target.value)}
+                                        style="min-width: 100px;"
+                                    >
+                                        <option value="Verse">Verse</option>
+                                        <option value="Chorus">Chorus</option>
+                                        <option value="Bridge">Bridge</option>
+                                        <option value="Intro">Intro</option>
+                                    </select>
+                                </SettingRow>
                             </div>
                         )}
-                    </div>
-                </div>
+                    </SettingGroup>
 
-                <button
-                    class="primary-btn"
-                    style="width: 100%; margin-top: 1.5rem; padding: 1rem;"
-                    onClick={handleConfirm}
-                >
-                    Generate Song
-                </button>
+                    <button
+                        class="primary-btn"
+                        style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
+                        onClick={handleConfirm}
+                    >
+                        ✨ Generate New Arrangement
+                    </button>
+                </div>
             </div>
         </div>
     );

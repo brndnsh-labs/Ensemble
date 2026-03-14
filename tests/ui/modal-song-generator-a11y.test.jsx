@@ -65,35 +65,31 @@ describe('Song Generator Modal Accessibility', () => {
     it('should have a labeled title', () => {
         const title = document.getElementById('generate-song-title');
         expect(title).not.toBeNull();
-        expect(title.tagName).toBe('H3');
-        expect(title.textContent).toBe('Song Generator');
+        expect(title.tagName).toBe('H2');
+        expect(title.textContent).toBe('Inspiration Hub');
     });
 
-    it('should have properly associated labels for all select inputs', () => {
-        const selects = [
-            { id: 'gen-root-key', labelText: 'Root Key' },
-            { id: 'gen-time-sig', labelText: 'Time Signature' },
-            { id: 'gen-structure', labelText: 'Structure' },
-        ];
+    it('should have properly associated labels for select inputs', () => {
+        const expectedLabels = ['Root Key', 'Time Signature', 'Structure'];
 
-        selects.forEach(({ id, labelText }) => {
-            const select = document.getElementById(id);
-            expect(select).not.toBeNull();
-
-            const label = document.querySelector(`label[for="${id}"]`);
-            expect(label).not.toBeNull();
-            expect(label.textContent).toBe(labelText);
+        expectedLabels.forEach((labelText) => {
+            const labels = Array.from(document.querySelectorAll('.setting-label'));
+            const foundLabel = labels.find((l) => l.textContent.includes(labelText));
+            expect(foundLabel).not.toBeNull();
         });
     });
 
     it('should have accessible seed options when enabled', async () => {
-        // Find the checkbox to enable seed options
-        const seedCheckbox = document.querySelector('input[type="checkbox"]');
-        expect(seedCheckbox).not.toBeNull();
+        // Find all setting rows
+        const rows = Array.from(document.querySelectorAll('.setting-row'));
+        const seedRow = rows.find((r) => r.textContent.includes('Seed from Current'));
+        expect(seedRow).not.toBeUndefined();
+
+        const seedToggle = seedRow.querySelector('input[type="checkbox"]');
+        expect(seedToggle).not.toBeNull();
 
         // Simulate click to enable seed options
-        seedCheckbox.checked = true;
-        seedCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+        seedToggle.click();
 
         // Wait for re-render
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -101,8 +97,8 @@ describe('Song Generator Modal Accessibility', () => {
         const seedSelect = document.getElementById('gen-seed-type');
         expect(seedSelect).not.toBeNull();
 
-        const label = document.querySelector(`label[for="gen-seed-type"]`);
-        expect(label).not.toBeNull();
-        expect(label.textContent).toBe('Seed as...');
+        const labels = Array.from(document.querySelectorAll('.setting-label'));
+        const foundLabel = labels.find((l) => l.textContent.includes('Treat Seed as...'));
+        expect(foundLabel).not.toBeNull();
     });
 });

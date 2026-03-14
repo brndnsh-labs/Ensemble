@@ -57,4 +57,31 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.click('#shareOverlay .close-btn');
         await page.waitForSelector('#shareOverlay', { state: 'hidden' });
     });
+
+    test('Inspiration Hub Modal - Layout and Actions', async ({ page }) => {
+        // Open editor first
+        await page.click('#editArrangementBtn');
+        await page.waitForSelector('#editorOverlay', { state: 'visible' });
+
+        // Open randomize menu
+        await page.click('#arrangerActionTrigger');
+        await page.click('#randomizeBtn');
+
+        // Editor should close and generator should open
+        await page.waitForSelector('#editorOverlay', { state: 'hidden' });
+        await page.waitForSelector('#generateSongOverlay', { state: 'visible' });
+
+        const generatorModal = page.locator('#generateSongOverlay .settings-content');
+        await expect(generatorModal).toBeVisible();
+
+        // Verify content
+        await expect(generatorModal).toContainText('Inspiration Hub');
+        await expect(generatorModal).toContainText('Root Key');
+        await expect(generatorModal).toContainText('Key Quality');
+        await expect(generatorModal).toContainText('Structure');
+
+        // Close modal
+        await page.click('#closeGenerateSongBtn');
+        await page.waitForSelector('#generateSongOverlay', { state: 'hidden' });
+    });
 });
