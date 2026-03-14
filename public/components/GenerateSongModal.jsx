@@ -169,10 +169,7 @@ export function GenerateSongModal() {
                         <SettingRow label="Key Quality" description="Major or Minor mode">
                             <div class="flex-row" style="gap: 0.5rem; align-items: center;">
                                 <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
-                                <Toggle
-                                    checked={isMinor}
-                                    onChange={setIsMinor}
-                                    />
+                                <Toggle checked={isMinor} onChange={setIsMinor} />
                                 <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
                             </div>
                         </SettingRow>
@@ -183,7 +180,6 @@ export function GenerateSongModal() {
                                 value={timeSignature}
                                 onChange={(e) => setTimeSignature(e.target.value)}
                                 style="min-width: 100px;"
-                                
                             >
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option>
@@ -208,7 +204,6 @@ export function GenerateSongModal() {
                                 value={structure}
                                 onChange={(e) => setStructure(e.target.value)}
                                 style="min-width: 150px;"
-                                
                             >
                                 {structureOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>
@@ -241,7 +236,6 @@ export function GenerateSongModal() {
                                 value={complexity}
                                 onInput={(e) => setComplexity(parseFloat(e.target.value))}
                                 style="width: 100px;"
-                                
                             />
                         </SettingRow>
                     </SettingGroup>
@@ -252,11 +246,7 @@ export function GenerateSongModal() {
                             label="Seed from Current"
                             description="Use active section as a motif"
                         >
-                            <Toggle
-                                checked={useSeed}
-                                onChange={setUseSeed}
-                                
-                            />
+                            <Toggle checked={useSeed} onChange={setUseSeed} />
                         </SettingRow>
 
                         {useSeed && (
@@ -270,7 +260,6 @@ export function GenerateSongModal() {
                                         value={seedType}
                                         onChange={(e) => setSeedType(e.target.value)}
                                         style="min-width: 100px;"
-                                        
                                     >
                                         <option value="Verse">Verse</option>
                                         <option value="Chorus">Chorus</option>
@@ -286,7 +275,6 @@ export function GenerateSongModal() {
                         class="primary-btn"
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
-                        
                     >
                         ✨ Generate New Arrangement
                     </button>
