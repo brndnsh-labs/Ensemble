@@ -434,7 +434,7 @@ export function getAccompanimentNotes(
     const spm = ts.beats * ts.stepsPerBeat;
 
     // --- Sustain / CC Handling ---
-    const chordIndex = arranger.progression.indexOf(chord);
+    const chordIndex = arranger.progression ? arranger.progression.indexOf(chord) : -1;
     const ccEvents = handleSustainEvents(
         step,
         measureStep,

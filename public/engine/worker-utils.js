@@ -70,7 +70,7 @@ export function safeSync(target, source, moduleName) {
  */
 export function getChordAtStep(step, cursor = null) {
     const { arranger } = getState();
-    if (arranger.totalSteps === 0) {
+    if (arranger.totalSteps === 0 || !arranger.stepMap) {
         return null;
     }
     const targetStep = step % arranger.totalSteps;
