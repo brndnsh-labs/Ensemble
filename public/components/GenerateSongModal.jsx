@@ -29,9 +29,8 @@ export function GenerateSongModal() {
     const [useSeed, setUseSeed] = useState(false);
     const [seedType, setSeedType] = useState('Verse');
 
-    // UI Feedback State
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [showSuccess, setShowSuccess] = useState(false);
+    // UI Feedback State: 'idle' | 'generating' | 'success'
+    const [processState, setProcessState] = useState('idle');
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
@@ -41,9 +40,8 @@ export function GenerateSongModal() {
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
             }
-            // Reset feedback states when opening
-            setIsGenerating(false);
-            setShowSuccess(false);
+            // Reset state when opening
+            setProcessState('idle');
         }
     }, [isOpen]);
 
@@ -58,10 +56,10 @@ export function GenerateSongModal() {
             }
         }
 
-        setIsGenerating(true);
+        setProcessState('generating');
 
         // Artificial delay for "musical deliberation"
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
         let seed = null;
         if (useSeed) {
@@ -106,14 +104,14 @@ export function GenerateSongModal() {
         refreshArrangerUI();
         validateAndAnalyze();
 
-        setIsGenerating(false);
-        setShowSuccess(true);
+        setProcessState('success');
 
         // Brief delay to show success before closing
         setTimeout(() => {
             close();
-            showToast('Generated new inspiration!');
-        }, 800);
+            // Small extra delay before toast to ensure modal is gone
+            setTimeout(() => showToast('Generated new inspiration!'), 100);
+        }, 1000);
     };
 
     const structureOptions = [
@@ -125,6 +123,8 @@ export function GenerateSongModal() {
         { id: 'loop', label: 'Loop 🔄', desc: 'Short 4-Bar Phrase' },
     ];
 
+    const isProcessing = processState !== 'idle';
+
     return (
         <div
             id="generateSongOverlay"
@@ -135,14 +135,14 @@ export function GenerateSongModal() {
             aria-modal="true"
             aria-labelledby="generate-song-title"
             onClick={(e) => {
-                if (e.target.id === 'generateSongOverlay' && !isGenerating && !showSuccess) {
+                if (e.target.id === 'generateSongOverlay' && !isProcessing) {
                     close();
                 }
             }}
         >
             <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
-                {/* Success Overlay */}
-                {showSuccess && (
+                {/* Processing/Success Overlay */}
+                {isProcessing && (
                     <div
                         class="modal-success-overlay"
                         style={{
@@ -158,12 +158,21 @@ export function GenerateSongModal() {
                             justifyContent: 'center',
                             zIndex: 100,
                             borderRadius: '12px',
-                            animation: 'fadeIn 0.3s ease-out',
+                            textAlign: 'center',
+                            padding: '2rem'
                         }}
                     >
-                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✨</div>
-                        <h2 style={{ color: 'var(--accent-color)', margin: 0 }}>Arrangement Ready!</h2>
-                        <p class="text-mini-muted">Closing in a moment...</p>
+                        <div class="animate-bounce" style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>
+                            {processState === 'generating' ? '⌛' : '✨'}
+                        </div>
+                        <h2 style={{ color: 'var(--accent-color)', margin: '0 0 0.5rem 0' }}>
+                            {processState === 'generating' ? 'Harmonizing...' : 'Arrangement Ready!'}
+                        </h2>
+                        <p class="text-mini-muted">
+                            {processState === 'generating' 
+                                ? 'Building musical structures...' 
+                                : 'Applying to your workspace...'}
+                        </p>
                     </div>
                 )}
 
@@ -174,13 +183,13 @@ export function GenerateSongModal() {
                         class="close-btn"
                         aria-label="Close"
                         onClick={close}
-                        disabled={isGenerating || showSuccess}
+                        disabled={isProcessing}
                     >
                         &times;
                     </button>
                 </div>
 
-                <div class="modal-body" style="padding: 1.5rem; position: relative;">
+                <div class="modal-body" style="padding: 1.5rem;">
                     {/* --- FOUNDATION --- */}
                     <SettingGroup title="1. Foundation">
                         <SettingRow label="Root Key" description="Starting key for the song">
@@ -189,7 +198,6 @@ export function GenerateSongModal() {
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
                                 style="min-width: 100px;"
-                                disabled={isGenerating || showSuccess}
                             >
                                 <option value="Random">Random</option>
                                 <option value="C">C</option>
@@ -210,7 +218,7 @@ export function GenerateSongModal() {
                         <SettingRow label="Key Quality" description="Major or Minor mode">
                             <div class="flex-row" style="gap: 0.5rem; align-items: center;">
                                 <span style={{ opacity: isMinor ? 0.5 : 1 }}>Major</span>
-                                <Toggle checked={isMinor} onChange={setIsMinor} disabled={isGenerating || showSuccess} />
+                                <Toggle checked={isMinor} onChange={setIsMinor} />
                                 <span style={{ opacity: isMinor ? 1 : 0.5 }}>Minor</span>
                             </div>
                         </SettingRow>
@@ -221,7 +229,6 @@ export function GenerateSongModal() {
                                 value={timeSignature}
                                 onChange={(e) => setTimeSignature(e.target.value)}
                                 style="min-width: 100px;"
-                                disabled={isGenerating || showSuccess}
                             >
                                 <option value="Random">Random</option>
                                 <option value="4/4">4/4</option>
@@ -237,13 +244,15 @@ export function GenerateSongModal() {
 
                     {/* --- VIBE & STYLE --- */}
                     <SettingGroup title="2. Vibe & Style" style="margin-top: 1rem;">
-                        <SettingRow label="Structure" description="The architectural form of the song">
+                        <SettingRow
+                            label="Structure"
+                            description="The architectural form of the song"
+                        >
                             <select
                                 id="gen-structure"
                                 value={structure}
                                 onChange={(e) => setStructure(e.target.value)}
                                 style="min-width: 150px;"
-                                disabled={isGenerating || showSuccess}
                             >
                                 {structureOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>
@@ -276,26 +285,30 @@ export function GenerateSongModal() {
                                 value={complexity}
                                 onInput={(e) => setComplexity(parseFloat(e.target.value))}
                                 style="width: 100px;"
-                                disabled={isGenerating || showSuccess}
                             />
                         </SettingRow>
                     </SettingGroup>
 
                     {/* --- ADVANCED --- */}
                     <SettingGroup title="3. Seeds" style="margin-top: 1rem; border-bottom: none;">
-                        <SettingRow label="Seed from Current" description="Use active section as a motif">
-                            <Toggle checked={useSeed} onChange={setUseSeed} disabled={isGenerating || showSuccess} />
+                        <SettingRow
+                            label="Seed from Current"
+                            description="Use active section as a motif"
+                        >
+                            <Toggle checked={useSeed} onChange={setUseSeed} />
                         </SettingRow>
 
                         {useSeed && (
                             <div class="animate-in" style="margin-top: 0.5rem;">
-                                <SettingRow label="Treat Seed as..." description="Section type for the seed">
+                                <SettingRow
+                                    label="Treat Seed as..."
+                                    description="Section type for the seed"
+                                >
                                     <select
                                         id="gen-seed-type"
                                         value={seedType}
                                         onChange={(e) => setSeedType(e.target.value)}
                                         style="min-width: 100px;"
-                                        disabled={isGenerating || showSuccess}
                                     >
                                         <option value="Verse">Verse</option>
                                         <option value="Chorus">Chorus</option>
@@ -311,9 +324,8 @@ export function GenerateSongModal() {
                         class="primary-btn"
                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                         onClick={handleConfirm}
-                        disabled={isGenerating || showSuccess}
                     >
-                        {isGenerating ? '⌛ Harmonizing...' : '✨ Generate New Arrangement'}
+                        ✨ Generate New Arrangement
                     </button>
                 </div>
             </div>
