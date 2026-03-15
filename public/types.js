@@ -116,4 +116,6 @@ export const ACTIONS = {
 
     // --- MIDI ---
     SET_MIDI_CONFIG: 'SET_MIDI_CONFIG',
+    RESTORE_GAINS: 'RESTORE_GAINS',
+    INIT_AUDIO: 'INIT_AUDIO',
 };

@@ -1,7 +1,8 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { initAudio, killSoloistNote, playSoloNote, restoreGains } from '../engine/engine.js';
-import { getState } from '../state.js';
+import { killSoloistNote, playSoloNote } from '../engine/engine.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
 import { midiToNote } from '../utils.js';
 
 /**
@@ -259,7 +260,7 @@ export function PerformanceCanvas({
         e.stopPropagation();
 
         if (!audioInitializedRef.current) {
-            initAudio();
+            dispatch(ACTIONS.INIT_AUDIO);
             const { playback } = getState();
             playback.audio?.resume();
             audioInitializedRef.current = true;

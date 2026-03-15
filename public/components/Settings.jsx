@@ -9,7 +9,6 @@ const { playback } = getState();
 
 import { applyTheme } from '../app-controller.js';
 import { APP_VERSION, MIXER_GAIN_MULTIPLIERS } from '../config.js';
-import { restoreGains } from '../engine/engine.js';
 import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
@@ -109,7 +108,7 @@ export function Settings() {
             panic();
         }
         dispatch(ACTIONS.SET_MIDI_CONFIG, { enabled });
-        restoreGains();
+        dispatch(ACTIONS.RESTORE_GAINS);
         saveCurrentState();
     };
 
@@ -459,7 +458,7 @@ export function Settings() {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             muteLocal: val,
                                         });
-                                        restoreGains();
+                                        dispatch(ACTIONS.RESTORE_GAINS);
                                         saveCurrentState();
                                     }}
                                 />

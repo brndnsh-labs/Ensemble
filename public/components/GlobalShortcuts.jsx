@@ -1,6 +1,5 @@
 import { useEffect } from 'preact/hooks';
 import { SHORTCUT_CONFIG } from '../data/shortcut-config.js';
-import { initAudio } from '../engine/engine.js';
 import { switchMeasure } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
@@ -56,7 +55,7 @@ export function GlobalShortcuts() {
                 if (document.activeElement instanceof HTMLElement) {
                     document.activeElement.blur();
                 }
-                initAudio();
+                dispatch(ACTIONS.INIT_AUDIO);
                 setTimeout(() => {
                     dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
                 }, 0);
@@ -74,7 +73,7 @@ export function GlobalShortcuts() {
                 if (document.activeElement instanceof HTMLElement) {
                     document.activeElement.blur();
                 }
-                initAudio();
+                dispatch(ACTIONS.INIT_AUDIO);
                 setTimeout(() => {
                     dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'drumPad', open: true });
                 }, 0);

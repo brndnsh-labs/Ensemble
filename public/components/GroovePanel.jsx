@@ -1,6 +1,5 @@
 import { Fragment, h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { initAudio } from '../engine/engine.js';
 import {
     cloneMeasure,
     saveDrumPreset,
@@ -85,7 +84,7 @@ export function GroovePanel({ isActiveMobile }) {
                             if (document.activeElement instanceof HTMLElement) {
                                 document.activeElement.blur();
                             }
-                            initAudio();
+                            dispatch(ACTIONS.INIT_AUDIO);
                             setTimeout(() => {
                                 dispatch(ACTIONS.SET_MODAL_OPEN, {
                                     modal: 'drumPad',

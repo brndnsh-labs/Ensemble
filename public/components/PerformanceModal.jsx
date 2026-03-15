@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../config.js';
-import { initAudio, killSoloistNote, playSoloNote, restoreGains } from '../engine/engine.js';
+import { killSoloistNote, playSoloNote } from '../engine/engine.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -26,8 +26,8 @@ export function PerformanceModal() {
 
     // Ensure routing is updated for performance mode and handle focus
     useLayoutEffect(() => {
-        initAudio();
-        restoreGains();
+        dispatch(ACTIONS.INIT_AUDIO);
+        dispatch(ACTIONS.RESTORE_GAINS);
         killSoloistNote(); // Immediate silence of any automatic phrases
 
         // Focus management: Use a multi-stage approach to ensure focus is captured
@@ -62,9 +62,9 @@ export function PerformanceModal() {
 
     // Ensure routing is updated for performance mode
     useEffect(() => {
-        restoreGains();
+        dispatch(ACTIONS.RESTORE_GAINS);
         return () => {
-            restoreGains();
+            dispatch(ACTIONS.RESTORE_GAINS);
         };
     }, []);
 
@@ -165,8 +165,8 @@ export function PerformanceModal() {
 
     // Unified trigger for both keyboard and pointer events
     const triggerNote = (midiNote, sourceKey, isLegato = false) => {
-        initAudio();
-        restoreGains();
+        dispatch(ACTIONS.INIT_AUDIO);
+        dispatch(ACTIONS.RESTORE_GAINS);
 
         const freq = 440 * 2 ** ((midiNote - 69) / 12);
         // Use a very long duration (60s) for manual performance to allow sustains

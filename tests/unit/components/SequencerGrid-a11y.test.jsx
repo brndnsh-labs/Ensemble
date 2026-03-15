@@ -41,6 +41,8 @@ vi.mock('../../../public/state.js', () => {
         dispatch: mockDispatch,
         ACTIONS: {
             STEP_TOGGLE: 'STEP_TOGGLE',
+            INIT_AUDIO: 'INIT_AUDIO',
+            RESTORE_GAINS: 'RESTORE_GAINS',
         },
         playback: {
             lastPlayingStep: 0,
@@ -68,6 +70,8 @@ vi.mock('../../../public/state.js', () => {
 vi.mock('../../../public/types.js', () => ({
     ACTIONS: {
         STEP_TOGGLE: 'STEP_TOGGLE',
+        INIT_AUDIO: 'INIT_AUDIO',
+        RESTORE_GAINS: 'RESTORE_GAINS',
     },
 }));
 
@@ -167,7 +171,7 @@ describe('SequencerGrid Accessibility', () => {
     });
 
     it('Track symbol should be keyboard accessible for auditioning', async () => {
-        const { initAudio, playDrumSound } = await import('../../../public/engine/engine.js');
+        const { playDrumSound } = await import('../../../public/engine/engine.js');
 
         render(<SequencerGrid />, container);
         const trackSymbol = container.querySelector('.track-symbol');
@@ -187,7 +191,7 @@ describe('SequencerGrid Accessibility', () => {
         trackSymbol.dispatchEvent(enterEvent);
 
         await vi.waitFor(() => {
-            expect(initAudio).toHaveBeenCalled();
+            expect(mockDispatch).toHaveBeenCalledWith('INIT_AUDIO');
             expect(playDrumSound).toHaveBeenCalledWith('Kick', expect.any(Number), 1.0);
         });
     });

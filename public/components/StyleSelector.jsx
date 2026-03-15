@@ -1,5 +1,4 @@
 import { h } from 'preact';
-import { restoreGains } from '../engine/engine.js';
 import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { ACTIONS } from '../types.js';
@@ -30,7 +29,7 @@ export function StyleSelector({ module, styles }) {
 
         syncWorker();
         flushBuffers();
-        restoreGains();
+        dispatch(ACTIONS.RESTORE_GAINS);
         saveCurrentState();
     };
 

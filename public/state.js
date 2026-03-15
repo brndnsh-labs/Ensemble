@@ -1,4 +1,5 @@
 import { MODULES } from './constants.js';
+import { initAudio, restoreGains } from './engine/engine.js';
 import { arranger, arrangerReducer, setArrangerParam } from './state/arranger.js';
 import { groove, grooveReducer, setGrooveParam } from './state/groove.js';
 import {
@@ -199,6 +200,14 @@ async function handleEffects(action, payload, context = {}) {
                 const { loadDrumPreset } = await import('./instrument-controller.js');
                 loadDrumPreset(payload.drum);
             }
+            break;
+        }
+        case ACTIONS.RESTORE_GAINS: {
+            restoreGains();
+            break;
+        }
+        case ACTIONS.INIT_AUDIO: {
+            initAudio();
             break;
         }
     }

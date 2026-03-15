@@ -2,11 +2,12 @@
 module.exports = {
     forbidden: [
         {
-          name: 'no-direct-engine-import-from-ui',
-          comment: 'UI components should not import directly from the engine. Use ui-bridge or specific controllers.',
-          severity: 'warn',
-          from: { path: '^public/components/' },
-          to: { path: '^public/engine/' }
+            name: 'no-direct-engine-import-from-ui',
+            comment:
+                'UI components should not import directly from the engine. Use ui-bridge or specific controllers.',
+            severity: 'warn',
+            from: { path: '^public/components/' },
+            to: { path: '^public/engine/' },
         },
         {
             name: 'no-circular-dependencies',
@@ -27,6 +28,6 @@ module.exports = {
             path: 'node_modules',
         },
         tsPreCompilationDeps: true,
-        progress: { type: 'cli-feedback' }
-        }
-        };
+        progress: { type: 'cli-feedback' },
+    },
+};

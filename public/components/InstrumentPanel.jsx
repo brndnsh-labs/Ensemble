@@ -1,6 +1,5 @@
 import { h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { initAudio } from '../engine/engine.js';
 import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
@@ -85,7 +84,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                                 if (document.activeElement instanceof HTMLElement) {
                                     document.activeElement.blur();
                                 }
-                                initAudio();
+                                dispatch(ACTIONS.INIT_AUDIO);
                                 setTimeout(() => {
                                     dispatch(ACTIONS.SET_MODAL_OPEN, {
                                         modal: 'performance',

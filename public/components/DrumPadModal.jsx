@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { initAudio, killDrumNote, playDrumSound, restoreGains } from '../engine/engine.js';
+import { killDrumNote, playDrumSound } from '../engine/engine.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -25,8 +25,8 @@ export function DrumPadModal() {
     const timeoutsRef = useRef({});
 
     useLayoutEffect(() => {
-        initAudio();
-        restoreGains();
+        dispatch(ACTIONS.INIT_AUDIO);
+        dispatch(ACTIONS.RESTORE_GAINS);
         killDrumNote(); // Silence automatic drums immediately
 
         if (modalRef.current) {
@@ -50,8 +50,8 @@ export function DrumPadModal() {
     };
 
     const triggerDrum = (name) => {
-        initAudio();
-        restoreGains();
+        dispatch(ACTIONS.INIT_AUDIO);
+        dispatch(ACTIONS.RESTORE_GAINS);
         const { playback } = useEnsembleState.getState();
         const time = playback.audio?.currentTime || 0;
 
