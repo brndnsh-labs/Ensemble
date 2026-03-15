@@ -1,26 +1,27 @@
+import { applyTheme, setBpm } from './app-controller.js';
 import { initAudio, restoreGains } from './engine/engine.js';
+import { togglePlay } from './engine/scheduler-core.js';
+import { loadDrumPreset } from './instrument-controller.js';
+import { initMIDI } from './midi-controller.js';
 import { ACTIONS } from './types.js';
 
 /**
  * Handle side effects for specific actions.
  * Extracted from state.js to break circular dependencies with the engine.
  */
-export async function handleEffects(action, payload, stateMap, context = {}) {
+export function handleEffects(action, payload, stateMap, context = {}) {
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
-            const { togglePlay } = await import('./engine/scheduler-core.js');
             togglePlay(payload?.viz, true);
             break;
         }
         case ACTIONS.SET_BPM: {
-            const { setBpm } = await import('./app-controller.js');
             setBpm(payload, payload?.viz, true, context.oldBpm);
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
             const { playback } = stateMap;
             if (payload.drum && !playback.isPlaying) {
-                const { loadDrumPreset } = await import('./instrument-controller.js');
                 loadDrumPreset(payload.drum);
             }
             break;
@@ -31,6 +32,13 @@ export async function handleEffects(action, payload, stateMap, context = {}) {
         }
         case ACTIONS.INIT_AUDIO: {
             initAudio(stateMap);
+            break;
+        }
+        case 'HYDRATE': {
+            applyTheme(stateMap.playback.theme);
+            if (stateMap.midi.enabled) {
+                initMIDI();
+            }
             break;
         }
     }
