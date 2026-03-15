@@ -1,0 +1,7 @@
+{
+    "*.{js,jsx,json,md}": [
+        "biome check --write --no-errors-on-unmatched",
+        "cspell --no-must-find-files"
+    ],
+    "public/**/*.{js,jsx}": ["node scripts/check-mutations.js", "npm run depcheck"]
+}

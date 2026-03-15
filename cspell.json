@@ -1,0 +1,27 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "words": [
+        "depcruise",
+        "preact",
+        "vitest",
+        "biomejs",
+        "playwright",
+        "huskey",
+        "knip",
+        "web-midi-api",
+        "ensemble",
+        "chordal",
+        "harmonies",
+        "soloist",
+        "arranger",
+        "vizState",
+        "chords",
+        "accompaniment",
+        "theory-scales",
+        "musicxml",
+        "worker-utils",
+        "synth-utils"
+    ],
+    "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
+}
