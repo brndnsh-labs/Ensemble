@@ -185,7 +185,11 @@ describe('Instrument Reducer', () => {
         });
 
         it('should alias harmonies module to harmony', () => {
-            instrumentReducer(ACTIONS.SET_PARAM, { module: 'harmonies', param: 'volume', value: 0.8 });
+            instrumentReducer(ACTIONS.SET_PARAM, {
+                module: 'harmonies',
+                param: 'volume',
+                value: 0.8,
+            });
             expect(harmony.volume).toEqual(0.8);
         });
     });
