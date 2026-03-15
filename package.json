@@ -5,7 +5,7 @@
     "license": "AGPL-3.0-only",
     "type": "module",
     "scripts": {
-        "dev": "npm run build:quiet && npx serve public -p 5173",
+        "dev": "npm run build:quiet && npx serve dist -p 5173",
         "format": "biome check --write .",
         "lint": "biome check .",
         "depcheck": "depcruise public --config .dependency-cruiser.cjs",
