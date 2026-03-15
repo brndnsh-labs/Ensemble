@@ -28,7 +28,14 @@ module.exports = {
             comment: 'This module is not used anywhere.',
             severity: 'info',
             from: { orphan: true },
-            to: {},
+            to: {
+                pathNot: [
+                    '^public/sw.js$',
+                    '^public/form-extractor.js$',
+                    '^tests/',
+                    '^scripts/',
+                ],
+            },
         },
     ],
     options: {
