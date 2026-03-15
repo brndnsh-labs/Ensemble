@@ -13,6 +13,7 @@ import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
+import { generateId } from '../utils.js';
 import { ButtonGroup, SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
 export function GenerateSongModal() {
@@ -80,15 +81,7 @@ export function GenerateSongModal() {
     };
 
     const applyTemplate = (template) => {
-        if (isDirty && sections.length > 1) {
-            if (
-                !confirm(
-                    `Apply "${template.name}" template? This will replace your current arrangement.`,
-                )
-            ) {
-                return;
-            }
-        } else if (
+        if (
             !confirm(
                 `Apply "${template.name}" template? This will replace your current arrangement.`,
             )
@@ -96,29 +89,39 @@ export function GenerateSongModal() {
             return;
         }
 
-        pushHistory();
+        try {
+            pushHistory();
 
-        const newSections = template.sections.map((s, i) => ({
-            id: `section-${Date.now()}-${i}`,
-            label: s.label,
-            value: s.value,
-            repeat: s.repeat || 1,
-        }));
+            const newSections = template.sections.map((s) => ({
+                id: generateId(),
+                label: s.label,
+                value: s.value,
+                repeat: s.repeat || 1,
+            }));
 
-        dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
+            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
 
-        arranger.isDirty = true;
-        if (template.isMinor !== undefined) {
-            arranger.isMinor = template.isMinor;
+            arranger.isDirty = true; // @direct-mutation
+            if (template.isMinor !== undefined) {
+                arranger.isMinor = template.isMinor; // @direct-mutation
+            }
+
+            clearChordPresetHighlight();
+            refreshArrangerUI();
+
+            setTimeout(() => {
+                showToast('✨ Template Applied!');
+                setHasGenerated(true);
+            }, 50);
+        } catch (e) {
+            if (e.name === 'TypeError' && e.message.includes('currentTime')) {
+                // Audio not initialized, ignore this error as it's expected if no user gesture yet
+                setHasGenerated(true);
+                return;
+            }
+            console.error('Template application failed:', e);
+            showToast('Template application failed.');
         }
-
-        clearChordPresetHighlight();
-        refreshArrangerUI();
-
-        setTimeout(() => {
-            showToast('✨ Template Applied!');
-            setHasGenerated(true);
-        }, 50);
     };
 
     const handleConfirm = () => {
@@ -166,15 +169,15 @@ export function GenerateSongModal() {
             if (newSections.length > 0) {
                 const first = newSections[0];
                 if (first.key && first.key !== 'Random') {
-                    arranger.key = first.key;
+                    arranger.key = first.key; // @direct-mutation
                 }
                 if (first.timeSignature && first.timeSignature !== 'Random') {
-                    arranger.timeSignature = first.timeSignature;
+                    arranger.timeSignature = first.timeSignature; // @direct-mutation
                 }
             }
 
-            arranger.isMinor = isMinor;
-            arranger.isDirty = true;
+            arranger.isMinor = isMinor; // @direct-mutation
+            arranger.isDirty = true; // @direct-mutation
 
             clearChordPresetHighlight();
             refreshArrangerUI();
