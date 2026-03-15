@@ -36,6 +36,7 @@ vi.mock('../../../public/state.js', () => {
             type: '',
             frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
             Q: { value: 0 },
+            gain: { value: 0, setValueAtTime: vi.fn() },
             connect: vi.fn(),
             stop: vi.fn(),
         })),
@@ -143,6 +144,39 @@ describe('Soloist Presets', () => {
 
         const filters = playback.audio.createBiquadFilter.mock.results.map((r) => r.value);
         expect(filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(800, 10);
+    });
+
+    it('should play Trumpet preset (Saw + Peaking Filter)', () => {
+        soloist.preset = 'trumpet';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Vibrato = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 1 Lowpass + 1 Peaking = 2 filters
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(2);
+        expect(soloist.activeVoices.length).toBe(1);
+    });
+
+    it('should play Saxophone preset (Saw/Tri + Breath LFO)', () => {
+        soloist.preset = 'saxophone';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Breath LFO + 1 Vibrato = 4 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
+        // 2 Bandpass filters
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(2);
+        expect(soloist.activeVoices.length).toBe(1);
+    });
+
+    it('should play Shred preset (High-gain Saw + Noise)', () => {
+        soloist.preset = 'shred';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Vibrato = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 1 Resonant filter
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
+        expect(soloist.activeVoices.length).toBe(1);
     });
 
     it('should kill active voices properly', () => {
