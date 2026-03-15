@@ -65,7 +65,7 @@ test.describe('Modals Responsiveness @ui', () => {
 
         // Open randomize menu
         await page.click('#arrangerActionTrigger');
-        await page.click('#randomizeBtn');
+        await page.click('#inspirationHubBtn');
 
         // Editor should close and generator should open
         await page.waitForSelector('#editorOverlay', { state: 'hidden' });

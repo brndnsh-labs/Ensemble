@@ -17,9 +17,6 @@ const PerformanceModal = lazy(() =>
     import('./PerformanceModal.jsx').then((m) => ({ default: m.PerformanceModal })),
 );
 const Settings = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.Settings })));
-const TemplatesModal = lazy(() =>
-    import('./TemplatesModal.jsx').then((m) => ({ default: m.TemplatesModal })),
-);
 const ManualModal = lazy(() =>
     import('./ManualModal.jsx').then((m) => ({ default: m.ManualModal })),
 );
@@ -72,7 +69,6 @@ export function Modals() {
         editorOpen,
         generateSongOpen,
         shareOpen,
-        templatesOpen,
         analyzerOpen,
         performanceOpen,
         manualOpen,
@@ -82,7 +78,6 @@ export function Modals() {
         editorOpen: s.playback.modals.editor,
         generateSongOpen: s.playback.modals.generateSong,
         shareOpen: s.playback.modals.share,
-        templatesOpen: s.playback.modals.templates,
         analyzerOpen: s.playback.modals.analyzer,
         performanceOpen: s.playback.modals.performance,
         manualOpen: s.playback.modals.manual,
@@ -95,7 +90,6 @@ export function Modals() {
             editorOpen ||
             generateSongOpen ||
             shareOpen ||
-            templatesOpen ||
             analyzerOpen ||
             performanceOpen ||
             manualOpen ||
@@ -110,7 +104,6 @@ export function Modals() {
         editorOpen,
         generateSongOpen,
         shareOpen,
-        templatesOpen,
         analyzerOpen,
         performanceOpen,
         manualOpen,
@@ -123,7 +116,6 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
             <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
             <AnimatedModalWrapper isOpen={shareOpen} component={ShareModal} />
-            <AnimatedModalWrapper isOpen={templatesOpen} component={TemplatesModal} />
             <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
             <AnimatedModalWrapper isOpen={performanceOpen} component={PerformanceModal} />
             <AnimatedModalWrapper isOpen={manualOpen} component={ManualModal} />
