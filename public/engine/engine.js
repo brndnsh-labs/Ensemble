@@ -67,6 +67,17 @@ export function initAudio(state) {
 
         // Attach the Watchdog
         audioWatchdog.attachToMaster(playback.masterGain);
+        audioWatchdog.onRecover = async (pbState, mapState) => {
+            await killAllNotes(mapState);
+            pbState.audio.close().then(() => {
+                pbState.audio = null; // @worker-mutation
+                initAudio(mapState);
+                restoreGains(mapState);
+                if (pbState.masterGain) {
+                    audioWatchdog.attachToMaster(pbState.masterGain);
+                }
+            });
+        };
         audioWatchdog.start();
 
         playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation

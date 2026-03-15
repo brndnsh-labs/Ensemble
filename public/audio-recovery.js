@@ -1,4 +1,3 @@
-import { initAudio, killAllNotes, restoreGains } from './engine/engine.js';
 import { getState, stateMap } from './state.js';
 
 /**
@@ -18,6 +17,7 @@ class AudioHealthMonitor {
         this.dataBuffer = null;
         this.crashCount = 0;
         this.isRecovering = false;
+        this.onRecover = null;
     }
 
     start() {
@@ -128,32 +128,16 @@ class AudioHealthMonitor {
             }
         }
 
-        // 2. Kill all note scheduling
-        await killAllNotes(stateMap);
-
-        // 3. Re-initialize the audio graph (recreates Master, EQ, Limiters)
-        // We call initAudio to rebuild the graph.
-        try {
-            // Force recreation of the graph nodes
-            playback.audio.close().then(async () => {
-                playback.audio = null; // @worker-mutation // Clear reference
-                initAudio(stateMap); // Rebuild from scratch
-
-                // 4. Restore levels
-                restoreGains(stateMap);
-
-                // 5. Re-attach watchdog
-                if (playback.masterGain) {
-                    this.attachToMaster(playback.masterGain);
-                }
-
-                console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
-                this.isRecovering = false;
-            });
-        } catch {
-            console.error('[AudioWatchdog] DSP Reset Failed');
-            this.isRecovering = false;
+        if (this.onRecover) {
+            try {
+                await this.onRecover(playback, stateMap);
+            } catch (e) {
+                console.error('[AudioWatchdog] DSP Reset Callback Failed', e);
+            }
         }
+
+        this.isRecovering = false;
+        console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
     }
 
     triggerFullRestart() {
