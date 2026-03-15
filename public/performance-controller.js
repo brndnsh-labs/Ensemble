@@ -4,7 +4,6 @@ import {
     killSoloistNote,
     playDrumSound,
     playSoloNote,
-    restoreGains,
 } from './engine/engine.js';
 import { stateMap } from './state.js';
 
@@ -41,9 +40,4 @@ export function triggerDrumSound(name, time, velocity) {
 
 export function stopDrums() {
     killDrumNote(stateMap);
-}
-
-export function ensureEngineReady() {
-    initAudio(stateMap);
-    restoreGains(stateMap);
 }

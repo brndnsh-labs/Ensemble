@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { audioWatchdog } from '../../../public/audio-recovery.js';
+import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
 import { _resetChromiumCheck, getVisualTime, initAudio } from '../../../public/engine/engine.js';
 
 // Mock state.js

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractForm } from '../../public/form-extractor.js';
+import { extractForm } from '../utils/form-extractor.js';
 
 // Helper to generate beat data from a chord string
 // Format: "C | F | G | C" (each chord is 1 measure = 4 beats)

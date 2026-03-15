@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractForm } from '../../public/form-extractor.js';
+import { extractForm } from '../utils/form-extractor.js';
 
 describe('Form Extractor: Consensus Healing', () => {
     it('should heal a mis-detected chord in a repeating section', () => {

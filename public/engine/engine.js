@@ -1,7 +1,7 @@
-import { audioWatchdog } from '../audio-recovery.js';
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
+import { audioWatchdog } from './audio-recovery.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
 import {

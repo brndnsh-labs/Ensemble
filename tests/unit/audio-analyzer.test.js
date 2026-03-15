@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
-import { extractForm } from '../../public/form-extractor.js';
+import { extractForm } from '../utils/form-extractor.js';
 
 class MockAudioBuffer {
     constructor({ length, sampleRate }) {

@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { audioWatchdog } from '../../../public/audio-recovery.js';
+import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
 import * as Engine from '../../../public/engine/engine.js';
 import {
     activateWakeLock,

@@ -7,7 +7,7 @@ import { dispatch, getState, storage } from '../../public/state.js';
 
 const { arranger, playback, chords, bass, soloist, groove } = getState();
 
-import { audioWatchdog } from '../../public/audio-recovery.js';
+import { audioWatchdog } from '../../public/engine/audio-recovery.js';
 import { initAudio } from '../../public/engine/engine.js';
 import { scheduleGlobalEvent } from '../../public/engine/scheduler-core.js';
 import { getTimerWorker, initWorker } from '../../public/worker-client.js';

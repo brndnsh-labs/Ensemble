@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { ChordAnalyzerLite } from '../../public/audio-analyzer-lite.js';
-import { extractForm } from '../../public/form-extractor.js';
+import { extractForm } from '../utils/form-extractor.js';
 
 const filePath = process.argv[2] || 'tests/resources/12 Bar Blues with bass.m4a';
 

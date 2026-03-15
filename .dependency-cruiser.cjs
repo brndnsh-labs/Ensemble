@@ -29,7 +29,7 @@ module.exports = {
             severity: 'info',
             from: { orphan: true },
             to: {
-                pathNot: ['^public/sw.js$', '^public/form-extractor.js$', '^tests/', '^scripts/'],
+                pathNot: ['^public/sw.js$', '^tests/', '^scripts/'],
             },
         },
     ],

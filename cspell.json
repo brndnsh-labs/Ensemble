@@ -86,7 +86,11 @@
         "playhead",
         "reharmonize",
         "Afrobeat",
-        "Accomp"
+        "Accomp",
+        "acodec",
+        "chromagram",
+        "Chromagram",
+        "AABA"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
