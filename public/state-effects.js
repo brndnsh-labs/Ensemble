@@ -5,9 +5,7 @@ import { ACTIONS } from './types.js';
  * Handle side effects for specific actions.
  * Extracted from state.js to break circular dependencies with the engine.
  */
-export async function handleEffects(action, payload, context = {}) {
-    const { stateMap } = await import('./state.js');
-
+export async function handleEffects(action, payload, stateMap, context = {}) {
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
             const { togglePlay } = await import('./engine/scheduler-core.js');
