@@ -36,8 +36,7 @@ const messageQueue = [];
 // Ensure we resume processing messages after an export completes
 setOnExportEnd(() => processMessageQueue());
 
-function fillBuffers(currentStep, requestTimestamp = null, processStartTime = null) {
-    const state = getState();
+function fillBuffers(state, currentStep, requestTimestamp = null, processStartTime = null) {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
     const targetStep = currentStep + LOOKAHEAD;
     const notesToMain = [];
@@ -129,7 +128,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                 }
             }
 
-            const result = applyGrooveOverrides(getState(), {
+            const result = applyGrooveOverrides(state, {
                 step,
                 inst,
                 stepVal,
@@ -323,7 +322,8 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
 }
 
 function processMessage(type, data, startTime) {
-    const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
+    const state = getState();
+    const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
     try {
         switch (type) {
             case WORKER_MSG.START:
@@ -332,7 +332,7 @@ function processMessage(type, data, startTime) {
                         const startTime = performance.now();
                         postMessage({ type: WORKER_RESP.TICK });
                         const s = playback.step;
-                        fillBuffers(s, null, startTime);
+                        fillBuffers(state, s, null, startTime);
                     }, interval);
                 }
                 break;
@@ -373,7 +373,7 @@ function processMessage(type, data, startTime) {
                 }
                 break;
             case WORKER_MSG.REQUEST_BUFFER:
-                fillBuffers(data.step, data.requestTimestamp, startTime);
+                fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
             case WORKER_MSG.FLUSH:
                 if (data.syncData) {
@@ -435,18 +435,18 @@ function processMessage(type, data, startTime) {
                 compingState.lockedUntil = 0;
                 compingState.rhythmPattern = [];
                 if (data.primeSteps > 0) {
-                    handlePrime(data.primeSteps);
+                    handlePrime(state, data.primeSteps);
                 }
-                fillBuffers(data.step, data.requestTimestamp, startTime);
+                fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
             case WORKER_MSG.PRIME:
-                handlePrime(data);
+                handlePrime(state, data);
                 break;
             case WORKER_MSG.RESOLUTION:
-                handleResolution(data.step, data.requestTimestamp, startTime);
+                handleResolution(state, data.step, data.requestTimestamp, startTime);
                 break;
             case WORKER_MSG.EXPORT:
-                handleExport(data);
+                handleExport(state, data);
                 break;
         }
     } catch (err) {
@@ -476,8 +476,7 @@ if (typeof self !== 'undefined') {
     };
 }
 
-export function handleResolution(step, requestTimestamp = null, processStartTime = null) {
-    const state = getState();
+export function handleResolution(state, step, requestTimestamp = null, processStartTime = null) {
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
@@ -507,8 +506,8 @@ export function handleResolution(step, requestTimestamp = null, processStartTime
     });
 }
 
-function handlePrime(steps) {
-    const { soloist, arranger, playback, bass } = getState();
+function handlePrime(state, steps) {
+    const { soloist, arranger, playback, bass } = state;
     if (!soloist.enabled || arranger.totalSteps === 0) {
         return;
     }

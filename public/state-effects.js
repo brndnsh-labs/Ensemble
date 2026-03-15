@@ -10,9 +10,10 @@ import { ACTIONS } from './types.js';
  * Extracted from state.js to break circular dependencies with the engine.
  */
 export function handleEffects(action, payload, stateMap, context = {}) {
+    const { dispatch } = context;
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
-            togglePlay(payload?.viz, true);
+            togglePlay(stateMap, payload?.viz, true, dispatch);
             break;
         }
         case ACTIONS.SET_BPM: {

@@ -24,7 +24,6 @@ import {
     unlockAudio,
 } from '../platform.js';
 import { getSoloistNote } from '../soloist.js';
-import { dispatch, getState, stateMap } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -83,11 +82,13 @@ initPlatform();
  * Handles audio context suspension/resumption, worker synchronization,
  * and global state updates for starting or stopping the engine.
  *
+ * @param {Object} state - Global ensemble state.
  * @param {Object} [viz] - Optional visualizer instance override.
  * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
+ * @param {Function} [dispatch] - State dispatch function.
  */
-export function togglePlay(viz, fromDispatch = false) {
-    const { playback, arranger, chords } = stateMap;
+export function togglePlay(state, viz, fromDispatch = false, dispatch = null) {
+    const { playback, arranger, chords } = state;
     const activeViz = viz || playback.viz;
 
     // Determine if we are STARTING or STOPPING based on current state.
@@ -110,13 +111,17 @@ export function togglePlay(viz, fromDispatch = false) {
         chords.scheduledChordIndex = null; // @direct-mutation
         playback.resolutionTriggered = false; // @direct-mutation
         playback.isScheduling = false; // @direct-mutation
-        dispatch(ACTIONS.SET_ENDING_PENDING, false);
-        dispatch(ACTIONS.SET_STOP_AT_END, false);
+        if (dispatch) {
+            dispatch(ACTIONS.SET_ENDING_PENDING, false);
+            dispatch(ACTIONS.SET_STOP_AT_END, false);
+        }
         if (activeViz) {
             activeViz.clear();
         }
-        dispatch('VIS_RESET');
-        killAllNotes(stateMap);
+        if (dispatch) {
+            dispatch('VIS_RESET');
+        }
+        killAllNotes(state);
         panic(true); // Full MIDI reset
         sendMIDITransport('stop', playback.audio?.currentTime || 0);
         flushBuffers();
@@ -127,6 +132,7 @@ export function togglePlay(viz, fromDispatch = false) {
             }
             playback.suspendTimeout = setTimeout(() => {
                 // @direct-mutation
+                // @direct-mutation
                 if (!playback.isPlaying && playback.audio.state === 'running') {
                     playback.audio.suspend();
                 }
@@ -136,7 +142,7 @@ export function togglePlay(viz, fromDispatch = false) {
         if (playback.suspendTimeout) {
             clearTimeout(playback.suspendTimeout);
         }
-        initAudio(stateMap);
+        initAudio(state);
 
         if (playback.audio && playback.audio.state === 'suspended') {
             playback.audio.resume();
@@ -155,14 +161,16 @@ export function togglePlay(viz, fromDispatch = false) {
         playback.resolutionTriggered = false; // @direct-mutation
         playback.isScheduling = false; // @direct-mutation
         chords.scheduledChordIndex = 0; // @direct-mutation
-        dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
-        dispatch(ACTIONS.SET_ENDING_PENDING, false);
+        if (dispatch) {
+            dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
+            dispatch(ACTIONS.SET_ENDING_PENDING, false);
+        }
         syncWorker();
         const primeSteps = arranger.totalSteps > 0 ? arranger.totalSteps * 2 : 0;
         flushBuffers(primeSteps);
 
         unlockAudio();
-        restoreGains(stateMap);
+        restoreGains(state);
         const startTime = playback.audio.currentTime + 0.1;
         playback.nextNoteTime = startTime; // @direct-mutation
         playback.unswungNextNoteTime = startTime; // @direct-mutation
@@ -182,12 +190,12 @@ export function togglePlay(viz, fromDispatch = false) {
         sendMIDITransport('start', startTime);
 
         startWorker();
-        scheduler();
+        scheduler(state, dispatch);
     }
 }
 
-function triggerResolution(time) {
-    const { playback, bass, soloist, chords, harmony, groove } = stateMap;
+function triggerResolution(state, time, dispatch) {
+    const { playback, bass, soloist, chords, harmony, groove } = state;
 
     // 0. Clear all buffers to prevent "double hits" from pre-fetched notes
     // The worker might have already sent normal notes for the wrap-around step.
@@ -204,12 +212,12 @@ function triggerResolution(time) {
     // The worker-client already handles incoming 'notes' and puts them in buffers.
     // We just need to wait a few ms and then schedule them.
     setTimeout(() => {
-        scheduleResolution(time);
+        scheduleResolution(state, time, dispatch);
     }, 50);
 }
 
-function scheduleResolution(time) {
-    const { playback, bass, soloist, chords, harmony, groove } = getState();
+function scheduleResolution(state, time, dispatch) {
+    const { playback, bass, soloist, chords, harmony, groove } = state;
     // Schedule the final resolution measure (Tonic chord, Kick+Crash, etc.)
     const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
     const spb = 60.0 / effectiveBpm;
@@ -221,19 +229,19 @@ function scheduleResolution(time) {
     const dummyChordData = { chord: { freqs: [] } };
 
     if (bass.enabled) {
-        scheduleBass(dummyChordData, playback.step, time);
+        scheduleBass(state, dummyChordData, playback.step, time);
     }
     if (soloist.enabled) {
-        scheduleSoloist(dummyChordData, playback.step, time, time);
+        scheduleSoloist(state, dummyChordData, playback.step, time, time);
     }
     if (chords.enabled) {
-        scheduleChords(dummyChordData, playback.step, time);
+        scheduleChords(state, dummyChordData, playback.step, time);
     }
     if (harmony.enabled) {
-        scheduleHarmonies(dummyChordData, playback.step, time);
+        scheduleHarmonies(state, dummyChordData, playback.step, time);
     }
     if (groove.enabled) {
-        scheduleDrumsFromBuffer(playback.step, time);
+        scheduleDrumsFromBuffer(state, playback.step, time);
     }
 
     // 2. Add a final flash
@@ -245,7 +253,7 @@ function scheduleResolution(time) {
     setTimeout(
         () => {
             if (playback.isPlaying) {
-                updateSustain(stateMap, false);
+                updateSustain(state, false);
             }
         },
         6 * spb * 1000,
@@ -253,7 +261,7 @@ function scheduleResolution(time) {
 
     // 4. Stop playback after the full ring-out (2 bars)
     setTimeout(() => {
-        if (playback.isPlaying) {
+        if (playback.isPlaying && dispatch) {
             dispatch(ACTIONS.TOGGLE_PLAY);
         }
     }, measureDuration * 1000);
@@ -263,9 +271,12 @@ function scheduleResolution(time) {
  * Main scheduling loop.
  * Looks ahead by `playback.scheduleAheadTime` and schedules notes for all enabled instruments.
  * Handles count-in, session timing, and resolution triggers.
+ *
+ * @param {Object} state - Global ensemble state.
+ * @param {Function} [dispatch] - State dispatch function.
  */
-export function scheduler() {
-    const { playback, groove, arranger } = getState();
+export function scheduler(state, dispatch) {
+    const { playback, groove, arranger } = state;
     if (playback.isScheduling || !playback.isPlaying) {
         return;
     }
@@ -275,7 +286,7 @@ export function scheduler() {
         requestBuffer(playback.step);
 
         // Update genre UI (countdowns)
-        if (groove.pendingGenreFeel) {
+        if (groove.pendingGenreFeel && dispatch) {
             const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
             const stepsRemaining = stepsPerMeasure - (playback.step % stepsPerMeasure);
             const beatsRemaining = Math.ceil(stepsRemaining / 4);
@@ -283,34 +294,21 @@ export function scheduler() {
             if (groove.genreSwitchCountdown !== beatsRemaining) {
                 dispatch(ACTIONS.SET_GENRE_COUNTDOWN, beatsRemaining);
             }
-        } else if (groove.genreSwitchCountdown !== null) {
+        } else if (groove.genreSwitchCountdown !== null && dispatch) {
             dispatch(ACTIONS.SET_GENRE_COUNTDOWN, null);
         }
 
         while (playback.nextNoteTime < playback.audio.currentTime + playback.scheduleAheadTime) {
-            console.log('DEBUG loop:', {
-                step: playback.step,
-                totalSteps: arranger.totalSteps,
-                isEndingPending: playback.isEndingPending,
-                isCountingIn: !!playback.isCountingIn,
-                pendingGenre: !!groove.pendingGenreFeel,
-            });
             if (playback.isCountingIn) {
-                scheduleCountIn(playback.countInBeat, playback.nextNoteTime);
-                advanceCountIn();
+                scheduleCountIn(state, playback.countInBeat, playback.nextNoteTime);
+                advanceCountIn(state);
             } else {
                 const spm = getStepsPerMeasure(arranger.timeSignature);
-                console.log('DEBUG loop check:', {
-                    step: playback.step,
-                    spm,
-                    mod: playback.step % spm,
-                    pending: !!groove.pendingGenreFeel,
-                });
 
                 // --- Session Timer Check ---
                 if (playback.songMode && playback.sessionTimer > 0 && !playback.isEndingPending) {
                     const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
-                    if (elapsedMins >= playback.sessionTimer) {
+                    if (elapsedMins >= playback.sessionTimer && dispatch) {
                         dispatch(ACTIONS.SET_ENDING_PENDING, true);
                     }
                 }
@@ -322,7 +320,7 @@ export function scheduler() {
 
                     // --- Loop Limit Check ---
                     if (playback.songMode && playback.loopLimit > 0 && !playback.isEndingPending) {
-                        if (playback.currentLoopCount >= playback.loopLimit) {
+                        if (playback.currentLoopCount >= playback.loopLimit && dispatch) {
                             dispatch(ACTIONS.SET_ENDING_PENDING, true);
                         }
                     }
@@ -335,30 +333,28 @@ export function scheduler() {
                         if (!playback.resolutionTriggered) {
                             playback.resolutionTriggered = true; // @direct-mutation
                             playback.stopAtEnd = false; // @direct-mutation
-                            triggerResolution(playback.nextNoteTime);
+                            triggerResolution(state, playback.nextNoteTime, dispatch);
                         }
                         return; // Stop scheduling
                     }
                 }
 
                 if (playback.step % spm === 0 && groove.pendingGenreFeel) {
-                    applyPendingGenre();
+                    applyPendingGenre(state);
                 }
 
-                scheduleGlobalEvent(playback.step, playback.nextNoteTime);
-                advanceGlobalStep();
+                scheduleGlobalEvent(state, playback.step, playback.nextNoteTime, dispatch);
+                advanceGlobalStep(state);
             }
         }
     } finally {
-        const { playback: pb } = getState();
-        pb.isScheduling = false;
+        playback.isScheduling = false; // @direct-mutation
     }
 }
 
-function applyPendingGenre() {
-    const { groove, playback } = getState();
+function applyPendingGenre(state) {
+    const { groove, playback } = state;
     const payload = groove.pendingGenreFeel;
-    console.log('DEBUG applyPendingGenre:', { payload });
     if (!payload) {
         return;
     }
@@ -382,12 +378,12 @@ function applyPendingGenre() {
 
     playback.nextNoteTime = playback.unswungNextNoteTime; // @direct-mutation
 
-    syncAndFlushWorker(playback.step);
+    syncAndFlushWorker(state, playback.step);
     triggerFlash(0.15);
 }
 
-function advanceCountIn() {
-    const { playback, arranger } = getState();
+function advanceCountIn(state) {
+    const { playback, arranger } = state;
     const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
     const beatDuration = 60.0 / effectiveBpm;
     playback.nextNoteTime += beatDuration;
@@ -400,8 +396,8 @@ function advanceCountIn() {
     }
 }
 
-function scheduleCountIn(beat, time) {
-    const { playback, arranger, soloist } = stateMap;
+function scheduleCountIn(state, beat, time) {
+    const { playback, arranger, soloist } = state;
     if (playback.visualFlash) {
         playback.drawQueue.push({ type: 'flash', time: time, intensity: 0.3, beat: 1 });
     }
@@ -470,7 +466,7 @@ function scheduleCountIn(beat, time) {
             const duration = (res.durationSteps || 4) * 0.25 * (60.0 / playback.bpm);
 
             playSoloNote(
-                stateMap,
+                state,
                 freq,
                 time,
                 duration,
@@ -492,8 +488,8 @@ function scheduleCountIn(beat, time) {
     }
 }
 
-function advanceGlobalStep() {
-    const { playback, groove, arranger } = stateMap;
+function advanceGlobalStep(state) {
+    const { playback, groove, arranger } = state;
     updateLarsTempo(playback.step);
     const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
     const sixteenth = 0.25 * (60.0 / effectiveBpm);
@@ -536,8 +532,8 @@ function advanceGlobalStep() {
     playback.step++; // @direct-mutation
 }
 
-function getChordAtStep(step) {
-    const { arranger, chords } = stateMap;
+function getChordAtStep(state, step) {
+    const { arranger, chords } = state;
     if (arranger.totalSteps === 0) {
         return null;
     }
@@ -564,16 +560,11 @@ function getChordAtStep(step) {
  * Schedules drum sounds for a specific step.
  * Applies pocket/timing offsets, handles fills, and pushes events to the visualizer queue.
  *
- * @param {number} step - The local drum loop step (0-15 etc).
- * @param {number} time - The AudioContext time to play.
- * @param {boolean} isDownbeat - Whether this step is the start of a measure.
- * @param {boolean} isQuarter - Whether this step is a beat start.
- * @param {boolean} isBackbeat - Whether this step is a backbeat (2 or 4).
- * @param {number} absoluteStep - The global session step.
- * @param {boolean} isGroupStart - Whether this step is the start of a rhythm group.
- * @param {string} sectionId - The ID of the current song section.
+ * @param {Object} state - Global ensemble state.
+ * @param {Object} params - Drum parameters.
+ * @param {Function} [dispatch] - State dispatch function.
  */
-function scheduleDrums(params) {
+function scheduleDrums(state, params, dispatch = null) {
     const {
         step,
         time,
@@ -591,7 +582,7 @@ function scheduleDrums(params) {
         isTurnaround,
     } = params;
 
-    const { playback, groove, vizState, midi, arranger } = stateMap;
+    const { playback, groove, vizState, midi, arranger } = state;
 
     // PERFORMANCE MODE: Skip automatic drums if manual pad is active
     if (playback.modals?.drumPad) {
@@ -606,9 +597,17 @@ function scheduleDrums(params) {
     if (groove.fillActive) {
         const fillStep = absoluteStep - groove.fillStartStep;
         if (fillStep >= groove.fillLength) {
-            dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });
+            if (dispatch) {
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'groove',
+                    param: 'fillActive',
+                    value: false,
+                });
+            } else {
+                groove.fillActive = false; // @direct-mutation
+            }
             if (groove.pendingCrash) {
-                playDrumSound(stateMap, 'Crash', finalTime, 1.1 * conductorVel);
+                playDrumSound(state, 'Crash', finalTime, 1.1 * conductorVel);
                 groove.pendingCrash = false; // @direct-mutation
             }
         }
@@ -628,7 +627,7 @@ function scheduleDrums(params) {
                         });
                     }
                     notes.forEach((note) => {
-                        playDrumSound(stateMap, note.name, finalTime, note.vel * conductorVel);
+                        playDrumSound(state, note.name, finalTime, note.vel * conductorVel);
 
                         if (vizState.enabled && playback.viz) {
                             const midiNum = DRUM_VIS_PITCHES[note.name] || 36;
@@ -664,7 +663,7 @@ function scheduleDrums(params) {
                 stepVal = varInst[step];
             }
         }
-        const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides(stateMap, {
+        const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides(state, {
             step: absoluteStep,
             inst,
             stepVal,
@@ -686,7 +685,7 @@ function scheduleDrums(params) {
 
         if (shouldPlay && !inst.muted) {
             const playTime = finalTime + instTimeOffset;
-            playDrumSound(stateMap, soundName, playTime, velocity * conductorVel);
+            playDrumSound(state, soundName, playTime, velocity * conductorVel);
 
             if (vizState.enabled && playback.viz) {
                 const midiNum = DRUM_VIS_PITCHES[soundName] || 36;
@@ -712,11 +711,12 @@ function scheduleDrums(params) {
 /**
  * Schedules drum notes directly from the worker buffer (for Resolution or pattern playback).
  *
+ * @param {Object} state - Global ensemble state.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-function scheduleDrumsFromBuffer(step, time) {
-    const { groove, playback, vizState, midi } = stateMap;
+function scheduleDrumsFromBuffer(state, step, time) {
+    const { groove, playback, vizState, midi } = state;
 
     // PERFORMANCE MODE: Skip automatic drums if manual pad is active
     if (playback.modals?.drumPad) {
@@ -733,7 +733,7 @@ function scheduleDrumsFromBuffer(step, time) {
             const { name, velocity, timingOffset } = n;
             const playTime = time + (timingOffset || 0);
 
-            playDrumSound(stateMap, name, playTime, velocity * conductorVel);
+            playDrumSound(state, name, playTime, velocity * conductorVel);
 
             if (vizState.enabled && playback.viz) {
                 const midiNum = DRUM_VIS_PITCHES[name] || 36;
@@ -754,12 +754,13 @@ function scheduleDrumsFromBuffer(step, time) {
 /**
  * Schedules bass notes from the worker buffer.
  *
+ * @param {Object} state - Global ensemble state.
  * @param {Object} chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-function scheduleBass(chordData, step, time) {
-    const { bass, playback, vizState, midi } = getState();
+function scheduleBass(state, chordData, step, time) {
+    const { bass, playback, vizState, midi } = state;
     const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
 
@@ -794,7 +795,7 @@ function scheduleBass(chordData, step, time) {
                         duration,
                     });
                 }
-                playBassNote(stateMap, freq, adjustedTime, duration, finalVel, muted);
+                playBassNote(state, freq, adjustedTime, duration, finalVel, muted);
                 if (!muted) {
                     // Bass is strictly monophonic, so we force Mono mode to kill previous notes
                     sendMIDINote(
@@ -815,22 +816,18 @@ function scheduleBass(chordData, step, time) {
  * Schedules soloist (melody) notes from the worker buffer.
  * Handles monophonic/polyphonic modes, bends, and MIDI output.
  *
+ * @param {Object} state - Global ensemble state.
  * @param {Object} chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time (swung).
  * @param {number} unswungTime - The AudioContext time (linear/unswung) for strict quantization.
  */
-function scheduleSoloist(chordData, step, _time, unswungTime) {
-    const { soloist, playback, vizState, midi } = getState();
+function scheduleSoloist(state, chordData, step, _time, unswungTime) {
+    const { soloist, playback, vizState, midi } = state;
     const notes = soloist.buffer.get(step);
     soloist.buffer.delete(step);
 
     if (notes && notes.length > 0) {
-        if (playback.debugSoloist) {
-            console.log(
-                `[Soloist Debug] Step ${step}: Scheduling ${notes.length} notes from buffer`,
-            );
-        }
         // Optimization: Avoid allocation if we only play one note (Common case)
         let notesToPlay = notes;
         if (soloist.mode === 'monophonic' && notes.length > 1) {
@@ -874,7 +871,7 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                 const playTime = unswungTime + offsetS;
 
                 playSoloNote(
-                    stateMap,
+                    state,
                     freq,
                     playTime,
                     duration,
@@ -933,8 +930,8 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
     }
 }
 
-export function scheduleChordVisuals(chordData, t) {
-    const { playback } = getState();
+export function scheduleChordVisuals(state, chordData, t) {
+    const { playback } = state;
     if (chordData.stepInChord === 0) {
         const freqs = chordData.chord.freqs;
         const fLen = freqs.length;
@@ -964,12 +961,13 @@ export function scheduleChordVisuals(chordData, t) {
  * Schedules chord notes from the worker buffer.
  * Handles sustain pedal events (MIDI CC 64).
  *
+ * @param {Object} state - Global ensemble state.
  * @param {Object} chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-function scheduleChords(_chordData, step, time) {
-    const { chords, playback, midi } = getState();
+function scheduleChords(state, _chordData, step, time) {
+    const { chords, playback, midi } = state;
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
 
@@ -1001,7 +999,7 @@ function scheduleChords(_chordData, step, time) {
                     if (cc.controller === 64) {
                         const isSustain = cc.value >= 64;
                         const ccTime = playTime + (cc.timingOffset || 0);
-                        updateSustain(stateMap, isSustain, ccTime);
+                        updateSustain(state, isSustain, ccTime);
                         sendMIDICC(midi.chordsChannel, 64, cc.value, ccTime);
                     }
                 });
@@ -1009,7 +1007,7 @@ function scheduleChords(_chordData, step, time) {
 
             if (!muted && freq) {
                 const duration = (durationSteps || 1) * 0.25 * spb;
-                playNote(stateMap, freq, playTime, duration, {
+                playNote(state, freq, playTime, duration, {
                     vol: velocity,
                     index: 0,
                     instrument: instrument || 'Piano',
@@ -1032,12 +1030,13 @@ function scheduleChords(_chordData, step, time) {
  * Schedules harmony notes (pads, stabs) from the worker buffer.
  * Handles voice killing for smoother transitions.
  *
+ * @param {Object} state - Global ensemble state.
  * @param {Object} chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
-function scheduleHarmonies(_chordData, step, time) {
-    const { harmony, playback, vizState, midi } = getState();
+function scheduleHarmonies(state, _chordData, step, time) {
+    const { harmony, playback, vizState, midi } = state;
     const notes = harmony.buffer.get(step);
     harmony.buffer.delete(step);
 
@@ -1048,7 +1047,7 @@ function scheduleHarmonies(_chordData, step, time) {
         // clear previous voices once before scheduling the new ones.
         const starter = notes.find((n) => n.isChordStart);
         if (starter) {
-            killHarmonyNote(stateMap, starter.killFade || 0.05);
+            killHarmonyNote(state, starter.killFade || 0.05);
         }
 
         // Power-compensation for multiple voices: Scale volume by 1/sqrt(N)
@@ -1082,7 +1081,7 @@ function scheduleHarmonies(_chordData, step, time) {
                 const finalVel = baseVel * polyphonyComp;
 
                 playHarmonyNote(
-                    stateMap,
+                    state,
                     freq || 440,
                     playTime,
                     duration,
@@ -1121,11 +1120,13 @@ function scheduleHarmonies(_chordData, step, time) {
  * Orchestrates global events for the current step.
  * Updates conductor state, triggers MIDI automation, rhythm section masking, and metronome.
  *
+ * @param {Object} state - Global ensemble state.
  * @param {number} step - The global step index.
  * @param {number} swungTime - The swung AudioContext time.
+ * @param {Function} [dispatch] - State dispatch function.
  */
-export function scheduleGlobalEvent(step, swungTime) {
-    const { arranger, playback, groove, soloist, midi, chords, bass, harmony } = getState();
+export function scheduleGlobalEvent(state, step, swungTime, dispatch = null) {
+    const { arranger, playback, groove, soloist, midi, chords, bass, harmony } = state;
     const globalTS = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepInfo = getStepInfo(step, globalTS, arranger.measureMap, TIME_SIGNATURES);
     const ts = TIME_SIGNATURES[stepInfo.tsName] || globalTS;
@@ -1221,7 +1222,7 @@ export function scheduleGlobalEvent(step, swungTime) {
 
         playback.drawQueue.push({ type: 'drum_vis', step: drumStep, time: swungTime });
 
-        const chordDataForDrums = getChordAtStep(step);
+        const chordDataForDrums = getChordAtStep(state, step);
         const sectionId = chordDataForDrums?.chord?.sectionId || null;
 
         // --- Port Turnaround Logic from Worker ---
@@ -1241,25 +1242,29 @@ export function scheduleGlobalEvent(step, swungTime) {
                 measuresInSection > 1 && barInSection % measuresInSection === measuresInSection - 1;
         }
 
-        scheduleDrums({
-            step: drumStep,
-            time: t,
-            isDownbeat: stepInfo.isMeasureStart,
-            isBeatStart: stepInfo.isBeatStart,
-            isBackbeat: stepInfo.isBackbeat,
-            absoluteStep: step,
-            isGroupStart: stepInfo.isGroupStart,
-            sectionId,
-            beatIndex: stepInfo.beatIndex,
-            isOffbeat: stepInfo.isOffbeat,
-            isEOfBeat: stepInfo.isEOfBeat,
-            isAOfBeat: stepInfo.isAOfBeat,
-            tsConfig: stepInfo.tsConfig,
-            isTurnaround,
-        });
+        scheduleDrums(
+            state,
+            {
+                step: drumStep,
+                time: t,
+                isDownbeat: stepInfo.isMeasureStart,
+                isBeatStart: stepInfo.isBeatStart,
+                isBackbeat: stepInfo.isBackbeat,
+                absoluteStep: step,
+                isGroupStart: stepInfo.isGroupStart,
+                sectionId,
+                beatIndex: stepInfo.beatIndex,
+                isOffbeat: stepInfo.isOffbeat,
+                isEOfBeat: stepInfo.isEOfBeat,
+                isAOfBeat: stepInfo.isAOfBeat,
+                tsConfig: stepInfo.tsConfig,
+                isTurnaround,
+            },
+            dispatch,
+        );
     }
 
-    const chordData = getChordAtStep(step);
+    const chordData = getChordAtStep(state, step);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
             playback.currentKey = chordData.chord.key; // @direct-mutation
@@ -1267,18 +1272,18 @@ export function scheduleGlobalEvent(step, swungTime) {
                 new CustomEvent('key-change', { detail: { key: playback.currentKey } }),
             );
         }
-        scheduleChordVisuals(chordData, t);
+        scheduleChordVisuals(state, chordData, t);
         if (bass.enabled) {
-            scheduleBass(chordData, step, t);
+            scheduleBass(state, chordData, step, t);
         }
         if (soloist.enabled) {
-            scheduleSoloist(chordData, step, t, soloistTime);
+            scheduleSoloist(state, chordData, step, t, soloistTime);
         }
         if (chords.enabled) {
-            scheduleChords(chordData, step, t);
+            scheduleChords(state, chordData, step, t);
         }
         if (harmony.enabled) {
-            scheduleHarmonies(chordData, step, t);
+            scheduleHarmonies(state, chordData, step, t);
         }
     }
 }
@@ -1287,10 +1292,12 @@ export function scheduleGlobalEvent(step, swungTime) {
  * Syncs current state parameters to the worker and flushes the note buffers.
  * Called when key parameters (genre, key, progression) change.
  *
+ * @param {Object} state - Global ensemble state.
  * @param {number} step - The current global step.
+ * @param {Function} [dispatch] - State dispatch function.
  */
-function syncAndFlushWorker(step) {
-    const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
+function syncAndFlushWorker(state, step, dispatch = null) {
+    const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
     const syncData = {
         arranger: {
             progression: arranger.progression,
@@ -1361,9 +1368,13 @@ function syncAndFlushWorker(step) {
     bass.buffer.clear();
     soloist.buffer.clear();
     harmony.buffer.clear();
-    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });
+    if (dispatch) {
+        dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });
+    } else {
+        groove.fillActive = false; // @direct-mutation
+    }
 
-    killAllNotes(stateMap);
+    killAllNotes(state);
     flushWorker(step, syncData);
-    restoreGains(stateMap);
+    restoreGains(state);
 }

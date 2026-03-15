@@ -7,7 +7,6 @@ import { analyzeForm } from '../form-analysis.js';
 import { getHarmonyNotes } from '../harmonies.js';
 import { generateResolutionNotes } from '../resolution.js';
 import { getSoloistNote } from '../soloist.js';
-import { getState } from '../state.js';
 import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import {
@@ -29,8 +28,9 @@ let _onExportEnd = null;
 export const setOnExportEnd = (fn) => (_onExportEnd = fn);
 
 export class ExportProcessor {
-    constructor(options) {
-        const { arranger, groove, playback, chords, bass, soloist, harmony } = getState();
+    constructor(state, options) {
+        const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
+        this.state = state;
         this.options = options;
         this.includedTracks = options.includedTracks || [
             'chords',
@@ -145,7 +145,7 @@ export class ExportProcessor {
     }
 
     start() {
-        const { arranger } = getState();
+        const { arranger } = this.state;
         if (arranger.progression.length === 0) {
             postMessage({ type: WORKER_RESP.ERROR, data: 'No progression to export' });
             this.cleanup();
@@ -157,12 +157,12 @@ export class ExportProcessor {
     }
 
     toPulses(t) {
-        const { playback } = getState();
+        const { playback } = this.state;
         return Math.round(t * (playback.bpm / 60.0) * PPQ);
     }
 
     checkWorkerTransition(step) {
-        const { groove, playback, arranger, harmony } = getState();
+        const { groove, playback, arranger, harmony } = this.state;
         if (!groove.enabled) {
             return;
         }
@@ -261,7 +261,7 @@ export class ExportProcessor {
 
     processStep(globalStep) {
         this.checkWorkerTransition(globalStep);
-        const { arranger, groove, playback, soloist, bass, harmony } = getState();
+        const { arranger, groove, playback, soloist, bass, harmony } = this.state;
 
         const stepTimeS = this.stepTimes[globalStep];
         const measureStep = globalStep % this.stepsPerMeasure;
@@ -326,7 +326,7 @@ export class ExportProcessor {
                     }
                 }
 
-                const result = applyGrooveOverrides(getState(), {
+                const result = applyGrooveOverrides(this.state, {
                     step: globalStep,
                     inst,
                     stepVal,
@@ -696,7 +696,7 @@ export class ExportProcessor {
                         }
 
                         const { shouldPlay, velocity, soundName, instTimeOffset } =
-                            applyGrooveOverrides(getState(), {
+                            applyGrooveOverrides(this.state, {
                                 step: globalStep,
                                 inst,
                                 stepVal,
@@ -740,7 +740,7 @@ export class ExportProcessor {
     }
 
     finish() {
-        const { arranger, playback, groove, soloist } = getState();
+        const { arranger, playback, groove, soloist } = this.state;
         const resolutionStep = this.totalStepsWithoutEnding;
         const resTimeS = this.stepTimes[resolutionStep];
         const resPulse = this.toPulses(resTimeS);
@@ -904,7 +904,7 @@ export class ExportProcessor {
     }
 
     cleanup() {
-        const { chords, bass, soloist, harmony, groove, playback } = getState();
+        const { chords, bass, soloist, harmony, groove, playback } = this.state;
         if (this.prevStates) {
             chords.enabled = this.prevStates.chords; // @worker-mutation
             bass.enabled = this.prevStates.bass; // @worker-mutation
@@ -923,9 +923,9 @@ export class ExportProcessor {
     }
 }
 
-export function handleExport(options) {
+export function handleExport(state, options) {
     try {
-        const processor = new ExportProcessor(options);
+        const processor = new ExportProcessor(state, options);
         processor.start();
     } catch (e) {
         postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });

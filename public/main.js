@@ -27,7 +27,7 @@ function init() {
 
         // --- WORKER INIT ---
         initWorker(
-            () => scheduler(),
+            () => scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p)),
             (notes, requestTimestamp, workerProcessTime, isResolution) => {
                 const { playback, soloist, bass, harmony, chords, groove } = getState();
 
@@ -86,7 +86,7 @@ function init() {
                     }
                 });
                 if (playback.isPlaying) {
-                    scheduler();
+                    scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p));
                 }
             },
         );
@@ -98,7 +98,10 @@ function init() {
         viz.addTrack('harmony', 'var(--harmony-color)');
         viz.addTrack('drums', 'var(--text-color)');
 
-        setInstrumentControllerRefs(() => scheduler(), viz);
+        setInstrumentControllerRefs(
+            () => scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p)),
+            viz,
+        );
 
         const hasDrumPattern = groove.instruments.some((inst) => inst.steps.some((s) => s > 0));
         if (!hasDrumPattern) {
