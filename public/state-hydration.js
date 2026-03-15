@@ -151,7 +151,7 @@ export function hydrateState() {
             stopAtEnd: false,
         });
 
-        vizState.enabled = savedState.vizEnabled !== undefined ? savedState.vizEnabled : false;
+        vizState.enabled = savedState.vizEnabled !== undefined ? savedState.vizEnabled : false; // @direct-mutation
 
         if (savedState.chords) {
             Object.assign(chords, {
@@ -354,8 +354,8 @@ export function loadFromUrl() {
     if (params.get('genre')) {
         const genre = params.get('genre');
         if (SMART_GENRES[genre]) {
-            groove.lastSmartGenre = genre;
-            groove.genreFeel = genre;
+            groove.lastSmartGenre = genre; // @direct-mutation
+            groove.genreFeel = genre; // @direct-mutation
         }
     }
 
