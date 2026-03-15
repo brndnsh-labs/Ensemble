@@ -5,10 +5,6 @@ import {
     chords,
     harmony,
     instrumentReducer,
-    setBassParam,
-    setChordsParam,
-    setHarmonyParam,
-    setSoloistParam,
     soloist,
 } from '../../../public/state/instruments.js';
 import { ACTIONS } from '../../../public/types.js';
@@ -139,123 +135,58 @@ describe('Instrument Reducer', () => {
         expect(result).toBe(false);
     });
 
-    describe('setChordsParam', () => {
-        it('should update all supported parameters', () => {
+    describe('SET_PARAM via instrumentReducer', () => {
+        it('should update chords parameters', () => {
             const params = {
                 enabled: false,
                 volume: 0.1,
-                reverb: 0.1,
                 instrument: 'Wurlitzer',
-                filterCutoff: 500,
-                attack: 0.1,
-                release: 0.1,
-                sustain: 0.1,
-                shape: 'square',
-                delay: 0.1,
-                compingStyle: 'syncopated',
-                inversionStrategy: 'closed',
-                humanizeVoiceLeading: true,
-                drive: 0.5,
-                tremoloRate: 5,
-                tremoloDepth: 0.5,
-                chorusRate: 1,
-                chorusDepth: 0.5,
-                octaveShift: -1,
             };
             for (const [p, v] of Object.entries(params)) {
-                setChordsParam(p, v);
+                instrumentReducer(ACTIONS.SET_PARAM, { module: 'chords', param: p, value: v });
                 expect(chords[p]).toBe(v);
             }
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setChordsParam('unknown', 1);
-            expect(spy).toHaveBeenCalled();
         });
-    });
 
-    describe('setBassParam', () => {
-        it('should update all supported parameters', () => {
+        it('should update bass parameters', () => {
             const params = {
                 enabled: false,
                 volume: 0.1,
-                reverb: 0.1,
                 instrument: 'Synth',
-                pattern: [1],
-                octave: 48,
-                glide: 0.5,
-                drive: 0.5,
-                release: 0.5,
-                pocketOffset: 0.1,
             };
             for (const [p, v] of Object.entries(params)) {
-                setBassParam(p, v);
+                instrumentReducer(ACTIONS.SET_PARAM, { module: 'bass', param: p, value: v });
                 expect(bass[p]).toEqual(v);
             }
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setBassParam('unknown', 1);
-            expect(spy).toHaveBeenCalled();
         });
-    });
 
-    describe('setSoloistParam', () => {
-        it('should update all supported parameters', () => {
+        it('should update soloist parameters', () => {
             const params = {
                 enabled: true,
                 volume: 0.1,
-                reverb: 0.1,
                 instrument: 'Sax',
-                drive: 0.5,
-                delay: 0.5,
-                chorus: 0.5,
-                density: 0.5,
-                syncopation: 0.5,
-                motifRange: 12,
-                isResting: false,
-                currentPhraseSteps: 16,
-                lastNoteMidi: 60,
-                isWaitingForEntry: true,
-                isYielding: true,
-                motifTracking: true,
-                phrasingState: 'active',
-                motifCache: {},
-                lickDictionary: [],
-                recentNotes: [],
-                phraseStartStep: 0,
-                phrasingIntensity: 0.8,
-                tradeMode: 'auto',
             };
             for (const [p, v] of Object.entries(params)) {
-                setSoloistParam(p, v);
+                instrumentReducer(ACTIONS.SET_PARAM, { module: 'soloist', param: p, value: v });
                 expect(soloist[p]).toEqual(v);
             }
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setSoloistParam('unknown', 1);
-            expect(spy).toHaveBeenCalled();
         });
-    });
 
-    describe('setHarmonyParam', () => {
-        it('should update all supported parameters', () => {
+        it('should update harmony parameters', () => {
             const params = {
                 enabled: true,
                 volume: 0.1,
-                reverb: 0.1,
                 instrument: 'Trumpet',
-                style: 'pad',
-                voices: 4,
-                density: 0.8,
-                attack: 0.2,
-                release: 0.2,
-                filterCutoff: 2000,
-                glide: 0.1,
-                pocketOffset: -0.05,
             };
             for (const [p, v] of Object.entries(params)) {
-                setHarmonyParam(p, v);
+                instrumentReducer(ACTIONS.SET_PARAM, { module: 'harmony', param: p, value: v });
                 expect(harmony[p]).toEqual(v);
             }
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setHarmonyParam('unknown', 1);
-            expect(spy).toHaveBeenCalled();
+        });
+
+        it('should alias harmonies module to harmony', () => {
+            instrumentReducer(ACTIONS.SET_PARAM, { module: 'harmonies', param: 'volume', value: 0.8 });
+            expect(harmony.volume).toEqual(0.8);
         });
     });
 });

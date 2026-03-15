@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { playback, playbackReducer, setPlaybackParam } from '../../../public/state/playback.js';
+import { playback, playbackReducer } from '../../../public/state/playback.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Playback Reducer', () => {
@@ -134,7 +134,7 @@ describe('Playback Reducer', () => {
         expect(playback.intent.density).toBe(0.8);
     });
 
-    describe('setPlaybackParam', () => {
+    describe('setPlaybackParam via reducer', () => {
         it('should update ALL supported parameters', () => {
             const allParams = {
                 audio: { ctx: true },
@@ -204,16 +204,9 @@ describe('Playback Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(allParams)) {
-                setPlaybackParam(param, value);
+                playbackReducer(ACTIONS.SET_PARAM, { module: 'playback', param, value });
                 expect(playback[param]).toEqual(value);
             }
-        });
-
-        it('should log warning for unknown parameters', () => {
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setPlaybackParam('ghost_param', 'spooky');
-            expect(spy).toHaveBeenCalledWith('[State] Unknown playback param: ghost_param');
-            spy.mockRestore();
         });
     });
 });

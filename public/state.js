@@ -1,21 +1,11 @@
 import { MODULES } from './constants.js';
-import { arranger, arrangerReducer, setArrangerParam } from './state/arranger.js';
-import { groove, grooveReducer, setGrooveParam } from './state/groove.js';
-import {
-    bass,
-    chords,
-    harmony,
-    instrumentReducer,
-    setBassParam,
-    setChordsParam,
-    setHarmonyParam,
-    setSoloistParam,
-    soloist,
-} from './state/instruments.js';
-import { midi, midiReducer, setMidiParam } from './state/midi.js';
+import { arranger, arrangerReducer } from './state/arranger.js';
+import { groove, grooveReducer } from './state/groove.js';
+import { bass, chords, harmony, instrumentReducer, soloist } from './state/instruments.js';
+import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
-import { playback, playbackReducer, setPlaybackParam } from './state/playback.js';
-import { setVizParam, vizReducer, vizState } from './state/visualizer.js';
+import { playback, playbackReducer } from './state/playback.js';
+import { vizReducer, vizState } from './state/visualizer.js';
 import { ACTIONS } from './types.js';
 
 // --- Global Export for E2E ---
@@ -107,67 +97,15 @@ const listeners = new Set();
  * @param {*} [payload] - The data associated with the action.
  */
 export function dispatch(action, payload) {
-    let handled = false;
     const oldBpm = playback.bpm;
 
-    // 1. Generic Param Handling (Legacy/Dynamic)
-    if (action === ACTIONS.SET_PARAM) {
-        switch (payload.module) {
-            case MODULES.PLAYBACK:
-                setPlaybackParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.CHORDS:
-                setChordsParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.BASS:
-                setBassParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.SOLOIST:
-                setSoloistParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.GROOVE:
-            case 'drum':
-            case 'drums':
-                setGrooveParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.HARMONIES:
-            case 'harmony':
-                setHarmonyParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.ARRANGER:
-                setArrangerParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.VIZ:
-                setVizParam(payload.param, payload.value);
-                handled = true;
-                break;
-            case MODULES.MIDI:
-                setMidiParam(payload.param, payload.value);
-                handled = true;
-                break;
-            default:
-                console.warn(`[State] SET_PARAM failed: Unknown module ${payload.module}`);
-                break;
-        }
-    }
-
-    // 2. Delegate to Reducers
-    if (!handled) {
-        const pHandled = playbackReducer(action, payload);
-        const aHandled = arrangerReducer(action, payload);
-        const iHandled = instrumentReducer(action, payload);
-        const gHandled = grooveReducer(action, payload, playback);
-        const mHandled = midiReducer(action, payload);
-        const vHandled = vizReducer(action, payload);
-        handled = pHandled || aHandled || iHandled || gHandled || mHandled || vHandled;
-    }
+    // Delegate to Reducers
+    playbackReducer(action, payload);
+    arrangerReducer(action, payload);
+    instrumentReducer(action, payload);
+    grooveReducer(action, payload, playback);
+    midiReducer(action, payload);
+    vizReducer(action, payload);
 
     // Always increment version on dispatch to force UI updates for in-place mutations
     playback.stateVersion++;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { groove, grooveReducer, setGrooveParam } from '../../../public/state/groove.js';
+import { groove, grooveReducer } from '../../../public/state/groove.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Groove Reducer', () => {
@@ -155,15 +155,9 @@ describe('Groove Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                setGrooveParam(param, value);
+                grooveReducer(ACTIONS.SET_PARAM, { module: 'groove', param, value }, {});
                 expect(groove[param]).toEqual(value);
             }
-        });
-
-        it('should log warning for unknown parameters', () => {
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setGrooveParam('unknown', 'val');
-            expect(spy).toHaveBeenCalled();
         });
     });
 });

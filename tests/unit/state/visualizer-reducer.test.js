@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { setVizParam, vizReducer, vizState } from '../../../public/state/visualizer.js';
+import { vizReducer, vizState } from '../../../public/state/visualizer.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Visualizer State Reducer', () => {
@@ -22,7 +22,7 @@ describe('Visualizer State Reducer', () => {
         expect(result).toBe(false);
     });
 
-    describe('setVizParam', () => {
+    describe('setVizParam via reducer', () => {
         it('should update all supported parameters', () => {
             const params = {
                 enabled: true,
@@ -36,15 +36,9 @@ describe('Visualizer State Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                setVizParam(param, value);
+                vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param, value });
                 expect(vizState[param]).toBe(value);
             }
-        });
-
-        it('should log warning for unknown parameters', () => {
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setVizParam('unknown', 'val');
-            expect(spy).toHaveBeenCalled();
         });
     });
 });

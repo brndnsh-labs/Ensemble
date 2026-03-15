@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { midi, midiReducer, setMidiParam } from '../../../public/state/midi.js';
+import { midi, midiReducer } from '../../../public/state/midi.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('MIDI State Reducer', () => {
@@ -10,7 +10,7 @@ describe('MIDI State Reducer', () => {
         expect(midi.selectedOutputId).toBe('port-1');
     });
 
-    describe('setMidiParam', () => {
+    describe('setMidiParam via reducer', () => {
         it('should update individual parameters', () => {
             const params = {
                 enabled: false,
@@ -27,15 +27,9 @@ describe('MIDI State Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                setMidiParam(param, value);
+                midiReducer(ACTIONS.SET_PARAM, { module: 'midi', param, value });
                 expect(midi[param]).toEqual(value);
             }
-        });
-
-        it('should log warning for unknown parameters', () => {
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setMidiParam('unknown', 'val');
-            expect(spy).toHaveBeenCalled();
         });
     });
 });

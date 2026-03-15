@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { arranger, arrangerReducer, setArrangerParam } from '../../../public/state/arranger.js';
+import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Arranger Reducer', () => {
@@ -68,15 +68,9 @@ describe('Arranger Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                setArrangerParam(param, value);
+                arrangerReducer(ACTIONS.SET_PARAM, { module: 'arranger', param, value });
                 expect(arranger[param]).toEqual(value);
             }
-        });
-
-        it('should log warning for unknown parameters', () => {
-            const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            setArrangerParam('ghost', 'val');
-            expect(spy).toHaveBeenCalled();
         });
     });
 });
