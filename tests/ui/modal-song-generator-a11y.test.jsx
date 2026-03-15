@@ -69,7 +69,17 @@ describe('Song Generator Modal Accessibility', () => {
         expect(title.textContent).toBe('Inspiration Hub');
     });
 
-    it('should have properly associated labels for select inputs', () => {
+    it('should have properly associated labels for select inputs', async () => {
+        // Switch to Generator tab
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const genTab = buttons.find((b) => b.textContent.includes('Randomize'));
+        if (genTab) {
+            genTab.click();
+        }
+
+        // Wait for re-render
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         const expectedLabels = ['Root Key', 'Time Signature', 'Structure'];
 
         expectedLabels.forEach((labelText) => {
@@ -80,22 +90,33 @@ describe('Song Generator Modal Accessibility', () => {
     });
 
     it('should have accessible seed options when enabled', async () => {
-        // Find all setting rows
-        const rows = Array.from(document.querySelectorAll('.setting-row'));
-        const seedRow = rows.find((r) => r.textContent.includes('Seed from Current'));
-        expect(seedRow).not.toBeUndefined();
-
-        const seedToggle = seedRow.querySelector('input[type="checkbox"]');
-        expect(seedToggle).not.toBeNull();
-
-        // Simulate click to enable seed options
-        seedToggle.click();
+        // Switch to Generator tab
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const genTab = buttons.find((b) => b.textContent.includes('Randomize'));
+        if (genTab) {
+            genTab.click();
+        }
 
         // Wait for re-render
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        const seedSelect = document.getElementById('gen-seed-type');
+        // Find all setting rows
+        const rows = Array.from(document.querySelectorAll('.setting-row'));
+        const seedRow = rows.find((r) => r.textContent.includes('Seed Source'));
+        expect(seedRow).not.toBeUndefined();
+
+        const seedSelect = seedRow.querySelector('select');
         expect(seedSelect).not.toBeNull();
+
+        // Simulate click to enable seed options
+        seedSelect.value = 'existing';
+        seedSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // Wait for re-render
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const seedTypeSelect = document.getElementById('gen-seed-type');
+        expect(seedTypeSelect).not.toBeNull();
 
         const labels = Array.from(document.querySelectorAll('.setting-label'));
         const foundLabel = labels.find((l) => l.textContent.includes('Treat Seed as...'));

@@ -130,17 +130,13 @@ export function EditorModal() {
         addSection();
     };
 
-    const handleTemplates = () => {
+    const handleInspirationHub = () => {
         setIsMenuOpen(false);
-        if (window.innerWidth < 900) {
-            // Close editor on mobile to show templates?
-            // The legacy logic opened templatesOverlay on top.
-        }
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'templates', open: true });
-
-        // Template rendering logic is still legacy for now in ui-controller.js or ui.js
-        // We'll trigger the rendering if needed, but it usually happens on open.
+        setTimeout(
+            () => dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: true }),
+            10,
+        );
     };
 
     const handleAnalyze = () => {
@@ -150,15 +146,6 @@ export function EditorModal() {
         }
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'analyzer', open: true });
-    };
-
-    const handleRandomize = () => {
-        setIsMenuOpen(false);
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
-        setTimeout(
-            () => dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: true }),
-            10,
-        );
     };
 
     const handleMutate = () => {
@@ -368,20 +355,12 @@ Em  C  G  D"
                                 📥 <span>Import Tab</span>
                             </button>
                             <button
-                                id="templatesBtn"
-                                title="Song Templates"
-                                aria-label="Templates (Song Templates)"
-                                onClick={handleTemplates}
+                                id="inspirationHubBtn"
+                                title="Inspiration Hub"
+                                aria-label="Inspiration Hub"
+                                onClick={handleInspirationHub}
                             >
-                                📋 <span>Templates</span>
-                            </button>
-                            <button
-                                id="randomizeBtn"
-                                title="Randomize Progression"
-                                aria-label="Randomize (Progression)"
-                                onClick={handleRandomize}
-                            >
-                                🎲 <span>Randomize</span>
+                                ✨ <span>Inspiration Hub</span>
                             </button>
                             {showConfirmClear ? (
                                 <div

@@ -65,14 +65,10 @@ const setupMinimalDOM = () => {
             <button id="transUpBtn"></button>
             <button id="transDownBtn"></button>
             <button id="maximizeChordBtn"></button>
-            <button id="templatesBtn"></button>
-            <div id="templatesOverlay" aria-hidden="true"></div>
-            <div id="templateChips"></div>
-            <button id="closeTemplatesBtn"></button>
+            <button id="inspirationHubBtn"></button>
             <div id="activeSectionLabel"></div>
             <div id="arrangerActionTrigger"></div>
             <div id="arrangerActionMenu"></div>
-            <button id="randomizeBtn"></button>
             <button id="mutateBtn"></button>
             <button id="undoBtn"></button>
             <button id="clearProgBtn"></button>

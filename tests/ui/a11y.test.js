@@ -21,7 +21,6 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
                 <input id="bassVolume" type="range" aria-label="Bass Volume">
             </div>
 
-            <div id="templatesOverlay" class="overlay"></div>
             <div id="settingsOverlay" class="overlay"></div>
             <button id="settingsBtn" aria-label="Open Settings">Settings</button>
         `;
@@ -47,14 +46,10 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'soloistPowerBtnDesktop',
             'vizPowerBtn',
             'addSectionBtn',
-            'templatesBtn',
-            'templatesOverlay',
-            'templateChips',
-            'closeTemplatesBtn',
+            'inspirationHubBtn',
             'activeSectionLabel',
             'arrangerActionTrigger',
             'arrangerActionMenu',
-            'randomizeBtn',
             'mutateBtn',
             'undoBtn',
             'clearProgBtn',

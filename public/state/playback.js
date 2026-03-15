@@ -116,7 +116,6 @@ export const playback = {
         settings: false,
         editor: false,
         share: false,
-        templates: false,
         analyzer: false,
         generateSong: false,
         performance: false,

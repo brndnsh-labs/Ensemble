@@ -145,9 +145,9 @@ export function Stepper({
 /**
  * Reusable ButtonGroup for mutually exclusive options (chips).
  */
-export function ButtonGroup({ options, value, onChange }) {
+export function ButtonGroup({ options, value, onChange, className = '', style = {} }) {
     return (
-        <div class="flex-row" style="gap: 0.25rem;">
+        <div class={`flex-row ${className}`} style={{ gap: '0.25rem', ...style }}>
             {options.map((opt) => (
                 <button
                     key={opt.value}
@@ -161,6 +161,7 @@ export function ButtonGroup({ options, value, onChange }) {
                         color: value === opt.value ? 'white' : 'var(--text-color)',
                         border: '1px solid var(--border-color)',
                         cursor: 'pointer',
+                        ...opt.style,
                     }}
                 >
                     {opt.label}
