@@ -76,6 +76,9 @@ test.describe('Modals Responsiveness @ui', () => {
 
         // Verify content
         await expect(generatorModal).toContainText('Inspiration Hub');
+
+        // Switch to Randomize tab to see these settings
+        await page.click('button:has-text("Randomize")');
         await expect(generatorModal).toContainText('Root Key');
         await expect(generatorModal).toContainText('Key Quality');
         await expect(generatorModal).toContainText('Structure');
