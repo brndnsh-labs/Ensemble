@@ -115,7 +115,7 @@ describe('Arrangement Logic & Mixed Meter', () => {
         it('should correctly flatten sections with repeat > 1', () => {
             arranger.sections = [{ id: 's1', label: 'Intro', value: 'C | G', repeat: 2 }];
 
-            validateProgression();
+            validateProgression(getState());
 
             // C | G is 2 chords. Repeat 2x should be 4 chords.
             expect(arranger.progression).toHaveLength(4);
@@ -133,7 +133,7 @@ describe('Arrangement Logic & Mixed Meter', () => {
                 { id: 's2', label: 'Part 2', value: 'G', timeSignature: '4/4' }, // 16 steps
             ];
 
-            validateProgression();
+            validateProgression(getState());
 
             // 12 + 16 = 28 total steps
             expect(arranger.totalSteps).toBe(28);
@@ -145,7 +145,7 @@ describe('Arrangement Logic & Mixed Meter', () => {
                 { id: 's2', label: 'Part 2', value: 'G', timeSignature: '4/4' },
             ];
 
-            validateProgression();
+            validateProgression(getState());
 
             expect(arranger.measureMap).toHaveLength(2);
             expect(arranger.measureMap[0]).toEqual({ start: 0, end: 12, ts: '3/4' });
@@ -157,7 +157,7 @@ describe('Arrangement Logic & Mixed Meter', () => {
                 { id: 's1', label: 'Loop', value: 'C', timeSignature: '3/4', repeat: 2 },
             ];
 
-            validateProgression();
+            validateProgression(getState());
 
             expect(arranger.totalSteps).toBe(24);
             expect(arranger.measureMap).toHaveLength(2);
@@ -173,7 +173,7 @@ describe('Arrangement Logic & Mixed Meter', () => {
                 { id: 's2', label: 'G Part', value: 'I', key: 'G' },
             ];
 
-            validateProgression();
+            validateProgression(getState());
 
             // Section 1: I in C -> C
             // Section 2: I in G -> G

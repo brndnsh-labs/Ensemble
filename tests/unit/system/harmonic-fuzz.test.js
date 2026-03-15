@@ -45,7 +45,7 @@ describe('Harmonic Fuzz Testing', () => {
 
             // We want to ensure this call NEVER throws
             expect(() => {
-                validateProgression();
+                validateProgression(getState());
             }, `Failed on input: "${junk}"`).not.toThrow();
 
             // Additional sanity checks on the result
@@ -65,7 +65,7 @@ describe('Harmonic Fuzz Testing', () => {
         arranger.sections = [{ id: 'long', label: 'Long', value: longJunk }];
 
         const start = Date.now();
-        validateProgression();
+        validateProgression(getState());
         const duration = Date.now() - start;
 
         expect(duration).toBeLessThan(500); // Should be well under 500ms even for 5k chars
@@ -98,7 +98,7 @@ describe('Harmonic Fuzz Testing', () => {
         arranger.sections = [{ id: 'complex', label: 'Complex', value: complexProg }];
 
         expect(() => {
-            validateProgression();
+            validateProgression(getState());
         }).not.toThrow();
 
         expect(arranger.progression.length).toBeGreaterThan(400);
@@ -108,7 +108,7 @@ describe('Harmonic Fuzz Testing', () => {
         const weird = 'C    |     F\n\n\n   G \t\t  C';
         arranger.sections = [{ id: 'weird', label: 'Weird', value: weird }];
 
-        validateProgression();
+        validateProgression(getState());
         expect(arranger.progression.length).toBe(4);
         expect(arranger.progression[0].absName).toBe('C');
     });

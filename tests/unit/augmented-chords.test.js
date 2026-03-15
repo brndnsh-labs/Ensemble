@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getChordDetails, getIntervals } from '../../public/chords.js';
+import { getState } from '../../public/state.js';
 
 // Mock state
 vi.mock('../../public/state.js', () => {
@@ -60,7 +61,14 @@ describe('Augmented Chords Support', () => {
 
         cases.forEach(({ desc, quality, is7th, expected }) => {
             it(`should return ${expected} for ${desc}`, () => {
-                const intervals = getIntervals(quality, is7th, 'standard', 'Rock', true);
+                const intervals = getIntervals(
+                    getState(),
+                    quality,
+                    is7th,
+                    'standard',
+                    'Rock',
+                    true,
+                );
                 expect(intervals).toEqual(expected);
             });
         });

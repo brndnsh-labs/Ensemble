@@ -184,7 +184,7 @@ describe('Audio Engine Snapshot Regression', () => {
         const stepDuration = 60 / 120 / 4; // 125ms
 
         for (let step = 0; step < 16; step++) {
-            scheduleGlobalEvent(step, currentTime);
+            scheduleGlobalEvent(getState(), step, currentTime);
             currentTime += stepDuration;
         }
 

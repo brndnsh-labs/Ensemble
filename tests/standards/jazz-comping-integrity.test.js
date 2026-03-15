@@ -266,7 +266,7 @@ describe('Jazz Comping Integrity', () => {
     it('should maintain smooth voice leading over Autumn Leaves cycle of fourths', () => {
         // Am7 | D7 | Gmaj7 | Cmaj7
         arranger.sections = [{ id: 'A', value: 'Am7 | D7 | Gmaj7 | Cmaj7' }];
-        validateProgression();
+        validateProgression(getState());
 
         let lastAvg = null;
         arranger.progression.forEach((chord, i) => {

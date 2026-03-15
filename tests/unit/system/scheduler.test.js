@@ -251,14 +251,14 @@ describe('Scheduler Core System', () => {
 
     describe('Playback Control (togglePlay)', () => {
         it('should start playback correctly', () => {
-            togglePlay();
+            togglePlay(getState(), null);
             expect(playback.isPlaying).toBe(true);
             expect(playback.step).toBe(0);
         });
 
         it('should start with count-in if enabled (lines 168-169)', () => {
             playback.countIn = true;
-            togglePlay();
+            togglePlay(getState(), null);
             expect(playback.isCountingIn).toBe(true);
         });
 
@@ -267,7 +267,7 @@ describe('Scheduler Core System', () => {
             playback.audio.state = 'running';
             playback.audio.suspend = vi.fn();
 
-            togglePlay();
+            togglePlay(getState(), null);
 
             expect(playback.isPlaying).toBe(false);
 
@@ -287,7 +287,7 @@ describe('Scheduler Core System', () => {
             state.playback.nextNoteTime = 10.0;
             state.playback.audio.currentTime = 10.0;
 
-            scheduler();
+            scheduler(getState());
 
             expect(state.playback.resolutionTriggered).toBe(true);
             expect(state.playback.isScheduling).toBe(false);
@@ -302,7 +302,7 @@ describe('Scheduler Core System', () => {
             state.playback.nextNoteTime = 10.0;
             state.playback.audio.currentTime = 10.0;
 
-            scheduler();
+            scheduler(getState());
 
             expect(state.playback.countInBeat).toBe(1);
             expect(state.playback.isScheduling).toBe(false);
@@ -317,7 +317,7 @@ describe('Scheduler Core System', () => {
             state.playback.audio.currentTime = 10.0;
             state.groove.pendingGenreFeel = { drum: 'Modern808' };
 
-            scheduler();
+            scheduler(getState());
 
             expect(state.groove.pendingGenreFeel).toBe(null);
             expect(state.playback.isScheduling).toBe(false);
@@ -338,7 +338,7 @@ describe('Scheduler Core System', () => {
             chords.buffer.set(0, chordNotes);
 
             // Trigger chord scheduling via global event
-            scheduleGlobalEvent(0, 10.0);
+            scheduleGlobalEvent(getState(), 0, 10.0);
 
             expect(Engine.updateSustain).toHaveBeenCalledWith(
                 expect.any(Object),
@@ -358,7 +358,7 @@ describe('Scheduler Core System', () => {
             ];
             harmony.buffer.set(0, harmonyNotes);
 
-            scheduleGlobalEvent(0, 10.0);
+            scheduleGlobalEvent(getState(), 0, 10.0);
 
             expect(Engine.killHarmonyNote).toHaveBeenCalledWith(expect.any(Object), 0.1);
             expect(Engine.playHarmonyNote).toHaveBeenCalled();
@@ -371,7 +371,7 @@ describe('Scheduler Core System', () => {
             soloist.buffer.set(0, [{ freq: 880, velocity: 0.9, durationSteps: 4 }]);
             harmony.buffer.set(0, [{ freq: 440, velocity: 0.5, durationSteps: 4 }]);
 
-            scheduleGlobalEvent(0, 10.0);
+            scheduleGlobalEvent(getState(), 0, 10.0);
 
             const soloistVis = playback.drawQueue.find((e) => e.type === 'soloist_vis');
             const harmonyVis = playback.drawQueue.find((e) => e.type === 'harmony_vis');
@@ -386,19 +386,19 @@ describe('Scheduler Core System', () => {
             groove.enabled = true;
 
             // Step 0 is Measure Start (Flash intensity 0.2)
-            scheduleGlobalEvent(0, 10.0);
+            scheduleGlobalEvent(getState(), 0, 10.0);
             const flash0 = playback.drawQueue.find((e) => e.type === 'flash');
             expect(flash0.intensity).toBe(0.2);
 
             // Step 8 is Group Start in 4/4 (Flash intensity 0.15)
             playback.drawQueue.length = 0;
-            scheduleGlobalEvent(8, 11.0);
+            scheduleGlobalEvent(getState(), 8, 11.0);
             const flash8 = playback.drawQueue.find((e) => e.type === 'flash');
             expect(flash8.intensity).toBe(0.15);
         });
         it('should emit a key-updated event when playhead crosses section threshold', () => {
             // Trigger Step 0 (Key A)
-            scheduleGlobalEvent(0, 0);
+            scheduleGlobalEvent(getState(), 0, 0);
 
             expect(window.dispatchEvent).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -410,11 +410,11 @@ describe('Scheduler Core System', () => {
             window.dispatchEvent.mockClear();
 
             // Trigger Step 15 (Still Key A)
-            scheduleGlobalEvent(15, 0);
+            scheduleGlobalEvent(getState(), 15, 0);
             expect(window.dispatchEvent).not.toHaveBeenCalled();
 
             // Trigger Step 16 (Key B)
-            scheduleGlobalEvent(16, 0);
+            scheduleGlobalEvent(getState(), 16, 0);
             expect(window.dispatchEvent).toHaveBeenCalledWith(
                 expect.objectContaining({
                     type: 'key-change',
@@ -427,21 +427,21 @@ describe('Scheduler Core System', () => {
             playback.metronome = true;
 
             // Step 0 is Measure Start (1000Hz)
-            scheduleGlobalEvent(0, 0);
+            scheduleGlobalEvent(getState(), 0, 0);
 
             const osc = playback.audio.createOscillator();
             expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(1000, 0);
 
             // Step 4 is a normal beat in 4/4 (600Hz)
-            scheduleGlobalEvent(4, 1.0);
+            scheduleGlobalEvent(getState(), 4, 1.0);
             expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(600, 1.0);
 
             // Step 8 is Group Start in 4/4 [2, 2] grouping (800Hz)
-            scheduleGlobalEvent(8, 2.0);
+            scheduleGlobalEvent(getState(), 8, 2.0);
             expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(800, 2.0);
 
             // Step 12 is a normal beat (600Hz)
-            scheduleGlobalEvent(12, 3.0);
+            scheduleGlobalEvent(getState(), 12, 3.0);
             expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(600, 3.0);
 
             // Trigger onended for coverage
@@ -452,7 +452,7 @@ describe('Scheduler Core System', () => {
 
         it('should calculate rhythm section mask (lines 1118-1140)', () => {
             // Step 0 triggers mask calculation
-            scheduleGlobalEvent(0, 0);
+            scheduleGlobalEvent(getState(), 0, 0);
             expect(groove.snareMask).toBeGreaterThan(0);
         });
 
@@ -462,7 +462,7 @@ describe('Scheduler Core System', () => {
             soloist.tension = 0.5;
 
             // Step 0 is Beat Start
-            scheduleGlobalEvent(0, 0);
+            scheduleGlobalEvent(getState(), 0, 0);
         });
 
         it('should handle turnaround logic (lines 1210-1225)', () => {
@@ -477,7 +477,7 @@ describe('Scheduler Core System', () => {
             // Mock scheduleDrums to verify if isTurnaround is passed
             // Since we imported it from scheduler-core, it's hard to mock internal calls.
             // But we hit the lines for coverage anyway.
-            scheduleGlobalEvent(16, 1.0);
+            scheduleGlobalEvent(getState(), 16, 1.0);
             // This should hit measuresInSection > 1 && barInSection === 1 branch
         });
     });
@@ -499,7 +499,7 @@ describe('Scheduler Core System', () => {
             vizState.enabled = false;
             playback.viz = null;
 
-            scheduleChordVisuals(chordData, time);
+            scheduleChordVisuals(getState(), chordData, time);
 
             expect(playback.drawQueue.length).toBe(1);
             expect(playback.drawQueue[0]).toMatchObject({
@@ -516,7 +516,7 @@ describe('Scheduler Core System', () => {
                 chord: { freqs: [] },
             };
 
-            scheduleChordVisuals(chordData, 10.0);
+            scheduleChordVisuals(getState(), chordData, 10.0);
 
             expect(playback.drawQueue.length).toBe(0);
         });

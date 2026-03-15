@@ -55,7 +55,7 @@ describe('Ska-Punk Genre Integrity', () => {
     it('should use horns style for harmonies in Ska', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         // Step 2 is an offbeat stab in my implementation
-        const notes = getHarmonyNotes(chord, null, 2, 0, 'smart', 2);
+        const notes = getHarmonyNotes(getState(), chord, null, 2, 0, 'smart', 2);
         if (notes.length > 0) {
             expect(notes[0].style).toBe('horns');
         }
@@ -119,7 +119,7 @@ describe('Ska-Punk Genre Integrity', () => {
 
         // Measure 0 (Step 0)
         const soloistM0 = getSoloistNote(chord, null, 0, null, 5, 'ska', 0, false);
-        const _harmM0 = getHarmonyNotes(chord, null, 0, 0, 'horns', 0);
+        const _harmM0 = getHarmonyNotes(getState(), chord, null, 0, 0, 'horns', 0);
 
         // Previous behavior forced soloistM0 to be null here.
         // We just ensure it doesn't crash and we aren't enforcing a strict null check.
@@ -127,7 +127,7 @@ describe('Ska-Punk Genre Integrity', () => {
 
         // Measure 1 (Step 16)
         const soloistM1 = getSoloistNote(chord, null, 16, null, 5, 'ska', 0, false);
-        const _harmonyM1 = getHarmonyNotes(chord, null, 16, 0, 'horns', 0);
+        const _harmonyM1 = getHarmonyNotes(getState(), chord, null, 16, 0, 'horns', 0);
 
         expect(soloistM1 !== undefined).toBe(true);
     });
@@ -147,7 +147,7 @@ describe('Ska-Punk Genre Integrity', () => {
         // Bypass the 85% dropout by mocking Math.random
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-        const notes = getHarmonyNotes(chord, null, 0, 0, 'horns', 0, { midi: 72 });
+        const notes = getHarmonyNotes(getState(), chord, null, 0, 0, 'horns', 0, { midi: 72 });
 
         expect(notes.length).toBeGreaterThan(0);
         expect(notes[0].isLatched).toBe(true);

@@ -167,7 +167,7 @@ describe('Phase Integrity (Audio/Visual Sync)', () => {
         const expectedTime = playback.nextNoteTime;
 
         // Execute one iteration of the scheduler loop
-        scheduler();
+        scheduler(getState());
 
         // Check if Step 0 visuals are correctly timestamped
         const flash = playback.drawQueue.find((ev) => ev.type === 'flash');
@@ -196,7 +196,7 @@ describe('Phase Integrity (Audio/Visual Sync)', () => {
         // If currentTime is 0.1, it can schedule until 0.2 (at least one more step)
         playback.audio.currentTime = 0.1;
 
-        scheduler();
+        scheduler(getState());
 
         const drumEvents = playback.drawQueue.filter((ev) => ev.type === 'drum_vis');
         expect(drumEvents.length).toBeGreaterThan(1);

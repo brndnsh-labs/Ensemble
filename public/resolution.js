@@ -41,6 +41,7 @@ const GENRE_MAP = {
 };
 
 export function generateResolutionNotes(
+    state,
     step,
     arranger,
     enabled,
@@ -94,7 +95,7 @@ export function generateResolutionNotes(
             quality.includes('9') ||
             quality.includes('6') ||
             quality.includes('minor');
-        const intervals = getIntervals(quality, is7th, density, genre, true);
+        const intervals = getIntervals(state, quality, is7th, density, genre, true);
 
         let playRoot = anchor - (anchor % 12) + targetPC;
         if (playRoot > anchor + 6) {
@@ -105,6 +106,7 @@ export function generateResolutionNotes(
         }
 
         const voicings = getBestInversion(
+            state,
             playRoot,
             intervals,
             lastMidis,

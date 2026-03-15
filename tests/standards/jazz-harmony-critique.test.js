@@ -46,7 +46,17 @@ describe('Jazz Harmony Critique', () => {
         for (let i = 0; i < totalSteps; i++) {
             const stepInMeasure = i % 16;
             const stepInTwoBars = i % 32;
-            const notes = getHarmonyNotes(chordC, null, i, 64, 'smart', stepInMeasure, null, {});
+            const notes = getHarmonyNotes(
+                getState(),
+                chordC,
+                null,
+                i,
+                64,
+                'smart',
+                stepInMeasure,
+                null,
+                {},
+            );
 
             if (notes.length > 0) {
                 totalStabs++;
@@ -103,12 +113,13 @@ describe('Jazz Harmony Critique', () => {
 
         // Scenario 1: Soloist Resting
         mockState.soloist.isResting = true;
-        const notesQuiet = getHarmonyNotes(chord, null, 0, 64, 'smart', 0, null, {});
+        const notesQuiet = getHarmonyNotes(getState(), chord, null, 0, 64, 'smart', 0, null, {});
 
         // Scenario 2: Soloist Busy
         mockState.soloist.isResting = false;
         mockState.soloist.notesInPhrase = 5;
         const notesBusy = getHarmonyNotes(
+            getState(),
             chord,
             null,
             0,

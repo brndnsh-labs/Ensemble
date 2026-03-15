@@ -32,6 +32,10 @@ describe('Resolution Engine Profiles', () => {
         ],
     };
     const enabled = { bass: true, chords: true, soloist: true, harmony: true, groove: true };
+    const state = {
+        playback: { bandIntensity: 0.5 },
+        groove: { genreFeel: 'Rock' },
+    };
 
     const getUniqueChordTimes = (notes) => {
         const chordEvents = notes.filter((n) => n.module === 'chords' && n.midi > 0);
@@ -51,7 +55,9 @@ describe('Resolution Engine Profiles', () => {
     };
 
     it('Jazz Profile: Generates 2-step V-I with ritardando', () => {
-        const notes = generateResolutionNotes(0, mockArranger, enabled, 120, { genreFeel: 'Jazz' });
+        const notes = generateResolutionNotes(state, 0, mockArranger, enabled, 120, {
+            genreFeel: 'Jazz',
+        });
         const uniqueTimes = getUniqueChordTimes(notes);
 
         // Should have 2 distinct chords (V and I)
@@ -65,7 +71,9 @@ describe('Resolution Engine Profiles', () => {
     });
 
     it('Rock Profile: Generates 1-step BUTTON hit', () => {
-        const notes = generateResolutionNotes(0, mockArranger, enabled, 120, { genreFeel: 'Rock' });
+        const notes = generateResolutionNotes(state, 0, mockArranger, enabled, 120, {
+            genreFeel: 'Rock',
+        });
         const uniqueTimes = getUniqueChordTimes(notes);
 
         // Should be 1 step (BUTTON)
@@ -73,7 +81,7 @@ describe('Resolution Engine Profiles', () => {
     });
 
     it('Blues Profile: Generates 2-step resolution', () => {
-        const notes = generateResolutionNotes(0, mockArranger, enabled, 120, {
+        const notes = generateResolutionNotes(state, 0, mockArranger, enabled, 120, {
             genreFeel: 'Blues',
         });
         const uniqueTimes = getUniqueChordTimes(notes);

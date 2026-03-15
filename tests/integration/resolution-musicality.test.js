@@ -17,7 +17,15 @@ describe('Resolution Musicality: Final Button Overhaul', () => {
     });
 
     it('should generate a sharp BUTTON hit for Rock style', () => {
-        const notes = generateResolutionNotes(100, arranger, enabled, 120, groove, soloist);
+        const notes = generateResolutionNotes(
+            getState(),
+            100,
+            arranger,
+            enabled,
+            120,
+            groove,
+            soloist,
+        );
 
         // Rock uses BUTTON profile (1 step)
         const bassNotes = notes.filter((n) => n.module === 'bass');
@@ -35,7 +43,15 @@ describe('Resolution Musicality: Final Button Overhaul', () => {
 
     it('should generate a two-step resolution for Jazz style', () => {
         groove.genreFeel = 'Jazz';
-        const notes = generateResolutionNotes(100, arranger, enabled, 120, groove, soloist);
+        const notes = generateResolutionNotes(
+            getState(),
+            100,
+            arranger,
+            enabled,
+            120,
+            groove,
+            soloist,
+        );
 
         // Jazz uses JAZZ_V_I (2 steps)
         const bassNotes = notes.filter((n) => n.module === 'bass');
@@ -50,7 +66,15 @@ describe('Resolution Musicality: Final Button Overhaul', () => {
     });
 
     it('should force the soloist to resolve to Tonic or 5th', () => {
-        const notes = generateResolutionNotes(100, arranger, enabled, 120, groove, soloist);
+        const notes = generateResolutionNotes(
+            getState(),
+            100,
+            arranger,
+            enabled,
+            120,
+            groove,
+            soloist,
+        );
         const soloNotes = notes.filter((n) => n.module === 'soloist');
 
         // Last note should be Tonic (0 relative to G)
@@ -61,7 +85,15 @@ describe('Resolution Musicality: Final Button Overhaul', () => {
     it('should respect minor key settings', () => {
         arranger.isMinor = true;
         groove.genreFeel = 'Jazz';
-        const notes = generateResolutionNotes(100, arranger, enabled, 120, groove, soloist);
+        const notes = generateResolutionNotes(
+            getState(),
+            100,
+            arranger,
+            enabled,
+            120,
+            groove,
+            soloist,
+        );
 
         // Chord notes should contain a minor 3rd (Bb relative to G)
         // G is 7. Bb is 10.

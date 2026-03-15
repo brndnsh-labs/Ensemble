@@ -30,8 +30,9 @@ describe('Resolution Logic', () => {
         const bpm = 120;
         const step = 64;
 
+        const state = { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } };
         // Rock is the default, which uses BUTTON (1 step)
-        const notes = generateResolutionNotes(step, arranger, enabled, bpm);
+        const notes = generateResolutionNotes(state, step, arranger, enabled, bpm);
 
         expect(notes.length).toBeGreaterThan(0);
 
@@ -48,7 +49,14 @@ describe('Resolution Logic', () => {
         const arranger = { key: 'C', isMinor: true };
         const enabled = { chords: true, bass: true };
         const groove = { genreFeel: 'Rock' }; // Use explicit genre to check mapping
-        const notes = generateResolutionNotes(0, arranger, enabled, 100, groove);
+        const notes = generateResolutionNotes(
+            { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } },
+            0,
+            arranger,
+            enabled,
+            100,
+            groove,
+        );
 
         expect(notes.length).toBeGreaterThan(0);
 
@@ -62,7 +70,14 @@ describe('Resolution Logic', () => {
         const enabled = { chords: true };
         const groove = { genreFeel: 'Jazz' };
 
-        const notes = generateResolutionNotes(0, arranger, enabled, 100, groove);
+        const notes = generateResolutionNotes(
+            { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } },
+            0,
+            arranger,
+            enabled,
+            100,
+            groove,
+        );
 
         // Jazz Major should be JAZZ_V_I (2 steps)
         const uniqueTimes = [...new Set(notes.map((n) => n.timingOffset))];

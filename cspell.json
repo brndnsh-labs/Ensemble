@@ -83,7 +83,10 @@
         "Extensivenss",
         "wakeup",
         "onmidimessage",
-        "playhead"
+        "playhead",
+        "reharmonize",
+        "Afrobeat",
+        "Accomp"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduler } from '../../public/engine/scheduler-core.js';
-import { getState } from '../../public/state.js';
+import { dispatch, getState } from '../../public/state.js';
 import { requestResolution } from '../../public/worker-client.js';
 
 // Mock State
@@ -130,7 +130,7 @@ describe('Song Mode Ending Logic', () => {
     });
 
     it('should set isEndingPending when timer expires', () => {
-        scheduler();
+        scheduler(getState(), dispatch);
         expect(getState().playback.isEndingPending).toBe(true);
     });
 
@@ -139,7 +139,7 @@ describe('Song Mode Ending Logic', () => {
         state.playback.isEndingPending = true;
         state.playback.step = 16; // End of first section (Intro)
 
-        scheduler();
+        scheduler(getState(), dispatch);
 
         // Current implementation WOULD set shouldStop = true at step 16 because it's a section boundary
         // We want this to be false.
@@ -151,7 +151,7 @@ describe('Song Mode Ending Logic', () => {
         state.playback.isEndingPending = true;
         state.playback.step = 64; // End of the loop
 
-        scheduler();
+        scheduler(getState(), dispatch);
 
         expect(requestResolution).toHaveBeenCalled();
     });

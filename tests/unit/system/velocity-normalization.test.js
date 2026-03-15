@@ -103,7 +103,7 @@ describe('Velocity Normalization & MIDI Limits', () => {
         // High intensity + high conductor velocity
         playback.bandIntensity = 1.0;
 
-        handleExport({
+        handleExport(getState(), {
             includedTracks: ['chords', 'bass', 'soloist', 'drums'],
             targetDuration: 0.1,
         });

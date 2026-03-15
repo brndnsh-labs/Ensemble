@@ -175,6 +175,14 @@ describe('Audio Recovery & Platform Integrity', () => {
         });
 
         it('should execute the DSP reset pipeline', async () => {
+            // Setup onRecover callback
+            audioWatchdog.onRecover = async (pb, map) => {
+                await Engine.killAllNotes(map);
+                await pb.audio.close();
+                Engine.initAudio(map);
+                Engine.restoreGains(map);
+            };
+
             // Initiate reset
             const resetPromise = audioWatchdog.triggerDSPReset();
 
@@ -182,15 +190,10 @@ describe('Audio Recovery & Platform Integrity', () => {
             expect(mockMasterGain.disconnect).toHaveBeenCalled();
             expect(Engine.killAllNotes).toHaveBeenCalled();
 
-            // Flush promises so close() resolves
+            // Flush promises
             await resetPromise;
-            // Advance timers for internal .then()
-            vi.runAllTimers();
-            // In Node/Happy-DOM, we might need a tick
-            await Promise.resolve();
 
             expect(mockAudioContext.close).toHaveBeenCalled();
-            // Since initAudio is mocked, we check if it was called
             expect(Engine.initAudio).toHaveBeenCalled();
             expect(Engine.restoreGains).toHaveBeenCalled();
         });

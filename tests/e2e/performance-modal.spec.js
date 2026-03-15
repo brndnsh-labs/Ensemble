@@ -86,7 +86,7 @@ test.describe('Performance Modal @ui', () => {
             });
 
             // 3. Force re-parse
-            validateProgression();
+            validateProgression(window.ensemble.getState());
 
             // 4. Ensure we are at the start
             dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'step', value: 0 });

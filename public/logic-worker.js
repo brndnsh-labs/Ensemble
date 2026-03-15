@@ -286,6 +286,7 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
                 const { chord, stepInChord } = chordData;
                 const nextChordData = getChordAtStep(step + 4, arranger, lookaheadCursor);
                 const harmonyNotes = getHarmonyNotes(
+                    getState(),
                     chord,
                     nextChordData?.chord,
                     step,
@@ -482,6 +483,7 @@ export function handleResolution(state, step, requestTimestamp = null, processSt
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
     const coordination = createCoordinationContext(step, stepInfo);
     const notesToMain = generateResolutionNotes(
+        state,
         step,
         arranger,
         {

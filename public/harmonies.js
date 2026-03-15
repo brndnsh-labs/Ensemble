@@ -177,6 +177,7 @@ export function generateCompingPattern(feel, seed, tsConfig) {
  * Generates harmony notes for a given step.
  */
 export function getHarmonyNotes(
+    state,
     chord,
     _nextChord,
     step,
@@ -192,7 +193,7 @@ export function getHarmonyNotes(
     }
 
     // Destructure state here to avoid ReferenceError during evaluation
-    const { playback, groove, harmony, soloist, arranger } = getState();
+    const { playback, groove, harmony, soloist, arranger } = state;
 
     // Internal Style Config
     const STYLE_CONFIG = {
@@ -576,6 +577,7 @@ export function getHarmonyNotes(
     }
 
     const currentMidis = getBestInversion(
+        state,
         rootMidi,
         finalIntervals,
         harmony.lastMidis,

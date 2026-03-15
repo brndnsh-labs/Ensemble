@@ -248,17 +248,17 @@ describe('System Smoke Test (E2E Workflow)', () => {
 
         onSectionUpdate(sectionId, 'value', 'C | G | Am | F');
 
-        validateProgression();
+        validateProgression(getState());
         expect(arranger.progression.length).toBeGreaterThan(0);
 
         const mockViz = { setBeatReference: vi.fn(), clear: vi.fn() };
-        togglePlay(mockViz);
+        togglePlay(getState(), mockViz);
 
         expect(playback.isPlaying).toBe(true);
         expect(playback.audio).not.toBeNull();
         expect(mockViz.setBeatReference).toHaveBeenCalled();
 
-        togglePlay(mockViz);
+        togglePlay(getState(), mockViz);
         expect(playback.isPlaying).toBe(false);
     });
 
@@ -266,13 +266,13 @@ describe('System Smoke Test (E2E Workflow)', () => {
         addSection();
         const sectionId = arranger.sections[0].id;
         onSectionUpdate(sectionId, 'value', 'C | G');
-        validateProgression();
+        validateProgression(getState());
         expect(arranger.progression[0].absName).toBe('C');
         expect(arranger.progression[1].absName).toBe('G');
 
         // Update the value
         onSectionUpdate(sectionId, 'value', 'C | F');
-        validateProgression();
+        validateProgression(getState());
         expect(arranger.progression[0].absName).toBe('C');
         expect(arranger.progression[1].absName).toBe('F');
     });

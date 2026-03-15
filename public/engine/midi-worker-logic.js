@@ -573,6 +573,7 @@ export class ExportProcessor {
             // 4. Harmonies
             if (this.includedTracks.includes('harmonies')) {
                 const harmonyNotes = getHarmonyNotes(
+                    this.state,
                     chord,
                     nextChordData?.chord,
                     globalStep,
@@ -748,6 +749,7 @@ export class ExportProcessor {
         this.metaTrack.marker(resPulse, '=== Resolution ===');
 
         const resolutionNotes = generateResolutionNotes(
+            this.state,
             resolutionStep,
             arranger,
             {

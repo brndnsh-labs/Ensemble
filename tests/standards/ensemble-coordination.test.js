@@ -99,6 +99,7 @@ describe('Ensemble Coordination Contract', () => {
             // Harmony should target the "hole" between Chords (52+) and Soloist
             const contextSoloHigh = { soloistMidi: 85, soloistActive: true };
             const harmonyHigh = getHarmonyNotes(
+                getState(),
                 chord,
                 null,
                 0,
@@ -114,6 +115,7 @@ describe('Ensemble Coordination Contract', () => {
             // Harmony should shift ABOVE the soloist
             const contextSoloLow = { soloistMidi: 62, soloistActive: true };
             const harmonyLow = getHarmonyNotes(
+                getState(),
                 chord,
                 null,
                 0,

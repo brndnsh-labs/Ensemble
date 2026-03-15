@@ -176,7 +176,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should generate a valid voicing for Major keys in resolution', () => {
-        handleResolution(0);
+        handleResolution(getState(), 0);
 
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         expect(noteMsg).toBeDefined();
@@ -201,7 +201,7 @@ describe('Export and Resolution Logic Validation', () => {
             freqs: [220, 261.63, 329.63],
             intervals: [0, 3, 7],
         };
-        handleResolution(0);
+        handleResolution(getState(), 0);
 
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         const chordNotes = noteMsg.notes.filter((n) => n.module === 'chords' && n.midi > 0);
@@ -219,7 +219,7 @@ describe('Export and Resolution Logic Validation', () => {
             freqs: [392, 493.88, 587.33],
             intervals: [0, 4, 7],
         };
-        handleResolution(0);
+        handleResolution(getState(), 0);
 
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         const bassNotes = noteMsg.notes.filter((n) => n.module === 'bass');
@@ -232,7 +232,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should include sustain pedal events in resolution', () => {
-        handleResolution(0);
+        handleResolution(getState(), 0);
 
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         const ccEvent = noteMsg.notes.find((n) => n.ccEvents?.some((cc) => cc.controller === 64));
@@ -241,7 +241,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should clamp all MIDI velocities to 127', () => {
-        handleResolution(0);
+        handleResolution(getState(), 0);
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
 
         noteMsg.notes.forEach((note) => {
@@ -253,7 +253,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should handle muted property by reducing velocity in resolution', () => {
-        handleResolution(0);
+        handleResolution(getState(), 0);
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         // Bass doesn't always have velocity reduction logic in resolution.js anymore,
         // but midiVelocity should still be reasonable.
@@ -262,7 +262,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should include Harmony module in resolution', () => {
-        handleResolution(0);
+        handleResolution(getState(), 0);
 
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         const harmonyNotes = noteMsg.notes.filter((n) => n.module === 'harmony');
@@ -271,7 +271,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should apply reasonable velocity in resolution', () => {
-        handleResolution(0);
+        handleResolution(getState(), 0);
         const noteMsg = capturedMessages.find((m) => m.type === 'notes');
         const chordNotes = noteMsg.notes.filter((n) => n.module === 'chords' && n.midi > 0);
 
@@ -280,7 +280,7 @@ describe('Export and Resolution Logic Validation', () => {
     });
 
     it('should complete MIDI export including harmonies', () => {
-        handleExport({
+        handleExport(getState(), {
             includedTracks: ['chords', 'bass', 'soloist', 'harmonies', 'drums'],
             targetDuration: 0.1,
             loopMode: 'once',
@@ -290,6 +290,9 @@ describe('Export and Resolution Logic Validation', () => {
         vi.runAllTimers();
 
         const _errorMsg = capturedMessages.find((m) => m.type === 'error');
+        if (_errorMsg) {
+            console.error('Export Error:', _errorMsg.data, _errorMsg.stack);
+        }
 
         const exportMsg = capturedMessages.find((m) => m.type === 'exportComplete');
         expect(exportMsg).toBeDefined();
@@ -331,7 +334,7 @@ describe('Export and Resolution Logic Validation', () => {
             const state = getState();
             state.groove.creativity = false;
 
-            handleExport({
+            handleExport(getState(), {
                 includedTracks: ['drums'],
                 loopMode: 'once',
             });
@@ -347,7 +350,7 @@ describe('Export and Resolution Logic Validation', () => {
             state.groove.creativity = true;
             state.playback.bandIntensity = 0.7; // Ideal range for ghost notes in rock.js
 
-            handleExport({
+            handleExport(getState(), {
                 includedTracks: ['drums'],
                 loopMode: 'once',
             });
@@ -369,7 +372,7 @@ describe('Export and Resolution Logic Validation', () => {
                 { id: 's2', start: 32, end: 64, label: 'Chorus' },
             ];
 
-            handleExport({
+            handleExport(getState(), {
                 includedTracks: ['drums'],
                 loopMode: 'once',
             });

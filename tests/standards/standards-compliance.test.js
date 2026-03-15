@@ -118,7 +118,7 @@ describe('Standards Compliance Test Suite', () => {
             arranger.key = TEST_KEY;
             arranger.isMinor = false;
             arranger.sections = [{ id: 'A', label: 'A', value: ROMAN_PROG }];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should identify correct relative scales', () => {
@@ -147,7 +147,7 @@ describe('Standards Compliance Test Suite', () => {
             arranger.key = TEST_KEY;
             arranger.isMinor = false;
             arranger.sections = [{ id: 'Main', label: 'Main', value: BASE_PROG }];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should select correct scales for rapid major-third key shifts', () => {
@@ -188,7 +188,7 @@ describe('Standards Compliance Test Suite', () => {
                     seamless: true,
                 },
             ];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should correctly identify the key center for the Bridge modulations', () => {
@@ -220,7 +220,7 @@ describe('Standards Compliance Test Suite', () => {
             arranger.key = 'A';
             arranger.isMinor = true;
             arranger.sections = [{ id: 'Main', label: 'Main', value: 'i | bVII | bVI | V' }];
-            validateProgression();
+            validateProgression(getState());
             soloist.isResting = false;
             soloist.currentPhraseSteps = 0;
             soloist.notesInPhrase = 0;
@@ -254,7 +254,7 @@ describe('Standards Compliance Test Suite', () => {
                     value: 'F7 | Bb7 | F7 | F7 | Bb7 | Bb7 | F7 | D7alt | Gm7 | C7 | F7 | C7',
                 },
             ];
-            validateProgression();
+            validateProgression(getState());
             soloist.isResting = false;
             soloist.currentPhraseSteps = 0;
             soloist.notesInPhrase = 0;
@@ -318,7 +318,7 @@ describe('Standards Compliance Test Suite', () => {
                         value: 'Cm7 | Cm7 | Fm7 | Fm7 | Dm7b5 | G7alt | Cm7 | Cm7 | Ebm7 | Ab7 | Dbmaj7 | Dbmaj7 | Dm7b5 | G7alt | Cm7 | Dm7b5 G7alt',
                     },
                 ];
-                validateProgression();
+                validateProgression(getState());
             });
 
             it('should select correct scales for modulation to Db Major', () => {
@@ -338,7 +338,7 @@ describe('Standards Compliance Test Suite', () => {
                     { id: 'A', label: 'A', value: 'Dm7 | Dm7' },
                     { id: 'B', label: 'B', value: 'Ebm7' },
                 ];
-                validateProgression();
+                validateProgression(getState());
             });
 
             it('should maintain Dorian mode', () => {
@@ -355,7 +355,7 @@ describe('Standards Compliance Test Suite', () => {
                 arranger.timeSignature = '5/4';
                 groove.genreFeel = 'Jazz';
                 arranger.sections = [{ id: 'A', label: 'A', value: 'Ebm7 | Bbm7' }];
-                validateProgression();
+                validateProgression(getState());
             });
 
             it('should handle 5/4 meter in bass', () => {
@@ -383,7 +383,7 @@ describe('Standards Compliance Test Suite', () => {
             arranger.isMinor = false;
             groove.genreFeel = 'Neo-Soul';
             arranger.sections = [{ id: 'Verse', label: 'Verse', value: 'IVmaj9/5 | III7#9' }];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should correctly identify and voice slash chords', () => {
@@ -422,7 +422,7 @@ describe('Standards Compliance Test Suite', () => {
                     value: 'Gmaj7 | Gmaj7 | Gm7 | C7 | Fmaj7 | Fmaj7 | Fm7 | Bb7',
                 },
             ];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should correctly select scales for shifting ii-V patterns', () => {
@@ -458,7 +458,7 @@ describe('Standards Compliance Test Suite', () => {
                     value: 'IVmaj7 | #IVdim7 | Imaj7/V | VI7 | II7 | V7 | Imaj7 | iim7 V7',
                 },
             ];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should correctly handle the Bird-style chromatic shifts and Lydian Dominant II7', () => {
@@ -499,7 +499,7 @@ describe('Standards Compliance Test Suite', () => {
             arranger.isMinor = false;
             groove.genreFeel = 'Rock';
             arranger.sections = [{ id: 'Main', label: 'Main', value: 'IVmaj7 | V7 | iii7 | vi7' }];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should select correct scales', () => {
@@ -521,7 +521,7 @@ describe('Standards Compliance Test Suite', () => {
                     value: 'Em7b5 | A7alt | Cm7 | F7 | Fm7 | Bb7 | Ebmaj7 | Ab7',
                 },
             ];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should select appropriate scales', () => {
@@ -542,7 +542,7 @@ describe('Standards Compliance Test Suite', () => {
                 { label: 'A', value: 'I vi7 | ii7 V7 | I vi7 | ii7 V7 | I I7 | IV iv7 | I V7 | I' },
                 { label: 'B', value: 'III7 | III7 | VI7 | VI7 | II7 | II7 | V7 | V7' },
             ];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should select appropriate scales for turnaround', () => {
@@ -590,7 +590,7 @@ describe('Standards Compliance Test Suite', () => {
                     seamless: true,
                 },
             ];
-            validateProgression();
+            validateProgression(getState());
         });
 
         it('should navigate Cycle of Fifths', () => {

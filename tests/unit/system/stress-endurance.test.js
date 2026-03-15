@@ -146,7 +146,7 @@ describe('Long-Session Stress & Endurance', () => {
             soloist.buffer.set(playback.step, [{ freq: 400, durationSteps: 1 }]);
             chords.buffer.set(playback.step, [{ freq: 300, durationSteps: 1 }]);
 
-            scheduler();
+            scheduler(getState());
             draw(null);
 
             if (i % 100 === 0) {

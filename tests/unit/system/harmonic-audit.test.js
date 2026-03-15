@@ -53,7 +53,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
         it(`Audit: ${presetName}`, () => {
             arranger.sections = sections;
             arranger.isMinor = isMinor;
-            validateProgression();
+            validateProgression(getState());
 
             const errors = [];
 
@@ -219,6 +219,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
 
                         // 4. Harmony Check
                         const harmonyNotes = getHarmonyNotes(
+                            getState(),
                             chord,
                             null,
                             step,

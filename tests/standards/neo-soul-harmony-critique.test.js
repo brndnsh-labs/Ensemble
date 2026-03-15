@@ -42,7 +42,17 @@ describe('Neo-Soul Harmony Critique', () => {
 
         for (let i = 0; i < totalSteps; i++) {
             const stepInMeasure = i % 16;
-            const notes = getHarmonyNotes(chordC, null, i, 64, 'smart', stepInMeasure, null, {});
+            const notes = getHarmonyNotes(
+                getState(),
+                chordC,
+                null,
+                i,
+                64,
+                'smart',
+                stepInMeasure,
+                null,
+                {},
+            );
 
             if (notes.length > 0) {
                 totalStabs++;

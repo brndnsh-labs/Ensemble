@@ -139,7 +139,17 @@ describe('Arrangement Integrity & Clutter Audit', () => {
             });
 
             // 4. Harmony
-            const harm = getHarmonyNotes(chord, null, s, 60, 'smart', s, sol, coordination);
+            const harm = getHarmonyNotes(
+                getState(),
+                chord,
+                null,
+                s,
+                60,
+                'smart',
+                s,
+                sol,
+                coordination,
+            );
             harm.forEach((n) => {
                 if (n.midi > 0) {
                     hitsAtStep.push({ module: 'harmony', midi: n.midi, velocity: n.velocity });

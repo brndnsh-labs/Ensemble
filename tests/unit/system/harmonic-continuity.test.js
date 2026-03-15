@@ -144,7 +144,7 @@ describe('Harmonic Continuity & Genre Transitions', () => {
         playback.step = 1;
         playback.nextNoteTime = 0.125; // 120BPM, 16th note
 
-        scheduler();
+        scheduler(getState());
 
         // Genre should still be Rock
         expect(groove.genreFeel).toBe('Rock');
@@ -159,7 +159,7 @@ describe('Harmonic Continuity & Genre Transitions', () => {
         playback.nextNoteTime = 15 * 0.125;
         playback.audio.currentTime = 15 * 0.125;
 
-        scheduler();
+        scheduler(getState());
 
         // The first call to scheduleGlobalEvent in the loop will be step 15.
         // Then it advances to step 16.

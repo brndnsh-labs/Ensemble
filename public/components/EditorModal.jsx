@@ -219,7 +219,7 @@ export function EditorModal() {
             dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
             // Re-validate to update the stepMap/progression
             const { validateProgression } = await import('../chords.js');
-            validateProgression();
+            validateProgression(getState());
             syncWorker();
         }
     };

@@ -38,7 +38,7 @@ export function saveProgression() {
 }
 
 export function validateAndAnalyze() {
-    validateProgression(() => {
+    validateProgression(stateMap, null, () => {
         analyzeFormUI();
     });
 }

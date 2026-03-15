@@ -51,7 +51,7 @@ vi.mock('../../../public/ui.js', () => ({
 }));
 
 vi.mock('../../../public/chords.js', () => ({
-    validateProgression: vi.fn((chords) => chords?.()),
+    validateProgression: vi.fn((_state, _dispatch, renderCallback) => renderCallback?.()),
     transformRelativeProgression: vi.fn((val, shift) => {
         if (val === 'I | V' && shift === -3) {
             return 'bIII | bVII';

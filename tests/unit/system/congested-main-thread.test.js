@@ -113,7 +113,7 @@ describe('Main Thread Congestion Resilience', () => {
 
     it('should schedule multiple steps to catch up if the main thread was blocked', () => {
         // Simulate normal start
-        scheduler();
+        scheduler(getState());
         const firstStep = playback.step;
 
         // Simulate a 500ms block of the main thread
@@ -121,7 +121,7 @@ describe('Main Thread Congestion Resilience', () => {
         playback.audio.currentTime += 0.5;
 
         // Call scheduler again
-        scheduler();
+        scheduler(getState());
 
         // It should have scheduled many more steps to get ahead of currentTime + scheduleAheadTime
         expect(playback.step).toBeGreaterThan(firstStep);
@@ -135,7 +135,7 @@ describe('Main Thread Congestion Resilience', () => {
         playback.audio.currentTime = 0;
 
         const start = Date.now();
-        scheduler();
+        scheduler(getState());
         const elapsed = Date.now() - start;
 
         expect(elapsed).toBeLessThan(100); // Should finish quickly

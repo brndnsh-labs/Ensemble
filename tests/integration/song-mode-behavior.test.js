@@ -92,7 +92,7 @@ describe('Song Mode Behavior', () => {
         playback.isEndingPending = false;
 
         // Run scheduler
-        scheduler();
+        scheduler(getState(), dispatch);
 
         expect(playback.isEndingPending).toBe(true);
     });
@@ -105,7 +105,7 @@ describe('Song Mode Behavior', () => {
         playback.audio.currentTime = 0;
         playback.scheduleAheadTime = 0.1; // Only enough for one step
 
-        scheduler();
+        scheduler(getState(), dispatch);
 
         // Should NOT have triggered resolution anymore at section boundaries
         expect(workerClient.requestResolution).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('Song Mode Behavior', () => {
         playback.audio.currentTime = 0;
         playback.scheduleAheadTime = 0.1;
 
-        scheduler();
+        scheduler(getState(), dispatch);
         expect(workerClient.requestResolution).toHaveBeenCalledWith(32);
     });
 
@@ -130,7 +130,7 @@ describe('Song Mode Behavior', () => {
         playback.nextNoteTime = 0;
         playback.audio.currentTime = 0;
 
-        scheduler();
+        scheduler(getState(), dispatch);
 
         expect(workerClient.requestResolution).not.toHaveBeenCalled();
         expect(playback.step).toBe(5);

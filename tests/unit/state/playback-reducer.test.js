@@ -106,11 +106,11 @@ describe('Playback Reducer', () => {
     });
 
     it('should show toasts and auto-remove them', () => {
-        playbackReducer(ACTIONS.SHOW_TOAST, 'Hello World');
+        playbackReducer(ACTIONS.SHOW_TOAST, { id: 'test-id', message: 'Hello World' });
         expect(playback.toasts.length).toBe(1);
         expect(playback.toasts[0].message).toBe('Hello World');
 
-        vi.advanceTimersByTime(2000);
+        playbackReducer('TOAST_EXPIRED', 'test-id');
         expect(playback.toasts.length).toBe(0);
     });
 
@@ -118,7 +118,7 @@ describe('Playback Reducer', () => {
         playbackReducer(ACTIONS.TRIGGER_FLASH, 0.5);
         expect(playback.flashIntensity).toBe(0.5);
 
-        vi.advanceTimersByTime(50);
+        playbackReducer('FLASH_EXPIRED');
         expect(playback.flashIntensity).toBe(0);
     });
 

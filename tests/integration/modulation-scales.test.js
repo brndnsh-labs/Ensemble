@@ -74,7 +74,7 @@ describe('Modulation Scale Selection Integration', () => {
         ];
 
         // Trigger the progression parser
-        validateProgression();
+        validateProgression(getState());
 
         const f7Chord = arranger.progression[0];
         expect(f7Chord).toBeDefined();

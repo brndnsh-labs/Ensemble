@@ -130,7 +130,7 @@ describe('Progression Audit: Verifying All Library Presets', () => {
             }
 
             // Validate Progression
-            validateProgression();
+            validateProgression(getState());
             expect(arranger.progression.length).toBeGreaterThan(0);
 
             // Audit Harmonic Cohesion: Accompanist vs Soloist

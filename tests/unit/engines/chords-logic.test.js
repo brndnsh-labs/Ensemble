@@ -103,32 +103,42 @@ describe('Chords & Voicing Logic', () => {
 
     describe('Interval Generation (getIntervals)', () => {
         it('should provide spread 10ths for Rock Major', () => {
-            const intervals = getIntervals('major', false, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), 'major', false, 'standard', 'Rock', false);
             expect(intervals).toEqual([0, 7, 16, 19]);
         });
 
         it('should use rootless functional voicings for Jazz', () => {
             groove.genreFeel = 'Jazz';
             // maj7 -> 3, 5, 7
-            expect(getIntervals('maj7', true, 'standard', 'Jazz', true)).toEqual([4, 7, 11]);
+            expect(getIntervals(getState(), 'maj7', true, 'standard', 'Jazz', true)).toEqual([
+                4, 7, 11,
+            ]);
             // m7 -> b3, 5, b7
-            expect(getIntervals('minor', true, 'standard', 'Jazz', true)).toEqual([3, 7, 10]);
+            expect(getIntervals(getState(), 'minor', true, 'standard', 'Jazz', true)).toEqual([
+                3, 7, 10,
+            ]);
             // 7 -> 3, 5, b7
-            expect(getIntervals('7', true, 'standard', 'Jazz', true)).toEqual([4, 7, 10]);
+            expect(getIntervals(getState(), '7', true, 'standard', 'Jazz', true)).toEqual([
+                4, 7, 10,
+            ]);
         });
 
         it('should scale density for Jazz voicings', () => {
             groove.genreFeel = 'Jazz';
             // standard maj7: 3, 5, 7 [4, 7, 11]
             // rich maj7: 3, 7, 9 [4, 11, 14]
-            expect(getIntervals('maj7', true, 'rich', 'Jazz', true)).toEqual([4, 11, 14]);
+            expect(getIntervals(getState(), 'maj7', true, 'rich', 'Jazz', true)).toEqual([
+                4, 11, 14,
+            ]);
             // rich 7: 3, b7, 9, 13 [4, 10, 14, 21]
-            expect(getIntervals('7', true, 'rich', 'Jazz', true)).toEqual([4, 10, 14, 21]);
+            expect(getIntervals(getState(), '7', true, 'rich', 'Jazz', true)).toEqual([
+                4, 10, 14, 21,
+            ]);
         });
 
         it('should handle altered dominants correctly', () => {
             groove.genreFeel = 'Jazz';
-            const intervals = getIntervals('7alt', true, 'standard', 'Jazz', true);
+            const intervals = getIntervals(getState(), '7alt', true, 'standard', 'Jazz', true);
             // 3, b7, #9, b13 -> [4, 10, 15, 20]
             expect(intervals).toEqual([4, 10, 15, 20]);
         });
@@ -136,18 +146,20 @@ describe('Chords & Voicing Logic', () => {
         it('should use rootless voicings for Blues dominant chords', () => {
             groove.genreFeel = 'Blues';
             // Dominant 7: 3, 5, b7 [4, 7, 10]
-            expect(getIntervals('7', true, 'standard', 'Blues', true)).toEqual([4, 7, 10]);
+            expect(getIntervals(getState(), '7', true, 'standard', 'Blues', true)).toEqual([
+                4, 7, 10,
+            ]);
         });
 
         it('should use "So What" voicing for Neo-Soul minor 7', () => {
             groove.genreFeel = 'Neo-Soul';
-            expect(getIntervals('minor', true, 'standard', 'Neo-Soul', true)).toEqual([
+            expect(getIntervals(getState(), 'minor', true, 'standard', 'Neo-Soul', true)).toEqual([
                 5, 10, 15, 19,
             ]);
         });
 
         it('should NOT produce a perfect 5th for half-diminished in Rock/Pop', () => {
-            const intervals = getIntervals('halfdim', true, 'standard', 'Rock', true);
+            const intervals = getIntervals(getState(), 'halfdim', true, 'standard', 'Rock', true);
             expect(intervals).toContain(6); // b5
             expect(intervals).not.toContain(7); // No natural 5
         });
@@ -156,11 +168,11 @@ describe('Chords & Voicing Logic', () => {
     describe('Inversion & Voice Leading (getBestInversion)', () => {
         it('should center the first chord and minimize movement thereafter', () => {
             // C Major triad
-            const voicedC = getBestInversion(60, [0, 4, 7], []);
+            const voicedC = getBestInversion(getState(), 60, [0, 4, 7], []);
             expect(voicedC).toEqual([55, 60, 64]);
 
             // Transition to F Major [5, 9, 0]
-            const voicedF = getBestInversion(65, [0, 4, 7], voicedC);
+            const voicedF = getBestInversion(getState(), 65, [0, 4, 7], voicedC);
             // Closest F triad to [55, 60, 64] is [53, 57, 60] or [57, 60, 65]
             // Let's verify voice leading
             const avgC = voicedC.reduce((a, b) => a + b, 0) / 3; // 59.66
@@ -169,14 +181,14 @@ describe('Chords & Voicing Logic', () => {
         });
 
         it('should respect range limits and prevent overlapping with bass', () => {
-            const voicedLow = getBestInversion(36, [0, 4, 7], []);
+            const voicedLow = getBestInversion(getState(), 36, [0, 4, 7], []);
             const avg = voicedLow.reduce((a, b) => a + b, 0) / 3;
             expect(avg).toBeGreaterThanOrEqual(43);
         });
 
         it('should maintain spread voicings as a unit', () => {
             const intervals = [0, 7, 16, 19];
-            const voiced = getBestInversion(48, intervals, []);
+            const voiced = getBestInversion(getState(), 48, intervals, []);
             const resultIntervals = voiced.map((n) => n - voiced[0]);
             expect(resultIntervals).toEqual(intervals);
         });
@@ -207,7 +219,7 @@ describe('Chords & Voicing Logic', () => {
             ];
             arranger.key = 'C';
             arranger.isMinor = true;
-            validateProgression();
+            validateProgression(getState());
 
             expect(arranger.progression[0].absName).toBe('Cm7');
             expect(arranger.progression[2].absName).toBe('Fm7');

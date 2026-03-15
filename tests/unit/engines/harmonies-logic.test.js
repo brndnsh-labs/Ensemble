@@ -81,7 +81,7 @@ describe('Harmony Engine Logic', () => {
         if (getBestInversion.mock.calls.length === 0) {
             return null;
         }
-        return getBestInversion.mock.calls[getBestInversion.mock.calls.length - 1][1];
+        return getBestInversion.mock.calls[getBestInversion.mock.calls.length - 1][2];
     }
 
     describe('Guide Tones & Safe Voicings', () => {
@@ -117,7 +117,7 @@ describe('Harmony Engine Logic', () => {
             groove.genreFeel = 'Pop'; // Ensure activeStyle resolves to 'strings' for min polyphony 2
             const chord = { rootMidi: 60, intervals: [0, 4, 7, 10, 14], sectionId: 's1', beats: 4 };
 
-            getHarmonyNotes(chord, null, 0, 60, 'smart', 0);
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
 
             const requested = getLastRequestedIntervals();
             // Should prefer 4 and 10
@@ -137,7 +137,7 @@ describe('Harmony Engine Logic', () => {
 
             const chord = { rootMidi: 60, intervals: [0, 4, 7, 14, 18], sectionId: 's1', beats: 4 }; // 9, #11
 
-            getHarmonyNotes(chord, null, 0, 60, 'smart', 0);
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
 
             const requested = getLastRequestedIntervals();
             expect(requested).not.toContain(14); // 9th
@@ -181,7 +181,7 @@ describe('Harmony Engine Logic', () => {
             playback.bandIntensity = 0.2;
             let lowIntNotesCount = 0;
             for (let i = 0; i < 16; i++) {
-                const n = getHarmonyNotes(chord, null, i, 60, 'smart', i);
+                const n = getHarmonyNotes(getState(), chord, null, i, 60, 'smart', i);
                 if (n.length > 0) {
                     lowIntNotesCount++;
                 }
@@ -191,7 +191,7 @@ describe('Harmony Engine Logic', () => {
             playback.bandIntensity = 0.9;
             let highIntNotesCount = 0;
             for (let i = 0; i < 16; i++) {
-                const n = getHarmonyNotes(chord, null, i, 60, 'smart', i);
+                const n = getHarmonyNotes(getState(), chord, null, i, 60, 'smart', i);
                 if (n.length > 0) {
                     highIntNotesCount++;
                 }
@@ -206,7 +206,7 @@ describe('Harmony Engine Logic', () => {
             // Funk pattern 0 usually has a hit on step 3 (And of 1)
             const notes = [];
             for (let s = 0; s < 16; s++) {
-                const res = getHarmonyNotes(chordC, null, s, 60, 'smart', s);
+                const res = getHarmonyNotes(getState(), chordC, null, s, 60, 'smart', s);
                 if (res.length > 0) {
                     notes.push({ step: s, notes: res });
                 }
@@ -219,11 +219,11 @@ describe('Harmony Engine Logic', () => {
         it('should scale density with intensity', () => {
             playback.bandIntensity = 0.1;
             harmony.complexity = 0.1;
-            const lowNotes = getHarmonyNotes(chordC, null, 0, 60, 'smart', 0);
+            const lowNotes = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
 
             playback.bandIntensity = 1.0;
             harmony.complexity = 1.0;
-            const highNotes = getHarmonyNotes(chordC, null, 0, 60, 'smart', 0);
+            const highNotes = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
 
             expect(highNotes.length).toBeGreaterThanOrEqual(lowNotes.length);
         });
@@ -235,7 +235,7 @@ describe('Harmony Engine Logic', () => {
             groove.genreFeel = 'Funk';
             let stabFound = false;
             for (let s = 1; s < 16; s++) {
-                const res = getHarmonyNotes(chordC, null, s, 60, 'smart', s);
+                const res = getHarmonyNotes(getState(), chordC, null, s, 60, 'smart', s);
                 if (res.length > 0 && res[0].durationSteps < 4) {
                     stabFound = true;
                     break;
@@ -251,14 +251,14 @@ describe('Harmony Engine Logic', () => {
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
 
-            const res = getHarmonyNotes(chordC, null, 0, 60, 'smart', 0);
+            const res = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
             expect(res.length).toBeGreaterThan(0);
             // In new logic, downbeat duration is 3 (less than 4-step pad)
             expect(res[0].durationSteps).toBeLessThan(4);
 
             // At 0.5 intensity, it should skip some non-essential hits when soloist is busy
             // (needed = 0.4 + 0.2 = 0.6 for medium hits, 0.5 < 0.6)
-            const offbeatRes = getHarmonyNotes(chordC, null, 3, 60, 'smart', 3);
+            const offbeatRes = getHarmonyNotes(getState(), chordC, null, 3, 60, 'smart', 3);
             if (offbeatRes.length > 0) {
                 // If it does play, it should be very short
                 expect(offbeatRes[0].durationSteps).toBeLessThan(2);
@@ -274,7 +274,7 @@ describe('Harmony Engine Logic', () => {
 
             let hitFound = false;
             for (let s = 0; s < 16; s++) {
-                const res = getHarmonyNotes(chordC, null, s, 60, 'smart', s);
+                const res = getHarmonyNotes(getState(), chordC, null, s, 60, 'smart', s);
                 if (res.length > 0) {
                     hitFound = true;
                     break;
@@ -291,14 +291,14 @@ describe('Harmony Engine Logic', () => {
 
             const hits1 = [];
             for (let s = 0; s < 16; s++) {
-                if (getHarmonyNotes(sectionA1, null, s, 60, 'smart', s).length > 0) {
+                if (getHarmonyNotes(getState(), sectionA1, null, s, 60, 'smart', s).length > 0) {
                     hits1.push(s);
                 }
             }
 
             const hits2 = [];
             for (let s = 0; s < 16; s++) {
-                if (getHarmonyNotes(sectionA2, null, s, 60, 'smart', s).length > 0) {
+                if (getHarmonyNotes(getState(), sectionA2, null, s, 60, 'smart', s).length > 0) {
                     hits2.push(s);
                 }
             }
@@ -323,7 +323,7 @@ describe('Harmony Engine Logic', () => {
             };
             const soloistNote = { midi: 72, freq: 523.25 };
 
-            const notes = getHarmonyNotes(chord, null, 0, 60, 'smart', 0, soloistNote);
+            const notes = getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, soloistNote);
 
             expect(notes.length).toBeGreaterThan(0);
             expect(notes[0].isLatched).toBe(true);
