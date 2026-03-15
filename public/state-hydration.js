@@ -1,4 +1,3 @@
-import { applyTheme } from './app-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from './config.js';
 import {
     BASS_STYLES,
@@ -286,17 +285,7 @@ export function hydrateState() {
                         ? savedState.midi.velocitySensitivity
                         : 1.0,
             });
-
-            if (savedState.midi.enabled) {
-                import('./midi-controller.js').then(({ initMIDI }) => {
-                    initMIDI();
-                });
-            }
         }
-
-        applyTheme(playback.theme);
-    } else {
-        applyTheme('auto');
     }
     dispatch('HYDRATE');
 }
