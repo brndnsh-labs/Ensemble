@@ -39,7 +39,6 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             break;
         }
         case ACTIONS.SHOW_TOAST: {
-            const id = Math.random().toString(36).substr(2, 9);
             // We re-dispatch with an ID so the reducer can store it and we can expire it
             // but the reducer already handles the first SHOW_TOAST.
             // Actually, we can just use the payload if it's already an object with an ID,
