@@ -152,6 +152,13 @@ export function selectPitchAndDevices(
         isGreatsProfileEnabled && soloistState.phraseContext?.role === 'response';
     const isFunkOrSka = activeStyle === 'funk' || activeStyle === 'ska';
 
+    // Optimization: Pre-compute chord tones into a bitmask to avoid O(N) .some() checks and closure creation in hot loop
+    let chordMask = 0;
+    for (let i = 0; i < targetChord.intervals.length; i++) {
+        const intv = ((targetChord.intervals[i] % 12) + 12) % 12;
+        chordMask |= 1 << intv;
+    }
+
     for (let m = searchMin; m <= searchMax; m++) {
         const pc = ((m % 12) + 12) % 12;
         const interval = (pc - (rootMidi % 12) + 12) % 12;
@@ -285,18 +292,21 @@ export function selectPitchAndDevices(
         if (dist <= 4) {
             weight += 50;
         }
-        if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
+
+        const isChordTone = (chordMask >> interval) & 1;
+
+        if (isChordTone) {
             weight += 150;
         }
 
         // Prioritize chord tones on strong beats or sustained notes
         if (isStrongBeat || durationSteps >= 4) {
-            if (targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
+            if (isChordTone) {
                 weight += 300;
             }
         } else if (durationSteps <= 2 && !isStrongBeat) {
             // Passing tone on weak beat/short duration
-            if (!targetChord.intervals.some((i) => ((i % 12) + 12) % 12 === interval)) {
+            if (!isChordTone) {
                 weight += 100; // boost scale notes that aren't chord tones
             }
         }
