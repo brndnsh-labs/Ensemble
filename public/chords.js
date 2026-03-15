@@ -6,7 +6,6 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from './config.js';
-import { dispatch, getState } from './state.js';
 import { getFrequency, normalizeKey } from './utils.js';
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
@@ -132,6 +131,7 @@ export function getChordDetails(symbol) {
  * @returns {number[]} - Optimized MIDI notes for the chord.
  */
 export function getBestInversion(
+    state,
     rootMidi,
     intervals,
     previousMidis,
@@ -141,7 +141,7 @@ export function getBestInversion(
     max = 84,
     style = 'stabs',
 ) {
-    const { chords } = getState();
+    const { chords } = state;
     const homeAnchor = anchor || chords.octave || 60;
 
     // Organ needs more aggressive correction back to the anchor to avoid mud
@@ -391,8 +391,8 @@ function resolveChordRoot(part, keyRootMidi, baseOctave) {
  * Generates pro-level rootless jazz voicings.
  * Omits root and often the 5th to focus on 3rd, 7th, and extensions.
  */
-function getRootlessVoicing(quality, is7th, isRich) {
-    const { groove, playback } = getState();
+function getRootlessVoicing(state, quality, is7th, isRich) {
+    const { groove, playback } = state;
     const genre = groove.genreFeel;
     const intensity = playback.bandIntensity;
 
@@ -511,8 +511,8 @@ function getRootlessVoicing(quality, is7th, isRich) {
     return null; // Fallback to standard triads
 }
 
-export function getIntervals(quality, is7th, density, genre = 'Rock', bassEnabled = true) {
-    const { playback, groove } = getState();
+export function getIntervals(state, quality, is7th, density, genre = 'Rock', bassEnabled = true) {
+    const { playback, groove } = state;
     const isRich = density === 'rich';
     const intensity = playback.bandIntensity;
 
@@ -532,7 +532,7 @@ export function getIntervals(quality, is7th, density, genre = 'Rock', bassEnable
             genre === 'Funk' ||
             genre === 'Blues');
     if (shouldBeRootless) {
-        const rootless = getRootlessVoicing(quality, is7th, isRich || intensity > 0.6);
+        const rootless = getRootlessVoicing(state, quality, is7th, isRich || intensity > 0.6);
         if (rootless) {
             return rootless;
         }
@@ -906,14 +906,15 @@ export function getFormattedChordNames(rootName, rootNNS, rootRomanBase, quality
 
 /**
  * Parses a single progression string part (e.g., from one section).
+ * @param {Object} state
  * @param {string} input
  * @param {string} key
  * @param {string} timeSignature
  * @param {number[]} initialMidis
  * @returns {{chords: Array, finalMidis: number[]}}
  */
-function parseProgressionPart(input, key, timeSignature, initialMidis) {
-    const { chords, groove, bass } = getState();
+function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
+    const { chords, groove, bass } = state;
     const parsed = [];
     const baseOctave = Math.floor(chords.octave / 12) * 12;
     const keyRootMidi = baseOctave + KEY_ORDER.indexOf(normalizeKey(key));
@@ -994,6 +995,7 @@ function parseProgressionPart(input, key, timeSignature, initialMidis) {
                 }
 
                 const intervals = getIntervals(
+                    state,
                     quality,
                     is7th,
                     chords.density,
@@ -1004,6 +1006,7 @@ function parseProgressionPart(input, key, timeSignature, initialMidis) {
                 const pianoMin = bass.enabled || chords.pianoRoots ? 52 : 43;
                 const isPivot = parsed.length === 0;
                 let currentMidis = getBestInversion(
+                    state,
                     rootMidi,
                     intervals,
                     lastMidis,
@@ -1087,10 +1090,12 @@ function parseProgressionPart(input, key, timeSignature, initialMidis) {
 
 /**
  * Parses the progression input string and updates the chord state.
- * @param {Function} renderCallback - Callback to trigger visual update.
+ * @param {Object} state
+ * @param {Function} [dispatch]
+ * @param {Function} [renderCallback] - Callback to trigger visual update.
  */
-export function validateProgression(renderCallback) {
-    const { arranger } = getState();
+export function validateProgression(state, dispatch, renderCallback) {
+    const { arranger } = state;
     let allChords = [];
     let lastMidis = [];
 
@@ -1102,6 +1107,7 @@ export function validateProgression(renderCallback) {
 
             for (let r = 0; r < repeats; r++) {
                 const { chords, finalMidis } = parseProgressionPart(
+                    state,
                     section.value,
                     sectionKey,
                     sectionTS,
@@ -1125,8 +1131,10 @@ export function validateProgression(renderCallback) {
 
     arranger.progression = allChords;
     Object.assign(arranger, { progression: allChords });
-    updateProgressionCache();
-    dispatch('PROG_VALIDATED'); // Notify Preact
+    updateProgressionCache(state);
+    if (dispatch) {
+        dispatch('PROG_VALIDATED'); // Notify Preact
+    }
     if (renderCallback) {
         renderCallback();
     }
@@ -1135,8 +1143,8 @@ export function validateProgression(renderCallback) {
 /**
  * Caches progression metadata to avoid redundant calculations in the scheduler.
  */
-function updateProgressionCache() {
-    const { arranger } = getState();
+function updateProgressionCache(state) {
+    const { arranger } = state;
     if (!arranger.progression.length) {
         Object.assign(arranger, {
             totalSteps: 0,

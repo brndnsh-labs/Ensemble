@@ -20,7 +20,7 @@ function init() {
         // Ensure state is populated BEFORE the UI mounts so components initialize with correct data.
         hydrateState();
         loadFromUrl();
-        validateProgression();
+        validateProgression(getState(), (a, p) => window.ensemble?.dispatch(a, p));
 
         // --- ASSEMBLE UI ---
         mountComponents();

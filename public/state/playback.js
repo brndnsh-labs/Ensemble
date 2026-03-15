@@ -222,22 +222,18 @@ export function playbackReducer(action, payload) {
             }
             break;
         case ACTIONS.SHOW_TOAST: {
-            const id = Math.random().toString(36).substr(2, 9);
-            playback.toasts = [...playback.toasts, { id, message: payload }];
-            setTimeout(() => {
-                playback.toasts = playback.toasts.filter((t) => t.id !== id);
-                // We don't have a direct notify() here, but the standard subscribe mechanism in ui-bridge will pick it up on the next dispatch
-                // or we can dispatch an internal update action
-                import('../state.js').then(({ dispatch }) => dispatch('TOAST_EXPIRED'));
-            }, 2000);
+            const id = payload.id || Math.random().toString(36).substr(2, 9);
+            playback.toasts = [...playback.toasts, { id, message: payload.message || payload }];
             return true;
         }
+        case 'TOAST_EXPIRED':
+            playback.toasts = playback.toasts.filter((t) => t.id !== payload);
+            return true;
         case ACTIONS.TRIGGER_FLASH:
             playback.flashIntensity = payload || 0.25;
-            setTimeout(() => {
-                playback.flashIntensity = 0;
-                import('../state.js').then(({ dispatch }) => dispatch('FLASH_EXPIRED'));
-            }, 50);
+            return true;
+        case 'FLASH_EXPIRED':
+            playback.flashIntensity = 0;
             return true;
     }
     return false;

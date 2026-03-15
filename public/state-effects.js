@@ -1,4 +1,5 @@
 import { applyTheme, setBpm } from './app-controller.js';
+import { validateProgression } from './chords.js';
 import { initAudio, restoreGains } from './engine/engine.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { loadDrumPreset } from './instrument-controller.js';
@@ -16,6 +17,16 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             togglePlay(stateMap, payload?.viz, true, dispatch);
             break;
         }
+        case ACTIONS.SET_SECTIONS:
+        case ACTIONS.ADD_SECTION:
+        case ACTIONS.REMOVE_SECTION:
+        case ACTIONS.UPDATE_SECTION:
+        case ACTIONS.SET_KEY:
+        case ACTIONS.SET_TIME_SIGNATURE:
+        case ACTIONS.SET_IS_MINOR: {
+            validateProgression(stateMap, dispatch);
+            break;
+        }
         case ACTIONS.SET_BPM: {
             setBpm(payload, payload?.viz, true, context.oldBpm);
             break;
@@ -25,6 +36,32 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             if (payload.drum && !playback.isPlaying) {
                 loadDrumPreset(payload.drum);
             }
+            break;
+        }
+        case ACTIONS.SHOW_TOAST: {
+            const id = Math.random().toString(36).substr(2, 9);
+            // We re-dispatch with an ID so the reducer can store it and we can expire it
+            // but the reducer already handles the first SHOW_TOAST.
+            // Actually, we can just use the payload if it's already an object with an ID,
+            // or if it's a string, we know the reducer will generate one.
+            // Better: let the reducer handle the initial state, and here we just set the timer.
+            // But we need the ID. Let's look at how SHOW_TOAST is called.
+
+            // Optimization: If payload is a string, we need to know what ID the reducer gave it.
+            // Or we can generate the ID here and pass it to the reducer.
+            // Let's assume the reducer and effects are called in sequence.
+            const toastId = stateMap.playback.toasts[stateMap.playback.toasts.length - 1]?.id;
+            if (toastId) {
+                setTimeout(() => {
+                    dispatch('TOAST_EXPIRED', toastId);
+                }, 2000);
+            }
+            break;
+        }
+        case ACTIONS.TRIGGER_FLASH: {
+            setTimeout(() => {
+                dispatch('FLASH_EXPIRED');
+            }, 50);
             break;
         }
         case ACTIONS.RESTORE_GAINS: {
