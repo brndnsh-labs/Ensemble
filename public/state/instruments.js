@@ -462,6 +462,10 @@ export function instrumentReducer(action, payload) {
                 activeSteps: 0,
                 rhythmicEntropy: 0,
                 rhythmPlan: [],
+                deviceBuffer: [],
+                embellishmentBuffer: [],
+                hookBuffer: [],
+                sharedHookBuffer: [],
                 phraseContext: {
                     role: 'call',
                     skeleton: [],

@@ -116,6 +116,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         soloist.isResting = false;
         soloist.activeSteps = 100;
         soloist.embellishmentBuffer = [];
+        soloist.deviceBuffer = [];
 
         // Force high probability for device triggering
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
