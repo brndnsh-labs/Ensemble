@@ -40,6 +40,8 @@ export function GenerateSongModal() {
     const [manualSeedValue, setManualSeedValue] = useState('');
     const [seedType, setSeedType] = useState('Verse');
     const [hasGenerated, setHasGenerated] = useState(false);
+    const [confirmTemplate, setConfirmTemplate] = useState(null);
+    const [confirmGen, setConfirmGen] = useState(false);
 
     const prevOpenRef = useRef(false);
 
@@ -81,13 +83,11 @@ export function GenerateSongModal() {
     };
 
     const applyTemplate = (template) => {
-        if (
-            !confirm(
-                `Apply "${template.name}" template? This will replace your current arrangement.`,
-            )
-        ) {
+        if (confirmTemplate !== template.name) {
+            setConfirmTemplate(template.name);
             return;
         }
+        setConfirmTemplate(null);
 
         try {
             pushHistory();
@@ -131,10 +131,12 @@ export function GenerateSongModal() {
         }
 
         if (isDirty && sections.length > 1) {
-            if (!confirm('Replace current arrangement with generated song?')) {
+            if (!confirmGen) {
+                setConfirmGen(true);
                 return;
             }
         }
+        setConfirmGen(false);
 
         try {
             let seed = null;
@@ -323,9 +325,24 @@ export function GenerateSongModal() {
                                                     e.currentTarget.style.transform =
                                                         'translateY(0)';
                                                 }}
+                                                aria-label={
+                                                    confirmTemplate === template.name
+                                                        ? 'Apply template? This replaces current arrangement.'
+                                                        : undefined
+                                                }
+                                                aria-live={
+                                                    confirmTemplate === template.name
+                                                        ? 'polite'
+                                                        : 'off'
+                                                }
                                             >
-                                                <div style="font-weight: bold; color: var(--accent-color); font-size: 1rem;">
-                                                    {template.name}
+                                                <div style="font-weight: bold; color: var(--accent-color); font-size: 1rem; display: flex; justify-content: space-between;">
+                                                    <span>{template.name}</span>
+                                                    {confirmTemplate === template.name && (
+                                                        <span style="color: var(--red); font-size: 0.8rem;">
+                                                            Click again to replace
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div style="font-size: 0.75rem; color: var(--text-muted);">
                                                     {template.sections.length} Sections •{' '}
@@ -548,8 +565,16 @@ export function GenerateSongModal() {
                                         class="primary-btn"
                                         style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
                                         onClick={handleConfirm}
+                                        aria-label={
+                                            confirmGen
+                                                ? 'Replace current arrangement with generated song?'
+                                                : undefined
+                                        }
+                                        aria-live={confirmGen ? 'polite' : 'off'}
                                     >
-                                        ✨ Generate New Arrangement
+                                        {confirmGen
+                                            ? '⚠️ Replace arrangement?'
+                                            : '✨ Generate New Arrangement'}
                                     </button>
                                 </Fragment>
                             )}

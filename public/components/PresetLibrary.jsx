@@ -19,6 +19,8 @@ export function PresetLibrary({ type }) {
     }));
 
     const [userPresets, setUserPresets] = useState([]);
+    const [confirmSelect, setConfirmSelect] = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
 
     useEffect(() => {
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
@@ -43,8 +45,14 @@ export function PresetLibrary({ type }) {
 
     const handleSelect = (item, isUser = false) => {
         if (type === 'chord') {
-            if (isDirty && !confirm('Discard your custom arrangement and load this preset?')) {
-                return;
+            if (isDirty) {
+                const itemId = item.id || item.name;
+                if (confirmSelect !== itemId) {
+                    setConfirmSelect(itemId);
+                    setConfirmDelete(null); // Clear other
+                    return;
+                }
+                setConfirmSelect(null);
             }
 
             const newSections = isUser
@@ -161,9 +169,12 @@ export function PresetLibrary({ type }) {
 
     const handleDelete = (e, index) => {
         e.stopPropagation();
-        if (!confirm(`Delete this ${type === 'chord' ? 'preset' : 'drum pattern'}?`)) {
+        if (confirmDelete !== index) {
+            setConfirmDelete(index);
+            setConfirmSelect(null); // Clear other
             return;
         }
+        setConfirmDelete(null);
 
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
         const updated = [...userPresets];
@@ -186,20 +197,29 @@ export function PresetLibrary({ type }) {
     return (
         <Fragment>
             <div className="presets-container">
-                {sorted.map((item, idx) => (
-                    <button
-                        key={item.id || item.name}
-                        className={`preset-chip ${type}-preset-chip ${activeId === (item.id || item.name) ? 'active' : ''}`}
-                        onClick={() => handleSelect(item)}
-                        data-id={item.id || item.name}
-                        data-category={item.category || 'Other'}
-                        style={{
-                            animationDelay: `${Math.min(idx * 0.03, 0.6)}s`,
-                        }}
-                    >
-                        {formatUnicodeSymbols(item.name)}
-                    </button>
-                ))}
+                {sorted.map((item, idx) => {
+                    const id = item.id || item.name;
+                    return (
+                        <button
+                            key={id}
+                            className={`preset-chip ${type}-preset-chip ${activeId === id ? 'active' : ''}`}
+                            onClick={() => handleSelect(item)}
+                            data-id={id}
+                            data-category={item.category || 'Other'}
+                            style={{
+                                animationDelay: `${Math.min(idx * 0.03, 0.6)}s`,
+                            }}
+                            aria-label={
+                                confirmSelect === id
+                                    ? 'Discard arrangement and load preset?'
+                                    : undefined
+                            }
+                            aria-live={confirmSelect === id ? 'polite' : 'off'}
+                        >
+                            {confirmSelect === id ? '⚠️ Replace?' : formatUnicodeSymbols(item.name)}
+                        </button>
+                    );
+                })}
             </div>
 
             {userPresets.length > 0 && (
@@ -214,25 +234,41 @@ export function PresetLibrary({ type }) {
                         User
                     </label>
                     <div className="presets-container">
-                        {userPresets.map((item, idx) => (
-                            <button
-                                key={`user-${idx}`}
-                                className={`preset-chip user-preset-chip ${type}-preset-chip ${activeId === item.name ? 'active' : ''}`}
-                                onClick={() => handleSelect(item, true)}
-                                style={{
-                                    animationDelay: `${Math.min(idx * 0.05, 0.6)}s`,
-                                }}
-                            >
-                                {item.name}
-                                <span
-                                    className="delete-btn"
-                                    onClick={(e) => handleDelete(e, idx)}
-                                    style="margin-left: 0.5rem; opacity: 0.5; font-size: 0.8rem;"
+                        {userPresets.map((item, idx) => {
+                            const id = item.id || item.name;
+                            return (
+                                <button
+                                    key={`user-${idx}`}
+                                    className={`preset-chip user-preset-chip ${type}-preset-chip ${activeId === item.name ? 'active' : ''}`}
+                                    onClick={() => handleSelect(item, true)}
+                                    style={{
+                                        animationDelay: `${Math.min(idx * 0.05, 0.6)}s`,
+                                    }}
+                                    aria-label={
+                                        confirmSelect === id
+                                            ? 'Discard arrangement and load preset?'
+                                            : undefined
+                                    }
+                                    aria-live={confirmSelect === id ? 'polite' : 'off'}
                                 >
-                                    ✕
-                                </span>
-                            </button>
-                        ))}
+                                    {confirmSelect === id ? '⚠️ Replace?' : item.name}
+                                    <span
+                                        className="delete-btn"
+                                        onClick={(e) => handleDelete(e, idx)}
+                                        style="margin-left: 0.5rem; opacity: 0.5; font-size: 0.8rem;"
+                                        aria-label={
+                                            confirmDelete === idx
+                                                ? 'Confirm delete preset'
+                                                : 'Delete preset'
+                                        }
+                                        aria-live={confirmDelete === idx ? 'polite' : 'off'}
+                                        role={confirmDelete === idx ? 'alert' : 'button'}
+                                    >
+                                        {confirmDelete === idx ? '⚠️ Sure?' : '✕'}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
