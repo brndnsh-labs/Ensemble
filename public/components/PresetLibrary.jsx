@@ -209,7 +209,11 @@ export function PresetLibrary({ type }) {
                             style={{
                                 animationDelay: `${Math.min(idx * 0.03, 0.6)}s`,
                             }}
-                            aria-label={confirmSelect === id ? 'Discard arrangement and load preset?' : undefined}
+                            aria-label={
+                                confirmSelect === id
+                                    ? 'Discard arrangement and load preset?'
+                                    : undefined
+                            }
                             aria-live={confirmSelect === id ? 'polite' : 'off'}
                         >
                             {confirmSelect === id ? '⚠️ Replace?' : formatUnicodeSymbols(item.name)}
@@ -240,7 +244,11 @@ export function PresetLibrary({ type }) {
                                     style={{
                                         animationDelay: `${Math.min(idx * 0.05, 0.6)}s`,
                                     }}
-                                    aria-label={confirmSelect === id ? 'Discard arrangement and load preset?' : undefined}
+                                    aria-label={
+                                        confirmSelect === id
+                                            ? 'Discard arrangement and load preset?'
+                                            : undefined
+                                    }
                                     aria-live={confirmSelect === id ? 'polite' : 'off'}
                                 >
                                     {confirmSelect === id ? '⚠️ Replace?' : item.name}
@@ -248,7 +256,11 @@ export function PresetLibrary({ type }) {
                                         className="delete-btn"
                                         onClick={(e) => handleDelete(e, idx)}
                                         style="margin-left: 0.5rem; opacity: 0.5; font-size: 0.8rem;"
-                                        aria-label={confirmDelete === idx ? 'Confirm delete preset' : 'Delete preset'}
+                                        aria-label={
+                                            confirmDelete === idx
+                                                ? 'Confirm delete preset'
+                                                : 'Delete preset'
+                                        }
                                         aria-live={confirmDelete === idx ? 'polite' : 'off'}
                                         role={confirmDelete === idx ? 'alert' : 'button'}
                                     >
