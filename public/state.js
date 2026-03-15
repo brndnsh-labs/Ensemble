@@ -16,7 +16,6 @@ import { midi, midiReducer, setMidiParam } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer, setPlaybackParam } from './state/playback.js';
 import { setVizParam, vizReducer, vizState } from './state/visualizer.js';
-import { handleEffects } from './state-effects.js';
 import { ACTIONS } from './types.js';
 
 // --- Global Export for E2E ---
@@ -174,10 +173,7 @@ export function dispatch(action, payload) {
     playback.stateVersion++;
 
     // Notify listeners
-    listeners.forEach((listener) => listener(action, payload, stateMap));
-
-    // 3. Side Effects (Middleware)
-    handleEffects(action, payload, { oldBpm });
+    listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm }));
 }
 
 /**

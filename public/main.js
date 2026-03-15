@@ -5,6 +5,7 @@ import { scheduler } from './engine/scheduler-core.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
 import { initPWA } from './pwa.js';
 import { getState, subscribe } from './state.js';
+import { handleEffects } from './state-effects.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
 import { mountComponents } from './ui-root.jsx';
 import { UnifiedVisualizer } from './visualizer.js';
@@ -115,7 +116,10 @@ function init() {
 
         analyzeFormUI();
 
-        subscribe((action, payload) => syncWorker(action, payload));
+        subscribe((action, payload, stateMap, context) => {
+            syncWorker(action, payload);
+            handleEffects(action, payload, stateMap, context);
+        });
         syncWorker();
 
         // Signal to E2E tests that hydration and mounting are complete
