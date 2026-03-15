@@ -1,8 +1,11 @@
 /* eslint-disable */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import {
     calculateTimingOffset,
+    clampFreq,
+    createReverbImpulse,
+    createSoftClipCurve,
     formatUnicodeSymbols,
     getChordMidiNotes,
     getFrequency,
@@ -13,6 +16,63 @@ import {
 } from '../../public/utils.js';
 
 describe('Utility Functions', () => {
+    describe('DSP Utility Functions', () => {
+        let mockAudioCtx;
+
+        beforeEach(() => {
+            mockAudioCtx = {
+                sampleRate: 44100,
+                createBuffer: vi.fn((channels, length, sampleRate) => ({
+                    numberOfChannels: channels,
+                    length,
+                    sampleRate,
+                    _data: Array.from({ length: channels }, () => new Float32Array(length)),
+                    getChannelData(channel) {
+                        return this._data[channel];
+                    },
+                })),
+            };
+        });
+
+        it('should correctly generate a reverb impulse', () => {
+            const impulse = createReverbImpulse(mockAudioCtx, 1.0, 2.0);
+
+            expect(mockAudioCtx.createBuffer).toHaveBeenCalledWith(2, 44100, 44100);
+            expect(impulse.numberOfChannels).toBe(2);
+            expect(impulse.length).toBe(44100);
+            expect(impulse.sampleRate).toBe(44100);
+
+            // Check that the data is populated
+            const channelData = impulse.getChannelData(0);
+            expect(channelData[0]).not.toBeNaN();
+            expect(channelData[44099]).toBeCloseTo(0, 4); // Should decay towards 0
+        });
+
+        it('should create and cache a soft clip curve', () => {
+            const curve1 = createSoftClipCurve();
+            expect(curve1).toBeInstanceOf(Float32Array);
+            expect(curve1.length).toBe(44100);
+
+            // Check that it's monotonic cubic: f(x) = (3x - x^3) / 2
+            // At x=-1 (i=0), f(-1) = (-3 + 1)/2 = -1
+            expect(curve1[0]).toBeCloseTo(-1, 5);
+            // At x=1 (i=44099), f(1) ~ 1
+            expect(curve1[44099]).toBeCloseTo(1, 4);
+            // At x=0 (i=22050), f(0) = 0
+            expect(curve1[22050]).toBeCloseTo(0, 5);
+
+            const curve2 = createSoftClipCurve();
+            expect(curve1).toBe(curve2); // Should be exactly the same cached instance
+        });
+
+        it('should clamp frequencies correctly', () => {
+            expect(clampFreq(-100)).toBe(0);
+            expect(clampFreq(440)).toBe(440);
+            expect(clampFreq(25000)).toBe(24000); // Default max
+            expect(clampFreq(25000, 26000)).toBe(25000); // Custom max
+        });
+    });
+
     describe('calculateTimingOffset', () => {
         const pocket = {
             globalDrive: 0.5,
@@ -21,6 +81,10 @@ describe('Utility Functions', () => {
             chordGravity: 0.6,
             soloistGravity: 0.4,
         };
+
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
 
         it('should correctly calculate global drive offset', () => {
             // 0.5 drive = -6ms (ahead)
@@ -40,6 +104,36 @@ describe('Utility Functions', () => {
             // Total -> -0.00576
             const offset = calculateTimingOffset('bass', pocket, 1.0);
             expect(offset).toBeCloseTo(-0.00576, 5);
+        });
+
+        it('should apply chord gravity displacement', () => {
+            vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            const offset = calculateTimingOffset('chords', pocket, 1.0);
+            // 0.6 chordGravity -> 0.4 * 0.006 = +0.0024
+            // + 0.3 (1-bassGravity) * 0.003 = +0.0009
+            // sum = 0.0033
+            // elasticity factor * 0.1 -> 0.00033
+            // Global drive -> -0.006
+            // Total -> -0.00567
+            expect(offset).toBeCloseTo(-0.00567, 5);
+        });
+
+        it('should apply soloist gravity displacement', () => {
+            vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            const offset = calculateTimingOffset('soloist', pocket, 1.0);
+            // 0.4 soloistGravity -> 0.6 * 0.012 = 0.0072
+            // elasticity factor * 0.1 -> 0.00072
+            // Global drive -> -0.006
+            // Total -> -0.00528
+            expect(offset).toBeCloseTo(-0.00528, 5);
+        });
+
+        it('should handle missing match as 0 instrumentSpecific', () => {
+            vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            const offset = calculateTimingOffset('unknown', pocket, 1.0);
+            // instrumentSpecific = 0
+            // Total -> -0.006
+            expect(offset).toBeCloseTo(-0.006, 5);
         });
 
         it('should return 0 if pocket is missing', () => {
