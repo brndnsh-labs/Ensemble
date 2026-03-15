@@ -183,9 +183,9 @@ export function SequencerGrid() {
     }, []);
 
     const handleAudition = useCallback((inst) => {
-        import('../engine/engine.js').then(({ playDrumSound }) => {
-            dispatch(ACTIONS.INIT_AUDIO);
-            playDrumSound(inst.name, playbackState.audio.currentTime, 1.0);
+        dispatch(ACTIONS.INIT_AUDIO);
+        import('../performance-controller.js').then(({ triggerDrumSound }) => {
+            triggerDrumSound(inst.name, playbackState.audio.currentTime, 1.0);
         });
     }, []);
 

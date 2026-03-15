@@ -73,6 +73,7 @@ vi.mock('../../public/state.js', () => {
         playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
     };
 });

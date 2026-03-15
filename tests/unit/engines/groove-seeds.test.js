@@ -2,33 +2,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../../public/conductor.js';
 
 // Mock state
-const mockState = {
-    groove: {
-        enabled: true,
-        creativity: true,
-        sectionSeedMap: {},
-        genreFeel: 'Rock',
+const { mockState } = vi.hoisted(() => ({
+    mockState: {
+        groove: {
+            enabled: true,
+            creativity: true,
+            sectionSeedMap: {},
+            genreFeel: 'Rock',
+        },
+        arranger: {
+            totalSteps: 32,
+            stepMap: [
+                { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
+                { start: 16, end: 32, chord: { sectionId: 's2', sectionLabel: 'Chorus' } },
+            ],
+            sections: [
+                { id: 's1', label: 'Verse' },
+                { id: 's2', label: 'Chorus' },
+            ],
+            timeSignature: '4/4',
+        },
+        playback: {
+            bandIntensity: 0.5,
+            autoIntensity: false,
+            visualFlash: false,
+        },
     },
-    arranger: {
-        totalSteps: 32,
-        stepMap: [
-            { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
-            { start: 16, end: 32, chord: { sectionId: 's2', sectionLabel: 'Chorus' } },
-        ],
-        sections: [
-            { id: 's1', label: 'Verse' },
-            { id: 's2', label: 'Chorus' },
-        ],
-        timeSignature: '4/4',
-    },
-    playback: {
-        bandIntensity: 0.5,
-        autoIntensity: false,
-        visualFlash: false,
-    },
-};
+}));
 
 vi.mock('../../../public/state.js', () => ({
+    stateMap: mockState,
     getState: () => mockState,
     dispatch: vi.fn((action, payload) => {
         if (action === 'SET_GROOVE_SEED') {

@@ -14,6 +14,7 @@ vi.mock('../../public/state.js', () => {
         playback: { step: 0 },
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_PARAM') {

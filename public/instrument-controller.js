@@ -13,7 +13,7 @@ import {
     restoreGains,
 } from './engine/engine.js';
 import { saveCurrentState } from './persistence.js';
-import { dispatch, getState } from './state.js';
+import { dispatch, getState, stateMap } from './state.js';
 import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 import { getStepsPerMeasure } from './utils.js';
@@ -162,15 +162,15 @@ export function flushBuffers(primeSteps = 0) {
     harmony.buffer.clear();
 
     // 2. Kill current sounds and buses
-    killAllPianoNotes();
-    killSoloistNote();
-    killBassNote();
-    killDrumNote();
+    killAllPianoNotes(stateMap);
+    killSoloistNote(stateMap);
+    killBassNote(stateMap);
+    killDrumNote(stateMap);
 
-    killChordBus();
-    killBassBus();
-    killSoloistBus();
-    killDrumBus();
+    killChordBus(stateMap);
+    killBassBus(stateMap);
+    killSoloistBus(stateMap);
+    killDrumBus(stateMap);
 
     // 3. Prepare sync data for atomicity
     const syncData = {
@@ -236,7 +236,7 @@ export function flushBuffers(primeSteps = 0) {
 
     // 4. Trigger a BUNDLED worker flush
     flushWorker(playback.step, syncData, primeSteps);
-    restoreGains();
+    restoreGains(stateMap);
 }
 
 function flushBuffer(type, primeSteps = 0) {
@@ -246,37 +246,37 @@ function flushBuffer(type, primeSteps = 0) {
             bass.lastFreq = bass.lastPlayedFreq; // @worker-mutation
         }
         bass.buffer.clear();
-        killBassNote();
-        killBassBus();
+        killBassNote(stateMap);
+        killBassBus(stateMap);
     }
     if (type === 'soloist' || type === 'all') {
         if (soloist.lastPlayedFreq !== null) {
             soloist.lastFreq = soloist.lastPlayedFreq; // @worker-mutation
         }
         soloist.buffer.clear();
-        killSoloistNote();
-        killSoloistBus();
+        killSoloistNote(stateMap);
+        killSoloistBus(stateMap);
     }
     if (type === 'chord' || type === 'all') {
         chords.buffer.clear();
-        killAllPianoNotes();
-        killChordBus();
+        killAllPianoNotes(stateMap);
+        killChordBus(stateMap);
     }
     if (type === 'harmony' || type === 'all') {
         harmony.buffer.clear();
-        killHarmonyNote();
-        killHarmonyBus();
+        killHarmonyNote(stateMap);
+        killHarmonyBus(stateMap);
     }
     if (type === 'groove' || type === 'all') {
-        killDrumNote();
-        killDrumBus();
+        killDrumNote(stateMap);
+        killDrumBus(stateMap);
     }
 
     // Solo flush (usually from UI toggles)
     if (type !== 'none') {
         flushWorker(playback.step, null, primeSteps);
     }
-    restoreGains();
+    restoreGains(stateMap);
 }
 
 export function togglePower(type) {
@@ -340,11 +340,11 @@ export function togglePower(type) {
     if (['chord', 'bass', 'soloist', 'harmony'].includes(normalizedType)) {
         flushBuffer(normalizedType);
     } else {
-        restoreGains();
+        restoreGains(stateMap);
     }
 
     if (newState) {
-        restoreGains();
+        restoreGains(stateMap);
     }
 
     saveCurrentState();

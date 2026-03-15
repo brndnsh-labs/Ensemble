@@ -1,5 +1,4 @@
 import { MODULES } from './constants.js';
-import { initAudio, restoreGains } from './engine/engine.js';
 import { arranger, arrangerReducer, setArrangerParam } from './state/arranger.js';
 import { groove, grooveReducer, setGrooveParam } from './state/groove.js';
 import {
@@ -17,6 +16,7 @@ import { midi, midiReducer, setMidiParam } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer, setPlaybackParam } from './state/playback.js';
 import { setVizParam, vizReducer, vizState } from './state/visualizer.js';
+import { handleEffects } from './state-effects.js';
 import { ACTIONS } from './types.js';
 
 // --- Global Export for E2E ---
@@ -32,7 +32,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Central State Map for Generic PARAM Updates
-const stateMap = {
+export const stateMap = {
     playback,
     chords,
     bass,
@@ -178,39 +178,6 @@ export function dispatch(action, payload) {
 
     // 3. Side Effects (Middleware)
     handleEffects(action, payload, { oldBpm });
-}
-
-/**
- * Handle side effects for specific actions.
- */
-async function handleEffects(action, payload, context = {}) {
-    switch (action) {
-        case ACTIONS.TOGGLE_PLAY: {
-            const { togglePlay } = await import('./engine/scheduler-core.js');
-            togglePlay(payload?.viz, true);
-            break;
-        }
-        case ACTIONS.SET_BPM: {
-            const { setBpm } = await import('./app-controller.js');
-            setBpm(payload, payload?.viz, true, context.oldBpm);
-            break;
-        }
-        case ACTIONS.SET_GENRE_FEEL: {
-            if (payload.drum && !playback.isPlaying) {
-                const { loadDrumPreset } = await import('./instrument-controller.js');
-                loadDrumPreset(payload.drum);
-            }
-            break;
-        }
-        case ACTIONS.RESTORE_GAINS: {
-            restoreGains();
-            break;
-        }
-        case ACTIONS.INIT_AUDIO: {
-            initAudio();
-            break;
-        }
-    }
 }
 
 /**

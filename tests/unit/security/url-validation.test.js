@@ -16,6 +16,7 @@ const { dispatchSpy, mockState } = vi.hoisted(() => {
 });
 
 vi.mock('../../../public/state.js', () => ({
+    stateMap: mockState,
     getState: () => mockState,
     dispatch: dispatchSpy,
     storage: { get: () => ({}) },

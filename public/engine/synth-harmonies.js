@@ -1,4 +1,3 @@
-import { getState } from '../state.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
 
@@ -7,15 +6,22 @@ import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js
  * Optimized for Horns (stabs) and Strings (pads).
  */
 
-export function killHarmonyNote(fadeTime = 0.05) {
-    const { playback, harmony } = getState();
+/**
+ * Stop any currently playing harmony notes.
+ * @param {Object} state - Global ensemble state.
+ * @param {number} fadeTime - Fade out time in seconds.
+ */
+export function killHarmonyNote(state, fadeTime = 0.05) {
+    const { playback, harmony } = state;
     killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
 }
 
 /**
  * Plays a harmony note with genre-specific synthesis and articulations.
+ * @param {Object} state - Global ensemble state.
  */
 export function playHarmonyNote(
+    state,
     freq,
     time,
     duration,
@@ -26,7 +32,7 @@ export function playHarmonyNote(
     slideDuration = 0,
     vibrato = { rate: 0, depth: 0 },
 ) {
-    const { playback, harmony, groove } = getState();
+    const { playback, harmony, groove } = state;
     if (!Number.isFinite(freq) || !playback.audio) {
         return;
     }
@@ -36,23 +42,19 @@ export function playHarmonyNote(
     const feel = groove.genreFeel;
 
     if (!harmony.activeVoices) {
-        harmony.activeVoices = [];
+        harmony.activeVoices = []; // @direct-mutation
     }
 
     // 1. Strict Voice Management & Stealing
     // Remove expired voices
-    harmony.activeVoices = harmony.activeVoices.filter((v) => v.time + v.duration + 0.1 > playTime);
+    harmony.activeVoices = harmony.activeVoices.filter((v) => v.time + v.duration + 0.1 > playTime); // @direct-mutation
 
     // Pitch-aware Stealing
     if (midi !== null) {
         const existing = harmony.activeVoices.find((v) => v.midi === midi);
         if (existing) {
             killActiveVoices([existing], playTime, 0.005);
-            // harmony.activeVoices update is handled by killActiveVoices if passed whole array,
-            // but here we pass a slice, so we need to manually filter if the utility clears the passed array.
-            // Actually killActiveVoices clears the array passed to it.
-            // Let's re-filter to be safe.
-            harmony.activeVoices = harmony.activeVoices.filter((v) => v !== existing);
+            harmony.activeVoices = harmony.activeVoices.filter((v) => v !== existing); // @direct-mutation
         }
     }
 

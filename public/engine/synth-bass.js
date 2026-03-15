@@ -1,12 +1,15 @@
-import { getState } from '../state.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
 import { rampGain, updateDensityDucking } from './synth-utils.js';
 
-export function killBassNote() {
-    const { playback, bass } = getState();
+/**
+ * Stop any currently playing bass note.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killBassNote(state) {
+    const { playback, bass } = state;
     if (bass.lastBassGain) {
         rampGain(bass.lastBassGain.gain, 0, playback.audio.currentTime, 0.005);
-        bass.lastBassGain = null;
+        bass.lastBassGain = null; // @direct-mutation
     }
 }
 
@@ -19,12 +22,15 @@ const mixState = {
 
 /**
  * P-Bass Synthesis: Layered physical model
- * 1. Thump: Triangle fundamental + Passive Pickup Warmth (WaveShaper)
- * 2. Growl: Sawtooth character + 12dB/oct LPF
- * 3. Impact: Sine 'Click' transient
+ * @param {Object} state - Global ensemble state.
+ * @param {number} freq - Frequency in Hz.
+ * @param {number} time - Start time in seconds.
+ * @param {number} duration - Note duration in seconds.
+ * @param {number} velocity - Note velocity (0.0 - 1.0).
+ * @param {boolean} muted - Whether the note is palm-muted.
  */
-export function playBassNote(freq, time, duration, velocity = 1.0, muted = false) {
-    const { playback, bass, groove } = getState();
+export function playBassNote(state, freq, time, duration, velocity = 1.0, muted = false) {
+    const { playback, bass, groove } = state;
     if (!Number.isFinite(freq) || !Number.isFinite(time) || !Number.isFinite(duration)) {
         return;
     }
@@ -142,7 +148,7 @@ export function playBassNote(freq, time, duration, velocity = 1.0, muted = false
         if (bass.lastBassGain && bass.lastBassGain !== mainGain) {
             rampGain(bass.lastBassGain.gain, 0, startTime, 0.005);
         }
-        bass.lastBassGain = mainGain;
+        bass.lastBassGain = mainGain; // @direct-mutation
 
         oscSine.start(startTime);
         oscTri.start(startTime);

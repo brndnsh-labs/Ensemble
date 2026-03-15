@@ -44,6 +44,7 @@ vi.mock('../../public/state.js', () => {
         }),
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
         dispatch: mockState.dispatch,
     };

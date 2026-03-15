@@ -110,6 +110,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     };
     return {
         ...actual,
+        stateMap: mockState,
         getState: () => mockState,
         dispatch: vi.fn((action, _payload) => {
             if (action === 'SET_PARAM' || action === 'SET_ACTIVE_MEASURE') {

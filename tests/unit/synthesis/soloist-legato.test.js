@@ -64,6 +64,7 @@ vi.mock('../../../public/state.js', () => {
         },
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
     };
 });
@@ -78,20 +79,20 @@ describe('Soloist Legato Articulation', () => {
     });
 
     it('should track lastRenderedFreq across calls', () => {
-        playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
+        playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
         expect(soloist.lastRenderedFreq).toBe(440);
 
-        playSoloNote(880, 101, 0.5, 0.5, 0, 'scalar', false);
+        playSoloNote(getState(), 880, 101, 0.5, 0.5, 0, 'scalar', false);
         expect(soloist.lastRenderedFreq).toBe(880);
     });
 
     it('should use portamento ramp when isLegato is true', () => {
         // First note to establish prevFreq
-        playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
+        playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
 
         // Legato note (Monophonic Mode)
         soloist.mode = 'monophonic';
-        playSoloNote(554, 100.5, 0.5, 0.5, 0, 'scalar', true);
+        playSoloNote(getState(), 554, 100.5, 0.5, 0.5, 0, 'scalar', true);
 
         const voice = soloist.activeVoices[0];
         const osc = voice.nodes.find((n) => n.frequency?.setValueAtTime);
@@ -105,8 +106,8 @@ describe('Soloist Legato Articulation', () => {
 
     it('should use 30ms glide for guitar mode', () => {
         soloist.mode = 'guitar';
-        playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
-        playSoloNote(554, 100.5, 0.5, 0.5, 0, 'scalar', true);
+        playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
+        playSoloNote(getState(), 554, 100.5, 0.5, 0.5, 0, 'scalar', true);
 
         // In guitar mode, playTime 100.5 doesn't kill the first voice (100 + 0.5 + 1.0 > 100.5)
         // So the activeVoices will have 2 voices. The legato glide happens on the SECOND voice.
@@ -118,7 +119,7 @@ describe('Soloist Legato Articulation', () => {
     });
 
     it('should use fast attack (0.005s) for legato notes', () => {
-        playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', true);
+        playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', true);
 
         const voice = soloist.activeVoices[0];
         const gain = voice.gain;
@@ -129,7 +130,7 @@ describe('Soloist Legato Articulation', () => {
 
     it('should use normal attack (0.02s) for non-legato Neo preset', () => {
         soloist.preset = 'neo';
-        playSoloNote(440, 100, 0.5, 0.5, 0, 'scalar', false);
+        playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
 
         const voice = soloist.activeVoices[0];
         const gain = voice.gain;

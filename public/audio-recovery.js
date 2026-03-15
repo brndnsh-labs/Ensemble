@@ -1,5 +1,5 @@
 import { initAudio, killAllNotes, restoreGains } from './engine/engine.js';
-import { getState } from './state.js';
+import { getState, stateMap } from './state.js';
 
 /**
  * AudioRecovery.js
@@ -129,7 +129,7 @@ class AudioHealthMonitor {
         }
 
         // 2. Kill all note scheduling
-        await killAllNotes();
+        await killAllNotes(stateMap);
 
         // 3. Re-initialize the audio graph (recreates Master, EQ, Limiters)
         // We call initAudio to rebuild the graph.
@@ -137,10 +137,10 @@ class AudioHealthMonitor {
             // Force recreation of the graph nodes
             playback.audio.close().then(async () => {
                 playback.audio = null; // @worker-mutation // Clear reference
-                initAudio(); // Rebuild from scratch
+                initAudio(stateMap); // Rebuild from scratch
 
                 // 4. Restore levels
-                restoreGains();
+                restoreGains(stateMap);
 
                 // 5. Re-attach watchdog
                 if (playback.masterGain) {

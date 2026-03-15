@@ -72,7 +72,7 @@ describe('Neo-Soul Groove Integrity', () => {
             }
 
             const ghostStep = barIndexMotif1 * 16 + 3; // 'e' of 1
-            const result = applyGrooveOverrides(createParams(ghostStep, 'Snare'));
+            const result = applyGrooveOverrides(getState(), createParams(ghostStep, 'Snare'));
             expect(result.shouldPlay).toBe(true);
             expect(result.velocity).toBeLessThan(0.5);
         });
@@ -80,7 +80,7 @@ describe('Neo-Soul Groove Integrity', () => {
         it('should drag Snare timing slightly', () => {
             getState.mockReturnValue(mockState);
             const backbeat = 4;
-            const result = applyGrooveOverrides(createParams(backbeat, 'Snare'));
+            const result = applyGrooveOverrides(getState(), createParams(backbeat, 'Snare'));
             expect(result.instTimeOffset).toBeGreaterThan(0);
         });
     });

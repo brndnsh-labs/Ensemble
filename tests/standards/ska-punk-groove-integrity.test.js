@@ -60,8 +60,8 @@ describe('Ska-Punk Groove Integrity', () => {
             const offbeat = 2;
             const downbeat = 0;
 
-            const resultOff = applyGrooveOverrides(createParams(offbeat, 'HiHat', 1));
-            const resultDown = applyGrooveOverrides(createParams(downbeat, 'HiHat', 1));
+            const resultOff = applyGrooveOverrides(getState(), createParams(offbeat, 'HiHat', 1));
+            const resultDown = applyGrooveOverrides(getState(), createParams(downbeat, 'HiHat', 1));
 
             expect(resultOff.velocity).toBeGreaterThan(resultDown.velocity);
         });

@@ -55,7 +55,7 @@ describe('Jazz Drummer Critique', () => {
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
                     };
-                    const result = applyGrooveOverrides(params);
+                    const result = applyGrooveOverrides(getState(), params);
                     if (result.shouldPlay) {
                         stepData.instruments[result.soundName || instName] = {
                             velocity: result.velocity,

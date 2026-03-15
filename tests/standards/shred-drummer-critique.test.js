@@ -55,7 +55,7 @@ describe('Shred Drummer Critique', () => {
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
                     };
-                    const result = applyGrooveOverrides(params);
+                    const result = applyGrooveOverrides(getState(), params);
                     if (result.shouldPlay && result.soundName === instName) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,

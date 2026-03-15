@@ -1,5 +1,4 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getState } from '../state.js';
 import { binarySearchMap, calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
 import * as acoustic from './grooves/acoustic.js';
 import * as blues from './grooves/blues.js';
@@ -53,25 +52,27 @@ function humanizeVelocity(vel, amount = 0.05) {
     return vel * (1.0 + (Math.random() - 0.5) * amount);
 }
 
-export function applyGrooveOverrides({
-    step,
-    inst,
-    stepVal,
-    playback,
-    groove,
-    isDownbeat,
-    isBeatStart,
-    isGroupStart,
-    isBackbeat,
-    isOffbeat,
-    isEOfBeat,
-    isAOfBeat,
-    beatIndex,
-    tsConfig,
-}) {
-    const { soloist } = getState();
-    const stateObj = getState();
-    const arrangerState = stateObj?.arranger || { timeSignature: '4/4' };
+export function applyGrooveOverrides(
+    state,
+    {
+        stepVal,
+        step,
+        inst,
+        playback,
+        groove,
+        isDownbeat,
+        isBeatStart,
+        isGroupStart,
+        isBackbeat,
+        isOffbeat,
+        isEOfBeat,
+        isAOfBeat,
+        beatIndex,
+        tsConfig,
+    },
+) {
+    const { soloist, arranger } = state;
+    const arrangerState = arranger || { timeSignature: '4/4' };
     const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
     const loopStep = step % stepsPerBar;
 

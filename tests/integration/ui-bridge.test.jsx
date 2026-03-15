@@ -5,7 +5,6 @@ import { h, render } from 'preact';
 import { useState } from 'preact/hooks';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 // We need to mock state.js before importing ui-bridge.js
 // but we want to use the real implementation mostly.
 import * as stateModule from '../../public/state.js';

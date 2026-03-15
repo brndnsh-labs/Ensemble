@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../config.js';
-import { killSoloistNote, playSoloNote } from '../engine/engine.js';
+import { stopSoloist, triggerSoloNote } from '../performance-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -28,7 +28,7 @@ export function PerformanceModal() {
     useLayoutEffect(() => {
         dispatch(ACTIONS.INIT_AUDIO);
         dispatch(ACTIONS.RESTORE_GAINS);
-        killSoloistNote(); // Immediate silence of any automatic phrases
+        stopSoloist(); // Immediate silence of any automatic phrases
 
         // Focus management: Use a multi-stage approach to ensure focus is captured
         // even if there's a slight delay from animations or first-time interactions.
@@ -170,7 +170,7 @@ export function PerformanceModal() {
 
         const freq = 440 * 2 ** ((midiNote - 69) / 12);
         // Use a very long duration (60s) for manual performance to allow sustains
-        playSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
+        triggerSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
 
         const noteInfo = midiToNote(midiNote);
         setCurrentNoteName(`${noteInfo.name}${noteInfo.octave}`);
@@ -180,7 +180,7 @@ export function PerformanceModal() {
     const stopNote = (sourceKey = null) => {
         if (!sourceKey) {
             // Kill everything
-            killSoloistNote();
+            stopSoloist();
             setCurrentNoteName('');
             heldKeysRef.current = [];
             setActiveKeys(new Set());
@@ -201,7 +201,7 @@ export function PerformanceModal() {
         setActiveKeys(nextHeld);
 
         if (heldKeysRef.current.length === 0) {
-            killSoloistNote();
+            stopSoloist();
             setCurrentNoteName('');
             setPlayingKey(null);
         } else if (wasPlaying) {

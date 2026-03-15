@@ -59,7 +59,7 @@ describe('Disco Groove Integrity', () => {
             getState.mockReturnValue(mockState);
             const kickSteps = [0, 4, 8, 12];
             for (const step of kickSteps) {
-                const result = applyGrooveOverrides(createParams(step, 'Kick'));
+                const result = applyGrooveOverrides(getState(), createParams(step, 'Kick'));
                 expect(result.shouldPlay).toBe(true);
             }
         });
@@ -80,7 +80,7 @@ describe('Disco Groove Integrity', () => {
             // Offbeats are 2, 6, 10, 14
             const offbeats = [2, 6, 10, 14].map((s) => barIndexMotif0 * 16 + s);
             for (const step of offbeats) {
-                const result = applyGrooveOverrides(createParams(step, 'HiHat'));
+                const result = applyGrooveOverrides(getState(), createParams(step, 'HiHat'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Open');
             }
@@ -92,7 +92,7 @@ describe('Disco Groove Integrity', () => {
             const step15 = turnaroundBarIndex * 16 + 15;
 
             const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.1);
-            const result = applyGrooveOverrides(createParams(step15, 'Snare'));
+            const result = applyGrooveOverrides(getState(), createParams(step15, 'Snare'));
             expect(result.shouldPlay).toBe(true);
             expect(result.velocity).toBeGreaterThan(0.3);
             mockMath.mockRestore();

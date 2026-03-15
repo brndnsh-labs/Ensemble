@@ -4,10 +4,18 @@ module.exports = {
         {
             name: 'no-direct-engine-import-from-ui',
             comment:
-                'UI components should not import directly from the engine. Use ui-bridge or specific controllers.',
+                'UI components should not import directly from the engine. Exception: manual performance triggers (playSoloNote, etc) which are currently being refactored.',
             severity: 'warn',
             from: { path: '^public/components/' },
             to: { path: '^public/engine/' },
+        },
+        {
+            name: 'no-state-import-from-engine',
+            comment:
+                'Engine should receive state via parameters or specific modular state slices, not the global state manager.',
+            severity: 'warn',
+            from: { path: '^public/engine/' },
+            to: { path: '^public/state.js$' },
         },
         {
             name: 'no-circular-dependencies',

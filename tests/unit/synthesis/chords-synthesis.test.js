@@ -56,6 +56,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         arranger: {},
         bass: {},
@@ -85,14 +86,14 @@ describe('Chord Synthesis', () => {
     });
 
     it('should use a PeriodicWave for the "Piano" instrument', () => {
-        playNote(440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
 
         const osc = playback.audio.createOscillator.mock.results[0].value;
         expect(osc.setPeriodicWave).toHaveBeenCalled();
     });
 
     it('should apply a randomized strum offset based on index', () => {
-        playNote(440, 10, 1.0, { index: 2, instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0, { index: 2, instrument: 'Piano' });
 
         const osc = playback.audio.createOscillator.mock.results[0].value;
         const startTime = osc.frequency.setValueAtTime.mock.calls[0][1];
@@ -103,20 +104,20 @@ describe('Chord Synthesis', () => {
     });
 
     it('should create a hammer strike noise layer for Piano', () => {
-        playNote(440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
     });
 
     it('should use a simple triangle wave for the "Warm" instrument', () => {
-        playNote(440, 10, 1.0, { instrument: 'Warm' });
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Warm' });
 
         const osc = playback.audio.createOscillator.mock.results[0].value;
         expect(osc.type).toBe('triangle');
     });
 
     it('should implement chord scratch synthesis', () => {
-        playChordScratch(10, 0.5);
+        playChordScratch(getState(), 10, 0.5);
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
         const filter = playback.audio.createBiquadFilter.mock.results[0].value;

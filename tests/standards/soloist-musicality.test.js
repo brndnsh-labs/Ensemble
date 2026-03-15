@@ -3,34 +3,37 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/soloist.js';
 
 // Define mockState in a way that vi.mock can capture it
-const testState = {
-    playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: {}, lyricalBias: 0.5 },
-    groove: { genreFeel: 'Jazz', pocket: 0 },
-    soloist: {
-        enabled: true,
-        style: 'smart',
-        mode: 'monophonic',
-        octave: 64,
-        sessionSteps: 0,
-        currentPhraseSteps: 0,
-        notesInPhrase: 0,
-        srdcState: 'Conclusion',
-        isResting: false,
-        motifBuffer: [],
-        thematicSeed: [],
-        thematicSeedRoot: 0,
-        isReplayingMotif: false,
-        isReplayingSeed: false,
-        busySteps: 0,
-        pitchHistory: [],
-        lastInterval: 0,
-        stagnationCount: 0,
+const { testState } = vi.hoisted(() => ({
+    testState: {
+        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: {}, lyricalBias: 0.5 },
+        groove: { genreFeel: 'Jazz', pocket: 0 },
+        soloist: {
+            enabled: true,
+            style: 'smart',
+            mode: 'monophonic',
+            octave: 64,
+            sessionSteps: 0,
+            currentPhraseSteps: 0,
+            notesInPhrase: 0,
+            srdcState: 'Conclusion',
+            isResting: false,
+            motifBuffer: [],
+            thematicSeed: [],
+            thematicSeedRoot: 0,
+            isReplayingMotif: false,
+            isReplayingSeed: false,
+            busySteps: 0,
+            pitchHistory: [],
+            lastInterval: 0,
+            stagnationCount: 0,
+        },
+        harmony: { enabled: false },
+        arranger: { timeSignature: '4/4' },
     },
-    harmony: { enabled: false },
-    arranger: { timeSignature: '4/4' },
-};
+}));
 
 vi.mock('../../public/state.js', () => ({
+    stateMap: testState,
     getState: () => testState,
     dispatch: vi.fn(),
 }));

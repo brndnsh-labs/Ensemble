@@ -1,5 +1,3 @@
-import { getState } from '../state.js';
-
 /**
  * GENERATIVE STATE PROTECTION
  * These keys are managed locally by the worker's generative engines.
@@ -67,10 +65,12 @@ export function safeSync(target, source, moduleName) {
 /**
  * Core utility for finding the current chord based on the global step.
  * Uses a cursor-based optimization to avoid full-map traversals.
+ * @param {number} step - The global step index.
+ * @param {Object} arranger - The arranger state (progression, stepMap, etc.).
+ * @param {Object} [cursor] - Optional cursor for tracking position.
  */
-export function getChordAtStep(step, cursor = null) {
-    const { arranger } = getState();
-    if (arranger.totalSteps === 0 || !arranger.stepMap) {
+export function getChordAtStep(step, arranger, cursor = null) {
+    if (!arranger || arranger.totalSteps === 0 || !arranger.stepMap) {
         return null;
     }
     const targetStep = step % arranger.totalSteps;

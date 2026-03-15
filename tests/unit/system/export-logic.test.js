@@ -2,6 +2,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const capturedMessages = [];
+const { mockNoteOn, noteOnEvents } = vi.hoisted(() => ({
+    mockNoteOn: vi.fn(),
+    noteOnEvents: [],
+}));
+
+// Mock midi-utils.js to ensure we catch all noteOn calls from the class
+vi.mock('../../../public/engine/midi-utils.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        MidiTrack: class extends actual.MidiTrack {
+            noteOn(time, chan, midi, vel) {
+                if (chan === 9) {
+                    noteOnEvents.push({ time, midi, vel });
+                }
+                mockNoteOn(time, chan, midi, vel);
+                super.noteOn(time, chan, midi, vel);
+            }
+        },
+    };
+});
 
 // Mock postMessage for global scope (worker style)
 vi.stubGlobal('postMessage', (msg) => capturedMessages.push(msg));
@@ -74,6 +95,7 @@ vi.mock('../../../public/state.js', () => {
     };
     return {
         ...mockState,
+        stateMap: mockState,
         getState: () => mockState,
     };
 });
@@ -98,12 +120,15 @@ import { getState } from '../../../public/state.js';
 
 const { arranger, harmony } = getState();
 
-import { handleExport, MidiTrack } from '../../../public/engine/midi-worker-logic.js';
+import { MidiTrack } from '../../../public/engine/midi-utils.js';
+import { handleExport } from '../../../public/engine/midi-worker-logic.js';
 import { handleResolution } from '../../../public/logic-worker.js';
 
 describe('Export and Resolution Logic Validation', () => {
     beforeEach(() => {
         capturedMessages.length = 0;
+        noteOnEvents.length = 0;
+        mockNoteOn.mockClear();
         arranger.key = 'C';
         arranger.isMinor = false;
         harmony.enabled = true;
@@ -264,30 +289,17 @@ describe('Export and Resolution Logic Validation', () => {
         // Advance timers to allow chunks to process
         vi.runAllTimers();
 
-        const exportMsg = capturedMessages.find((m) => m.type === 'exportComplete');
+        const _errorMsg = capturedMessages.find((m) => m.type === 'error');
 
+        const exportMsg = capturedMessages.find((m) => m.type === 'exportComplete');
         expect(exportMsg).toBeDefined();
         expect(exportMsg.blob).toBeInstanceOf(Uint8Array);
         expect(exportMsg.filename).toContain('.mid');
     });
-
     describe('Generative Drums Export Parity', () => {
-        let noteOnSpy;
-        let noteOnEvents = [];
-
         beforeEach(() => {
-            noteOnEvents = [];
-            noteOnSpy = vi
-                .spyOn(MidiTrack.prototype, 'noteOn')
-                .mockImplementation(function (time, chan, midi, vel) {
-                    if (chan === 9) {
-                        noteOnEvents.push({ time, midi, vel });
-                    }
-                    // Call original logic by appending to events array directly
-                    this.events.push({ time, data: [0x90 | chan, midi, vel] });
-                });
-
-            // Re-setup arrangement to 4 bars
+            vi.useFakeTimers();
+            const _state = getState();
             arranger.totalSteps = 64;
             const mockChord = {
                 root: 'C',
@@ -312,7 +324,6 @@ describe('Export and Resolution Logic Validation', () => {
         });
 
         afterEach(() => {
-            noteOnSpy.mockRestore();
             vi.restoreAllMocks();
         });
 
@@ -328,8 +339,6 @@ describe('Export and Resolution Logic Validation', () => {
             vi.runAllTimers();
 
             const snareHits = noteOnEvents.filter((e) => e.midi === 38);
-            const snareSteps = snareHits.map((e) => Math.round(e.time / 120));
-            console.log('Snare hits when OFF at steps:', snareSteps);
             expect(snareHits.length).toBe(8); // 2 backbeats * 4 bars
         });
 
@@ -370,16 +379,8 @@ describe('Export and Resolution Logic Validation', () => {
             // Crash is MIDI 49
             const crashHits = noteOnEvents.filter((e) => e.midi === 49);
             const openHits = noteOnEvents.filter((e) => e.midi === 46);
-            console.log(
-                `[Export Test] Crash Hits (49): ${crashHits.length}, Open Hits (46): ${openHits.length}`,
-            );
 
             // Check if a crash happened at the start of section 2
-            const steps = crashHits.map((e) => Math.round(e.time / 120));
-            console.log('Crash steps:', steps);
-            const openSteps = openHits.map((e) => Math.round(e.time / 120));
-            console.log('Open steps:', openSteps);
-
             expect(crashHits.length + openHits.length).toBeGreaterThanOrEqual(1);
         });
     });

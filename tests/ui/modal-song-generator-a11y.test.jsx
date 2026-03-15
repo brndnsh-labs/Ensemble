@@ -37,6 +37,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
     };
     return {
         ...mockState,
+        stateMap: mockState,
         getState: () => mockState,
         dispatch: actual.dispatch,
         ACTIONS: actual.ACTIONS,

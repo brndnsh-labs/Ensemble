@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { killSoloistNote, playSoloNote } from '../engine/engine.js';
+import { stopSoloist, triggerSoloNote } from '../performance-controller.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { midiToNote } from '../utils.js';
@@ -305,7 +305,7 @@ export function PerformanceCanvas({
             if (!prevData || prevData.midi !== data.midi) {
                 const freq = 440 * 2 ** ((data.midi - 69) / 12);
                 const isLegato = activePointers.size > 0;
-                playSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
+                triggerSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
                 onNoteChange(data.midi);
             }
         });
@@ -313,7 +313,7 @@ export function PerformanceCanvas({
         // Global kill if all touches released
         if (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'touchmove') {
             if (nextPointers.size === 0 && activePointers.size > 0) {
-                killSoloistNote();
+                stopSoloist();
                 onNoteChange(null);
             }
         }

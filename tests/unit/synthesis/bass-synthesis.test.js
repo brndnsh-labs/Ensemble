@@ -62,6 +62,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         arranger: {},
         chords: {},
@@ -92,7 +93,7 @@ describe('Motown P-Bass Synthesis', () => {
     });
 
     it('should create and connect correct nodes for a Motown standard note', () => {
-        playBassNote(41.2, 10, 1.0, 1.0);
+        playBassNote(getState(), 41.2, 10, 1.0, 1.0);
 
         // Verify oscillators: Sine, Triangle, Growl(Sawtooth)
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
@@ -104,7 +105,7 @@ describe('Motown P-Bass Synthesis', () => {
     });
 
     it('should apply vintage roll-off via cascaded low-pass filters', () => {
-        playBassNote(41.2, 10, 1.0, 1.0);
+        playBassNote(getState(), 41.2, 10, 1.0, 1.0);
 
         const filters = playback.audio.createBiquadFilter.mock.results;
         const lp1 = filters[0].value;
@@ -117,7 +118,7 @@ describe('Motown P-Bass Synthesis', () => {
     });
 
     it('should implement a woody finger thud via band-pass noise', () => {
-        playBassNote(41.2, 10, 1.0, 1.0);
+        playBassNote(getState(), 41.2, 10, 1.0, 1.0);
 
         const filters = playback.audio.createBiquadFilter.mock.results;
         const impactFilter = filters[2].value;
@@ -127,7 +128,7 @@ describe('Motown P-Bass Synthesis', () => {
     });
 
     it('should add a Jamerson punch via 120Hz body EQ', () => {
-        playBassNote(41.2, 10, 1.0, 1.2);
+        playBassNote(getState(), 41.2, 10, 1.0, 1.2);
 
         const filters = playback.audio.createBiquadFilter.mock.results;
         const bodyEQ = filters[3].value;
@@ -138,7 +139,7 @@ describe('Motown P-Bass Synthesis', () => {
     });
 
     it('should implement punchy Motown decay for non-muted notes', () => {
-        playBassNote(41.2, 10, 1.0, 1.0);
+        playBassNote(getState(), 41.2, 10, 1.0, 1.0);
 
         const mockGains = playback.audio.createGain.mock.results;
         // Gains: bodyMix (0), growlGain (1), impactGain (2), mainGain (3)
@@ -155,7 +156,7 @@ describe('Motown P-Bass Synthesis', () => {
     });
 
     it('should apply muted characteristics when muted: true', () => {
-        playBassNote(41.2, 10, 1.0, 1.0, true);
+        playBassNote(getState(), 41.2, 10, 1.0, 1.0, true);
 
         const lp1 = playback.audio.createBiquadFilter.mock.results[0].value;
         expect(lp1.frequency.setValueAtTime).toHaveBeenCalledWith(300, 10);
@@ -174,7 +175,7 @@ describe('Motown P-Bass Synthesis', () => {
         };
         bass.lastBassGain = mockPrevGain;
 
-        playBassNote(41.2, 11, 1.0, 1.0);
+        playBassNote(getState(), 41.2, 11, 1.0, 1.0);
 
         expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11);
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.005);

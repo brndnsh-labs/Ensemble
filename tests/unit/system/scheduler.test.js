@@ -3,6 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getState } from '../../../public/state.js';
 
 // Global Mocks
 vi.stubGlobal('window', {
@@ -99,6 +100,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     return {
         ...actual,
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
     };
 });
@@ -170,7 +172,6 @@ import {
     scheduler,
     togglePlay,
 } from '../../../public/engine/scheduler-core.js';
-import { dispatch, getState } from '../../../public/state.js';
 
 const { arranger, playback, vizState, groove, midi, soloist, chords, bass, harmony } = getState();
 
@@ -339,7 +340,11 @@ describe('Scheduler Core System', () => {
             // Trigger chord scheduling via global event
             scheduleGlobalEvent(0, 10.0);
 
-            expect(Engine.updateSustain).toHaveBeenCalledWith(true, expect.any(Number));
+            expect(Engine.updateSustain).toHaveBeenCalledWith(
+                expect.any(Object),
+                true,
+                expect.any(Number),
+            );
         });
 
         it('should handle harmony voice killing on chord start (lines 1043-1046)', () => {
@@ -355,7 +360,7 @@ describe('Scheduler Core System', () => {
 
             scheduleGlobalEvent(0, 10.0);
 
-            expect(Engine.killHarmonyNote).toHaveBeenCalledWith(0.1);
+            expect(Engine.killHarmonyNote).toHaveBeenCalledWith(expect.any(Object), 0.1);
             expect(Engine.playHarmonyNote).toHaveBeenCalled();
         });
 

@@ -64,6 +64,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         arranger: {},
         chords: {},
@@ -94,26 +95,26 @@ describe('Latin Drum Synthesis', () => {
     });
 
     it('should synthesize Clave using a single sine oscillator', () => {
-        playDrumSound('Clave', 10, 1.0);
+        playDrumSound(getState(), 'Clave', 10, 1.0);
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(1);
         const osc = playback.audio.createOscillator.mock.results[0].value;
         expect(osc.type).toBe('sine');
     });
 
     it('should synthesize Congas with both tone and noise components', () => {
-        playDrumSound('CongaHigh', 10, 1.0);
+        playDrumSound(getState(), 'CongaHigh', 10, 1.0);
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(1);
         expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
     });
 
     it('should use a triangle wave for Conga Slaps for more harmonic content', () => {
-        playDrumSound('CongaHighSlap', 10, 1.0);
+        playDrumSound(getState(), 'CongaHighSlap', 10, 1.0);
         const osc = playback.audio.createOscillator.mock.results[0].value;
         expect(osc.type).toBe('triangle');
     });
 
     it('should synthesize Agogo bells using a multi-oscillator stack', () => {
-        playDrumSound('AgogoHigh', 10, 1.0);
+        playDrumSound(getState(), 'AgogoHigh', 10, 1.0);
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
         const osc1 = playback.audio.createOscillator.mock.results[0].value;
         const osc2 = playback.audio.createOscillator.mock.results[1].value;
@@ -124,7 +125,7 @@ describe('Latin Drum Synthesis', () => {
     });
 
     it('should use pulsed noise for the Guiro scrape effect', () => {
-        playDrumSound('Guiro', 10, 1.0);
+        playDrumSound(getState(), 'Guiro', 10, 1.0);
         expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
         // The first Gain (results[0]) is the panner. The second (results[1]) is the effect gain.
         const gain = playback.audio.createGain.mock.results[1].value;
@@ -133,7 +134,7 @@ describe('Latin Drum Synthesis', () => {
     });
 
     it('should synthesize Shaker using high-pass filtered noise', () => {
-        playDrumSound('Shaker', 10, 1.0);
+        playDrumSound(getState(), 'Shaker', 10, 1.0);
         expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
         expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
         const filter = playback.audio.createBiquadFilter.mock.results[0].value;

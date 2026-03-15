@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
+import { getState } from '../../../public/state.js';
 import { getStepInfo } from '../../../public/utils.js';
 
 // Mock state
@@ -17,6 +18,7 @@ vi.mock('../../../public/state.js', () => {
         arranger: { timeSignature: '4/4', stepMap: [] },
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
     };
 });
@@ -55,7 +57,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         // Run many times to ensure no random hits
         for (let i = 0; i < 100; i++) {
             const params = createParams(step, 'Snare', false);
-            const result = applyGrooveOverrides(params);
+            const result = applyGrooveOverrides(getState(), params);
             expect(result.shouldPlay).toBe(false);
         }
     });
@@ -66,7 +68,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         let generatedHits = 0;
         for (let i = 0; i < 200; i++) {
             const params = createParams(step, 'Snare', true, 1.0);
-            const result = applyGrooveOverrides(params);
+            const result = applyGrooveOverrides(getState(), params);
             if (result.shouldPlay) {
                 generatedHits++;
             }
@@ -83,7 +85,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         let entropyHits = 0;
         for (let i = 0; i < 100; i++) {
             const params = createParams(step, 'HiHat', true, 1.0);
-            const result = applyGrooveOverrides(params);
+            const result = applyGrooveOverrides(getState(), params);
             // In Rock, Downbeat HiHat might be forced to play by global logic,
             // but we want to ensure ENTROPY doesn't just fire everywhere.
             // Our entropy block uses (loopStep % 2 === 1) or (loopStep % 4 === 2).

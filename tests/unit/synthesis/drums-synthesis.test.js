@@ -63,6 +63,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         arranger: {},
         chords: {},
@@ -94,7 +95,7 @@ describe('Drum Synthesis', () => {
     });
 
     it('should create a 4-layer model for the Kick drum', () => {
-        playDrumSound('Kick', 10, 1.0);
+        playDrumSound(getState(), 'Kick', 10, 1.0);
 
         // Layers: Beater (Osc), Skin (Noise), Knock (Osc), Shell (Osc) + Panner (Gain)
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
@@ -103,7 +104,7 @@ describe('Drum Synthesis', () => {
     });
 
     it('should use a pre-rendered AudioBuffer for HiHat to optimize CPU', () => {
-        playDrumSound('HiHat', 10, 1.0);
+        playDrumSound(getState(), 'HiHat', 10, 1.0);
 
         // Should create buffer ONCE (if not cached) and use BufferSource
         expect(playback.audio.createBuffer).toHaveBeenCalled();
@@ -123,14 +124,14 @@ describe('Drum Synthesis', () => {
         };
         groove.lastHatGain = mockPrevGain;
 
-        playDrumSound('HiHat', 11, 1.0);
+        playDrumSound(getState(), 'HiHat', 11, 1.0);
 
         expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11);
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.005);
     });
 
     it('should use a highpass filter for the Snare wires', () => {
-        playDrumSound('Snare', 10, 1.0);
+        playDrumSound(getState(), 'Snare', 10, 1.0);
 
         // Snare creates Tone (2 Oscs) and Wires (Noise)
         const filters = playback.audio.createBiquadFilter.mock.results;
@@ -139,7 +140,7 @@ describe('Drum Synthesis', () => {
     });
 
     it('should implement a 4-layer model for Toms (Stick, Body, Skin, Shell)', () => {
-        playDrumSound('High Tom', 10, 1.0);
+        playDrumSound(getState(), 'High Tom', 10, 1.0);
 
         // Layers: Stick (Osc), Body (Osc), Shell (Osc) + Skin (Noise)
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
@@ -147,7 +148,7 @@ describe('Drum Synthesis', () => {
     });
 
     it('should implement Ride cymbal synthesis', () => {
-        playDrumSound('Ride', 10, 1.0);
+        playDrumSound(getState(), 'Ride', 10, 1.0);
 
         // Ride should use BufferSource (metallic) + Filter + Gain + Panner
         expect(playback.audio.createBufferSource).toHaveBeenCalled();

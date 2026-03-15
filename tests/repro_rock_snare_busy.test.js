@@ -52,7 +52,7 @@ describe('Rock Snare Density Reproduction', () => {
                     stepsPerBar: 16,
                     loopStep: step,
                 };
-                const result = applyGrooveOverrides(params);
+                const result = applyGrooveOverrides(getState(), params);
                 if (result.shouldPlay) {
                     snareHits.push({ bar, step, velocity: result.velocity });
                 }

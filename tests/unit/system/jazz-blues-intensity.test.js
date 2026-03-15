@@ -43,6 +43,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     return {
         ...actual,
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_BAND_INTENSITY') {

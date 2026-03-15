@@ -1,18 +1,23 @@
 import { STYLE_CONFIG } from '../soloist-config.js';
-import { getState } from '../state.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
 
-export function killSoloistNote() {
-    const { playback, soloist } = getState();
+/**
+ * Stop any currently playing soloist notes.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killSoloistNote(state) {
+    const { playback, soloist } = state;
     killActiveVoices(soloist.activeVoices, playback.audio.currentTime, 0.01);
 }
 
 /**
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
+ * @param {Object} state - Global ensemble state.
  */
 export function playSoloNote(
+    state,
     freq,
     time,
     duration,
@@ -22,7 +27,7 @@ export function playSoloNote(
     isLegato = false,
     vibrato = false,
 ) {
-    const { playback, soloist } = getState();
+    const { playback, soloist } = state;
     if (!Number.isFinite(freq)) {
         return;
     }
@@ -64,6 +69,7 @@ export function playSoloNote(
     soloist.lastRenderedFreq = freq; // @direct-mutation
 
     const args = [
+        state,
         ctx,
         freq,
         playTime,
@@ -107,11 +113,11 @@ export function playSoloNote(
 
 function manageVoices(playTime, soloist) {
     if (!soloist.activeVoices) {
-        soloist.activeVoices = [];
+        soloist.activeVoices = []; // @direct-mutation
     }
 
     // Clean up finished voices
-    soloist.activeVoices = soloist.activeVoices.filter((v) => v.time + v.duration + 1.0 > playTime);
+    soloist.activeVoices = soloist.activeVoices.filter((v) => v.time + v.duration + 1.0 > playTime); // @direct-mutation
 
     const VOICE_LIMIT = soloist.mode === 'piano' ? 4 : soloist.mode === 'guitar' ? 2 : 1;
 
@@ -137,6 +143,7 @@ function manageVoices(playTime, soloist) {
 // --- PRESET IMPLEMENTATIONS ---
 
 function playTrumpet(
+    state,
     ctx,
     freq,
     playTime,
@@ -150,7 +157,7 @@ function playTrumpet(
     prevFreq,
     vibratoFlag,
 ) {
-    const { soloist } = getState();
+    const { soloist } = state;
 
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -162,6 +169,7 @@ function playTrumpet(
     voiceObj.nodes.push(osc1, osc2);
 
     applyPitchEnvelope(
+        state,
         osc1,
         osc2,
         freq,
@@ -176,6 +184,7 @@ function playTrumpet(
 
     if (soloist.mode !== 'piano') {
         const { vibrato, vibGain } = createVibrato(
+            state,
             ctx,
             freq,
             playTime,
@@ -227,6 +236,7 @@ function playTrumpet(
 }
 
 function playSaxophone(
+    state,
     ctx,
     freq,
     playTime,
@@ -240,7 +250,7 @@ function playSaxophone(
     prevFreq,
     vibratoFlag,
 ) {
-    const { soloist } = getState();
+    const { soloist } = state;
 
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -252,6 +262,7 @@ function playSaxophone(
     voiceObj.nodes.push(osc1, osc2);
 
     applyPitchEnvelope(
+        state,
         osc1,
         osc2,
         freq,
@@ -266,6 +277,7 @@ function playSaxophone(
 
     if (soloist.mode !== 'piano') {
         const { vibrato, vibGain } = createVibrato(
+            state,
             ctx,
             freq,
             playTime,
@@ -330,6 +342,7 @@ function playSaxophone(
 }
 
 function playClassic(
+    state,
     ctx,
     freq,
     playTime,
@@ -343,7 +356,7 @@ function playClassic(
     prevFreq,
     vibratoFlag,
 ) {
-    const { playback, soloist } = getState();
+    const { playback, soloist } = state;
     const intensity = playback.bandIntensity || 0.5;
     const intensityGain = 0.5 + intensity * 0.9;
     const randomizedVol = vol * intensityGain * (0.95 + Math.random() * 0.1);
@@ -359,6 +372,7 @@ function playClassic(
 
     // Pitch Envelope
     applyPitchEnvelope(
+        state,
         osc1,
         osc2,
         freq,
@@ -374,6 +388,7 @@ function playClassic(
     // Vibrato
     if (soloist.mode !== 'piano') {
         const { vibrato, vibGain } = createVibrato(
+            state,
             ctx,
             freq,
             playTime,
@@ -448,6 +463,7 @@ function playClassic(
 }
 
 function playNeoJuno(
+    state,
     ctx,
     freq,
     playTime,
@@ -461,7 +477,7 @@ function playNeoJuno(
     prevFreq,
     vibratoFlag,
 ) {
-    const { soloist } = getState();
+    const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
     const osc2 = ctx.createOscillator();
@@ -485,6 +501,7 @@ function playNeoJuno(
     voiceObj.nodes.push(osc1, osc2, lfo1, lfo1Gain, lfo2, lfo2Gain);
 
     applyPitchEnvelope(
+        state,
         osc1,
         osc2,
         freq,
@@ -499,6 +516,7 @@ function playNeoJuno(
 
     if (soloist.mode !== 'piano') {
         const { vibrato, vibGain } = createVibrato(
+            state,
             ctx,
             freq,
             playTime,
@@ -545,6 +563,7 @@ function playNeoJuno(
 }
 
 function playVowel(
+    state,
     ctx,
     freq,
     playTime,
@@ -558,7 +577,7 @@ function playVowel(
     prevFreq,
     vibratoFlag,
 ) {
-    const { soloist } = getState();
+    const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
     const osc2 = ctx.createOscillator();
@@ -568,6 +587,7 @@ function playVowel(
     voiceObj.nodes.push(osc1, osc2);
 
     applyPitchEnvelope(
+        state,
         osc1,
         osc2,
         freq,
@@ -582,6 +602,7 @@ function playVowel(
 
     if (soloist.mode !== 'piano') {
         const { vibrato, vibGain } = createVibrato(
+            state,
             ctx,
             freq,
             playTime,
@@ -623,6 +644,7 @@ function playVowel(
 }
 
 function playShred(
+    state,
     ctx,
     freq,
     playTime,
@@ -636,7 +658,7 @@ function playShred(
     prevFreq,
     vibratoFlag,
 ) {
-    const { soloist } = getState();
+    const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
     const osc2 = ctx.createOscillator();
@@ -646,6 +668,7 @@ function playShred(
     voiceObj.nodes.push(osc1, osc2);
 
     applyPitchEnvelope(
+        state,
         osc1,
         osc2,
         freq,
@@ -660,6 +683,7 @@ function playShred(
 
     if (soloist.mode !== 'piano') {
         const { vibrato, vibGain } = createVibrato(
+            state,
             ctx,
             freq,
             playTime,
@@ -699,6 +723,7 @@ function playShred(
 }
 
 function applyPitchEnvelope(
+    state,
     osc1,
     osc2,
     freq,
@@ -710,7 +735,7 @@ function applyPitchEnvelope(
     prevFreq,
     isPiano = false,
 ) {
-    const { soloist } = getState();
+    const { soloist } = state;
     if (isPiano) {
         osc1.frequency.setValueAtTime(freq, playTime);
         osc2.frequency.setValueAtTime(freq, playTime);
@@ -737,8 +762,8 @@ function applyPitchEnvelope(
     }
 }
 
-function createVibrato(ctx, freq, time, duration, style, forceVibrato = false) {
-    const { soloist, playback } = getState();
+function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = false) {
+    const { soloist, playback } = state;
     const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
     const intensity = playback.bandIntensity || 0.5;
     const vibrato = ctx.createOscillator();

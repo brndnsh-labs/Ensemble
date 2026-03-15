@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { killDrumNote, playDrumSound } from '../engine/engine.js';
+import { stopDrums, triggerDrumSound } from '../performance-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -27,7 +27,7 @@ export function DrumPadModal() {
     useLayoutEffect(() => {
         dispatch(ACTIONS.INIT_AUDIO);
         dispatch(ACTIONS.RESTORE_GAINS);
-        killDrumNote(); // Silence automatic drums immediately
+        stopDrums(); // Silence automatic drums immediately
 
         if (modalRef.current) {
             modalRef.current.focus({ preventScroll: true });
@@ -62,7 +62,7 @@ export function DrumPadModal() {
             finalVelocity = velocity * intensityMultiplier;
         }
 
-        playDrumSound(name, time, finalVelocity);
+        triggerDrumSound(name, time, finalVelocity);
 
         setActivePads((prev) => {
             const next = new Set(prev);

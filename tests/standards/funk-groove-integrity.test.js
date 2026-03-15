@@ -74,7 +74,7 @@ describe('Funk Groove Integrity', () => {
             const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.01);
 
             const stepGhost = 6; // step 6 is an offbeat (non-beatStart)
-            const resultSnare = applyGrooveOverrides(createParams(stepGhost, 'Snare'));
+            const resultSnare = applyGrooveOverrides(getState(), createParams(stepGhost, 'Snare'));
 
             // The ghost note should play, but with low velocity
             expect(resultSnare.shouldPlay).toBe(true);
@@ -93,8 +93,14 @@ describe('Funk Groove Integrity', () => {
             const normalBackbeat = 12; // beat 4
             const displacedBackbeat = 14; // "and" of 4
 
-            const resultNormal = applyGrooveOverrides(createParams(normalBackbeat, 'Snare'));
-            const resultDisplaced = applyGrooveOverrides(createParams(displacedBackbeat, 'Snare'));
+            const resultNormal = applyGrooveOverrides(
+                getState(),
+                createParams(normalBackbeat, 'Snare'),
+            );
+            const resultDisplaced = applyGrooveOverrides(
+                getState(),
+                createParams(displacedBackbeat, 'Snare'),
+            );
 
             // In a displaced motif, the normal backbeat is often silent, and the "and" is strong
             expect(resultNormal.shouldPlay).toBe(false);
@@ -113,7 +119,7 @@ describe('Funk Groove Integrity', () => {
             // Force math.random to trigger the turnaround
             const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.1);
 
-            const resultHat = applyGrooveOverrides(createParams(beat4And, 'HiHat'));
+            const resultHat = applyGrooveOverrides(getState(), createParams(beat4And, 'HiHat'));
 
             // Should convert to an 'Open' bark
             expect(resultHat.shouldPlay).toBe(true);

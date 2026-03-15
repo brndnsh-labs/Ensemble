@@ -98,7 +98,7 @@ describe('DSP & Signal Safety', () => {
     });
 
     it('should adjust master limiter based on band intensity to prevent clipping', () => {
-        initAudio(); // Initialize nodes
+        initAudio(getState()); // Initialize nodes
 
         // Low intensity
         playback.bandIntensity = 0.2;
@@ -119,7 +119,7 @@ describe('DSP & Signal Safety', () => {
         chords.reverb = 1.2; // Over 1.0!
         bass.reverb = 0.8;
 
-        initAudio();
+        initAudio(getState());
 
         // The engine should clamp or handle these.
         // Let's verify what the gain nodes were actually set to.

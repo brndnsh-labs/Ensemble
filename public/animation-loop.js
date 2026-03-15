@@ -1,7 +1,7 @@
 import { TIME_SIGNATURES } from './config.js';
 import { getVisualTime } from './engine/engine.js';
 import { switchMeasure } from './instrument-controller.js';
-import { dispatch, getState } from './state.js';
+import { dispatch, getState, stateMap } from './state.js';
 import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 
@@ -47,7 +47,7 @@ export function draw(viz) {
         }
         return;
     }
-    const now = getVisualTime();
+    const now = getVisualTime(stateMap);
     while (playback.drawQueue.length > 0 && playback.drawQueue[0].time < now - 2.0) {
         playback.drawQueue.shift();
     }

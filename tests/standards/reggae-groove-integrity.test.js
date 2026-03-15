@@ -74,8 +74,8 @@ describe('Reggae Groove Integrity', () => {
             const beat1 = barIndexMotif0 * 16 + 0;
             const beat3 = barIndexMotif0 * 16 + 8;
 
-            const result1 = applyGrooveOverrides(createParams(beat1, 'Kick'));
-            const result3 = applyGrooveOverrides(createParams(beat3, 'Kick'));
+            const result1 = applyGrooveOverrides(getState(), createParams(beat1, 'Kick'));
+            const result3 = applyGrooveOverrides(getState(), createParams(beat3, 'Kick'));
 
             expect(result1.shouldPlay).toBe(false);
             expect(result3.shouldPlay).toBe(true);
@@ -99,7 +99,7 @@ describe('Reggae Groove Integrity', () => {
 
             const kickSteps = [0, 4, 8, 12].map((s) => barIndexMotif1 * 16 + s);
             for (const step of kickSteps) {
-                const result = applyGrooveOverrides(createParams(step, 'Kick'));
+                const result = applyGrooveOverrides(getState(), createParams(step, 'Kick'));
                 expect(result.shouldPlay).toBe(true);
             }
         });

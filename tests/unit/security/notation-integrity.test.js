@@ -19,6 +19,7 @@ vi.mock('../../../public/state.js', () => {
         vizState: {},
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
         dispatch: vi.fn(),
         storage: {

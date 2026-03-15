@@ -55,7 +55,7 @@ describe('Acoustic Drummer Critique', () => {
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
                     };
-                    const result = applyGrooveOverrides(params);
+                    const result = applyGrooveOverrides(getState(), params);
                     if (result.shouldPlay) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,

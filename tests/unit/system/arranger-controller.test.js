@@ -32,7 +32,7 @@ vi.mock('../../../public/state.js', () => {
         midi: {},
         dispatch: vi.fn(),
     };
-    return { ...mockState, getState: () => mockState };
+    return { ...mockState, stateMap: mockState, getState: () => mockState };
 });
 
 vi.mock('../../../public/form-analysis.js', () => ({

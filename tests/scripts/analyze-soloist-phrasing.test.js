@@ -2,42 +2,47 @@ import { describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/soloist.js';
 
 // --- MOCKS ---
-const mockState = {
-    soloist: {
-        enabled: true,
-        busySteps: 0,
-        currentPhraseSteps: 0,
-        notesInPhrase: 0,
-        qaState: 'Question',
-        srdcState: 'Statement',
-        isResting: true, // Start resting
-        pitchHistory: [],
-        deviceBuffer: [],
-        motifBuffer: [],
-        sessionSteps: 0,
-        isPhraseActive: false,
+const { mockState } = vi.hoisted(() => ({
+    mockState: {
+        soloist: {
+            enabled: true,
+            busySteps: 0,
+            currentPhraseSteps: 0,
+            notesInPhrase: 0,
+            qaState: 'Question',
+            srdcState: 'Statement',
+            isResting: true, // Start resting
+            pitchHistory: [],
+            deviceBuffer: [],
+            motifBuffer: [],
+            sessionSteps: 0,
+            isPhraseActive: false,
+        },
+        groove: { genreFeel: 'Blues' },
+        playback: {
+            bandIntensity: 0.7,
+            bpm: 106,
+            complexity: 0.7,
+            intent: { soloistMod: 0 },
+            sessionTimer: 3, // 3 minute session as per user description
+            sessionStartTime: Date.now(),
+        },
+        arranger: {
+            timeSignature: '4/4',
+            totalSteps: 192,
+            sectionMap: [{ start: 0, end: 192, syllables: [] }], // 12 bars of 16 steps = 192 steps (Jazz Blues)
+        },
+        chords: {},
+        bass: {},
+        harmony: { enabled: false, rhythmicMask: 0 },
     },
-    groove: { genreFeel: 'Blues' },
-    playback: {
-        bandIntensity: 0.7,
-        bpm: 106,
-        complexity: 0.7,
-        intent: { soloistMod: 0 },
-        sessionTimer: 3, // 3 minute session as per user description
-        sessionStartTime: Date.now(),
-    },
-    arranger: {
-        timeSignature: '4/4',
-        totalSteps: 192,
-        sectionMap: [{ start: 0, end: 192, syllables: [] }], // 12 bars of 16 steps = 192 steps (Jazz Blues)
-    },
-    chords: {},
-    bass: {},
-    harmony: { enabled: false, rhythmicMask: 0 },
-};
+}));
 
 // Minimal Mocking to make soloist.js run
-vi.mock('../../public/state.js', () => ({ getState: () => mockState }));
+vi.mock('../../public/state.js', () => ({
+    getState: () => mockState,
+    stateMap: mockState,
+}));
 vi.mock('../../public/config.js', () => ({
     TIME_SIGNATURES: { '4/4': { beats: 4, stepsPerBeat: 4, grouping: [4] } },
 }));

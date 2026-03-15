@@ -3,28 +3,33 @@ import { SMART_GENRES } from '../../public/data/smart-genres.js';
 import { getSoloistNote } from '../../public/soloist.js';
 
 // --- MOCKS ---
-const mockState = {
-    soloist: {
-        enabled: true,
-        busySteps: 0,
-        currentPhraseSteps: 0,
-        notesInPhrase: 0,
-        qaState: 'Question',
-        isResting: true,
-        pitchHistory: [],
-        deviceBuffer: [],
-        motifBuffer: [],
-        sessionSteps: 0,
+const { mockState } = vi.hoisted(() => ({
+    mockState: {
+        soloist: {
+            enabled: true,
+            busySteps: 0,
+            currentPhraseSteps: 0,
+            notesInPhrase: 0,
+            qaState: 'Question',
+            isResting: true, // Start resting
+            pitchHistory: [],
+            deviceBuffer: [],
+            motifBuffer: [],
+            sessionSteps: 0,
+        },
+        groove: { genreFeel: 'Jazz' },
+        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
+        arranger: { timeSignature: '4/4' },
+        chords: {},
+        bass: {},
+        harmony: { enabled: false, rhythmicMask: 0 },
     },
-    groove: { genreFeel: 'Jazz' },
-    playback: { bandIntensity: 0.8, bpm: 120, complexity: 0.8, intent: { soloistMod: 0 } },
-    arranger: { timeSignature: '4/4' },
-    chords: {},
-    bass: {},
-    harmony: { enabled: false, rhythmicMask: 0 },
-};
+}));
 
-vi.mock('../../public/state.js', () => ({ getState: () => mockState }));
+vi.mock('../../public/state.js', () => ({
+    getState: () => mockState,
+    stateMap: mockState,
+}));
 vi.mock('../../public/config.js', () => ({
     TIME_SIGNATURES: { '4/4': { beats: 4, stepsPerBeat: 4, grouping: [4] } },
     STYLE_CONFIG: {},

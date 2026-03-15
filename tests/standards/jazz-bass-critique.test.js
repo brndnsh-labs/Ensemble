@@ -4,18 +4,21 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { getFrequency, getStepInfo } from '../../public/utils.js';
 
 // Mock state
-const mockState = {
-    playback: { bandIntensity: 0.9, bpm: 120, complexity: 0.9 },
-    groove: { genreFeel: 'Jazz', pocket: 0, instruments: [] },
-    soloist: { busySteps: 0, tension: 0.5 },
-    arranger: {
-        timeSignature: '4/4',
-        totalSteps: 1000,
-        stepMap: [],
+const { mockState } = vi.hoisted(() => ({
+    mockState: {
+        playback: { bandIntensity: 0.9, bpm: 120, complexity: 0.9 },
+        groove: { genreFeel: 'Jazz', pocket: 0, instruments: [] },
+        soloist: { busySteps: 0, tension: 0.5 },
+        arranger: {
+            timeSignature: '4/4',
+            totalSteps: 1000,
+            stepMap: [],
+        },
     },
-};
+}));
 
 vi.mock('../../public/state.js', () => ({
+    stateMap: mockState,
     getState: () => mockState,
 }));
 

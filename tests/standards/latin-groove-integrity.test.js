@@ -62,13 +62,13 @@ describe('Latin Groove Integrity', () => {
             // Surdo Kick: 0, 8
             const heartbeatSteps = [0, 8];
             for (const step of heartbeatSteps) {
-                const result = applyGrooveOverrides(createParams(step, 'Kick'));
+                const result = applyGrooveOverrides(getState(), createParams(step, 'Kick'));
                 expect(result.shouldPlay).toBe(true);
             }
 
             // Offbeat check
             const offStep = 1;
-            const resultOff = applyGrooveOverrides(createParams(offStep, 'Kick'));
+            const resultOff = applyGrooveOverrides(getState(), createParams(offStep, 'Kick'));
             expect(resultOff.shouldPlay).toBe(false);
         });
 
@@ -93,7 +93,7 @@ describe('Latin Groove Integrity', () => {
             // Bar 1 (3-side): 0, 6, 12
             const bar1Steps = [0, 6, 12].map((s) => barIndexMotif0 * 16 + s);
             for (const step of bar1Steps) {
-                const result = applyGrooveOverrides(createParams(step, 'Snare'));
+                const result = applyGrooveOverrides(getState(), createParams(step, 'Snare'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Sidestick');
             }
@@ -101,7 +101,7 @@ describe('Latin Groove Integrity', () => {
             // Bar 2 (2-side): 2, 8
             const bar2Steps = [2, 8].map((s) => (barIndexMotif0 + 1) * 16 + s);
             for (const step of bar2Steps) {
-                const result = applyGrooveOverrides(createParams(step, 'Snare'));
+                const result = applyGrooveOverrides(getState(), createParams(step, 'Snare'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Sidestick');
             }
@@ -113,8 +113,11 @@ describe('Latin Groove Integrity', () => {
             const step8th = 0;
             const step16th = 1;
 
-            const result8th = applyGrooveOverrides(createParams(step8th, 'Shaker', 1));
-            const result16th = applyGrooveOverrides(createParams(step16th, 'Shaker', 1));
+            const result8th = applyGrooveOverrides(getState(), createParams(step8th, 'Shaker', 1));
+            const result16th = applyGrooveOverrides(
+                getState(),
+                createParams(step16th, 'Shaker', 1),
+            );
 
             expect(result8th.shouldPlay).toBe(true);
             expect(result16th.shouldPlay).toBe(true);

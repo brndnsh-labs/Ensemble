@@ -42,6 +42,7 @@ vi.mock('../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn(),
     };
@@ -124,7 +125,7 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should correctly assemble the master chain (Gain -> Saturator -> Limiter -> Dest)', () => {
-        initAudio();
+        initAudio(getState());
 
         // Verify Master Chain Connections
         expect(playback.masterGain.connect).toHaveBeenCalledWith(playback.saturator);
@@ -133,7 +134,7 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should apply safety limiter settings to prevent hard clipping', () => {
-        initAudio();
+        initAudio(getState());
 
         // Threshold should be below 0dB to allow for saturator peaks
         expect(playback.masterLimiter.threshold.setValueAtTime).toHaveBeenCalledWith(
@@ -147,7 +148,7 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should route all instrument buses through the master gain', () => {
-        initAudio();
+        initAudio(getState());
 
         // Check instrument gains are connected to masterGain
         expect(playback.chordsGain.connect).toHaveBeenCalled();
@@ -162,7 +163,7 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should protect the bass bus with its own compressor', () => {
-        initAudio();
+        initAudio(getState());
 
         // Find the compressor in the bass chain
         const compressors = playback.audio.createDynamicsCompressor.mock.results;
@@ -175,7 +176,7 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should verify that mixer gain multipliers are correctly applied', () => {
-        initAudio();
+        initAudio(getState());
 
         // mixer gain = state.volume * MIXER_GAIN_MULTIPLIERS[module]
         // From config.js: bass multiplier is now 0.32. state.bass.volume is 0.45.
@@ -192,15 +193,15 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should ensure the saturator uses an oversampled soft-clip curve', () => {
-        initAudio();
+        initAudio(getState());
 
         expect(playback.saturator.curve).toBeDefined();
         expect(playback.saturator.oversample).toBe('4x');
     });
 
     it('should maintain cumulative gain below 1.0 before the limiter', () => {
-        initAudio();
-        restoreGains();
+        initAudio(getState());
+        restoreGains(getState());
 
         // Check cumulative gain from restoreGains (uses setTargetAtTime)
         const drumGain = playback.drumsGain.gain.setTargetAtTime.mock.calls[0][0];
@@ -224,7 +225,7 @@ describe('Mix & Signal Integrity Audit', () => {
     });
 
     it('should calculate master gain correctly (Headroom Check)', () => {
-        initAudio();
+        initAudio(getState());
         // Master Gain = ui.masterVol (0.5) * masterMultiplier (0.85) = 0.425
         const masterGain = playback.masterGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(masterGain).toBeCloseTo(0.425, 4);

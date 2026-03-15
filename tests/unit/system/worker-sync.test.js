@@ -53,6 +53,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...stateMap,
+        stateMap: stateMap,
         getState: () => stateMap,
         dispatch: vi.fn(),
         subscribe: vi.fn(),

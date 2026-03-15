@@ -79,7 +79,7 @@ describe('Rock Groove Integrity', () => {
             }
 
             const step1AndOf1 = barIndexMotif1 * 16 + 2; // step 2 is the & of 1
-            const resultKick = applyGrooveOverrides(createParams(step1AndOf1, 'Kick'));
+            const resultKick = applyGrooveOverrides(getState(), createParams(step1AndOf1, 'Kick'));
             expect(resultKick.shouldPlay).toBe(true);
         });
 
@@ -90,7 +90,7 @@ describe('Rock Groove Integrity', () => {
             const beat4 = turnaroundBarIndex * 16 + 12; // step 12 is beat 4
 
             const _mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.1);
-            const resultTom = applyGrooveOverrides(createParams(beat4, 'High Tom'));
+            const resultTom = applyGrooveOverrides(getState(), createParams(beat4, 'High Tom'));
             expect(resultTom.shouldPlay).toBe(true);
         });
 
@@ -100,8 +100,14 @@ describe('Rock Groove Integrity', () => {
             const downbeatStep = 0;
             const upbeatStep = 2; // the "and"
 
-            const downbeatHat = applyGrooveOverrides(createParams(downbeatStep, 'HiHat', 2));
-            const upbeatHat = applyGrooveOverrides(createParams(upbeatStep, 'HiHat', 2));
+            const downbeatHat = applyGrooveOverrides(
+                getState(),
+                createParams(downbeatStep, 'HiHat', 2),
+            );
+            const upbeatHat = applyGrooveOverrides(
+                getState(),
+                createParams(upbeatStep, 'HiHat', 2),
+            );
 
             expect(downbeatHat.velocity).toBeGreaterThan(upbeatHat.velocity);
         });

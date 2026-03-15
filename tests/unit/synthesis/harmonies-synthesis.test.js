@@ -63,6 +63,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
     };
 });
@@ -89,7 +90,7 @@ describe('Harmony Synthesis', () => {
     });
 
     it('should play a basic harmony note', () => {
-        playHarmonyNote(440, 10, 1.0);
+        playHarmonyNote(getState(), 440, 10, 1.0);
 
         expect(playback.audio.createOscillator).toHaveBeenCalled();
         expect(playback.audio.createGain).toHaveBeenCalled();
@@ -102,18 +103,18 @@ describe('Harmony Synthesis', () => {
     });
 
     it('should use a sub-oscillator for frequencies above 250Hz', () => {
-        playHarmonyNote(440, 10, 1.0); // 440 > 250
+        playHarmonyNote(getState(), 440, 10, 1.0); // 440 > 250
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3); // osc1, osc2, sub
     });
 
     it('should NOT use a sub-oscillator for frequencies below 250Hz', () => {
-        playHarmonyNote(200, 10, 1.0); // 200 < 250
+        playHarmonyNote(getState(), 200, 10, 1.0); // 200 < 250
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(2); // osc1, osc2
     });
 
     describe('Style-specific synthesis', () => {
         it('should configure oscillators for "organ" style', () => {
-            playHarmonyNote(440, 10, 1.0, 0.4, 'organ');
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'organ');
 
             // osc1, osc2, sub, lfo, tremoloLfo, fifthOsc, click
             expect(playback.audio.createOscillator).toHaveBeenCalledTimes(7);
@@ -122,7 +123,7 @@ describe('Harmony Synthesis', () => {
 
         it('should use sawtooth for "Rock" feel', () => {
             groove.genreFeel = 'Rock';
-            playHarmonyNote(440, 10, 1.0);
+            playHarmonyNote(getState(), 440, 10, 1.0);
 
             const osc1 = playback.audio.createOscillator.mock.results[0].value;
             expect(osc1.type).toBe('sawtooth');
@@ -130,7 +131,7 @@ describe('Harmony Synthesis', () => {
 
         it('should use triangle for "Neo-Soul" feel', () => {
             groove.genreFeel = 'Neo-Soul';
-            playHarmonyNote(440, 10, 1.0);
+            playHarmonyNote(getState(), 440, 10, 1.0);
 
             const osc1 = playback.audio.createOscillator.mock.results[0].value;
             expect(osc1.type).toBe('triangle');
@@ -149,7 +150,7 @@ describe('Harmony Synthesis', () => {
             ];
             playback.audio.currentTime = 10;
 
-            playHarmonyNote(440, 10, 1.0);
+            playHarmonyNote(getState(), 440, 10, 1.0);
 
             // The old voice (time 5 + duration 1 + 0.1 = 6.1 < 10) should be filtered out
             expect(harmony.activeVoices.length).toBe(1);
@@ -170,7 +171,7 @@ describe('Harmony Synthesis', () => {
                 },
             ];
 
-            playHarmonyNote(440, 10, 1.0, 0.4, 'stabs', 60);
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs', 60);
 
             expect(cancelSpy).toHaveBeenCalledWith(10);
             expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.005);
@@ -203,7 +204,7 @@ describe('Harmony Synthesis', () => {
                 },
             ];
 
-            playHarmonyNote(440, 10, 1.0);
+            playHarmonyNote(getState(), 440, 10, 1.0);
 
             expect(harmony.activeVoices.length).toBe(3);
         });
@@ -212,19 +213,22 @@ describe('Harmony Synthesis', () => {
     describe('Articulations', () => {
         it('should apply stereo panning based on intensity', () => {
             playback.bandIntensity = 0.8;
-            playHarmonyNote(440, 10, 1.0);
+            playHarmonyNote(getState(), 440, 10, 1.0);
 
             expect(playback.audio.createStereoPanner).toHaveBeenCalled();
         });
 
         it('should apply vibrato if configured', () => {
-            playHarmonyNote(440, 10, 1.0, 0.4, 'stabs', null, 0, 0, { rate: 5, depth: 10 });
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs', null, 0, 0, {
+                rate: 5,
+                depth: 10,
+            });
 
             expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
         });
 
         it('should apply frequency slides', () => {
-            playHarmonyNote(440, 10, 1.0, 0.4, 'stabs', null, 2, 0.1);
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs', null, 2, 0.1);
 
             const osc1 = playback.audio.createOscillator.mock.results[0].value;
             expect(osc1.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(440, 10.1);
@@ -248,7 +252,7 @@ describe('Harmony Synthesis', () => {
                 },
             ];
 
-            killHarmonyNote(0.1);
+            killHarmonyNote(getState(), 0.1);
 
             expect(cancelSpy).toHaveBeenCalledTimes(2);
             expect(setTargetSpy).toHaveBeenCalledTimes(2);
@@ -258,7 +262,7 @@ describe('Harmony Synthesis', () => {
 
     describe('Cleanup', () => {
         it('should call safeDisconnect when oscillator ends', () => {
-            playHarmonyNote(440, 10, 1.0);
+            playHarmonyNote(getState(), 440, 10, 1.0);
 
             const osc1 = playback.audio.createOscillator.mock.results[0].value;
             expect(osc1.onended).toBeTypeOf('function');

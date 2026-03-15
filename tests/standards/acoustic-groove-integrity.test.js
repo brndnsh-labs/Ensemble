@@ -58,7 +58,7 @@ describe('Acoustic Groove Integrity', () => {
         it('should use Sidestick instead of Snare at low intensity', () => {
             getState.mockReturnValue(mockState);
             const backbeat = 4;
-            const result = applyGrooveOverrides(createParams(backbeat, 'Snare'));
+            const result = applyGrooveOverrides(getState(), createParams(backbeat, 'Snare'));
             expect(result.soundName).toBe('Sidestick');
         });
     });

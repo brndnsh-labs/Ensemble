@@ -55,7 +55,7 @@ describe('Funk Drummer Critique', () => {
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
                     };
-                    const result = applyGrooveOverrides(params);
+                    const result = applyGrooveOverrides(getState(), params);
                     if (
                         result.shouldPlay &&
                         (result.soundName === instName ||

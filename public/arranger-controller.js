@@ -8,7 +8,7 @@ import { getSectionEnergy } from './form-analysis.js';
 import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
-import { getState } from './state.js';
+import { getState, stateMap } from './state.js';
 import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
 import { syncWorker } from './worker-client.js';
@@ -52,7 +52,7 @@ export function refreshArrangerUI() {
     validateAndAnalyze();
     syncWorker();
     flushBuffers();
-    restoreGains();
+    restoreGains(stateMap);
     saveCurrentState();
 }
 

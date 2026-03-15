@@ -116,8 +116,9 @@ const files = [
 import { getSoloistNote } from '../../public/soloist.js';
 
 // We need to mock the dispatch and getState from state.js
-let mockState = {};
+let { mockState } = vi.hoisted(() => ({ mockState: {} }));
 vi.mock('../../public/state.js', () => ({
+    stateMap: mockState,
     getState: () => mockState,
     dispatch: () => {},
 }));

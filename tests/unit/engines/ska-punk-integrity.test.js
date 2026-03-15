@@ -65,7 +65,7 @@ describe('Ska-Punk Genre Integrity', () => {
         const inst = { name: 'HiHat' };
         const ts44 = TIME_SIGNATURES['4/4'];
         const info = getStepInfo(2, ts44, [], TIME_SIGNATURES);
-        const result = applyGrooveOverrides({
+        const result = applyGrooveOverrides(getState(), {
             step: 2,
             inst,
             stepVal: 1,

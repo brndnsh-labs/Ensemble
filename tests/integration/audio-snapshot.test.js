@@ -144,7 +144,7 @@ describe('Audio Engine Snapshot Regression', () => {
         soloist.enabled = true;
 
         // Init Engine
-        initAudio();
+        initAudio(getState());
     });
 
     afterEach(() => {

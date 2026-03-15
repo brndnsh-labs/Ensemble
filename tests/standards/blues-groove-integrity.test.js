@@ -74,7 +74,10 @@ describe('Blues Groove Integrity', () => {
 
             const shuffleSteps = [0, 3, 4, 7, 8, 11, 12, 15].map((s) => barIndexMotif0 * 16 + s);
             for (const step of shuffleSteps) {
-                const result = applyGrooveOverrides(createParams(step, 'HiHat', 0, 0.5));
+                const result = applyGrooveOverrides(
+                    getState(),
+                    createParams(step, 'HiHat', 0, 0.5),
+                );
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('HiHat');
             }

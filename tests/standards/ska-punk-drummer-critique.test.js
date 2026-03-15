@@ -58,7 +58,7 @@ describe('Ska-Punk Drummer Critique', () => {
                         stepsPerBar: 16,
                         loopStep: step,
                     };
-                    const result = applyGrooveOverrides(params);
+                    const result = applyGrooveOverrides(getState(), params);
                     if (result.shouldPlay) {
                         stepData.instruments[instName] = {
                             velocity: result.velocity,

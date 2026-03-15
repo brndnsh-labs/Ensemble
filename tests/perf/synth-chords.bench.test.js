@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getState } from '../../public/state.js';
 
 // Mock utils
 vi.mock('../../public/utils.js', () => ({
@@ -59,6 +60,7 @@ vi.mock('../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn(),
     };
@@ -72,7 +74,7 @@ describe('Synth Chords Performance', () => {
         const start = performance.now();
 
         for (let i = 0; i < iterations; i++) {
-            playNote(440, 0, 1.0, {
+            playNote(getState(), 440, 0, 1.0, {
                 vol: 0.8,
                 index: 0,
                 instrument: 'Piano',

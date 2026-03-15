@@ -54,7 +54,7 @@ describe('Snare Creativity Integrity', () => {
                     tsConfig: info.tsConfig,
                 };
 
-                const result = applyGrooveOverrides(params);
+                const result = applyGrooveOverrides(getState(), params);
                 if (result.shouldPlay) {
                     if (step !== 4 && step !== 12) {
                         barSnareHits++;
@@ -97,7 +97,7 @@ describe('Snare Creativity Integrity', () => {
                     tsConfig: info.tsConfig,
                 };
 
-                const result = applyGrooveOverrides(params);
+                const result = applyGrooveOverrides(getState(), params);
                 if (result.shouldPlay) {
                     hitsOnStep5Or13++;
                 }

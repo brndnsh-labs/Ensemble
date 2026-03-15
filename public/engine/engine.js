@@ -1,7 +1,6 @@
 import { audioWatchdog } from '../audio-recovery.js';
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
-import { getState } from '../state.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
@@ -40,15 +39,16 @@ export function _resetChromiumCheck() {
 /**
  * Initializes the Web Audio context and global audio nodes.
  * Must be called in response to a user gesture.
+ * @param {Object} state - Global ensemble state.
  */
-export function initAudio() {
-    const { playback, groove, chords, bass, soloist, harmony, midi } = getState();
+export function initAudio(state) {
+    const { playback, groove, chords, bass, soloist, harmony, midi } = state;
     if (!playback.audio || playback.audio.state === 'closed') {
         if (navigator.audioSession) {
             navigator.audioSession.type = 'playback';
         }
 
-        playback.audio = new (window.AudioContext || window.webkitAudioContext)();
+        playback.audio = new (window.AudioContext || window.webkitAudioContext)(); // @direct-mutation
 
         playback.audio.onstatechange = () => {
             if (playback.audio.state === 'suspended' && playback.isPlaying) {
@@ -56,7 +56,7 @@ export function initAudio() {
             }
         };
 
-        playback.masterGain = playback.audio.createGain();
+        playback.masterGain = playback.audio.createGain(); // @direct-mutation
         const volEl = document.getElementById('masterVolume');
         const initMasterVol = (parseFloat(volEl?.value) || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
         playback.masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
@@ -69,11 +69,11 @@ export function initAudio() {
         audioWatchdog.attachToMaster(playback.masterGain);
         audioWatchdog.start();
 
-        playback.saturator = playback.audio.createWaveShaper();
+        playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation
         playback.saturator.curve = createSoftClipCurve();
         playback.saturator.oversample = '4x';
 
-        playback.masterLimiter = playback.audio.createDynamicsCompressor();
+        playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
         playback.masterLimiter.threshold.setValueAtTime(-1.5, playback.audio.currentTime);
         playback.masterLimiter.knee.setValueAtTime(30, playback.audio.currentTime);
         playback.masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
@@ -84,7 +84,7 @@ export function initAudio() {
         playback.saturator.connect(playback.masterLimiter);
         playback.masterLimiter.connect(playback.audio.destination);
 
-        playback.reverbNode = playback.audio.createConvolver();
+        playback.reverbNode = playback.audio.createConvolver(); // @direct-mutation
         playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
         playback.reverbNode.connect(playback.masterGain);
 
@@ -136,7 +136,7 @@ export function initAudio() {
                 hp.connect(lowShelf);
                 lowShelf.connect(notch);
                 notch.connect(playback.masterGain);
-                playback.chordsEQ = hp;
+                playback.chordsEQ = hp; // @direct-mutation
             } else if (m.name === 'bass') {
                 const weight = playback.audio.createBiquadFilter();
                 weight.type = 'lowshelf';
@@ -167,7 +167,7 @@ export function initAudio() {
                 scoop.connect(definition);
                 definition.connect(comp);
                 comp.connect(playback.masterGain);
-                playback.bassEQ = weight;
+                playback.bassEQ = weight; // @direct-mutation
             } else if (m.name === 'soloist') {
                 const presence = playback.audio.createBiquadFilter();
                 presence.type = 'peaking';
@@ -183,7 +183,7 @@ export function initAudio() {
                 gainNode.connect(presence);
                 presence.connect(air);
                 air.connect(playback.masterGain);
-                playback.soloistEQ = presence;
+                playback.soloistEQ = presence; // @direct-mutation
             } else if (m.name === 'harmonies') {
                 const hp = playback.audio.createBiquadFilter();
                 hp.type = 'highpass';
@@ -197,7 +197,7 @@ export function initAudio() {
                 gainNode.connect(hp);
                 hp.connect(warmth);
                 warmth.connect(playback.masterGain);
-                playback.harmoniesEQ = hp;
+                playback.harmoniesEQ = hp; // @direct-mutation
             } else if (m.name === 'drums') {
                 // Parallel-style Drum Compression (Internal Routing)
                 const drumComp = playback.audio.createDynamicsCompressor();
@@ -241,58 +241,82 @@ export function initAudio() {
     }
 }
 
-export function killChordBus() {
-    const { playback } = getState();
+/**
+ * Kill the chord bus.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killChordBus(state) {
+    const { playback } = state;
     if (playback.chordsGain) {
         playback.chordsGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.chordsGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
 }
 
-export function killBassBus() {
-    const { playback } = getState();
+/**
+ * Kill the bass bus.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killBassBus(state) {
+    const { playback } = state;
     if (playback.bassGain) {
         playback.bassGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.bassGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
 }
 
-export function killSoloistBus() {
-    const { playback } = getState();
+/**
+ * Kill the soloist bus.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killSoloistBus(state) {
+    const { playback } = state;
     if (playback.soloistGain) {
         playback.soloistGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.soloistGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
 }
 
-export function killHarmonyBus() {
-    const { playback } = getState();
+/**
+ * Kill the harmony bus.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killHarmonyBus(state) {
+    const { playback } = state;
     if (playback.harmoniesGain) {
         playback.harmoniesGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.harmoniesGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
 }
 
-export function killDrumBus() {
-    const { playback } = getState();
+/**
+ * Kill the drum bus.
+ * @param {Object} state - Global ensemble state.
+ */
+export function killDrumBus(state) {
+    const { playback } = state;
     if (playback.drumsGain) {
         playback.drumsGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.drumsGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
 }
 
-export async function killAllNotes() {
-    killAllPianoNotes();
-    killSoloistNote();
-    killBassNote();
-    killHarmonyNote();
-    killDrumNote();
+/**
+ * Kill all ringing notes and silence all buses.
+ * @param {Object} state - Global ensemble state.
+ */
+export async function killAllNotes(state) {
+    killAllPianoNotes(state);
+    killSoloistNote(state);
+    killBassNote(state);
+    killHarmonyNote(state);
+    killDrumNote(state);
 
-    killChordBus();
-    killBassBus();
-    killSoloistBus();
-    killHarmonyBus();
-    killDrumBus();
+    killChordBus(state);
+    killBassBus(state);
+    killSoloistBus(state);
+    killHarmonyBus(state);
+    killDrumBus(state);
 
     try {
         const { panic } = await import('../midi-controller.js');
@@ -304,19 +328,40 @@ export async function killAllNotes() {
 
 /**
  * Restores instrument buses to their state-defined volumes.
+ * @param {Object} state - Global ensemble state.
  */
-export function restoreGains() {
-    const { playback, chords, bass, soloist, harmony, groove, midi } = getState();
+export function restoreGains(state) {
+    const { playback, chords, bass, soloist, harmony, groove, midi } = state;
     if (!playback.audio) {
         return;
     }
     const t = playback.audio.currentTime;
     const modules = [
-        { node: playback.chordsGain, state: chords, mult: MIXER_GAIN_MULTIPLIERS.chords },
-        { node: playback.bassGain, state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass },
-        { node: playback.soloistGain, state: soloist, mult: MIXER_GAIN_MULTIPLIERS.soloist },
-        { node: playback.harmoniesGain, state: harmony, mult: MIXER_GAIN_MULTIPLIERS.harmonies },
-        { node: playback.drumsGain, state: groove, mult: MIXER_GAIN_MULTIPLIERS.drums },
+        {
+            node: playback.chordsGain,
+            state: chords,
+            mult: MIXER_GAIN_MULTIPLIERS.chords,
+            name: 'chords',
+        },
+        { node: playback.bassGain, state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass, name: 'bass' },
+        {
+            node: playback.soloistGain,
+            state: soloist,
+            mult: MIXER_GAIN_MULTIPLIERS.soloist,
+            name: 'soloist',
+        },
+        {
+            node: playback.harmoniesGain,
+            state: harmony,
+            mult: MIXER_GAIN_MULTIPLIERS.harmonies,
+            name: 'harmonies',
+        },
+        {
+            node: playback.drumsGain,
+            state: groove,
+            mult: MIXER_GAIN_MULTIPLIERS.drums,
+            name: 'drums',
+        },
     ];
     modules.forEach((m) => {
         if (m.node) {
@@ -340,8 +385,12 @@ export function restoreGains() {
 let lastAudioTime = 0;
 let lastPerfTime = 0;
 
-export function getVisualTime() {
-    const { playback } = getState();
+/**
+ * Unified getter for the visualizer clock.
+ * @param {Object} state - Global ensemble state.
+ */
+export function getVisualTime(state) {
+    const { playback } = state;
     if (!playback.audio) {
         return 0;
     }

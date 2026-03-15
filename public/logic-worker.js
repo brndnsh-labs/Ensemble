@@ -70,7 +70,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
 
     while (head < targetStep) {
         const step = head;
-        const chordData = getChordAtStep(step, mainCursor);
+        const chordData = getChordAtStep(step, arranger, mainCursor);
         const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
         // 1. Context Assembly (Anchor: Groove)
@@ -88,7 +88,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
             coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
             if (remainingSteps <= stepsPerMeasure) {
-                const nextSectionChordData = getChordAtStep(sectionEnd, lookaheadCursor);
+                const nextSectionChordData = getChordAtStep(sectionEnd, arranger, lookaheadCursor);
                 if (nextSectionChordData?.chord) {
                     coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
                 }
@@ -129,7 +129,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
                 }
             }
 
-            const result = applyGrooveOverrides({
+            const result = applyGrooveOverrides(getState(), {
                 step,
                 inst,
                 stepVal,
@@ -161,7 +161,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         if (soloist.enabled && !isPerformanceModalOpen && step >= sbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
-                const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
+                const nextChordData = getChordAtStep(step + 4, arranger, lookaheadCursor);
                 soloResult = getSoloistNote(
                     chord,
                     nextChordData?.chord,
@@ -214,7 +214,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
             if (chordData) {
                 const { chord, stepInChord } = chordData;
                 if (isBassActive(bass.style, step, stepInChord, stepInfo, coordination)) {
-                    const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
+                    const nextChordData = getChordAtStep(step + 4, arranger, lookaheadCursor);
                     const { sectionStart, sectionEnd } = chordData;
                     const bassResult = getBassNote(
                         chord,
@@ -285,7 +285,7 @@ function fillBuffers(currentStep, requestTimestamp = null, processStartTime = nu
         if (harmony.enabled && step >= hbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord } = chordData;
-                const nextChordData = getChordAtStep(step + 4, lookaheadCursor);
+                const nextChordData = getChordAtStep(step + 4, arranger, lookaheadCursor);
                 const harmonyNotes = getHarmonyNotes(
                     chord,
                     nextChordData?.chord,
@@ -532,10 +532,10 @@ function handlePrime(steps) {
     const start = performance.now();
     for (let i = 0; i < stepsToPrime; i++) {
         const s = i;
-        const chordData = getChordAtStep(s, primeCursor);
+        const chordData = getChordAtStep(s, arranger, primeCursor);
         if (chordData) {
             const { chord, stepInChord } = chordData;
-            const nextChordData = getChordAtStep(s, primeLookaheadCursor);
+            const nextChordData = getChordAtStep(s, arranger, primeLookaheadCursor);
             const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
             const stepInfo = getStepInfo(s, ts, arranger.measureMap, TIME_SIGNATURES);
             const coordination = createCoordinationContext(s, stepInfo);

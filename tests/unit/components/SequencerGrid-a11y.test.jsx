@@ -63,6 +63,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockState,
+        stateMap: mockState,
         getState: () => mockState,
     };
 });
@@ -192,7 +193,12 @@ describe('SequencerGrid Accessibility', () => {
 
         await vi.waitFor(() => {
             expect(mockDispatch).toHaveBeenCalledWith('INIT_AUDIO');
-            expect(playDrumSound).toHaveBeenCalledWith('Kick', expect.any(Number), 1.0);
+            expect(playDrumSound).toHaveBeenCalledWith(
+                expect.any(Object),
+                'Kick',
+                expect.any(Number),
+                1.0,
+            );
         });
     });
 });

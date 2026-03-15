@@ -2,20 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // --- Global Mocks ---
 
-const mockState = {
-    arranger: {
-        key: 'C',
-        isMinor: false,
+const { mockState } = vi.hoisted(() => ({
+    mockState: {
+        arranger: {
+            key: 'C',
+            isMinor: false,
+        },
+        groove: {
+            genreFeel: 'Jazz',
+        },
+        soloist: {
+            tension: 0,
+        },
     },
-    groove: {
-        genreFeel: 'Jazz',
-    },
-    soloist: {
-        tension: 0,
-    },
-};
+}));
 
 vi.mock('../../public/state.js', () => ({
+    stateMap: mockState,
     getState: () => mockState,
 }));
 

@@ -52,6 +52,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         ...mockStateMap,
+        stateMap: mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn(),
     };
@@ -77,7 +78,7 @@ describe('Voice Exhaustion & Stealing', () => {
         // Ensure theft logic triggers
         for (let i = 0; i < 70; i++) {
             playback.audio.currentTime = 10.0 + i * 0.1;
-            playNote(440, playback.audio.currentTime, 1.0, { instrument: 'Piano' });
+            playNote(getState(), 440, playback.audio.currentTime, 1.0, { instrument: 'Piano' });
         }
 
         // The Set should never exceed 64
@@ -102,11 +103,11 @@ describe('Voice Exhaustion & Stealing', () => {
 
         // Schedule 10 held notes
         for (let i = 0; i < 10; i++) {
-            playNote(440, 10.0, 1.0);
+            playNote(getState(), 440, 10.0, 1.0);
         }
 
         // Lift pedal at time 11.0
-        updateSustain(false, 11.0);
+        updateSustain(getState(), false, 11.0);
 
         // Released notes use 0.12 damping constant for long notes
         const releasedGains = gains.filter((g) =>
@@ -119,7 +120,7 @@ describe('Voice Exhaustion & Stealing', () => {
     it('should not throw even under extreme rapid synthesis calls', () => {
         const stressTest = () => {
             for (let i = 0; i < 500; i++) {
-                playNote(220 + i, 10.0 + i, 0.1);
+                playNote(getState(), 220 + i, 10.0 + i, 0.1);
             }
         };
         expect(stressTest).not.toThrow();

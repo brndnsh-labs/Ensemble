@@ -24,7 +24,7 @@ import {
     unlockAudio,
 } from '../platform.js';
 import { getSoloistNote } from '../soloist.js';
-import { dispatch, getState } from '../state.js';
+import { dispatch, getState, stateMap } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -87,7 +87,7 @@ initPlatform();
  * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
  */
 export function togglePlay(viz, fromDispatch = false) {
-    const { playback, arranger, chords } = getState();
+    const { playback, arranger, chords } = stateMap;
     const activeViz = viz || playback.viz;
 
     // Determine if we are STARTING or STOPPING based on current state.
@@ -96,7 +96,7 @@ export function togglePlay(viz, fromDispatch = false) {
 
     if (isStopping) {
         if (!fromDispatch) {
-            playback.isPlaying = false;
+            playback.isPlaying = false; // @direct-mutation
         }
         if (playback.autoIntensity) {
             conductorState.target = 0.35;
@@ -104,19 +104,19 @@ export function togglePlay(viz, fromDispatch = false) {
         stopWorker();
         lockAudio();
         deactivateWakeLock();
-        playback.drawQueue = [];
-        playback.lastActiveDrumElements = null;
-        chords.lastActiveChordIndex = null;
-        chords.scheduledChordIndex = null;
-        playback.resolutionTriggered = false;
-        playback.isScheduling = false;
+        playback.drawQueue = []; // @direct-mutation
+        playback.lastActiveDrumElements = null; // @direct-mutation
+        chords.lastActiveChordIndex = null; // @direct-mutation
+        chords.scheduledChordIndex = null; // @direct-mutation
+        playback.resolutionTriggered = false; // @direct-mutation
+        playback.isScheduling = false; // @direct-mutation
         dispatch(ACTIONS.SET_ENDING_PENDING, false);
         dispatch(ACTIONS.SET_STOP_AT_END, false);
         if (activeViz) {
             activeViz.clear();
         }
         dispatch('VIS_RESET');
-        killAllNotes();
+        killAllNotes(stateMap);
         panic(true); // Full MIDI reset
         sendMIDITransport('stop', playback.audio?.currentTime || 0);
         flushBuffers();
@@ -126,6 +126,7 @@ export function togglePlay(viz, fromDispatch = false) {
                 clearTimeout(playback.suspendTimeout);
             }
             playback.suspendTimeout = setTimeout(() => {
+                // @direct-mutation
                 if (!playback.isPlaying && playback.audio.state === 'running') {
                     playback.audio.suspend();
                 }
@@ -135,25 +136,25 @@ export function togglePlay(viz, fromDispatch = false) {
         if (playback.suspendTimeout) {
             clearTimeout(playback.suspendTimeout);
         }
-        initAudio();
+        initAudio(stateMap);
 
         if (playback.audio && playback.audio.state === 'suspended') {
             playback.audio.resume();
         }
 
         if (!fromDispatch) {
-            playback.isPlaying = true;
-            playback.sessionStartTime = performance.now();
+            playback.isPlaying = true; // @direct-mutation
+            playback.sessionStartTime = performance.now(); // @direct-mutation
         }
 
         if (playback.autoIntensity) {
             conductorState.target = 0.35;
         }
 
-        playback.step = 0;
-        playback.resolutionTriggered = false;
-        playback.isScheduling = false;
-        chords.scheduledChordIndex = 0;
+        playback.step = 0; // @direct-mutation
+        playback.resolutionTriggered = false; // @direct-mutation
+        playback.isScheduling = false; // @direct-mutation
+        chords.scheduledChordIndex = 0; // @direct-mutation
         dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
         dispatch(ACTIONS.SET_ENDING_PENDING, false);
         syncWorker();
@@ -161,18 +162,18 @@ export function togglePlay(viz, fromDispatch = false) {
         flushBuffers(primeSteps);
 
         unlockAudio();
-        restoreGains();
+        restoreGains(stateMap);
         const startTime = playback.audio.currentTime + 0.1;
-        playback.nextNoteTime = startTime;
-        playback.unswungNextNoteTime = startTime;
-        playback.isCountingIn = playback.countIn;
-        playback.countInBeat = 0;
+        playback.nextNoteTime = startTime; // @direct-mutation
+        playback.unswungNextNoteTime = startTime; // @direct-mutation
+        playback.isCountingIn = playback.countIn; // @direct-mutation
+        playback.countInBeat = 0; // @direct-mutation
         activateWakeLock();
         if (activeViz) {
             activeViz.setBeatReference(playback.nextNoteTime);
         }
         if (!playback.isDrawing) {
-            playback.isDrawing = true;
+            playback.isDrawing = true; // @direct-mutation
             requestAnimationFrame(() => draw(activeViz));
         }
 
@@ -186,7 +187,7 @@ export function togglePlay(viz, fromDispatch = false) {
 }
 
 function triggerResolution(time) {
-    const { playback, bass, soloist, chords, harmony, groove } = getState();
+    const { playback, bass, soloist, chords, harmony, groove } = stateMap;
 
     // 0. Clear all buffers to prevent "double hits" from pre-fetched notes
     // The worker might have already sent normal notes for the wrap-around step.
@@ -244,7 +245,7 @@ function scheduleResolution(time) {
     setTimeout(
         () => {
             if (playback.isPlaying) {
-                updateSustain(false);
+                updateSustain(stateMap, false);
             }
         },
         6 * spb * 1000,
@@ -268,7 +269,7 @@ export function scheduler() {
     if (playback.isScheduling || !playback.isPlaying) {
         return;
     }
-    playback.isScheduling = true;
+    playback.isScheduling = true; // @direct-mutation
 
     try {
         requestBuffer(playback.step);
@@ -332,8 +333,8 @@ export function scheduler() {
                         playback.resolutionTriggered
                     ) {
                         if (!playback.resolutionTriggered) {
-                            playback.resolutionTriggered = true;
-                            playback.stopAtEnd = false;
+                            playback.resolutionTriggered = true; // @direct-mutation
+                            playback.stopAtEnd = false; // @direct-mutation
                             triggerResolution(playback.nextNoteTime);
                         }
                         return; // Stop scheduling
@@ -362,24 +363,24 @@ function applyPendingGenre() {
         return;
     }
 
-    groove.genreFeel = payload.feel;
+    groove.genreFeel = payload.feel; // @direct-mutation
     if (payload.swing !== undefined) {
-        groove.swing = payload.swing;
+        groove.swing = payload.swing; // @direct-mutation
     }
     if (payload.sub !== undefined) {
-        groove.swingSub = payload.sub;
+        groove.swingSub = payload.sub; // @direct-mutation
     }
     if (payload.genreName) {
-        groove.lastSmartGenre = payload.genreName;
+        groove.lastSmartGenre = payload.genreName; // @direct-mutation
     }
 
     if (payload.drum) {
         loadDrumPreset(payload.drum);
     }
 
-    groove.pendingGenreFeel = null;
+    groove.pendingGenreFeel = null; // @direct-mutation
 
-    playback.nextNoteTime = playback.unswungNextNoteTime;
+    playback.nextNoteTime = playback.unswungNextNoteTime; // @direct-mutation
 
     syncAndFlushWorker(playback.step);
     triggerFlash(0.15);
@@ -394,13 +395,13 @@ function advanceCountIn() {
     playback.countInBeat++;
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     if (playback.countInBeat >= ts.beats) {
-        playback.isCountingIn = false;
-        playback.step = 0;
+        playback.isCountingIn = false; // @direct-mutation
+        playback.step = 0; // @direct-mutation
     }
 }
 
 function scheduleCountIn(beat, time) {
-    const { playback, arranger, soloist } = getState();
+    const { playback, arranger, soloist } = stateMap;
     if (playback.visualFlash) {
         playback.drawQueue.push({ type: 'flash', time: time, intensity: 0.3, beat: 1 });
     }
@@ -469,6 +470,7 @@ function scheduleCountIn(beat, time) {
             const duration = (res.durationSteps || 4) * 0.25 * (60.0 / playback.bpm);
 
             playSoloNote(
+                stateMap,
                 freq,
                 time,
                 duration,
@@ -491,7 +493,7 @@ function scheduleCountIn(beat, time) {
 }
 
 function advanceGlobalStep() {
-    const { playback, groove, arranger } = getState();
+    const { playback, groove, arranger } = stateMap;
     updateLarsTempo(playback.step);
     const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
     const sixteenth = 0.25 * (60.0 / effectiveBpm);
@@ -535,7 +537,7 @@ function advanceGlobalStep() {
 }
 
 function getChordAtStep(step) {
-    const { arranger, chords } = getState();
+    const { arranger, chords } = stateMap;
     if (arranger.totalSteps === 0) {
         return null;
     }
@@ -589,7 +591,7 @@ function scheduleDrums(params) {
         isTurnaround,
     } = params;
 
-    const { playback, groove, vizState, midi, arranger } = getState();
+    const { playback, groove, vizState, midi, arranger } = stateMap;
 
     // PERFORMANCE MODE: Skip automatic drums if manual pad is active
     if (playback.modals?.drumPad) {
@@ -606,8 +608,8 @@ function scheduleDrums(params) {
         if (fillStep >= groove.fillLength) {
             dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });
             if (groove.pendingCrash) {
-                playDrumSound('Crash', finalTime, 1.1 * conductorVel);
-                groove.pendingCrash = false;
+                playDrumSound(stateMap, 'Crash', finalTime, 1.1 * conductorVel);
+                groove.pendingCrash = false; // @direct-mutation
             }
         }
     }
@@ -626,7 +628,7 @@ function scheduleDrums(params) {
                         });
                     }
                     notes.forEach((note) => {
-                        playDrumSound(note.name, finalTime, note.vel * conductorVel);
+                        playDrumSound(stateMap, note.name, finalTime, note.vel * conductorVel);
 
                         if (vizState.enabled && playback.viz) {
                             const midiNum = DRUM_VIS_PITCHES[note.name] || 36;
@@ -662,8 +664,7 @@ function scheduleDrums(params) {
                 stepVal = varInst[step];
             }
         }
-
-        const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides({
+        const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides(stateMap, {
             step: absoluteStep,
             inst,
             stepVal,
@@ -671,12 +672,12 @@ function scheduleDrums(params) {
             groove,
             isDownbeat,
             isBeatStart,
-            isBackbeat,
             isGroupStart,
-            beatIndex,
+            isBackbeat,
             isOffbeat,
             isEOfBeat,
             isAOfBeat,
+            beatIndex,
             tsConfig,
             isTurnaround,
             stepsPerBar,
@@ -685,7 +686,7 @@ function scheduleDrums(params) {
 
         if (shouldPlay && !inst.muted) {
             const playTime = finalTime + instTimeOffset;
-            playDrumSound(soundName, playTime, velocity * conductorVel);
+            playDrumSound(stateMap, soundName, playTime, velocity * conductorVel);
 
             if (vizState.enabled && playback.viz) {
                 const midiNum = DRUM_VIS_PITCHES[soundName] || 36;
@@ -715,7 +716,7 @@ function scheduleDrums(params) {
  * @param {number} time - The AudioContext time to play.
  */
 function scheduleDrumsFromBuffer(step, time) {
-    const { groove, playback, vizState, midi } = getState();
+    const { groove, playback, vizState, midi } = stateMap;
 
     // PERFORMANCE MODE: Skip automatic drums if manual pad is active
     if (playback.modals?.drumPad) {
@@ -732,7 +733,7 @@ function scheduleDrumsFromBuffer(step, time) {
             const { name, velocity, timingOffset } = n;
             const playTime = time + (timingOffset || 0);
 
-            playDrumSound(name, playTime, velocity * conductorVel);
+            playDrumSound(stateMap, name, playTime, velocity * conductorVel);
 
             if (vizState.enabled && playback.viz) {
                 const midiNum = DRUM_VIS_PITCHES[name] || 36;
@@ -768,7 +769,7 @@ function scheduleBass(chordData, step, time) {
                 const { freq, durationSteps, velocity, timingOffset, muted } = noteEntry;
                 const { chord } = chordData;
                 const adjustedTime = time + (timingOffset || 0);
-                bass.lastPlayedFreq = freq;
+                bass.lastPlayedFreq = freq; // @direct-mutation
                 const midiNum = getMidi(freq);
                 const { name, octave } = midiToNote(midiNum);
                 const spb = 60.0 / playback.bpm;
@@ -793,7 +794,7 @@ function scheduleBass(chordData, step, time) {
                         duration,
                     });
                 }
-                playBassNote(freq, adjustedTime, duration, finalVel, muted);
+                playBassNote(stateMap, freq, adjustedTime, duration, finalVel, muted);
                 if (!muted) {
                     // Bass is strictly monophonic, so we force Mono mode to kill previous notes
                     sendMIDINote(
@@ -873,6 +874,7 @@ function scheduleSoloist(chordData, step, _time, unswungTime) {
                 const playTime = unswungTime + offsetS;
 
                 playSoloNote(
+                    stateMap,
                     freq,
                     playTime,
                     duration,
@@ -999,7 +1001,7 @@ function scheduleChords(_chordData, step, time) {
                     if (cc.controller === 64) {
                         const isSustain = cc.value >= 64;
                         const ccTime = playTime + (cc.timingOffset || 0);
-                        updateSustain(isSustain, ccTime);
+                        updateSustain(stateMap, isSustain, ccTime);
                         sendMIDICC(midi.chordsChannel, 64, cc.value, ccTime);
                     }
                 });
@@ -1007,7 +1009,7 @@ function scheduleChords(_chordData, step, time) {
 
             if (!muted && freq) {
                 const duration = (durationSteps || 1) * 0.25 * spb;
-                playNote(freq, playTime, duration, {
+                playNote(stateMap, freq, playTime, duration, {
                     vol: velocity,
                     index: 0,
                     instrument: instrument || 'Piano',
@@ -1046,7 +1048,7 @@ function scheduleHarmonies(_chordData, step, time) {
         // clear previous voices once before scheduling the new ones.
         const starter = notes.find((n) => n.isChordStart);
         if (starter) {
-            killHarmonyNote(starter.killFade || 0.05);
+            killHarmonyNote(stateMap, starter.killFade || 0.05);
         }
 
         // Power-compensation for multiple voices: Scale volume by 1/sqrt(N)
@@ -1080,6 +1082,7 @@ function scheduleHarmonies(_chordData, step, time) {
                 const finalVel = baseVel * polyphonyComp;
 
                 playHarmonyNote(
+                    stateMap,
                     freq || 440,
                     playTime,
                     duration,
@@ -1143,7 +1146,7 @@ export function scheduleGlobalEvent(step, swungTime) {
             }
         }
         if (groove.snareMask !== snareMask) {
-            groove.snareMask = snareMask;
+            groove.snareMask = snareMask; // @direct-mutation
             // Immediate sync to worker so harmony module can "hear" the new drum pattern
             syncWorker(ACTIONS.SET_PARAM, {
                 module: 'groove',
@@ -1259,7 +1262,7 @@ export function scheduleGlobalEvent(step, swungTime) {
     const chordData = getChordAtStep(step);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
-            playback.currentKey = chordData.chord.key;
+            playback.currentKey = chordData.chord.key; // @direct-mutation
             window.dispatchEvent(
                 new CustomEvent('key-change', { detail: { key: playback.currentKey } }),
             );
@@ -1360,7 +1363,7 @@ function syncAndFlushWorker(step) {
     harmony.buffer.clear();
     dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });
 
-    killAllNotes();
+    killAllNotes(stateMap);
     flushWorker(step, syncData);
-    restoreGains();
+    restoreGains(stateMap);
 }

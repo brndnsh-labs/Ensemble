@@ -32,7 +32,7 @@ vi.mock('../../../public/state.js', () => {
         midi: {},
         vizState: {},
     };
-    return { ...mockState, getState: () => mockState };
+    return { ...mockState, stateMap: mockState, getState: () => mockState };
 });
 
 // Mock Config

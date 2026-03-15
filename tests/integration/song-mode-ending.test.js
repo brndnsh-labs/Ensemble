@@ -81,6 +81,7 @@ vi.mock('../../public/state.js', () => {
         }),
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
         dispatch: mockState.dispatch,
         ACTIONS: { SET_ENDING_PENDING: 'SET_ENDING_PENDING', TOGGLE_PLAY: 'TOGGLE_PLAY' },

@@ -38,6 +38,7 @@ vi.mock('../../../public/state.js', () => {
         dispatch: vi.fn(),
     };
     return {
+        stateMap: mockState,
         getState: () => mockState,
         resetMockState: (newState) => {
             Object.assign(mockState, newState);
@@ -52,7 +53,7 @@ describe('Turnaround Logic & Section Mapping', () => {
         const spm = 16;
 
         // Start of Bar 5 (step 64) - should have a crash because Bar 4 (48-63) was turnaround
-        const result = applyGrooveOverrides({
+        const result = applyGrooveOverrides(getState(), {
             step: 64,
             inst: { name: 'Kick', muted: false, steps: [] },
             stepVal: 0,
@@ -83,7 +84,7 @@ describe('Turnaround Logic & Section Mapping', () => {
         const spm = 16;
 
         // Start of Bar 2 (step 16) - should NOT have a crash because Bar 1 was too short for a fill
-        const result = applyGrooveOverrides({
+        const result = applyGrooveOverrides(getState(), {
             step: 16,
             inst: { name: 'Kick', muted: false, steps: [] },
             stepVal: 0,
@@ -111,7 +112,7 @@ describe('Turnaround Logic & Section Mapping', () => {
         const spm = 12;
 
         // Bar 4 (step 36) - should have a crash because Bar 3 was the turnaround
-        const result = applyGrooveOverrides({
+        const result = applyGrooveOverrides(getState(), {
             step: 36,
             inst: { name: 'Kick', muted: false, steps: [] },
             stepVal: 0,

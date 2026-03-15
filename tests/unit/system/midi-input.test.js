@@ -3,6 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getState } from '../../../public/state.js';
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
@@ -21,14 +22,14 @@ vi.mock('../../../public/state.js', () => {
     };
     return {
         ...mockState,
+        stateMap: mockState,
         getState: () => mockState,
     };
 });
 
 import { initMIDI } from '../../../public/midi-controller.js';
-import { dispatch, getState } from '../../../public/state.js';
 
-const { midi } = getState();
+const { midi, dispatch } = getState();
 
 describe('MIDI Input Handling', () => {
     let mockInput;

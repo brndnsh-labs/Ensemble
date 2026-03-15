@@ -5,6 +5,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { audioWatchdog } from '../../../public/audio-recovery.js';
 import { _resetChromiumCheck, getVisualTime, initAudio } from '../../../public/engine/engine.js';
+
+// Mock state.js
+vi.mock('../../../public/state.js', () => {
+    const mockState = {
+        playback: {
+            audio: { currentTime: 10.0 },
+            bandIntensity: 0.5,
+            modals: {},
+        },
+        groove: { audioBuffers: {} },
+        chords: { enabled: true, volume: 0.5, reverb: 0.5 },
+        bass: { enabled: true, volume: 0.5, reverb: 0.5 },
+        soloist: { enabled: true, volume: 0.5, reverb: 0.5 },
+        harmony: { enabled: true, volume: 0.5, reverb: 0.5 },
+        midi: { enabled: false },
+    };
+    return {
+        getState: () => mockState,
+        stateMap: mockState,
+    };
+});
+
 import { getState } from '../../../public/state.js';
 
 const { playback } = getState();
@@ -79,7 +101,7 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
     it('should correctly initialize with a 48kHz sample rate (Mac/iOS standard)', () => {
         global.window.AudioContext = getMockAudioContextClass({ sampleRate: 48000 });
 
-        initAudio();
+        initAudio(getState());
 
         expect(playback.audio.sampleRate).toBe(48000);
         // Noise buffer should scale to sample rate (2 seconds = 96000 samples)
@@ -89,7 +111,7 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
     it('should automatically attempt to resume audio if suspended while playing (Safari fix)', async () => {
         global.window.AudioContext = getMockAudioContextClass({ state: 'suspended' });
 
-        initAudio();
+        initAudio(getState());
         playback.isPlaying = true;
 
         // Trigger the state change handler manually
@@ -100,15 +122,15 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
 
     it('should return 0 for visual time if audio context is missing', () => {
         playback.audio = null;
-        expect(getVisualTime()).toBe(0);
+        expect(getVisualTime(getState())).toBe(0);
     });
 
     it('should compensate for hardware output latency in visualizer timing', () => {
         global.window.AudioContext = getMockAudioContextClass({ outputLatency: 0.08 }); // 80ms latency
 
-        initAudio();
+        initAudio(getState());
 
-        const visualTime = getVisualTime();
+        const visualTime = getVisualTime(getState());
         expect(visualTime).toBeLessThan(10.0);
         expect(visualTime).toBeCloseTo(9.92, 2);
     });
@@ -124,15 +146,15 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
 
         const MockClass = getMockAudioContextClass({ outputLatency: 0 });
         global.window.AudioContext = MockClass;
-        initAudio();
+        initAudio(getState());
 
         // Baseline call to stabilize smoothing
-        getVisualTime();
+        getVisualTime(getState());
 
         nowValue += 100;
         playback.audio.currentTime += 0.1;
 
-        const visualTime = getVisualTime();
+        const visualTime = getVisualTime(getState());
         // audioTime (10.1) + smoothDelta (approx 0) - fallback (0.015)
         expect(visualTime).toBeCloseTo(10.085, 3);
     });
@@ -148,14 +170,14 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
 
         const MockClass = getMockAudioContextClass({ outputLatency: 0 });
         global.window.AudioContext = MockClass;
-        initAudio();
+        initAudio(getState());
 
-        getVisualTime();
+        getVisualTime(getState());
 
         nowValue += 100;
         playback.audio.currentTime += 0.1;
 
-        const visualTime = getVisualTime();
+        const visualTime = getVisualTime(getState());
         // audioTime (10.1) - fallback (0.045)
         expect(visualTime).toBeCloseTo(10.055, 3);
     });

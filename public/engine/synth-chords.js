@@ -1,4 +1,3 @@
-import { getState } from '../state.js';
 import { safeDisconnect } from '../utils.js';
 import { createSimplePanner, rampGain } from './synth-utils.js';
 
@@ -42,11 +41,14 @@ let cachedShaperDrive = -1;
 
 /**
  * Updates the sustain pedal state, precisely scheduled.
+ * @param {Object} state - Global ensemble state.
+ * @param {boolean} active - Sustain state.
+ * @param {number|null} time - Scheduled time.
  */
-export function updateSustain(active, time = null) {
-    const { playback } = getState();
+export function updateSustain(state, active, time = null) {
+    const { playback } = state;
     const scheduleTime = time !== null ? time : playback.audio?.currentTime || 0;
-    playback.sustainActive = active;
+    playback.sustainActive = active; // @direct-mutation
 
     if (!active && playback.heldNotes) {
         playback.heldNotes.forEach((note) => {
@@ -58,9 +60,10 @@ export function updateSustain(active, time = null) {
 
 /**
  * Forcefully kills all ringing piano notes (panic button).
+ * @param {Object} state - Global ensemble state.
  */
-export function killAllPianoNotes() {
-    const { playback } = getState();
+export function killAllPianoNotes(state) {
+    const { playback } = state;
     const now = playback.audio?.currentTime || 0;
     if (playback.heldNotes) {
         playback.heldNotes.forEach((note) => {
@@ -70,19 +73,21 @@ export function killAllPianoNotes() {
         });
         playback.heldNotes.clear();
     }
-    playback.sustainActive = false;
+    playback.sustainActive = false; // @direct-mutation
 }
 
 /**
  * Plays a musical note with advanced synthesis based on instrument presets.
+ * @param {Object} state - Global ensemble state.
  */
 export function playNote(
+    state,
     freq,
     time,
     duration,
     { vol = 0.1, index = 0, instrument = 'Piano', muted = false, numVoices = 1 } = {},
 ) {
-    const { playback, groove } = getState();
+    const { playback, groove } = state;
     if (!Number.isFinite(freq)) {
         return;
     }
@@ -91,7 +96,7 @@ export function playNote(
     const finalVol = vol * polyphonyComp;
 
     if (!playback.heldNotes) {
-        playback.heldNotes = new Set();
+        playback.heldNotes = new Set(); // @direct-mutation
     }
 
     try {
@@ -241,9 +246,12 @@ export function playNote(
 
 /**
  * Plays a percussive "scratch" or muted strum sound for chord rhythms.
+ * @param {Object} state - Global ensemble state.
+ * @param {number} time - Scheduled time.
+ * @param {number} vol - Output volume.
  */
-export function playChordScratch(time, vol = 0.1) {
-    const { playback, groove } = getState();
+export function playChordScratch(state, time, vol = 0.1) {
+    const { playback, groove } = state;
     try {
         const randomizedVol = vol * (0.8 + Math.random() * 0.4);
         const gain = playback.audio.createGain();

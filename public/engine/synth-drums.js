@@ -1,4 +1,3 @@
-import { getState } from '../state.js';
 import { safeDisconnect } from '../utils.js';
 import { createSimplePanner, rampGain, updateDensityDucking } from './synth-utils.js';
 
@@ -13,15 +12,19 @@ const RIGHT_PANNED_INSTRUMENTS = new Set([
     'Clave',
 ]);
 
-export function killDrumNote() {
-    const { playback, groove } = getState();
+/**
+ * Stop any currently decaying drum sounds (specifically hat/ride).
+ * @param {Object} state - Global ensemble state.
+ */
+export function killDrumNote(state) {
+    const { playback, groove } = state;
     if (groove.lastHatGain) {
         rampGain(groove.lastHatGain.gain, 0, playback.audio.currentTime, 0.005);
-        groove.lastHatGain = null;
+        groove.lastHatGain = null; // @direct-mutation
     }
     if (groove.lastRideGain) {
         rampGain(groove.lastRideGain.gain, 0, playback.audio.currentTime, 0.05);
-        groove.lastRideGain = null;
+        groove.lastRideGain = null; // @direct-mutation
     }
 }
 
@@ -32,8 +35,15 @@ const mixState = {
     lastTick: 0,
 };
 
-export function playDrumSound(name, time, velocity = 1.0) {
-    const { playback, groove } = getState();
+/**
+ * Drum synthesis engine.
+ * @param {Object} state - Global ensemble state.
+ * @param {string} name - Drum instrument name.
+ * @param {number} time - Start time in seconds.
+ * @param {number} velocity - Note velocity (0.0 - 1.0).
+ */
+export function playDrumSound(state, name, time, velocity = 1.0) {
+    const { playback, groove } = state;
     if (!name) {
         return;
     }
@@ -306,9 +316,9 @@ export function playDrumSound(name, time, velocity = 1.0) {
         }
 
         if (isRide) {
-            groove.lastRideGain = gain;
+            groove.lastRideGain = gain; // @direct-mutation
         } else {
-            groove.lastHatGain = gain;
+            groove.lastHatGain = gain; // @direct-mutation
         }
 
         source.connect(bpFilter);
@@ -322,10 +332,10 @@ export function playDrumSound(name, time, velocity = 1.0) {
         source.onended = () => {
             if (isRide) {
                 if (groove.lastRideGain === gain) {
-                    groove.lastRideGain = null;
+                    groove.lastRideGain = null; // @direct-mutation
                 }
             } else if (groove.lastHatGain === gain) {
-                groove.lastHatGain = null;
+                groove.lastHatGain = null; // @direct-mutation
             }
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
         };
