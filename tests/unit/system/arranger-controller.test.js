@@ -206,28 +206,42 @@ describe('Arranger Controller', () => {
     });
 
     describe('switchToRelativeKey', () => {
-        it('should switch from Major to Relative Minor', () => {
-            arranger.key = 'C';
-            arranger.isMinor = false;
-            arranger.sections = [{ value: 'I | V' }];
+        it.each([
+            {
+                startKey: 'C',
+                startMinor: false,
+                startVal: 'I | V',
+                expectedKey: 'A',
+                expectedMinor: true,
+                expectedVal: 'bIII | bVII',
+                desc: 'Major to Relative Minor',
+            },
+            {
+                startKey: 'A',
+                startMinor: true,
+                startVal: 'i | iv',
+                expectedKey: 'C',
+                expectedMinor: false,
+                expectedVal: 'vi | ii',
+                desc: 'Minor to Relative Major',
+            },
+        ])('should switch from $desc', ({
+            startKey,
+            startMinor,
+            startVal,
+            expectedKey,
+            expectedMinor,
+            expectedVal,
+        }) => {
+            arranger.key = startKey;
+            arranger.isMinor = startMinor;
+            arranger.sections = [{ value: startVal }];
 
             switchToRelativeKey(vi.fn());
 
-            expect(arranger.key).toBe('A');
-            expect(arranger.isMinor).toBe(true);
-            expect(arranger.sections[0].value).toBe('bIII | bVII');
-        });
-
-        it('should switch from Minor to Relative Major', () => {
-            arranger.key = 'A';
-            arranger.isMinor = true;
-            arranger.sections = [{ value: 'i | iv' }];
-
-            switchToRelativeKey(vi.fn());
-
-            expect(arranger.key).toBe('C');
-            expect(arranger.isMinor).toBe(false);
-            expect(arranger.sections[0].value).toBe('vi | ii');
+            expect(arranger.key).toBe(expectedKey);
+            expect(arranger.isMinor).toBe(expectedMinor);
+            expect(arranger.sections[0].value).toBe(expectedVal);
         });
     });
 });
