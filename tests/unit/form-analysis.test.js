@@ -36,13 +36,13 @@ describe('Form Analysis Engine', () => {
                 // Verse (16 steps)
                 ...Array(16)
                     .fill(0)
-                    .map((_, i) => ({
+                    .map((_, _i) => ({
                         chord: { sectionId: 's1', sectionLabel: 'Verse', value: 'C', rootMidi: 60 },
                     })),
                 // Chorus (16 steps)
                 ...Array(16)
                     .fill(0)
-                    .map((_, i) => ({
+                    .map((_, _i) => ({
                         chord: {
                             sectionId: 's2',
                             sectionLabel: 'Chorus',
