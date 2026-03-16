@@ -104,15 +104,6 @@ export const TIME_SIGNATURES = {
 
 export const MIXER_GAIN_MULTIPLIERS = {
     master: 0.85,
-    chords: 0.3, // Primary harmonic focus
-    bass: 0.32, // Tucked from 0.35
-    soloist: 0.38, // Primary melodic focus
-    harmonies: 0.22, // Supportive background
-    drums: 0.52, // Supportive rhythm
-};
-
-export const PRO_MIX_MULTIPLIERS = {
-    master: 0.85,
     chords: 0.25, // Tighter harmonic space
     bass: 0.35, // More solid foundation
     soloist: 0.32, // Tamed melodic focus

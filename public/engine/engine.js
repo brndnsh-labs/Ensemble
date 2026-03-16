@@ -1,4 +1,4 @@
-import { MIXER_GAIN_MULTIPLIERS, PRO_MIX_MULTIPLIERS } from '../config.js';
+import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
@@ -87,9 +87,9 @@ export function initAudio(state) {
         playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
         playback.masterLimiter.threshold.setValueAtTime(-1.5, playback.audio.currentTime);
         playback.masterLimiter.knee.setValueAtTime(30, playback.audio.currentTime);
-        playback.masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
+        playback.masterLimiter.ratio.setValueAtTime(12, playback.audio.currentTime);
         playback.masterLimiter.attack.setValueAtTime(0.002, playback.audio.currentTime);
-        playback.masterLimiter.release.setValueAtTime(0.5, playback.audio.currentTime);
+        playback.masterLimiter.release.setValueAtTime(0.08, playback.audio.currentTime);
 
         playback.masterGain.connect(playback.saturator);
         playback.saturator.connect(playback.masterLimiter);
@@ -102,17 +102,11 @@ export function initAudio(state) {
         // --- Pro Mix: Abbey Road Reverb Filters ---
         const reverbHPF = playback.audio.createBiquadFilter();
         reverbHPF.type = 'highpass';
-        reverbHPF.frequency.setValueAtTime(
-            playback.useNewMix ? 600 : 20,
-            playback.audio.currentTime,
-        );
+        reverbHPF.frequency.setValueAtTime(600, playback.audio.currentTime);
 
         const reverbLPF = playback.audio.createBiquadFilter();
         reverbLPF.type = 'lowpass';
-        reverbLPF.frequency.setValueAtTime(
-            playback.useNewMix ? 6000 : 20000,
-            playback.audio.currentTime,
-        );
+        reverbLPF.frequency.setValueAtTime(6000, playback.audio.currentTime);
 
         reverbHPF.connect(reverbLPF);
         reverbLPF.connect(playback.reverbNode);
@@ -138,16 +132,15 @@ export function initAudio(state) {
                 isMuted = false;
             }
 
-            const mult = playback.useNewMix ? PRO_MIX_MULTIPLIERS[m.name] || m.mult : m.mult;
             const targetGain =
-                !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * mult) : 0.0001;
+                !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
             gainNode.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(
                 targetGain,
                 playback.audio.currentTime + 0.04,
             );
 
-            // New Bus Architecture with EQs and Sidechain
+            // New Bus Architecture with EQs, Panning, and Sidechain
             const busEQ = playback.audio.createBiquadFilter();
             busEQ.type = 'highpass';
             busEQ.frequency.setValueAtTime(20, playback.audio.currentTime); // Neutral by default
@@ -156,22 +149,16 @@ export function initAudio(state) {
                 const lowShelf = playback.audio.createBiquadFilter();
                 lowShelf.type = 'lowshelf';
                 lowShelf.frequency.setValueAtTime(350, playback.audio.currentTime);
-                lowShelf.gain.setValueAtTime(
-                    playback.useNewMix ? -2 : -6,
-                    playback.audio.currentTime,
-                );
+                lowShelf.gain.setValueAtTime(-2, playback.audio.currentTime);
 
                 const notch = playback.audio.createBiquadFilter();
                 notch.type = 'peaking';
                 notch.frequency.setValueAtTime(2500, playback.audio.currentTime);
                 notch.Q.setValueAtTime(0.7, playback.audio.currentTime);
-                notch.gain.setValueAtTime(playback.useNewMix ? -2 : -4, playback.audio.currentTime);
+                notch.gain.setValueAtTime(-2, playback.audio.currentTime);
 
                 const panner = playback.audio.createStereoPanner();
-                panner.pan.setValueAtTime(
-                    playback.useNewMix ? -0.2 : 0,
-                    playback.audio.currentTime,
-                );
+                panner.pan.setValueAtTime(-0.2, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
                 busEQ.connect(lowShelf);
@@ -194,10 +181,7 @@ export function initAudio(state) {
                 scoop.type = 'peaking';
                 scoop.frequency.setValueAtTime(450, playback.audio.currentTime);
                 scoop.Q.setValueAtTime(1.2, playback.audio.currentTime);
-                scoop.gain.setValueAtTime(
-                    playback.useNewMix ? -6 : -12,
-                    playback.audio.currentTime,
-                );
+                scoop.gain.setValueAtTime(-6, playback.audio.currentTime);
 
                 const definition = playback.audio.createBiquadFilter();
                 definition.type = 'peaking';
@@ -218,10 +202,7 @@ export function initAudio(state) {
                 const presence = playback.audio.createBiquadFilter();
                 presence.type = 'peaking';
                 presence.frequency.setValueAtTime(3500, playback.audio.currentTime);
-                presence.gain.setValueAtTime(
-                    playback.useNewMix ? 2 : 4,
-                    playback.audio.currentTime,
-                );
+                presence.gain.setValueAtTime(2, playback.audio.currentTime);
                 presence.Q.setValueAtTime(1.0, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
@@ -236,7 +217,7 @@ export function initAudio(state) {
                 warmth.gain.setValueAtTime(2, playback.audio.currentTime);
 
                 const panner = playback.audio.createStereoPanner();
-                panner.pan.setValueAtTime(playback.useNewMix ? 0.2 : 0, playback.audio.currentTime);
+                panner.pan.setValueAtTime(0.2, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
                 busEQ.connect(warmth);
@@ -336,28 +317,20 @@ export function killDrumBus(state) {
 }
 
 /**
- * Kill all ringing notes and silence all buses.
+ * Kills all instrument notes immediately.
  * @param {Object} state - Global ensemble state.
  */
 export async function killAllNotes(state) {
-    killAllPianoNotes(state);
-    killSoloistNote(state);
-    killBassNote(state);
-    killHarmonyNote(state);
-    killDrumNote(state);
-
-    killChordBus(state);
-    killBassBus(state);
-    killSoloistBus(state);
-    killHarmonyBus(state);
-    killDrumBus(state);
-
-    try {
-        const { panic } = await import('../midi-controller.js');
-        panic();
-    } catch {
-        /* ignore panic error */
+    const { playback } = state;
+    if (!playback.audio) {
+        return;
     }
+    const t = playback.audio.currentTime;
+    killAllPianoNotes(state, t);
+    killBassNote(state, t);
+    killDrumNote(state, t);
+    killSoloistNote(state, t);
+    killHarmonyNote(state, t);
 }
 
 /**
@@ -409,8 +382,7 @@ export function restoreGains(state) {
                 isMuted = false;
             }
 
-            const mult = playback.useNewMix ? PRO_MIX_MULTIPLIERS[m.name] || m.mult : m.mult;
-            const target = !isMuted && !isLocalMuted ? m.state.volume * mult : 0.0001;
+            const target = !isMuted && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
             m.node.gain.cancelScheduledValues(t);
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }
@@ -443,12 +415,8 @@ export function getVisualTime(state) {
 
     const outputLatency = playback.audio.outputLatency || 0;
     if (isChromium === null) {
-        isChromium =
-            typeof navigator !== 'undefined' &&
-            /Chrome/.test(navigator.userAgent) &&
-            /Google Inc/.test(navigator.vendor);
+        isChromium = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
     }
-    const offset = outputLatency > 0 ? outputLatency : isChromium ? 0.015 : 0.045;
 
-    return smoothAudioTime - offset;
+    return isChromium ? smoothAudioTime : audioTime - outputLatency;
 }

@@ -79,7 +79,7 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         const vol = masterVol * rr();
 
         // --- Sidechain Trigger ---
-        if (playback.useNewMix && playback.bassSidechain) {
+        if (playback.bassSidechain) {
             duckGain(playback.bassSidechain.gain, 0.45, playTime, 0.005, 0.12);
         }
 

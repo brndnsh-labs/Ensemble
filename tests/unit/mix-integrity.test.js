@@ -59,14 +59,6 @@ vi.mock('../../public/ui.js', () => ({
 vi.mock('../../public/config.js', () => ({
     MIXER_GAIN_MULTIPLIERS: {
         master: 0.85,
-        chords: 0.3,
-        bass: 0.32,
-        soloist: 0.38,
-        harmonies: 0.22,
-        drums: 0.52,
-    },
-    PRO_MIX_MULTIPLIERS: {
-        master: 0.85,
         chords: 0.25,
         bass: 0.35,
         soloist: 0.32,
@@ -114,7 +106,6 @@ describe('Mix & Signal Integrity Audit', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        playback.useNewMix = false;
 
         // Setup Global Audio Mock as a proper constructor function
         const MockAudioContext = vi.fn().mockImplementation(function () {
@@ -182,19 +173,17 @@ describe('Mix & Signal Integrity Audit', () => {
         expect(playback.drumsGain.connect).toHaveBeenCalled();
     });
 
-    it('should correctly assemble the Pro Mix v3 bus chain when enabled', () => {
-        const state = getState();
-        state.playback.useNewMix = true;
-
-        initAudio(state);
+    it('should correctly assemble the Pro Mix v3 bus chain', () => {
+        initAudio(getState());
 
         // Bass Sidechain & EQ
         expect(playback.bassGain.connect).toHaveBeenCalledWith(playback.bassSidechain);
         expect(playback.bassSidechain.connect).toHaveBeenCalledWith(playback.bassEQ);
         expect(playback.bassEQ.connect).toHaveBeenCalled();
 
-        // Chords EQ
+        // Chords EQ & Panner
         expect(playback.chordsGain.connect).toHaveBeenCalledWith(playback.chordsEQ);
+        expect(playback.chordsPanner).toBeDefined();
 
         // Soloist EQ
         expect(playback.soloistGain.connect).toHaveBeenCalledWith(playback.soloistEQ);
@@ -210,17 +199,17 @@ describe('Mix & Signal Integrity Audit', () => {
         initAudio(getState());
 
         // mixer gain = state.volume * MIXER_GAIN_MULTIPLIERS[module]
-        // From config.js: bass multiplier is now 0.32. state.bass.volume is 0.45.
-        // Target should be 0.45 * 0.32 = 0.144
+        // From config.js: bass multiplier is now 0.35. state.bass.volume is 0.45.
+        // Target should be 0.45 * 0.35 = 0.1575
 
         const bassTarget = playback.bassGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
-        expect(bassTarget).toBeCloseTo(0.144, 4);
+        expect(bassTarget).toBeCloseTo(0.1575, 4);
 
-        // Harmony multiplier is now 0.22. state.harmony.volume is 0.4.
-        // Target should be 0.4 * 0.22 = 0.088
+        // Harmony multiplier is now 0.28. state.harmony.volume is 0.4.
+        // Target should be 0.4 * 0.28 = 0.112
         const harmonyTarget =
             playback.harmoniesGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
-        expect(harmonyTarget).toBeCloseTo(0.088, 4);
+        expect(harmonyTarget).toBeCloseTo(0.112, 4);
     });
 
     it('should ensure the saturator uses an oversampled soft-clip curve', () => {
@@ -243,16 +232,16 @@ describe('Mix & Signal Integrity Audit', () => {
 
         const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain + harmonyGain;
 
-        // Verification: The sum should be safe (~0.832 based on 0.5/0.52/etc volumes)
+        // Verification: The sum should be safe (~0.7945 based on 0.5/0.48/etc volumes)
         expect(totalInstrumentGain).toBeLessThan(1.0);
         // Recalculating expected:
-        // Drums: 0.5 * 0.52 = 0.26
-        // Bass: 0.45 * 0.32 = 0.144
-        // Chords: 0.5 * 0.30 = 0.15
-        // Soloist: 0.5 * 0.38 = 0.19
-        // Harmony: 0.4 * 0.22 = 0.088
-        // Total = 0.832
-        expect(totalInstrumentGain).toBeCloseTo(0.832, 4);
+        // Drums: 0.5 * 0.48 = 0.24
+        // Bass: 0.45 * 0.35 = 0.1575
+        // Chords: 0.5 * 0.25 = 0.125
+        // Soloist: 0.5 * 0.32 = 0.16
+        // Harmony: 0.4 * 0.28 = 0.112
+        // Total = 0.7945
+        expect(totalInstrumentGain).toBeCloseTo(0.7945, 4);
     });
 
     it('should calculate master gain correctly (Headroom Check)', () => {

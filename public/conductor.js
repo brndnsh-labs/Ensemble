@@ -138,15 +138,9 @@ export function applyConductor() {
 
         // Master Limiter: Tighter at high intensity to glue the mix
         if (playback.masterLimiter) {
-            let targetThreshold = -0.5 - intensity * 1.5; // -0.5 to -2.0 dB
-            let targetRatio = 12 + intensity * 8; // 12:1 to 20:1
-            let targetRelease = 0.5;
-
-            if (playback.useNewMix) {
-                targetThreshold = -1.5 - intensity * 1.5; // Lower threshold
-                targetRatio = 4 + intensity * 4; // Much more transparent ratio (4:1 to 8:1)
-                targetRelease = 0.08; // Fast release to avoid pumping
-            }
+            const targetThreshold = -1.5 - intensity * 1.5; // Lower threshold (-1.5 to -3.0 dB)
+            const targetRatio = 4 + intensity * 4; // Transparent ratio (4:1 to 8:1)
+            const targetRelease = 0.08; // Fast release to avoid pumping
 
             playback.masterLimiter.threshold.setTargetAtTime(targetThreshold, time, ramp);
             playback.masterLimiter.ratio.setTargetAtTime(targetRatio, time, ramp);
@@ -154,58 +148,30 @@ export function applyConductor() {
         }
 
         // --- Pro Mix Spectral Slotting & Panning ---
-        if (playback.useNewMix) {
-            if (playback.chordsEQ) {
-                playback.chordsEQ.frequency.setTargetAtTime(250, time, ramp);
-            }
-            if (playback.chordsPanner) {
-                playback.chordsPanner.pan.setTargetAtTime(-0.2, time, ramp);
-            }
-            if (playback.bassEQ) {
-                playback.bassEQ.type = 'highpass';
-                playback.bassEQ.frequency.setTargetAtTime(40, time, ramp);
-            }
-            if (playback.soloistEQ) {
-                playback.soloistEQ.type = 'highshelf';
-                playback.soloistEQ.frequency.setTargetAtTime(8000, time, ramp);
-                playback.soloistEQ.gain.setTargetAtTime(-3, time, ramp); // Tame harshness
-            }
-            if (playback.harmoniesEQ) {
-                playback.harmoniesEQ.frequency.setTargetAtTime(300, time, ramp);
-            }
-            if (playback.harmoniesPanner) {
-                playback.harmoniesPanner.pan.setTargetAtTime(0.2, time, ramp);
-            }
-            if (playback.reverbPreFilter) {
-                // Reverb Cleaning (Abbey Road)
-                playback.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
-                // Note: LPF is connected to HPF, we can just leave it or find it if we stored it
-                // For simplicity, we mostly care about the HPF to remove reverb mud.
-            }
-        } else {
-            // Classic Neutral/Bypass
-            if (playback.chordsEQ) {
-                playback.chordsEQ.frequency.setTargetAtTime(180, time, ramp); // Restore classic HPF
-            }
-            if (playback.chordsPanner) {
-                playback.chordsPanner.pan.setTargetAtTime(0, time, ramp);
-            }
-            if (playback.bassEQ) {
-                playback.bassEQ.frequency.setTargetAtTime(20, time, ramp);
-            }
-            if (playback.soloistEQ) {
-                playback.soloistEQ.frequency.setTargetAtTime(20000, time, ramp);
-                playback.soloistEQ.gain.setTargetAtTime(0, time, ramp);
-            }
-            if (playback.harmoniesEQ) {
-                playback.harmoniesEQ.frequency.setTargetAtTime(20, time, ramp);
-            }
-            if (playback.harmoniesPanner) {
-                playback.harmoniesPanner.pan.setTargetAtTime(0, time, ramp);
-            }
-            if (playback.reverbPreFilter) {
-                playback.reverbPreFilter.frequency.setTargetAtTime(20, time, ramp);
-            }
+        if (playback.chordsEQ) {
+            playback.chordsEQ.frequency.setTargetAtTime(250, time, ramp);
+        }
+        if (playback.chordsPanner) {
+            playback.chordsPanner.pan.setTargetAtTime(-0.2, time, ramp);
+        }
+        if (playback.bassEQ) {
+            playback.bassEQ.type = 'highpass';
+            playback.bassEQ.frequency.setTargetAtTime(40, time, ramp);
+        }
+        if (playback.soloistEQ) {
+            playback.soloistEQ.type = 'highshelf';
+            playback.soloistEQ.frequency.setTargetAtTime(8000, time, ramp);
+            playback.soloistEQ.gain.setTargetAtTime(-3, time, ramp); // Tame harshness
+        }
+        if (playback.harmoniesEQ) {
+            playback.harmoniesEQ.frequency.setTargetAtTime(300, time, ramp);
+        }
+        if (playback.harmoniesPanner) {
+            playback.harmoniesPanner.pan.setTargetAtTime(0.2, time, ramp);
+        }
+        if (playback.reverbPreFilter) {
+            // Reverb Cleaning (Abbey Road)
+            playback.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
         }
 
         // --- Reverb-Intensity Linking ---

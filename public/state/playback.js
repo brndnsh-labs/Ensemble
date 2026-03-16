@@ -123,7 +123,6 @@ export const playback = {
     resolutionTriggered: false,
     isScheduling: false,
     stateVersion: 0,
-    useNewMix: false,
     modals: {
         settings: false,
         editor: false,

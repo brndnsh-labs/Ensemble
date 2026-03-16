@@ -32,13 +32,6 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             setBpm(payload, payload?.viz, true, context.oldBpm);
             break;
         }
-        case ACTIONS.SET_PARAM: {
-            if (payload.param === 'useNewMix') {
-                restoreGains(stateMap);
-                applyConductor();
-            }
-            break;
-        }
         case ACTIONS.SET_GENRE_FEEL: {
             const { playback } = stateMap;
             if (payload.drum && !playback.isPlaying) {

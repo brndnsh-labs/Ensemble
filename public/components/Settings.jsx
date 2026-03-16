@@ -671,24 +671,6 @@ export function Settings() {
 
                     <SettingGroup title="Advanced">
                         <SettingRow
-                            label="Experimental: Pro Mix v3"
-                            description="Enables higher-fidelity mixing, including sidechaining, spectral slotting, and optimized master dynamics."
-                            id="proMixToggle"
-                        >
-                            <Toggle
-                                id="proMixToggle"
-                                checked={playbackState.useNewMix}
-                                onChange={(val) =>
-                                    dispatch(ACTIONS.SET_PARAM, {
-                                        module: 'playback',
-                                        param: 'useNewMix',
-                                        value: val,
-                                    })
-                                }
-                            />
-                        </SettingRow>
-
-                        <SettingRow
                             label="Debug Soloist"
                             description="Enable chain-of-thought logging for the Soloist engine. Helpful for troubleshooting."
                             id="debugSoloistToggle"
