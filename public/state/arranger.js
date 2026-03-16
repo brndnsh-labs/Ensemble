@@ -93,6 +93,13 @@ export function arrangerReducer(action, payload) {
         case ACTIONS.SET_NOTATION:
             Object.assign(arranger, { notation: payload });
             return true;
+        case ACTIONS.LOAD_TEMPLATE:
+            Object.assign(arranger, {
+                sections: payload.sections,
+                isMinor: payload.isMinor !== undefined ? payload.isMinor : arranger.isMinor,
+                isDirty: true,
+            });
+            return true;
         case ACTIONS.SET_ARRANGEMENT:
             arranger.sections = payload;
             return true;
