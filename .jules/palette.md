@@ -31,3 +31,7 @@
 ## 2026-03-15 - Double-Click Confirmations over Inline Alerts
 **Learning:** When replacing native browser dialogs like `window.confirm()` with custom inline confirmation UIs, naive boolean state checks (e.g., `if (!confirmState)`) can introduce bypass bugs when multiple actionable items exist. Additionally, rendering a single alert component at the top of a scrollable container breaks usability if the triggered item is further down the page.
 **Action:** Instead of creating detached alert boxes, implement a "double-click" inline confirmation pattern directly on the button itself (e.g., tracking the specific `itemId` and temporarily changing its text to 'Sure?'). This natively solves scroll position issues, maintains focus for keyboard/screen-reader users, prevents action bypasses, and requires zero custom CSS. Always apply `aria-live="polite"` to the button when its state changes.
+
+## 2026-03-16 - Isolated Timer Cleanup in React
+**Learning:** When managing timeouts in React components (e.g., for inline confirmation button resets), isolating the `clearTimeout` cleanup inside a dedicated `useEffect` with an empty dependency array `[]` ensures proper cleanup on unmount. Piggybacking on existing effects with specific dependencies (like `isListening`) can cause timers to leak or clear prematurely when those unrelated states change during the timeout window.
+**Action:** Always isolate `useRef` timer cleanups in a dedicated `useEffect(() => () => clearTimeout(ref.current), [])` to avoid unintentional side effects from other component state updates.
