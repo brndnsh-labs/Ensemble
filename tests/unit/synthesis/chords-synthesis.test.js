@@ -40,7 +40,7 @@ vi.mock('../../../public/state.js', () => {
             })),
             createPeriodicWave: vi.fn(() => ({})),
             createWaveShaper: vi.fn(() => ({
-                connect: vi.fn()
+                connect: vi.fn(),
             })),
         },
         chordsGain: { connect: vi.fn() },
@@ -77,7 +77,12 @@ vi.mock('../../../public/utils.js', () => ({
     safeDisconnect: vi.fn(),
 }));
 
-import { playChordScratch, playNote, updateSustain, killAllPianoNotes } from '../../../public/engine/synth-chords.js';
+import {
+    killAllPianoNotes,
+    playChordScratch,
+    playNote,
+    updateSustain,
+} from '../../../public/engine/synth-chords.js';
 import { getState } from '../../../public/state.js';
 
 const { playback } = getState();
