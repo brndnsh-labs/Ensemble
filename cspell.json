@@ -100,7 +100,11 @@
         "Riddim",
         "riddim",
         "Biquad",
-        "Jank"
+        "Jank",
+        "sidechain",
+        "Sidechain",
+        "sidechaining",
+        "lerp"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

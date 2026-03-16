@@ -92,3 +92,22 @@ export function createSimplePanner(ctx, panValue, time) {
     }
     return panner;
 }
+
+/**
+ * Ducks a gain parameter to a target value and returns it to 1.0.
+ * Useful for sidechaining (e.g., ducking bass when kick hits).
+ * @param {AudioParam} param - The gain parameter to duck.
+ * @param {number} target - The target gain during the duck (e.g. 0.4).
+ * @param {number} time - Start time.
+ * @param {number} attack - Time to reach target gain (seconds).
+ * @param {number} release - Time to return to 1.0 (seconds).
+ */
+export function duckGain(param, target, time, attack = 0.01, release = 0.1) {
+    try {
+        param.cancelScheduledValues(time);
+        param.setTargetAtTime(target, time, attack);
+        param.setTargetAtTime(1.0, time + attack, release);
+    } catch {
+        /* ignore audio graph errors */
+    }
+}

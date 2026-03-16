@@ -1,5 +1,5 @@
 import { safeDisconnect } from '../utils.js';
-import { createSimplePanner, rampGain, updateDensityDucking } from './synth-utils.js';
+import { createSimplePanner, duckGain, rampGain, updateDensityDucking } from './synth-utils.js';
 
 const RIGHT_PANNED_INSTRUMENTS = new Set([
     'HiHat',
@@ -77,6 +77,11 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
 
     if (name === 'Kick') {
         const vol = masterVol * rr();
+
+        // --- Sidechain Trigger ---
+        if (playback.useNewMix && playback.bassSidechain) {
+            duckGain(playback.bassSidechain.gain, 0.45, playTime, 0.005, 0.12);
+        }
 
         // 1. Beater Snap: Higher velocity = Sharper snap
         const beater = playback.audio.createOscillator();

@@ -12,8 +12,12 @@ import { ACTIONS } from '../types.js';
  * @property {BiquadFilterNode|null} chordsEQ - EQ for chords (HP/Notch).
  * @property {GainNode|null} drumsReverb - Reverb send for drums.
  * @property {GainNode|null} bassReverb - Reverb send for bass.
+ * @property {GainNode|null} bassSidechain - Sidechain ducking gain node for bass.
+ * @property {BiquadFilterNode|null} bassEQ - EQ for bass (HPF/Notch).
  * @property {GainNode|null} soloistReverb - Reverb send for soloist.
+ * @property {BiquadFilterNode|null} soloistEQ - EQ for soloist (LPF/Shelf).
  * @property {GainNode|null} harmoniesReverb - Reverb send for harmonies.
+ * @property {BiquadFilterNode|null} harmoniesEQ - EQ for harmonies (HPF).
  * @property {boolean} isPlaying - Whether the sequencer is currently playing.
  * @property {number} bpm - Beats per minute (40-240).
  * @property {number} nextNoteTime - The scheduler time for the next note (swung).
@@ -57,10 +61,13 @@ export const playback = {
     drumsGain: null,
     bassReverb: null,
     bassGain: null,
+    bassSidechain: null,
     bassEQ: null,
     soloistReverb: null,
     soloistGain: null,
+    soloistEQ: null,
     harmoniesReverb: null,
+    harmoniesEQ: null,
     isPlaying: false,
     bpm: 100,
     nextNoteTime: 0.0,
@@ -110,6 +117,7 @@ export const playback = {
     resolutionTriggered: false,
     isScheduling: false,
     stateVersion: 0,
+    useNewMix: false,
     modals: {
         settings: false,
         editor: false,

@@ -1,4 +1,4 @@
-import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { MIXER_GAIN_MULTIPLIERS, PRO_MIX_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
@@ -119,36 +119,44 @@ export function initAudio(state) {
                 isMuted = false;
             }
 
+            const mult = playback.useNewMix ? PRO_MIX_MULTIPLIERS[m.name] || m.mult : m.mult;
             const targetGain =
-                !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
+                !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * mult) : 0.0001;
             gainNode.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(
                 targetGain,
                 playback.audio.currentTime + 0.04,
             );
 
-            if (m.name === 'chords') {
-                const hp = playback.audio.createBiquadFilter();
-                hp.type = 'highpass';
-                hp.frequency.setValueAtTime(180, playback.audio.currentTime);
+            // New Bus Architecture with EQs and Sidechain
+            const busEQ = playback.audio.createBiquadFilter();
+            busEQ.type = 'highpass';
+            busEQ.frequency.setValueAtTime(20, playback.audio.currentTime); // Neutral by default
 
+            if (m.name === 'chords') {
                 const lowShelf = playback.audio.createBiquadFilter();
                 lowShelf.type = 'lowshelf';
                 lowShelf.frequency.setValueAtTime(350, playback.audio.currentTime);
-                lowShelf.gain.setValueAtTime(-6, playback.audio.currentTime); // Reduce mud
+                lowShelf.gain.setValueAtTime(
+                    playback.useNewMix ? -2 : -6,
+                    playback.audio.currentTime,
+                );
 
                 const notch = playback.audio.createBiquadFilter();
                 notch.type = 'peaking';
                 notch.frequency.setValueAtTime(2500, playback.audio.currentTime);
                 notch.Q.setValueAtTime(0.7, playback.audio.currentTime);
-                notch.gain.setValueAtTime(-4, playback.audio.currentTime);
+                notch.gain.setValueAtTime(playback.useNewMix ? -2 : -4, playback.audio.currentTime);
 
-                gainNode.connect(hp);
-                hp.connect(lowShelf);
+                gainNode.connect(busEQ);
+                busEQ.connect(lowShelf);
                 lowShelf.connect(notch);
                 notch.connect(playback.masterGain);
-                playback.chordsEQ = hp; // @direct-mutation
+                playback.chordsEQ = busEQ; // @direct-mutation
             } else if (m.name === 'bass') {
+                const sidechain = playback.audio.createGain();
+                sidechain.gain.setValueAtTime(1.0, playback.audio.currentTime);
+
                 const weight = playback.audio.createBiquadFilter();
                 weight.type = 'lowshelf';
                 weight.frequency.setValueAtTime(100, playback.audio.currentTime);
@@ -156,9 +164,12 @@ export function initAudio(state) {
 
                 const scoop = playback.audio.createBiquadFilter();
                 scoop.type = 'peaking';
-                scoop.frequency.setValueAtTime(450, playback.audio.currentTime); // Slightly lower scoop
+                scoop.frequency.setValueAtTime(450, playback.audio.currentTime);
                 scoop.Q.setValueAtTime(1.2, playback.audio.currentTime);
-                scoop.gain.setValueAtTime(-12, playback.audio.currentTime); // Clear room for low-mids
+                scoop.gain.setValueAtTime(
+                    playback.useNewMix ? -6 : -12,
+                    playback.audio.currentTime,
+                );
 
                 const definition = playback.audio.createBiquadFilter();
                 definition.type = 'peaking';
@@ -166,62 +177,41 @@ export function initAudio(state) {
                 definition.Q.setValueAtTime(1.2, playback.audio.currentTime);
                 definition.gain.setValueAtTime(3, playback.audio.currentTime);
 
-                const comp = playback.audio.createDynamicsCompressor();
-                comp.threshold.setValueAtTime(-16, playback.audio.currentTime);
-                comp.knee.setValueAtTime(12, playback.audio.currentTime);
-                comp.ratio.setValueAtTime(4, playback.audio.currentTime);
-                comp.attack.setValueAtTime(0.005, playback.audio.currentTime);
-                comp.release.setValueAtTime(0.125, playback.audio.currentTime);
-
-                gainNode.connect(weight);
+                gainNode.connect(sidechain);
+                sidechain.connect(busEQ);
+                busEQ.connect(weight);
                 weight.connect(scoop);
                 scoop.connect(definition);
-                definition.connect(comp);
-                comp.connect(playback.masterGain);
-                playback.bassEQ = weight; // @direct-mutation
+                definition.connect(playback.masterGain);
+
+                playback.bassSidechain = sidechain; // @direct-mutation
+                playback.bassEQ = busEQ; // @direct-mutation
             } else if (m.name === 'soloist') {
                 const presence = playback.audio.createBiquadFilter();
                 presence.type = 'peaking';
                 presence.frequency.setValueAtTime(3500, playback.audio.currentTime);
-                presence.gain.setValueAtTime(4, playback.audio.currentTime); // Cut through the mix
+                presence.gain.setValueAtTime(
+                    playback.useNewMix ? 2 : 4,
+                    playback.audio.currentTime,
+                );
                 presence.Q.setValueAtTime(1.0, playback.audio.currentTime);
 
-                const air = playback.audio.createBiquadFilter();
-                air.type = 'highshelf';
-                air.frequency.setValueAtTime(8000, playback.audio.currentTime);
-                air.gain.setValueAtTime(3, playback.audio.currentTime);
+                gainNode.connect(busEQ);
+                busEQ.connect(presence);
+                presence.connect(playback.masterGain);
 
-                gainNode.connect(presence);
-                presence.connect(air);
-                air.connect(playback.masterGain);
-                playback.soloistEQ = presence; // @direct-mutation
+                playback.soloistEQ = busEQ; // @direct-mutation
             } else if (m.name === 'harmonies') {
-                const hp = playback.audio.createBiquadFilter();
-                hp.type = 'highpass';
-                hp.frequency.setValueAtTime(300, playback.audio.currentTime); // Keep it above bass/piano fundamentals
-
                 const warmth = playback.audio.createBiquadFilter();
                 warmth.type = 'peaking';
                 warmth.frequency.setValueAtTime(1200, playback.audio.currentTime);
                 warmth.gain.setValueAtTime(2, playback.audio.currentTime);
 
-                gainNode.connect(hp);
-                hp.connect(warmth);
+                gainNode.connect(busEQ);
+                busEQ.connect(warmth);
                 warmth.connect(playback.masterGain);
-                playback.harmoniesEQ = hp; // @direct-mutation
+                playback.harmoniesEQ = busEQ; // @direct-mutation
             } else if (m.name === 'drums') {
-                // Parallel-style Drum Compression (Internal Routing)
-                const drumComp = playback.audio.createDynamicsCompressor();
-                drumComp.threshold.setValueAtTime(-20, playback.audio.currentTime);
-                drumComp.ratio.setValueAtTime(8, playback.audio.currentTime);
-                drumComp.attack.setValueAtTime(0.001, playback.audio.currentTime);
-                drumComp.release.setValueAtTime(0.1, playback.audio.currentTime);
-
-                gainNode.connect(drumComp);
-                drumComp.connect(playback.masterGain);
-                // Also connect dry for punch
-                gainNode.connect(playback.masterGain);
-            } else {
                 gainNode.connect(playback.masterGain);
             }
 

@@ -57,15 +57,15 @@ describe('DSP & Signal Safety', () => {
                 connect: vi.fn(),
                 threshold: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
                 ratio: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
-                knee: { setValueAtTime: vi.fn() },
-                attack: { setValueAtTime: vi.fn() },
-                release: { setValueAtTime: vi.fn() },
+                knee: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                attack: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                release: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             }));
             this.createBiquadFilter = vi.fn().mockImplementation(() => ({
                 connect: vi.fn(),
-                frequency: { setValueAtTime: vi.fn() },
-                Q: { setValueAtTime: vi.fn() },
-                gain: { setValueAtTime: vi.fn() },
+                frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                Q: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                gain: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 type: 'lowpass',
             }));
             this.createConvolver = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));

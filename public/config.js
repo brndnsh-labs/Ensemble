@@ -111,6 +111,15 @@ export const MIXER_GAIN_MULTIPLIERS = {
     drums: 0.52, // Supportive rhythm
 };
 
+export const PRO_MIX_MULTIPLIERS = {
+    master: 0.85,
+    chords: 0.25, // Tighter harmonic space
+    bass: 0.35, // More solid foundation
+    soloist: 0.32, // Tamed melodic focus
+    harmonies: 0.28, // More supportive presence
+    drums: 0.48, // Balanced rhythm
+};
+
 export const REGGAE_RIDDIMS = {
     Stalag: [
         [0, 0, 1.1, 2],

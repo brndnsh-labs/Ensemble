@@ -195,6 +195,7 @@ describe('Conductor Logic', () => {
             playback.masterLimiter = {
                 threshold: { setTargetAtTime: vi.fn() },
                 ratio: { setTargetAtTime: vi.fn() },
+                release: { setTargetAtTime: vi.fn() },
             };
             playback.bandIntensity = 0.8;
 

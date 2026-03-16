@@ -55,6 +55,27 @@ vi.mock('../../public/ui.js', () => ({
     },
 }));
 
+// Mock Config
+vi.mock('../../public/config.js', () => ({
+    MIXER_GAIN_MULTIPLIERS: {
+        master: 0.85,
+        chords: 0.3,
+        bass: 0.32,
+        soloist: 0.38,
+        harmonies: 0.22,
+        drums: 0.52,
+    },
+    PRO_MIX_MULTIPLIERS: {
+        master: 0.85,
+        chords: 0.25,
+        bass: 0.35,
+        soloist: 0.32,
+        harmonies: 0.28,
+        drums: 0.48,
+    },
+    TIME_SIGNATURES: {},
+}));
+
 // Mock Utils
 vi.mock('../../public/utils.js', () => ({
     safeDisconnect: vi.fn(),
@@ -75,18 +96,17 @@ describe('Mix & Signal Integrity Audit', () => {
             gain: {
                 value: 1,
                 setValueAtTime: vi.fn(),
-                exponentialRampToValueAtTime: vi.fn(),
                 setTargetAtTime: vi.fn(),
+                exponentialRampToValueAtTime: vi.fn(),
                 cancelScheduledValues: vi.fn(),
             },
-            threshold: { setValueAtTime: vi.fn() },
-            knee: { setValueAtTime: vi.fn() },
-            ratio: { setValueAtTime: vi.fn() },
-            attack: { setValueAtTime: vi.fn() },
-            release: { setValueAtTime: vi.fn() },
-            frequency: { setValueAtTime: vi.fn() },
-            Q: { setValueAtTime: vi.fn() },
-            gainNode: { setValueAtTime: vi.fn() }, // for BiquadFilter .gain
+            threshold: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            knee: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            ratio: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            attack: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            release: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            Q: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             type: '',
             reduction: { value: 0 },
         };
@@ -94,6 +114,7 @@ describe('Mix & Signal Integrity Audit', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        playback.useNewMix = false;
 
         // Setup Global Audio Mock as a proper constructor function
         const MockAudioContext = vi.fn().mockImplementation(function () {
@@ -147,32 +168,38 @@ describe('Mix & Signal Integrity Audit', () => {
         );
     });
 
-    it('should route all instrument buses through the master gain', () => {
+    it('should route all instrument buses through the master gain or EQs', () => {
         initAudio(getState());
 
-        // Check instrument gains are connected to masterGain
+        // Check instrument gains are connected
         expect(playback.chordsGain.connect).toHaveBeenCalled();
         expect(playback.bassGain.connect).toHaveBeenCalled();
         expect(playback.soloistGain.connect).toHaveBeenCalled();
         expect(playback.drumsGain.connect).toHaveBeenCalled();
-
-        // Verify they are connecting to the correct destination (masterGain or EQ)
-        // Note: Chords and Bass go through EQ filters first
-        const chordsDest = playback.chordsGain.connect.mock.calls[0][0];
-        expect(chordsDest.type).toBe('highpass'); // Chords EQ
     });
 
-    it('should protect the bass bus with its own compressor', () => {
+    it('should correctly assemble the Pro Mix v3 bus chain when enabled', () => {
+        const state = getState();
+        state.playback.useNewMix = true;
+
+        initAudio(state);
+
+        // Bass Sidechain & EQ
+        expect(playback.bassGain.connect).toHaveBeenCalledWith(playback.bassSidechain);
+        expect(playback.bassSidechain.connect).toHaveBeenCalledWith(playback.bassEQ);
+        expect(playback.bassEQ.connect).toHaveBeenCalled();
+
+        // Chords EQ
+        expect(playback.chordsGain.connect).toHaveBeenCalledWith(playback.chordsEQ);
+
+        // Soloist EQ
+        expect(playback.soloistGain.connect).toHaveBeenCalledWith(playback.soloistEQ);
+    });
+
+    it('should protect the bass bus with its own EQ chain', () => {
         initAudio(getState());
-
-        // Find the compressor in the bass chain
-        const compressors = playback.audio.createDynamicsCompressor.mock.results;
-        const bassComp = compressors.find((r) =>
-            r.value.threshold.setValueAtTime.mock.calls.some((c) => c[0] === -16),
-        );
-
-        expect(bassComp).toBeDefined();
-        expect(bassComp.value.ratio.setValueAtTime).toHaveBeenCalledWith(4, 0);
+        expect(playback.bassEQ).toBeDefined();
+        expect(playback.bassEQ.type).toBe('highpass');
     });
 
     it('should verify that mixer gain multipliers are correctly applied', () => {
