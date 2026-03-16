@@ -49,7 +49,7 @@ mkdir -p dist
 
 # 3. Bundle and Minify JavaScript
 if [ "$QUIET" = false ]; then echo "📦 Bundling JavaScript..."; fi
-./node_modules/.bin/esbuild public/main.js public/logic-worker.js --bundle $MINIFY_FLAG --sourcemap --outdir=dist --splitting --format=esm --entry-names=[name].$REV --chunk-names=chunk-[hash] --define:WORKER_PATH="'logic-worker.$REV.js'" --jsx=automatic --jsx-import-source=preact
+./node_modules/.bin/esbuild public/main.js public/logic-worker.js public/visualizer-worker.js --bundle $MINIFY_FLAG --sourcemap --outdir=dist --splitting --format=esm --entry-names=[name].$REV --chunk-names=chunk-[hash] --define:WORKER_PATH="'logic-worker.$REV.js'" --define:VIZ_WORKER_PATH="'visualizer-worker.$REV.js'" --jsx=automatic --jsx-import-source=preact
 
 # 4. Bundle and Minify CSS
 if [ "$QUIET" = false ]; then echo "🎨 Bundling CSS..."; fi

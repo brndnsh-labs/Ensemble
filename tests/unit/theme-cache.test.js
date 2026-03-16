@@ -1,18 +1,15 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { UnifiedVisualizer } from '../../public/visualizer.js';
+import { VisualizerEngine } from '../../public/visualizer.js';
 
-describe('UnifiedVisualizer Theme Cache', () => {
-    let visualizer;
-    let container;
+describe('VisualizerEngine Theme Handling', () => {
+    let engine;
+    let mockCanvas;
+    let mockStaticCanvas;
 
     beforeEach(() => {
-        container = document.createElement('div');
-        container.id = 'viz-container';
-        document.body.appendChild(container);
-
         // Mock canvas context
-        const mockCtx = {
+        const createMockCtx = () => ({
             scale: vi.fn(),
             fillRect: vi.fn(),
             rect: vi.fn(),
@@ -24,75 +21,68 @@ describe('UnifiedVisualizer Theme Cache', () => {
             fill: vi.fn(),
             arc: vi.fn(),
             fillText: vi.fn(),
-        };
-        HTMLCanvasElement.prototype.getContext = () => mockCtx;
-
-        // Mock ResizeObserver
-        global.ResizeObserver = class {
-            observe() {}
-            disconnect() {}
-        };
-
-        // Mock matchMedia
-        Object.defineProperty(window, 'matchMedia', {
-            writable: true,
-            value: vi.fn().mockImplementation((query) => ({
-                matches: false,
-                media: query,
-                onchange: null,
-                addListener: vi.fn(),
-                removeListener: vi.fn(),
-                addEventListener: vi.fn(),
-                removeEventListener: vi.fn(),
-                dispatchEvent: vi.fn(),
-            })),
+            drawImage: vi.fn(),
+            resetTransform: vi.fn(),
+            measureText: vi.fn(() => ({ width: 10 })),
+            shadowBlur: 0,
+            shadowColor: '',
+            font: '',
+            textAlign: '',
+            textBaseline: '',
+            fillStyle: '',
+            strokeStyle: '',
+            lineWidth: 1,
+            globalAlpha: 1.0,
         });
 
-        visualizer = new UnifiedVisualizer('viz-container');
+        mockCanvas = {
+            getContext: vi.fn(() => createMockCtx()),
+            width: 800,
+            height: 600,
+        };
+
+        mockStaticCanvas = {
+            getContext: vi.fn(() => createMockCtx()),
+            width: 800,
+            height: 600,
+        };
+
+        engine = new VisualizerEngine(mockCanvas, mockStaticCanvas);
     });
 
     afterEach(() => {
-        visualizer.destroy();
-        document.body.removeChild(container);
+        vi.restoreAllMocks();
     });
 
-    it('initializes theme cache', () => {
-        expect(visualizer.themeCache).toBeDefined();
-        // Default light mode (implied by no matches and no data-theme='dark')
-        expect(visualizer.themeCache.bgColor).toBe('#f8fafc');
+    it('updates theme cache and triggers static redraw', () => {
+        engine.resize(800, 600, 1);
+        const renderSpy = vi.spyOn(engine, 'renderStaticLayer');
+
+        const theme = {
+            bgColor: '#123456',
+            keyWhite: '#fff',
+            keyBlack: '#000',
+            keySeparator: '#222',
+            labelColor: '#333',
+            gridColorMeasure: '#444',
+            gridColorBeat: '#555',
+            playheadColor: '#666',
+            outlineColor: '#777',
+            guideLineBlack: '#888',
+            guideLineWhite: '#999',
+            separatorColor: '#aaa',
+            chordColors: ['#f00', '#0f0', '#00f', '#ff0'],
+        };
+
+        engine.setTheme(theme);
+
+        expect(engine.themeCache).toBe(theme);
+        expect(engine.intervalColors).toBeDefined();
+        expect(renderSpy).toHaveBeenCalled();
     });
 
-    it('updates cache when data-theme changes', async () => {
-        // Change to dark mode
-        document.documentElement.setAttribute('data-theme', 'dark');
-
-        // Wait for MutationObserver to fire
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(visualizer.themeCache.bgColor).toBe('#0f172a');
-    });
-
-    it('updates cache when matchMedia changes', () => {
-        // Simulate matchMedia change event
-        // We mocked addEventListener to just spy, so we need to trigger the callback manually if we could access it.
-        // Instead, we can verify that updateThemeCache is called if we call the listener.
-
-        const updateSpy = vi.spyOn(visualizer, 'updateThemeCache');
-        visualizer.themeListener({}); // Trigger manually
-        expect(updateSpy).toHaveBeenCalled();
-    });
-
-    it('resolves track colors correctly', () => {
-        // Mock getComputedStyle to return a specific color for a var
-        const originalGetComputedStyle = window.getComputedStyle;
-        window.getComputedStyle = vi.fn().mockReturnValue({
-            getPropertyValue: (prop) => (prop === '--my-color' ? '#123456' : ''),
-        });
-
-        visualizer.addTrack('test-track', 'var(--my-color)');
-
-        expect(visualizer.tracks['test-track'].resolvedColor).toBe('#123456');
-
-        window.getComputedStyle = originalGetComputedStyle;
+    it('resolves track colors correctly during addition', () => {
+        engine.addTrack('test-track', 'var(--my-color)', '#123456');
+        expect(engine.tracks['test-track'].resolvedColor).toBe('#123456');
     });
 });

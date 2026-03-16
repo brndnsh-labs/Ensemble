@@ -7,7 +7,7 @@ const IS_BLACK = [false, true, false, true, false, false, true, false, true, fal
 // Optimization: Map interval indices (0-11) to color categories (0-3)
 // 0=root, 1=third, 2=fifth, 3=seventh
 const INTERVAL_CATEGORY = [0, 3, 3, 1, 1, 3, 3, 2, 3, 3, 3, 3];
-const INTERVAL_COLOR_INDEX = INTERVAL_CATEGORY; // Alias to prevent undeclared variable errors
+const INTERVAL_COLOR_INDEX = INTERVAL_CATEGORY;
 
 class RingBuffer {
     constructor(capacity) {
@@ -49,17 +49,12 @@ class RingBuffer {
         }
     }
 
-    /**
-     * Optimized iteration that avoids modulo operations per element.
-     * @param {function(item, index): boolean|void} callback - Return false to break loop
-     */
     forEach(callback) {
         const buffer = this.buffer;
         const capacity = this.capacity;
         const count = this.count;
         const start = this.start;
 
-        // Loop 1: start to end of buffer (or count if no wrap)
         const headLength = min(count, capacity - start);
         for (let i = 0; i < headLength; i++) {
             if (callback(buffer[start + i], i) === false) {
@@ -67,7 +62,6 @@ class RingBuffer {
             }
         }
 
-        // Loop 2: wrapped part
         if (headLength < count) {
             const tailLength = count - headLength;
             for (let i = 0; i < tailLength; i++) {
@@ -87,203 +81,74 @@ function getXStandalone(t, currentTime, pianoRollWidth, timeScale) {
     return pianoRollWidth + (currentTime - t) * timeScale;
 }
 
-export class UnifiedVisualizer {
-    constructor(containerId) {
-        this.container = document.getElementById(containerId);
-        if (!this.container) {
-            console.warn(
-                `[Visualizer] Container #${containerId} not found. Deferring initialization.`,
-            );
-        }
+/**
+ * VisualizerEngine
+ * Pure rendering logic decoupled from the DOM.
+ * Operates on Canvas or OffscreenCanvas.
+ */
+export class VisualizerEngine {
+    constructor(canvas, staticCanvas) {
+        this.canvas = canvas;
+        this.ctx = this.canvas.getContext('2d', { alpha: false });
 
-        this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d', { alpha: false }); // Optimization: no transparency
-
-        // Static layer optimization
-        this.staticCanvas = document.createElement('canvas');
+        this.staticCanvas = staticCanvas;
         this.staticCtx = this.staticCanvas.getContext('2d', { alpha: false });
 
-        if (this.container) {
-            this.container.appendChild(this.canvas);
-        }
-
-        this.tracks = {}; // { name: { color, history: [] } }
-        this.chordEvents = []; // { time, notes: [], duration, rootMidi, intervals }
-        this.windowSize = 4.0; // Seconds to show
-        this.visualRange = 60; // Semitones visual height (5 octaves) for absolute pitch
-        this.centerMidi = 60; // Middle C is center
+        this.tracks = {};
+        this.chordEvents = [];
+        this.windowSize = 4.0;
+        this.visualRange = 60;
+        this.centerMidi = 60;
         this.pianoRollWidth = 50;
         this.registers = { chords: 60 };
         this.beatReferenceTime = null;
-        this.themeCache = null; // Lazy init
+        this.themeCache = null;
         this.isFillActive = false;
 
-        // Initial theme cache population
-        if (typeof document !== 'undefined' && document.documentElement) {
-            this.updateThemeCache();
-        }
-
-        // Optimization: Track which C-notes are covered by highlights to redraw labels
         this.cNotesBuffer = new Uint8Array(128);
-
-        // Optimization: Shared buffer for calculated geometry
         this.soloistBuffers = [[], [], [], []];
-
-        // Optimization: Batched rendering buffers
-        // 4 categories: Root, Third, Fifth, Seventh
-        this.activeChordBuffers = [[], [], [], []]; // Stores Y coordinates
-        this.guideToneBuffers = [[], [], [], []]; // Stores [x, y, w, h] flat layout
-
-        if (this.container) {
-            this.initDOM();
-        }
-
-        // Observe theme changes
-        this.themeObserver = new MutationObserver((mutations) => {
-            if (
-                mutations.some((m) => m.type === 'attributes' && m.attributeName === 'data-theme')
-            ) {
-                this.updateThemeCache();
-            }
-        });
-        this.themeObserver.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['data-theme'],
-        });
-
-        this.themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        this.themeListener = () => this.updateThemeCache();
-        this.themeMediaQuery.addEventListener('change', this.themeListener);
-
-        // Robust resizing with ResizeObserver
-        this.resizeObserver = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                this.resize(entry.contentRect);
-            }
-        });
-
-        if (this.container) {
-            this.resizeObserver.observe(this.container);
-        }
+        this.activeChordBuffers = [[], [], [], []];
+        this.guideToneBuffers = [[], [], [], []];
     }
 
-    updateThemeCache() {
-        if (!document.documentElement) {
-            return;
-        }
-
-        const style = getComputedStyle(document.documentElement);
-        const isDark =
-            document.documentElement.getAttribute('data-theme') === 'dark' ||
-            (document.documentElement.getAttribute('data-theme') === 'auto' &&
-                window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-        this.themeCache = {
-            bgColor: isDark ? '#0f172a' : '#f8fafc',
-            keyWhite: isDark ? '#cbd5e1' : '#ffffff',
-            keyBlack: isDark ? '#1e293b' : '#1e293b',
-            keySeparator: isDark ? '#334155' : '#e2e8f0',
-            gridColorMeasure: isDark ? 'rgba(56, 189, 248, 0.4)' : 'rgba(2, 132, 199, 0.3)',
-            gridColorBeat: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-            playheadColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
-            outlineColor: isDark ? '#000' : '#fff',
-            labelColor: isDark ? '#64748b' : '#94a3b8',
-            guideLineBlack: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.03)',
-            guideLineWhite: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)',
-            separatorColor: isDark ? '#334155' : '#cbd5e1',
-            chordColors: [
-                style.getPropertyValue('--blue').trim() || '#268bd2', // 0: root
-                style.getPropertyValue('--green').trim() || '#859900', // 1: third
-                style.getPropertyValue('--orange').trim() || '#cb4b16', // 2: fifth
-                style.getPropertyValue('--magenta').trim() || '#d33682', // 3: seventh
-            ],
-        };
-
-        // Optimization: Pre-calculate interval color lookup
+    setTheme(themeCache) {
+        this.themeCache = themeCache;
         this.intervalColors = INTERVAL_CATEGORY.map(
             (catIndex) => this.themeCache.chordColors[catIndex],
         );
         this.categoryColors = this.themeCache.chordColors;
 
-        // Update track colors
-        for (const name in this.tracks) {
-            this.resolveTrackColor(name, style);
-        }
-
-        // Force redraw of static layer if initialized
         if (this.width && this.height) {
             this.renderStaticLayer();
         }
     }
 
-    resolveTrackColor(name, style = null) {
-        if (!this.tracks[name]) {
-            return;
-        }
-        const track = this.tracks[name];
-        if (track.color.startsWith('var(')) {
-            if (!style) {
-                style = getComputedStyle(document.documentElement);
-            }
-            const varName = track.color.slice(4, -1);
-            track.resolvedColor = style.getPropertyValue(varName).trim() || '#3b82f6';
-        } else {
-            track.resolvedColor = track.color;
-        }
-    }
+    resize(width, height, dpr = 1) {
+        this.width = width;
+        this.height = height;
+        this.dpr = dpr;
 
-    initDOM() {
-        this.container.style.position = 'relative';
-        this.canvas.style.display = 'block';
-        this.canvas.style.width = '100%';
-        this.canvas.style.height = '100%';
-
-        // Info Overlay Layer (stays HTML for sharp text)
-        this.infoLayer = document.createElement('div');
-        this.infoLayer.style.cssText = `
-            position: absolute; top: 10px; left: ${this.pianoRollWidth + 10}px; right: 10px;
-            display: flex; justify-content: space-between;
-            pointer-events: none; z-index: var(--z-controls);
-        `;
-        this.container.appendChild(this.infoLayer);
-    }
-
-    resize(contentRect) {
-        const dpr = window.devicePixelRatio || 1;
-        // Use provided rect or fallback to getBoundingClientRect
-        const rect = contentRect ||
-            this.container?.getBoundingClientRect() || { width: 0, height: 0 };
-
-        // Ensure we have non-zero dimensions to avoid canvas errors
-        if (rect.width === 0 || rect.height === 0) {
-            return;
-        }
-
-        this.canvas.width = rect.width * dpr;
-        this.canvas.height = rect.height * dpr;
-        this.width = rect.width;
-        this.height = rect.height;
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        this.ctx.resetTransform();
         this.ctx.scale(dpr, dpr);
 
-        // Optimization: Cache geometry calculations to avoid per-frame re-calculation
+        this.staticCanvas.width = width * dpr;
+        this.staticCanvas.height = height * dpr;
+        this.staticCtx.resetTransform();
+        this.staticCtx.scale(dpr, dpr);
+
         this.yScale = this.height / this.visualRange;
         this.midY = this.height / 2;
         this.timeScale = (this.width - this.pianoRollWidth) / this.windowSize;
 
-        // Resize static layer
-        this.staticCanvas.width = this.canvas.width;
-        this.staticCanvas.height = this.canvas.height;
-        this.staticCtx.scale(dpr, dpr);
-
         this.renderStaticLayer();
     }
 
-    // Optimization: Stable method for Y calculation to avoid closure allocation
     getY(m) {
         return getYStandalone(m, this.midY, this.centerMidi, this.yScale);
     }
 
-    // Optimization: Stable method for X calculation to avoid closure allocation
     getX(t, currentTime) {
         return getXStandalone(t, currentTime, this.pianoRollWidth, this.timeScale);
     }
@@ -309,7 +174,6 @@ export class UnifiedVisualizer {
             separatorColor,
         } = this.themeCache;
 
-        // Background
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, w, h);
 
@@ -323,7 +187,6 @@ export class UnifiedVisualizer {
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
-        // Pass 1: Keys & Labels
         for (let m = startMidi; m <= endMidi; m++) {
             const y = this.getY(m);
             const noteInOctave = m % 12;
@@ -339,7 +202,6 @@ export class UnifiedVisualizer {
             }
         }
 
-        // Pass 2: Separators
         ctx.strokeStyle = keySeparator;
         ctx.beginPath();
         for (let m = startMidi; m <= endMidi; m++) {
@@ -349,8 +211,6 @@ export class UnifiedVisualizer {
         }
         ctx.stroke();
 
-        // Pass 3: Guide Lines
-        // White
         ctx.strokeStyle = guideLineWhite;
         ctx.beginPath();
         for (let m = startMidi; m <= endMidi; m++) {
@@ -363,7 +223,6 @@ export class UnifiedVisualizer {
         }
         ctx.stroke();
 
-        // Black
         ctx.strokeStyle = guideLineBlack;
         ctx.beginPath();
         for (let m = startMidi; m <= endMidi; m++) {
@@ -376,7 +235,6 @@ export class UnifiedVisualizer {
         }
         ctx.stroke();
 
-        // Vertical Separator
         ctx.strokeStyle = separatorColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -385,21 +243,13 @@ export class UnifiedVisualizer {
         ctx.stroke();
     }
 
-    addTrack(name, color) {
-        const label = document.createElement('div');
-        label.style.color = color;
-        label.style.fontWeight = 'bold';
-        label.style.fontSize = '1.2rem';
-        label.style.textShadow = `0 0 2px #000`;
-        label.textContent = '';
-        this.infoLayer.appendChild(label);
-
+    addTrack(name, color, resolvedColor) {
         this.tracks[name] = {
             color,
+            resolvedColor: resolvedColor || color,
             history: new RingBuffer(100),
-            label,
+            currentNoteLabel: '',
         };
-        this.resolveTrackColor(name);
         if (!this.registers[name]) {
             this.registers[name] = 60;
         }
@@ -419,24 +269,17 @@ export class UnifiedVisualizer {
         }
         this.tracks[name].history.push(event);
         if (event.noteName && event.octave) {
-            this.tracks[name].label.textContent = `${event.noteName}${event.octave}`;
+            this.tracks[name].currentNoteLabel = `${event.noteName}${event.octave}`;
         }
     }
 
     pushChord(event) {
-        // Optimization: Avoid allocation by using event object directly.
-        // The caller is responsible for passing an owned object.
         this.chordEvents.push(event);
-
         while (this.chordEvents.length > 40) {
             this.chordEvents.shift();
         }
     }
 
-    /**
-     * Truncates any active notes on a track to end at the specified time.
-     * Used for enforcing monophony in the visualizer.
-     */
     truncateNotes(name, time) {
         if (!this.tracks[name]) {
             return;
@@ -450,16 +293,8 @@ export class UnifiedVisualizer {
     }
 
     render(currentTime, bpm, tsConfig) {
-        if (!this.container) {
+        if (!this.themeCache || !this.width || !this.height) {
             return;
-        }
-
-        if (!this.themeCache) {
-            this.updateThemeCache();
-        }
-
-        if (!this.width || !this.height) {
-            this.resize();
         }
 
         const ctx = this.ctx;
@@ -469,46 +304,33 @@ export class UnifiedVisualizer {
         const minTime = currentTime - this.windowSize;
         const yScale = this.yScale;
 
-        // Optimization: Pre-calculate frame constants for X/Y
         const frameXBase = this.pianoRollWidth + currentTime * this.timeScale;
         const frameXScale = this.timeScale;
-        // Y = midY - (m - centerMidi) * yScale
-        //   = midY + centerMidi * yScale - m * yScale
         const frameYBase = this.midY + this.centerMidi * this.yScale;
         const frameYScale = this.yScale;
 
-        // Use cached theme-aware colors
         const { gridColorMeasure, gridColorBeat, playheadColor, outlineColor, chordColors } =
             this.themeCache;
 
-        // 0. Static Background
-        // Optimization: Draw pre-rendered static layer
         ctx.drawImage(this.staticCanvas, 0, 0, w, h);
 
-        // --- Piano Roll Layer (Active Overlays) ---
         const topMidi = this.centerMidi + this.visualRange / 2;
         const bottomMidi = this.centerMidi - this.visualRange / 2;
         const startMidi = floor(bottomMidi);
         const endMidi = ceil(topMidi);
 
-        // Optimization: Pre-calculate visible octave range for the frame
         const minOct = floor(startMidi / 12);
         const maxOct = ceil(endMidi / 12);
 
-        // Optimization: Direct draw (no intermediate array) + Batch Label Redraw
         this.cNotesBuffer.fill(0);
 
-        // Active Chords (Direct Draw)
-        // Optimization: Batch rendering by color
-
-        // Reset buffers
         for (let i = 0; i < 4; i++) {
             this.activeChordBuffers[i].length = 0;
         }
 
         for (const ev of this.chordEvents) {
             if (ev.time > currentTime) {
-                break; // Optimization: Early exit
+                break;
             }
             if (ev.time <= currentTime && ev.time + (ev.duration || 2.0) >= currentTime) {
                 if (ev.notes) {
@@ -532,14 +354,12 @@ export class UnifiedVisualizer {
             }
         }
 
-        // Render Batches
         for (let i = 0; i < 4; i++) {
             const buffer = this.activeChordBuffers[i];
             if (buffer.length === 0) {
                 continue;
             }
 
-            // Optimization: Batch fillRect calls into a single path to reduce draw call overhead
             ctx.fillStyle = this.categoryColors[i];
             ctx.beginPath();
             for (let j = 0; j < buffer.length; j++) {
@@ -548,20 +368,17 @@ export class UnifiedVisualizer {
             ctx.fill();
         }
 
-        // Active Tracks (Direct Draw)
         for (const name in this.tracks) {
             const track = this.tracks[name];
             const color = track.resolvedColor || track.color;
-            ctx.fillStyle = color; // Batch style change per track
+            ctx.fillStyle = color;
 
-            // Optimization: Inline RingBuffer iteration to avoid closure allocation
             const buffer = track.history.buffer;
             const capacity = track.history.capacity;
             const count = track.history.count;
             const start = track.history.start;
             const headLength = min(count, capacity - start);
 
-            // Loop 1: Start to end/wrap
             let stop = false;
             for (let i = 0; i < headLength; i++) {
                 const ev = buffer[start + i];
@@ -582,7 +399,6 @@ export class UnifiedVisualizer {
                 }
             }
 
-            // Loop 2: Wrapped part
             if (!stop && headLength < count) {
                 const tailLength = count - headLength;
                 for (let i = 0; i < tailLength; i++) {
@@ -605,13 +421,11 @@ export class UnifiedVisualizer {
             }
         }
 
-        // Batch Label Redraw (for covered C-notes)
         ctx.fillStyle = '#fff';
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
 
-        // Only iterate relevant range in steps of 12
         const startC = ceil(startMidi / 12) * 12;
         for (let m = startC; m <= endMidi; m += 12) {
             if (this.cNotesBuffer[m]) {
@@ -621,9 +435,7 @@ export class UnifiedVisualizer {
             }
         }
 
-        // 1. Rhythmic Grid
         if (bpm && this.beatReferenceTime !== null) {
-            // Handle numeric fallback for backward compatibility
             const ts =
                 typeof tsConfig === 'object' && tsConfig !== null
                     ? tsConfig
@@ -635,7 +447,6 @@ export class UnifiedVisualizer {
 
             ctx.lineWidth = 1;
 
-            // Batch Measure Lines
             ctx.strokeStyle = gridColorMeasure;
             ctx.beginPath();
             for (let i = startBeat; ; i++) {
@@ -658,7 +469,6 @@ export class UnifiedVisualizer {
             }
             ctx.stroke();
 
-            // Batch Beat Lines (Group Starts vs Others)
             ctx.beginPath();
             for (let i = startBeat; ; i++) {
                 const t = this.beatReferenceTime + i * beatLen;
@@ -668,7 +478,7 @@ export class UnifiedVisualizer {
 
                 const beatInMeasure = ((i % beatsPerMeasure) + beatsPerMeasure) % beatsPerMeasure;
                 if (beatInMeasure === 0) {
-                    continue; // Already drawn by measure loop
+                    continue;
                 }
 
                 const x = this.getX(t, currentTime);
@@ -676,7 +486,6 @@ export class UnifiedVisualizer {
                     continue;
                 }
 
-                // Check if it's a group start (macro beat)
                 let isGroupStart = false;
                 if (ts.grouping && ts.grouping.length > 1) {
                     let accumulated = 0;
@@ -690,7 +499,6 @@ export class UnifiedVisualizer {
                 }
 
                 if (isGroupStart) {
-                    // Stronger beat line for macro beats
                     ctx.strokeStyle = gridColorMeasure;
                     ctx.globalAlpha = 0.4;
                     ctx.moveTo(x, 0);
@@ -707,10 +515,9 @@ export class UnifiedVisualizer {
             ctx.stroke();
         }
 
-        // --- Fill Highlight ---
         if (this.isFillActive) {
-            const yMin = this.getY(52); // Top of drum range
-            const yMax = this.getY(36); // Bottom of drum range
+            const yMin = this.getY(52);
+            const yMax = this.getY(36);
             const fillGradient = ctx.createLinearGradient(
                 this.pianoRollWidth,
                 yMin,
@@ -724,11 +531,8 @@ export class UnifiedVisualizer {
             ctx.fillRect(this.pianoRollWidth, yMin, graphW, yMax - yMin);
         }
 
-        // 2. Chords - Pass 1: Background Guide Tones (Batched alpha change)
-        // Optimization: Batch rendering by color to reduce context state changes
         ctx.globalAlpha = 0.1;
 
-        // Reset buffers
         for (let i = 0; i < 4; i++) {
             this.guideToneBuffers[i].length = 0;
         }
@@ -760,26 +564,22 @@ export class UnifiedVisualizer {
                 const colorIdx = INTERVAL_COLOR_INDEX[((interval % 12) + 12) % 12];
                 const buffer = this.guideToneBuffers[colorIdx];
 
-                // Render in visible octaves (using hoisted range)
                 for (let oct = minOct; oct <= maxOct; oct++) {
                     const m = pc + oct * 12;
                     const y = round(frameYBase - m * frameYScale);
                     if (y >= -10 && y <= h + 10) {
-                        // Push flat layout: x, y, w, h
                         buffer.push(x, y - yScale / 2, cw, yScale);
                     }
                 }
             }
         }
 
-        // Render Batches
         for (let i = 0; i < 4; i++) {
             const buffer = this.guideToneBuffers[i];
             if (buffer.length === 0) {
                 continue;
             }
 
-            // Optimization: Batch fillRect calls into a single path
             ctx.fillStyle = this.categoryColors[i];
             ctx.beginPath();
             for (let j = 0; j < buffer.length; j += 4) {
@@ -788,11 +588,8 @@ export class UnifiedVisualizer {
             ctx.fill();
         }
 
-        // 2. Chords - Pass 2: Active Notes (Batched alpha change)
-        // Optimization: Batch rendering by color
         ctx.globalAlpha = 0.5;
 
-        // Reuse guideToneBuffers
         for (let i = 0; i < 4; i++) {
             this.guideToneBuffers[i].length = 0;
         }
@@ -830,14 +627,12 @@ export class UnifiedVisualizer {
             }
         }
 
-        // Render Batches
         for (let i = 0; i < 4; i++) {
             const buffer = this.guideToneBuffers[i];
             if (buffer.length === 0) {
                 continue;
             }
 
-            // Optimization: Batch fillRect calls into a single path
             ctx.fillStyle = this.categoryColors[i];
             ctx.beginPath();
             for (let j = 0; j < buffer.length; j += 4) {
@@ -847,25 +642,36 @@ export class UnifiedVisualizer {
         }
 
         ctx.globalAlpha = 1.0;
-
-        // Optimization: Hoist context properties out of the loop
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // 3. Melodic Tracks
+        // --- Render Info Labels (Track Note Names) ---
+        ctx.font = 'bold 1.2rem sans-serif';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+        let labelX = this.pianoRollWidth + 10;
+
         for (const name in this.tracks) {
             const track = this.tracks[name];
+            const color = track.resolvedColor || track.color;
             let activeX = -10,
                 activeY = -10,
                 isActive = false,
                 activeColor = null;
 
-            // SPECIAL HANDLING: Drums (Batched)
+            if (track.currentNoteLabel) {
+                ctx.fillStyle = color;
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = '#000';
+                ctx.fillText(track.currentNoteLabel, labelX, 10);
+                ctx.shadowBlur = 0;
+                labelX += ctx.measureText(track.currentNoteLabel).width + 20;
+            }
+
             if (name === 'drums') {
                 ctx.fillStyle = track.resolvedColor || track.color;
                 ctx.beginPath();
 
-                // Optimization: Inline RingBuffer iteration
                 const buffer = track.history.buffer;
                 const capacity = track.history.capacity;
                 const count = track.history.count;
@@ -873,7 +679,6 @@ export class UnifiedVisualizer {
                 const headLength = min(count, capacity - start);
                 let stop = false;
 
-                // Loop 1
                 for (let i = 0; i < headLength; i++) {
                     const ev = buffer[start + i];
                     if (ev.time > currentTime) {
@@ -886,7 +691,6 @@ export class UnifiedVisualizer {
                         continue;
                     }
 
-                    // Inline getX/getY
                     const x = frameXBase - ev.time * frameXScale;
                     const y = round(frameYBase - ev.midi * frameYScale);
                     const intensity = ev.velocity || 1.0;
@@ -897,7 +701,6 @@ export class UnifiedVisualizer {
                     ctx.lineTo(x - 4 * intensity, y);
                 }
 
-                // Loop 2
                 if (!stop && headLength < count) {
                     const tailLength = count - headLength;
                     for (let i = 0; i < tailLength; i++) {
@@ -911,7 +714,6 @@ export class UnifiedVisualizer {
                             continue;
                         }
 
-                        // Inline getX/getY
                         const x = frameXBase - ev.time * frameXScale;
                         const y = round(frameYBase - ev.midi * frameYScale);
                         const intensity = ev.velocity || 1.0;
@@ -927,10 +729,8 @@ export class UnifiedVisualizer {
                 continue;
             }
 
-            // Standard Melodic Tracks (Bass, Soloist, Harmony)
-            const color = track.resolvedColor || track.color;
+            const colorStandard = track.resolvedColor || track.color;
 
-            // Optimization: Split loop for soloist vs others to avoid per-event branching
             if (name === MODULES.SOLOIST) {
                 const baseWidth = 4;
                 for (let b = 0; b < 4; b++) {
@@ -944,7 +744,6 @@ export class UnifiedVisualizer {
                 const headLength = min(count, capacity - start);
                 let stop = false;
 
-                // Soloist Loop 1
                 for (let i = 0; i < headLength; i++) {
                     const ev = buffer[start + i];
                     if (ev.time > currentTime) {
@@ -959,13 +758,12 @@ export class UnifiedVisualizer {
 
                     const startT = max(minTime, ev.time);
                     const endT = min(currentTime, noteEnd);
-                    // Inline getX/getY
                     const x1 = frameXBase - startT * frameXScale;
                     const x2 = frameXBase - endT * frameXScale;
                     const y = round(frameYBase - ev.midi * frameYScale);
 
                     if (y >= -10 && y <= h + 10) {
-                        let typeCode = 0; // default
+                        let typeCode = 0;
                         if (ev.noteType === 'arp') {
                             typeCode = 1;
                         } else if (ev.noteType === 'target') {
@@ -988,13 +786,12 @@ export class UnifiedVisualizer {
                             } else if (ev.noteType === 'altered') {
                                 activeColor = chordColors[3];
                             } else {
-                                activeColor = color;
+                                activeColor = colorStandard;
                             }
                         }
                     }
                 }
 
-                // Soloist Loop 2
                 if (!stop && headLength < count) {
                     const tailLength = count - headLength;
                     for (let i = 0; i < tailLength; i++) {
@@ -1015,7 +812,7 @@ export class UnifiedVisualizer {
                         const y = round(frameYBase - ev.midi * frameYScale);
 
                         if (y >= -10 && y <= h + 10) {
-                            let typeCode = 0; // default
+                            let typeCode = 0;
                             if (ev.noteType === 'arp') {
                                 typeCode = 1;
                             } else if (ev.noteType === 'target') {
@@ -1038,14 +835,13 @@ export class UnifiedVisualizer {
                                 } else if (ev.noteType === 'altered') {
                                     activeColor = chordColors[3];
                                 } else {
-                                    activeColor = color;
+                                    activeColor = colorStandard;
                                 }
                             }
                         }
                     }
                 }
 
-                // Soloist Rendering
                 ctx.strokeStyle = outlineColor;
                 ctx.lineWidth = baseWidth + 2;
                 ctx.beginPath();
@@ -1065,9 +861,8 @@ export class UnifiedVisualizer {
                 }
 
                 ctx.lineWidth = baseWidth;
-                // Batch 1: Default (0)
                 if (this.soloistBuffers[0].length > 0) {
-                    ctx.strokeStyle = color;
+                    ctx.strokeStyle = colorStandard;
                     ctx.beginPath();
                     const buf = this.soloistBuffers[0];
                     for (let j = 0; j < buf.length; j += 3) {
@@ -1077,7 +872,6 @@ export class UnifiedVisualizer {
                     ctx.stroke();
                 }
 
-                // Batch 2: Root (Target - 2)
                 if (this.soloistBuffers[2].length > 0) {
                     ctx.strokeStyle = chordColors[0];
                     ctx.beginPath();
@@ -1089,7 +883,6 @@ export class UnifiedVisualizer {
                     ctx.stroke();
                 }
 
-                // Batch 3: Fifth (Arp - 1)
                 if (this.soloistBuffers[1].length > 0) {
                     ctx.strokeStyle = chordColors[2];
                     ctx.beginPath();
@@ -1101,7 +894,6 @@ export class UnifiedVisualizer {
                     ctx.stroke();
                 }
 
-                // Batch 4: Seventh (Altered - 3)
                 if (this.soloistBuffers[3].length > 0) {
                     ctx.strokeStyle = chordColors[3];
                     ctx.beginPath();
@@ -1113,7 +905,6 @@ export class UnifiedVisualizer {
                     ctx.stroke();
                 }
             } else {
-                // Generic Track (Bass, Harmony)
                 const baseWidth = 5;
                 let hasNotes = false;
                 ctx.beginPath();
@@ -1125,7 +916,6 @@ export class UnifiedVisualizer {
                 const headLength = min(count, capacity - start);
                 let stop = false;
 
-                // Generic Loop 1
                 for (let i = 0; i < headLength; i++) {
                     const ev = buffer[start + i];
                     if (ev.time > currentTime) {
@@ -1152,12 +942,11 @@ export class UnifiedVisualizer {
                             activeX = x2;
                             activeY = y;
                             isActive = true;
-                            activeColor = color;
+                            activeColor = colorStandard;
                         }
                     }
                 }
 
-                // Generic Loop 2
                 if (!stop && headLength < count) {
                     const tailLength = count - headLength;
                     for (let i = 0; i < tailLength; i++) {
@@ -1185,19 +974,18 @@ export class UnifiedVisualizer {
                                 activeX = x2;
                                 activeY = y;
                                 isActive = true;
-                                activeColor = color;
+                                activeColor = colorStandard;
                             }
                         }
                     }
                 }
 
-                // Generic Rendering
                 if (hasNotes) {
                     ctx.strokeStyle = outlineColor;
                     ctx.lineWidth = baseWidth + 2;
                     ctx.stroke();
 
-                    ctx.strokeStyle = color;
+                    ctx.strokeStyle = colorStandard;
                     ctx.lineWidth = baseWidth;
                     ctx.stroke();
                 }
@@ -1214,11 +1002,9 @@ export class UnifiedVisualizer {
             }
         }
 
-        // 4. Playhead
         ctx.strokeStyle = playheadColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        // Playhead is now at the piano roll edge (Time = Current)
         ctx.moveTo(this.pianoRollWidth, 0);
         ctx.lineTo(this.pianoRollWidth, h);
         ctx.stroke();
@@ -1227,35 +1013,95 @@ export class UnifiedVisualizer {
     clear() {
         for (const name in this.tracks) {
             this.tracks[name].history.clear();
-            this.tracks[name].label.textContent = '';
+            this.tracks[name].currentNoteLabel = '';
         }
         this.chordEvents = [];
         if (this.width && this.height) {
             this.ctx.clearRect(0, 0, this.width, this.height);
         }
     }
+}
+
+/**
+ * UnifiedVisualizer (Proxy)
+ * Main thread class that manages the VisualizerWorker.
+ */
+export class UnifiedVisualizer {
+    constructor(canvas, staticCanvas) {
+        this.canvas = canvas;
+        this.staticCanvas = staticCanvas;
+
+        // In production, WORKER_PATH is injected by esbuild --define
+        const workerPath =
+            typeof VIZ_WORKER_PATH !== 'undefined' ? VIZ_WORKER_PATH : 'visualizer-worker.js';
+        this.worker = new Worker(workerPath, { type: 'module' });
+
+        const offscreen = canvas.transferControlToOffscreen();
+        const staticOffscreen = staticCanvas.transferControlToOffscreen();
+
+        this.worker.postMessage(
+            {
+                type: 'INIT',
+                canvas: offscreen,
+                staticCanvas: staticOffscreen,
+            },
+            [offscreen, staticOffscreen],
+        );
+
+        this.themeCache = null;
+        this.tracks = {};
+    }
+
+    setTheme(themeCache) {
+        this.themeCache = themeCache;
+        this.worker.postMessage({ type: 'THEME', themeCache });
+    }
+
+    resize(width, height, dpr = 1) {
+        this.worker.postMessage({ type: 'RESIZE', width, height, dpr });
+    }
+
+    addTrack(name, color, resolvedColor) {
+        this.tracks[name] = { color, resolvedColor };
+        this.worker.postMessage({ type: 'ADD_TRACK', name, color, resolvedColor });
+    }
+
+    setRegister(name, midi) {
+        this.worker.postMessage({ type: 'SET_REGISTER', name, midi });
+    }
+
+    setBeatReference(time) {
+        this.worker.postMessage({ type: 'SET_BEAT_REFERENCE', time });
+    }
+
+    pushNote(name, event) {
+        this.worker.postMessage({ type: 'PUSH_NOTE', name, event });
+    }
+
+    pushChord(event) {
+        this.worker.postMessage({ type: 'PUSH_CHORD', event });
+    }
+
+    truncateNotes(name, time) {
+        this.worker.postMessage({ type: 'TRUNCATE', name, time });
+    }
+
+    clear() {
+        this.worker.postMessage({ type: 'CLEAR' });
+    }
+
+    render(currentTime, bpm, tsConfig) {
+        this.worker.postMessage({ type: 'RENDER', currentTime, bpm, tsConfig });
+    }
+
+    syncClock(audioTime, perfTime) {
+        this.worker.postMessage({ type: 'SYNC_CLOCK', audioTime, perfTime });
+    }
 
     destroy() {
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
+        if (this.worker) {
+            this.worker.terminate();
+            this.worker = null;
         }
-        if (this.themeObserver) {
-            this.themeObserver.disconnect();
-            this.themeObserver = null;
-        }
-        if (this.themeMediaQuery && this.themeListener) {
-            this.themeMediaQuery.removeEventListener('change', this.themeListener);
-            this.themeMediaQuery = null;
-            this.themeListener = null;
-        }
-        if (this.canvas?.parentNode) {
-            this.canvas.parentNode.removeChild(this.canvas);
-        }
-        if (this.infoLayer?.parentNode) {
-            this.infoLayer.parentNode.removeChild(this.infoLayer);
-        }
-        this.staticCanvas = null;
-        this.staticCtx = null;
     }
 }

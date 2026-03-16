@@ -98,7 +98,9 @@
         "esque",
         "Prestia",
         "Riddim",
-        "riddim"
+        "riddim",
+        "Biquad",
+        "Jank"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

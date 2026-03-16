@@ -8,6 +8,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/main.js` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
+| `public/visualizer-worker.js` | Background rendering thread for 60fps visuals. | `engine.render` |
 | `public/state.js` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |

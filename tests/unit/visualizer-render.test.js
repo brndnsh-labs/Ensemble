@@ -3,17 +3,17 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MODULES } from '../../public/constants.js';
-import { UnifiedVisualizer } from '../../public/visualizer.js';
+import { VisualizerEngine } from '../../public/visualizer.js';
 
-describe('UnifiedVisualizer Rendering Deep Dive', () => {
-    let visualizer;
+describe('VisualizerEngine Rendering Deep Dive', () => {
+    let engine;
     let mockCtx;
     let mockCanvas;
+    let mockStaticCanvas;
+    let mockStaticCtx;
 
     beforeEach(() => {
-        document.body.innerHTML = '<div id="viz-container"></div>';
-
-        mockCtx = {
+        const createMockCtx = () => ({
             fillRect: vi.fn(),
             rect: vi.fn(),
             beginPath: vi.fn(),
@@ -25,6 +25,7 @@ describe('UnifiedVisualizer Rendering Deep Dive', () => {
             fillText: vi.fn(),
             drawImage: vi.fn(),
             scale: vi.fn(),
+            resetTransform: vi.fn(),
             createLinearGradient: vi.fn(() => ({
                 addColorStop: vi.fn(),
             })),
@@ -34,67 +35,82 @@ describe('UnifiedVisualizer Rendering Deep Dive', () => {
             strokeStyle: '',
             lineWidth: 1,
             globalAlpha: 1.0,
-        };
-
-        const canvas = document.createElement('canvas');
-        canvas.getContext = vi.fn(() => mockCtx);
-        mockCanvas = canvas;
-
-        vi.stubGlobal(
-            'ResizeObserver',
-            class {
-                observe() {}
-                disconnect() {}
-            },
-        );
-
-        vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
-            if (tagName.toLowerCase() === 'canvas') {
-                return mockCanvas;
-            }
-            return HTMLDocument.prototype.createElement.call(document, tagName);
+            font: '',
+            textAlign: '',
+            textBaseline: '',
+            measureText: vi.fn(() => ({ width: 10 })),
+            shadowBlur: 0,
+            shadowColor: '',
         });
 
-        visualizer = new UnifiedVisualizer('viz-container');
-        visualizer.resize({ width: 800, height: 600 });
+        mockCtx = createMockCtx();
+        mockStaticCtx = createMockCtx();
+
+        mockCanvas = {
+            getContext: vi.fn(() => mockCtx),
+            width: 800,
+            height: 600,
+        };
+
+        mockStaticCanvas = {
+            getContext: vi.fn(() => mockStaticCtx),
+            width: 800,
+            height: 600,
+        };
+
+        engine = new VisualizerEngine(mockCanvas, mockStaticCanvas);
+        engine.setTheme({
+            bgColor: '#000',
+            keyWhite: '#fff',
+            keyBlack: '#111',
+            keySeparator: '#222',
+            labelColor: '#333',
+            gridColorMeasure: '#444',
+            gridColorBeat: '#555',
+            playheadColor: '#666',
+            outlineColor: '#777',
+            guideLineBlack: '#888',
+            guideLineWhite: '#999',
+            separatorColor: '#aaa',
+            chordColors: ['#f00', '#0f0', '#00f', '#ff0'],
+        });
+        engine.resize(800, 600, 1);
     });
 
     afterEach(() => {
-        visualizer.destroy();
         vi.restoreAllMocks();
     });
 
     it('should render soloist notes with different types', () => {
-        visualizer.addTrack(MODULES.SOLOIST, 'blue');
-        visualizer.pushNote(MODULES.SOLOIST, { time: 10, midi: 60, duration: 1, noteType: 'arp' });
-        visualizer.pushNote(MODULES.SOLOIST, {
+        engine.addTrack(MODULES.SOLOIST, 'blue', 'blue');
+        engine.pushNote(MODULES.SOLOIST, { time: 10, midi: 60, duration: 1, noteType: 'arp' });
+        engine.pushNote(MODULES.SOLOIST, {
             time: 11,
             midi: 62,
             duration: 1,
             noteType: 'target',
         });
-        visualizer.pushNote(MODULES.SOLOIST, {
+        engine.pushNote(MODULES.SOLOIST, {
             time: 12,
             midi: 64,
             duration: 1,
             noteType: 'altered',
         });
-        visualizer.pushNote(MODULES.SOLOIST, { time: 13, midi: 65, duration: 1 }); // default
+        engine.pushNote(MODULES.SOLOIST, { time: 13, midi: 65, duration: 1 }); // default
 
-        visualizer.render(14, 120);
+        engine.render(14, 120);
 
         // Verify batch paths were created for each type
-        // The stroke() call count is a good proxy for how many batches were rendered
         const strokeCalls = mockCtx.stroke.mock.calls.length;
         expect(strokeCalls).toBeGreaterThan(1);
     });
 
     it('should render drum hits', () => {
-        visualizer.addTrack('drums', 'purple');
-        visualizer.pushNote('drums', { time: 10, midi: 36, velocity: 0.8 });
-        visualizer.pushNote('drums', { time: 10.5, midi: 38, velocity: 1.0 });
+        engine.addTrack('drums', 'purple', 'purple');
+        engine.pushNote('drums', { time: 10, midi: 36, velocity: 0.8 });
+        engine.pushNote('drums', { time: 10.5, midi: 38, velocity: 1.0 });
 
-        visualizer.render(11, 120);
+        engine.render(11, 120);
 
         // Drums use lineTo/moveTo to draw diamond shapes
         expect(mockCtx.lineTo).toHaveBeenCalled();
@@ -102,7 +118,7 @@ describe('UnifiedVisualizer Rendering Deep Dive', () => {
     });
 
     it('should render guide tones for chords', () => {
-        visualizer.pushChord({
+        engine.pushChord({
             time: 10,
             duration: 2,
             rootMidi: 60,
@@ -110,7 +126,7 @@ describe('UnifiedVisualizer Rendering Deep Dive', () => {
             intervals: [0, 4, 7],
         });
 
-        visualizer.render(11, 120);
+        engine.render(11, 120);
 
         // Guide tones are drawn with rect() batches at low alpha
         expect(mockCtx.rect).toHaveBeenCalled();
@@ -118,15 +134,15 @@ describe('UnifiedVisualizer Rendering Deep Dive', () => {
     });
 
     it('should render fill highlight', () => {
-        visualizer.isFillActive = true;
-        visualizer.render(10, 120);
+        engine.isFillActive = true;
+        engine.render(10, 120);
 
         expect(mockCtx.createLinearGradient).toHaveBeenCalled();
         expect(mockCtx.fillRect).toHaveBeenCalled();
     });
 
     it('should handle complex time signatures', () => {
-        visualizer.setBeatReference(0);
+        engine.setBeatReference(0);
 
         // 7/8 with 2+2+3 grouping
         const tsConfig = {
@@ -135,25 +151,19 @@ describe('UnifiedVisualizer Rendering Deep Dive', () => {
             stepsPerBeat: 2,
         };
 
-        visualizer.render(1, 120, tsConfig);
+        engine.render(1, 120, tsConfig);
 
         // Verify it doesn't crash and draws something
         expect(mockCtx.stroke).toHaveBeenCalled();
     });
 
-    it('should handle missing container during render', () => {
-        visualizer.container = null;
-        expect(() => visualizer.render(10, 120)).not.toThrow();
-    });
-
     it('should handle wrapped RingBuffer during rendering', () => {
-        visualizer.addTrack('bass', 'red');
-        // Capacity is 100. Fill it and wrap it.
+        engine.addTrack('bass', 'red', 'red');
         for (let i = 0; i < 150; i++) {
-            visualizer.pushNote('bass', { time: i, midi: 36, duration: 0.1 });
+            engine.pushNote('bass', { time: i, midi: 36, duration: 0.1 });
         }
 
-        visualizer.render(149, 120);
+        engine.render(149, 120);
         expect(mockCtx.stroke).toHaveBeenCalled();
     });
 });

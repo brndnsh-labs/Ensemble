@@ -3,21 +3,18 @@
  * @vitest-environment happy-dom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { UnifiedVisualizer } from '../../public/visualizer.js';
+import { UnifiedVisualizer, VisualizerEngine } from '../../public/visualizer.js';
 
-describe('UnifiedVisualizer', () => {
-    let visualizer;
+describe('Visualizer System', () => {
     let mockCtx;
     let mockCanvas;
+    let mockStaticCanvas;
+    let mockStaticCtx;
     let getPropertyValueSpy;
 
     beforeEach(() => {
-        // Setup DOM
-        document.body.innerHTML =
-            '<div id="viz-container" style="width: 800px; height: 600px;"></div>';
-
         // Mock Context
-        mockCtx = {
+        const createMockCtx = () => ({
             fillRect: vi.fn(),
             rect: vi.fn(),
             beginPath: vi.fn(),
@@ -32,6 +29,10 @@ describe('UnifiedVisualizer', () => {
             fillText: vi.fn(),
             drawImage: vi.fn(),
             measureText: vi.fn(() => ({ width: 10 })),
+            resetTransform: vi.fn(),
+            createLinearGradient: vi.fn(() => ({
+                addColorStop: vi.fn(),
+            })),
             fillStyle: '',
             strokeStyle: '',
             lineWidth: 1,
@@ -41,39 +42,39 @@ describe('UnifiedVisualizer', () => {
             textBaseline: '',
             set lineCap(_v) {},
             set lineJoin(_v) {},
+            shadowBlur: 0,
+            shadowColor: '',
+        });
+
+        mockCtx = createMockCtx();
+        mockStaticCtx = createMockCtx();
+
+        mockCanvas = {
+            getContext: vi.fn(() => mockCtx),
+            width: 800,
+            height: 600,
+            transferControlToOffscreen: vi.fn(() => ({})),
         };
 
-        // Create a REAL canvas element from happy-dom
-        const canvas = document.createElement('canvas');
-        canvas.getContext = vi.fn(() => mockCtx);
-        mockCanvas = canvas;
+        mockStaticCanvas = {
+            getContext: vi.fn(() => mockStaticCtx),
+            width: 800,
+            height: 600,
+            transferControlToOffscreen: vi.fn(() => ({})),
+        };
 
-        // Mock ResizeObserver with proper spies
+        // Mock Worker
         vi.stubGlobal(
-            'ResizeObserver',
+            'Worker',
             class {
-                constructor(callback) {
-                    this.callback = callback;
-                    this.observe = vi.fn();
-                    this.unobserve = vi.fn();
-                    this.disconnect = vi.fn();
+                constructor() {
+                    this.postMessage = vi.fn();
+                    this.terminate = vi.fn();
                 }
             },
         );
 
-        // Mock matchMedia
-        window.matchMedia = vi.fn().mockImplementation((query) => ({
-            matches: false,
-            media: query,
-            onchange: null,
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-            dispatchEvent: vi.fn(),
-        }));
-
-        // Mock getComputedStyle with spy
+        // Mock getComputedStyle
         getPropertyValueSpy = vi.fn((prop) => {
             if (prop?.startsWith('--')) {
                 return '#123456';
@@ -81,165 +82,127 @@ describe('UnifiedVisualizer', () => {
             return '#000000';
         });
 
-        vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+        vi.stubGlobal('getComputedStyle', () => ({
             getPropertyValue: getPropertyValueSpy,
-        });
-
-        // Use a safer way to mock createElement to avoid recursion
-        const _originalCreateElement = document.createElement.bind(document);
-        vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
-            if (tagName.toLowerCase() === 'canvas') {
-                return mockCanvas;
-            }
-            // Use the prototype's original method to avoid recursion if vitest wraps the instance method
-            return HTMLDocument.prototype.createElement.call(document, tagName);
-        });
-
-        visualizer = new UnifiedVisualizer('viz-container');
-        visualizer.resize({ width: 800, height: 600 });
+        }));
     });
 
     afterEach(() => {
-        if (visualizer) {
-            visualizer.destroy();
-        }
         vi.restoreAllMocks();
     });
 
-    it('should initialize with a canvas and info layer', () => {
-        const container = document.getElementById('viz-container');
-        expect(container.contains(mockCanvas)).toBe(true);
-        expect(visualizer.infoLayer).toBeDefined();
-        expect(mockCanvas.getContext).toHaveBeenCalledWith('2d', { alpha: false });
-    });
+    describe('VisualizerEngine (Logic Core)', () => {
+        let engine;
 
-    it('should correctly handle track additions', () => {
-        visualizer.addTrack('bass', '#ff0000');
-        expect(visualizer.tracks.bass).toBeDefined();
-        expect(visualizer.tracks.bass.color).toBe('#ff0000');
-        expect(visualizer.infoLayer.children.length).toBe(1);
-    });
-
-    it('should push notes into track history', () => {
-        visualizer.addTrack('soloist', 'blue');
-        const noteEvent = { time: 1.0, midi: 60, duration: 0.5, noteName: 'C', octave: 4 };
-        visualizer.pushNote('soloist', noteEvent);
-
-        expect(visualizer.tracks.soloist.history.length).toBe(1);
-        expect(visualizer.tracks.soloist.label.textContent).toBe('C4');
-    });
-
-    it('should push chords into chord events', () => {
-        const chordEvent = { time: 0, notes: [60, 64, 67], rootMidi: 60, intervals: [0, 4, 7] };
-        visualizer.pushChord(chordEvent);
-
-        expect(visualizer.chordEvents.length).toBe(1);
-        expect(visualizer.chordEvents[0].notes).toEqual([60, 64, 67]);
-    });
-
-    it('should truncate notes correctly for monophonic rendering', () => {
-        visualizer.addTrack('bass', 'red');
-        visualizer.pushNote('bass', { time: 0, midi: 36, duration: 1.0 });
-
-        visualizer.truncateNotes('bass', 0.5);
-        expect(visualizer.tracks.bass.history.at(0).duration).toBe(0.5);
-    });
-
-    it('should execute draw calls during render', () => {
-        visualizer.addTrack('bass', 'red');
-        visualizer.pushNote('bass', { time: 10, midi: 36, duration: 1.0 });
-        visualizer.setBeatReference(0);
-
-        visualizer.render(10.5, 120, 4);
-
-        // Verify background was drawn
-        expect(mockCtx.fillRect).toHaveBeenCalled();
-        // Verify piano roll keys were drawn (startMidi to endMidi loop)
-        expect(mockCtx.beginPath).toHaveBeenCalled();
-        // Verify notes/tracks were processed
-        expect(mockCtx.moveTo).toHaveBeenCalled();
-        expect(mockCtx.lineTo).toHaveBeenCalled();
-    });
-
-    it('should clear all tracks and events on clear()', () => {
-        visualizer.addTrack('bass', 'red');
-        visualizer.pushNote('bass', { time: 0, midi: 36 });
-        visualizer.pushChord({ time: 0 });
-
-        visualizer.clear();
-
-        expect(visualizer.tracks.bass.history.length).toBe(0);
-        expect(visualizer.chordEvents.length).toBe(0);
-        expect(mockCtx.clearRect).toHaveBeenCalled();
-    });
-
-    describe('Lifecycle', () => {
-        it('should remove canvas and info layer on destroy', () => {
-            const container = document.getElementById('viz-container');
-            expect(container.contains(mockCanvas)).toBe(true);
-
-            visualizer.destroy();
-
-            expect(container.contains(mockCanvas)).toBe(false);
-            expect(container.querySelector('div')).toBeNull(); // Info layer should be gone
+        beforeEach(() => {
+            engine = new VisualizerEngine(mockCanvas, mockStaticCanvas);
+            engine.setTheme({
+                bgColor: '#000',
+                keyWhite: '#fff',
+                keyBlack: '#111',
+                keySeparator: '#222',
+                labelColor: '#333',
+                gridColorMeasure: '#444',
+                gridColorBeat: '#555',
+                playheadColor: '#666',
+                outlineColor: '#777',
+                guideLineBlack: '#888',
+                guideLineWhite: '#999',
+                separatorColor: '#aaa',
+                chordColors: ['#f00', '#0f0', '#00f', '#ff0'],
+            });
+            engine.resize(800, 600, 1);
         });
 
-        it('should disconnect ResizeObserver on destroy', () => {
-            const disconnectSpy = vi.spyOn(visualizer.resizeObserver, 'disconnect');
-            visualizer.destroy();
-            expect(disconnectSpy).toHaveBeenCalled();
+        it('should initialize correctly', () => {
+            expect(engine.canvas).toBe(mockCanvas);
+            expect(engine.staticCanvas).toBe(mockStaticCanvas);
+            expect(mockCanvas.getContext).toHaveBeenCalledWith('2d', { alpha: false });
+        });
+
+        it('should handle track additions', () => {
+            engine.addTrack('bass', '#ff0000', '#ff0000');
+            expect(engine.tracks.bass).toBeDefined();
+            expect(engine.tracks.bass.color).toBe('#ff0000');
+        });
+
+        it('should push notes and update labels', () => {
+            engine.addTrack('soloist', 'blue', 'blue');
+            engine.pushNote('soloist', { time: 1.0, midi: 60, noteName: 'C', octave: 4 });
+            expect(engine.tracks.soloist.history.length).toBe(1);
+            expect(engine.tracks.soloist.currentNoteLabel).toBe('C4');
+        });
+
+        it('should truncate notes correctly', () => {
+            engine.addTrack('bass', 'red', 'red');
+            engine.pushNote('bass', { time: 0, midi: 36, duration: 1.0 });
+            engine.truncateNotes('bass', 0.5);
+            expect(engine.tracks.bass.history.at(0).duration).toBe(0.5);
+        });
+
+        it('should draw during render', () => {
+            engine.addTrack('bass', 'red', 'red');
+            engine.pushNote('bass', { time: 10, midi: 36, duration: 1.0 });
+            engine.setBeatReference(0);
+            engine.render(10.5, 120, 4);
+
+            expect(mockCtx.drawImage).toHaveBeenCalled();
+            expect(mockCtx.fillRect).toHaveBeenCalled();
+            expect(mockCtx.beginPath).toHaveBeenCalled();
+        });
+
+        it('should clear data on clear()', () => {
+            engine.addTrack('bass', 'red', 'red');
+            engine.pushNote('bass', { time: 0, midi: 36 });
+            engine.pushChord({ time: 0 });
+            engine.clear();
+
+            expect(engine.tracks.bass.history.length).toBe(0);
+            expect(engine.chordEvents.length).toBe(0);
+            expect(mockCtx.clearRect).toHaveBeenCalled();
         });
     });
 
-    describe('Performance Optimizations', () => {
-        it('should have ZERO getPropertyValue calls during render loop (caching enabled)', () => {
-            // Setup scene
-            visualizer.addTrack('bass', 'var(--blue)');
-            visualizer.addTrack('drums', 'var(--green)');
-            visualizer.addTrack('melody', 'var(--red)');
+    describe('UnifiedVisualizer (Proxy)', () => {
+        let proxy;
 
-            visualizer.pushNote('bass', { time: 1, midi: 60, duration: 1 });
-            visualizer.pushNote('drums', { time: 1, midi: 36, duration: 1 });
-            visualizer.pushNote('melody', { time: 1, midi: 72, duration: 1 });
-
-            // Trigger initial lazy cache setup
-            visualizer.render(1.5, 120);
-
-            // Clear any calls from setup and initial lazy init
-            getPropertyValueSpy.mockClear();
-
-            const iterations = 100;
-            for (let i = 0; i < iterations; i++) {
-                visualizer.render(1.5, 120);
-            }
-
-            // Assert: No CSS variable lookups in the hot loop
-            expect(getPropertyValueSpy.mock.calls.length).toBe(0);
+        beforeEach(() => {
+            proxy = new UnifiedVisualizer(mockCanvas, mockStaticCanvas);
         });
 
-        it('should re-resolve colors when theme changes', async () => {
-            visualizer.addTrack('bass', 'var(--blue)');
+        it('should instantiate a worker and transfer control', () => {
+            expect(proxy.worker).toBeDefined();
+            expect(mockCanvas.transferControlToOffscreen).toHaveBeenCalled();
+            expect(proxy.worker.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'INIT' }),
+                expect.any(Array),
+            );
+        });
 
-            // Trigger initial lazy cache setup
-            visualizer.render(0, 120);
+        it('should forward resize messages', () => {
+            proxy.resize(1024, 768, 2);
+            expect(proxy.worker.postMessage).toHaveBeenCalledWith({
+                type: 'RESIZE',
+                width: 1024,
+                height: 768,
+                dpr: 2,
+            });
+        });
 
-            // Clear calls from init and initial lazy setup
-            getPropertyValueSpy.mockClear();
+        it('should forward data messages', () => {
+            const note = { time: 1 };
+            proxy.pushNote('bass', note);
+            expect(proxy.worker.postMessage).toHaveBeenCalledWith({
+                type: 'PUSH_NOTE',
+                name: 'bass',
+                event: note,
+            });
+        });
 
-            // 1. Subsequent Render should not trigger calls
-            visualizer.render(0, 120);
-            expect(getPropertyValueSpy.mock.calls.length).toBe(0);
-
-            // 2. Change Theme
-            document.documentElement.setAttribute('data-theme', 'dark');
-
-            // Wait for MutationObserver (async)
-            await new Promise((resolve) => setTimeout(resolve, 50));
-
-            // 3. Should have re-resolved colors
-            // Exact count depends on number of colors to resolve (chords x4 + tracks)
-            const callsAfterThemeChange = getPropertyValueSpy.mock.calls.length;
-            expect(callsAfterThemeChange).toBeGreaterThan(0);
+        it('should terminate worker on destroy', () => {
+            const terminateSpy = vi.spyOn(proxy.worker, 'terminate');
+            proxy.destroy();
+            expect(terminateSpy).toHaveBeenCalled();
         });
     });
 });

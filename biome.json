@@ -18,6 +18,7 @@
         "jsxRuntime": "reactClassic",
         "globals": [
             "WORKER_PATH",
+            "VIZ_WORKER_PATH",
             "describe",
             "it",
             "expect",

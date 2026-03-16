@@ -4,6 +4,35 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock Worker and OffscreenCanvas for the system smoke tests
+if (typeof global !== 'undefined') {
+    global.Worker = class MockWorker {
+        constructor() {
+            this.postMessage = vi.fn();
+            this.terminate = vi.fn();
+            this.onmessage = null;
+        }
+    };
+}
+
+if (typeof HTMLCanvasElement !== 'undefined') {
+    HTMLCanvasElement.prototype.transferControlToOffscreen = vi.fn(() => ({
+        getContext: vi.fn(() => ({
+            fillRect: vi.fn(),
+            clearRect: vi.fn(),
+            beginPath: vi.fn(),
+            moveTo: vi.fn(),
+            lineTo: vi.fn(),
+            stroke: vi.fn(),
+            fill: vi.fn(),
+            arc: vi.fn(),
+            scale: vi.fn(),
+            resetTransform: vi.fn(),
+            drawImage: vi.fn(),
+        })),
+    }));
+}
+
 const setupMinimalDOM = () => {
     document.body.innerHTML = `
         <div id="app">
