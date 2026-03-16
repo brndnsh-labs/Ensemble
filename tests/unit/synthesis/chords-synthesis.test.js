@@ -39,9 +39,13 @@ vi.mock('../../../public/state.js', () => {
                 onended: null,
             })),
             createPeriodicWave: vi.fn(() => ({})),
+            createWaveShaper: vi.fn(() => ({
+                connect: vi.fn()
+            })),
         },
         chordsGain: { connect: vi.fn() },
         sustainActive: false,
+        heldNotes: new Set(),
     };
     const mockGroove = { audioBuffers: { noise: {} } };
     const mockChords = { activeTab: 'smart' };
@@ -73,7 +77,7 @@ vi.mock('../../../public/utils.js', () => ({
     safeDisconnect: vi.fn(),
 }));
 
-import { playChordScratch, playNote } from '../../../public/engine/synth-chords.js';
+import { playChordScratch, playNote, updateSustain, killAllPianoNotes } from '../../../public/engine/synth-chords.js';
 import { getState } from '../../../public/state.js';
 
 const { playback } = getState();
@@ -83,6 +87,7 @@ describe('Chord Synthesis', () => {
         vi.clearAllMocks();
         playback.audio.currentTime = 10;
         playback.sustainActive = false;
+        playback.heldNotes.clear();
     });
 
     it('should use a PeriodicWave for the "Piano" instrument', () => {
@@ -122,5 +127,51 @@ describe('Chord Synthesis', () => {
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
         const filter = playback.audio.createBiquadFilter.mock.results[0].value;
         expect(filter.type).toBe('bandpass');
+    });
+
+    it('should hold notes when sustain is active', () => {
+        playback.sustainActive = true;
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+
+        expect(playback.heldNotes.size).toBe(1);
+    });
+
+    it('should pop the oldest note when heldNotes exceeds 64 limit', () => {
+        playback.sustainActive = true;
+        for (let i = 0; i < 65; i++) {
+            playNote(getState(), 440 + i, 10 + i * 0.1, 1.0, { instrument: 'Piano' });
+        }
+        expect(playback.heldNotes.size).toBe(64);
+    });
+
+    it('should release held notes when sustain is deactivated', () => {
+        playback.sustainActive = true;
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+
+        expect(playback.heldNotes.size).toBe(1);
+
+        updateSustain(getState(), false, 11);
+
+        expect(playback.sustainActive).toBe(false);
+        expect(playback.heldNotes.size).toBe(0);
+    });
+
+    it('should kill all piano notes immediately', () => {
+        playback.sustainActive = true;
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+
+        killAllPianoNotes(getState());
+
+        expect(playback.sustainActive).toBe(false);
+        expect(playback.heldNotes.size).toBe(0);
+    });
+
+    it('should apply wave shaping at high intensities', () => {
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        expect(playback.audio.createWaveShaper).not.toHaveBeenCalled();
+
+        playback.bandIntensity = 0.9;
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        expect(playback.audio.createWaveShaper).toHaveBeenCalled();
     });
 });
