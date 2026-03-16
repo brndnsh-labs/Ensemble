@@ -1,0 +1,92 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateShareUrl, shareProgression } from '../../../public/sharing.js';
+import { getState } from '../../../public/state.js';
+import { showToast } from '../../../public/ui.js';
+
+vi.mock('../../../public/state.js', () => ({
+    getState: vi.fn(),
+}));
+
+vi.mock('../../../public/ui.js', () => ({
+    showToast: vi.fn(),
+}));
+
+vi.mock('../../../public/utils.js', () => ({
+    compressSections: vi.fn(() => 'compressed-sections'),
+}));
+
+describe('Sharing Deep Dive', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getState.mockReturnValue({
+            arranger: { sections: [], key: 'C', timeSignature: '4/4', notation: 'abs' },
+            playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5 },
+            chords: { enabled: true, volume: 0.5, reverb: 0.2 },
+            bass: { enabled: true, volume: 0.5, reverb: 0.2 },
+            soloist: { enabled: true, volume: 0.5, reverb: 0.2 },
+            harmony: { enabled: true, volume: 0.5, reverb: 0.2, complexity: 0.5 },
+            groove: {
+                enabled: true,
+                volume: 0.5,
+                reverb: 0.2,
+                swing: 0,
+                swingSub: 0,
+                humanize: 0,
+                genreFeel: 'Rock',
+            },
+        });
+
+        // Mock clipboard
+        Object.defineProperty(navigator, 'clipboard', {
+            value: {
+                writeText: vi.fn().mockResolvedValue(),
+            },
+            configurable: true,
+        });
+    });
+
+    it('should generate share URL with targetDuration', () => {
+        const url = generateShareUrl({ targetDuration: 300 });
+        expect(url).toContain('tmr=300');
+    });
+
+    it('should respect include toggles in compressed settings', () => {
+        const url = generateShareUrl({
+            includeSolo: false,
+            includeBass: false,
+            includeChords: false,
+            includeHarmony: false,
+            includeDrums: false,
+        });
+        // We can't easily decode the Base64 here but we verify it doesn't crash
+        // and exercise those branches.
+        expect(url).toContain('bnd=');
+    });
+
+    it('should handle clipboard errors', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        navigator.clipboard.writeText.mockRejectedValue(new Error('Blocked'));
+
+        shareProgression();
+
+        await vi.waitFor(() => {
+            expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Failed to copy link'));
+        });
+        consoleSpy.mockRestore();
+    });
+
+    it('should handle general errors during share', () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        getState.mockImplementation(() => {
+            throw new Error('State crash');
+        });
+
+        shareProgression();
+
+        expect(showToast).toHaveBeenCalledWith('Error generating share link.');
+        consoleSpy.mockRestore();
+    });
+});

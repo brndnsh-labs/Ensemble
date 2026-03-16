@@ -90,7 +90,10 @@
         "acodec",
         "chromagram",
         "Chromagram",
-        "AABA"
+        "AABA",
+        "Csus",
+        "Cadd",
+        "Thelonious"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
