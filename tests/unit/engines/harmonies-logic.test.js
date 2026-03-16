@@ -34,7 +34,7 @@ vi.mock('../../../public/config.js', () => ({
 // We will stick to the target file's style unless necessary.
 
 // Mock chords.js to spy on getBestInversion
-vi.mock('../../../public/chords.js', async (importOriginal) => {
+vi.mock('../../../public/chords-engine.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
@@ -53,7 +53,7 @@ import { getState } from '../../../public/state.js';
 
 const { playback, soloist, harmony, groove } = getState();
 
-import { getBestInversion } from '../../../public/chords.js';
+import { getBestInversion } from '../../../public/chords-engine.js';
 
 describe('Harmony Engine Logic', () => {
     const chordC = {

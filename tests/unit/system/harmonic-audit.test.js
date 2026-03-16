@@ -1,8 +1,8 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../../public/accompaniment.js';
-import { getBassNote, isBassActive } from '../../../public/bass.js';
-import { validateProgression } from '../../../public/chords.js';
+import { getBassNote, isBassActive } from '../../../public/bass-engine.js';
+import { validateProgression } from '../../../public/chords-engine.js';
 import { CHORD_PRESETS } from '../../../public/data/chord-presets.js';
 import { SONG_TEMPLATES } from '../../../public/data/song-templates.js';
 import { getHarmonyNotes } from '../../../public/harmonies.js';

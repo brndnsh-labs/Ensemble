@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getChordDetails } from '../../../public/chords.js';
+import { getChordDetails } from '../../../public/chords-engine.js';
 
 describe('Chords Details Deep Dive', () => {
     it('should extract complex chord qualities', () => {

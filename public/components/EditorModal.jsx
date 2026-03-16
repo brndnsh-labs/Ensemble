@@ -218,7 +218,7 @@ export function EditorModal() {
         if (newSections) {
             dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
             // Re-validate to update the stepMap/progression
-            const { validateProgression } = await import('../chords.js');
+            const { validateProgression } = await import('../chords-engine.js');
             validateProgression(getState());
             syncWorker();
         }

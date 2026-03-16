@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mutateProgression } from '../../../public/chords.js';
+import { mutateProgression } from '../../../public/chords-engine.js';
 
 describe('Chords Mutation Logic', () => {
     it('should return an object with value and mutatedIndex', () => {

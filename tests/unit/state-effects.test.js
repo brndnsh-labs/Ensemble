@@ -12,7 +12,7 @@ import { ACTIONS } from '../../public/types.js';
 vi.mock('../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn(),
 }));
-vi.mock('../../public/chords.js', () => ({
+vi.mock('../../public/chords-engine.js', () => ({
     validateProgression: vi.fn(),
 }));
 vi.mock('../../public/app-controller.js', () => ({

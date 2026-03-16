@@ -67,7 +67,7 @@ vi.mock('../../../public/config.js', () => ({
     REGGAE_RIDDIMS: {},
 }));
 
-import { getBassNote, isBassActive } from '../../../public/bass.js';
+import { getBassNote, isBassActive } from '../../../public/bass-engine.js';
 import { getState } from '../../../public/state.js';
 
 const { bass, playback } = getState();

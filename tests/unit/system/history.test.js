@@ -18,7 +18,7 @@ vi.mock('../../../public/ui.js', () => ({
     renderChordVisualizer: vi.fn(),
 }));
 
-vi.mock('../../../public/chords.js', () => ({
+vi.mock('../../../public/chords-engine.js', () => ({
     validateProgression: vi.fn((chords) => chords()),
 }));
 
