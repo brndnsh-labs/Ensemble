@@ -20,6 +20,20 @@ function init() {
         // Ensure state is populated BEFORE the UI mounts so components initialize with correct data.
         hydrateState();
         loadFromUrl();
+
+        // Apply theme after hydration
+        import('./app-controller.js').then(({ applyTheme }) => {
+            applyTheme(playback.theme);
+
+            // Reactive System Theme Listener for 'auto' mode
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (_e) => {
+                const state = getState();
+                if (state.playback.theme === 'auto') {
+                    applyTheme('auto');
+                }
+            });
+        });
+
         validateProgression(getState(), (a, p) => window.ensemble?.dispatch(a, p));
 
         // --- ASSEMBLE UI ---

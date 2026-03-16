@@ -6,7 +6,8 @@ import { syncWorker } from './worker-client.js';
 
 export function applyTheme(theme) {
     const { playback } = getState();
-    playback.theme = theme; // @direct-mutation
+    const currentTheme = playback.theme;
+
     if (theme === 'auto') {
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -14,6 +15,10 @@ export function applyTheme(theme) {
     } else {
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.style.colorScheme = theme;
+    }
+
+    if (theme !== currentTheme) {
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'theme', value: theme });
     }
 }
 

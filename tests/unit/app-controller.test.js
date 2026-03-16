@@ -58,24 +58,42 @@ describe('App Controller', () => {
     });
 
     describe('applyTheme', () => {
-        it('should apply a specific theme', () => {
+        it('should apply a specific theme and dispatch SET_PARAM', () => {
             applyTheme('light');
-            expect(state.playback.theme).toBe('light');
+            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
+                module: 'playback',
+                param: 'theme',
+                value: 'light',
+            });
             expect(document.documentElement.getAttribute('data-theme')).toBe('light');
         });
 
         it('should apply auto theme based on media query (dark)', () => {
             window.matchMedia.mockReturnValue({ matches: true });
             applyTheme('auto');
-            expect(state.playback.theme).toBe('auto');
+            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
+                module: 'playback',
+                param: 'theme',
+                value: 'auto',
+            });
             expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
         });
 
         it('should apply auto theme based on media query (light)', () => {
             window.matchMedia.mockReturnValue({ matches: false });
             applyTheme('auto');
-            expect(state.playback.theme).toBe('auto');
+            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
+                module: 'playback',
+                param: 'theme',
+                value: 'auto',
+            });
             expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+        });
+
+        it('should not dispatch if theme is unchanged', () => {
+            state.playback.theme = 'dark';
+            applyTheme('dark');
+            expect(dispatch).not.toHaveBeenCalled();
         });
     });
 
