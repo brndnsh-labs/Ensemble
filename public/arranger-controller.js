@@ -23,7 +23,15 @@ export function saveProgression() {
         return;
     }
 
-    const userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
+    let userPresets = [];
+    try {
+        userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
+        if (!Array.isArray(userPresets)) {
+            userPresets = [];
+        }
+    } catch (e) {
+        console.warn('[State] Failed to parse ensemble_userPresets from storage:', e);
+    }
     const newPreset = {
         name: name.substring(0, 32),
         sections: compressSections(arranger.sections),

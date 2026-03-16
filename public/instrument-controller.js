@@ -81,7 +81,15 @@ export function saveDrumPreset() {
         return;
     }
 
-    const userPresets = JSON.parse(localStorage.getItem('ensemble_userDrumPresets') || '[]');
+    let userPresets = [];
+    try {
+        userPresets = JSON.parse(localStorage.getItem('ensemble_userDrumPresets') || '[]');
+        if (!Array.isArray(userPresets)) {
+            userPresets = [];
+        }
+    } catch (e) {
+        console.warn('[State] Failed to parse ensemble_userDrumPresets from storage:', e);
+    }
     const newPreset = {
         name: name.substring(0, 32),
         measures: groove.measures,
