@@ -45,9 +45,11 @@
     .app-main-layout {
         display: grid;
         grid-template-columns: 1fr 28rem; /* Main | Fixed Sidebar */
+        grid-template-rows: auto auto 1fr;
         grid-template-areas:
             "arranger sidebar"
-            "visualizer sidebar";
+            "visualizer sidebar"
+            "empty sidebar";
         gap: 1rem;
         align-items: stretch;
         max-width: 1800px;
