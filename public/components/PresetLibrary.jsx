@@ -25,7 +25,15 @@ export function PresetLibrary({ type }) {
     useEffect(() => {
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
         const load = () => {
-            const data = JSON.parse(localStorage.getItem(key) || '[]');
+            let data = [];
+            try {
+                data = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!Array.isArray(data)) {
+                    data = [];
+                }
+            } catch (e) {
+                console.warn(`[State] Failed to parse ${key} from storage:`, e);
+            }
             setUserPresets(data);
         };
         load();

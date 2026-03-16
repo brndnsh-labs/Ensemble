@@ -33,3 +33,8 @@
 **Learning:** `localStorage` is an external input source and should be treated as untrusted. Users, browser glitches, or other scripts can corrupt it.
 **Prevention:** Always wrap `JSON.parse` calls involving `localStorage` (or any external input) in `try...catch` blocks and provide safe fallback values.
 
+
+## 2025-02-19 - LocalStorage DoS Protection 2
+**Vulnerability:** Similar to earlier finding, `JSON.parse` was still called directly on `localStorage` values without error handling in controllers and UI components (`arranger-controller.js`, `instrument-controller.js`, `PresetLibrary.jsx`). Malformed JSON could cause the application to crash or fail to load UI sections.
+**Learning:** `JSON.parse` on external inputs (like `localStorage`) must be globally searched and consistently wrapped in `try...catch` blocks across the entire codebase, not just in central state hydration modules. Type validation (e.g. `Array.isArray`) is also necessary after parsing.
+**Prevention:** Treat all `localStorage` reads as untrusted and wrap them in robust `try...catch` blocks with safe fallbacks and type checks.
