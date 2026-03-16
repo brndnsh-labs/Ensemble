@@ -94,7 +94,11 @@
         "Csus",
         "Cadd",
         "Thelonious",
-        "multikey"
+        "multikey",
+        "esque",
+        "Prestia",
+        "Riddim",
+        "riddim"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
