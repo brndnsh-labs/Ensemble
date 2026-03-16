@@ -6,7 +6,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
-| `public/main.js` | App entry point, worker init, global events. | `init`, `viz` |
+| `public/main.js` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/state.js` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
@@ -67,6 +67,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/components/ManualModal.jsx` | Self-building documentation viewer. |
 | `public/components/Arranger.jsx` | Chord progression and section manager. |
 | `public/components/Transport.jsx` | Playback controls and tempo. |
+| `public/components/Visualizer.jsx` | Canvas rendering and animation loop. |
 | `public/components/SequencerGrid.jsx` | Interactive drum pattern editor. |
 | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
 

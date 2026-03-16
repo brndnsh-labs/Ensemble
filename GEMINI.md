@@ -5,8 +5,9 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 ## Project Overview
 
 *   **Architecture**: Modular ES6 architecture with domain-specific controllers (`app`, `arranger`, `instrument`, `ui`, `midi`) and specialized musical engines (`bass`, `soloist`, `accompaniment`, `harmonies`, `fills`). Core logic is modularized into high-precision scheduling (`scheduler-core.js`), visual rendering (`visualizer.js`), and decentralized synthesis (`synth-*.js`).
-*   **State Architecture**: **Domain Slices Pattern**. State is decomposed into autonomous modules within `public/state/`. Cross-module side effects are managed via **Inversion of Control (IoC)** in `state-effects.js` to eliminate circular dependencies.
+*   **State Architecture**: **Domain Slices Pattern**. State is decomposed into autonomous modules within `public/state/`. Cross-module side effects are managed via **Inversion of Control (IoC)** in `state-effects.js`.
 *   **UI Layer**: **Preact (v10)** Component-Based Architecture. Logic is decentralized into functional components within `public/components/`.
+*   **Visualizer**: Refactored into a reactive Preact component (`Visualizer.jsx`). It independently consumes the `drawQueue` from the engine, decoupling rendering from high-precision scheduling.
 *   **State Bridge**: `public/ui-bridge.js` exports `useEnsembleState` for reactive component updates. It uses a `version` counter to force re-renders since the underlying engine state is mutated via `Object.assign`.
 *   **Initialization**: `public/main.js` orchestrates hydration, worker setup, and root mounting (`ui-root.jsx`). Hydration and parsing MUST happen before mounting to prevent stale UI state.
 *   **Domain Controllers**: Specialized logic resides in `app-controller.js`, `instrument-controller.js`, `arranger-controller.js`, and `midi-controller.js`.
@@ -69,6 +70,7 @@ The project has completed the **v2.29 Codebase Health & Standards Audit**, achie
 17. **Musical Coordination Contract (v2.9)**: COMPLETED implementation of interactive band logic using a centralized `CoordinationContext`. Established strict register slotting (Bass: 28-51, Chords: 52-84, Soloist: 60-90) enforced by a "Musical Firewall" middleware. Integrated rhythmic yielding where Bass locks to Kick and Chords yield density to Soloist. Verified with property-based fuzz tests.
 18. **Lean Bundle & Architectural Refinement (v2.30)**: COMPLETED comprehensive optimization of the codebase. Reduced initial JS bundle size by 60% via lazy-loading modals. Modularized static data into `public/data/` and consolidated WebAudio boilerplate into `synth-utils.js`. Established `UIControls.jsx` shared library and purged hundreds of lines of redundant inline styles.
 19. **Core Infrastructure & Test Integrity (v2.31)**: COMPLETED major architectural remediation. Implemented **State Slices Pattern** for all domain state. Resolved circular dependencies in core state/effects using **Inversion of Control (IoC)**. Decoupled engine from global state. Reached **89% project-wide test coverage** milestone including 100% coverage for all primary controllers. Verified with 1,300+ tests.
+20. **Visualizer Refactor (v2.32)**: COMPLETED migration of the canvas rendering engine to a Preact-based component architecture. Decoupled `UnifiedVisualizer` from the global `playback` state and high-precision scheduling loop. Implemented high-performance direct mutation pattern for 60fps rendering flags, maintaining UI responsiveness without redundant state version bumps. Verified with updated E2E and system smoke tests.
 
 ## Codebase Health
 

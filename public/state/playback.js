@@ -42,7 +42,6 @@ import { ACTIONS } from '../types.js';
  * @property {Array<HTMLElement>|null} lastActiveDrumElements - Cache of currently animating drum UI elements.
  * @property {number} lastPlayingStep - The last step index processed by the UI loop.
  * @property {boolean} workerLogging - Whether to log messages from the audio worker.
- * @property {Object|null} viz - Reference to the Visualizer instance.
  * @property {number|null} suspendTimeout - ID of the timeout for audio context suspension.
  * @property {number} conductorVelocity - Dynamic velocity modifier (0.0-1.0) applied by Conductor.
  */
@@ -97,7 +96,6 @@ export const playback = {
     lastActiveDrumElements: null,
     lastPlayingStep: 0,
     workerLogging: false,
-    viz: null,
     suspendTimeout: null,
     conductorVelocity: 1.0,
     lyricalBias: 0.5,

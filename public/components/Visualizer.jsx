@@ -79,26 +79,14 @@ export function Visualizer({ enabled }) {
             lastFrameTime = nowFrame;
 
             if (!playback.audio) {
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'playback',
-                    param: 'isDrawing',
-                    value: false,
-                });
+                playback.isDrawing = false; // @direct-mutation
                 loopRef.current = requestAnimationFrame(loop);
                 return;
             }
             if (!playback.isPlaying && playback.drawQueue.length === 0) {
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'playback',
-                    param: 'isDrawing',
-                    value: false,
-                });
+                playback.isDrawing = false; // @direct-mutation
                 if (chords.lastActiveChordIndex !== null) {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'chords',
-                        param: 'lastActiveChordIndex',
-                        value: null,
-                    });
+                    chords.lastActiveChordIndex = null; // @direct-mutation
                     dispatch('VIS_RESET');
                 }
                 if (vizRef.current) {
@@ -112,11 +100,7 @@ export function Visualizer({ enabled }) {
                 playback.drawQueue.shift();
             }
             if (playback.drawQueue.length > 300) {
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'playback',
-                    param: 'drawQueue',
-                    value: playback.drawQueue.slice(playback.drawQueue.length - 200),
-                });
+                playback.drawQueue = playback.drawQueue.slice(playback.drawQueue.length - 200); // @direct-mutation
             }
             const spm = getStepsPerMeasure(arranger.timeSignature);
             while (playback.drawQueue.length && playback.drawQueue[0].time <= now) {
@@ -130,18 +114,10 @@ export function Visualizer({ enabled }) {
                     ) {
                         switchMeasure(stepMeasure, true);
                     }
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'playback',
-                        param: 'lastPlayingStep',
-                        value: ev.step,
-                    });
+                    playback.lastPlayingStep = ev.step; // @direct-mutation
                 } else if (ev.type === 'chord_vis') {
                     if (chords.lastActiveChordIndex !== ev.index) {
-                        dispatch(ACTIONS.SET_PARAM, {
-                            module: 'chords',
-                            param: 'lastActiveChordIndex',
-                            value: ev.index,
-                        });
+                        chords.lastActiveChordIndex = ev.index; // @direct-mutation
                         dispatch('VIS_UPDATE', { type: 'chord', index: ev.index });
                     }
                     if (vizRef.current && enabled && playback.isDrawing) {
