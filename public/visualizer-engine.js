@@ -1,77 +1,7 @@
 import { MODULES } from './constants.js';
+import { INTERVAL_CATEGORY, IS_BLACK, RingBuffer } from './visualizer-utils.js';
 
 const { min, max, floor, PI, round, ceil } = Math;
-
-const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
-
-// Optimization: Map interval indices (0-11) to color categories (0-3)
-// 0=root, 1=third, 2=fifth, 3=seventh
-const INTERVAL_CATEGORY = [0, 3, 3, 1, 1, 3, 3, 2, 3, 3, 3, 3];
-const INTERVAL_COLOR_INDEX = INTERVAL_CATEGORY;
-
-class RingBuffer {
-    constructor(capacity) {
-        this.buffer = new Array(capacity);
-        this.capacity = capacity;
-        this.start = 0;
-        this.count = 0;
-    }
-
-    get length() {
-        return this.count;
-    }
-
-    push(item) {
-        if (this.count < this.capacity) {
-            this.buffer[(this.start + this.count) % this.capacity] = item;
-            this.count++;
-        } else {
-            this.buffer[this.start] = item;
-            this.start = (this.start + 1) % this.capacity;
-        }
-    }
-
-    at(index) {
-        if (index < 0 || index >= this.count) {
-            return undefined;
-        }
-        return this.buffer[(this.start + index) % this.capacity];
-    }
-
-    clear() {
-        this.start = 0;
-        this.count = 0;
-    }
-
-    *[Symbol.iterator]() {
-        for (let i = 0; i < this.count; i++) {
-            yield this.at(i);
-        }
-    }
-
-    forEach(callback) {
-        const buffer = this.buffer;
-        const capacity = this.capacity;
-        const count = this.count;
-        const start = this.start;
-
-        const headLength = min(count, capacity - start);
-        for (let i = 0; i < headLength; i++) {
-            if (callback(buffer[start + i], i) === false) {
-                return;
-            }
-        }
-
-        if (headLength < count) {
-            const tailLength = count - headLength;
-            for (let i = 0; i < tailLength; i++) {
-                if (callback(buffer[i], headLength + i) === false) {
-                    return;
-                }
-            }
-        }
-    }
-}
 
 function getYStandalone(m, midY, centerMidi, yScale) {
     return midY - (m - centerMidi) * yScale;
@@ -113,7 +43,7 @@ export class VisualizerEngine {
 
     setTheme(themeCache) {
         this.themeCache = themeCache;
-        this.intervalColors = INTERVAL_CATEGORY.map(
+        this.intervalColors = Array.from(INTERVAL_CATEGORY).map(
             (catIndex) => this.themeCache.chordColors[catIndex],
         );
         this.categoryColors = this.themeCache.chordColors;
@@ -309,8 +239,7 @@ export class VisualizerEngine {
         const frameYBase = this.midY + this.centerMidi * this.yScale;
         const frameYScale = this.yScale;
 
-        const { gridColorMeasure, gridColorBeat, playheadColor, outlineColor, chordColors } =
-            this.themeCache;
+        const { chordColors } = this.themeCache;
 
         ctx.drawImage(this.staticCanvas, 0, 0, w, h);
 
@@ -342,7 +271,7 @@ export class VisualizerEngine {
 
                         const interval = ((m % 12) - rootPC + 12) % 12;
                         const y = frameYBase - m * frameYScale;
-                        const colorIdx = INTERVAL_COLOR_INDEX[interval];
+                        const colorIdx = INTERVAL_CATEGORY[interval];
 
                         this.activeChordBuffers[colorIdx].push(y);
 
@@ -447,7 +376,7 @@ export class VisualizerEngine {
 
             ctx.lineWidth = 1;
 
-            ctx.strokeStyle = gridColorMeasure;
+            ctx.strokeStyle = this.themeCache.gridColorMeasure;
             ctx.beginPath();
             for (let i = startBeat; ; i++) {
                 const t = this.beatReferenceTime + i * beatLen;
@@ -499,7 +428,7 @@ export class VisualizerEngine {
                 }
 
                 if (isGroupStart) {
-                    ctx.strokeStyle = gridColorMeasure;
+                    ctx.strokeStyle = this.themeCache.gridColorMeasure;
                     ctx.globalAlpha = 0.4;
                     ctx.moveTo(x, 0);
                     ctx.lineTo(x, h);
@@ -507,7 +436,7 @@ export class VisualizerEngine {
                     ctx.beginPath();
                     ctx.globalAlpha = 1.0;
                 } else {
-                    ctx.strokeStyle = gridColorBeat;
+                    ctx.strokeStyle = this.themeCache.gridColorBeat;
                     ctx.moveTo(x, 0);
                     ctx.lineTo(x, h);
                 }
@@ -561,7 +490,7 @@ export class VisualizerEngine {
 
             for (const interval of ev.intervals) {
                 const pc = (((rootPC + interval) % 12) + 12) % 12;
-                const colorIdx = INTERVAL_COLOR_INDEX[((interval % 12) + 12) % 12];
+                const colorIdx = INTERVAL_CATEGORY[((interval % 12) + 12) % 12];
                 const buffer = this.guideToneBuffers[colorIdx];
 
                 for (let oct = minOct; oct <= maxOct; oct++) {
@@ -619,7 +548,7 @@ export class VisualizerEngine {
             for (const midi of ev.notes) {
                 const y = round(frameYBase - midi * frameYScale);
                 const interval = ((midi % 12) - rootPC + 12) % 12;
-                const colorIdx = INTERVAL_COLOR_INDEX[interval];
+                const colorIdx = INTERVAL_CATEGORY[interval];
 
                 if (y >= -10 && y <= h + 10) {
                     this.guideToneBuffers[colorIdx].push(x, y - yScale / 2 + 2, cw, yScale - 4);
@@ -842,7 +771,7 @@ export class VisualizerEngine {
                     }
                 }
 
-                ctx.strokeStyle = outlineColor;
+                ctx.strokeStyle = this.themeCache.outlineColor;
                 ctx.lineWidth = baseWidth + 2;
                 ctx.beginPath();
                 let hasOutline = false;
@@ -981,7 +910,7 @@ export class VisualizerEngine {
                 }
 
                 if (hasNotes) {
-                    ctx.strokeStyle = outlineColor;
+                    ctx.strokeStyle = this.themeCache.outlineColor;
                     ctx.lineWidth = baseWidth + 2;
                     ctx.stroke();
 
@@ -993,7 +922,7 @@ export class VisualizerEngine {
 
             if (isActive) {
                 ctx.fillStyle = activeColor || '#fff';
-                ctx.strokeStyle = outlineColor;
+                ctx.strokeStyle = this.themeCache.outlineColor;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.arc(activeX, activeY, 6, 0, PI * 2);
@@ -1002,7 +931,7 @@ export class VisualizerEngine {
             }
         }
 
-        ctx.strokeStyle = playheadColor;
+        ctx.strokeStyle = this.themeCache.playheadColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(this.pianoRollWidth, 0);
@@ -1018,90 +947,6 @@ export class VisualizerEngine {
         this.chordEvents = [];
         if (this.width && this.height) {
             this.ctx.clearRect(0, 0, this.width, this.height);
-        }
-    }
-}
-
-/**
- * UnifiedVisualizer (Proxy)
- * Main thread class that manages the VisualizerWorker.
- */
-export class UnifiedVisualizer {
-    constructor(canvas, staticCanvas) {
-        this.canvas = canvas;
-        this.staticCanvas = staticCanvas;
-
-        // In production, WORKER_PATH is injected by esbuild --define
-        const workerPath =
-            typeof VIZ_WORKER_PATH !== 'undefined' ? VIZ_WORKER_PATH : 'visualizer-worker.js';
-        this.worker = new Worker(workerPath, { type: 'module' });
-
-        const offscreen = canvas.transferControlToOffscreen();
-        const staticOffscreen = staticCanvas.transferControlToOffscreen();
-
-        this.worker.postMessage(
-            {
-                type: 'INIT',
-                canvas: offscreen,
-                staticCanvas: staticOffscreen,
-            },
-            [offscreen, staticOffscreen],
-        );
-
-        this.themeCache = null;
-        this.tracks = {};
-    }
-
-    setTheme(themeCache) {
-        this.themeCache = themeCache;
-        this.worker.postMessage({ type: 'THEME', themeCache });
-    }
-
-    resize(width, height, dpr = 1) {
-        this.worker.postMessage({ type: 'RESIZE', width, height, dpr });
-    }
-
-    addTrack(name, color, resolvedColor) {
-        this.tracks[name] = { color, resolvedColor };
-        this.worker.postMessage({ type: 'ADD_TRACK', name, color, resolvedColor });
-    }
-
-    setRegister(name, midi) {
-        this.worker.postMessage({ type: 'SET_REGISTER', name, midi });
-    }
-
-    setBeatReference(time) {
-        this.worker.postMessage({ type: 'SET_BEAT_REFERENCE', time });
-    }
-
-    pushNote(name, event) {
-        this.worker.postMessage({ type: 'PUSH_NOTE', name, event });
-    }
-
-    pushChord(event) {
-        this.worker.postMessage({ type: 'PUSH_CHORD', event });
-    }
-
-    truncateNotes(name, time) {
-        this.worker.postMessage({ type: 'TRUNCATE', name, time });
-    }
-
-    clear() {
-        this.worker.postMessage({ type: 'CLEAR' });
-    }
-
-    render(currentTime, bpm, tsConfig) {
-        this.worker.postMessage({ type: 'RENDER', currentTime, bpm, tsConfig });
-    }
-
-    syncClock(audioTime, perfTime) {
-        this.worker.postMessage({ type: 'SYNC_CLOCK', audioTime, perfTime });
-    }
-
-    destroy() {
-        if (this.worker) {
-            this.worker.terminate();
-            this.worker = null;
         }
     }
 }

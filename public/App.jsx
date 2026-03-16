@@ -124,7 +124,7 @@ function ArrangerPanel() {
                 </button>
             </div>
 
-            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.5rem; min-height: 100px;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; min-height: 100px;">
                 <label class="library-label">Library</label>
                 <PresetLibrary type="chord" />
             </div>
@@ -236,8 +236,7 @@ function MobileNav({ activeTab }) {
         if (tab === 'grooves') {
             dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'smart' });
         }
-        const { groove } = getState();
-        groove.mobileTab = tab;
+        dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'mobileTab', value: tab });
         dispatch('MOBILE_TAB_SWITCH');
         syncWorker();
         saveCurrentState();

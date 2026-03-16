@@ -286,14 +286,45 @@ button {
 
 /* --- Layout --- */
 .app-main-layout {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+        "arranger sidebar"
+        "visualizer sidebar"
+        "empty sidebar";
     gap: 1.5rem;
-    padding: 1rem;
-    max-width: 1400px;
+    padding: 1.5rem;
+    max-width: 1600px;
     margin: 0 auto;
     width: 100%;
     min-height: calc(100vh - 80px);
+}
+
+#panel-arranger {
+    grid-area: arranger;
+    min-height: 400px;
+}
+
+#panel-visualizer {
+    grid-area: visualizer;
+    min-height: 200px;
+    transition: all 0.3s var(--anim-ease);
+}
+
+#panel-visualizer.collapsed {
+    min-height: 60px;
+}
+
+#col-sidebar {
+    grid-area: sidebar;
+    height: fit-content;
+}
+
+@media (max-width: 1100px) {
+    .app-main-layout {
+        grid-template-columns: 1fr 320px;
+    }
 }
 
 @media (max-width: 900px) {
@@ -302,6 +333,13 @@ button {
         flex-direction: column;
         gap: 0;
         padding: 0.5rem;
+    }
+
+    #panel-arranger,
+    #panel-visualizer,
+    #col-sidebar {
+        grid-area: auto;
+        min-height: 0;
     }
 
     .dashboard-panel {
@@ -332,12 +370,9 @@ button {
 
     #col-sidebar {
         order: 3;
-        display: contents; /* We want individual panels to be siblings for the tab-connection logic if needed, but actually we can keep it as a div */
+        display: contents;
     }
 
-    /* We actually need the active panel to be visually connected to the nav above it. 
-       If col-sidebar is display: contents, then .instrument-panel.active-mobile is a direct child of app-main-layout.
-    */
     .instrument-panel {
         order: 3;
     }
@@ -348,7 +383,7 @@ button {
 
     #panel-visualizer {
         order: 4;
-        margin-bottom: 2rem; /* Buffer at bottom */
+        margin-bottom: 2rem;
     }
 }
 

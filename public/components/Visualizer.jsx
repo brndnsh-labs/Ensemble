@@ -7,7 +7,7 @@ import { dispatch, getState, stateMap } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure } from '../utils.js';
-import { UnifiedVisualizer } from '../visualizer.js';
+import { UnifiedVisualizer } from '../visualizer-proxy.js';
 
 let lastFrameTime = 0;
 let missedFrames = 0;
@@ -118,6 +118,13 @@ export function Visualizer({ enabled }) {
         updateTheme(vizRef.current);
     }, [theme]);
 
+    // Sync playing state to worker
+    useEffect(() => {
+        if (vizRef.current) {
+            vizRef.current.setPlaying(isPlaying);
+        }
+    }, [isPlaying]);
+
     // Update worker loop parameters
     useEffect(() => {
         if (vizRef.current) {
@@ -163,8 +170,9 @@ export function Visualizer({ enabled }) {
             }
 
             // Sync clock periodically or every frame for high precision
-            const audioTime = playback.audio.currentTime;
-            vizRef.current.syncClock(audioTime, performance.now());
+            // Apply visual offset to worker clock as well for perfect sync
+            const now = getVisualTime(stateMap);
+            vizRef.current.syncClock(now, performance.now());
 
             if (!playback.isPlaying && playback.drawQueue.length === 0) {
                 playback.isDrawing = false; // @direct-mutation
@@ -179,9 +187,8 @@ export function Visualizer({ enabled }) {
                 return;
             }
 
-            const now = getVisualTime(stateMap);
             while (playback.drawQueue.length > 0 && playback.drawQueue[0].time < now - 2.0) {
-                playback.drawQueue.shift();
+                playback.drawQueue.shift(); // @direct-mutation
             }
             if (playback.drawQueue.length > 300) {
                 playback.drawQueue = playback.drawQueue.slice(playback.drawQueue.length - 200); // @direct-mutation
@@ -189,7 +196,7 @@ export function Visualizer({ enabled }) {
             const spm = getStepsPerMeasure(arranger.timeSignature);
 
             while (playback.drawQueue.length && playback.drawQueue[0].time <= now) {
-                const ev = playback.drawQueue.shift();
+                const ev = playback.drawQueue.shift(); // @direct-mutation
                 if (ev.type === 'drum_vis') {
                     const stepMeasure = Math.floor(ev.step / spm);
                     if (
@@ -246,11 +253,10 @@ export function Visualizer({ enabled }) {
             loopRef.current = requestAnimationFrame(loop);
         };
 
-        if (isPlaying && !prevPlayingRef.current) {
-            const state = getState();
-            state.playback.isDrawing = true; // @direct-mutation
+        if (isPlaying) {
+            stateMap.playback.isDrawing = true; // @direct-mutation
             if (vizRef.current) {
-                const { playback, arranger } = state;
+                const { playback, arranger } = stateMap;
                 const secondsPerBeat = 60.0 / playback.bpm;
                 const sixteenth = 0.25 * secondsPerBeat;
                 const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);

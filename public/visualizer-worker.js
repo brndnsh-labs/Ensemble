@@ -1,4 +1,4 @@
-import { VisualizerEngine } from './visualizer.js';
+import { VisualizerEngine } from './visualizer-engine.js';
 
 let engine = null;
 let currentBpm = 120;
@@ -6,8 +6,15 @@ let currentTS = { beats: 4, grouping: [4], stepsPerBeat: 4 };
 let syncAudioTime = 0;
 let syncPerfTime = 0;
 let isRunning = false;
+let isPlayingLocal = false;
 
 function getInterpolatedTime() {
+    if (!syncPerfTime) {
+        return 0;
+    }
+    if (!isPlayingLocal) {
+        return syncAudioTime;
+    }
     return syncAudioTime + (performance.now() - syncPerfTime) / 1000;
 }
 
@@ -18,7 +25,9 @@ function tick() {
 
     if (engine) {
         const now = getInterpolatedTime();
-        engine.render(now, currentBpm, currentTS);
+        if (now > 0) {
+            engine.render(now, currentBpm, currentTS);
+        }
     }
     requestAnimationFrame(tick);
 }
@@ -39,10 +48,10 @@ self.onmessage = (e) => {
         time,
         event,
         audioTime,
-        perfTime,
         bpm,
         tsConfig,
         active,
+        isPlaying,
     } = e.data;
 
     switch (type) {
@@ -68,6 +77,10 @@ self.onmessage = (e) => {
             if (engine) {
                 engine.isFillActive = active;
             }
+            break;
+
+        case 'SET_PLAYING':
+            isPlayingLocal = !!isPlaying;
             break;
 
         case 'ADD_TRACK':
@@ -113,14 +126,13 @@ self.onmessage = (e) => {
             break;
 
         case 'RENDER':
-            // Manual render trigger (optional, usually handled by tick)
             currentBpm = bpm;
             currentTS = tsConfig;
             break;
 
         case 'SYNC_CLOCK':
             syncAudioTime = audioTime;
-            syncPerfTime = perfTime;
+            syncPerfTime = performance.now();
             break;
 
         case 'STOP':

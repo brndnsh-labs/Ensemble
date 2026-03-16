@@ -3,7 +3,8 @@
  * @vitest-environment happy-dom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { UnifiedVisualizer, VisualizerEngine } from '../../public/visualizer.js';
+import { VisualizerEngine } from '../../public/visualizer-engine.js';
+import { UnifiedVisualizer } from '../../public/visualizer-proxy.js';
 
 describe('Visualizer System', () => {
     let mockCtx;
