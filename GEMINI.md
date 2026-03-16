@@ -9,8 +9,7 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 *   **UI Layer**: **Preact (v10)** Component-Based Architecture. Logic is decentralized into functional components within `public/components/`.
 *   **State Bridge**: `public/ui-bridge.js` exports `useEnsembleState` for reactive component updates. It uses a `version` counter to force re-renders since the underlying engine state is mutated via `Object.assign`.
 *   **Initialization**: `public/main.js` orchestrates hydration, worker setup, and root mounting (`ui-root.jsx`). Hydration and parsing MUST happen before mounting to prevent stale UI state.
-*   `ui-controller.js`: Orchestrates top-level legacy events and bridges components with non-reactive DOM elements.
-*   `ui.js`: Exports a registry of DOM elements used by secondary controllers and legacy logic.
+*   **Domain Controllers**: Specialized logic resides in `app-controller.js`, `instrument-controller.js`, `arranger-controller.js`, and `midi-controller.js`.
 *   `types.js`: Centralized `ACTIONS` constants for the state dispatch system.
 *   **Engine Architecture**:
     *   `soloist.js`: Core engine for melodic generation using a simplified ACTIVE/RESTING phrasing model.

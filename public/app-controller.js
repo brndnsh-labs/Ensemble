@@ -1,5 +1,6 @@
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
+import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 import { syncWorker } from './worker-client.js';
 
@@ -25,6 +26,7 @@ export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
         return;
     }
 
+    // Audio parameters use direct mutation for precision timing
     if (playback.isPlaying && playback.audio) {
         const now = playback.audio.currentTime;
         const ratio = currentBpm / newBpm;
@@ -40,14 +42,11 @@ export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
     }
 
     if (!fromDispatch) {
-        playback.bpm = newBpm; // @direct-mutation
+        dispatch(ACTIONS.SET_BPM, newBpm);
     }
 
     syncWorker();
     saveCurrentState();
-    if (!fromDispatch) {
-        dispatch('BPM_CHANGE');
-    }
 
     if (viz && playback.isPlaying && playback.audio) {
         const secondsPerBeat = 60.0 / playback.bpm;

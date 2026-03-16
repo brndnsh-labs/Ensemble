@@ -23,6 +23,7 @@ This document is the primary operational guide for AI agents working on the Ense
 ### B. State Management (Redux-ish)
 *   **Domain Slices:** State is decomposed into `public/state/` (e.g., `playback.js`, `arranger.js`).
 *   **Writes**: ALWAYS use `dispatch(ACTIONS.TYPE, payload)`.
+*   **The @direct-mutation Exception**: Direct mutation of state objects is **strictly forbidden** in controllers (`public/*-controller.js`) and UI components. It is **only allowed** in performance-critical engine code (e.g., `scheduler-core.js`, `synth-*.js`) for real-time audio parameters. These must be marked with a `// @direct-mutation` comment for transparency.
 *   **Hybrid Bridge**: Use the `useEnsembleState` hook in `public/ui-bridge.js` for reactive component updates.
 *   **Decoupling**: Avoid circular dependencies. Use **Inversion of Control (IoC)** for side effects (e.g., `state-effects.js` should not be imported by state slices; it should subscribe to state changes).
 *   **Complex Actions**: For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.js` or `scheduler-core.js` rather than dispatching raw actions.
@@ -85,7 +86,7 @@ Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written ta
 
 ---
 
-## 5. AI-Friendly Best Practices
+## 6. AI-Friendly Best Practices
 
 1.  **Fail Fast in Workers:** Validate payload shapes immediately when sending data to `logic-worker.js`.
 2.  **No Magic Numbers:** Use CSS variables for all spacing and colors.

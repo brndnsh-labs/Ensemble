@@ -80,26 +80,24 @@ describe('App Controller', () => {
     });
 
     describe('setBpm', () => {
-        it('should update BPM and call sync/save when not playing', () => {
+        it('should dispatch SET_BPM and call sync/save when not playing', () => {
             setBpm(140);
-            expect(state.playback.bpm).toBe(140);
+            expect(dispatch).toHaveBeenCalledWith('SET_BPM', 140);
             expect(syncWorker).toHaveBeenCalled();
             expect(saveCurrentState).toHaveBeenCalled();
-            expect(dispatch).toHaveBeenCalledWith('BPM_CHANGE');
         });
 
-        it('should constrain BPM between 40 and 240', () => {
+        it('should dispatch constrained BPM between 40 and 240', () => {
             setBpm(10);
-            expect(state.playback.bpm).toBe(40);
+            expect(dispatch).toHaveBeenCalledWith('SET_BPM', 40);
             setBpm(300);
-            expect(state.playback.bpm).toBe(240);
+            expect(dispatch).toHaveBeenCalledWith('SET_BPM', 240);
         });
 
         it('should handle BPM change while playing', () => {
             state.playback.isPlaying = true;
             state.playback.audio = { currentTime: 100 };
-            state.playback.nextNoteTime = 101; // 1 beat at 120bpm is 0.5s. Wait, 120bpm = 2bps. 1 beat = 0.5s.
-            // 1s = 2 beats. nextNoteTime is 1s away from now (100).
+            state.playback.nextNoteTime = 101;
 
             setBpm(60); // Halving BPM should double the remaining time.
 
@@ -107,7 +105,7 @@ describe('App Controller', () => {
             // noteTimeRemaining = 101 - 100 = 1.
             // new nextNoteTime = 100 + 1 * 2 = 102.
             expect(state.playback.nextNoteTime).toBe(102);
-            expect(state.playback.bpm).toBe(60);
+            expect(dispatch).toHaveBeenCalledWith('SET_BPM', 60);
         });
 
         it('should not dispatch if fromDispatch is true', () => {
