@@ -376,7 +376,8 @@ export function restoreGains(state) {
                 isMuted = false;
             }
 
-            const target = !isMuted && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
+            const mult = playback.useNewMix ? PRO_MIX_MULTIPLIERS[m.name] || m.mult : m.mult;
+            const target = !isMuted && !isLocalMuted ? m.state.volume * mult : 0.0001;
             m.node.gain.cancelScheduledValues(t);
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }

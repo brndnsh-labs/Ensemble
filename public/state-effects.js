@@ -1,5 +1,6 @@
 import { applyTheme, setBpm } from './app-controller.js';
 import { validateProgression } from './chords-engine.js';
+import { applyConductor } from './conductor.js';
 import { initAudio, restoreGains } from './engine/engine.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { loadDrumPreset } from './instrument-controller.js';
@@ -29,6 +30,13 @@ export function handleEffects(action, payload, stateMap, context = {}) {
         }
         case ACTIONS.SET_BPM: {
             setBpm(payload, payload?.viz, true, context.oldBpm);
+            break;
+        }
+        case ACTIONS.SET_PARAM: {
+            if (payload.param === 'useNewMix') {
+                restoreGains(stateMap);
+                applyConductor();
+            }
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
