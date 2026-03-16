@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getChordDetails, getIntervals } from '../../public/chords.js';
+import { getChordDetails, getIntervals } from '../../public/chords-engine.js';
 import { getState } from '../../public/state.js';
 
 // Mock state

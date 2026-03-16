@@ -16,7 +16,7 @@ import {
     saveProgression,
     validateAndAnalyze,
 } from '../arranger-controller.js';
-import { mutateProgression, transformRelativeProgression } from '../chords.js';
+import { mutateProgression, transformRelativeProgression } from '../chords-engine.js';
 import { KEY_ORDER } from '../config.js';
 import { pushHistory, undo } from '../history.js';
 import { shareProgression } from '../sharing.js';
@@ -218,7 +218,7 @@ export function EditorModal() {
         if (newSections) {
             dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
             // Re-validate to update the stepMap/progression
-            const { validateProgression } = await import('../chords.js');
+            const { validateProgression } = await import('../chords-engine.js');
             validateProgression(getState());
             syncWorker();
         }

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { getFormattedChordNames } from '../../public/chords.js';
+import { getFormattedChordNames } from '../../public/chords-engine.js';
 
 describe('Chord Formatting Verification', () => {
     it('correctly formats im9 rendering', () => {

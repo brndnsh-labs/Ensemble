@@ -113,7 +113,7 @@ vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 
 import { compingState, getAccompanimentNotes } from '../../public/accompaniment.js';
-import { validateProgression } from '../../public/chords.js';
+import { validateProgression } from '../../public/chords-engine.js';
 import { getState } from '../../public/state.js';
 
 const { arranger, playback, chords, bass, soloist, groove } = getState();

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../../public/accompaniment.js';
-import { getBassNote, isBassActive } from '../../../public/bass.js';
+import { getBassNote, isBassActive } from '../../../public/bass-engine.js';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getHarmonyNotes } from '../../../public/harmonies.js';

@@ -1,4 +1,4 @@
-import { getBestInversion, getIntervals } from './chords.js';
+import { getBestInversion, getIntervals } from './chords-engine.js';
 import { KEY_ORDER } from './config.js';
 import { getFrequency } from './utils.js';
 

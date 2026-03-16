@@ -7,7 +7,7 @@ import { getState } from '../../../public/state.js';
 
 const { arranger, chords, bass, groove } = getState();
 
-import { getChordDetails, validateProgression } from '../../../public/chords.js';
+import { getChordDetails, validateProgression } from '../../../public/chords-engine.js';
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({ ui: {} }));

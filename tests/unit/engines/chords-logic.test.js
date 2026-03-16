@@ -75,7 +75,7 @@ import {
     getIntervals,
     transformRelativeProgression,
     validateProgression,
-} from '../../../public/chords.js';
+} from '../../../public/chords-engine.js';
 import { getState } from '../../../public/state.js';
 
 const { arranger, playback, chords, bass, groove } = getState();

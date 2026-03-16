@@ -1,5 +1,5 @@
 import { applyTheme, setBpm } from './app-controller.js';
-import { validateProgression } from './chords.js';
+import { validateProgression } from './chords-engine.js';
 import { initAudio, restoreGains } from './engine/engine.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { loadDrumPreset } from './instrument-controller.js';

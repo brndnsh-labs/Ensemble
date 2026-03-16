@@ -1,4 +1,4 @@
-import { getBestInversion } from './chords.js';
+import { getBestInversion } from './chords-engine.js';
 import { TIME_SIGNATURES } from './config.js';
 import { getState } from './state.js';
 import { calculateTimingOffset } from './utils.js';
