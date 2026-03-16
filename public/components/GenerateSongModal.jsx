@@ -99,12 +99,10 @@ export function GenerateSongModal() {
                 repeat: s.repeat || 1,
             }));
 
-            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
-
-            arranger.isDirty = true; // @direct-mutation
-            if (template.isMinor !== undefined) {
-                arranger.isMinor = template.isMinor; // @direct-mutation
-            }
+            dispatch(ACTIONS.LOAD_TEMPLATE, {
+                sections: newSections,
+                isMinor: template.isMinor,
+            });
 
             clearChordPresetHighlight();
             refreshArrangerUI();
