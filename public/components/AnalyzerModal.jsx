@@ -17,11 +17,13 @@ export function AnalyzerModal() {
     const [transcribedBPM, setTranscribedBPM] = useState(null);
     const [isProcessingFile, setIsProcessingFile] = useState(false);
     const [processingProgress, setProcessingProgress] = useState(0);
+    const [confirmClearHistory, setConfirmClearHistory] = useState(false);
 
     const analyzerRef = useRef(null);
     const micStreamRef = useRef(null);
     const overlayRef = useRef(null);
     const autoAddTimerRef = useRef(null);
+    const clearHistoryTimerRef = useRef(null);
 
     useEffect(() => {
         return () => {
@@ -36,6 +38,14 @@ export function AnalyzerModal() {
             }
         };
     }, [isListening]);
+
+    useEffect(() => {
+        return () => {
+            if (clearHistoryTimerRef.current) {
+                clearTimeout(clearHistoryTimerRef.current);
+            }
+        };
+    }, []);
 
     function addCurrentChord() {
         if (!currentStableChord) {
@@ -295,7 +305,28 @@ export function AnalyzerModal() {
                                 <div class="results-header">
                                     <span class="label-caps">Transcribed Progression</span>
                                     <div class="btn-group-mini">
-                                        <button onClick={() => setHistory([])}>Clear</button>
+                                        <button
+                                            aria-live="polite"
+                                            onClick={() => {
+                                                if (!confirmClearHistory) {
+                                                    setConfirmClearHistory(true);
+                                                    clearHistoryTimerRef.current = setTimeout(
+                                                        () => {
+                                                            setConfirmClearHistory(false);
+                                                        },
+                                                        3000,
+                                                    );
+                                                } else {
+                                                    setHistory([]);
+                                                    setConfirmClearHistory(false);
+                                                    if (clearHistoryTimerRef.current) {
+                                                        clearTimeout(clearHistoryTimerRef.current);
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            {confirmClearHistory ? 'Sure?' : 'Clear'}
+                                        </button>
                                         <button onClick={() => setHistory(history.slice(0, -1))}>
                                             Undo
                                         </button>
