@@ -413,6 +413,14 @@ export function generateExtraNotes(ctx) {
 
     if (soloist.mode === 'piano') {
         const currentRoot = currentChord.rootMidi;
+
+        // ⚡ Bolt Optimization: Pre-compute bitmask for chord intervals to eliminate O(N) linear scanning inside loop
+        let chordMask = 0;
+        for (let i = 0; i < currentChord.intervals.length; i++) {
+            const intv = ((currentChord.intervals[i] % 12) + 12) % 12;
+            chordMask |= 1 << intv;
+        }
+
         if ((activeStyle === 'neo' || activeStyle === 'bird') && Math.random() < 0.6) {
             extraNotes.push({
                 midi: selectedMidi - 5,
@@ -430,11 +438,8 @@ export function generateExtraNotes(ctx) {
             let count = 0;
             for (let m = selectedMidi - 1; m > selectedMidi - 13 && count < 2; m--) {
                 const pc = ((m % 12) + 12) % 12;
-                if (
-                    currentChord.intervals.some(
-                        (i) => i % 12 === (pc - (currentRoot % 12) + 12) % 12,
-                    )
-                ) {
+                const interval = (pc - (currentRoot % 12) + 12) % 12;
+                if ((chordMask >> interval) & 1) {
                     extraNotes.push({
                         midi: m,
                         velocity: (0.5 + effectiveIntensity * 0.6) * 0.85,
@@ -462,6 +467,14 @@ export function generateExtraNotes(ctx) {
         });
     } else if (soloist.mode === 'guitar') {
         const currentRoot = currentChord.rootMidi;
+
+        // ⚡ Bolt Optimization: Pre-compute bitmask for chord intervals to eliminate O(N) linear scanning inside loop
+        let chordMask = 0;
+        for (let i = 0; i < currentChord.intervals.length; i++) {
+            const intv = ((currentChord.intervals[i] % 12) + 12) % 12;
+            chordMask |= 1 << intv;
+        }
+
         const validIntervalsDown = [3, 4, 5, 7, 8, 9]; // minor 3rd to major 6th down
         let foundMidi = null;
 
@@ -469,10 +482,8 @@ export function generateExtraNotes(ctx) {
             const dsInt = validIntervalsDown[i];
             const candidateMidi = selectedMidi - dsInt;
             const pc = ((candidateMidi % 12) + 12) % 12;
-            const isChordTone = currentChord.intervals.some(
-                (intv) => intv % 12 === (pc - (currentRoot % 12) + 12) % 12,
-            );
-            if (isChordTone) {
+            const interval = (pc - (currentRoot % 12) + 12) % 12;
+            if ((chordMask >> interval) & 1) {
                 foundMidi = candidateMidi;
                 break;
             }
