@@ -1,5 +1,5 @@
 import { compingState, getAccompanimentNotes } from '../accompaniment.js';
-import { getBassNote, isBassActive } from '../bass.js';
+import { getBassNote, isBassActive } from '../bass-engine.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { generateProceduralFill } from '../fills.js';

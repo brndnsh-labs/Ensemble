@@ -16,7 +16,7 @@ import {
     saveProgression,
     validateAndAnalyze,
 } from '../arranger-controller.js';
-import { mutateProgression, transformRelativeProgression } from '../chords.js';
+import { mutateProgression, transformRelativeProgression } from '../chords-engine.js';
 import { KEY_ORDER } from '../config.js';
 import { pushHistory, undo } from '../history.js';
 import { shareProgression } from '../sharing.js';

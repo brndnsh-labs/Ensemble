@@ -13,7 +13,7 @@ import {
     transposeKey,
     validateAndAnalyze,
 } from '../../public/arranger-controller.js';
-import { transformRelativeProgression, validateProgression } from '../../public/chords.js';
+import { transformRelativeProgression, validateProgression } from '../../public/chords-engine.js';
 import { analyzeFormUI } from '../../public/conductor.js';
 import { restoreGains } from '../../public/engine/engine.js';
 import { pushHistory } from '../../public/history.js';

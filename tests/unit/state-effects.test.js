@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTheme, setBpm } from '../../public/app-controller.js';
-import { validateProgression } from '../../public/chords.js';
+import { validateProgression } from '../../public/chords-engine.js';
 import { initAudio, restoreGains } from '../../public/engine/engine.js';
 import { togglePlay } from '../../public/engine/scheduler-core.js';
 import { loadDrumPreset } from '../../public/instrument-controller.js';

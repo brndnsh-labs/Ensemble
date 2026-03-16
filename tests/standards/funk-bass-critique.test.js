@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getBassNote, isBassActive } from '../../public/bass.js';
+import { getBassNote, isBassActive } from '../../public/bass-engine.js';
 import { getFrequency } from '../../public/utils.js';
 
 // Mock state

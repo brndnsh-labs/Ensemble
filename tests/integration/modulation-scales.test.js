@@ -40,7 +40,7 @@ vi.mock('../../public/config.js', async (importOriginal) => {
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 
-import { validateProgression } from '../../public/chords.js';
+import { validateProgression } from '../../public/chords-engine.js';
 import { getState } from '../../public/state.js';
 import { getScaleForChord } from '../../public/theory-scales.js';
 

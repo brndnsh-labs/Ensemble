@@ -1,4 +1,4 @@
-import { validateProgression } from './chords.js';
+import { validateProgression } from './chords-engine.js';
 import { analyzeFormUI } from './conductor.js';
 import { initAudio, playNote } from './engine/engine.js';
 import { scheduler } from './engine/scheduler-core.js';
