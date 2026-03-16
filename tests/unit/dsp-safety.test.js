@@ -48,6 +48,10 @@ describe('DSP & Signal Safety', () => {
                     cancelScheduledValues: vi.fn(),
                 },
             }));
+            this.createStereoPanner = vi.fn().mockImplementation(() => ({
+                connect: vi.fn(),
+                pan: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
+            }));
             this.createWaveShaper = vi.fn().mockImplementation(() => ({
                 connect: vi.fn(),
                 curve: null,

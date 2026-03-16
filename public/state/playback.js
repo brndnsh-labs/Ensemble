@@ -7,9 +7,11 @@ import { ACTIONS } from '../types.js';
  * @property {WaveShaperNode|null} saturator - The master soft-clipper/saturator.
  * @property {DynamicsCompressorNode|null} masterLimiter - The master safety limiter.
  * @property {ConvolverNode|null} reverbNode - The global reverb node.
+ * @property {BiquadFilterNode|null} reverbPreFilter - HPF for reverb cleaning.
  * @property {GainNode|null} chordsGain - The gain node for chords.
  * @property {GainNode|null} chordsReverb - Reverb send for chords.
  * @property {BiquadFilterNode|null} chordsEQ - EQ for chords (HP/Notch).
+ * @property {StereoPannerNode|null} chordsPanner - Stereo panner for chords.
  * @property {GainNode|null} drumsReverb - Reverb send for drums.
  * @property {GainNode|null} bassReverb - Reverb send for bass.
  * @property {GainNode|null} bassSidechain - Sidechain ducking gain node for bass.
@@ -18,6 +20,7 @@ import { ACTIONS } from '../types.js';
  * @property {BiquadFilterNode|null} soloistEQ - EQ for soloist (LPF/Shelf).
  * @property {GainNode|null} harmoniesReverb - Reverb send for harmonies.
  * @property {BiquadFilterNode|null} harmoniesEQ - EQ for harmonies (HPF).
+ * @property {StereoPannerNode|null} harmoniesPanner - Stereo panner for harmonies.
  * @property {boolean} isPlaying - Whether the sequencer is currently playing.
  * @property {number} bpm - Beats per minute (40-240).
  * @property {number} nextNoteTime - The scheduler time for the next note (swung).
@@ -54,9 +57,11 @@ export const playback = {
     masterGain: null,
     saturator: null,
     reverbNode: null,
+    reverbPreFilter: null,
     chordsGain: null,
     chordsReverb: null,
     chordsEQ: null,
+    chordsPanner: null,
     drumsReverb: null,
     drumsGain: null,
     bassReverb: null,
@@ -68,6 +73,7 @@ export const playback = {
     soloistEQ: null,
     harmoniesReverb: null,
     harmoniesEQ: null,
+    harmoniesPanner: null,
     isPlaying: false,
     bpm: 100,
     nextNoteTime: 0.0,

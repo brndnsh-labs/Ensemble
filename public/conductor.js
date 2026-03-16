@@ -153,10 +153,13 @@ export function applyConductor() {
             playback.masterLimiter.release.setTargetAtTime(targetRelease, time, ramp);
         }
 
-        // --- Pro Mix Spectral Slotting ---
+        // --- Pro Mix Spectral Slotting & Panning ---
         if (playback.useNewMix) {
             if (playback.chordsEQ) {
                 playback.chordsEQ.frequency.setTargetAtTime(250, time, ramp);
+            }
+            if (playback.chordsPanner) {
+                playback.chordsPanner.pan.setTargetAtTime(-0.2, time, ramp);
             }
             if (playback.bassEQ) {
                 playback.bassEQ.type = 'highpass';
@@ -170,10 +173,22 @@ export function applyConductor() {
             if (playback.harmoniesEQ) {
                 playback.harmoniesEQ.frequency.setTargetAtTime(300, time, ramp);
             }
+            if (playback.harmoniesPanner) {
+                playback.harmoniesPanner.pan.setTargetAtTime(0.2, time, ramp);
+            }
+            if (playback.reverbPreFilter) {
+                // Reverb Cleaning (Abbey Road)
+                playback.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
+                // Note: LPF is connected to HPF, we can just leave it or find it if we stored it
+                // For simplicity, we mostly care about the HPF to remove reverb mud.
+            }
         } else {
             // Classic Neutral/Bypass
             if (playback.chordsEQ) {
                 playback.chordsEQ.frequency.setTargetAtTime(180, time, ramp); // Restore classic HPF
+            }
+            if (playback.chordsPanner) {
+                playback.chordsPanner.pan.setTargetAtTime(0, time, ramp);
             }
             if (playback.bassEQ) {
                 playback.bassEQ.frequency.setTargetAtTime(20, time, ramp);
@@ -184,6 +199,12 @@ export function applyConductor() {
             }
             if (playback.harmoniesEQ) {
                 playback.harmoniesEQ.frequency.setTargetAtTime(20, time, ramp);
+            }
+            if (playback.harmoniesPanner) {
+                playback.harmoniesPanner.pan.setTargetAtTime(0, time, ramp);
+            }
+            if (playback.reverbPreFilter) {
+                playback.reverbPreFilter.frequency.setTargetAtTime(20, time, ramp);
             }
         }
 

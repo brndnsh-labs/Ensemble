@@ -123,6 +123,10 @@ describe('Mix & Signal Integrity Audit', () => {
             this.currentTime = 0;
             this.sampleRate = 44100;
             this.createGain = vi.fn().mockImplementation(createMockNode);
+            this.createStereoPanner = vi.fn().mockImplementation(() => ({
+                connect: vi.fn(),
+                pan: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
+            }));
             this.createWaveShaper = vi.fn().mockImplementation(createMockNode);
             this.createDynamicsCompressor = vi.fn().mockImplementation(createMockNode);
             this.createConvolver = vi.fn().mockImplementation(createMockNode);

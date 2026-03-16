@@ -99,6 +99,25 @@ export function initAudio(state) {
         playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
         playback.reverbNode.connect(playback.masterGain);
 
+        // --- Pro Mix: Abbey Road Reverb Filters ---
+        const reverbHPF = playback.audio.createBiquadFilter();
+        reverbHPF.type = 'highpass';
+        reverbHPF.frequency.setValueAtTime(
+            playback.useNewMix ? 600 : 20,
+            playback.audio.currentTime,
+        );
+
+        const reverbLPF = playback.audio.createBiquadFilter();
+        reverbLPF.type = 'lowpass';
+        reverbLPF.frequency.setValueAtTime(
+            playback.useNewMix ? 6000 : 20000,
+            playback.audio.currentTime,
+        );
+
+        reverbHPF.connect(reverbLPF);
+        reverbLPF.connect(playback.reverbNode);
+        playback.reverbPreFilter = reverbHPF; // @direct-mutation
+
         const modules = [
             { name: MODULES.CHORDS, state: chords, mult: MIXER_GAIN_MULTIPLIERS.chords },
             { name: MODULES.BASS, state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass },
@@ -148,11 +167,20 @@ export function initAudio(state) {
                 notch.Q.setValueAtTime(0.7, playback.audio.currentTime);
                 notch.gain.setValueAtTime(playback.useNewMix ? -2 : -4, playback.audio.currentTime);
 
+                const panner = playback.audio.createStereoPanner();
+                panner.pan.setValueAtTime(
+                    playback.useNewMix ? -0.2 : 0,
+                    playback.audio.currentTime,
+                );
+
                 gainNode.connect(busEQ);
                 busEQ.connect(lowShelf);
                 lowShelf.connect(notch);
-                notch.connect(playback.masterGain);
+                notch.connect(panner);
+                panner.connect(playback.masterGain);
+
                 playback.chordsEQ = busEQ; // @direct-mutation
+                playback.chordsPanner = panner; // @direct-mutation
             } else if (m.name === 'bass') {
                 const sidechain = playback.audio.createGain();
                 sidechain.gain.setValueAtTime(1.0, playback.audio.currentTime);
@@ -207,10 +235,15 @@ export function initAudio(state) {
                 warmth.frequency.setValueAtTime(1200, playback.audio.currentTime);
                 warmth.gain.setValueAtTime(2, playback.audio.currentTime);
 
+                const panner = playback.audio.createStereoPanner();
+                panner.pan.setValueAtTime(playback.useNewMix ? 0.2 : 0, playback.audio.currentTime);
+
                 gainNode.connect(busEQ);
                 busEQ.connect(warmth);
-                warmth.connect(playback.masterGain);
+                warmth.connect(panner);
+                panner.connect(playback.masterGain);
                 playback.harmoniesEQ = busEQ; // @direct-mutation
+                playback.harmoniesPanner = panner; // @direct-mutation
             } else if (m.name === 'drums') {
                 gainNode.connect(playback.masterGain);
             }
@@ -225,7 +258,7 @@ export function initAudio(state) {
                 playback.audio.currentTime + 0.04,
             );
             gainNode.connect(reverbGain);
-            reverbGain.connect(playback.reverbNode);
+            reverbGain.connect(playback.reverbPreFilter || playback.reverbNode);
             playback[`${m.name}Reverb`] = reverbGain;
         });
 
