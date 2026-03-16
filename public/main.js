@@ -8,10 +8,7 @@ import { getState, subscribe } from './state.js';
 import { handleEffects } from './state-effects.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
 import { mountComponents } from './ui-root.jsx';
-import { UnifiedVisualizer } from './visualizer.js';
 import { initWorker, syncWorker } from './worker-client.js';
-
-let viz;
 
 function init() {
     const { playback, groove } = getState();
@@ -105,16 +102,8 @@ function init() {
             },
         );
 
-        viz = new UnifiedVisualizer('unifiedVizContainer');
-        playback.viz = viz; // @direct-mutation
-        viz.addTrack('bass', 'var(--success-color)');
-        viz.addTrack('soloist', 'var(--soloist-color)');
-        viz.addTrack('harmony', 'var(--harmony-color)');
-        viz.addTrack('drums', 'var(--text-color)');
-
-        setInstrumentControllerRefs(
-            () => scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p)),
-            viz,
+        setInstrumentControllerRefs(() =>
+            scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p)),
         );
 
         const hasDrumPattern = groove.instruments.some((inst) => inst.steps.some((s) => s > 0));

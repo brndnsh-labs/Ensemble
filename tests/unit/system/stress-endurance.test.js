@@ -108,7 +108,6 @@ vi.mock('../../../public/conductor.js', () => ({
     conductorState: { larsBpmOffset: 0 },
 }));
 
-import { draw } from '../../../public/animation-loop.js';
 import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { getState } from '../../../public/state.js';
 
@@ -147,10 +146,9 @@ describe('Long-Session Stress & Endurance', () => {
             chords.buffer.set(playback.step, [{ freq: 300, durationSteps: 1 }]);
 
             scheduler(getState());
-            draw(null);
 
             if (i % 100 === 0) {
-                expect(playback.drawQueue.length).toBeLessThan(350);
+                // The draw logic shifted to the React component, so we just check buffer cleanup
                 expect(bass.buffer.size).toBeLessThan(10);
                 expect(soloist.buffer.size).toBeLessThan(10);
                 expect(chords.buffer.size).toBeLessThan(10);

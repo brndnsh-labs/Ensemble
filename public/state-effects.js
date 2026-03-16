@@ -14,7 +14,7 @@ export function handleEffects(action, payload, stateMap, context = {}) {
     const { dispatch } = context;
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
-            togglePlay(stateMap, payload?.viz, true, dispatch);
+            togglePlay(stateMap, true, dispatch);
             break;
         }
         case ACTIONS.SET_SECTIONS:

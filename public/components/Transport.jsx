@@ -1,13 +1,10 @@
 import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
-import { dispatch, getState } from '../state.js';
+import { handleTap } from '../instrument-controller.js';
+import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-
-const { playback } = getState(); // Direct access for viz, audio
-
-import { handleTap } from '../instrument-controller.js';
 
 export function Transport() {
     const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode } = useEnsembleState(
@@ -45,7 +42,7 @@ export function Transport() {
     }, [isPlaying, sessionTimer, sessionStartTime, songMode]);
 
     const onTogglePlay = () => {
-        dispatch(ACTIONS.TOGGLE_PLAY, { viz: playback.viz });
+        dispatch(ACTIONS.TOGGLE_PLAY);
     };
 
     const onBpmInput = (e) => {

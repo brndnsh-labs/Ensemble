@@ -57,7 +57,7 @@ describe('Global Shortcuts', () => {
         const { dispatch } = await import('../../public/state.js');
         const event = new KeyboardEvent('keydown', { key: ' ' });
         window.dispatchEvent(event);
-        expect(dispatch).toHaveBeenCalledWith(ACTIONS.TOGGLE_PLAY, expect.anything());
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.TOGGLE_PLAY);
     });
 
     it('should NOT toggle playback if modal is open via state', async () => {

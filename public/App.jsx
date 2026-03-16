@@ -14,6 +14,7 @@ import { PWAUpdateBanner } from './components/PWAUpdateBanner.jsx';
 import { SequencerGrid } from './components/SequencerGrid.jsx';
 import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
+import { Visualizer } from './components/Visualizer.jsx';
 import { APP_VERSION } from './config.js';
 import {
     BASS_STYLES,
@@ -156,9 +157,7 @@ function VisualizerPanel({ enabled }) {
                 </div>
             </div>
 
-            <div class="viz-graph-area">
-                <div id="unifiedVizContainer" />
-            </div>
+            <div class="viz-graph-area">{enabled && <Visualizer enabled={enabled} />}</div>
         </div>
     );
 }

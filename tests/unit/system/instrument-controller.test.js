@@ -281,9 +281,8 @@ describe('Instrument Controller', () => {
             expect(WorkerClient.syncWorker).toHaveBeenCalled();
         });
 
-        it('should toggle viz state and clear visualizer', () => {
-            const mockViz = { clear: vi.fn() };
-            InstrumentController.setInstrumentControllerRefs(null, mockViz);
+        it('should toggle viz state', () => {
+            InstrumentController.setInstrumentControllerRefs(null);
 
             InstrumentController.togglePower('viz');
 
@@ -292,7 +291,6 @@ describe('Instrument Controller', () => {
                 param: 'enabled',
                 value: false,
             });
-            expect(mockViz.clear).toHaveBeenCalled();
         });
 
         it('should handle soloist specific phrasing resets when turning on', () => {

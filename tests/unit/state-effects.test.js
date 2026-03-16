@@ -44,9 +44,9 @@ describe('State Effects Handler', () => {
     });
 
     it('should call togglePlay on TOGGLE_PLAY action', () => {
-        const payload = { viz: true };
+        const payload = {};
         handleEffects(ACTIONS.TOGGLE_PLAY, payload, stateMap, { dispatch });
-        expect(togglePlay).toHaveBeenCalledWith(stateMap, payload.viz, true, dispatch);
+        expect(togglePlay).toHaveBeenCalledWith(stateMap, true, dispatch);
     });
 
     it('should call validateProgression on section-related actions', () => {

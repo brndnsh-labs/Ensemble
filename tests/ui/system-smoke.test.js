@@ -251,14 +251,12 @@ describe('System Smoke Test (E2E Workflow)', () => {
         validateProgression(getState());
         expect(arranger.progression.length).toBeGreaterThan(0);
 
-        const mockViz = { setBeatReference: vi.fn(), clear: vi.fn() };
-        togglePlay(getState(), mockViz);
+        togglePlay(getState());
 
         expect(playback.isPlaying).toBe(true);
         expect(playback.audio).not.toBeNull();
-        expect(mockViz.setBeatReference).toHaveBeenCalled();
 
-        togglePlay(getState(), mockViz);
+        togglePlay(getState());
         expect(playback.isPlaying).toBe(false);
     });
 

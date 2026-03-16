@@ -27,7 +27,7 @@ export function GlobalShortcuts() {
 
             if (e.key === ' ' && !isTyping && !anyModalOpen) {
                 e.preventDefault();
-                dispatch(ACTIONS.TOGGLE_PLAY, { viz: playback.viz });
+                dispatch(ACTIONS.TOGGLE_PLAY);
             }
 
             // 'E': Toggle Editor

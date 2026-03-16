@@ -1,4 +1,3 @@
-import { draw } from '../animation-loop.js';
 import {
     checkSectionTransition,
     conductorState,
@@ -87,9 +86,8 @@ initPlatform();
  * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
  * @param {Function} [dispatch] - State dispatch function.
  */
-export function togglePlay(state, viz, fromDispatch = false, dispatch = null) {
+export function togglePlay(state, fromDispatch = false, dispatch = null) {
     const { playback, arranger, chords } = state;
-    const activeViz = viz || playback.viz;
 
     // Determine if we are STARTING or STOPPING based on current state.
     // If fromDispatch is true, isPlaying ALREADY reflects the target state.
@@ -114,9 +112,6 @@ export function togglePlay(state, viz, fromDispatch = false, dispatch = null) {
         if (dispatch) {
             dispatch(ACTIONS.SET_ENDING_PENDING, false);
             dispatch(ACTIONS.SET_STOP_AT_END, false);
-        }
-        if (activeViz) {
-            activeViz.clear();
         }
         if (dispatch) {
             dispatch('VIS_RESET');
@@ -177,13 +172,6 @@ export function togglePlay(state, viz, fromDispatch = false, dispatch = null) {
         playback.isCountingIn = playback.countIn; // @direct-mutation
         playback.countInBeat = 0; // @direct-mutation
         activateWakeLock();
-        if (activeViz) {
-            activeViz.setBeatReference(playback.nextNoteTime);
-        }
-        if (!playback.isDrawing) {
-            playback.isDrawing = true; // @direct-mutation
-            requestAnimationFrame(() => draw(activeViz));
-        }
 
         // Initial MIDI cleanup
         panic(true);
@@ -619,7 +607,7 @@ function scheduleDrums(state, params, dispatch = null) {
             if (playback.bandIntensity >= 0.5 || fillStep >= groove.fillLength / 2) {
                 const notes = groove.fillSteps[fillStep];
                 if (notes && notes.length > 0) {
-                    if (vizState.enabled && playback.viz) {
+                    if (vizState.enabled) {
                         playback.drawQueue.push({
                             type: 'fill_active',
                             time: finalTime,
@@ -629,7 +617,7 @@ function scheduleDrums(state, params, dispatch = null) {
                     notes.forEach((note) => {
                         playDrumSound(state, note.name, finalTime, note.vel * conductorVel);
 
-                        if (vizState.enabled && playback.viz) {
+                        if (vizState.enabled) {
                             const midiNum = DRUM_VIS_PITCHES[note.name] || 36;
                             playback.drawQueue.push({
                                 type: 'drums_vis',
@@ -644,7 +632,7 @@ function scheduleDrums(state, params, dispatch = null) {
                 }
             }
         }
-    } else if (vizState.enabled && playback.viz) {
+    } else if (vizState.enabled) {
         // Ensure fill visual state is cleared when fill is not active
         playback.drawQueue.push({ type: 'fill_active', time: finalTime, active: false });
     }
@@ -687,7 +675,7 @@ function scheduleDrums(state, params, dispatch = null) {
             const playTime = finalTime + instTimeOffset;
             playDrumSound(state, soundName, playTime, velocity * conductorVel);
 
-            if (vizState.enabled && playback.viz) {
+            if (vizState.enabled) {
                 const midiNum = DRUM_VIS_PITCHES[soundName] || 36;
                 playback.drawQueue.push({
                     type: 'drums_vis',
@@ -735,7 +723,7 @@ function scheduleDrumsFromBuffer(state, step, time) {
 
             playDrumSound(state, name, playTime, velocity * conductorVel);
 
-            if (vizState.enabled && playback.viz) {
+            if (vizState.enabled) {
                 const midiNum = DRUM_VIS_PITCHES[name] || 36;
                 playback.drawQueue.push({
                     type: 'drums_vis',
@@ -776,9 +764,7 @@ function scheduleBass(state, chordData, step, time) {
                 const spb = 60.0 / playback.bpm;
                 const duration = (durationSteps || 4) * 0.25 * spb;
                 const finalVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
-                if (vizState.enabled && playback.viz) {
-                    playback.viz.truncateNotes('bass', adjustedTime);
-
+                if (vizState.enabled) {
                     const fLen = chord.freqs.length;
                     const chordNotes = new Array(fLen);
                     for (let i = 0; i < fLen; i++) {
@@ -902,11 +888,7 @@ function scheduleSoloist(state, chordData, step, _time, unswungTime) {
                     { isMono, bend },
                 );
 
-                if (vizState.enabled && playback.viz) {
-                    if (isMono) {
-                        playback.viz.truncateNotes('soloist', playTime);
-                    }
-
+                if (vizState.enabled) {
                     const fLen = chord.freqs.length;
                     const chordNotes = new Array(fLen);
                     for (let i = 0; i < fLen; i++) {
@@ -1100,7 +1082,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
                     duration,
                 );
 
-                if (vizState.enabled && playback.viz) {
+                if (vizState.enabled) {
                     const { name, octave } = midiToNote(m);
                     playback.drawQueue.push({
                         type: 'harmony_vis',

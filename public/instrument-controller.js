@@ -19,11 +19,7 @@ import { showToast } from './ui.js';
 import { getStepsPerMeasure } from './utils.js';
 import { flushWorker, syncWorker } from './worker-client.js';
 
-let vizRef = null;
-
-export function setInstrumentControllerRefs(_scheduler, viz) {
-    vizRef = viz;
-}
+export function setInstrumentControllerRefs(_scheduler) {}
 
 export function switchMeasure(idx) {
     const { groove } = getState();
@@ -338,10 +334,7 @@ export function togglePower(type) {
         }
     }
 
-    // Viz cleanup
-    if (normalizedType === 'viz' && !newState && vizRef) {
-        vizRef.clear();
-    }
+    // Viz cleanup is now handled by the component's unmount/disable effect
 
     syncWorker();
 

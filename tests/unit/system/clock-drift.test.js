@@ -55,8 +55,6 @@ vi.mock('../../../public/instrument-controller.js', () => ({
     switchMeasure: vi.fn(),
 }));
 
-vi.mock('../../../public/animation-loop.js', () => ({ draw: vi.fn() }));
-
 describe('Clock Drift & Scheduling Precision', () => {
     beforeEach(() => {
         vi.clearAllMocks();
