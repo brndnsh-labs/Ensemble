@@ -13,6 +13,17 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 
+## State Management (Domain Slices)
+
+| Path | Domain Responsibility | Initial State |
+| :--- | :--- | :--- |
+| `public/state/playback.js` | BPM, transport, volume, and visual state. | `playback` |
+| `public/state/arranger.js` | Chords, sections, time signature, and key. | `arranger` |
+| `public/state/groove.js` | Genre, intensity, and drum kit selection. | `groove` |
+| `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
+| `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
+| `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
+
 ## Generative Engines (Worker Thread)
 
 | Path | Responsibility | Key Logic |

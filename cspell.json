@@ -93,7 +93,8 @@
         "AABA",
         "Csus",
         "Cadd",
-        "Thelonious"
+        "Thelonious",
+        "multikey"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

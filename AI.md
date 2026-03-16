@@ -22,9 +22,10 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ### B. State Management (Redux-ish)
 *   **Domain Slices:** State is decomposed into `public/state/` (e.g., `playback.js`, `arranger.js`).
-*   **Writes:** ALWAYS use `dispatch(ACTIONS.TYPE, payload)`.
-*   **Hybrid Bridge:** Use the `useEnsembleState` hook in `public/ui-bridge.js` for reactive component updates.
-*   **Complex Actions:** For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.js` or `scheduler-core.js` rather than dispatching raw actions.
+*   **Writes**: ALWAYS use `dispatch(ACTIONS.TYPE, payload)`.
+*   **Hybrid Bridge**: Use the `useEnsembleState` hook in `public/ui-bridge.js` for reactive component updates.
+*   **Decoupling**: Avoid circular dependencies. Use **Inversion of Control (IoC)** for side effects (e.g., `state-effects.js` should not be imported by state slices; it should subscribe to state changes).
+*   **Complex Actions**: For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.js` or `scheduler-core.js` rather than dispatching raw actions.
 
 ### C. UI & Component Architecture
 *   **Preact (v10):** All new UI logic must be encapsulated in functional components within `public/components/`.
