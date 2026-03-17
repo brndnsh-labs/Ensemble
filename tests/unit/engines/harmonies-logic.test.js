@@ -8,6 +8,7 @@ vi.mock('../../../public/state.js', () => {
         groove: { genreFeel: 'Rock' },
         harmony: { enabled: true, style: 'smart', volume: 0.5, complexity: 0.5, lastMidis: [] },
         soloist: { enabled: false, busySteps: 0, notesInPhrase: 0, isResting: true },
+        bass: { enabled: true },
         arranger: { timeSignature: '4/4' },
         chords: {},
         vizState: {},
@@ -17,8 +18,8 @@ vi.mock('../../../public/state.js', () => {
     };
     return {
         ...mockState,
-        stateMap: mockState,
         getState: () => mockState,
+        subscribe: vi.fn(),
     };
 });
 
@@ -42,6 +43,7 @@ vi.mock('../../../public/chords-engine.js', async (importOriginal) => {
     };
 });
 
+import { getBestInversion } from '../../../public/chords-engine.js';
 import {
     clearHarmonyMemory,
     generateCompingPattern,
@@ -51,11 +53,9 @@ import {
 } from '../../../public/harmonies.js';
 import { getState } from '../../../public/state.js';
 
-const { playback, soloist, harmony, groove } = getState();
-
-import { getBestInversion } from '../../../public/chords-engine.js';
-
 describe('Harmony Engine Logic', () => {
+    let _playback, _soloist, _harmony, _groove, _bass;
+
     const chordC = {
         rootMidi: 60,
         intervals: [0, 4, 7],
@@ -65,15 +65,23 @@ describe('Harmony Engine Logic', () => {
     };
 
     beforeEach(() => {
+        const state = getState();
+        _playback = state.playback;
+        _soloist = state.soloist;
+        _harmony = state.harmony;
+        _groove = state.groove;
+        _bass = state.bass;
+
         vi.clearAllMocks();
         clearHarmonyMemory();
-        groove.genreFeel = 'Funk';
-        harmony.style = 'smart';
-        playback.bandIntensity = 0.5;
-        harmony.complexity = 0.5;
-        soloist.enabled = true;
-        soloist.isResting = true;
-        soloist.notesInPhrase = 0;
+        _groove.genreFeel = 'Funk';
+        _harmony.style = 'smart';
+        _playback.bandIntensity = 0.5;
+        _harmony.complexity = 0.5;
+        _soloist.enabled = true;
+        _bass.enabled = true;
+        _soloist.isResting = true;
+        _soloist.notesInPhrase = 0;
     });
 
     // Helper to check intervals requested from chords.js
@@ -112,9 +120,9 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should use guide tones at low complexity/intensity', () => {
-            playback.bandIntensity = 0.3;
-            harmony.complexity = 0.3;
-            groove.genreFeel = 'Pop'; // Ensure activeStyle resolves to 'strings' for min polyphony 2
+            _playback.bandIntensity = 0.3;
+            _harmony.complexity = 0.3;
+            _groove.genreFeel = 'Pop'; // Ensure activeStyle resolves to 'strings' for min polyphony 2
             const chord = { rootMidi: 60, intervals: [0, 4, 7, 10, 14], sectionId: 's1', beats: 4 };
 
             getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
@@ -128,10 +136,10 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should restrict to safe voicings when soloist is active', () => {
-            playback.bandIntensity = 0.8;
-            soloist.enabled = true;
-            soloist.isResting = false;
-            soloist.notesInPhrase = 5; // Busy
+            _playback.bandIntensity = 0.8;
+            _soloist.enabled = true;
+            _soloist.isResting = false;
+            _soloist.notesInPhrase = 5; // Busy
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
 
@@ -142,7 +150,13 @@ describe('Harmony Engine Logic', () => {
             const requested = getLastRequestedIntervals();
             expect(requested).not.toContain(14); // 9th
             expect(requested).not.toContain(18); // #11
-            expect(requested).toContain(0);
+
+            // In Funk with bass enabled, the root is now removed to preserve space
+            if (_playback.practiceMode || _bass.enabled) {
+                expect(requested).not.toContain(0);
+            } else {
+                expect(requested).toContain(0);
+            }
 
             randomSpy.mockRestore();
         });
@@ -175,10 +189,10 @@ describe('Harmony Engine Logic', () => {
     describe('Dynamic Intensity', () => {
         it('should play more notes at higher intensity for Funk', () => {
             const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionId: 'funk-test', beats: 4 };
-            groove.genreFeel = 'Funk';
+            _groove.genreFeel = 'Funk';
 
             // 1. Low Intensity -> Fewer notes
-            playback.bandIntensity = 0.2;
+            _playback.bandIntensity = 0.2;
             let lowIntNotesCount = 0;
             for (let i = 0; i < 16; i++) {
                 const n = getHarmonyNotes(getState(), chord, null, i, 60, 'smart', i);
@@ -188,7 +202,7 @@ describe('Harmony Engine Logic', () => {
             }
 
             // 2. High Intensity -> More notes
-            playback.bandIntensity = 0.9;
+            _playback.bandIntensity = 0.9;
             let highIntNotesCount = 0;
             for (let i = 0; i < 16; i++) {
                 const n = getHarmonyNotes(getState(), chord, null, i, 60, 'smart', i);
@@ -217,12 +231,12 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should scale density with intensity', () => {
-            playback.bandIntensity = 0.1;
-            harmony.complexity = 0.1;
+            _playback.bandIntensity = 0.1;
+            _harmony.complexity = 0.1;
             const lowNotes = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
 
-            playback.bandIntensity = 1.0;
-            harmony.complexity = 1.0;
+            _playback.bandIntensity = 1.0;
+            _harmony.complexity = 1.0;
             const highNotes = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
 
             expect(highNotes.length).toBeGreaterThanOrEqual(lowNotes.length);
@@ -231,8 +245,8 @@ describe('Harmony Engine Logic', () => {
 
     describe('Soloist Awareness (Integration)', () => {
         it('should play stabs when soloist is resting', () => {
-            soloist.isResting = true;
-            groove.genreFeel = 'Funk';
+            _soloist.isResting = true;
+            _groove.genreFeel = 'Funk';
             let stabFound = false;
             for (let s = 1; s < 16; s++) {
                 const res = getHarmonyNotes(getState(), chordC, null, s, 60, 'smart', s);
@@ -245,9 +259,9 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should use sparse comping when soloist is busy', () => {
-            soloist.isResting = false;
-            soloist.notesInPhrase = 10;
-            playback.bandIntensity = 0.5; // Moderate intensity
+            _soloist.isResting = false;
+            _soloist.notesInPhrase = 10;
+            _playback.bandIntensity = 0.5; // Moderate intensity
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
 
@@ -269,8 +283,8 @@ describe('Harmony Engine Logic', () => {
 
     describe('Genre-Specific Rhythms (Integration)', () => {
         it('should use Jazz rhythms in Jazz genre', () => {
-            groove.genreFeel = 'Jazz';
-            soloist.isResting = true;
+            _groove.genreFeel = 'Jazz';
+            _soloist.isResting = true;
 
             let hitFound = false;
             for (let s = 0; s < 16; s++) {
@@ -307,12 +321,54 @@ describe('Harmony Engine Logic', () => {
         });
     });
 
+    describe('Practice Mode', () => {
+        it('should reserve bass register (stay above 52) when practiceMode is ON', () => {
+            _playback.practiceMode = true;
+            _bass.enabled = false;
+            _groove.genreFeel = 'Rock';
+            _harmony.style = 'smart';
+
+            const chord = { rootMidi: 48, intervals: [0, 4, 7], sectionId: 'p1', beats: 4 }; // Low C
+            const notes = getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+
+            notes.forEach((n) => {
+                expect(n.midi).toBeGreaterThanOrEqual(52);
+            });
+        });
+
+        it('should perform rootless reduction in Funk when practiceMode is ON even if bass is disabled', () => {
+            _playback.practiceMode = true;
+            _bass.enabled = false;
+            _groove.genreFeel = 'Funk';
+
+            const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionId: 'p2', beats: 4 };
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+
+            const requested = getLastRequestedIntervals();
+            expect(requested).not.toContain(0);
+        });
+
+        it('should NOT reserve space when practiceMode is OFF and bass is disabled', () => {
+            _playback.practiceMode = false;
+            _bass.enabled = false;
+            _groove.genreFeel = 'Rock';
+
+            const chord = { rootMidi: 48, intervals: [0, 4, 7], sectionId: 'p3', beats: 4 };
+            // Use anchor of 48 so it stays low
+            const notes = getHarmonyNotes(getState(), chord, null, 0, 48, 'smart', 0);
+
+            // Should be allowed to drop below 52 to fill the gap
+            const hasLowNotes = notes.some((n) => n.midi < 52);
+            expect(hasLowNotes).toBe(true);
+        });
+    });
+
     describe('Soloist Hook Reinforcement', () => {
         it('should reinforce (latch onto) the soloist hook at high intensity in Ska', () => {
-            soloist.enabled = true;
-            soloist.sharedHookBuffer = [{ step: 0 }];
-            groove.genreFeel = 'Ska-Punk';
-            playback.bandIntensity = 0.8;
+            _soloist.enabled = true;
+            _soloist.sharedHookBuffer = [{ step: 0 }];
+            _groove.genreFeel = 'Ska-Punk';
+            _playback.bandIntensity = 0.8;
 
             const chord = {
                 rootMidi: 60,

@@ -34,10 +34,15 @@ export function getGuideTones(intervals) {
 
 /**
  * Filters intervals to remove high extensions (9, 11, 13) to avoid clashing with soloist.
+ * @param {number[]} intervals
+ * @param {boolean} rootless - If true, remove the root (0) from the voicing.
  */
-export function getSafeVoicings(intervals) {
+export function getSafeVoicings(intervals, rootless = false) {
     return intervals.filter((i) => {
         const iMod = i % 12;
+        if (rootless && iMod === 0) {
+            return false;
+        }
         // Allow Root(0), 5th(7), 3rds(3/4), 7ths(10/11), 6ths(9)
         // Exclude b9(1), 9(2), 11(5), #11(6), b13(8) unless they are essentially 3/7
         return [0, 7, 3, 4, 10, 11, 9].includes(iMod);
@@ -193,7 +198,7 @@ export function getHarmonyNotes(
     }
 
     // Destructure state here to avoid ReferenceError during evaluation
-    const { playback, groove, harmony, soloist, arranger } = state;
+    const { playback, groove, harmony, soloist, arranger, bass } = state;
 
     // Internal Style Config
     const STYLE_CONFIG = {
@@ -320,6 +325,9 @@ export function getHarmonyNotes(
     }
 
     // -- COORDINATION: Thin out if others are busy --
+    const reserveBassSpace = playback.practiceMode || bass?.enabled || false;
+    const isCompingGenre = ['Jazz', 'Funk', 'Neo-Soul', 'Blues'].includes(feel);
+
     if (isSoloistBusy || accompanimentHit) {
         // Back off entirely if soloist is actively playing notes
         if (isSoloistBusy && (soloist.notesInPhrase > 1 || playback.bandIntensity < 0.8)) {
@@ -330,14 +338,15 @@ export function getHarmonyNotes(
             }
         }
 
-        intervals = getSafeVoicings(intervals);
+        intervals = getSafeVoicings(intervals, reserveBassSpace && isCompingGenre);
         // Thin out if very busy
         if (soloist.notesInPhrase > 3 || accompanimentHit || harmony.complexity < 0.4) {
             const guides = getGuideTones(intervals);
             if (guides.length > 0) {
-                intervals = [0, ...guides];
+                const root = reserveBassSpace && isCompingGenre ? [] : [0];
+                intervals = [...root, ...guides];
             } else {
-                intervals = [0, 7];
+                intervals = reserveBassSpace && isCompingGenre ? [7] : [0, 7];
             }
         }
 
@@ -563,7 +572,11 @@ export function getHarmonyNotes(
     const _avgChordMidi = coordination.avgChordMidi || 60;
 
     // Increased minimums to avoid bass mud (MIDI 57 = A3, MIDI 53 = F3)
-    let rangeMin = activeStyle === 'organ' ? 57 : 53;
+    // If space is NOT reserved, allow it to drop to 43 (G2) to fill the gap.
+    let rangeMin = reserveBassSpace ? (activeStyle === 'organ' ? 57 : 53) : 43;
+    if (reserveBassSpace) {
+        rangeMin = Math.max(rangeMin, 52); // Never drop below E3 in practice mode
+    }
     let rangeMax = 79;
 
     // Spectral Hole Filling: target the gap between chords and soloist
@@ -605,7 +618,14 @@ export function getHarmonyNotes(
         let finalMidi = midi + styleOffset;
 
         // Safety Filter: Hard cut below G3 (55) for most styles to prevent muddy collisions with bass
-        if (finalMidi < 55 && activeStyle !== 'counter' && activeStyle !== 'plucks') {
+        // If in practice mode, ensure we stay above E3 (52) even for plucks/counter
+        // If space is NOT reserved, allow it to drop to G2 (43) to fill the gap.
+        const safetyFloor = reserveBassSpace
+            ? 52
+            : activeStyle !== 'counter' && activeStyle !== 'plucks'
+              ? 43
+              : 0;
+        if (finalMidi < safetyFloor) {
             continue;
         }
 
