@@ -11,6 +11,7 @@ vi.mock('../../public/chords-engine.js', () => ({
     validateProgression: vi.fn((_s, _d, cb) => cb?.()),
     transformRelativeProgression: vi.fn(),
 }));
+
 vi.mock('../../public/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
