@@ -100,7 +100,7 @@ export function midiToNote(midi) {
 /**
  * Converts a frequency in Hertz to a MIDI note number.
  * @param {number} freq - The frequency in Hz.
- * @returns {number} The MIDI note number.
+ * @returns {number | null} The MIDI note number.
  */
 export function getMidi(freq) {
     if (!freq || freq <= 0 || !Number.isFinite(freq)) {
@@ -120,7 +120,7 @@ export function generateId() {
  * Calculates MIDI notes for specific scale degrees (Full 10-note scale)
  * based on a given chord object.
  *
- * @param {Object} chordObj - The chord object containing rootMidi and quality.
+ * @param {{ rootMidi: number, quality?: string }} chordObj - The chord object containing rootMidi and quality.
  * @param {number} baseOctave - The default octave to use (default: 4 for Soloist).
  * @returns {number[]} Array of 10 MIDI note numbers.
  *                     [0-4]: Odd degrees (1, 3, 5, 7, 9)
@@ -168,22 +168,26 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
 
 /**
  * Compresses the sections array into a Base64 string, handling Unicode.
- * @param {Array} sections
+ * @param {Array<import('./state/arranger.js').Section>} sections
  * @returns {string}
  */
 export function compressSections(sections) {
     const minified = sections.map((s) => {
         const m = { l: s.label, v: s.value };
         if (s.key) {
+            // @ts-expect-error
             m.k = s.key;
         }
         if (s.repeat && s.repeat > 1) {
+            // @ts-expect-error
             m.r = s.repeat;
         }
         if (s.timeSignature) {
+            // @ts-expect-error
             m.t = s.timeSignature;
         }
         if (s.seamless) {
+            // @ts-expect-error
             m.s = 1;
         }
         return m;
@@ -197,7 +201,7 @@ export function compressSections(sections) {
 /**
  * Decompresses the Base64 string back into sections, handling Unicode.
  * @param {string} str
- * @returns {Array}
+ * @returns {Array<import('./state/arranger.js').Section>}
  */
 export function decompressSections(str) {
     try {
@@ -210,7 +214,7 @@ export function decompressSections(str) {
         }
 
         const binString = atob(str);
-        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
         const json = new TextDecoder().decode(bytes);
         const minified = JSON.parse(json);
 
@@ -287,7 +291,7 @@ export function getStepsPerMeasure(ts) {
  *
  * @param {Array<{start: number, end: number}>} mapArray - A sorted array of range objects.
  * @param {number} step - The global step to find.
- * @returns {object|null} The matching element, or null if not found.
+ * @returns {number} The index of the matching element, or -1 if not found.
  */
 export function binarySearchMapIndex(mapArray, step) {
     if (!mapArray || mapArray.length === 0) {
@@ -310,6 +314,12 @@ export function binarySearchMapIndex(mapArray, step) {
     return -1;
 }
 
+/**
+ * @template T
+ * @param {Array<T & {start: number, end: number}>} mapArray
+ * @param {number} step
+ * @returns {T | null}
+ */
 export function binarySearchMap(mapArray, step) {
     const index = binarySearchMapIndex(mapArray, step);
     return index !== -1 ? mapArray[index] : null;
@@ -318,17 +328,17 @@ export function binarySearchMap(mapArray, step) {
 /**
  * Returns detailed structural information about a specific step in a measure.
  * @param {number} step - The global step counter.
- * @param {Object} tsConfig - The global time signature configuration (fallback).
- * @param {Array} [measureMap] - Optional map of measure boundaries for variable time signatures.
- * @param {Object} [allTSConfigs] - Map of all available time signature configurations.
- * @returns {Object} { isMeasureStart, isGroupStart, isBeatStart, groupIndex, beatInGroup, tsName }
+ * @param {string | { tsName?: string, beats: number, stepsPerBeat: number, grouping?: number[], backbeat?: number[], isCompound?: boolean }} tsConfig - The global time signature configuration (fallback).
+ * @param {Array<{start: number, end: number, ts: string}>} [measureMap] - Optional map of measure boundaries for variable time signatures.
+ * @param {Record<string, { tsName?: string, beats: number, stepsPerBeat: number, grouping?: number[], backbeat?: number[], isCompound?: boolean }>} [allTSConfigs] - Map of all available time signature configurations.
+ * @returns {import('./types.js').StepInfo}
  */
 export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
-    let currentTS = tsConfig;
+    let currentTS = typeof tsConfig === 'object' ? tsConfig : null;
     const allTS = allTSConfigs || {};
 
-    if (typeof currentTS === 'string') {
-        currentTS = allTS[currentTS] || allTS['4/4'];
+    if (typeof tsConfig === 'string') {
+        currentTS = allTS[tsConfig] || allTS['4/4'];
     } else if (currentTS && !currentTS.beats && currentTS.tsName) {
         // Handle case where it's an object with only tsName
         currentTS = allTS[currentTS.tsName] || allTS['4/4'];
@@ -359,7 +369,11 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
 
         if (measure) {
             tsName = measure.ts || tsName;
-            currentTS = allTSConfigs?.[tsName] ? allTSConfigs[tsName] : tsConfig;
+            currentTS = allTSConfigs?.[tsName]
+                ? allTSConfigs[tsName]
+                : typeof tsConfig === 'object'
+                  ? tsConfig
+                  : currentTS;
             if (!currentTS) {
                 currentTS = allTSConfigs?.['4/4']
                     ? allTSConfigs['4/4']
@@ -499,6 +513,7 @@ export function formatUnicodeSymbols(str) {
     return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
 }
 
+/** @type {Float32Array | null} */
 let cachedSoftClipCurve = null;
 
 /**
@@ -535,7 +550,7 @@ export function clampFreq(freq, max = 24000) {
 /**
  * Calculates a unified timing offset for an instrument based on the global pocket state.
  * @param {string} instrument - 'drums', 'bass', 'chords', or 'soloist'.
- * @param {Object} pocket - The global pocket state.
+ * @param {import('./state/groove.js').GrooveState['pocket']} pocket - The global pocket state.
  * @param {number} intensity - Current band intensity.
  * @returns {number} Offset in seconds.
  */
