@@ -4,35 +4,16 @@
 
 /**
  * @typedef {Object} EnsembleState
- * @property {Object} arranger - Chord progression and arrangement state.
- * @property {Array} arranger.progression - Array of chord entries.
- * @property {number} arranger.totalSteps - Total steps in the arrangement.
- * @property {Array} arranger.stepMap - Flat map of chord entries per step range.
- * @property {Array} arranger.sectionMap - Map of sections (Intro, Verse, etc.).
- * @property {string} arranger.key - Global key root.
- * @property {boolean} arranger.isMinor - True if the global key is minor.
- *
- * @property {Object} playback - Real-time transport and intensity state.
- * @property {boolean} playback.isPlaying - Current transport status.
- * @property {number} playback.bpm - Current tempo.
- * @property {number} playback.bandIntensity - Global 0.0-1.0 intensity value.
- * @property {number} playback.step - The current playback step (updated by scheduler).
- *
- * @property {Object} groove - Rhythmic engine state.
- * @property {string} groove.genreFeel - Selected musical style (e.g., 'Jazz', 'Funk').
- * @property {number} groove.swing - Swing percentage (0-100).
- * @property {Array} groove.instruments - List of drum instruments and their patterns.
- *
- * @property {Object} bass - Bass engine state.
- * @property {string} bass.style - Selected bass technique (e.g., 'Walking', 'Slap').
- * @property {number} bass.octave - Center MIDI octave.
- *
- * @property {Object} soloist - Melodic soloist state.
- * @property {string} soloist.style - Melodic style (e.g., 'Bird', 'Bebop').
- * @property {number} soloist.busySteps - Local phrasing counter for rests.
- *
- * @property {Object} harmony - Background harmony state.
- * @property {string} harmony.style - Harmony style (e.g., 'Stabs', 'Pads').
+ * @property {import('./state/arranger.js').ArrangerState} arranger - Chord progression and arrangement state.
+ * @property {import('./state/playback.js').GlobalContext} playback - Real-time transport and intensity state.
+ * @property {import('./state/groove.js').GrooveState} groove - Rhythmic engine state.
+ * @property {import('./state/instruments.js').BassState} bass - Bass engine state.
+ * @property {import('./state/instruments.js').SoloistState} soloist - Melodic soloist state.
+ * @property {import('./state/instruments.js').HarmonyState} harmony - Background harmony state.
+ * @property {import('./state/instruments.js').ChordState} chords - Accompaniment chords state.
+ * @property {import('./state/conductor.js').ConductorState} conductor - Macro-arc and intensity drift state.
+ * @property {import('./state/visualizer.js').VisualizerState} vizState - Visualizer rendering state.
+ * @property {import('./state/midi.js').MidiState} midi - WebMIDI routing and local muting state.
  */
 
 /**

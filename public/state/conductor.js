@@ -3,6 +3,7 @@ import { ACTIONS } from '../types.js';
 /**
  * @typedef {Object} ConductorState
  * @property {number} targetIntensity - Target intensity level for auto-intensity drift.
+ * @property {number} stepSize - Internal step size for auto-intensity.
  * @property {number} larsBpmOffset - Current BPM offset applied by Lars Mode tempo drift.
  * @property {Object|null} form - Structural analysis of the song arrangement.
  * @property {number} loopCount - Number of times the current section has looped.

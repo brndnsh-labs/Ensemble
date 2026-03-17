@@ -28,6 +28,7 @@ import { ACTIONS } from '../types.js';
  * @property {Array<string>} history - Undo history stack (JSON strings).
  * @property {string} lastInteractedSectionId - ID of the last edited section.
  * @property {string} lastChordPreset - Name of the last loaded chord preset.
+ * @property {string|null} mutatedSectionId - ID of a section that was programmatically mutated.
  * @property {boolean} isDirty - Whether the arrangement has been manually modified.
  * @property {Array<number>|null} grouping - Custom rhythmic grouping array (e.g. [3, 2]).
  */

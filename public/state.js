@@ -39,7 +39,7 @@ export const stateMap = {
  * Unified getter for global state.
  * Use this instead of importing individual state slices to ensure
  * easier refactoring and better type safety in the future.
- * @returns {typeof stateMap}
+ * @returns {import('./types.js').EnsembleState}
  */
 export function getState() {
     return stateMap;

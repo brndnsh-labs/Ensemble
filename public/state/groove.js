@@ -34,6 +34,14 @@ import { ACTIONS } from '../types.js';
  * @property {number} fillLength - Length of the current fill in steps.
  * @property {number} snareMask - 16-bit mask of the current snare pattern.
  * @property {boolean} pendingCrash - Whether a crash cymbal is queued for the next downbeat.
+ * @property {boolean} creativity - Whether generative fills/variations are enabled.
+ * @property {Object} sectionSeedMap - Random seeds for each song section.
+ * @property {number} gridVersion - Counter for grid UI updates.
+ * @property {Object} pocket - Unified rhythmic pocket configuration.
+ * @property {string} lastSmartGenre - Last selected smart genre.
+ * @property {string|null} pendingGenreFeel - Genre queued for the next measure.
+ * @property {number|null} genreSwitchCountdown - Beats until genre switch.
+ * @property {Map} buffer - Map of scheduled drum events.
  */
 export const groove = {
     enabled: true,

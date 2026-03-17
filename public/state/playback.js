@@ -52,6 +52,20 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} workerLogging - Whether to log messages from the audio worker.
  * @property {number|null} suspendTimeout - ID of the timeout for audio context suspension.
  * @property {number} conductorVelocity - Dynamic velocity modifier (0.0-1.0) applied by Conductor.
+ * @property {number} lyricalBias - Bias towards lyrical phrasing in soloist (0.0-1.0).
+ * @property {number} masterVolume - Master output volume.
+ * @property {boolean} countIn - Whether the metronome count-in is enabled.
+ * @property {boolean} visualFlash - Whether visual flashing is enabled.
+ * @property {boolean} haptic - Whether haptic feedback is enabled.
+ * @property {Array<Object>} toasts - List of active toast notifications.
+ * @property {number} flashIntensity - Current intensity of the screen flash effect.
+ * @property {boolean} updateAvailable - Whether a PWA update is pending.
+ * @property {boolean} resolutionTriggered - Whether the resolution ending sequence has been triggered.
+ * @property {boolean} isScheduling - Whether the scheduler is currently active.
+ * @property {number} stateVersion - Counter used to force UI re-renders.
+ * @property {Object} modals - Visibility state for various UI modals.
+ * @property {number} loopLimit - Number of loops before stopping (0 = infinite).
+ * @property {number} currentLoopCount - Current loop iteration counter.
  */
 export const playback = {
     audio: null,
