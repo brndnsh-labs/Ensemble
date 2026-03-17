@@ -13,6 +13,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
+| `public/worker-client.js` | Main-thread orchestrator for worker messaging. | `workerClient` |
 
 ## State Management (Domain Slices)
 
@@ -24,18 +25,32 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
+| `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
+| `public/state-hydration.js` | Initial state loading and validation logic. | `hydrateState` |
 
 ## Generative Engines (Worker Thread)
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/soloist.js` | Melodic soloist generation logic. | `getSoloistNote`, `soloistState` |
-| `public/bass.js` | Bass line generation (Walking, Funk). | `getBassNote`, `hiphop`, `acoustic`, `dub`, `blues`, `metal` |
+| `public/soloist.js` | Melodic soloist generation logic (Main). | `getSoloistNote` |
+| `public/bass-engine.js` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
 | `public/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
+| `public/chords-engine.js` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
 | `public/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
+| `public/conductor.js` | Global intensity and coordination logic. | `conductor` |
 
-## Engine Core (Shared)
+## Engine Styles (Genre Logic)
+
+| Path | Responsibility | Key Patterns |
+| :--- | :--- | :--- |
+| `public/bass-styles.js` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
+| `public/chords-styles.js` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
+| `public/soloist-config.js` | Style definitions and influence pools. | `STYLE_CONFIG` |
+| `public/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
+| `public/engine/grooves/` | Directory of 15+ genre-specific drum strategies. | `jazz.js`, `rock.js`, `funk.js`, etc. |
+
+## Engine Core (Internal)
 
 | Path | Responsibility | Key Exports |
 | :--- | :--- | :--- |
@@ -44,10 +59,24 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/synth-utils.js` | Shared WebAudio boilerplate (ramping, voices). | `rampGain`, `killActiveVoices` |
 | `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/groove-engine.js` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
-| `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
+| `public/engine/soloist-pitch-engine.js` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
+| `public/engine/soloist-rhythm-engine.js` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
 | `public/engine/worker-utils.js` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
+| `public/engine/audio-recovery.js` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
+| `public/engine/midi-utils.js` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
+| `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 
-## Data Modules (static)
+## Synthesis Engine (WebAudio)
+
+| Path | Responsibility |
+| :--- | :--- |
+| `public/engine/synth-bass.js` | Sub-bass and Growl synthesis. |
+| `public/engine/synth-chords.js` | Polyphonic piano/pad synthesis. |
+| `public/engine/synth-drums.js` | Procedural percussion synthesis. |
+| `public/engine/synth-harmonies.js` | Background "Stab" and "Pad" synthesis. |
+| `public/engine/synth-soloist.js` | Lead instrument synthesis and glides. |
+
+## Data & Configuration
 
 | Path | Responsibility | Key Data |
 | :--- | :--- | :--- |
@@ -55,38 +84,64 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/data/smart-genres.js` | High-level genre configurations. | `SMART_GENRES` |
 | `public/data/chord-presets.js` | Library chord progressions. | `CHORD_PRESETS` |
 | `public/data/song-templates.js` | Full song structure templates. | `SONG_TEMPLATES` |
-| `public/data/instrument-styles.js` | Engine-specific style definitions. | `CHORD_STYLES`, `BASS_STYLES`, etc. |
-| `public/data/shortcut-config.js` | Centralized keyboard shortcut definitions. | `SHORTCUT_CONFIG` |
+| `public/data/instrument-styles.js` | UI menu definitions for instruments. | `CHORD_STYLES`, `BASS_STYLES` |
+| `public/data/shortcut-config.js` | Centralized keyboard shortcuts. | `SHORTCUT_CONFIG` |
 
 ## UI Components (Preact)
 
+| Category | Path | Responsibility |
+| :--- | :--- | :--- |
+| **Containers** | `public/App.jsx` | Root layout and theme provider. |
+| **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
+| **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
+| **Logic Views** | `public/components/Arranger.jsx` | Chord progression manager. |
+| **Controls** | `public/components/Transport.jsx` | Playback controls and tempo. |
+| **Visuals** | `public/components/Visualizer.jsx` | Canvas rendering container. |
+| **Grid** | `public/components/SequencerGrid.jsx` | Interactive drum editor. |
+| **Panels** | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
+| **Others** | `public/components/` | Functional modals and settings panels. |
+
+## High-Level Controllers & Integration
+
 | Path | Responsibility |
 | :--- | :--- |
-| `public/App.jsx` | Root layout and theme provider. |
-| `public/components/UIControls.jsx` | Reusable UI toolkit (SettingRow, Toggle, etc.). |
-| `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
-| `public/components/ManualModal.jsx` | Self-building documentation viewer. |
-| `public/components/Arranger.jsx` | Chord progression and section manager. |
-| `public/components/Transport.jsx` | Playback controls and tempo. |
-| `public/components/Visualizer.jsx` | Canvas rendering and animation loop. |
-| `public/components/SequencerGrid.jsx` | Interactive drum pattern editor. |
-| `public/components/GroovePanel.jsx` | Genre and vibe selection. |
+| `public/arranger-controller.js` | High-level song structure manipulation. |
+| `public/instrument-controller.js` | Per-instrument state and preset routing. |
+| `public/performance-controller.js` | Real-time keyboard performance logic. |
+| `public/midi-controller.js` | WebMIDI bridging and DAW sync. |
+| `public/midi-export.js` | Main-thread MIDI file triggers. |
+| `public/song-generator.js` | Algorithmic song structure generation. |
+| `public/melody-harmonizer.js` | Monophonic analysis for chord generation. |
+| `public/persistence.js` | LocalStorage session saving. |
+| `public/platform.js` | Browser hacks (WakeLock, Audio Unlock). |
+| `public/sharing.js` | URL-based song sharing. |
+| `public/utils.js` | General-purpose musical and math utilities. |
+| `public/theory-scales.js` | Scale degrees and mode definitions. |
+| `public/resolution.js` | Harmonic resolution and transition logic. |
+| `public/visualizer-engine.js` | High-performance Canvas rendering logic. |
+| `public/visualizer-proxy.js` | Main-thread bridge to visualizer worker. |
 
-## Testing
+## Infrastructure & Lifecycle (Internal)
 
 | Path | Responsibility |
 | :--- | :--- |
-| `tests/unit/` | Low-level logic verification. |
-| `tests/standards/` | **Expert Critiques** (Authenticity Audit) and security ledgers. |
-| `tests/integration/` | Cross-module behavioral tests. |
-| `tests/e2e/` | Visual regression and UI flow tests. |
+| `public/ui-root.jsx` | Preact application entry point and hydration. |
+| `public/ui.js` | Lazy Proxy-based DOM access layer. |
+| `public/worker-types.js` | Shared message type definitions for workers. |
+| `public/config.js` | Global timing and musical constants. |
+| `public/constants.js` | Global visual and UI state constants. |
+| `public/history.js` | Session history and undo/redo logic. |
+| `public/visualizer-utils.js` | Shared canvas math and drawing utilities. |
+| `public/audio-analyzer-lite.js` | Real-time waveform and frequency detection. |
 
-## Documentation & Standards
+## Documentation, Parsing & Testing
 
-| File | Purpose |
+| Path | Responsibility |
 | :--- | :--- |
-| `GEMINI.md` | Primary Project Context (The "What"). |
-| `AI.md` | Operational Protocols (The "How"). |
-| `AI_MAP.md` | Codebase Navigation (The "Where"). |
-| `docs/guides/` | Domain-specific guides (Coordination, Tuning). |
-| `docs/archive/` | Historical reports and completed plans. |
+| `public/MANUAL.md` | User-facing guide with auto-generated tables. |
+| `public/musicxml-parser.js` | Symbolic format importer. |
+| `public/tab-parser.js` | Text-based chord/tab importer. |
+| `public/form-analysis.js` | Song section and structure detection. |
+| `tests/` | Unit, Integration, and E2E test suites. |
+| `GEMINI.md` / `AI.md` | Primary architectural and operational guides. |
+| `AI_MAP.md` | Codebase navigation (this file). |

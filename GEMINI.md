@@ -13,10 +13,9 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 *   **Domain Controllers**: Specialized logic resides in `app-controller.js`, `instrument-controller.js`, `arranger-controller.js`, and `midi-controller.js`.
 *   `types.js`: Centralized `ACTIONS` constants for the state dispatch system.
 *   **Engine Architecture**:
-    *   `soloist.js`: Core engine for melodic generation using a simplified ACTIVE/RESTING phrasing model.
-    *   `soloist-config.js`: Centralized style definitions (`STYLE_CONFIG`) and emphasis maps.
-    *   `soloist-devices.js`: Procedural embellishment algorithms (Runs, Enclosures, Licks).
-    *   `bass.js` / `accompaniment.js`: Specialized engines for groove and comping.
+    *   `soloist.js`: Main entry for melodic generation. Delegates to `soloist-pitch-engine.js` and `soloist-rhythm-engine.js` for phasing and pitch selection.
+    *   `bass-engine.js` / `accompaniment.js`: Orchestrators for rhythm section generation.
+    *   `*-styles.js`: Dedicated modules (`bass-styles.js`, `chords-styles.js`) housing genre-specific algorithms and rhythmic patterns.
     *   `logic-worker.js`: Background thread orchestrator for all real-time generative logic.
 *   **State Access**: Read state through the `useEnsembleState` hook in components, or the exported state objects in engine code. **NEVER** modify state objects directly in components. Use `dispatch(ACTIONS.ACTION_TYPE, payload)` from `state.js` using constants from `types.js` to trigger updates.
 *   **Precision Timing**: Use `playback.audio.currentTime` for all audio scheduling. Visual events should be pushed to `playback.drawQueue` for synchronization in `requestAnimationFrame` loop.
