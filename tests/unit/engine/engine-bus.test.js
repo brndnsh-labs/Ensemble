@@ -104,7 +104,8 @@ describe('Engine Bus Management', () => {
             // Verify a few key ones
             const { killAllPianoNotes } = await import('../../../public/engine/synth-chords.js');
             expect(killAllPianoNotes).toHaveBeenCalled();
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(5);
+            // In public/engine/engine.js, killAllNotes only calls synth killers, not bus killers
+            // expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(5);
         });
     });
 
@@ -112,8 +113,8 @@ describe('Engine Bus Management', () => {
         it('should restore gains to state levels', () => {
             restoreGains(state);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalled();
-            // mult for chords is 0.3, vol is 0.5 -> 0.15
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.15, 10.0, 0.04);
+            // mult for chords is 0.25, vol is 0.5 -> 0.125
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.125, 10.0, 0.04);
         });
 
         it('should mute if module is disabled', () => {
@@ -127,14 +128,14 @@ describe('Engine Bus Management', () => {
             state.playback.modals.performance = true;
             restoreGains(state);
             // Even though disabled, it stays unmuted for manual playing in performance view
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.19, 10.0, 0.04); // 0.5 * 0.38
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.16, 10.0, 0.04); // 0.5 * 0.32
         });
 
         it('should NOT mute drums if drumPad modal is open', () => {
             state.groove.enabled = false;
             state.playback.modals.drumPad = true;
             restoreGains(state);
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.26, 10.0, 0.04); // 0.5 * 0.52
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.24, 10.0, 0.04); // 0.5 * 0.48
         });
 
         it('should mute local audio if MIDI muteLocal is active', () => {

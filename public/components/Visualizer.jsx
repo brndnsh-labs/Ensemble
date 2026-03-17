@@ -135,7 +135,7 @@ export function Visualizer({ enabled }) {
 
     // Handle render loop (Data Forwarding Only)
     useEffect(() => {
-        if (!vizRef.current || !enabled) {
+        if (!vizRef.current) {
             return;
         }
 
@@ -172,7 +172,9 @@ export function Visualizer({ enabled }) {
             // Sync clock periodically or every frame for high precision
             // Apply visual offset to worker clock as well for perfect sync
             const now = getVisualTime(stateMap);
-            vizRef.current.syncClock(now, performance.now());
+            if (enabled) {
+                vizRef.current.syncClock(now, performance.now());
+            }
 
             if (!playback.isPlaying && playback.drawQueue.length === 0) {
                 playback.isDrawing = false; // @direct-mutation
@@ -180,7 +182,7 @@ export function Visualizer({ enabled }) {
                     chords.lastActiveChordIndex = null; // @direct-mutation
                     dispatch('VIS_RESET');
                 }
-                if (vizRef.current) {
+                if (enabled) {
                     vizRef.current.clear();
                 }
                 loopRef.current = requestAnimationFrame(loop);
@@ -212,38 +214,38 @@ export function Visualizer({ enabled }) {
                         chords.lastActiveChordIndex = ev.index; // @direct-mutation
                         dispatch('VIS_UPDATE', { type: 'chord', index: ev.index });
                     }
-                    if (vizRef.current && enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing) {
                         ev.notes = ev.chordNotes;
                         vizRef.current.pushChord(ev);
                     }
                 } else if (ev.type === 'bass_vis') {
-                    if (vizRef.current && enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing) {
                         ev.noteName = ev.name;
                         vizRef.current.pushNote('bass', ev);
                     }
                 } else if (ev.type === 'soloist_vis') {
-                    if (vizRef.current && enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing) {
                         vizRef.current.truncateNotes('soloist', ev.time);
                         ev.noteName = ev.name;
                         vizRef.current.pushNote('soloist', ev);
                     }
                 } else if (ev.type === 'harmony_vis') {
-                    if (vizRef.current && enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing) {
                         ev.noteName = ev.name;
                         vizRef.current.pushNote('harmony', ev);
                     }
                 } else if (ev.type === 'drums_vis') {
-                    if (vizRef.current && enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing) {
                         vizRef.current.pushNote('drums', ev);
                     }
                 } else if (ev.type === 'fill_active') {
-                    if (vizRef.current && enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing) {
                         vizRef.current.worker.postMessage({ type: 'SET_FILL', active: ev.active });
                     }
                 }
             }
 
-            if (vizRef.current && enabled && playback.isDrawing) {
+            if (enabled && playback.isDrawing) {
                 vizRef.current.setRegister('bass', bass.octave);
                 vizRef.current.setRegister('soloist', soloist.octave);
                 vizRef.current.setRegister('chords', chords.octave);
@@ -255,7 +257,7 @@ export function Visualizer({ enabled }) {
 
         if (isPlaying) {
             stateMap.playback.isDrawing = true; // @direct-mutation
-            if (vizRef.current) {
+            if (enabled) {
                 const { playback, arranger } = stateMap;
                 const secondsPerBeat = 60.0 / playback.bpm;
                 const sixteenth = 0.25 * secondsPerBeat;
@@ -275,7 +277,7 @@ export function Visualizer({ enabled }) {
                 loopRef.current = null;
             }
         };
-    }, [enabled, isPlaying]);
+    }, [isPlaying, enabled]);
 
     // Cleanup and visual clear on disable or stop
     useEffect(() => {

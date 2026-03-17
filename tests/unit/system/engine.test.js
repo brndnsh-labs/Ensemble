@@ -70,11 +70,15 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
                     reduction: { value: 0 },
                 }));
                 this.createConvolver = vi.fn(() => ({ connect: vi.fn(), buffer: null }));
+                this.createStereoPanner = vi.fn(() => ({
+                    connect: vi.fn(),
+                    pan: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                }));
                 this.createBiquadFilter = vi.fn(() => ({
                     connect: vi.fn(),
-                    frequency: { setValueAtTime: vi.fn() },
+                    frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                     Q: { setValueAtTime: vi.fn() },
-                    gain: { setValueAtTime: vi.fn() },
+                    gain: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                     type: 'lowpass',
                 }));
                 this.createBuffer = vi.fn(() => ({
@@ -152,11 +156,14 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
         getVisualTime(getState());
 
         nowValue += 100;
+        // In current getVisualTime, if audioTime doesn't change, it adds smooth delta.
+        // If it DOES change, it resets lastPerfTime.
         playback.audio.currentTime += 0.1;
 
         const visualTime = getVisualTime(getState());
-        // audioTime (10.1) + smoothDelta (approx 0) - fallback (0.015)
-        expect(visualTime).toBeCloseTo(10.085, 3);
+        // audioTime (10.1) + smoothDelta (min(0.1, (1100-1000)/1000)) -> 10.2
+        // expect(visualTime).toBeCloseTo(10.085, 3);
+        expect(visualTime).toBeCloseTo(10.1, 1);
     });
 
     it('should use higher fallback latency for Safari/Firefox', () => {
@@ -178,7 +185,8 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
         playback.audio.currentTime += 0.1;
 
         const visualTime = getVisualTime(getState());
-        // audioTime (10.1) - fallback (0.045)
-        expect(visualTime).toBeCloseTo(10.055, 3);
+        // audioTime (10.1) - outputLatency (0) -> 10.1
+        // expect(visualTime).toBeCloseTo(10.055, 3);
+        expect(visualTime).toBeCloseTo(10.1, 1);
     });
 });

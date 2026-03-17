@@ -96,7 +96,11 @@ describe('Audio Engine Snapshot Regression', () => {
                 connect: () => {},
                 frequency: { setValueAtTime: () => {}, setTargetAtTime: () => {} },
                 Q: { setValueAtTime: () => {} },
-                gain: { setValueAtTime: () => {} },
+                gain: { setValueAtTime: () => {}, setTargetAtTime: () => {} },
+            }),
+            createStereoPanner: () => ({
+                connect: () => {},
+                pan: { setValueAtTime: () => {}, setTargetAtTime: () => {} },
             }),
             createBufferSource: () => ({
                 buffer: null,
