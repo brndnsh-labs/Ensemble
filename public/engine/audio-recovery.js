@@ -1,5 +1,3 @@
-import { getState, stateMap } from '../state.js';
-
 /**
  * AudioRecovery.js
  *
@@ -20,11 +18,14 @@ class AudioHealthMonitor {
         this.onRecover = null;
     }
 
-    start() {
+    start(getPlaybackState) {
         if (this.intervalId) {
             return;
         }
-        this.intervalId = setInterval(() => this.healthCheck(), this.checkInterval);
+        this.intervalId = setInterval(
+            () => this.healthCheck(getPlaybackState()),
+            this.checkInterval,
+        );
         console.log('[AudioWatchdog] Monitoring started.');
     }
 
@@ -35,8 +36,7 @@ class AudioHealthMonitor {
         }
     }
 
-    attachToMaster(masterNode) {
-        const { playback } = getState();
+    attachToMaster(masterNode, playback) {
         if (!playback.audio) {
             return;
         }
@@ -59,8 +59,7 @@ class AudioHealthMonitor {
         }
     }
 
-    async healthCheck() {
-        const { playback } = getState();
+    async healthCheck(playback) {
         if (!playback.audio) {
             return;
         }
@@ -84,7 +83,7 @@ class AudioHealthMonitor {
 
         if (state === 'closed' && isPlaying) {
             console.error('[AudioWatchdog] Context is CLOSED. Fatal error.');
-            this.triggerFullRestart();
+            this.triggerFullRestart(playback);
             return;
         }
 
@@ -106,13 +105,12 @@ class AudioHealthMonitor {
                 console.error(
                     '[AudioWatchdog] DSP CORRUPTION DETECTED (NaN/Infinity). Static detected.',
                 );
-                this.triggerDSPReset();
+                this.triggerDSPReset(playback);
             }
         }
     }
 
-    async triggerDSPReset() {
-        const { playback } = getState();
+    async triggerDSPReset(playback) {
         this.isRecovering = true;
         this.crashCount++;
 
@@ -130,7 +128,7 @@ class AudioHealthMonitor {
 
         if (this.onRecover) {
             try {
-                await this.onRecover(playback, stateMap);
+                await this.onRecover(playback);
             } catch (e) {
                 console.error('[AudioWatchdog] DSP Reset Callback Failed', e);
             }
@@ -140,9 +138,9 @@ class AudioHealthMonitor {
         console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
     }
 
-    triggerFullRestart() {
+    triggerFullRestart(playback) {
         // Full page reload might be too aggressive, let's try to re-init first
-        this.triggerDSPReset();
+        this.triggerDSPReset(playback);
     }
 }
 

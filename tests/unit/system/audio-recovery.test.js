@@ -111,12 +111,12 @@ describe('Audio Recovery & Platform Integrity', () => {
     // --- Watchdog Tests ---
     describe('AudioWatchdog', () => {
         it('should start and stop monitoring intervals', () => {
-            audioWatchdog.start();
+            audioWatchdog.start(() => playback);
             expect(audioWatchdog.intervalId).not.toBeNull();
 
             // Should not create multiple intervals
             const firstId = audioWatchdog.intervalId;
-            audioWatchdog.start();
+            audioWatchdog.start(() => playback);
             expect(audioWatchdog.intervalId).toBe(firstId);
 
             audioWatchdog.stop();
@@ -124,7 +124,7 @@ describe('Audio Recovery & Platform Integrity', () => {
         });
 
         it('should attach an analyser to the master node', () => {
-            audioWatchdog.attachToMaster(mockMasterGain);
+            audioWatchdog.attachToMaster(mockMasterGain, playback);
 
             expect(mockAudioContext.createAnalyser).toHaveBeenCalled();
             expect(mockMasterGain.connect).toHaveBeenCalledWith(mockAnalyser);
@@ -135,7 +135,7 @@ describe('Audio Recovery & Platform Integrity', () => {
         it('should attempt to resume a suspended context', async () => {
             mockAudioContext.state = 'suspended';
 
-            await audioWatchdog.healthCheck();
+            await audioWatchdog.healthCheck(playback);
 
             expect(mockAudioContext.resume).toHaveBeenCalled();
         });
@@ -144,13 +144,13 @@ describe('Audio Recovery & Platform Integrity', () => {
             mockAudioContext.state = 'suspended';
             playback.isPlaying = false;
 
-            await audioWatchdog.healthCheck();
+            await audioWatchdog.healthCheck(playback);
 
             expect(mockAudioContext.resume).not.toHaveBeenCalled();
         });
 
         it('should trigger DSP reset if NaN is detected in audio buffer', async () => {
-            audioWatchdog.attachToMaster(mockMasterGain);
+            audioWatchdog.attachToMaster(mockMasterGain, playback);
 
             // Corrupt the buffer mock
             mockAnalyser.getFloatTimeDomainData.mockImplementationOnce((buf) => {
@@ -159,7 +159,7 @@ describe('Audio Recovery & Platform Integrity', () => {
 
             const triggerSpy = vi.spyOn(audioWatchdog, 'triggerDSPReset');
 
-            await audioWatchdog.healthCheck();
+            await audioWatchdog.healthCheck(playback);
 
             expect(triggerSpy).toHaveBeenCalled();
             expect(audioWatchdog.crashCount).toBe(1);
@@ -169,14 +169,15 @@ describe('Audio Recovery & Platform Integrity', () => {
             mockAudioContext.state = 'closed';
             const restartSpy = vi.spyOn(audioWatchdog, 'triggerFullRestart');
 
-            await audioWatchdog.healthCheck();
+            await audioWatchdog.healthCheck(playback);
 
             expect(restartSpy).toHaveBeenCalled();
         });
 
         it('should execute the DSP reset pipeline', async () => {
             // Setup onRecover callback
-            audioWatchdog.onRecover = async (pb, map) => {
+            audioWatchdog.onRecover = async (pb) => {
+                const map = getState();
                 await Engine.killAllNotes(map);
                 await pb.audio.close();
                 Engine.initAudio(map);
@@ -184,7 +185,7 @@ describe('Audio Recovery & Platform Integrity', () => {
             };
 
             // Initiate reset
-            const resetPromise = audioWatchdog.triggerDSPReset();
+            const resetPromise = audioWatchdog.triggerDSPReset(playback);
 
             expect(audioWatchdog.isRecovering).toBe(true);
             expect(mockMasterGain.disconnect).toHaveBeenCalled();
