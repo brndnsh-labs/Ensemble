@@ -1016,7 +1016,11 @@ export function getAccompanimentNotes(
             }
 
             // Frequency Slotting: Avoid masking the bass
-            if (bass.enabled && voicing.length > 0) {
+            if (
+                (playback.practiceMode || bass.enabled) &&
+                !chords.pianoRoots &&
+                voicing.length > 0
+            ) {
                 // Ensure sorted for predictable slotting
                 voicing.sort((a, b) => getMidi(a) - getMidi(b));
 

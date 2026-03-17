@@ -190,6 +190,7 @@ export function syncWorker(action, payload) {
                 bandIntensity: playback.bandIntensity,
                 complexity: playback.complexity,
                 autoIntensity: playback.autoIntensity,
+                practiceMode: playback.practiceMode,
                 sessionTimer: playback.sessionTimer,
                 sessionStartTime: playback.sessionStartTime,
                 modals: { performance: playback.modals?.performance || false },

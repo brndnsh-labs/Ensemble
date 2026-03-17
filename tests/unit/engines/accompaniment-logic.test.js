@@ -124,12 +124,20 @@ describe('Accompaniment Engine Logic', () => {
             ).toBe(true);
         });
 
-        it('should perform rootless reduction when bass is enabled', () => {
+        it('should perform rootless reduction when space is reserved and pianoRoots is false', () => {
+            const { chords, playback, bass } = getState();
+            chords.pianoRoots = true;
+            bass.enabled = false;
+            playback.practiceMode = false;
+
             const notesNormal = getAccompanimentNotes(mockChord, 0, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,
             });
-            bass.enabled = true;
+
+            chords.pianoRoots = false;
+            playback.practiceMode = true; // This reserves the space even if bass is disabled
+
             const notesRootless = getAccompanimentNotes(mockChord, 16, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,

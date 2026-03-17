@@ -1294,6 +1294,7 @@ function syncAndFlushWorker(state, step, dispatch = null) {
             bandIntensity: playback.bandIntensity,
             complexity: playback.complexity,
             autoIntensity: playback.autoIntensity,
+            practiceMode: playback.practiceMode,
             songMode: playback.songMode,
             sessionTimer: playback.sessionTimer,
             sessionStartTime: playback.sessionStartTime,

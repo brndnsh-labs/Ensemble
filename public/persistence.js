@@ -26,6 +26,7 @@ export function saveCurrentState() {
         songMode: playback.songMode,
         vizEnabled: vizState.enabled,
         autoIntensity: playback.autoIntensity,
+        practiceMode: playback.practiceMode,
         masterVolume: playback.masterVolume,
         chords: {
             enabled: chords.enabled,

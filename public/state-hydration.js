@@ -136,6 +136,7 @@ export function hydrateState() {
             bandIntensity: clamp(savedState.bandIntensity, 0, 1, 0.35),
             complexity: clamp(savedState.complexity, 0, 1, 0.3),
             autoIntensity: true,
+            practiceMode: savedState.practiceMode !== undefined ? savedState.practiceMode : true,
             metronome: false,
             visualFlash: savedState.visualFlash !== undefined ? savedState.visualFlash : false,
             haptic: savedState.haptic !== undefined ? savedState.haptic : false,

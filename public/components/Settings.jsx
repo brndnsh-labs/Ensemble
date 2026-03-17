@@ -19,6 +19,7 @@ export function Settings() {
         theme,
         countIn,
         metronome,
+        practiceMode,
         visualFlash,
         haptic,
         sessionTimer,
@@ -36,6 +37,7 @@ export function Settings() {
         theme: state.playback.theme,
         countIn: state.playback.countIn,
         metronome: state.playback.metronome,
+        practiceMode: state.playback.practiceMode,
         visualFlash: state.playback.visualFlash,
         haptic: state.playback.haptic,
         sessionTimer: state.playback.sessionTimer,
@@ -208,6 +210,21 @@ export function Settings() {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'countIn',
+                                        value: val,
+                                    });
+                                    saveCurrentState();
+                                }}
+                            />
+                        </SettingRow>
+
+                        <SettingRow label="Practice Mode" id="practiceModeCheck">
+                            <Toggle
+                                id="practiceModeCheck"
+                                checked={practiceMode}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_PARAM, {
+                                        module: 'playback',
+                                        param: 'practiceMode',
                                         value: val,
                                     });
                                     saveCurrentState();

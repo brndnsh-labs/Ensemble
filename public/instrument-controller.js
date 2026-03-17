@@ -235,6 +235,7 @@ export function flushBuffers(primeSteps = 0) {
             bandIntensity: playback.bandIntensity,
             complexity: playback.complexity,
             autoIntensity: playback.autoIntensity,
+            practiceMode: playback.practiceMode,
         },
     };
 

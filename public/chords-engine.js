@@ -655,16 +655,17 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                     }
                 }
 
+                const reserveBassSpace = state.playback.practiceMode || bass.enabled;
                 const intervals = getIntervals(
                     state,
                     quality,
                     is7th,
                     chords.density,
                     groove.genreFeel,
-                    bass.enabled || chords.pianoRoots,
+                    reserveBassSpace && !chords.pianoRoots,
                 );
-                // Reduce mud: if bass is active, keep piano above E3 (52)
-                const pianoMin = bass.enabled || chords.pianoRoots ? 52 : 43;
+                // Reduce mud: reserve space for bass by keeping piano above E3 (52), unless roots are forced
+                const pianoMin = reserveBassSpace && !chords.pianoRoots ? 52 : 43;
                 const isPivot = parsed.length === 0;
                 let currentMidis = getBestInversion(
                     state,

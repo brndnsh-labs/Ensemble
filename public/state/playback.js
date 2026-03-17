@@ -36,6 +36,7 @@ import { ACTIONS } from '../types.js';
  * @property {number} bandIntensity - Global band intensity/energy level (0.0 - 1.0).
  * @property {number} complexity - Global complexity level (0.0 - 1.0).
  * @property {boolean} autoIntensity - Whether the intensity automatically drifts over time.
+ * @property {boolean} practiceMode - Whether muted instruments strictly reserve their sonic space.
  * @property {boolean} metronome - Whether the metronome is active.
  * @property {boolean} applyPresetSettings - Whether to apply BPM/Style from presets.
  * @property {boolean} sustainActive - Whether the global sustain pedal is "pressed".
@@ -89,6 +90,7 @@ export const playback = {
     bandIntensity: 0.35,
     complexity: 0.3,
     autoIntensity: true,
+    practiceMode: true,
     metronome: false,
     applyPresetSettings: false,
     sustainActive: false,
