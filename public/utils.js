@@ -289,9 +289,9 @@ export function getStepsPerMeasure(ts) {
  * @param {number} step - The global step to find.
  * @returns {object|null} The matching element, or null if not found.
  */
-export function binarySearchMap(mapArray, step) {
+export function binarySearchMapIndex(mapArray, step) {
     if (!mapArray || mapArray.length === 0) {
-        return null;
+        return -1;
     }
     let low = 0;
     let high = mapArray.length - 1;
@@ -300,14 +300,19 @@ export function binarySearchMap(mapArray, step) {
         const mid = (low + high) >>> 1;
         const m = mapArray[mid];
         if (step >= m.start && step < m.end) {
-            return m;
+            return mid;
         } else if (step < m.start) {
             high = mid - 1;
         } else {
             low = mid + 1;
         }
     }
-    return null;
+    return -1;
+}
+
+export function binarySearchMap(mapArray, step) {
+    const index = binarySearchMapIndex(mapArray, step);
+    return index !== -1 ? mapArray[index] : null;
 }
 
 /**
