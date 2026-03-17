@@ -7,6 +7,19 @@ export class UnifiedVisualizer {
         this.canvas = canvas;
         this.staticCanvas = staticCanvas;
 
+        if (
+            !canvas ||
+            !staticCanvas ||
+            typeof canvas.transferControlToOffscreen !== 'function' ||
+            typeof staticCanvas.transferControlToOffscreen !== 'function'
+        ) {
+            console.warn(
+                '[UnifiedVisualizer] Missing canvas elements or OffscreenCanvas support. Running in NOOP mode.',
+            );
+            this.worker = { postMessage: () => {}, terminate: () => {} };
+            return;
+        }
+
         // In production, VIZ_WORKER_PATH is injected by esbuild --define
         const workerPath =
             typeof VIZ_WORKER_PATH !== 'undefined' ? VIZ_WORKER_PATH : 'visualizer-worker.js';

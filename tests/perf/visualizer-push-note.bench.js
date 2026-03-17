@@ -1,5 +1,5 @@
 import { bench, describe } from 'vitest';
-import { UnifiedVisualizer } from '../../public/visualizer.js';
+import { UnifiedVisualizer } from '../../public/visualizer-proxy.js';
 
 describe('UnifiedVisualizer PushNote Performance', () => {
     // Mock container
@@ -7,7 +7,10 @@ describe('UnifiedVisualizer PushNote Performance', () => {
     container.id = 'viz-container';
     document.body.appendChild(container);
 
-    const visualizer = new UnifiedVisualizer('viz-container');
+    const visualizer = new UnifiedVisualizer(
+        document.createElement('canvas'),
+        document.createElement('canvas'),
+    );
     visualizer.addTrack('bench', '#000000');
 
     // Fill history to the limit (100)

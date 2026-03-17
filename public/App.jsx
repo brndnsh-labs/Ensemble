@@ -30,7 +30,7 @@ import { ACTIONS } from './types.js';
 import { useEnsembleState } from './ui-bridge.js';
 import { syncWorker } from './worker-client.js';
 
-export function App() {
+export function App({ getVisualTime }) {
     const { vizEnabled, grooveMobileTab } = useEnsembleState((s) => ({
         vizEnabled: s.vizState.enabled,
         grooveMobileTab: s.groove.mobileTab,
@@ -43,7 +43,7 @@ export function App() {
                 <Header />
                 <main class="app-main-layout loaded" id="dashboardGrid">
                     <ArrangerPanel />
-                    <VisualizerPanel enabled={vizEnabled} />
+                    <VisualizerPanel enabled={vizEnabled} getVisualTime={getVisualTime} />
                     <Sidebar grooveMobileTab={grooveMobileTab} />
                     <MobileNav activeTab={grooveMobileTab} />
                 </main>
@@ -132,7 +132,7 @@ function ArrangerPanel() {
     );
 }
 
-function VisualizerPanel({ enabled }) {
+function VisualizerPanel({ enabled, getVisualTime }) {
     const handleToggle = () => {
         togglePower('viz');
     };
@@ -158,7 +158,7 @@ function VisualizerPanel({ enabled }) {
             </div>
 
             <div class="viz-graph-area">
-                <Visualizer enabled={enabled} />
+                <Visualizer enabled={enabled} getVisualTime={getVisualTime} />
             </div>
         </div>
     );

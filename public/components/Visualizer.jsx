@@ -1,7 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
-import { getVisualTime } from '../engine/engine.js';
 import { switchMeasure } from '../instrument-controller.js';
 import { dispatch, getState, stateMap } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -12,7 +11,7 @@ import { UnifiedVisualizer } from '../visualizer-proxy.js';
 let lastFrameTime = 0;
 let missedFrames = 0;
 
-export function Visualizer({ enabled }) {
+export function Visualizer({ enabled, getVisualTime }) {
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
     const staticCanvasRef = useRef(null);

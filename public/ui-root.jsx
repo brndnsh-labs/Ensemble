@@ -26,14 +26,14 @@ class ErrorBoundary extends Component {
     }
 }
 
-export function mountComponents() {
+export function mountComponents(getVisualTime) {
     console.log('[UI-Root] Mounting Preact Root...');
 
     const root = document.body;
 
     render(
         <ErrorBoundary>
-            <App />
+            <App getVisualTime={getVisualTime} />
         </ErrorBoundary>,
         root,
     );
