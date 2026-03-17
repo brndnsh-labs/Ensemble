@@ -1,5 +1,6 @@
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
+import { getState } from '../state.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
@@ -66,19 +67,20 @@ export function initAudio(state) {
         );
 
         // Attach the Watchdog
-        audioWatchdog.attachToMaster(playback.masterGain);
-        audioWatchdog.onRecover = async (pbState, mapState) => {
+        audioWatchdog.attachToMaster(playback.masterGain, playback);
+        audioWatchdog.onRecover = async (pbState) => {
+            const mapState = getState();
             await killAllNotes(mapState);
             pbState.audio.close().then(() => {
                 pbState.audio = null; // @worker-mutation
                 initAudio(mapState);
                 restoreGains(mapState);
                 if (pbState.masterGain) {
-                    audioWatchdog.attachToMaster(pbState.masterGain);
+                    audioWatchdog.attachToMaster(pbState.masterGain, pbState);
                 }
             });
         };
-        audioWatchdog.start();
+        audioWatchdog.start(() => getState().playback);
 
         playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation
         playback.saturator.curve = createSoftClipCurve();
