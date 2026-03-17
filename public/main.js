@@ -1,6 +1,6 @@
 import { validateProgression } from './chords-engine.js';
 import { analyzeFormUI } from './conductor.js';
-import { initAudio, playNote } from './engine/engine.js';
+import { getVisualTime, initAudio, playNote } from './engine/engine.js';
 import { scheduler } from './engine/scheduler-core.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
 import { initPWA } from './pwa.js';
@@ -34,7 +34,7 @@ function init() {
         validateProgression(getState(), (a, p) => window.ensemble?.dispatch(a, p));
 
         // --- ASSEMBLE UI ---
-        mountComponents();
+        mountComponents(getVisualTime);
 
         // --- WORKER INIT ---
         initWorker(

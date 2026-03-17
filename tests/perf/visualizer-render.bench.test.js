@@ -1,12 +1,107 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, it } from 'vitest';
-import { UnifiedVisualizer } from '../../public/visualizer.js';
+import { VisualizerEngine } from '../../public/visualizer-engine.js';
 
 describe('UnifiedVisualizer Render Benchmark', () => {
     let visualizer;
-    let container;
-    let mockCtx;
 
+    let mockCtx;
+    let mockCanvas;
+    let mockStaticCanvas;
+
+    beforeEach(() => {
+        mockCtx = {
+            fillRect: vi.fn(),
+            rect: vi.fn(),
+            beginPath: vi.fn(),
+            moveTo: vi.fn(),
+            lineTo: vi.fn(),
+            stroke: vi.fn(),
+            fill: vi.fn(),
+            closePath: vi.fn(),
+            clearRect: vi.fn(),
+            arc: vi.fn(),
+            save: vi.fn(),
+            restore: vi.fn(),
+            fillText: vi.fn(),
+            measureText: vi.fn(() => ({ width: 10 })),
+            drawImage: vi.fn(),
+            setLineDash: vi.fn(),
+            translate: vi.fn(),
+            roundRect: vi.fn(),
+            clip: vi.fn(),
+            scale: vi.fn(),
+            transform: vi.fn(),
+            resetTransform: vi.fn(),
+            createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+            createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+            _fillStyle: '',
+            get fillStyle() {
+                return this._fillStyle;
+            },
+            set fillStyle(v) {
+                this._fillStyle = v;
+            },
+            _strokeStyle: '',
+            get strokeStyle() {
+                return this._strokeStyle;
+            },
+            set strokeStyle(v) {
+                this._strokeStyle = v;
+            },
+            _lineWidth: 1,
+            get lineWidth() {
+                return this._lineWidth;
+            },
+            set lineWidth(v) {
+                this._lineWidth = v;
+            },
+            _globalAlpha: 1.0,
+            get globalAlpha() {
+                return this._globalAlpha;
+            },
+            set globalAlpha(v) {
+                this._globalAlpha = v;
+            },
+            _font: '',
+            _fontSetCount: 0,
+            get font() {
+                return this._font;
+            },
+            set font(v) {
+                this._font = v;
+                this._fontSetCount++;
+            },
+            _textAlign: '',
+            _textAlignSetCount: 0,
+            get textAlign() {
+                return this._textAlign;
+            },
+            set textAlign(v) {
+                this._textAlign = v;
+                this._textAlignSetCount++;
+            },
+            _textBaseline: '',
+            _textBaselineSetCount: 0,
+            get textBaseline() {
+                return this._textBaseline;
+            },
+            set textBaseline(v) {
+                this._textBaseline = v;
+                this._textBaselineSetCount++;
+            },
+            set lineCap(_v) {},
+            set lineJoin(_v) {},
+            shadowBlur: 0,
+            shadowColor: '',
+        };
+        mockCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
+        mockStaticCanvas = { getContext: () => mockCtx, width: 800, height: 600 };
+    });
+
+    let container;
+
+    // biome-ignore lint/suspicious/noDuplicateTestHooks: Need separate hook for container
     beforeEach(() => {
         container = document.createElement('div');
         container.id = 'viz-container';
@@ -15,6 +110,7 @@ describe('UnifiedVisualizer Render Benchmark', () => {
         // Minimal Mock canvas context for speed
         mockCtx = {
             scale: () => {},
+            resetTransform: () => {},
             fillRect: () => {},
             rect: () => {},
             clearRect: () => {},
@@ -60,11 +156,11 @@ describe('UnifiedVisualizer Render Benchmark', () => {
             }),
         });
 
-        visualizer = new UnifiedVisualizer('viz-container');
+        visualizer = new VisualizerEngine(mockCanvas, mockStaticCanvas);
         visualizer.resize({ width: 800, height: 600 });
 
         // Setup heavy scene
-        visualizer.addTrack('bass', '#ff0000');
+        visualizer.addTrack('bass', '#ff0000', '#ff0000');
         visualizer.addTrack('soloist', '#00ff00');
 
         // Add 100 notes history
@@ -83,8 +179,9 @@ describe('UnifiedVisualizer Render Benchmark', () => {
     });
 
     afterEach(() => {
-        visualizer.destroy();
-        document.body.removeChild(container);
+        if (visualizer?.destroy) {
+            visualizer.destroy();
+        }
     });
 
     // Using a manual loop instead of vitest 'bench' if not available or for simpler setup

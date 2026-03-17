@@ -8,7 +8,7 @@ const { arranger } = getState();
 // Mock dependencies to isolate performance of the reorder logic
 vi.mock('../../public/history.js', () => ({ pushHistory: vi.fn() }));
 vi.mock('../../public/chords-engine.js', () => ({
-    validateProgression: vi.fn((cb) => cb?.()),
+    validateProgression: vi.fn((s, d, cb) => cb?.()),
     transformRelativeProgression: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
