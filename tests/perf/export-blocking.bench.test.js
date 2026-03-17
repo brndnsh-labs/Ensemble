@@ -94,7 +94,7 @@ describe('Export Blocking Performance', () => {
 
         // Call handleExport directly
         // It should return almost immediately now
-        handleExport({
+        handleExport(getState(), {
             includedTracks: ['chords', 'bass', 'soloist', 'harmonies', 'drums'],
             targetDuration: 3, // 3 minutes
             loopMode: 'time',
