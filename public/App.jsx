@@ -157,7 +157,9 @@ function VisualizerPanel({ enabled }) {
                 </div>
             </div>
 
-            <div class="viz-graph-area">{enabled && <Visualizer enabled={enabled} />}</div>
+            <div class="viz-graph-area">
+                <Visualizer enabled={enabled} />
+            </div>
         </div>
     );
 }
