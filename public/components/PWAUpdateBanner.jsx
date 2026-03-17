@@ -29,7 +29,7 @@ export function PWAUpdateBanner() {
             aria-live="polite"
         >
             <span>A new version is available.</span>
-            <button id="updateRefreshBtn" onClick={skipWaiting}>
+            <button id="updateRefreshBtn" onClick={skipWaiting} aria-label="Refresh to update app">
                 Refresh
             </button>
         </div>
