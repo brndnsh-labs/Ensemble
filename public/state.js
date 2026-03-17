@@ -1,5 +1,6 @@
 import { MODULES } from './constants.js';
 import { arranger, arrangerReducer } from './state/arranger.js';
+import { conductor, conductorReducer } from './state/conductor.js';
 import { groove, grooveReducer } from './state/groove.js';
 import { bass, chords, harmony, instrumentReducer, soloist } from './state/instruments.js';
 import { midi, midiReducer } from './state/midi.js';
@@ -31,6 +32,7 @@ export const stateMap = {
     arranger,
     vizState,
     midi,
+    conductor,
 };
 
 /**
@@ -49,6 +51,8 @@ export {
     arrangerReducer,
     bass,
     chords,
+    conductor,
+    conductorReducer,
     groove,
     grooveReducer,
     harmony,
@@ -102,6 +106,7 @@ export function dispatch(action, payload) {
     // Delegate to Reducers
     playbackReducer(action, payload);
     arrangerReducer(action, payload);
+    conductorReducer(action, payload);
     instrumentReducer(action, payload);
     grooveReducer(action, payload, playback);
     midiReducer(action, payload);
@@ -111,7 +116,7 @@ export function dispatch(action, payload) {
     playback.stateVersion++;
 
     // Notify listeners
-    listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm }));
+    listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));
 }
 
 /**

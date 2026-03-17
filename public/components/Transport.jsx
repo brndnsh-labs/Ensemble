@@ -7,18 +7,36 @@ import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
 export function Transport() {
-    const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode } = useEnsembleState(
-        (state) => ({
+    const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode, larsMode, larsBpmOffset } =
+        useEnsembleState((state) => ({
             isPlaying: state.playback.isPlaying,
             bpm: state.playback.bpm,
             sessionTimer: state.playback.sessionTimer,
             sessionStartTime: state.playback.sessionStartTime,
             songMode: state.playback.songMode,
-        }),
-    );
+            larsMode: state.groove.larsMode,
+            larsBpmOffset: state.conductor.larsBpmOffset,
+        }));
 
     const [tapActive, setTapActive] = useState(false);
     const [timeLeft, setTimeLeft] = useState(null);
+
+    // Calculate effective BPM and visual style for Lars Mode
+    const effectiveBpm = Math.round(bpm + (larsBpmOffset || 0));
+    const isLarsActive = larsMode && isPlaying;
+    let bpmStyle = '';
+    let bpmLabelText = 'BPM';
+
+    if (isLarsActive && Math.abs(larsBpmOffset) > 0.1) {
+        const intensity = Math.min(1, Math.abs(larsBpmOffset) / 6);
+        const isPushing = larsBpmOffset > 0;
+        const targetColor = isPushing ? 'var(--blue)' : 'var(--red)';
+        const mixPercent = 20 + Math.round(intensity * 80);
+        bpmStyle = `color: color-mix(in srgb, var(--text-color), ${targetColor} ${mixPercent}%)`;
+
+        const direction = isPushing ? '↗' : '↘';
+        bpmLabelText = `${effectiveBpm} ${direction}`;
+    }
 
     useEffect(() => {
         let interval;
@@ -72,9 +90,9 @@ export function Transport() {
                 </span>
             </button>
 
-            <div class="control-group" id="bpmControlGroup">
-                <span class="control-label" id="bpm-label">
-                    BPM
+            <div class={`control-group ${isLarsActive ? 'lars-active' : ''}`} id="bpmControlGroup">
+                <span class="control-label" id="bpmLabel" style={bpmStyle}>
+                    {bpmLabelText}
                 </span>
                 <input
                     type="number"
@@ -82,7 +100,8 @@ export function Transport() {
                     value={bpm}
                     min="40"
                     max="240"
-                    aria-labelledby="bpm-label"
+                    style={bpmStyle}
+                    aria-labelledby="bpmLabel"
                     aria-label="Tempo in BPM"
                     onInput={onBpmInput}
                 />

@@ -1,13 +1,9 @@
-import {
-    checkSectionTransition,
-    conductorState,
-    updateAutoConductor,
-    updateLarsTempo,
-} from '../conductor.js';
+import { checkSectionTransition, updateAutoConductor, updateLarsTempo } from '../conductor.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { getSoloistNote } from '../soloist.js';
+import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -84,7 +80,6 @@ initPlatformHacks();
  * and global state updates for starting or stopping the engine.
  *
  * @param {Object} state - Global ensemble state.
- * @param {Object} [viz] - Optional visualizer instance override.
  * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
  * @param {Function} [dispatch] - State dispatch function.
  */
@@ -99,8 +94,8 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
         if (!fromDispatch) {
             playback.isPlaying = false; // @direct-mutation
         }
-        if (playback.autoIntensity) {
-            conductorState.target = 0.35;
+        if (playback.autoIntensity && dispatch) {
+            dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { targetIntensity: 0.35 });
         }
         stopWorker();
         stopPlatformAudioAndWakeLock();
@@ -128,6 +123,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
             playback.suspendTimeout = setTimeout(() => {
                 // @direct-mutation
                 // @direct-mutation
+                // @direct-mutation
                 if (!playback.isPlaying && playback.audio.state === 'running') {
                     playback.audio.suspend();
                 }
@@ -148,8 +144,8 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
             playback.sessionStartTime = performance.now(); // @direct-mutation
         }
 
-        if (playback.autoIntensity) {
-            conductorState.target = 0.35;
+        if (playback.autoIntensity && dispatch) {
+            dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { targetIntensity: 0.35 });
         }
 
         playback.step = 0; // @direct-mutation
@@ -203,9 +199,9 @@ function triggerResolution(state, time, dispatch) {
 }
 
 function scheduleResolution(state, time, dispatch) {
-    const { playback, bass, soloist, chords, harmony, groove } = state;
+    const { playback, bass, soloist, chords, harmony, groove, conductor } = state;
     // Schedule the final resolution measure (Tonic chord, Kick+Crash, etc.)
-    const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
+    const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
     const spb = 60.0 / effectiveBpm;
     const measureDuration = 8 * spb; // Ring out for 2 bars (approx 5-6s)
 
@@ -369,8 +365,8 @@ function applyPendingGenre(state) {
 }
 
 function advanceCountIn(state) {
-    const { playback, arranger } = state;
-    const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
+    const { playback, arranger, conductor } = state;
+    const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
     const beatDuration = 60.0 / effectiveBpm;
     playback.nextNoteTime += beatDuration;
     playback.unswungNextNoteTime += beatDuration;
@@ -475,9 +471,9 @@ function scheduleCountIn(state, beat, time) {
 }
 
 function advanceGlobalStep(state) {
-    const { playback, groove, arranger } = state;
+    const { playback, groove, arranger, conductor } = state;
     updateLarsTempo(playback.step);
-    const effectiveBpm = playback.bpm + (conductorState.larsBpmOffset || 0);
+    const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
     const sixteenth = 0.25 * (60.0 / effectiveBpm);
     let duration = sixteenth;
     if (groove.swing > 0) {

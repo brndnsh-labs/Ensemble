@@ -71,6 +71,14 @@ vi.mock('../../public/state.js', () => {
         harmony: { enabled: false, buffer: new Map() },
         midi: { enabled: false },
         vizState: { enabled: false },
+        conductor: {
+            targetIntensity: 0.35,
+            stepSize: 0.0005,
+            larsBpmOffset: 0,
+            form: null,
+            loopCount: 0,
+            formIteration: 0,
+        },
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_ENDING_PENDING') {
                 mockState.playback.isEndingPending = payload;
@@ -97,7 +105,6 @@ vi.mock('../../public/worker-client.js', () => ({
     requestResolution: vi.fn(),
 }));
 vi.mock('../../public/conductor.js', () => ({
-    conductorState: { larsBpmOffset: 0 },
     updateAutoConductor: vi.fn(),
     updateLarsTempo: vi.fn(),
     checkSectionTransition: vi.fn(),

@@ -104,7 +104,9 @@
         "sidechain",
         "Sidechain",
         "sidechaining",
-        "lerp"
+        "lerp",
+        "sparkline",
+        "sparklines"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

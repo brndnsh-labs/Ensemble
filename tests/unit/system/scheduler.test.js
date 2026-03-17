@@ -84,6 +84,14 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const mockBass = { enabled: false, buffer: new Map() };
     const mockChords = { enabled: false, buffer: new Map() };
     const mockHarmony = { enabled: false, buffer: new Map() };
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
 
     const mockStateMap = {
         arranger: mockArranger,
@@ -95,6 +103,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         bass: mockBass,
         chords: mockChords,
         harmony: mockHarmony,
+        conductor: mockConductor,
     };
 
     return {
@@ -159,7 +168,6 @@ vi.mock('../../../public/worker-client.js', () => ({
 }));
 
 vi.mock('../../../public/conductor.js', () => ({
-    conductorState: { target: 0 },
     updateAutoConductor: vi.fn(),
     updateLarsTempo: vi.fn(),
     checkSectionTransition: vi.fn(),

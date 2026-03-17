@@ -57,8 +57,7 @@ export function initAudio(state) {
         };
 
         playback.masterGain = playback.audio.createGain(); // @direct-mutation
-        const volEl = document.getElementById('masterVolume');
-        const initMasterVol = (parseFloat(volEl?.value) || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
+        const initMasterVol = (playback.masterVolume || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
         playback.masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
         playback.masterGain.gain.exponentialRampToValueAtTime(
             initMasterVol,

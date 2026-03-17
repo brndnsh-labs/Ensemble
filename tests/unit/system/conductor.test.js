@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     applyConductor,
     checkSectionTransition,
-    conductorState,
     updateAutoConductor,
 } from '../../../public/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
@@ -17,7 +16,14 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     // Create distinct mock objects so we can control them
     const mockPlayback = { ...actual.playback };
     const mockArranger = { ...actual.arranger, sections: [] };
-    const mockConductorState = { ...actual.conductorState };
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
     const mockGroove = { ...actual.groove };
     const mockSoloist = { ...actual.soloist };
     const mockHarmony = { enabled: false, buffer: new Map() };
@@ -27,7 +33,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const mockStateMap = {
         playback: mockPlayback,
         arranger: mockArranger,
-        conductorState: mockConductorState,
+        conductor: mockConductor,
         groove: mockGroove,
         soloist: mockSoloist,
         harmony: mockHarmony,
@@ -45,6 +51,8 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
                 mockPlayback.bandIntensity = payload;
             } else if (action === 'UPDATE_CONDUCTOR_DECISION') {
                 Object.assign(mockPlayback, payload); // Simplistic apply for testing
+            } else if (action === 'UPDATE_CONDUCTOR_STATE') {
+                Object.assign(mockConductor, payload);
             }
         }),
     };
@@ -67,7 +75,7 @@ vi.mock('../../../public/fills.js', () => ({
 }));
 
 describe('Conductor Logic', () => {
-    let arranger, playback, groove, soloist;
+    let arranger, playback, groove, soloist, conductor;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -76,6 +84,7 @@ describe('Conductor Logic', () => {
         playback = state.playback;
         groove = state.groove;
         soloist = state.soloist;
+        conductor = state.conductor;
 
         playback.autoIntensity = true;
         playback.isPlaying = true;
@@ -86,9 +95,10 @@ describe('Conductor Logic', () => {
         playback.sessionTimer = 0;
         playback.audio = null;
 
-        conductorState.target = 0.5;
-        conductorState.stepSize = 0.01;
-        conductorState.formIteration = 0;
+        conductor.targetIntensity = 0.5;
+        conductor.stepSize = 0.01;
+        conductor.formIteration = 0;
+        conductor.loopCount = 0;
 
         arranger.totalSteps = 16;
         arranger.stepMap = [{ start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'A' } }];
@@ -208,7 +218,7 @@ describe('Conductor Logic', () => {
 
     describe('updateAutoConductor', () => {
         it('should ramp intensity towards target', () => {
-            conductorState.target = 0.6;
+            conductor.targetIntensity = 0.6;
             updateAutoConductor();
             expect(playback.bandIntensity).toBeGreaterThan(0.35);
         });
@@ -217,14 +227,14 @@ describe('Conductor Logic', () => {
             vi.spyOn(Math, 'random').mockReturnValue(0.5);
             // Test Build
             playback.bandIntensity = 0.35;
-            conductorState.target = 0.7;
-            conductorState.stepSize = 0.01;
+            conductor.targetIntensity = 0.7;
+            conductor.stepSize = 0.01;
             updateAutoConductor();
             const buildDiff = playback.bandIntensity - 0.35;
 
             // Test Drop
             playback.bandIntensity = 0.35;
-            conductorState.target = 0.1; // Lower than 0.35 to ensure a drop
+            conductor.targetIntensity = 0.1; // Lower than 0.35 to ensure a drop
             updateAutoConductor();
             const dropDiff = 0.35 - playback.bandIntensity;
 
@@ -237,8 +247,9 @@ describe('Conductor Logic', () => {
         it('should trigger a fill and update target energy at loop end', () => {
             vi.spyOn(Math, 'random').mockReturnValue(0.5);
             groove.enabled = true;
+            conductor.formIteration = 0;
             checkSectionTransition(0, 16);
-            expect(conductorState.formIteration).toBeGreaterThan(0);
+            expect(conductor.formIteration).toBeGreaterThan(0);
         });
 
         it('should adhere to the Grand Story macro-arc cycles', () => {
@@ -246,20 +257,20 @@ describe('Conductor Logic', () => {
             groove.enabled = true;
 
             // Cycle 0: Warm up (Macro Ceiling 0.45)
-            conductorState.formIteration = 0;
+            conductor.formIteration = 0;
             checkSectionTransition(0, 16);
-            expect(conductorState.target).toBeLessThanOrEqual(0.45 + 0.15);
+            expect(conductor.targetIntensity).toBeLessThanOrEqual(0.45 + 0.15);
 
             // Cycle 4: The Peak (Macro Floor 0.6)
-            conductorState.formIteration = 4;
+            conductor.formIteration = 4;
             checkSectionTransition(0, 16);
-            expect(conductorState.target).toBeGreaterThanOrEqual(0.6 - 0.15);
+            expect(conductor.targetIntensity).toBeGreaterThanOrEqual(0.6 - 0.15);
         });
 
         it('should apply Local Functional Roles when form analysis is present', () => {
             vi.spyOn(Math, 'random').mockReturnValue(0.5);
             groove.enabled = true;
-            conductorState.formIteration = 4; // Peak cycle, allows high ceiling
+            conductor.formIteration = 4; // Peak cycle, allows high ceiling
             arranger.totalSteps = 32; // <--- FIX HERE
 
             arranger.stepMap = [
@@ -271,7 +282,7 @@ describe('Conductor Logic', () => {
                 { id: 's2', seamless: false },
             ];
 
-            conductorState.form = {
+            conductor.form = {
                 sections: [{ id: 's2', role: 'Climax', flux: 3.0, iteration: 2 }],
             };
 
@@ -279,7 +290,7 @@ describe('Conductor Logic', () => {
             checkSectionTransition(0, 16);
 
             // Expected target energy should be influenced by 'Climax' role and high flux
-            expect(conductorState.target).toBeGreaterThan(0.6);
+            expect(conductor.targetIntensity).toBeGreaterThan(0.6);
 
             // Test other roles for coverage
             const roles = [
@@ -291,9 +302,9 @@ describe('Conductor Logic', () => {
                 'Resolution',
             ];
             for (const role of roles) {
-                conductorState.form.sections[0].role = role;
+                conductor.form.sections[0].role = role;
                 checkSectionTransition(0, 16);
-                expect(conductorState.target).toBeGreaterThan(0); // Basic assertion, main goal is coverage
+                expect(conductor.targetIntensity).toBeGreaterThan(0); // Basic assertion, main goal is coverage
             }
         });
 

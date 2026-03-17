@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition, conductorState } from '../../../public/conductor.js';
+import { checkSectionTransition } from '../../../public/conductor.js';
 import { getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
@@ -12,7 +12,14 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     // Create distinct mock objects
     const mockPlayback = { ...actual.playback };
     const mockArranger = { ...actual.arranger, sections: [] };
-    const mockConductorState = { ...actual.conductorState };
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
     const mockGroove = { ...actual.groove };
     const mockHarmony = { enabled: false, buffer: new Map() };
     const mockChords = { ...actual.chords };
@@ -22,7 +29,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const mockStateMap = {
         playback: mockPlayback,
         arranger: mockArranger,
-        conductorState: mockConductorState,
+        conductor: mockConductor,
         groove: mockGroove,
         harmony: mockHarmony,
         chords: mockChords,
@@ -31,12 +38,15 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     };
 
     return {
+        ...actual,
         ...mockStateMap,
         stateMap: mockStateMap,
         getState: () => mockStateMap,
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_BAND_INTENSITY') {
                 mockPlayback.bandIntensity = payload;
+            } else if (action === 'UPDATE_CONDUCTOR_STATE') {
+                Object.assign(mockConductor, payload);
             }
         }),
     };
@@ -59,7 +69,7 @@ vi.mock('../../../public/fills.js', () => ({
 }));
 
 describe('Time Signature Transitions', () => {
-    let arranger, playback, groove;
+    let arranger, playback, groove, conductor;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -67,14 +77,15 @@ describe('Time Signature Transitions', () => {
         arranger = state.arranger;
         playback = state.playback;
         groove = state.groove;
+        conductor = state.conductor;
 
         playback.autoIntensity = true;
         playback.isPlaying = true;
         playback.bandIntensity = 0.5;
-        conductorState.target = 0.5;
-        conductorState.stepSize = 0;
-        conductorState.formIteration = 0;
-        conductorState.loopCount = 0;
+        conductor.targetIntensity = 0.5;
+        conductor.stepSize = 0;
+        conductor.formIteration = 0;
+        conductor.loopCount = 0;
         groove.enabled = true;
     });
 
@@ -94,18 +105,18 @@ describe('Time Signature Transitions', () => {
         // Check at the start of the last measure (step 84)
         checkSectionTransition(84, stepsPerMeasure);
 
-        expect(conductorState.formIteration).toBe(1);
-        expect(conductorState.target).not.toBe(0.5);
+        expect(conductor.formIteration).toBe(1);
+        expect(conductor.targetIntensity).not.toBe(0.5);
     });
 
     it('should trigger transition for 5/4 time (20 steps per measure)', () => {
         const stepsPerMeasure = 20;
         // 4 bars of 5/4 = 80 steps
         // The dynamic threshold is `stepsPerMeasure * 4` = 80 steps
-        // This is a "short loop", so `shouldFill` logic triggers based on `conductorState.loopCount` logic
+        // This is a "short loop", so `shouldFill` logic triggers based on `conductor.loopCount` logic
         // For intensity 0.5 (playback.bandIntensity = 0.5), freq is 2. Loop count needs to be % 2 === 0
         // We ensure loop count allows the fill target re-calculation.
-        conductorState.loopCount = 1;
+        conductor.loopCount = 1;
 
         arranger.totalSteps = 80;
         arranger.stepMap = [];
@@ -120,8 +131,8 @@ describe('Time Signature Transitions', () => {
         // Check at the start of the last measure (step 60)
         checkSectionTransition(60, stepsPerMeasure);
 
-        expect(conductorState.formIteration).toBe(1);
-        expect(conductorState.target).not.toBe(0.5);
+        expect(conductor.formIteration).toBe(1);
+        expect(conductor.targetIntensity).not.toBe(0.5);
     });
 
     it('should trigger transition for 6/8 time (12 steps per measure)', () => {
@@ -140,7 +151,7 @@ describe('Time Signature Transitions', () => {
         // Check at the start of the last measure (step 84)
         checkSectionTransition(84, stepsPerMeasure);
 
-        expect(conductorState.formIteration).toBe(1);
-        expect(conductorState.target).not.toBe(0.5);
+        expect(conductor.formIteration).toBe(1);
+        expect(conductor.targetIntensity).not.toBe(0.5);
     });
 });

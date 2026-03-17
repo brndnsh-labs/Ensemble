@@ -25,6 +25,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
+| `public/state/conductor.js` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
 | `public/state-hydration.js` | Initial state loading and validation logic. | `hydrateState` |
 
@@ -38,7 +39,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/chords-engine.js` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
 | `public/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
-| `public/conductor.js` | Global intensity and coordination logic. | `conductor` |
+| `public/conductor.js` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
 
 ## Engine Styles (Genre Logic)
 
@@ -102,6 +103,18 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Grid** | `public/components/SequencerGrid.jsx` | Interactive drum editor. |
 | **Panels** | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
+
+## Domain State Slices (Modular State)
+
+| Path | Responsibility |
+| :--- | :--- |
+| `public/state/playback.js` | Transport, BPM, master volume, and global intensity. |
+| `public/state/arranger.js` | Progression, key signature, and sections. |
+| `public/state/groove.js` | Drum patterns, genre feel, and pocket timing. |
+| `public/state/instruments.js` | Bass, Chords, Soloist, and Harmony settings. |
+| `public/state/conductor.js` | Auto-intensity target, tempo drift, and form tracking. |
+| `public/state/midi.js` | MIDI device and channel configuration. |
+| `public/state/visualizer.js` | Visualizer rendering and flash state. |
 
 ## High-Level Controllers & Integration
 

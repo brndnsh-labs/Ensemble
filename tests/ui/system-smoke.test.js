@@ -219,7 +219,7 @@ vi.mock('../../public/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 
-import { getState } from '../../public/state.js';
+import { dispatch, getState } from '../../public/state.js';
 
 const { arranger, playback } = getState();
 
@@ -280,12 +280,12 @@ describe('System Smoke Test (E2E Workflow)', () => {
         validateProgression(getState());
         expect(arranger.progression.length).toBeGreaterThan(0);
 
-        togglePlay(getState());
+        togglePlay(getState(), false, dispatch);
 
         expect(playback.isPlaying).toBe(true);
         expect(playback.audio).not.toBeNull();
 
-        togglePlay(getState());
+        togglePlay(getState(), false, dispatch);
         expect(playback.isPlaying).toBe(false);
     });
 

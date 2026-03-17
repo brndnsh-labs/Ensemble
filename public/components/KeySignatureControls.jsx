@@ -26,15 +26,15 @@ const GROUPING_OPTIONS = {
 
 export function KeySignatureControls() {
     const dispatch = useDispatch();
-    const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset } = useEnsembleState(
-        (s) => ({
+    const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset, isMaximized } =
+        useEnsembleState((s) => ({
             arrangerKey: s.arranger.key,
             timeSignature: s.arranger.timeSignature,
             isMinor: s.arranger.isMinor,
             grouping: s.arranger.grouping,
             lastDrumPreset: s.groove.lastDrumPreset,
-        }),
-    );
+            isMaximized: s.vizState.isMaximized,
+        }));
 
     const handleKeyChange = (e) => {
         const newKey = e.target.value;
@@ -86,19 +86,12 @@ export function KeySignatureControls() {
         <div class="key-controls">
             <button
                 id="maximizeChordBtn"
-                title="Maximize"
-                class="header-btn"
-                aria-label="Maximize Chords"
-                onClick={() => {
-                    const isMax = document.body.classList.toggle('chord-maximized');
-                    const btn = document.getElementById('maximizeChordBtn');
-                    if (btn) {
-                        btn.textContent = isMax ? '✕' : '⛶';
-                        btn.title = isMax ? 'Exit Maximize' : 'Maximize';
-                    }
-                }}
+                title={isMaximized ? 'Exit Maximize' : 'Maximize'}
+                class={`header-btn ${isMaximized ? 'active' : ''}`}
+                aria-label={isMaximized ? 'Exit Maximize' : 'Maximize Chords'}
+                onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS)}
             >
-                ⛶
+                {isMaximized ? '✕' : '⛶'}
             </button>
 
             <div class="time-sig-group">

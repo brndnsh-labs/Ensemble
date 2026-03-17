@@ -31,10 +31,25 @@ import { useEnsembleState } from './ui-bridge.js';
 import { syncWorker } from './worker-client.js';
 
 export function App({ getVisualTime }) {
-    const { vizEnabled, grooveMobileTab } = useEnsembleState((s) => ({
+    const { vizEnabled, grooveMobileTab, theme, isMaximized } = useEnsembleState((s) => ({
         vizEnabled: s.vizState.enabled,
         grooveMobileTab: s.groove.mobileTab,
+        theme: s.playback.theme,
+        isMaximized: s.vizState.isMaximized,
     }));
+
+    useEffect(() => {
+        const isDark =
+            theme === 'dark' ||
+            (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    }, [theme]);
+
+    useEffect(() => {
+        document.body.classList.toggle('chord-maximized', isMaximized);
+    }, [isMaximized]);
 
     return (
         <Fragment>
@@ -97,9 +112,7 @@ function ArrangerPanel() {
                 </div>
             </div>
 
-            <div className="display-area" id="chordVisualizer">
-                <ChordVisualizer />
-            </div>
+            <ChordVisualizer />
 
             <div id="activeSectionLabel" class="active-section-label" />
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition, conductorState } from '../../../public/conductor.js';
+import { checkSectionTransition } from '../../../public/conductor.js';
 import { getState } from '../../../public/state.js';
 
 // Mock dependencies
@@ -31,8 +31,8 @@ describe('Session Timer Intensity Arc', () => {
         ];
 
         // Reset conductor state
-        conductorState.formIteration = 0;
-        conductorState.loopCount = 0;
+        mockState.conductor.formIteration = 0;
+        mockState.conductor.loopCount = 0;
 
         // Mock performance.now to control time
         vi.spyOn(performance, 'now');
@@ -52,7 +52,7 @@ describe('Session Timer Intensity Arc', () => {
         // Trigger at step 112 (start of last measure, stepsPerMeasure=16)
         checkSectionTransition(112, 16);
 
-        return conductorState.target;
+        return mockState.conductor.targetIntensity;
     };
 
     const phases = [
@@ -73,7 +73,7 @@ describe('Session Timer Intensity Arc', () => {
 
     it('should fall back to loop-based logic if session timer is 0', () => {
         mockState.playback.sessionTimer = 0;
-        conductorState.formIteration = 3; // Will increment to 4 -> High Intensity (0.6 - 1.0)
+        mockState.conductor.formIteration = 3; // Will increment to 4 -> High Intensity (0.6 - 1.0)
 
         const target = runTransitionCheck(1);
         expect(target).toBeGreaterThanOrEqual(0.6);

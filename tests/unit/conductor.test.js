@@ -15,6 +15,7 @@ vi.mock('../../public/state.js', () => ({
     harmony: {},
     midi: {},
     vizState: {},
+    conductor: { larsBpmOffset: 0, formIteration: 0, loopCount: 0 },
 }));
 
 describe('Conductor Engine', () => {
@@ -28,6 +29,12 @@ describe('Conductor Engine', () => {
                 bandIntensity: 0.5,
                 autoIntensity: true,
                 visualFlash: true,
+            },
+            conductor: {
+                larsBpmOffset: 0,
+                formIteration: 0,
+                loopCount: 0,
+                targetIntensity: 0.35,
             },
             arranger: {
                 timeSignature: '4/4',

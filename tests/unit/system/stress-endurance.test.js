@@ -59,7 +59,14 @@ vi.mock('../../../public/state.js', () => {
     const mockHarmony = { enabled: true, buffer: new Map(), octave: 60 };
     const mockMidi = { enabled: false };
     const mockVizState = { enabled: true };
-    const mockConductorState = { larsBpmOffset: 0 };
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -71,7 +78,7 @@ vi.mock('../../../public/state.js', () => {
         harmony: mockHarmony,
         midi: mockMidi,
         vizState: mockVizState,
-        conductorState: mockConductorState,
+        conductor: mockConductor,
     };
 
     return {
@@ -105,7 +112,6 @@ vi.mock('../../../public/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),
-    conductorState: { larsBpmOffset: 0 },
 }));
 
 import { scheduler } from '../../../public/engine/scheduler-core.js';

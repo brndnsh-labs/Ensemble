@@ -56,7 +56,9 @@ describe('State Core Manager', () => {
                 action,
                 payload,
                 expect.any(Object),
-                expect.any(Object),
+                expect.objectContaining({
+                    dispatch: expect.any(Function),
+                }),
             );
 
             unsubscribe();

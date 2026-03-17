@@ -125,6 +125,7 @@ export function ChordVisualizer() {
         notation,
         leadSheetMelody,
         soloistStyle,
+        isMaximized,
     } = useEnsembleState((s) => ({
         progression: s.arranger.progression,
         timeSignature: s.arranger.timeSignature,
@@ -133,9 +134,10 @@ export function ChordVisualizer() {
         notation: s.arranger.notation || 'roman',
         leadSheetMelody: s.soloist.leadSheetMelody,
         soloistStyle: s.soloist.style,
+        isMaximized: s.vizState.isMaximized,
     }));
 
-    const isMaximized = document.body.classList.contains('chord-maximized');
+    const containerRef = useRef(null);
     const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
 
     const groupedSections = useMemo(() => {
@@ -203,13 +205,10 @@ export function ChordVisualizer() {
     );
 
     useEffect(() => {
-        // ... (existing effect)
-        const container = document.getElementById('chordVisualizer');
+        const container = containerRef.current;
         if (!container) {
             return;
         }
-
-        container.dataset.totalMeasures = totalMeasures;
 
         if (isMaximized) {
             return;
@@ -237,7 +236,12 @@ export function ChordVisualizer() {
     }, [lastActiveChordIndex, isMaximized, totalMeasures]);
 
     return (
-        <Fragment>
+        <div
+            className="display-area"
+            id="chordVisualizer"
+            ref={containerRef}
+            data-total-measures={totalMeasures}
+        >
             {groupedSections.map((section) => (
                 <div
                     key={section.id}
@@ -275,6 +279,6 @@ export function ChordVisualizer() {
                     </div>
                 </div>
             ))}
-        </Fragment>
+        </div>
     );
 }

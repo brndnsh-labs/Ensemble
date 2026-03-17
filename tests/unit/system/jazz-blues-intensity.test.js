@@ -3,10 +3,10 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition, conductorState } from '../../../public/conductor.js';
+import { checkSectionTransition } from '../../../public/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
 
-const { arranger, playback, groove } = getState();
+const { arranger, playback, groove, conductor } = getState();
 
 import { ACTIONS } from '../../../public/types.js';
 
@@ -22,7 +22,14 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             { id: 's2', label: 'Turnaround' },
         ],
     };
-    const mockConductorState = { ...actual.conductorState };
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
     const mockGroove = { ...actual.groove };
     const mockHarmony = { enabled: false, buffer: new Map() };
     const mockChords = { ...actual.chords };
@@ -32,7 +39,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const mockStateMap = {
         playback: mockPlayback,
         arranger: mockArranger,
-        conductorState: mockConductorState,
+        conductor: mockConductor,
         groove: mockGroove,
         harmony: mockHarmony,
         chords: mockChords,
@@ -48,6 +55,8 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_BAND_INTENSITY') {
                 mockPlayback.bandIntensity = payload;
+            } else if (action === 'UPDATE_CONDUCTOR_STATE') {
+                Object.assign(mockConductor, payload);
             }
         }),
     };
@@ -75,9 +84,9 @@ describe('Jazz Blues Intensity Bug', () => {
         playback.autoIntensity = true;
         playback.isPlaying = true;
         playback.bandIntensity = 0.5;
-        conductorState.target = 0.5;
-        conductorState.stepSize = 0;
-        conductorState.formIteration = 0;
+        conductor.targetIntensity = 0.5;
+        conductor.stepSize = 0;
+        conductor.formIteration = 0;
         groove.enabled = true;
     });
 
@@ -97,8 +106,8 @@ describe('Jazz Blues Intensity Bug', () => {
         checkSectionTransition(176, 16);
 
         // In 12-bar blues, step 176 should match fillStart (192 - 16 = 176)
-        expect(conductorState.formIteration).toBe(1);
-        expect(conductorState.target).not.toBe(0.5);
+        expect(conductor.formIteration).toBe(1);
+        expect(conductor.targetIntensity).not.toBe(0.5);
     });
 
     it('should trigger intensity change for Jazz Blues (2 chords in last measure) - Loop End', () => {
@@ -130,7 +139,7 @@ describe('Jazz Blues Intensity Bug', () => {
         let triggered = false;
         for (let step = 176; step < 192; step++) {
             checkSectionTransition(step, 16);
-            if (conductorState.formIteration > 0) {
+            if (conductor.formIteration > 0) {
                 triggered = true;
                 break;
             }

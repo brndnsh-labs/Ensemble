@@ -46,7 +46,6 @@ vi.mock('../../../public/midi-controller.js', () => ({
 }));
 
 vi.mock('../../../public/conductor.js', () => ({
-    conductorState: { target: 0.35 },
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),
@@ -136,6 +135,14 @@ describe('Scheduler Core Deep Dive', () => {
             harmony: { buffer: new Map() },
             midi: { enabled: true, selectedOutputId: 'out-1' },
             vizState: { enabled: true },
+            conductor: {
+                targetIntensity: 0.35,
+                stepSize: 0.0005,
+                larsBpmOffset: 0,
+                form: null,
+                loopCount: 0,
+                formIteration: 0,
+            },
         };
         dispatch = vi.fn();
     });
@@ -147,7 +154,7 @@ describe('Scheduler Core Deep Dive', () => {
     describe('togglePlay Suspend Logic', () => {
         it('should suspend audio context after timeout when stopping', () => {
             state.playback.isPlaying = true;
-            togglePlay(state, null, false, dispatch);
+            togglePlay(state, false, dispatch);
 
             expect(state.playback.isPlaying).toBe(false);
             expect(state.playback.suspendTimeout).toBeDefined();
@@ -160,7 +167,7 @@ describe('Scheduler Core Deep Dive', () => {
             state.playback.suspendTimeout = setTimeout(() => {}, 1000);
             const spy = vi.spyOn(global, 'clearTimeout');
 
-            togglePlay(state, null, false, dispatch);
+            togglePlay(state, false, dispatch);
             expect(spy).toHaveBeenCalled();
         });
     });

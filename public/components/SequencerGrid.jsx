@@ -78,7 +78,7 @@ export function SequencerGrid() {
 
     // Optimization: Cache step elements to avoid thousands of querySelectorAll calls
     useLayoutEffect(() => {
-        const grid = document.getElementById('sequencerGrid');
+        const grid = _gridRef.current;
         if (!grid) {
             return;
         }
@@ -101,7 +101,7 @@ export function SequencerGrid() {
     // Optimized visual update loop
     useEffect(() => {
         if (!isPlaying) {
-            const grid = document.getElementById('sequencerGrid');
+            const grid = _gridRef.current;
             if (grid) {
                 const playingSteps = grid.getElementsByClassName('playing');
                 while (playingSteps.length > 0) {
@@ -120,7 +120,7 @@ export function SequencerGrid() {
             const step = (playbackState.lastPlayingStep || 0) % totalSteps;
 
             if (step !== lastStep) {
-                const grid = document.getElementById('sequencerGrid');
+                const grid = _gridRef.current;
                 if (grid && grid.offsetParent !== null) {
                     if (lastStep !== -1) {
                         const prev = stepCache.current.get(lastStep);
@@ -195,7 +195,7 @@ export function SequencerGrid() {
     }, []);
 
     return (
-        <Fragment>
+        <div className="sequencer-grid" ref={_gridRef}>
             {instruments.map((inst, instIdx) => (
                 <div key={inst.name} className="track">
                     <div className="track-header">
@@ -278,6 +278,6 @@ export function SequencerGrid() {
                     })}
                 </div>
             </div>
-        </Fragment>
+        </div>
     );
 }

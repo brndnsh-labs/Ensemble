@@ -99,12 +99,9 @@ export function GlobalShortcuts() {
             // Escape: Close Modal / Unmaximize
             if (e.key === 'Escape') {
                 e.preventDefault();
-                if (document.body.classList.contains('chord-maximized')) {
-                    document.body.classList.remove('chord-maximized');
-                    const btn = document.getElementById('maximizeChordBtn');
-                    if (btn) {
-                        btn.textContent = '⛶';
-                    }
+                const { vizState } = getState();
+                if (vizState.isMaximized) {
+                    dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false);
                 }
 
                 // Close any open modals

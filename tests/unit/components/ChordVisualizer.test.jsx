@@ -59,6 +59,9 @@ describe('ChordVisualizer Component', () => {
                     leadSheetMelody: [],
                     style: 'scalar',
                 },
+                vizState: {
+                    isMaximized: false,
+                },
                 ...overrides,
             };
             return selector(state);

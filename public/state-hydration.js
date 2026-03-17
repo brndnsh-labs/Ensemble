@@ -286,6 +286,8 @@ export function hydrateState() {
                         : 1.0,
             });
         }
+    } else {
+        dispatch(ACTIONS.RESET_STATE);
     }
     dispatch('HYDRATE');
 }

@@ -10,6 +10,19 @@ describe('Visualizer State Reducer', () => {
         expect(vizState.enabled).toBe(false);
     });
 
+    it('should toggle maximized chords state', () => {
+        vizState.isMaximized = false;
+        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS);
+        expect(vizState.isMaximized).toBe(true);
+        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS);
+        expect(vizState.isMaximized).toBe(false);
+
+        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, true);
+        expect(vizState.isMaximized).toBe(true);
+        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false);
+        expect(vizState.isMaximized).toBe(false);
+    });
+
     it('should handle generic SET_PARAM action', () => {
         vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param: 'showGrid', value: true });
         expect(vizState.showGrid).toBe(true);

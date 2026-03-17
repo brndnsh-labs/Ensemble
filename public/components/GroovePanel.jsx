@@ -168,9 +168,7 @@ export function GroovePanel({ isActiveMobile }) {
                             💾 Save Pattern
                         </button>
                     </div>
-                    <div className="sequencer-grid" id="sequencerGrid">
-                        <SequencerGrid />
-                    </div>
+                    <SequencerGrid />
                 </div>
             </div>
 

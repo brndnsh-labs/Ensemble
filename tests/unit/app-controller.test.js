@@ -65,7 +65,7 @@ describe('App Controller', () => {
                 param: 'theme',
                 value: 'light',
             });
-            expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+            expect(saveCurrentState).toHaveBeenCalled();
         });
 
         it('should apply auto theme based on media query (dark)', () => {
@@ -76,7 +76,7 @@ describe('App Controller', () => {
                 param: 'theme',
                 value: 'auto',
             });
-            expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+            expect(saveCurrentState).toHaveBeenCalled();
         });
 
         it('should apply auto theme based on media query (light)', () => {
@@ -87,13 +87,14 @@ describe('App Controller', () => {
                 param: 'theme',
                 value: 'auto',
             });
-            expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+            expect(saveCurrentState).toHaveBeenCalled();
         });
 
         it('should not dispatch if theme is unchanged', () => {
             state.playback.theme = 'dark';
             applyTheme('dark');
             expect(dispatch).not.toHaveBeenCalled();
+            expect(saveCurrentState).not.toHaveBeenCalled();
         });
     });
 

@@ -101,6 +101,9 @@ describe('KeySignatureControls Component', () => {
                 groove: {
                     lastDrumPreset: null,
                 },
+                vizState: {
+                    isMaximized: false,
+                },
             };
             return selector(state);
         });
@@ -190,6 +193,7 @@ describe('KeySignatureControls Component', () => {
             return selector({
                 arranger: { key: 'C', timeSignature: '4/4', isMinor: false, grouping: null },
                 groove: { lastDrumPreset: 'Jazz Kit' },
+                vizState: { isMaximized: false },
             });
         });
 
@@ -219,6 +223,7 @@ describe('KeySignatureControls Component', () => {
             return selector({
                 arranger: { key: 'C', timeSignature: '5/4', isMinor: false, grouping: [3, 2] },
                 groove: { lastDrumPreset: null },
+                vizState: { isMaximized: false },
             });
         });
 
@@ -259,6 +264,7 @@ describe('KeySignatureControls Component', () => {
             return selector({
                 arranger: { key: 'C', timeSignature: '4/4', isMinor: false, grouping: null },
                 groove: { lastDrumPreset: null },
+                vizState: { isMaximized: false },
             });
         });
 
@@ -327,16 +333,6 @@ describe('KeySignatureControls Component', () => {
             maxBtn.dispatchEvent(new Event('click', { bubbles: true }));
         });
 
-        expect(document.body.classList.contains('chord-maximized')).toBe(true);
-        expect(maxBtn.textContent).toBe('✕');
-        expect(maxBtn.title).toBe('Exit Maximize');
-
-        act(() => {
-            maxBtn.dispatchEvent(new Event('click', { bubbles: true }));
-        });
-
-        expect(document.body.classList.contains('chord-maximized')).toBe(false);
-        expect(maxBtn.textContent).toBe('⛶');
-        expect(maxBtn.title).toBe('Maximize');
+        expect(mockDispatch).toHaveBeenCalledWith('TOGGLE_MAXIMIZED_CHORDS');
     });
 });

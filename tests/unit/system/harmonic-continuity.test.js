@@ -54,6 +54,14 @@ vi.mock('../../../public/state.js', () => {
         drumsOctave: 0,
     };
     const mockVizState = { enabled: false };
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -65,6 +73,7 @@ vi.mock('../../../public/state.js', () => {
         arranger: mockArranger,
         midi: mockMidi,
         vizState: mockVizState,
+        conductor: mockConductor,
     };
 
     return {
@@ -98,7 +107,6 @@ vi.mock('../../../public/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),
-    conductorState: { larsBpmOffset: 0 },
 }));
 
 // Mock ui

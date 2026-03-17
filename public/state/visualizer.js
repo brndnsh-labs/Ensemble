@@ -3,15 +3,20 @@ import { ACTIONS } from '../types.js';
 /**
  * @typedef {Object} VisualizerState
  * @property {boolean} enabled - Whether the advanced visualizer is active.
+ * @property {boolean} isMaximized - Whether the chord visualizer is maximized.
  */
 export const vizState = {
     enabled: false,
+    isMaximized: false,
 };
 
 export function vizReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_VIZ_ENABLED:
             vizState.enabled = !!payload;
+            return true;
+        case ACTIONS.TOGGLE_MAXIMIZED_CHORDS:
+            vizState.isMaximized = payload !== undefined ? !!payload : !vizState.isMaximized;
             return true;
         case ACTIONS.SET_PARAM:
             if (payload.module === 'viz' || payload.module === 'vizState') {

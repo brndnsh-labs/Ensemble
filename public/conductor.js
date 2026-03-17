@@ -6,19 +6,10 @@ import { ACTIONS } from './types.js';
 import { triggerFlash } from './ui.js';
 import { binarySearchMap, binarySearchMapIndex } from './utils.js';
 
-export const conductorState = {
-    target: 0.35,
-    stepSize: 0.0005,
-    loopCount: 0,
-    formIteration: 0, // Tracks how many times the ENTIRE song has looped
-    form: null,
-    larsBpmOffset: 0,
-};
-
 export function analyzeFormUI() {
     const form = analyzeForm();
     if (form) {
-        conductorState.form = form;
+        dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { form });
     }
 }
 
@@ -211,19 +202,19 @@ export function applyConductor() {
  * Updates auto-intensity and monitors the band's "conversation".
  */
 export function updateAutoConductor() {
-    const { playback } = getState();
+    const { playback, conductor } = getState();
     if (!playback.autoIntensity || !playback.isPlaying) {
         return;
     }
 
-    if (Math.abs(playback.bandIntensity - conductorState.target) > 0.001) {
+    if (Math.abs(playback.bandIntensity - conductor.targetIntensity) > 0.001) {
         // Asymmetric ramping: humans tend to build energy gradually but can stop/drop quickly
-        const multiplier = playback.bandIntensity > conductorState.target ? 2.5 : 1.0;
+        const multiplier = playback.bandIntensity > conductor.targetIntensity ? 2.5 : 1.0;
         let newIntensity =
             playback.bandIntensity +
-            (playback.bandIntensity < conductorState.target
-                ? Math.abs(conductorState.stepSize)
-                : -Math.abs(conductorState.stepSize)) *
+            (playback.bandIntensity < conductor.targetIntensity
+                ? Math.abs(conductor.stepSize)
+                : -Math.abs(conductor.stepSize)) *
                 multiplier;
         newIntensity = Math.max(0.01, Math.min(1.0, newIntensity));
 
@@ -239,11 +230,10 @@ export function updateAutoConductor() {
  * Calculates and applies tempo drift for "Lars Mode".
  */
 export function updateLarsTempo(currentStep) {
-    const { groove, playback, arranger } = getState();
+    const { groove, playback, arranger, conductor } = getState();
     if (!groove.larsMode || !playback.isPlaying) {
-        if (conductorState.larsBpmOffset !== 0) {
-            conductorState.larsBpmOffset = 0;
-            updateBpmUI();
+        if (conductor.larsBpmOffset !== 0) {
+            dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { larsBpmOffset: 0 });
         }
         return;
     }
@@ -281,72 +271,23 @@ export function updateLarsTempo(currentStep) {
 
     // 2. Smoothly ramp towards target offset
     const lerpFactor = groove.fillActive ? 0.08 : 0.03; // Snappier transitions
-    conductorState.larsBpmOffset += (targetOffset - conductorState.larsBpmOffset) * lerpFactor;
+    let newLarsBpmOffset =
+        conductor.larsBpmOffset + (targetOffset - conductor.larsBpmOffset) * lerpFactor;
 
-    if (Math.abs(conductorState.larsBpmOffset) < 0.01) {
+    if (Math.abs(newLarsBpmOffset) < 0.01) {
         // Only reset if we are very close to zero AND the target is zero
         if (Math.abs(targetOffset) < 0.01) {
-            conductorState.larsBpmOffset = 0;
+            newLarsBpmOffset = 0;
         }
     }
 
-    updateBpmUI();
-}
-
-function updateBpmUI() {
-    const { groove, playback } = getState();
-    const bpmInput = document.getElementById('bpmInput');
-    const bpmControlGroup = document.getElementById('bpmControlGroup');
-    const bpmLabel = document.getElementById('bpmLabel');
-
-    if (!bpmInput || !bpmControlGroup) {
-        return;
-    }
-
-    const baseBpm = playback.bpm;
-    const offset = conductorState.larsBpmOffset;
-    const effectiveBpm = Math.round(baseBpm + offset);
-
-    if (groove.larsMode && playback.isPlaying) {
-        bpmControlGroup.classList.add('lars-active');
-
-        // Calculate intensity of the color (0 to 1)
-        // Saturate the color shift at 6 BPM offset
-        const intensity = Math.min(1, Math.abs(offset) / 6);
-
-        if (Math.abs(offset) > 0.1) {
-            const isPushing = offset > 0;
-            const targetColor = isPushing ? 'var(--blue)' : 'var(--red)';
-            const mixPercent = 20 + Math.round(intensity * 80);
-            const blendedColor = `color-mix(in srgb, var(--text-color), ${targetColor} ${mixPercent}%)`;
-
-            bpmInput.style.color = blendedColor;
-
-            if (bpmLabel) {
-                // On desktop (label visible), show secondary counter
-                const direction = isPushing ? '↗' : '↘';
-                bpmLabel.textContent = `${effectiveBpm} ${direction}`;
-                bpmLabel.style.color = blendedColor;
-            }
-        } else {
-            bpmInput.style.color = '';
-            if (bpmLabel) {
-                bpmLabel.textContent = 'BPM';
-                bpmLabel.style.color = '';
-            }
-        }
-    } else {
-        bpmControlGroup.classList.remove('lars-active');
-        bpmInput.style.color = '';
-        if (bpmLabel) {
-            bpmLabel.textContent = 'BPM';
-            bpmLabel.style.color = '';
-        }
+    if (newLarsBpmOffset !== conductor.larsBpmOffset) {
+        dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { larsBpmOffset: newLarsBpmOffset });
     }
 }
 
 export function checkSectionTransition(currentStep, stepsPerMeasure) {
-    const { groove, arranger, playback } = getState();
+    const { groove, arranger, playback, conductor } = getState();
     if (!groove.enabled) {
         return;
     }
@@ -425,8 +366,12 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
             }
 
             if (isLoopEnd && shouldFill) {
-                conductorState.loopCount++;
-                conductorState.formIteration++;
+                const nextLoopCount = conductor.loopCount + 1;
+                const nextFormIteration = conductor.formIteration + 1;
+                dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
+                    loopCount: nextLoopCount,
+                    formIteration: nextFormIteration,
+                });
 
                 // Dynamic threshold based on measure length
                 // If the total song length is 4 measures or fewer, we treat it as a short loop.
@@ -439,7 +384,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                     // Low intensity = fill every 4 loops.
                     const loopFrequency =
                         playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
-                    shouldFill = conductorState.loopCount % loopFrequency === 0;
+                    shouldFill = nextLoopCount % loopFrequency === 0;
                 }
             }
 
@@ -479,7 +424,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                     }
                 } else {
                     // Fallback: Repetition-Based Logic (5+ Minute Jam Logic)
-                    const grandCycle = conductorState.formIteration % 8;
+                    const grandCycle = conductor.formIteration % 8;
                     if (grandCycle === 0) {
                         macroFloor = 0.15;
                         macroCeiling = 0.45;
@@ -499,8 +444,8 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 }
 
                 // --- 2. THE LOCAL FUNCTIONAL ROLE ---
-                if (conductorState.form?.sections) {
-                    const nextSection = conductorState.form.sections.find(
+                if (conductor.form?.sections) {
+                    const nextSection = conductor.form.sections.find(
                         (s) => s.id === nextEntry.chord.sectionId,
                     );
                     if (nextSection) {
@@ -576,9 +521,10 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 }
 
                 if (playback.autoIntensity) {
-                    conductorState.target = targetEnergy;
-                    conductorState.stepSize =
-                        (conductorState.target - playback.bandIntensity) / stepsPerMeasure;
+                    dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
+                        targetIntensity: targetEnergy,
+                        stepSize: (targetEnergy - playback.bandIntensity) / stepsPerMeasure,
+                    });
                 }
 
                 // --- 3. THE DRUM SEED (Creativity Memory) ---

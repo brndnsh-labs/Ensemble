@@ -27,6 +27,14 @@ const { mockState } = vi.hoisted(() => ({
             autoIntensity: false,
             visualFlash: false,
         },
+        conductor: {
+            targetIntensity: 0.35,
+            stepSize: 0.0005,
+            larsBpmOffset: 0,
+            form: null,
+            loopCount: 0,
+            formIteration: 0,
+        },
     },
 }));
 

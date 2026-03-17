@@ -9,6 +9,7 @@ vi.mock('../../public/state.js', () => {
     const mockPlayback = {
         audio: null,
         masterGain: null,
+        masterVolume: 0.5,
         saturator: null,
         masterLimiter: null,
         reverbNode: null,
@@ -27,6 +28,14 @@ vi.mock('../../public/state.js', () => {
     const mockMidi = { enabled: false, muteLocal: false };
     const mockArranger = {};
     const mockVizState = {};
+    const mockConductor = {
+        targetIntensity: 0.35,
+        stepSize: 0.0005,
+        larsBpmOffset: 0,
+        form: null,
+        loopCount: 0,
+        formIteration: 0,
+    };
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -38,6 +47,7 @@ vi.mock('../../public/state.js', () => {
         midi: mockMidi,
         arranger: mockArranger,
         vizState: mockVizState,
+        conductor: mockConductor,
     };
 
     return {

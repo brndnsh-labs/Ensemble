@@ -33,6 +33,14 @@ vi.mock('../../public/state.js', () => {
             srdcState: 'Statement',
         },
         groove: { enabled: true, genreFeel: 'Jazz' },
+        conductor: {
+            targetIntensity: 0.35,
+            stepSize: 0.0005,
+            larsBpmOffset: 0,
+            form: null,
+            loopCount: 0,
+            formIteration: 0,
+        },
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_PARAM') {
                 if (payload.module && payload.param && mockState[payload.module]) {
