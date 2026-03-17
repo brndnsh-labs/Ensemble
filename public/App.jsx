@@ -39,12 +39,20 @@ export function App({ getVisualTime }) {
     }));
 
     useEffect(() => {
-        const isDark =
-            theme === 'dark' ||
-            (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-        document.documentElement.setAttribute('data-theme', theme);
-        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        const updateTheme = () => {
+            const isDark = theme === 'dark' || (theme === 'auto' && mediaQuery.matches);
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        };
+
+        updateTheme();
+
+        if (theme === 'auto') {
+            mediaQuery.addEventListener('change', updateTheme);
+            return () => mediaQuery.removeEventListener('change', updateTheme);
+        }
     }, [theme]);
 
     useEffect(() => {

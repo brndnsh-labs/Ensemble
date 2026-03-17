@@ -84,10 +84,7 @@ export function Visualizer({ enabled, getVisualTime }) {
             return;
         }
         const style = getComputedStyle(document.documentElement);
-        const isDark =
-            document.documentElement.getAttribute('data-theme') === 'dark' ||
-            (document.documentElement.getAttribute('data-theme') === 'auto' &&
-                window.matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
         const themeCache = {
             bgColor: isDark ? '#0f172a' : '#f8fafc',
