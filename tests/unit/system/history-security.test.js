@@ -2,8 +2,8 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getState } from '../../../public/state.js';
 import { undo } from '../../../public/history.js';
+import { getState } from '../../../public/state.js';
 
 const { arranger } = getState();
 
