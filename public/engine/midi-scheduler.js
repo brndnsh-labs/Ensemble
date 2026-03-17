@@ -10,7 +10,7 @@ import { getMidi } from '../utils.js';
 
 /**
  * Stops MIDI transport and sends panic.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} _state - Global ensemble state
  * @param {number} time - AudioContext time
  */
 export function stopMidiTransport(_state, time) {
@@ -20,7 +20,7 @@ export function stopMidiTransport(_state, time) {
 
 /**
  * Starts MIDI transport and sends panic.
- * @param {Object} _state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} _state - Global ensemble state
  * @param {number} time - AudioContext time
  */
 export function startMidiTransport(_state, time) {
@@ -30,7 +30,7 @@ export function startMidiTransport(_state, time) {
 
 /**
  * Dispatches a MIDI count-in note for the soloist.
- * @param {Object} _state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} _state - Global ensemble state
  * @param {Object} res - Resolution object
  * @param {number} time - AudioContext time
  */
@@ -40,7 +40,7 @@ export function dispatchMidiCountInSoloist(_state, res, time) {
 
 /**
  * Dispatches a MIDI drum note.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {string} soundName - Drum sound name
  * @param {number} playTime - AudioContext time
  * @param {number} velocity - Drum velocity
@@ -52,7 +52,7 @@ export function dispatchMidiDrum(state, soundName, playTime, velocity) {
 
 /**
  * Dispatches a MIDI bass note.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} midiNum - MIDI note number
  * @param {number} finalVel - Final velocity
  * @param {number} adjustedTime - Adjusted AudioContext time
@@ -72,7 +72,7 @@ export function dispatchMidiBass(state, midiNum, finalVel, adjustedTime, duratio
 
 /**
  * Dispatches a MIDI soloist note with pitch bend support.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} midiNum - MIDI note number
  * @param {number} vel - Final velocity
  * @param {number} playTime - AudioContext time
@@ -110,7 +110,7 @@ export function dispatchMidiSoloist(
 
 /**
  * Dispatches a MIDI sustain pedal event.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} value - CC value
  * @param {number} ccTime - AudioContext time
  */
@@ -121,7 +121,7 @@ export function dispatchMidiChordSustain(state, value, ccTime) {
 
 /**
  * Dispatches a MIDI chord note.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} freq - Note frequency
  * @param {number} velocity - Note velocity
  * @param {number} playTime - AudioContext time
@@ -140,7 +140,7 @@ export function dispatchMidiChordNote(state, freq, velocity, playTime, duration)
 
 /**
  * Dispatches a MIDI harmony note.
- * @param {Object} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} m - MIDI note number
  * @param {number} finalVel - Note velocity
  * @param {number} playTime - AudioContext time
@@ -159,8 +159,8 @@ export function dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration) 
 
 /**
  * Dispatches MIDI automation CC messages.
- * @param {Object} state - Global ensemble state
- * @param {Object} stepInfo - Global step info
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
+ * @param {import('../types.js').StepInfo} stepInfo - Global step info
  * @param {number} swungTime - AudioContext time
  */
 export function dispatchMidiAutomation(state, stepInfo, swungTime) {

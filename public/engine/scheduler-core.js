@@ -78,7 +78,7 @@ initPlatformHacks();
  * Handles audio context suspension/resumption, worker synchronization,
  * and global state updates for starting or stopping the engine.
  *
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
  * @param {Function} [dispatch] - State dispatch function.
  */
@@ -542,7 +542,7 @@ function getChordAtStep(state, step) {
  * Schedules drum sounds for a specific step.
  * Applies pocket/timing offsets, handles fills, and pushes events to the visualizer queue.
  *
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {Object} params - Drum parameters.
  * @param {Function} [dispatch] - State dispatch function.
  */
@@ -688,7 +688,7 @@ function scheduleDrums(state, params, dispatch = null) {
 /**
  * Schedules drum notes directly from the worker buffer (for Resolution or pattern playback).
  *
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
@@ -731,8 +731,8 @@ function scheduleDrumsFromBuffer(state, step, time) {
 /**
  * Schedules bass notes from the worker buffer.
  *
- * @param {Object} state - Global ensemble state.
- * @param {Object} chordData - The current chord context.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ * @param {import('../types.js').ChordContext} chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
@@ -784,10 +784,10 @@ function scheduleBass(state, chordData, step, time) {
  * Schedules soloist (melody) notes from the worker buffer.
  * Handles monophonic/polyphonic modes, bends, and MIDI output.
  *
- * @param {Object} state - Global ensemble state.
- * @param {Object} chordData - The current chord context.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ * @param {import('../types.js').ChordContext} chordData - The current chord context.
  * @param {number} step - The global step index.
- * @param {number} time - The AudioContext time (swung).
+ * @param {number} _time - The AudioContext time (swung).
  * @param {number} unswungTime - The AudioContext time (linear/unswung) for strict quantization.
  */
 function scheduleSoloist(state, chordData, step, _time, unswungTime) {
@@ -918,8 +918,8 @@ export function scheduleChordVisuals(state, chordData, t) {
  * Schedules chord notes from the worker buffer.
  * Handles sustain pedal events (MIDI CC 64).
  *
- * @param {Object} state - Global ensemble state.
- * @param {Object} chordData - The current chord context.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ * @param {import('../types.js').ChordContext} _chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
@@ -981,8 +981,8 @@ function scheduleChords(state, _chordData, step, time) {
  * Schedules harmony notes (pads, stabs) from the worker buffer.
  * Handles voice killing for smoother transitions.
  *
- * @param {Object} state - Global ensemble state.
- * @param {Object} chordData - The current chord context.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ * @param {import('../types.js').ChordContext} _chordData - The current chord context.
  * @param {number} step - The global step index.
  * @param {number} time - The AudioContext time to play.
  */
@@ -1065,7 +1065,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
  * Orchestrates global events for the current step.
  * Updates conductor state, triggers MIDI automation, rhythm section masking, and metronome.
  *
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} step - The global step index.
  * @param {number} swungTime - The swung AudioContext time.
  * @param {Function} [dispatch] - State dispatch function.
@@ -1229,7 +1229,7 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = null) {
  * Syncs current state parameters to the worker and flushes the note buffers.
  * Called when key parameters (genre, key, progression) change.
  *
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} step - The current global step.
  * @param {Function} [dispatch] - State dispatch function.
  */
