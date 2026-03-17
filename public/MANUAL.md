@@ -46,6 +46,13 @@ Ensemble can act as a high-precision MIDI controller for Logic, Ableton, or hard
 
 ## 🧠 Understanding the Band
 
+### Soloist Melodic Devices
+The Soloist engine utilizes procedural algorithms to generate stylistic embellishments, runs, and licks based on the selected genre. Examples include:
+- **Jazz & Bebop:** `bebopScale` runs, `chromaticEnclosure`s, and Coltrane-style `sheetsOfSound`.
+- **Blues & Rock:** Signature `bluesLick`s, `bluesTurnaround`s, and expressive `bluesCurl` bends.
+- **Country:** Authentic `chickenPick` double-stops, `banjoRoll`s, and `countryBend`s.
+- **Modern/Fusion:** `quartalStack`s and `graceSlide`s for sophisticated phrasing.
+
 ### The Conductor (Intensity & Complexity)
 These two sliders are the most powerful tools in the app:
 - **Intensity:** Controls the band's energy. At 0.1, the drummer might just use cross-sticks; at 0.9, they'll be playing heavy crashes and busy fills.
