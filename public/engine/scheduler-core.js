@@ -7,21 +7,6 @@ import {
 import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
-import {
-    normalizeMidiVelocity,
-    panic,
-    sendMIDICC,
-    sendMIDIDrum,
-    sendMIDINote,
-    sendMIDITransport,
-} from '../midi-controller.js';
-import {
-    activateWakeLock,
-    deactivateWakeLock,
-    initPlatform,
-    lockAudio,
-    unlockAudio,
-} from '../platform.js';
 import { getSoloistNote } from '../soloist.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
@@ -54,6 +39,23 @@ import {
     updateSustain,
 } from './engine.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
+import {
+    dispatchMidiAutomation,
+    dispatchMidiBass,
+    dispatchMidiChordNote,
+    dispatchMidiChordSustain,
+    dispatchMidiCountInSoloist,
+    dispatchMidiDrum,
+    dispatchMidiHarmonyNote,
+    dispatchMidiSoloist,
+    startMidiTransport,
+    stopMidiTransport,
+} from './midi-scheduler.js';
+import {
+    initPlatformHacks,
+    startPlatformAudioAndWakeLock,
+    stopPlatformAudioAndWakeLock,
+} from './platform-orchestrator.js';
 
 const DRUM_VIS_PITCHES = {
     Kick: 36,
@@ -74,7 +76,7 @@ const DRUM_VIS_PITCHES = {
 };
 
 // Initialize platform-specific hacks (iOS Audio, WakeLock state)
-initPlatform();
+initPlatformHacks();
 
 /**
  * Toggles the playback state of the session.
@@ -101,8 +103,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
             conductorState.target = 0.35;
         }
         stopWorker();
-        lockAudio();
-        deactivateWakeLock();
+        stopPlatformAudioAndWakeLock();
         playback.drawQueue = []; // @direct-mutation
         playback.lastActiveDrumElements = null; // @direct-mutation
         chords.lastActiveChordIndex = null; // @direct-mutation
@@ -117,8 +118,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
             dispatch('VIS_RESET');
         }
         killAllNotes(state);
-        panic(true); // Full MIDI reset
-        sendMIDITransport('stop', playback.audio?.currentTime || 0);
+        stopMidiTransport(state, playback.audio?.currentTime || 0);
         flushBuffers();
 
         if (playback.audio) {
@@ -164,18 +164,16 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
         const primeSteps = arranger.totalSteps > 0 ? arranger.totalSteps * 2 : 0;
         flushBuffers(primeSteps);
 
-        unlockAudio();
+        startPlatformAudioAndWakeLock();
         restoreGains(state);
         const startTime = playback.audio.currentTime + 0.1;
         playback.nextNoteTime = startTime; // @direct-mutation
         playback.unswungNextNoteTime = startTime; // @direct-mutation
         playback.isCountingIn = playback.countIn; // @direct-mutation
         playback.countInBeat = 0; // @direct-mutation
-        activateWakeLock();
 
         // Initial MIDI cleanup
-        panic(true);
-        sendMIDITransport('start', startTime);
+        startMidiTransport(state, startTime);
 
         startWorker();
         scheduler(state, dispatch);
@@ -464,7 +462,7 @@ function scheduleCountIn(state, beat, time) {
                 false,
                 res.vibrato,
             );
-            sendMIDINote('Soloist', res.midi, res.velocity, time, res.duration || 0.25);
+            dispatchMidiCountInSoloist(state, res, time);
             playback.drawQueue.push({
                 type: 'note',
                 track: 'soloist',
@@ -570,7 +568,7 @@ function scheduleDrums(state, params, dispatch = null) {
         isTurnaround,
     } = params;
 
-    const { playback, groove, vizState, midi, arranger } = state;
+    const { playback, groove, vizState, arranger } = state;
 
     // PERFORMANCE MODE: Skip automatic drums if manual pad is active
     if (playback.modals?.drumPad) {
@@ -686,12 +684,7 @@ function scheduleDrums(state, params, dispatch = null) {
                 });
             }
 
-            sendMIDIDrum(
-                soundName,
-                playTime,
-                Math.min(1.0, velocity * conductorVel),
-                midi.drumsOctave,
-            );
+            dispatchMidiDrum(state, soundName, playTime, velocity * conductorVel);
         }
     });
 }
@@ -704,7 +697,7 @@ function scheduleDrums(state, params, dispatch = null) {
  * @param {number} time - The AudioContext time to play.
  */
 function scheduleDrumsFromBuffer(state, step, time) {
-    const { groove, playback, vizState, midi } = state;
+    const { groove, playback, vizState } = state;
 
     // PERFORMANCE MODE: Skip automatic drums if manual pad is active
     if (playback.modals?.drumPad) {
@@ -734,7 +727,7 @@ function scheduleDrumsFromBuffer(state, step, time) {
                 });
             }
 
-            sendMIDIDrum(name, playTime, Math.min(1.0, velocity * conductorVel), midi.drumsOctave);
+            dispatchMidiDrum(state, name, playTime, velocity * conductorVel);
         });
     }
 }
@@ -748,7 +741,7 @@ function scheduleDrumsFromBuffer(state, step, time) {
  * @param {number} time - The AudioContext time to play.
  */
 function scheduleBass(state, chordData, step, time) {
-    const { bass, playback, vizState, midi } = state;
+    const { bass, playback, vizState } = state;
     const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
 
@@ -784,14 +777,7 @@ function scheduleBass(state, chordData, step, time) {
                 playBassNote(state, freq, adjustedTime, duration, finalVel, muted);
                 if (!muted) {
                     // Bass is strictly monophonic, so we force Mono mode to kill previous notes
-                    sendMIDINote(
-                        midi.bassChannel,
-                        midiNum + midi.bassOctave * 12,
-                        normalizeMidiVelocity(finalVel),
-                        adjustedTime,
-                        duration,
-                        true,
-                    );
+                    dispatchMidiBass(state, midiNum, finalVel, adjustedTime, duration);
                 }
             }
         });
@@ -809,7 +795,7 @@ function scheduleBass(state, chordData, step, time) {
  * @param {number} unswungTime - The AudioContext time (linear/unswung) for strict quantization.
  */
 function scheduleSoloist(state, chordData, step, _time, unswungTime) {
-    const { soloist, playback, vizState, midi } = state;
+    const { soloist, playback, vizState } = state;
     const notes = soloist.buffer.get(step);
     soloist.buffer.delete(step);
 
@@ -871,21 +857,14 @@ function scheduleSoloist(state, chordData, step, _time, unswungTime) {
                 // Soloist is monophonic UNLESS double stops are enabled
                 const isMono = soloist.mode === 'monophonic';
 
-                // Support Pitch Bend for MIDI scoops
-                let bend = 0;
-                if (bendStartInterval !== 0) {
-                    // Map semitones to 14-bit value (-8192 to 8191)
-                    // Assuming standard 2-semitone range.
-                    bend = Math.round(-(bendStartInterval / 2) * 8192);
-                }
-
-                sendMIDINote(
-                    midi.soloistChannel,
-                    midiNum + midi.soloistOctave * 12,
-                    normalizeMidiVelocity(vel),
+                dispatchMidiSoloist(
+                    state,
+                    midiNum,
+                    vel,
                     playTime,
                     duration,
-                    { isMono, bend },
+                    bendStartInterval || 0,
+                    isMono,
                 );
 
                 if (vizState.enabled) {
@@ -949,7 +928,7 @@ export function scheduleChordVisuals(state, chordData, t) {
  * @param {number} time - The AudioContext time to play.
  */
 function scheduleChords(state, _chordData, step, time) {
-    const { chords, playback, midi } = state;
+    const { chords, playback } = state;
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
 
@@ -982,7 +961,7 @@ function scheduleChords(state, _chordData, step, time) {
                         const isSustain = cc.value >= 64;
                         const ccTime = playTime + (cc.timingOffset || 0);
                         updateSustain(state, isSustain, ccTime);
-                        sendMIDICC(midi.chordsChannel, 64, cc.value, ccTime);
+                        dispatchMidiChordSustain(state, cc.value, ccTime);
                     }
                 });
             }
@@ -996,13 +975,7 @@ function scheduleChords(state, _chordData, step, time) {
                     dry: dry,
                     numVoices: numVoices,
                 });
-                sendMIDINote(
-                    midi.chordsChannel,
-                    getMidi(freq) + midi.chordsOctave * 12,
-                    normalizeMidiVelocity(velocity),
-                    playTime,
-                    duration,
-                );
+                dispatchMidiChordNote(state, freq, velocity, playTime, duration);
             }
         });
     }
@@ -1018,7 +991,7 @@ function scheduleChords(state, _chordData, step, time) {
  * @param {number} time - The AudioContext time to play.
  */
 function scheduleHarmonies(state, _chordData, step, time) {
-    const { harmony, playback, vizState, midi } = state;
+    const { harmony, playback, vizState } = state;
     const notes = harmony.buffer.get(step);
     harmony.buffer.delete(step);
 
@@ -1074,13 +1047,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
                     slideDuration,
                     vibrato,
                 );
-                sendMIDINote(
-                    midi.harmonyChannel,
-                    m + midi.harmonyOctave * 12,
-                    normalizeMidiVelocity(finalVel),
-                    playTime,
-                    duration,
-                );
+                dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration);
 
                 if (vizState.enabled) {
                     const { name, octave } = midiToNote(m);
@@ -1108,7 +1075,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
  * @param {Function} [dispatch] - State dispatch function.
  */
 export function scheduleGlobalEvent(state, step, swungTime, dispatch = null) {
-    const { arranger, playback, groove, soloist, midi, chords, bass, harmony } = state;
+    const { arranger, playback, groove, soloist, chords, bass, harmony } = state;
     const globalTS = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepInfo = getStepInfo(step, globalTS, arranger.measureMap, TIME_SIGNATURES);
     const ts = TIME_SIGNATURES[stepInfo.tsName] || globalTS;
@@ -1142,15 +1109,7 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = null) {
     checkSectionTransition(step, spm);
 
     // MIDI Automation
-    if (midi.enabled && midi.selectedOutputId && stepInfo.isBeatStart) {
-        const intensityCC = Math.floor(playback.bandIntensity * 127);
-        const soloistTensionCC = Math.floor(soloist.tension * 127);
-
-        sendMIDICC(midi.soloistChannel, 1, soloistTensionCC, swungTime);
-        sendMIDICC(midi.soloistChannel, 11, intensityCC, swungTime);
-        sendMIDICC(midi.chordsChannel, 11, intensityCC, swungTime);
-        sendMIDICC(midi.bassChannel, 11, intensityCC, swungTime);
-    }
+    dispatchMidiAutomation(state, stepInfo, swungTime);
 
     const drumStep = step % (groove.measures * spm);
     const t = swungTime + (Math.random() - 0.5) * (groove.humanize / 100) * 0.025;
