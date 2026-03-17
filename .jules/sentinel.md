@@ -38,3 +38,8 @@
 **Vulnerability:** Similar to earlier finding, `JSON.parse` was still called directly on `localStorage` values without error handling in controllers and UI components (`arranger-controller.js`, `instrument-controller.js`, `PresetLibrary.jsx`). Malformed JSON could cause the application to crash or fail to load UI sections.
 **Learning:** `JSON.parse` on external inputs (like `localStorage`) must be globally searched and consistently wrapped in `try...catch` blocks across the entire codebase, not just in central state hydration modules. Type validation (e.g. `Array.isArray`) is also necessary after parsing.
 **Prevention:** Treat all `localStorage` reads as untrusted and wrap them in robust `try...catch` blocks with safe fallbacks and type checks.
+
+## 2026-03-16 - Undo History JSON Parsing Protection
+**Vulnerability:** The `undo` function in `history.js` parsed snapshots from the `arranger.history` stack using `JSON.parse` without error handling or type validation. Malformed or unexpected JSON data in the history could cause the application to crash or enter an invalid state when performing an undo.
+**Learning:** Even internal state stacks that are ostensibly "safe" should be treated with caution if they are derived from or can be influenced by serializable data. Defense-in-depth requires robust parsing and validation at every boundary where data is deserialized.
+**Prevention:** Wrapped `JSON.parse` in a `try...catch` block and added `Array.isArray` validation to ensure the restored state is valid. Gracefully handle failures by returning early to preserve the current application state.
