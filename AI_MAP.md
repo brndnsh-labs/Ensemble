@@ -55,6 +55,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Exports |
 | :--- | :--- | :--- |
 | `public/engine/scheduler-core.js` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
+| `public/engine/midi-scheduler.js` | MIDI scheduling logic. | `dispatchMidiDrum`, `dispatchMidiSoloist` |
+| `public/engine/platform-orchestrator.js` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
 | `public/engine/engine.js` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
 | `public/engine/synth-utils.js` | Shared WebAudio boilerplate (ramping, voices). | `rampGain`, `killActiveVoices` |
 | `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
