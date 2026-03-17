@@ -4,6 +4,7 @@
         "public/main.js",
         "public/sw.js",
         "public/ui-root.jsx",
+        "public/visualizer-worker.js",
         "scripts/*.js",
         "tests/scripts/*.js"
     ],

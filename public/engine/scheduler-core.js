@@ -3,7 +3,6 @@ import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { getSoloistNote } from '../soloist.js';
-import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -121,6 +120,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
                 clearTimeout(playback.suspendTimeout);
             }
             playback.suspendTimeout = setTimeout(() => {
+                // @direct-mutation
                 // @direct-mutation
                 // @direct-mutation
                 // @direct-mutation
