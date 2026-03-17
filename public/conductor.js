@@ -4,7 +4,7 @@ import { debounceSaveState, saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
 import { triggerFlash } from './ui.js';
-import { binarySearchMap } from './utils.js';
+import { binarySearchMap, binarySearchMapIndex } from './utils.js';
 
 export const conductorState = {
     target: 0.35,
@@ -377,7 +377,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
         // Find the chord at the beginning of the NEXT section/loop iteration
         const nextChordIdx = isLoopEnd
             ? 0
-            : arranger.stepMap.findIndex((e) => measureEnd >= e.start && measureEnd < e.end);
+            : binarySearchMapIndex(arranger.stepMap || [], measureEnd);
         const nextEntry = nextChordIdx !== -1 ? arranger.stepMap[nextChordIdx] : null;
 
         if (nextEntry && (isLoopEnd || nextEntry.chord.sectionId !== entry.chord.sectionId)) {
@@ -599,9 +599,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
 
     // --- Harmonic Anticipation (Ghost Kick / Bark) ---
     // Runs at the very end of a chord if it leads into a new section or song end.
-    const currentChordIdx = arranger.stepMap.findIndex(
-        (e) => modStep >= e.start && modStep < e.end,
-    );
+    const currentChordIdx = binarySearchMapIndex(arranger.stepMap || [], modStep);
     if (currentChordIdx === -1) {
         return;
     }

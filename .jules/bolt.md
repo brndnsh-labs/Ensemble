@@ -17,3 +17,7 @@
 ## 2025-10-26 - Bolt: Eliminate linear search using `.some` for double stop logic
 **Learning:** Generating extra notes for "double stops" (`generateExtraNotes`) invokes linear array scanning inside tight looping logic (`currentChord.intervals.some`).
 **Action:** Precompute chord intervals into a bitmask (`chordMask`) and evaluate matching intervals via bitwise lookup `((chordMask >> interval) & 1)`.
+
+## 2025-10-27 - Bolt: Optimize Range Index Lookups with binarySearchMapIndex
+**Learning:** Just like `find()`, using `.findIndex((e) => step >= e.start && step < e.end)` on large sorted map arrays (like `arranger.stepMap`) inside frequent audio updates or UI loops causes O(N) linear scan overhead.
+**Action:** Add and use a custom `binarySearchMapIndex` function in `utils.js` to achieve O(log N) performance for retrieving the array index of the matching range block.

@@ -5,7 +5,12 @@ import { stopSoloist, triggerSoloNote } from '../performance-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { formatUnicodeSymbols, getChordMidiNotes, midiToNote } from '../utils.js';
+import {
+    binarySearchMapIndex,
+    formatUnicodeSymbols,
+    getChordMidiNotes,
+    midiToNote,
+} from '../utils.js';
 import { PerformanceCanvas } from './PerformanceCanvas.jsx';
 
 function useMobile() {
@@ -85,7 +90,7 @@ export function PerformanceModal() {
     if (stepMap && stepMap.length > 0) {
         // Use modulo to wrap the step during song looping
         const loopStep = totalSteps > 0 ? step % totalSteps : step;
-        const currentIdx = stepMap.findIndex((e) => loopStep >= e.start && loopStep < e.end);
+        const currentIdx = binarySearchMapIndex(stepMap, loopStep);
         if (currentIdx !== -1) {
             currentEntry = stepMap[currentIdx];
             if (currentIdx + 1 < stepMap.length) {
