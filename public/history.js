@@ -19,7 +19,19 @@ export function undo(refreshArrangerUI) {
         return;
     }
     const last = arranger.history.pop();
-    arranger.sections = JSON.parse(last);
+    try {
+        const parsed = JSON.parse(last);
+        if (Array.isArray(parsed)) {
+            arranger.sections = parsed;
+        } else {
+            console.warn('[History] Undo failed: Snapshot is not an array');
+            return;
+        }
+    } catch (e) {
+        console.error('[History] Undo failed: Malformed history snapshot', e);
+        return;
+    }
+
     if (refreshArrangerUI) {
         refreshArrangerUI();
     }
