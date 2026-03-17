@@ -36,6 +36,13 @@ const messageQueue = [];
 // Ensure we resume processing messages after an export completes
 setOnExportEnd(() => processMessageQueue());
 
+/**
+ * Fills the note buffers for the next n steps ahead of the current step.
+ * @param {import('./types.js').EnsembleState} state
+ * @param {number} currentStep
+ * @param {number|null} requestTimestamp
+ * @param {number|null} processStartTime
+ */
 function fillBuffers(state, currentStep, requestTimestamp = null, processStartTime = null) {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
     const targetStep = currentStep + LOOKAHEAD;
@@ -322,6 +329,12 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
     }
 }
 
+/**
+ * Process incoming messages from the main thread.
+ * @param {string} type
+ * @param {Object} data
+ * @param {number} startTime
+ */
 function processMessage(type, data, startTime) {
     const state = getState();
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
@@ -477,6 +490,13 @@ if (typeof self !== 'undefined') {
     };
 }
 
+/**
+ * Handles generating a resolution/ending sequence.
+ * @param {import('./types.js').EnsembleState} state
+ * @param {number} step
+ * @param {number|null} requestTimestamp
+ * @param {number|null} processStartTime
+ */
 export function handleResolution(state, step, requestTimestamp = null, processStartTime = null) {
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -508,6 +528,11 @@ export function handleResolution(state, step, requestTimestamp = null, processSt
     });
 }
 
+/**
+ * Primes the generative engines by running them "silently" for a number of steps.
+ * @param {import('./types.js').EnsembleState} state
+ * @param {number} steps
+ */
 function handlePrime(state, steps) {
     const { soloist, arranger, playback, bass } = state;
     if (!soloist.enabled || arranger.totalSteps === 0) {

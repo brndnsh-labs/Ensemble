@@ -28,6 +28,10 @@ let _onExportEnd = null;
 export const setOnExportEnd = (fn) => (_onExportEnd = fn);
 
 export class ExportProcessor {
+    /**
+     * @param {import('../types.js').EnsembleState} state
+     * @param {Object} options
+     */
     constructor(state, options) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
         this.state = state;
@@ -925,6 +929,11 @@ export class ExportProcessor {
     }
 }
 
+/**
+ * Handles the offline MIDI export process.
+ * @param {import('../types.js').EnsembleState} state
+ * @param {Object} options
+ */
 export function handleExport(state, options) {
     try {
         const processor = new ExportProcessor(state, options);
