@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { injectManualMetadata } from '../utils/manual-metadata.js';
+import { escapeHTML } from '../utils.js';
 
 /**
  * A tiny, zero-dependency Markdown-to-HTML converter.
@@ -13,8 +14,13 @@ function simpleMarkdown(text) {
         return '';
     }
 
+    // Apply full HTML escaping to mitigate XSS (attribute injection, raw tags, entity evasion).
+    // The simpleMarkdown parser handles headers, bold, code, lists, and links, none
+    // of which require raw HTML characters (<, >, &, ", ', `).
+    const sanitizedText = escapeHTML(text);
+
     return (
-        text
+        sanitizedText
             // Headers
             .replace(/^# (.*$)/gm, '<h1>$1</h1>')
             .replace(/^## (.*$)/gm, '<h2>$1</h2>')
@@ -24,10 +30,20 @@ function simpleMarkdown(text) {
             // Inline Code
             .replace(/`(.*?)`/g, '<code>$1</code>')
             // Links
-            .replace(
-                /\[(.*?)\]\((.*?)\)/g,
-                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
-            )
+            .replace(/\[(.*?)\]\((.*?)\)/g, (_match, linkText, url) => {
+                // Prevent javascript: and data: URIs in links.
+                // Since `escapeHTML` has run, entity evasion (e.g., jav&#x09;ascript:)
+                // is neutralized because the '&' became '&amp;'.
+                const cleanUrl = url.trim().toLowerCase();
+                if (
+                    cleanUrl.startsWith('javascript:') ||
+                    cleanUrl.startsWith('data:') ||
+                    cleanUrl.startsWith('vbscript:')
+                ) {
+                    return linkText;
+                }
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+            })
             // Horizontal Rule
             .replace(/^---$/gm, '<hr />')
             // Lists (Simple unordered)
