@@ -41,7 +41,9 @@ export function getSoloistNote(
 
     let activeStyle = style;
     if (activeStyle === 'smart') {
-        activeStyle = GENRE_STYLE_MAPPING[groove.genreFeel] || 'scalar';
+        /** @type {any} */
+        const mapping = GENRE_STYLE_MAPPING;
+        activeStyle = mapping[groove.genreFeel] || 'scalar';
     }
 
     let intensity = playback.bandIntensity || 0.5;
@@ -87,7 +89,6 @@ export function getSoloistNote(
         soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
     }
 
-    // --- Helper to finalize legacy notes (Lead Sheet / Devices) ---
     /**
      * @param {any} res
      * @returns {any}
@@ -100,7 +101,7 @@ export function getSoloistNote(
         const primary = results[results.length - 1];
 
         // Coordination: Mark as busy if playing short durations or dense phrases
-        primary.isBusy = soloist.busySteps > 0 || (primary.durationSteps || 1) < 1.0;
+        primary.isBusy = (soloist.busySteps || 0) > 0 || (primary.durationSteps || 1) < 1.0;
 
         soloist.lastMidiPlayed = primary.midi; // @worker-mutation
 
@@ -135,7 +136,8 @@ export function getSoloistNote(
         }
 
         if (activeStyle === 'blues') {
-            const relativeInterval = ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12;
+            const relativeInterval =
+                ((primary.midi % 12) - ((currentChord.rootMidi || 0) % 12) + 12) % 12;
             if (
                 (relativeInterval === 3 || relativeInterval === 6) &&
                 primary.bendStartInterval === 0
@@ -151,7 +153,9 @@ export function getSoloistNote(
         if (soloist.leadSheetMelody && soloist.leadSheetMelody.length > 0) {
             const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
             const stepInFormRelative = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
-            const note = soloist.leadSheetMelody.find((n) => n.globalStep === stepInFormRelative);
+            const note = soloist.leadSheetMelody.find(
+                (/** @type {any} */ n) => n.globalStep === stepInFormRelative,
+            );
 
             if (note) {
                 const res = {
@@ -207,7 +211,9 @@ export function getSoloistNote(
     // At the start of a section, the soloist adopts a new "state of mind" (influence)
     // PRE-HEAT: Also trigger rotation at the start of the count-in (e.g., step -16)
     if (stepInForm === coordination.sectionStart || (step < 0 && step === -stepsPerMeasure)) {
-        const pool = INFLUENCE_POOLS[activeStyle] || [];
+        /** @type {any} */
+        const pools = INFLUENCE_POOLS;
+        const pool = pools[activeStyle] || [];
         if (pool.length > 0) {
             // High intensity sections might shift influence more frequently (probabilistically)
             const shouldShift = soloist.phraseCount === 0 || Math.random() < 0.8;
@@ -253,7 +259,7 @@ export function getSoloistNote(
         }
     }
 
-    if (isFinalMeasure && soloist.transitionState === 'rest') {
+    if (isFinalMeasure && (soloist.transitionState || null) === 'rest') {
         const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
         const restBeatStart = tsConfig.beats >= 4 ? 2 : 1;
         if (beatInMeasure >= restBeatStart) {
@@ -267,7 +273,7 @@ export function getSoloistNote(
         soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
         // --- Proactive Lead-in Wake-up ---
-        if (soloist.transitionState === 'lead_in') {
+        if ((soloist.transitionState || null) === 'lead_in') {
             const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
             // If we are in the last beat of the measure, force wake up to play pick-ups
             if (beatInMeasure === tsConfig.beats - 1) {
@@ -275,17 +281,19 @@ export function getSoloistNote(
             }
         }
 
-        if (soloist.restSteps <= 0 || coordination.bypassRhythm) {
+        if ((soloist.restSteps || 0) <= 0 || coordination.bypassRhythm) {
             const isGoodEntry =
                 isBeatStart || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
             const preventBreakout =
                 isFinalMeasure &&
-                soloist.transitionState === 'rest' &&
+                (soloist.transitionState || null) === 'rest' &&
                 Math.floor(measureStep / stepsPerBeat) >= 2;
 
             if (
                 !preventBreakout &&
-                (isGoodEntry || coordination.bypassRhythm || soloist.restSteps < -stepsPerMeasure)
+                (isGoodEntry ||
+                    coordination.bypassRhythm ||
+                    (soloist.restSteps || 0) < -stepsPerMeasure)
             ) {
                 soloist.isResting = false; // @worker-mutation
                 soloist.phrasingState = 'active'; // @worker-mutation
@@ -300,29 +308,33 @@ export function getSoloistNote(
 
                 // --- Call & Response Framework ---
                 if (['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle)) {
-                    const wasCall = soloist.phraseContext.role === 'call';
+                    const wasCall = (soloist.phraseContext?.role || 'call') === 'call';
                     const responseProb = wasCall ? 0.7 : 0.2;
                     const nextRole = Math.random() < responseProb ? 'response' : 'call';
 
                     logDebug(
-                        `C&R transition: ${soloist.phraseContext.role} -> ${nextRole} (prob: ${responseProb})`,
+                        `C&R transition: ${soloist.phraseContext?.role} -> ${nextRole} (prob: ${responseProb})`,
                     );
 
-                    soloist.phraseContext.role = nextRole; // @worker-mutation
+                    if (soloist.phraseContext) {
+                        soloist.phraseContext.role = nextRole; // @worker-mutation
+                    }
                 } else {
-                    soloist.phraseContext.role = 'call'; // @worker-mutation
+                    if (soloist.phraseContext) {
+                        soloist.phraseContext.role = 'call'; // @worker-mutation
+                    }
                 }
 
                 // GENERATE RHYTHM PLAN FOR THE PHRASE
                 const nextRhythmPlan = generateRhythmPlan(
                     step,
-                    soloist.activeSteps,
+                    soloist.activeSteps || 0,
                     activeStyle,
                     intensity,
                     stepsPerMeasure,
                     stepsPerBeat,
                     coordination,
-                    soloist.sessionSteps,
+                    soloist.sessionSteps || 0,
                     soloist,
                     stepInfo,
                 );
@@ -346,7 +358,7 @@ export function getSoloistNote(
         const isStrongResolution =
             measureStep === stepsPerMeasure - 1 || (isBackbeat && intensity > 0.5);
 
-        if (soloist.activeSteps <= 0 && isStrongResolution && !coordination.bypassRhythm) {
+        if ((soloist.activeSteps || 0) <= 0 && isStrongResolution && !coordination.bypassRhythm) {
             soloist.isResting = true; // @worker-mutation
             soloist.phrasingState = 'rest'; // @worker-mutation
             const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
