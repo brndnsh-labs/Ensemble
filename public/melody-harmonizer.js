@@ -91,7 +91,7 @@ export class Harmonizer {
                 type: strategy.name,
                 description: strategy.description,
                 chords: result,
-                progression: this.formatProgression(result.map((c) => c.roman)),
+                progression: this.formatProgression(result.map((/** @type {any} */ c) => c.roman)),
             });
         });
 

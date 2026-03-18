@@ -20,6 +20,7 @@ import { SettingRow, Slider, Toggle } from './UIControls.jsx';
  * @param {Object} props
  * @param {boolean} props.isActiveMobile
  */
+/** @param {any} props */
 export function GroovePanel({ isActiveMobile }) {
     const { activeTab, enabled, measures, fillActive } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({

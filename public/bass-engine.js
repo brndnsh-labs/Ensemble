@@ -596,16 +596,16 @@ export function getBassNote(
                 }
                 return best;
             })
-            .filter((n) => n >= absMin && n <= absMax && !isSameAsPrev(n));
+            .filter((/** @type {any} */ n) => n >= absMin && n <= absMax && !isSameAsPrev(n));
 
         if (isSoloistBusy) {
-            candidates = candidates.filter((n) => {
+            candidates = candidates.filter((/** @type {any} */ n) => {
                 const pc = n % 12;
                 const rootPC = baseRoot % 12;
                 return pc === rootPC || pc === (rootPC + 7) % 12;
             });
             if (candidates.length === 0) {
-                candidates = [baseRoot, baseRoot + 7, baseRoot - 5].map((n) =>
+                candidates = [baseRoot, baseRoot + 7, baseRoot - 5].map((/** @type {any} */ n) =>
                     clampAndNormalize(n),
                 );
             }

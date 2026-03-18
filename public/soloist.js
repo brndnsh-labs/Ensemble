@@ -331,7 +331,9 @@ export function getSoloistNote(
                 // Capture skeleton for future responses
                 if (nextRhythmPlan.length > 0) {
                     // Skeleton is relative steps from phrase start
-                    soloist.phraseContext.skeleton = nextRhythmPlan.map((n) => n.stepTarget - step); // @worker-mutation
+                    soloist.phraseContext.skeleton = nextRhythmPlan.map(
+                        (/** @type {any} */ n) => n.stepTarget - step,
+                    ); // @worker-mutation
                 }
             }
         }

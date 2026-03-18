@@ -188,7 +188,7 @@ export function syncWorker(action, payload) {
                 measures: groove.measures,
                 swing: groove.swing,
                 swingSub: groove.swingSub,
-                instruments: groove.instruments.map((i) => ({
+                instruments: groove.instruments.map((/** @type {any} */ i) => ({
                     name: i.name,
                     steps: [...i.steps],
                     muted: i.muted,

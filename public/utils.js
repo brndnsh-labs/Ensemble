@@ -172,7 +172,7 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
  * @returns {string}
  */
 export function compressSections(sections) {
-    const minified = sections.map((s) => {
+    const minified = sections.map((/** @type {any} */ s) => {
         const m = { l: s.label, v: s.value };
         if (s.key) {
             // @ts-expect-error

@@ -528,10 +528,10 @@ export class ExportProcessor {
                     stepInfo,
                     coordination,
                 );
-                const numVoices = notes.filter((n) => n.midi > 0).length;
+                const numVoices = notes.filter((/** @type {any} */ n) => n.midi > 0).length;
                 const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
 
-                notes.forEach((n) => {
+                notes.forEach((/** @type {any} */ n) => {
                     const noteTimeS = stepTimeS + (n.timingOffset || 0);
                     const notePulse = Math.max(0, this.toPulses(noteTimeS));
 
@@ -590,7 +590,7 @@ export class ExportProcessor {
                 );
                 const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
 
-                harmonyNotes.forEach((n) => {
+                harmonyNotes.forEach((/** @type {any} */ n) => {
                     const noteTimeS = stepTimeS + (n.timingOffset || 0);
                     const notePulse = Math.max(0, this.toPulses(noteTimeS));
                     const midiVel = Math.max(
@@ -646,7 +646,7 @@ export class ExportProcessor {
                         if (playback.bandIntensity >= 0.5 || fillStep >= groove.fillLength / 2) {
                             const fillNotes = groove.fillSteps[fillStep];
                             if (fillNotes && fillNotes.length > 0) {
-                                fillNotes.forEach((n) => {
+                                fillNotes.forEach((/** @type {any} */ n) => {
                                     const midi = drumMap[n.name];
                                     if (midi) {
                                         const durS =
@@ -768,7 +768,7 @@ export class ExportProcessor {
             soloist,
         );
 
-        resolutionNotes.forEach((n) => {
+        resolutionNotes.forEach((/** @type {any} */ n) => {
             let track;
             let channel = 0;
             if (n.module === 'bass') {

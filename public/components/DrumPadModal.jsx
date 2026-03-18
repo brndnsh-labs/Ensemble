@@ -39,11 +39,13 @@ export function DrumPadModal() {
         };
     }, []);
 
-    const { swing, bpm, lastSmartGenre } = useEnsembleState((s) => ({
-        swing: s.groove.swing,
-        bpm: s.playback.bpm,
-        lastSmartGenre: s.groove.lastSmartGenre,
-    }));
+    const { swing, bpm, lastSmartGenre } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            swing: s.groove.swing,
+            bpm: s.playback.bpm,
+            lastSmartGenre: s.groove.lastSmartGenre,
+        }),
+    );
 
     const close = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'drumPad', open: false });

@@ -9,6 +9,7 @@ import { midiToNote } from '../utils.js';
  * PerformanceCanvas - A vertical-first, 4-pillar ribbon interface for mobile.
  * Includes intelligent melodic guidance and sticky-zone sustain logic.
  */
+/** @param {any} props */
 export function PerformanceCanvas({
     noteGroups,
     onNoteChange,

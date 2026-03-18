@@ -10,13 +10,16 @@ import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { SoloistSmartTab } from './SoloistSmartTab.jsx';
 import { StyleSelector } from './StyleSelector.jsx';
 
+/** @param {any} props */
 export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
-    const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState((s) => ({
-        activeTab: s[module].activeTab,
-        enabled: s[module].enabled,
-        tradeMode: s[module].tradeMode,
-        performanceOpen: s.playback.modals?.performance,
-    }));
+    const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            activeTab: s[module].activeTab,
+            enabled: s[module].enabled,
+            tradeMode: s[module].tradeMode,
+            performanceOpen: s.playback.modals?.performance,
+        }),
+    );
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef(null);

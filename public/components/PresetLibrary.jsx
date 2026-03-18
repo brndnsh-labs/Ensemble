@@ -10,13 +10,16 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
+/** @param {any} props */
 export function PresetLibrary({ type }) {
     const dispatch = useDispatch();
-    const { lastChordPreset, lastDrumPreset, isDirty } = useEnsembleState((s) => ({
-        lastChordPreset: s.arranger.lastChordPreset,
-        lastDrumPreset: s.groove.lastDrumPreset,
-        isDirty: s.arranger.isDirty,
-    }));
+    const { lastChordPreset, lastDrumPreset, isDirty } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            lastChordPreset: s.arranger.lastChordPreset,
+            lastDrumPreset: s.groove.lastDrumPreset,
+            isDirty: s.arranger.isDirty,
+        }),
+    );
 
     const [userPresets, setUserPresets] = useState([]);
     const [confirmSelect, setConfirmSelect] = useState(null);

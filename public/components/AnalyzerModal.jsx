@@ -7,7 +7,9 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
 export function AnalyzerModal() {
-    const isOpen = useEnsembleState((s) => s.playback.modals.analyzer);
+    const isOpen = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.analyzer,
+    );
     const dispatch = useDispatch();
     const [mode, setMode] = useState('chord'); // 'chord' or 'melody'
     const [isListening, setIsListening] = useState(false);

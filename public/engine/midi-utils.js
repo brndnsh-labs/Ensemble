@@ -18,7 +18,7 @@ export function writeVarInt(value) {
 }
 
 export function writeString(str) {
-    return str.split('').map((c) => c.charCodeAt(0));
+    return str.split('').map((/** @type {any} */ c) => c.charCodeAt(0));
 }
 
 export function writeInt32(val) {

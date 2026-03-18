@@ -144,7 +144,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         ];
     } else if (deviceType === 'banjoRoll') {
         const root = targetChord.rootMidi;
-        const rollPitches = [0, 4, 7, 9].map((i) => root + i);
+        const rollPitches = [0, 4, 7, 9].map((/** @type {any} */ i) => root + i);
         for (let i = 0; i < 4; i++) {
             deviceBuffer.push({
                 midi: rollPitches[i % rollPitches.length],
@@ -391,7 +391,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         const targetMidi = soloist.isResting ? dynamicCenter : lastMidi;
         const octaveShift = Math.round((targetMidi - startMidi) / 12) * 12;
 
-        return deviceBuffer.map((n) => {
+        return deviceBuffer.map((/** @type {any} */ n) => {
             const notes = Array.isArray(n) ? n : [n];
             const shifted = notes.map((note) => ({
                 ...note,

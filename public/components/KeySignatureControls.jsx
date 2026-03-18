@@ -27,7 +27,7 @@ const GROUPING_OPTIONS = {
 export function KeySignatureControls() {
     const dispatch = useDispatch();
     const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset, isMaximized } =
-        useEnsembleState((s) => ({
+        useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
             arrangerKey: s.arranger.key,
             timeSignature: s.arranger.timeSignature,
             isMinor: s.arranger.isMinor,

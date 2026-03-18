@@ -1,6 +1,7 @@
 import { h } from 'preact';
 import React from 'preact/compat';
 
+/** @param {any} props */
 export function SymbolMenu({ onSelect, onClose }) {
     const symbols = [
         '|',

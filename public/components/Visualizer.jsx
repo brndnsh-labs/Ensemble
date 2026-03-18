@@ -16,6 +16,7 @@ let missedFrames = 0;
  * @param {any} props.enabled
  * @param {any} props.getVisualTime
  */
+/** @param {any} props */
 export function Visualizer({ enabled, getVisualTime }) {
     const containerRef = useRef(null);
     const canvasRef = useRef(null);

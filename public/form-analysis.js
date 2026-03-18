@@ -90,7 +90,7 @@ export function analyzeForm() {
     });
 
     // 2. Identify Patterns (Saliency)
-    const sectionSignatures = sections.map((s) => s.chords.join('|'));
+    const sectionSignatures = sections.map((/** @type {any} */ s) => s.chords.join('|'));
     const occurrenceCount = {};
 
     sections.forEach((s, i) => {

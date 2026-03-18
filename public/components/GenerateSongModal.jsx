@@ -19,10 +19,19 @@ import { ButtonGroup, SettingGroup, SettingRow, Stepper, Toggle } from './UICont
 export function GenerateSongModal() {
     const { arranger } = getState();
     const dispatch = useDispatch();
-    const isOpen = useEnsembleState((s) => s.playback.modals.generateSong);
-    const lastInteractedId = useEnsembleState((s) => s.arranger.lastInteractedSectionId);
-    const sections = useEnsembleState((s) => s.arranger.sections);
-    const isDirty = useEnsembleState((s) => s.arranger.isDirty);
+    const isOpen = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.generateSong,
+    );
+    const lastInteractedId = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) =>
+            s.arranger.lastInteractedSectionId,
+    );
+    const sections = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.sections,
+    );
+    const isDirty = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.isDirty,
+    );
 
     const overlayRef = useRef(null);
 

@@ -118,7 +118,20 @@
         "Partido",
         "partido",
         "Ganza",
-        "Pentatonics"
+        "Pentatonics",
+        "Krumhansl",
+        "Schmuckler",
+        "chromatical",
+        "cand",
+        "Hann",
+        "Ableton",
+        "Viterbi",
+        "pathfinding",
+        "reharm",
+        "intv",
+        "APOS",
+        "microtonal",
+        "Vivm"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

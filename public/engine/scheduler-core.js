@@ -719,7 +719,7 @@ function scheduleDrumsFromBuffer(state, step, time) {
     if (notes && notes.length > 0) {
         const conductorVel = playback.conductorVelocity || 1.0;
 
-        notes.forEach((n) => {
+        notes.forEach((/** @type {any} */ n) => {
             const { name, velocity, timingOffset } = n;
             const playTime = time + (timingOffset || 0);
 
@@ -951,7 +951,7 @@ function scheduleChords(state, _chordData, step, time) {
             }
         }
 
-        notes.forEach((n) => {
+        notes.forEach((/** @type {any} */ n) => {
             const {
                 freq,
                 velocity,
@@ -1024,7 +1024,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
         }
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
 
-        notes.forEach((n) => {
+        notes.forEach((/** @type {any} */ n) => {
             const {
                 freq,
                 velocity,
@@ -1296,7 +1296,7 @@ function syncAndFlushWorker(state, step, dispatch = null) {
             measures: groove.measures,
             swing: groove.swing,
             swingSub: groove.swingSub,
-            instruments: groove.instruments.map((i) => ({
+            instruments: groove.instruments.map((/** @type {any} */ i) => ({
                 name: i.name,
                 steps: [...i.steps],
                 muted: i.muted,

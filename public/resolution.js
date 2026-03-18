@@ -219,7 +219,7 @@ export function generateResolutionNotes(
         // --- HARMONY ---
         if (enabled.harmony) {
             // Pads follow the top notes of the voicing
-            voicings.slice(-3).forEach((m) => {
+            voicings.slice(-3).forEach((/** @type {any} */ m) => {
                 notes.push({
                     midi: m,
                     freq: getFrequency(m),

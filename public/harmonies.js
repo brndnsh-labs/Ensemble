@@ -26,7 +26,7 @@ export function clearHarmonyMemory() {
  * Critical for "supportive" harmony that defines quality without clutter.
  */
 export function getGuideTones(intervals) {
-    return intervals.filter((i) => {
+    return intervals.filter((/** @type {any} */ i) => {
         const iMod = i % 12;
         return iMod === 3 || iMod === 4 || iMod === 10 || iMod === 11;
     });
@@ -38,7 +38,7 @@ export function getGuideTones(intervals) {
  * @param {boolean} rootless - If true, remove the root (0) from the voicing.
  */
 export function getSafeVoicings(intervals, rootless = false) {
-    return intervals.filter((i) => {
+    return intervals.filter((/** @type {any} */ i) => {
         const iMod = i % 12;
         if (rootless && iMod === 0) {
             return false;
@@ -557,7 +557,7 @@ export function getHarmonyNotes(
 
     if (finalIntervals.length > polyphony) {
         const guides = getGuideTones(finalIntervals);
-        const nonGuides = finalIntervals.filter((i) => !guides.includes(i));
+        const nonGuides = finalIntervals.filter((/** @type {any} */ i) => !guides.includes(i));
         const selected = [...guides];
         const needed = polyphony - selected.length;
         if (needed < 0) {

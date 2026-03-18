@@ -183,7 +183,9 @@ export function getBestInversion(
                 bestShift = shift;
             }
         }
-        return intervals.map((i) => rootMidi + i + bestShift).sort((a, b) => a - b);
+        return intervals
+            .map((/** @type {any} */ i) => rootMidi + i + bestShift)
+            .sort((a, b) => a - b);
     }
 
     const result = [];
@@ -206,11 +208,11 @@ export function getBestInversion(
     let finalResult = result;
     const minNote = Math.min(...finalResult);
     if (minNote < RANGE_MIN) {
-        finalResult = finalResult.map((n) => n + 12);
+        finalResult = finalResult.map((/** @type {any} */ n) => n + 12);
     }
     const maxNote = Math.max(...finalResult);
     if (maxNote > RANGE_MAX) {
-        finalResult = finalResult.map((n) => n - 12);
+        finalResult = finalResult.map((/** @type {any} */ n) => n - 12);
     }
 
     return finalResult.sort((a, b) => a - b);
@@ -679,7 +681,9 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                 );
                 if (bassMidi !== null) {
                     const bassPC = bassMidi % 12;
-                    const filtered = currentMidis.filter((m) => m % 12 !== bassPC);
+                    const filtered = currentMidis.filter(
+                        (/** @type {any} */ m) => m % 12 !== bassPC,
+                    );
                     if (filtered.length > 0) {
                         currentMidis = filtered;
                     }

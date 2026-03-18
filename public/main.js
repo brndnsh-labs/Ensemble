@@ -53,7 +53,7 @@ function init() {
 
                 const sbUpdatedSteps = new Set();
                 const bassUpdatedSteps = new Set();
-                notes.forEach((n) => {
+                notes.forEach((/** @type {any} */ n) => {
                     if (n.module === 'bass') {
                         if (!bassUpdatedSteps.has(n.step)) {
                             bass.buffer.set(n.step, []);

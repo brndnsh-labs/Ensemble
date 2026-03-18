@@ -3,7 +3,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
 export function NotificationLayer() {
-    const notifications = useEnsembleState((s) => s.playback.notifications);
+    const notifications = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.notifications,
+    );
     const [visibleNotify, setVisibleNotify] = useState([]);
 
     useEffect(() => {

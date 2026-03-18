@@ -119,7 +119,7 @@ export function initAudio(state) {
             { name: 'drums', state: groove, mult: MIXER_GAIN_MULTIPLIERS.drums },
         ];
 
-        modules.forEach((m) => {
+        modules.forEach((/** @type {any} */ m) => {
             const gainNode = playback.audio.createGain();
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
@@ -369,7 +369,7 @@ export function restoreGains(state) {
             name: 'drums',
         },
     ];
-    modules.forEach((m) => {
+    modules.forEach((/** @type {any} */ m) => {
         if (m.node) {
             const isLocalMuted = midi.enabled && midi.muteLocal;
 

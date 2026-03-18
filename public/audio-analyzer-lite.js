@@ -1056,7 +1056,7 @@ export class ChordAnalyzerLite {
         // 1. Check for a structural match using the EFFECTIVE (tail-trimmed) duration
         // This is preferred as it ignores silent tails.
         bestStructuralMatch = structuralCandidates
-            .filter((c) => abs(c.bpm - primaryBPM) < snapThresholdBPM)
+            .filter((/** @type {any} */ c) => abs(c.bpm - primaryBPM) < snapThresholdBPM)
             .sort((a, b) => abs(a.bpm - primaryBPM) - abs(b.bpm - primaryBPM))[0];
 
         if (bestStructuralMatch) {
@@ -1077,7 +1077,7 @@ export class ChordAnalyzerLite {
             });
 
             bestStructuralMatch = structuralCandidatesFull
-                .filter((c) => abs(c.bpm - primaryBPM) < snapThresholdBPM)
+                .filter((/** @type {any} */ c) => abs(c.bpm - primaryBPM) < snapThresholdBPM)
                 .sort((a, b) => abs(a.bpm - primaryBPM) - abs(b.bpm - primaryBPM))[0];
 
             if (bestStructuralMatch) {

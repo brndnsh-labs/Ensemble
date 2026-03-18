@@ -69,8 +69,12 @@ export function Settings() {
         midiVelocity: s.midi.velocitySensitivity,
     }));
 
-    const masterVolume = useEnsembleState((s) => s.playback.masterVolume);
-    const complexity = useEnsembleState((s) => s.playback.complexity);
+    const masterVolume = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.masterVolume,
+    );
+    const complexity = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.complexity,
+    );
 
     let complexityLabel = 'Low';
     if (complexity > 0.33) {
@@ -133,10 +137,18 @@ export function Settings() {
 
     const [showConfirmReset, setShowConfirmReset] = useState(false);
 
-    const isOpen = useEnsembleState((s) => s.playback.modals.settings);
-    const notation = useEnsembleState((s) => s.arranger.notation);
-    const applyPresetSettings = useEnsembleState((s) => s.playback.applyPresetSettings);
-    const playbackState = useEnsembleState((s) => s.playback);
+    const isOpen = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.settings,
+    );
+    const notation = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.notation,
+    );
+    const applyPresetSettings = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.applyPresetSettings,
+    );
+    const playbackState = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback,
+    );
     const overlayRef = useRef(null);
 
     useEffect(() => {

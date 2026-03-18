@@ -73,15 +73,17 @@ export function PerformanceModal() {
         };
     }, []);
 
-    const { step, stepMap, key, isMinor, totalSteps, notation, bpm } = useEnsembleState((s) => ({
-        step: s.playback.step,
-        stepMap: s.arranger.stepMap,
-        key: s.arranger.key,
-        isMinor: s.arranger.isMinor,
-        totalSteps: s.arranger.totalSteps,
-        notation: s.arranger.notation || 'roman',
-        bpm: s.playback.bpm,
-    }));
+    const { step, stepMap, key, isMinor, totalSteps, notation, bpm } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            step: s.playback.step,
+            stepMap: s.arranger.stepMap,
+            key: s.arranger.key,
+            isMinor: s.arranger.isMinor,
+            totalSteps: s.arranger.totalSteps,
+            notation: s.arranger.notation || 'roman',
+            bpm: s.playback.bpm,
+        }),
+    );
 
     // Find current and next chords by finding the current step range in stepMap
     let currentEntry = null;

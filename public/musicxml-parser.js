@@ -318,7 +318,7 @@ export function reharmonizeMelody(leadSheetMelody, key, totalSteps) {
     const numBeats = Math.ceil(totalSteps / 4);
     const melodyByBeat = new Array(numBeats).fill(null).map(() => ({ midi: 0, energy: 0 }));
 
-    leadSheetMelody.forEach((n) => {
+    leadSheetMelody.forEach((/** @type {any} */ n) => {
         const beatIdx = Math.floor(n.globalStep / 4);
         if (beatIdx < numBeats) {
             // Take the first note or highest midi for the beat

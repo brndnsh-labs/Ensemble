@@ -3,6 +3,7 @@ import { Fragment, h } from 'preact';
 /**
  * SettingGroup wraps a set of related settings with a consistent title and spacing.
  */
+/** @param {any} props */
 export function SettingGroup({ title, children, style = '', className = '' }) {
     return (
         <div class={`setting-group ${className}`} style={style}>
@@ -16,6 +17,7 @@ export function SettingGroup({ title, children, style = '', className = '' }) {
  * SettingRow provides a standard layout for a single setting:
  * [ Label + Description ] [ Control Element ]
  */
+/** @param {any} props */
 export function SettingRow({ label, description, children, valueDisplay, id }) {
     return (
         <div class="setting-row">
@@ -36,6 +38,7 @@ export function SettingRow({ label, description, children, valueDisplay, id }) {
 /**
  * Reusable Toggle (Switch) component.
  */
+/** @param {any} props */
 export function Toggle({ id, checked, onChange, ariaLabel, label }) {
     return (
         <label class="toggle-switch" htmlFor={id}>
@@ -55,6 +58,7 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
 /**
  * Reusable Slider component.
  */
+/** @param {any} props */
 export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValueText, disabled }) {
     return (
         <input
@@ -75,6 +79,7 @@ export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValu
 /**
  * Reusable Select component.
  */
+/** @param {any} props */
 export function Select({ id, value, onChange, options, ariaLabel }) {
     return (
         <select
@@ -95,6 +100,7 @@ export function Select({ id, value, onChange, options, ariaLabel }) {
 /**
  * Reusable Stepper component for numeric inputs.
  */
+/** @param {any} props */
 export function Stepper({
     value,
     onDecrement,

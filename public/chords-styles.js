@@ -273,7 +273,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock', bas
     // 4. DENSITY-BASED MODIFICATIONS
     if (density === 'thin' && intervals.length >= 4) {
         if (intervals.includes(7)) {
-            intervals = intervals.filter((i) => i !== 7);
+            intervals = intervals.filter((/** @type {any} */ i) => i !== 7);
         }
     } else if (isRich && intervals.length <= 5 && quality !== '5') {
         const safeExtensions = {
@@ -335,7 +335,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock', bas
 
     // FINAL SAFETY: if augmented or altered 5th, ensure natural 5th is NOT present
     if (isAltered5 || isAug) {
-        intervals = intervals.filter((i) => i % 12 !== 7);
+        intervals = intervals.filter((/** @type {any} */ i) => i % 12 !== 7);
     }
 
     return intervals;

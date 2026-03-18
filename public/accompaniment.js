@@ -791,7 +791,7 @@ export function getAccompanimentNotes(
             }
 
             // Register Slotting: Ensure it stays in a punchy mid-register (E3-C6)
-            voicing = voicing.map((m) => {
+            voicing = voicing.map((/** @type {any} */ m) => {
                 while (m < 52) {
                     m += 12;
                 }

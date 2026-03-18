@@ -238,7 +238,7 @@ export function instrumentReducer(action, payload) {
 
             if (currentIdx !== -1 && xmlIdx !== -1 && currentIdx !== xmlIdx) {
                 const interval = currentIdx - xmlIdx;
-                transposedMelody = payload.leadSheetMelody.map((n) => ({
+                transposedMelody = payload.leadSheetMelody.map((/** @type {any} */ n) => ({
                     ...n,
                     midi: n.midi + interval,
                 }));

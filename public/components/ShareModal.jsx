@@ -9,7 +9,9 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
 export function ShareModal() {
-    const isOpen = useEnsembleState((s) => s.playback.modals.share);
+    const isOpen = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.share,
+    );
     const [isExporting, setIsExporting] = useState(false);
 
     // --- Content Scope State ---

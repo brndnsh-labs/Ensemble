@@ -13,8 +13,9 @@ import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.j
  * @param {Object} props
  * @param {any} props.module
  */
+/** @param {any} props */
 export function InstrumentSettings({ module }) {
-    const state = useEnsembleState((s) => {
+    const state = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
         const key = module === 'groove' ? 'groove' : module;
         return s[key];
     });

@@ -126,7 +126,7 @@ export function ChordVisualizer() {
         leadSheetMelody,
         soloistStyle,
         isMaximized,
-    } = useEnsembleState((s) => ({
+    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
         progression: s.arranger.progression,
         timeSignature: s.arranger.timeSignature,
         lastActiveChordIndex: s.chords.lastActiveChordIndex,

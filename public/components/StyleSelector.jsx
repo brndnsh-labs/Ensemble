@@ -6,6 +6,7 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
+/** @param {any} props */
 export function StyleSelector({ module, styles }) {
     const dispatch = useDispatch();
 

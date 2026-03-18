@@ -4,7 +4,9 @@ import { skipWaiting } from '../pwa.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
 export function PWAUpdateBanner() {
-    const updateAvailable = useEnsembleState((s) => s.playback.updateAvailable);
+    const updateAvailable = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.updateAvailable,
+    );
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
