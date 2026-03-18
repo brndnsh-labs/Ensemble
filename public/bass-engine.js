@@ -172,9 +172,11 @@ export function getBassNote(
                 }
             } else {
                 // Slower fallback if sectionMap is missing (should not happen in normal flow)
-                const currentSectionId = entry.chord.sectionId;
+                const currentSectionId = /** @type {any} */ (entry.chord).sectionId;
+                const { arranger } = getState();
                 const sectionEntries = arranger.stepMap.filter(
-                    (e) => e.chord.sectionId === currentSectionId,
+                    (/** @type {any} */ e) =>
+                        /** @type {any} */ (e.chord).sectionId === currentSectionId,
                 );
                 if (sectionEntries.length > 0) {
                     sectionStart = sectionEntries[0].start;
@@ -232,6 +234,7 @@ export function getBassNote(
         let best = -1;
         let minDiff = 999999;
 
+        /** @param {number} off */
         const check = (off) => {
             const c = octave + off + pc;
             if (
@@ -349,7 +352,7 @@ export function getBassNote(
                 style === 'quarter'
             ) {
                 durationSteps =
-                    style === 'quarter' || style === 'blues'
+                    style === 'quarter' || /** @type {any} */ (style) === 'blues'
                         ? ts.stepsPerBeat * 0.4
                         : style === 'neo'
                           ? ts.stepsPerBeat * 0.5
@@ -399,7 +402,7 @@ export function getBassNote(
 
     // --- Ensemble Awareness (Soloist Space) ---
     // If the soloist is shredding, reduce bass complexity to avoid mud.
-    const isSoloistBusy = soloist.busySteps > 0;
+    const isSoloistBusy = (soloist.busySteps || 0) > 0;
 
     /** @param {number} note */
     const withOctaveJump = (note) => {
@@ -436,7 +439,7 @@ export function getBassNote(
 
         // 2. Syncopated "Lazy" Hits
         if (isUpbeat) {
-            const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
+            const isSoloistBusy = soloist.enabled && (soloist.busySteps || 0) > 0;
             const complexityFactor = playback.complexity || 0.5;
 
             // Higher probability for syncopated hits at high complexity

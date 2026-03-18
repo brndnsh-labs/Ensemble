@@ -23,7 +23,7 @@ export function applyTheme(theme) {
  */
 export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
     const { playback, arranger } = getState();
-    const newBpm = Math.max(40, Math.min(240, parseInt(val, 10)));
+    const newBpm = Math.max(40, Math.min(240, parseInt(val.toString(), 10)));
     const currentBpm = fromDispatch ? oldBpmParam || playback.bpm : playback.bpm;
 
     if (!fromDispatch && newBpm === currentBpm) {

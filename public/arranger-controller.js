@@ -46,7 +46,7 @@ export function saveProgression() {
 }
 
 export function validateAndAnalyze() {
-    validateProgression(stateMap, null, () => {
+    validateProgression(stateMap, undefined, () => {
         analyzeFormUI();
     });
 }
@@ -73,13 +73,15 @@ export function onSectionUpdate(id, field, value) {
     const { arranger } = getState();
     if (field === 'reorder') {
         const sectionMap = new Map(arranger.sections.map((/** @type {any} */ s) => [s.id, s]));
-        const newSections = value.map((sid) => sectionMap.get(sid));
+        const newSections = value.map((/** @type {string} */ sid) => sectionMap.get(sid));
 
         // Check for changes more efficiently than JSON.stringify
         const currentIds = arranger.sections.map((/** @type {any} */ s) => s.id);
         const hasChanged =
             value.length !== currentIds.length ||
-            value.some((id, index) => id !== currentIds[index]);
+            value.some(
+                (/** @type {string} */ id, /** @type {number} */ index) => id !== currentIds[index],
+            );
 
         if (hasChanged) {
             pushHistory();
@@ -185,6 +187,7 @@ export function transposeKey(delta) {
 
     arranger.key = newKey;
 
+    /** @param {string} part */
     const isMusicalNotation = (part) => {
         return (
             part.match(/^(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i) ||
