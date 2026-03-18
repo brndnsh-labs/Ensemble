@@ -24,6 +24,8 @@ export function clearHarmonyMemory() {
 /**
  * Extracts 3rds and 7ths (Guide Tones) from a set of intervals.
  * Critical for "supportive" harmony that defines quality without clutter.
+ * @param {number[]} intervals
+ * @returns {number[]}
  */
 export function getGuideTones(intervals) {
     return intervals.filter((/** @type {any} */ i) => {
@@ -35,7 +37,8 @@ export function getGuideTones(intervals) {
 /**
  * Filters intervals to remove high extensions (9, 11, 13) to avoid clashing with soloist.
  * @param {number[]} intervals
- * @param {boolean} rootless - If true, remove the root (0) from the voicing.
+ * @param {boolean} [rootless] - If true, remove the root (0) from the voicing.
+ * @returns {number[]}
  */
 export function getSafeVoicings(intervals, rootless = false) {
     return intervals.filter((/** @type {any} */ i) => {
@@ -54,7 +57,7 @@ export function getSafeVoicings(intervals, rootless = false) {
  * Values indicate intensity threshold: 1=Always, 2=Medium(>0.4), 3=High(>0.7)
  * @param {string} feel - The genre feel
  * @param {number} seed - Random seed
- * @param {object} tsConfig - Time signature config
+ * @param {any} [tsConfig] - Time signature config
  * @returns {number[]} pattern matching total measure length (or 2 bars)
  */
 export function generateCompingPattern(feel, seed, tsConfig) {
@@ -67,6 +70,11 @@ export function generateCompingPattern(feel, seed, tsConfig) {
         return seed / 233280;
     };
 
+    /**
+     * @param {number} bar
+     * @param {number} beatIdx
+     * @param {number} [offsetSteps]
+     */
     const getBeatStep = (bar, beatIdx, offsetSteps = 0) => {
         return bar * spm + beatIdx * ts.stepsPerBeat + offsetSteps;
     };
@@ -180,6 +188,17 @@ export function generateCompingPattern(feel, seed, tsConfig) {
 
 /**
  * Generates harmony notes for a given step.
+ * @param {import('./types.js').EnsembleState} state
+ * @param {any} chord
+ * @param {any} _nextChord
+ * @param {number} step
+ * @param {number} octave
+ * @param {string} style
+ * @param {number} stepInChord
+ * @param {any} [soloistResult]
+ * @param {any} [coordination]
+ * @param {import('./types.js').StepInfo} [stepInfo]
+ * @returns {Array<any>}
  */
 export function getHarmonyNotes(
     state,
@@ -269,7 +288,9 @@ export function getHarmonyNotes(
     const _accMidis = coordination.accompanimentMidis || [];
 
     const notes = [];
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    /** @type {any} */
+    const signatures = TIME_SIGNATURES;
+    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
     const measureStep = step % stepsPerMeasure;
     const sectionId = chord.sectionId || 'default';
@@ -420,7 +441,9 @@ export function getHarmonyNotes(
         // -- Shared Hook Reinforcement --
         if (feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
             // Check if the soloist is currently playing a known shared hook
-            const hookMatch = soloist.sharedHookBuffer.find((h) => h.step === step);
+            const hookMatch = soloist.sharedHookBuffer.find(
+                (/** @type {any} */ h) => h.step === step,
+            );
             if (hookMatch) {
                 reinforce = true;
             }
@@ -557,7 +580,7 @@ export function getHarmonyNotes(
 
     if (finalIntervals.length > polyphony) {
         const guides = getGuideTones(finalIntervals);
-        const nonGuides = finalIntervals.filter((/** @type {any} */ i) => !guides.includes(i));
+        const nonGuides = finalIntervals.filter((/** @type {number} */ i) => !guides.includes(i));
         const selected = [...guides];
         const needed = polyphony - selected.length;
         if (needed < 0) {
@@ -654,13 +677,14 @@ export function getHarmonyNotes(
             vibrato = { rate: 5.0, depth: 10 * intensity };
         }
 
-        let baseVol = config.velocity * (0.6 + intensity * 0.4);
+        let baseVol = (config.velocity || 0.75) * (0.6 + intensity * 0.4);
         if (isGhost) {
             baseVol *= 0.4; // Ghost notes are much softer
         }
 
         const stagger = (i - (currentMidis.length - 1) / 2) * 0.005;
-        let finalOffset = basePocketOffset + stagger + Math.random() * config.timingJitter;
+        let finalOffset =
+            basePocketOffset + stagger + Math.random() * (config.timingJitter || 0.008);
 
         // Neo-Soul "Dilla" Pocket (Late): Layered on top
         if (feel === 'Neo-Soul') {
