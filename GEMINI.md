@@ -1,5 +1,10 @@
 # Ensemble: Technical Context & Instructions
 
+## 🚨 CRITICAL: Infrastructure Mandates
+*   **Package Manager**: This project **ONLY** uses `npm`. **NEVER** use `pnpm`, `yarn`, or `bun`.
+*   **Lockfiles**: ONLY `package-lock.json` is allowed. **DO NOT** create or commit `pnpm-lock.yaml`, `yarn.lock`, or `bun.lockb`.
+*   **Scripts**: Always use `npm run <script>` (e.g., `npm run validate`).
+
 Ensemble is a high-performance Progressive Web App (PWA) designed for generative musical accompaniment and chord visualization. It utilizes a "Virtual Band" engine to provide real-time, intensity-aware backing tracks.
 
 ## Project Overview

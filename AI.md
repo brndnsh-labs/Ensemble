@@ -15,9 +15,10 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ## 2. Core Protocols
 
-### A. Infrastructure & Dependencies
-*   **Strict Package Manager:** This project is **strictly npm-based**. Use `npm install` for dependencies.
-*   **Lockfile Integrity:** ALWAYS preserve `package-lock.json`. **NEVER** create or commit `pnpm-lock.yaml`, `yarn.lock`, or other alternative lockfiles.
+### A. Infrastructure & Dependencies (STRICT MANDATE)
+*   **Package Manager:** This project is **strictly npm-based**. Use `npm install` for dependencies and `npm run` for scripts.
+*   **BANNED TOOLS:** **NEVER** use `pnpm`, `yarn`, or `bun`. If a sub-agent (like Jules) attempts to use these, it MUST be corrected immediately.
+*   **Lockfile Integrity:** ALWAYS preserve `package-lock.json`. **NEVER** create or commit `pnpm-lock.yaml`, `yarn.lock`, or `bun.lockb`.
 *   **Node.js Version:** Use the engine version specified in `package.json` (if any).
 
 ### B. Refactoring & File Movements
