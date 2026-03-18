@@ -1,4 +1,0 @@
-## 2024-05-24 - Fix XSS Vulnerability in ManualModal
-**Vulnerability:** A custom markdown parser (`simpleMarkdown`) passed input to `dangerouslySetInnerHTML` without proper escaping, leading to raw HTML injection, attribute injection (via unescaped quotes), and entity evasion inside URLs (via unescaped ampersands).
-**Learning:** Naively replacing `<` and `>` breaks formatting (like `> Blockquotes`) or is insufficient. Filtering `javascript:` from links is bypassed if `&` isn't escaped first because attackers can use `jav&#x09;ascript:`.
-**Prevention:** Always use a full `escapeHTML` (which covers `<`, `>`, `"`, `'`, `` ` ``, and `&`) on raw markdown text *before* applying structural regex replacements. This prevents tag injection, neutralizes attribute injection, and ensures entity evasion techniques are rendered harmless (since `&` becomes `&amp;`) before the URL scheme is evaluated.

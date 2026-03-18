@@ -13,6 +13,10 @@ export const config = {
  * 1: Driving shuffle (consistent kick push on 4)
  * 2: Heavy shuffle (open hats/ride focus)
  * 3: Texas Double Shuffle (controlled snare ghosting)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ * @returns {number}
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -40,6 +44,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3;
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState & any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

@@ -14,6 +14,10 @@ export const config = {
  * 1: Trap Foundation (Consistent 16ths)
  * 2: Trap Skitter (Hi-hat rolls)
  * 3: Modern Hybrid (Syncopated & Busy)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ * @returns {number}
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -37,6 +41,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3; // Hybrid
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState & any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

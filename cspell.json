@@ -131,7 +131,8 @@
         "intv",
         "APOS",
         "microtonal",
-        "Vivm"
+        "Vivm",
+        "chicka"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

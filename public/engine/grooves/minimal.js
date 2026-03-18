@@ -7,6 +7,12 @@ export const config = {
     backbeatCrack: false,
 };
 
+/**
+ * @param {number} _seed
+ * @param {number} _complexity
+ * @param {number} [intensity=1.0]
+ * @returns {number}
+ */
 export function getMotif(_seed, _complexity, intensity = 1.0) {
     if (intensity < 0.4) {
         return 0; // Extremely sparse
@@ -17,6 +23,11 @@ export function getMotif(_seed, _complexity, intensity = 1.0) {
     return 2; // Slightly more active
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState & any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,
