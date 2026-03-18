@@ -41,8 +41,8 @@
  * @property {Object} chord - The current chord object.
  * @property {number} stepInChord - Step index relative to the start of the current chord.
  * @property {number} chordIndex - Index of the chord in the stepMap.
- * @property {number} sectionStart - Global start step of the current section.
- * @property {number} sectionEnd - Global end step of the current section.
+ * @property {number} [sectionStart] - Global start step of the current section.
+ * @property {number} [sectionEnd] - Global end step of the current section.
  */
 
 /**
@@ -55,8 +55,13 @@
  * @property {boolean} isEOfBeat - True if the step is on the "e" of a 16th-note beat.
  * @property {boolean} isAOfBeat - True if the step is on the "a" of a 16th-note beat.
  * @property {boolean} [isCompound] - True if the time signature is compound (e.g., 6/8).
+ * @property {boolean} [isDownbeat] - Alias for isMeasureStart.
+ * @property {boolean} [isTurnaround] - True if this is the final bar of a section.
  * @property {number} beatIndex - 0-indexed beat number within the measure.
  * @property {number} mStep - 0-indexed step within the current measure.
+ * @property {number} [stepInBeat] - 0-indexed step within the current beat.
+ * @property {any} [tsConfig] - Time signature configuration object.
+ * @property {string} [tsName] - Name of the time signature (e.g., "4/4").
  */
 
 export const ACTIONS = {

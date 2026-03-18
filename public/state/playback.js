@@ -50,7 +50,8 @@ import { ACTIONS } from '../types.js';
  * @property {Array<HTMLElement>|null} lastActiveDrumElements - Cache of currently animating drum UI elements.
  * @property {number} lastPlayingStep - The last step index processed by the UI loop.
  * @property {boolean} workerLogging - Whether to log messages from the audio worker.
- * @property {number|null} suspendTimeout - ID of the timeout for audio context suspension.
+ * @property {number|null|any} suspendTimeout - ID of the timeout for audio context suspension.
+ * @property {string|null} currentKey - The current musical key being tracked by playback.
  * @property {number} conductorVelocity - Dynamic velocity modifier (0.0-1.0) applied by Conductor.
  * @property {number} lyricalBias - Bias towards lyrical phrasing in soloist (0.0-1.0).
  * @property {number} masterVolume - Master output volume.
@@ -126,6 +127,7 @@ export const playback = {
     lastPlayingStep: 0,
     workerLogging: false,
     suspendTimeout: null,
+    currentKey: null,
     conductorVelocity: 1.0,
     lyricalBias: 0.5,
     masterLimiter: null,
