@@ -16,6 +16,14 @@ import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 // (Old getScaleForBass removed, using imported version)
 import { TIME_SIGNATURES } from './config.js';
 
+/**
+ * @param {string} style
+ * @param {number} step
+ * @param {number} stepInChord
+ * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {any} [coordination]
+ * @returns {boolean}
+ */
 export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     const { playback, groove, arranger } = getState();
 
@@ -25,6 +33,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     }
 
     if (style === 'smart') {
+        /** @type {any} */
         const mapping = {
             Rock: 'rock',
             Jazz: 'quarter',
@@ -45,7 +54,9 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
         style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
     }
 
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    /** @type {any} */
+    const signatures = TIME_SIGNATURES;
+    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const intBeat = stepInfo
         ? stepInfo.beatIndex
         : Math.floor((step % (ts.beats * ts.stepsPerBeat)) / ts.stepsPerBeat);
@@ -66,6 +77,20 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
     );
 }
 
+/**
+ * @param {any} chord
+ * @param {any} nextChord
+ * @param {number} _beatInMeasure
+ * @param {number|null} prevFreq
+ * @param {number} centerMidi
+ * @param {string} style
+ * @param {number} _chordIndex
+ * @param {number} step
+ * @param {number} stepInChord
+ * @param {any} [context]
+ * @param {import('./types.js').StepInfo} [stepInfo]
+ * @returns {any}
+ */
 export function getBassNote(
     chord,
     nextChord,
@@ -85,6 +110,7 @@ export function getBassNote(
     }
 
     if (style === 'smart') {
+        /** @type {any} */
         const mapping = {
             Rock: 'rock',
             Jazz: 'quarter',
@@ -104,7 +130,9 @@ export function getBassNote(
         style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
     }
 
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    /** @type {any} */
+    const signatures = TIME_SIGNATURES;
+    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
     const stepInMeasure = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
     const intBeat = Math.floor(stepInMeasure / ts.stepsPerBeat);
@@ -162,20 +190,20 @@ export function getBassNote(
     let safeCenterMidi = centerMidi || 48; // Standard bass register anchor
 
     // --- Genre-Specific Register Offsets ---
-    if (style === 'dub' || groove.genreFeel === 'Reggae') {
+    if (style === 'dub' || (groove.genreFeel || '') === 'Reggae') {
         safeCenterMidi = 32;
-    } else if (style === 'disco' || groove.genreFeel === 'Disco') {
+    } else if (style === 'disco' || (groove.genreFeel || '') === 'Disco') {
         safeCenterMidi = 36; // Lowered to allow octaves
     } else if (style === 'rocco') {
         safeCenterMidi = 38; // Rocco lives on the low E/A strings
-    } else if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
+    } else if (style === 'neo' || (groove.genreFeel || '') === 'Neo-Soul') {
         safeCenterMidi = 36; // Keep it deep
     }
 
     // Shift center up as intensity builds (max +7 semitones)
     // REGGAE EXCEPTION: Keep it deep even at high intensity
     const registerShift =
-        style === 'dub' || groove.genreFeel === 'Reggae'
+        style === 'dub' || (groove.genreFeel || '') === 'Reggae'
             ? Math.min(2, Math.floor(intensity * 7))
             : Math.floor(intensity * 7);
     safeCenterMidi += registerShift;
@@ -189,11 +217,12 @@ export function getBassNote(
         safeCenterMidi += 12;
     }
 
-    const prevMidi = getMidi(prevFreq);
+    const prevMidi = prevFreq ? getMidi(prevFreq) : null;
 
     const absMin = 28,
         absMax = 51; // Bass claims 28-51 as per Coordination Contract
 
+    /** @param {number} midi */
     const clampAndNormalize = (midi) => {
         if (!Number.isFinite(midi)) {
             return safeCenterMidi;
@@ -226,6 +255,7 @@ export function getBassNote(
         return Math.max(absMin, Math.min(absMax, octave + pc));
     };
 
+    /** @param {number} midi */
     const normalizeToRange = (midi) => {
         if (!Number.isFinite(midi)) {
             return safeCenterMidi;
@@ -275,6 +305,13 @@ export function getBassNote(
     const beatsInChord = Math.round(chord.beats);
     const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;
 
+    /**
+     * @param {number} freq
+     * @param {number|null} [durationMultiplier]
+     * @param {number} [velocityParam]
+     * @param {boolean} [muted]
+     * @param {number} [bendStartInterval]
+     */
     const result = (
         freq,
         durationMultiplier = null,
@@ -364,6 +401,7 @@ export function getBassNote(
     // If the soloist is shredding, reduce bass complexity to avoid mud.
     const isSoloistBusy = soloist.busySteps > 0;
 
+    /** @param {number} note */
     const withOctaveJump = (note) => {
         // Skip octave jumps if soloist is busy or intensity is too low
         if (isSoloistBusy || intensity < 0.4) {
@@ -435,6 +473,7 @@ export function getBassNote(
         return null;
     }
 
+    /** @param {number|null} midi */
     const isSameAsPrev = (midi) => {
         if (!prevMidi) {
             return false;
@@ -583,7 +622,7 @@ export function getBassNote(
     }
     if (intBeat > 0) {
         let candidates = scale
-            .map((pc) => {
+            .map((/** @type {number} */ pc) => {
                 const note = baseRoot + pc;
                 const octaves = [0, 12, -12];
                 let best = note,
@@ -596,16 +635,16 @@ export function getBassNote(
                 }
                 return best;
             })
-            .filter((/** @type {any} */ n) => n >= absMin && n <= absMax && !isSameAsPrev(n));
+            .filter((/** @type {number} */ n) => n >= absMin && n <= absMax && !isSameAsPrev(n));
 
         if (isSoloistBusy) {
-            candidates = candidates.filter((/** @type {any} */ n) => {
+            candidates = candidates.filter((/** @type {number} */ n) => {
                 const pc = n % 12;
                 const rootPC = baseRoot % 12;
                 return pc === rootPC || pc === (rootPC + 7) % 12;
             });
             if (candidates.length === 0) {
-                candidates = [baseRoot, baseRoot + 7, baseRoot - 5].map((/** @type {any} */ n) =>
+                candidates = [baseRoot, baseRoot + 7, baseRoot - 5].map((/** @type {number} */ n) =>
                     clampAndNormalize(n),
                 );
             }
@@ -613,7 +652,7 @@ export function getBassNote(
 
         if (candidates.length > 0) {
             candidates.sort(
-                (a, b) =>
+                (/** @type {number} */ a, /** @type {number} */ b) =>
                     Math.abs(a - (prevMidi || baseRoot)) - Math.abs(b - (prevMidi || baseRoot)),
             );
             return result(
