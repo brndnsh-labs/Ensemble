@@ -31,6 +31,7 @@ export {
     updateSustain,
 };
 
+/** @type {boolean | null} */
 let isChromium = null;
 export function _resetChromiumCheck() {
     isChromium = null;
@@ -39,77 +40,102 @@ export function _resetChromiumCheck() {
 /**
  * Initializes the Web Audio context and global audio nodes.
  * Must be called in response to a user gesture.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function initAudio(state) {
     const { playback, groove, chords, bass, soloist, harmony, midi } = state;
     if (!playback.audio || playback.audio.state === 'closed') {
-        if (navigator.audioSession) {
-            navigator.audioSession.type = 'playback';
+        if (/** @type {any} */ (navigator).audioSession) {
+            /** @type {any} */ (navigator).audioSession.type = 'playback';
         }
 
-        playback.audio = new (window.AudioContext || window.webkitAudioContext)(); // @direct-mutation
+        const AudioContextClass =
+            window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+        playback.audio = new AudioContextClass(); // @direct-mutation
 
-        playback.audio.onstatechange = () => {
-            if (playback.audio.state === 'suspended' && playback.isPlaying) {
-                playback.audio.resume().catch((e) => console.error('[DSP] Auto-resume failed:', e));
-            }
-        };
+        if (playback.audio) {
+            playback.audio.onstatechange = () => {
+                if (playback.audio && playback.audio.state === 'suspended' && playback.isPlaying) {
+                    playback.audio
+                        .resume()
+                        .catch((e) => console.error('[DSP] Auto-resume failed:', e));
+                }
+            };
+        }
 
-        playback.masterGain = playback.audio.createGain(); // @direct-mutation
-        const initMasterVol = (playback.masterVolume || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
-        playback.masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
-        playback.masterGain.gain.exponentialRampToValueAtTime(
-            initMasterVol,
-            playback.audio.currentTime + 0.04,
-        );
+        if (playback.audio) {
+            playback.masterGain = playback.audio.createGain(); // @direct-mutation
+            const initMasterVol = (playback.masterVolume || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
+            playback.masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
+            playback.masterGain.gain.exponentialRampToValueAtTime(
+                initMasterVol,
+                playback.audio.currentTime + 0.04,
+            );
+        }
 
         // Attach the Watchdog
-        audioWatchdog.attachToMaster(playback.masterGain, playback);
-        audioWatchdog.onRecover = async (pbState) => {
+        if (playback.masterGain) {
+            audioWatchdog.attachToMaster(playback.masterGain, playback);
+        }
+        audioWatchdog.onRecover = async (
+            /** @type {import('../state/playback.js').GlobalContext} */ pbState,
+        ) => {
             await killAllNotes(state);
-            pbState.audio.close().then(() => {
-                pbState.audio = null; // @worker-mutation
-                initAudio(state);
-                restoreGains(state);
-                if (pbState.masterGain) {
-                    audioWatchdog.attachToMaster(pbState.masterGain, pbState);
-                }
-            });
+            if (pbState.audio) {
+                pbState.audio.close().then(() => {
+                    pbState.audio = null; // @worker-mutation
+                    initAudio(state);
+                    restoreGains(state);
+                    if (pbState.masterGain) {
+                        audioWatchdog.attachToMaster(pbState.masterGain, pbState);
+                    }
+                });
+            }
         };
         audioWatchdog.start(() => state.playback);
 
-        playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation
-        playback.saturator.curve = createSoftClipCurve();
-        playback.saturator.oversample = '4x';
+        if (playback.audio) {
+            playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation
+            playback.saturator.curve = createSoftClipCurve();
+            playback.saturator.oversample = '4x';
 
-        playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
-        playback.masterLimiter.threshold.setValueAtTime(-1.5, playback.audio.currentTime);
-        playback.masterLimiter.knee.setValueAtTime(30, playback.audio.currentTime);
-        playback.masterLimiter.ratio.setValueAtTime(12, playback.audio.currentTime);
-        playback.masterLimiter.attack.setValueAtTime(0.002, playback.audio.currentTime);
-        playback.masterLimiter.release.setValueAtTime(0.08, playback.audio.currentTime);
+            playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
+            playback.masterLimiter.threshold.setValueAtTime(-1.5, playback.audio.currentTime);
+            playback.masterLimiter.knee.setValueAtTime(30, playback.audio.currentTime);
+            playback.masterLimiter.ratio.setValueAtTime(12, playback.audio.currentTime);
+            playback.masterLimiter.attack.setValueAtTime(0.002, playback.audio.currentTime);
+            playback.masterLimiter.release.setValueAtTime(0.08, playback.audio.currentTime);
+        }
 
-        playback.masterGain.connect(playback.saturator);
-        playback.saturator.connect(playback.masterLimiter);
-        playback.masterLimiter.connect(playback.audio.destination);
+        if (
+            playback.masterGain &&
+            playback.saturator &&
+            playback.masterLimiter &&
+            playback.audio?.destination
+        ) {
+            playback.masterGain.connect(playback.saturator);
+            playback.saturator.connect(playback.masterLimiter);
+            playback.masterLimiter.connect(playback.audio.destination);
+        }
 
-        playback.reverbNode = playback.audio.createConvolver(); // @direct-mutation
-        playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
-        playback.reverbNode.connect(playback.masterGain);
+        if (playback.audio && playback.masterGain) {
+            playback.reverbNode = playback.audio.createConvolver(); // @direct-mutation
+            playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
+            playback.reverbNode.connect(playback.masterGain);
 
-        // --- Pro Mix: Abbey Road Reverb Filters ---
-        const reverbHPF = playback.audio.createBiquadFilter();
-        reverbHPF.type = 'highpass';
-        reverbHPF.frequency.setValueAtTime(600, playback.audio.currentTime);
+            // --- Pro Mix: Abbey Road Reverb Filters ---
+            const reverbHPF = playback.audio.createBiquadFilter();
+            reverbHPF.type = 'highpass';
+            reverbHPF.frequency.setValueAtTime(600, playback.audio.currentTime);
 
-        const reverbLPF = playback.audio.createBiquadFilter();
-        reverbLPF.type = 'lowpass';
-        reverbLPF.frequency.setValueAtTime(6000, playback.audio.currentTime);
+            const reverbLPF = playback.audio.createBiquadFilter();
+            reverbLPF.type = 'lowpass';
+            reverbLPF.frequency.setValueAtTime(6000, playback.audio.currentTime);
 
-        reverbHPF.connect(reverbLPF);
-        reverbLPF.connect(playback.reverbNode);
-        playback.reverbPreFilter = reverbHPF; // @direct-mutation
+            reverbHPF.connect(reverbLPF);
+            reverbLPF.connect(playback.reverbNode);
+            playback.reverbPreFilter = reverbHPF; // @direct-mutation
+        }
 
         const modules = [
             { name: MODULES.CHORDS, state: chords, mult: MIXER_GAIN_MULTIPLIERS.chords },
@@ -120,6 +146,9 @@ export function initAudio(state) {
         ];
 
         modules.forEach((/** @type {any} */ m) => {
+            if (!playback.audio || !playback.masterGain) {
+                return;
+            }
             const gainNode = playback.audio.createGain();
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
@@ -228,7 +257,7 @@ export function initAudio(state) {
                 gainNode.connect(playback.masterGain);
             }
 
-            playback[`${m.name}Gain`] = gainNode;
+            /** @type {any} */ (playback)[`${m.name}Gain`] = gainNode;
 
             const reverbGain = playback.audio.createGain();
             const targetReverb = Math.max(0.0001, m.state.reverb);
@@ -238,30 +267,33 @@ export function initAudio(state) {
                 playback.audio.currentTime + 0.04,
             );
             gainNode.connect(reverbGain);
-            reverbGain.connect(playback.reverbPreFilter || playback.reverbNode);
-            playback[`${m.name}Reverb`] = reverbGain;
+            reverbGain.connect(
+                playback.reverbPreFilter || /** @type {any} */ (playback.reverbNode),
+            );
+            /** @type {any} */ (playback)[`${m.name}Reverb`] = reverbGain;
         });
 
         const bufSize = playback.audio.sampleRate * 2;
+        /** @type {any} */
         const buffer = playback.audio.createBuffer(1, bufSize, playback.audio.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufSize; i++) {
             data[i] = Math.random() * 2 - 1;
         }
-        groove.audioBuffers.noise = buffer;
+        /** @type {any} */ (groove.audioBuffers).noise = buffer;
     }
-    if (playback.audio.state === 'suspended') {
+    if (playback.audio && playback.audio.state === 'suspended') {
         playback.audio.resume();
     }
 }
 
 /**
  * Kill the chord bus.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killChordBus(state) {
     const { playback } = state;
-    if (playback.chordsGain) {
+    if (playback.chordsGain && playback.audio) {
         playback.chordsGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.chordsGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
@@ -269,11 +301,11 @@ export function killChordBus(state) {
 
 /**
  * Kill the bass bus.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killBassBus(state) {
     const { playback } = state;
-    if (playback.bassGain) {
+    if (playback.bassGain && playback.audio) {
         playback.bassGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.bassGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
@@ -281,11 +313,11 @@ export function killBassBus(state) {
 
 /**
  * Kill the soloist bus.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killSoloistBus(state) {
     const { playback } = state;
-    if (playback.soloistGain) {
+    if (playback.soloistGain && playback.audio) {
         playback.soloistGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.soloistGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
@@ -293,11 +325,11 @@ export function killSoloistBus(state) {
 
 /**
  * Kill the harmony bus.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killHarmonyBus(state) {
     const { playback } = state;
-    if (playback.harmoniesGain) {
+    if (playback.harmoniesGain && playback.audio) {
         playback.harmoniesGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.harmoniesGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
@@ -305,11 +337,11 @@ export function killHarmonyBus(state) {
 
 /**
  * Kill the drum bus.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killDrumBus(state) {
     const { playback } = state;
-    if (playback.drumsGain) {
+    if (playback.drumsGain && playback.audio) {
         playback.drumsGain.gain.cancelScheduledValues(playback.audio.currentTime);
         playback.drumsGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
@@ -317,24 +349,23 @@ export function killDrumBus(state) {
 
 /**
  * Kills all instrument notes immediately.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export async function killAllNotes(state) {
     const { playback } = state;
     if (!playback.audio) {
         return;
     }
-    const t = playback.audio.currentTime;
-    killAllPianoNotes(state, t);
-    killBassNote(state, t);
-    killDrumNote(state, t);
-    killSoloistNote(state, t);
-    killHarmonyNote(state, t);
+    killAllPianoNotes(state);
+    killBassNote(state);
+    killDrumNote(state);
+    killSoloistNote(state);
+    killHarmonyNote(state);
 }
 
 /**
  * Restores instrument buses to their state-defined volumes.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function restoreGains(state) {
     const { playback, chords, bass, soloist, harmony, groove, midi } = state;
@@ -370,7 +401,7 @@ export function restoreGains(state) {
         },
     ];
     modules.forEach((/** @type {any} */ m) => {
-        if (m.node) {
+        if (m.node && playback.audio) {
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
             let isMuted = !m.state.enabled;
@@ -393,7 +424,7 @@ let lastPerfTime = 0;
 
 /**
  * Unified getter for the visualizer clock.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function getVisualTime(state) {
     const { playback } = state;
@@ -414,7 +445,9 @@ export function getVisualTime(state) {
 
     const outputLatency = playback.audio.outputLatency || 0;
     if (isChromium === null) {
-        isChromium = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+        isChromium = !!(
+            navigator.userAgent.includes('Chrome') && navigator.vendor.includes('Google Inc')
+        );
     }
 
     return isChromium ? smoothAudioTime : audioTime - outputLatency;

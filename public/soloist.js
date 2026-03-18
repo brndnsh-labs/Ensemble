@@ -70,8 +70,9 @@ export function getSoloistNote(
         }
     };
 
-    const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
-    const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
+    const tsConfig =
+        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
@@ -167,8 +168,8 @@ export function getSoloistNote(
                 soloist.busySteps = Math.max(0, (res.durationSteps || 1) - 1); // @worker-mutation
                 return finalizeNote(res);
             }
-            if (soloist.busySteps > 0) {
-                soloist.busySteps--; // @worker-mutation
+            if ((soloist.busySteps || 0) > 0) {
+                soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
                 return null;
             }
         }
@@ -187,8 +188,8 @@ export function getSoloistNote(
         soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
         return finalizeNote(devNote);
     }
-    if (soloist.busySteps > 0) {
-        soloist.busySteps--; // @worker-mutation
+    if ((soloist.busySteps || 0) > 0) {
+        soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
         return null;
     }
 

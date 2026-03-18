@@ -58,6 +58,8 @@
  * @property {boolean} [isDownbeat] - Alias for isMeasureStart.
  * @property {boolean} [isTurnaround] - True if this is the final bar of a section.
  * @property {number} beatIndex - 0-indexed beat number within the measure.
+ * @property {number} groupIndex - 0-indexed group index within the measure.
+ * @property {number} stepInGroup - 0-indexed step within the current rhythmic group.
  * @property {number} mStep - 0-indexed step within the current measure.
  * @property {number} [stepInBeat] - 0-indexed step within the current beat.
  * @property {any} [tsConfig] - Time signature configuration object.

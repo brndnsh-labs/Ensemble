@@ -48,12 +48,15 @@ export function resetCursors() {
 
 /**
  * Safely merges state from the main thread while preserving worker-managed properties.
+ * @param {any} target
+ * @param {any} source
+ * @param {string} moduleName
  */
 export function safeSync(target, source, moduleName) {
     if (!source) {
         return;
     }
-    const protectedKeys = WORKER_MANAGED_KEYS[moduleName] || [];
+    const protectedKeys = /** @type {any} */ (WORKER_MANAGED_KEYS)[moduleName] || [];
     for (const key in source) {
         if (!protectedKeys.includes(key)) {
             // Only update if it's not a protected generative property
@@ -66,8 +69,8 @@ export function safeSync(target, source, moduleName) {
  * Core utility for finding the current chord based on the global step.
  * Uses a cursor-based optimization to avoid full-map traversals.
  * @param {number} step - The global step index.
- * @param {Object} arranger - The arranger state (progression, stepMap, etc.).
- * @param {Object} [cursor] - Optional cursor for tracking position.
+ * @param {import('../state/arranger.js').ArrangerState} arranger - The arranger state (progression, stepMap, etc.).
+ * @param {any} [cursor] - Optional cursor for tracking position.
  */
 export function getChordAtStep(step, arranger, cursor = null) {
     if (!arranger || arranger.totalSteps === 0 || !arranger.stepMap) {

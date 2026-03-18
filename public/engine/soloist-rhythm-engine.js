@@ -1,5 +1,17 @@
 import { STYLE_CONFIG, STYLE_EMPHASIS } from '../soloist-config.js';
 
+/**
+ * @param {number} startStep
+ * @param {number} activeSteps
+ * @param {string} style
+ * @param {number} intensity
+ * @param {number} stepsPerMeasure
+ * @param {number} stepsPerBeat
+ * @param {any} coordination
+ * @param {number} sessionSteps
+ * @param {import('../state/instruments.js').SoloistState} soloistState
+ * @param {import('../types.js').StepInfo | null} [_stepInfo=null]
+ */
 export function generateRhythmPlan(
     startStep,
     activeSteps,
@@ -10,11 +22,12 @@ export function generateRhythmPlan(
     coordination,
     sessionSteps,
     soloistState,
-    _stepInfo,
+    _stepInfo = null,
 ) {
+    /** @type {any[]} */
     const plan = [];
-    const _config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
-    const emphasisMap = STYLE_EMPHASIS[style] || STYLE_EMPHASIS.scalar;
+    const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+    const emphasisMap = /** @type {any} */ (STYLE_EMPHASIS)[style] || STYLE_EMPHASIS.scalar;
 
     let notesInPhrase = 0;
 

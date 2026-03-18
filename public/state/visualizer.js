@@ -24,7 +24,7 @@ export function vizReducer(action, payload) {
             return true;
         case ACTIONS.SET_PARAM:
             if (payload.module === 'viz' || payload.module === 'vizState') {
-                vizState[payload.param] = payload.value;
+                /** @type {any} */ (vizState)[payload.param] = payload.value;
                 return true;
             }
             break;

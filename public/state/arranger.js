@@ -60,7 +60,7 @@ export function arrangerReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_PARAM:
             if (payload.module === 'arranger') {
-                arranger[payload.param] = payload.value;
+                /** @type {any} */ (arranger)[payload.param] = payload.value;
                 return true;
             }
             break;

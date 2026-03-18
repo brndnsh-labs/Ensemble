@@ -5,9 +5,13 @@
  * This module ensures the "Musical Coordination Contract" is satisfied.
  */
 
+/**
+ * @param {number} step
+ * @param {import('../types.js').StepInfo|null} [stepInfo=null]
+ */
 export function createCoordinationContext(step, stepInfo = null) {
     // Initial context derived from the "anchor" (Groove)
-    const ts = stepInfo?.tsConfig || { beats: 4, stepsPerBeat: 4 };
+    const ts = /** @type {any} */ (stepInfo)?.tsConfig || { beats: 4, stepsPerBeat: 4 };
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
     const mStep = stepInfo ? stepInfo.mStep : step % stepsPerBar;
 
@@ -31,6 +35,11 @@ export function createCoordinationContext(step, stepInfo = null) {
     };
 }
 
+/**
+ * @param {any} context
+ * @param {string} module
+ * @param {any} result
+ */
 export function updateCoordinationContext(context, module, result) {
     if (!result) {
         return;
@@ -99,6 +108,10 @@ export function updateCoordinationContext(context, module, result) {
 /**
  * Enforces the "Strict Register Slotting" rules defined in ENSEMBLE_COORDINATION.md.
  * If a note is outside its designated slot, it is transposed to the nearest octave within range.
+ * @param {string} module
+ * @param {number} midi
+ * @param {any} _context
+ * @param {number|null} [targetMidi=null]
  */
 export function enforceRegisterSlotting(module, midi, _context, targetMidi = null) {
     if (midi <= 0) {
@@ -127,6 +140,12 @@ export function enforceRegisterSlotting(module, midi, _context, targetMidi = nul
     }
 }
 
+/**
+ * @param {number} midi
+ * @param {number} min
+ * @param {number} max
+ * @param {number|null} [target=null]
+ */
 function smoothOctaveClamp(midi, min, max, target = null) {
     let current = midi;
 

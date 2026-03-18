@@ -46,7 +46,7 @@ export function midiReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_PARAM:
             if (payload.module === 'midi') {
-                midi[payload.param] = payload.value;
+                /** @type {any} */ (midi)[payload.param] = payload.value;
                 return true;
             }
             break;

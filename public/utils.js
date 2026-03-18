@@ -513,13 +513,13 @@ export function formatUnicodeSymbols(str) {
     return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
 }
 
-/** @type {Float32Array | null} */
+/** @type {any} */
 let cachedSoftClipCurve = null;
 
 /**
  * Creates a soft-clipping curve for the WaveShaperNode.
  * Cached for performance.
- * @returns {Float32Array}
+ * @returns {any}
  */
 export function createSoftClipCurve() {
     if (cachedSoftClipCurve) {

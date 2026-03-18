@@ -12,12 +12,16 @@ import { ACTIONS } from '../types.js';
  * @property {GainNode|null} chordsReverb - Reverb send for chords.
  * @property {BiquadFilterNode|null} chordsEQ - EQ for chords (HP/Notch).
  * @property {StereoPannerNode|null} chordsPanner - Stereo panner for chords.
+ * @property {GainNode|null} drumsGain - The gain node for drums.
  * @property {GainNode|null} drumsReverb - Reverb send for drums.
+ * @property {GainNode|null} bassGain - The gain node for bass.
  * @property {GainNode|null} bassReverb - Reverb send for bass.
  * @property {GainNode|null} bassSidechain - Sidechain ducking gain node for bass.
  * @property {BiquadFilterNode|null} bassEQ - EQ for bass (HPF/Notch).
+ * @property {GainNode|null} soloistGain - The gain node for soloist.
  * @property {GainNode|null} soloistReverb - Reverb send for soloist.
  * @property {BiquadFilterNode|null} soloistEQ - EQ for soloist (LPF/Shelf).
+ * @property {GainNode|null} harmoniesGain - The gain node for harmonies.
  * @property {GainNode|null} harmoniesReverb - Reverb send for harmonies.
  * @property {BiquadFilterNode|null} harmoniesEQ - EQ for harmonies (HPF).
  * @property {StereoPannerNode|null} harmoniesPanner - Stereo panner for harmonies.
@@ -58,7 +62,7 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} countIn - Whether the metronome count-in is enabled.
  * @property {boolean} visualFlash - Whether visual flashing is enabled.
  * @property {boolean} haptic - Whether haptic feedback is enabled.
- * @property {Array<Object>} toasts - List of active toast notifications.
+ * @property {Array<{id: string, message: string}>} toasts - List of active toast notifications.
  * @property {number} flashIntensity - Current intensity of the screen flash effect.
  * @property {boolean} updateAvailable - Whether a PWA update is pending.
  * @property {boolean} resolutionTriggered - Whether the resolution ending sequence has been triggered.
@@ -87,6 +91,7 @@ export const playback = {
     soloistReverb: null,
     soloistGain: null,
     soloistEQ: null,
+    harmoniesGain: null,
     harmoniesReverb: null,
     harmoniesEQ: null,
     harmoniesPanner: null,
@@ -153,6 +158,10 @@ export const playback = {
     },
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ */
 export function playbackReducer(action, payload) {
     switch (action) {
         case ACTIONS.RESET_STATE:
@@ -190,13 +199,13 @@ export function playbackReducer(action, payload) {
             return true;
         case ACTIONS.SET_MODAL_OPEN:
             if (Object.hasOwn(playback.modals, payload.modal)) {
-                playback.modals[payload.modal] = !!payload.open;
+                /** @type {any} */ (playback.modals)[payload.modal] = !!payload.open;
                 return true;
             }
             return false;
         case ACTIONS.SET_PARAM:
             if (payload.module === 'playback') {
-                playback[payload.param] = payload.value;
+                /** @type {any} */ (playback)[payload.param] = payload.value;
                 return true;
             }
             break;
@@ -252,11 +261,12 @@ export function playbackReducer(action, payload) {
             break;
         case ACTIONS.SHOW_TOAST: {
             const id = payload.id || Math.random().toString(36).substr(2, 9);
-            playback.toasts = [...playback.toasts, { id, message: payload.message || payload }];
+            const message = payload.message || payload;
+            playback.toasts = [...playback.toasts, { id, message }];
             return true;
         }
         case 'TOAST_EXPIRED':
-            playback.toasts = playback.toasts.filter((t) => t.id !== payload);
+            playback.toasts = playback.toasts.filter((/** @type {any} */ t) => t.id !== payload);
             return true;
         case ACTIONS.TRIGGER_FLASH:
             playback.flashIntensity = payload || 0.25;

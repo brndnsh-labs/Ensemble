@@ -153,7 +153,7 @@ export function generateCompingPattern(feel, seed, tsConfig) {
         }
     } else if (feel === 'Reggae') {
         const backbeats = ts.backbeat || [1, 3];
-        backbeats.forEach((b) => {
+        backbeats.forEach((/** @type {number} */ b) => {
             pattern[getBeatStep(0, b)] = 1;
             pattern[getBeatStep(1, b)] = 1;
         });
@@ -323,7 +323,7 @@ export function getHarmonyNotes(
         activeStyle = 'organ';
     }
 
-    const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.smart;
+    const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.smart;
     let rhythmicStyle = config.rhythmicStyle;
 
     if (rhythmicStyle === 'auto') {

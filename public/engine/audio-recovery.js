@@ -18,6 +18,9 @@ class AudioHealthMonitor {
         this.onRecover = null;
     }
 
+    /**
+     * @param {function(): import('../state/playback.js').GlobalContext} getPlaybackState
+     */
     start(getPlaybackState) {
         if (this.intervalId) {
             return;
@@ -36,6 +39,10 @@ class AudioHealthMonitor {
         }
     }
 
+    /**
+     * @param {GainNode} masterNode
+     * @param {import('../state/playback.js').GlobalContext} playback
+     */
     attachToMaster(masterNode, playback) {
         if (!playback.audio) {
             return;
@@ -59,6 +66,9 @@ class AudioHealthMonitor {
         }
     }
 
+    /**
+     * @param {import('../state/playback.js').GlobalContext} playback
+     */
     async healthCheck(playback) {
         if (!playback.audio) {
             return;
@@ -88,8 +98,8 @@ class AudioHealthMonitor {
         }
 
         // 2. Check for NaN / Infinite (Blown Filters)
-        if (this.analyser && isPlaying) {
-            this.analyser.getFloatTimeDomainData(this.dataBuffer);
+        if (this.analyser && isPlaying && this.dataBuffer) {
+            this.analyser.getFloatTimeDomainData(/** @type {any} */ (this.dataBuffer));
 
             let hasNaN = false;
 
@@ -110,6 +120,9 @@ class AudioHealthMonitor {
         }
     }
 
+    /**
+     * @param {import('../state/playback.js').GlobalContext} playback
+     */
     async triggerDSPReset(playback) {
         this.isRecovering = true;
         this.crashCount++;
@@ -128,7 +141,7 @@ class AudioHealthMonitor {
 
         if (this.onRecover) {
             try {
-                await this.onRecover(playback);
+                await /** @type {any} */ (this.onRecover)(playback);
             } catch (e) {
                 console.error('[AudioWatchdog] DSP Reset Callback Failed', e);
             }
@@ -138,6 +151,9 @@ class AudioHealthMonitor {
         console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
     }
 
+    /**
+     * @param {import('../state/playback.js').GlobalContext} playback
+     */
     triggerFullRestart(playback) {
         // Full page reload might be too aggressive, let's try to re-init first
         this.triggerDSPReset(playback);

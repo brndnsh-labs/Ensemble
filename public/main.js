@@ -23,15 +23,25 @@ function init() {
             applyTheme(playback.theme);
         });
 
-        validateProgression(getState(), (a, p) => window.ensemble?.dispatch(a, p));
+        validateProgression(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
+            /** @type {any} */ (window).ensemble?.dispatch(a, p),
+        );
 
         // --- ASSEMBLE UI ---
         mountComponents(getVisualTime);
 
         // --- WORKER INIT ---
         initWorker(
-            () => scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p)),
-            (notes, requestTimestamp, workerProcessTime, isResolution) => {
+            () =>
+                scheduler(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
+                    /** @type {any} */ (window).ensemble?.dispatch(a, p),
+                ),
+            (
+                /** @type {any[]} */ notes,
+                /** @type {number} */ requestTimestamp,
+                /** @type {number} */ workerProcessTime,
+                /** @type {boolean} */ isResolution,
+            ) => {
                 const { playback, soloist, bass, harmony, chords, groove } = getState();
 
                 if (playback.resolutionTriggered && !isResolution) {
@@ -95,7 +105,9 @@ function init() {
         );
 
         setInstrumentControllerRefs(() =>
-            scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p)),
+            scheduler(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
+                /** @type {any} */ (window).ensemble?.dispatch(a, p),
+            ),
         );
 
         const hasDrumPattern = groove.instruments.some((inst) => inst.steps.some((s) => s > 0));
@@ -114,10 +126,17 @@ function init() {
 
         analyzeFormUI();
 
-        subscribe((action, payload, stateMap, context) => {
-            syncWorker(action, payload);
-            handleEffects(action, payload, stateMap, context);
-        });
+        subscribe(
+            (
+                /** @type {any} */ action,
+                /** @type {any} */ payload,
+                /** @type {any} */ stateMap,
+                /** @type {any} */ context,
+            ) => {
+                syncWorker(action, payload);
+                handleEffects(action, payload, stateMap, context);
+            },
+        );
         syncWorker();
 
         // Signal to E2E tests that hydration and mounting are complete
@@ -127,20 +146,24 @@ function init() {
     }
 }
 
-window.previewChord = (index) => {
+/** @type {any} */ (window).previewChord = (index) => {
     const { playback, arranger } = getState();
     if (playback.isPlaying) {
         return;
     }
-    initAudio();
-    const chord = arranger.progression[index];
+    initAudio(getState());
+    const chord = /** @type {any} */ (arranger.progression[index]);
     if (!chord) {
         return;
     }
     const wasSustainActive = playback.sustainActive;
     playback.sustainActive = false; // @direct-mutation
-    const now = playback.audio.currentTime;
-    chord.freqs.forEach((f) => playNote(f, now, 1.0, { vol: 0.15, instrument: 'Piano' }));
+    const now = playback.audio?.currentTime || 0;
+    if (playback.audio) {
+        chord.freqs.forEach((/** @type {number} */ f) =>
+            playNote(f, now, 1.0, { vol: 0.15, instrument: 'Piano' }),
+        );
+    }
     playback.sustainActive = wasSustainActive; // @direct-mutation
     const cards = document.querySelectorAll('.chord-card');
     if (cards[index]) {

@@ -33,7 +33,7 @@ export function applyConductor() {
 
     // --- 3. Musical Conversation (Soloist Density) ---
     // If soloist is active, the accompanist should "listen" and back off.
-    const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
+    const isSoloistBusy = soloist.enabled && (soloist.busySteps || 0) > 0;
     const targetIntentDensity = isSoloistBusy ? 0.3 * (1 - complexity) : 0.5 + intensity * 0.4;
 
     // --- 4. Harmony Evolution ---
@@ -77,7 +77,7 @@ export function applyConductor() {
     const modStep = arranger.totalSteps > 0 ? playback.step % arranger.totalSteps : 0;
     const currentEntry = binarySearchMap(arranger.stepMap || [], modStep);
     if (currentEntry) {
-        const label = currentEntry.chord.sectionLabel.toLowerCase();
+        const label = /** @type {any} */ (currentEntry.chord).sectionLabel.toLowerCase();
         let sectionBias = 0.5;
         if (label.includes('solo')) {
             sectionBias = 0.2;
@@ -186,11 +186,15 @@ export function applyConductor() {
                 bias = 1.2; // Keep soloist wetter
             }
 
-            const finalReverb = Math.max(0.001, targetReverb * bias);
+            const finalReverb = Math.max(0.0001, targetReverb * bias);
             node.state.reverb = finalReverb;
 
-            if (playback[node.gain]) {
-                playback[node.gain].gain.setTargetAtTime(finalReverb, time, ramp);
+            if (/** @type {any} */ (playback)[node.gain]) {
+                /** @type {any} */ (playback)[node.gain].gain.setTargetAtTime(
+                    finalReverb,
+                    time,
+                    ramp,
+                );
             }
         });
     }
@@ -228,6 +232,7 @@ export function updateAutoConductor() {
 
 /**
  * Calculates and applies tempo drift for "Lars Mode".
+ * @param {number} currentStep
  */
 export function updateLarsTempo(currentStep) {
     const { groove, playback, arranger, conductor } = getState();
@@ -250,11 +255,13 @@ export function updateLarsTempo(currentStep) {
     }
 
     // Use section label energy as a base (-0.5 to +0.5 normalized drift)
-    const labelEnergy = getSectionEnergy(entry.chord.sectionLabel); // 0.1 to 0.9
+    const labelEnergy = getSectionEnergy(/** @type {any} */ (entry.chord).sectionLabel); // 0.1 to 0.9
 
     // Blend with global band intensity (which includes macro-arc and randomness)
     // If the label is generic (e.g., "Section 1"), rely more on bandIntensity.
-    const isGeneric = entry.chord.sectionLabel.toLowerCase().includes('section');
+    const isGeneric = /** @type {any} */ (entry.chord).sectionLabel
+        .toLowerCase()
+        .includes('section');
     const energy = isGeneric
         ? playback.bandIntensity
         : labelEnergy * 0.6 + playback.bandIntensity * 0.4;
@@ -286,6 +293,10 @@ export function updateLarsTempo(currentStep) {
     }
 }
 
+/**
+ * @param {number} currentStep
+ * @param {number} stepsPerMeasure
+ */
 export function checkSectionTransition(currentStep, stepsPerMeasure) {
     const { groove, arranger, playback, conductor } = getState();
     if (!groove.enabled) {
@@ -321,7 +332,12 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
             : binarySearchMapIndex(arranger.stepMap || [], measureEnd);
         const nextEntry = nextChordIdx !== -1 ? arranger.stepMap[nextChordIdx] : null;
 
-        if (nextEntry && (isLoopEnd || nextEntry.chord.sectionId !== entry.chord.sectionId)) {
+        if (
+            nextEntry &&
+            (isLoopEnd ||
+                /** @type {any} */ (nextEntry.chord).sectionId !==
+                    /** @type {any} */ (entry.chord).sectionId)
+        ) {
             // --- 1. THE SOLOIST TRADE ---
             // Real musicians trade even if there isn't a drum fill!
             const { soloist: soloistState } = getState();
@@ -359,7 +375,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
             let shouldFill = true;
 
             // CHECK FOR SEAMLESS TRANSITION
-            const nextSectionId = nextEntry.chord.sectionId;
+            const nextSectionId = /** @type {any} */ (nextEntry.chord).sectionId;
             const nextSection = arranger.sections.find((s) => s.id === nextSectionId);
             if (nextSection?.seamless) {
                 shouldFill = false;
@@ -444,9 +460,10 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 }
 
                 // --- 2. THE LOCAL FUNCTIONAL ROLE ---
-                if (conductor.form?.sections) {
-                    const nextSection = conductor.form.sections.find(
-                        (s) => s.id === nextEntry.chord.sectionId,
+                if (conductor.form && /** @type {any} */ (conductor.form).sections) {
+                    const nextSection = /** @type {any} */ (conductor.form).sections.find(
+                        (/** @type {any} */ s) =>
+                            s.id === /** @type {any} */ (nextEntry.chord).sectionId,
                     );
                     if (nextSection) {
                         const role = nextSection.role;
@@ -487,10 +504,14 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                             targetEnergy -= 0.15;
                         }
                     } else {
-                        targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel);
+                        targetEnergy = getSectionEnergy(
+                            /** @type {any} */ (nextEntry.chord).sectionLabel,
+                        );
                     }
                 } else {
-                    targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel);
+                    targetEnergy = getSectionEnergy(
+                        /** @type {any} */ (nextEntry.chord).sectionLabel,
+                    );
                 }
 
                 targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
@@ -530,7 +551,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
                 // --- 3. THE DRUM SEED (Creativity Memory) ---
                 if (groove.creativity && nextSection) {
                     // Re-evaluate the drum seed only if it hasn't been set for this section
-                    if (groove.sectionSeedMap[nextSection.id] === undefined) {
+                    if (/** @type {any} */ (groove.sectionSeedMap)[nextSection.id] === undefined) {
                         // Generate a robust float seed (0.0 to 1.0) to serve as the abstract pool marker
                         const seed = Math.random();
                         dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed });
@@ -554,7 +575,10 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
     const isChordEnd = modStep === entry.end - 1;
     if (isChordEnd) {
         const nextEntry = arranger.stepMap[currentChordIdx + 1];
-        const isTransition = !nextEntry || nextEntry.chord.sectionId !== entry.chord.sectionId;
+        const isTransition =
+            !nextEntry ||
+            /** @type {any} */ (nextEntry.chord).sectionId !==
+                /** @type {any} */ (entry.chord).sectionId;
 
         if (isTransition && !groove.fillActive && playback.bandIntensity > 0.4) {
             dispatch(ACTIONS.TRIGGER_FILL, {

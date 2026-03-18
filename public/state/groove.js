@@ -41,7 +41,7 @@ import { ACTIONS } from '../types.js';
  * @property {string} lastSmartGenre - Last selected smart genre.
  * @property {string|null} pendingGenreFeel - Genre queued for the next measure.
  * @property {number|null} genreSwitchCountdown - Beats until genre switch.
- * @property {Map} buffer - Map of scheduled drum events.
+ * @property {Map<number, any>} buffer - Map of scheduled drum events.
  */
 export const groove = {
     enabled: true,
@@ -220,6 +220,7 @@ export function grooveReducer(action, payload, playback) {
                     lastSmartGenre: payload.genreName || groove.lastSmartGenre,
                 });
             } else {
+                /** @type {any} */
                 const updates = {
                     genreFeel: payload.feel,
                     pendingGenreFeel: null,

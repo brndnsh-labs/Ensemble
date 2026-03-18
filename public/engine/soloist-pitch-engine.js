@@ -5,6 +5,23 @@ import { calculateTimingOffset, getFrequency } from '../utils.js';
 
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 
+/**
+ * Primary entry point for pitch selection.
+ * @param {number} step
+ * @param {any} rhythmNode
+ * @param {any} currentChord
+ * @param {any} nextChord
+ * @param {string} activeStyle
+ * @param {number} intensity
+ * @param {number} stepInChord
+ * @param {any} coordination
+ * @param {import('../state/playback.js').GlobalContext} playback
+ * @param {import('../state/instruments.js').SoloistState} soloistState
+ * @param {import('../state/groove.js').GrooveState} groove
+ * @param {import('../state/arranger.js').ArrangerState} _arranger
+ * @param {number} stepsPerMeasure
+ * @param {number} stepsPerBeat
+ */
 export function selectPitchAndDevices(
     step,
     rhythmNode,
@@ -25,7 +42,7 @@ export function selectPitchAndDevices(
         return null;
     }
 
-    const config = STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar;
+    const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
 
     // Derived from the Rhythm Engine node
     const { velocity, durationSteps, isStrongBeat, vibrato } = rhythmNode;
@@ -50,7 +67,7 @@ export function selectPitchAndDevices(
     const isBeatStart = isStrongBeat;
 
     // Helper to finalize note (formerly inline in getSoloistNote)
-    const finalizeNote = (res) => {
+    const finalizeNote = (/** @type {any} */ res) => {
         if (!res) {
             return null;
         }
@@ -389,7 +406,11 @@ export function selectPitchAndDevices(
         config.doubleStopProb > 0;
 
     // --- Structural Awareness: Turnaround Handling ---
-    if (activeStyle === 'blues' && coordination.isTurnaround && Math.random() < 0.6) {
+    if (
+        activeStyle === 'blues' &&
+        /** @type {any} */ (coordination).isTurnaround &&
+        Math.random() < 0.6
+    ) {
         const deviceBuffer = generateMelodicDevice('bluesTurnaround', {
             selectedMidi,
             targetChord,
@@ -410,7 +431,9 @@ export function selectPitchAndDevices(
             soloistState.embellishmentBuffer = deviceBuffer.slice(1); // @worker-mutation
             const first = deviceBuffer[0];
             soloistState.busySteps =
-                (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
+                (Array.isArray(first)
+                    ? /** @type {any} */ (first[0]).durationSteps
+                    : /** @type {any} */ (first).durationSteps || 1) - 1; // @worker-mutation
             return finalizeNote(first);
         }
     }
@@ -434,7 +457,7 @@ export function selectPitchAndDevices(
                 allowed = ['bluesCurl', ...allowed]; // Prioritize the curl
             } else if (profile === 'monk' || profile === 'beck') {
                 allowed = ['graceNote', ...allowed]; // Prioritize crushed notes
-            } else if (profile === 'gilmour' && durationSteps >= 4) {
+            } else if (profile === 'gilmour' && /** @type {any} */ (durationSteps) >= 4) {
                 allowed = ['slide', ...allowed];
             }
         }
@@ -472,7 +495,9 @@ export function selectPitchAndDevices(
                 soloistState.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
                 const first = deviceBuffer[0];
                 soloistState.busySteps =
-                    (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1; // @worker-mutation
+                    (Array.isArray(first)
+                        ? /** @type {any} */ (first[0]).durationSteps
+                        : /** @type {any} */ (first).durationSteps || 1) - 1; // @worker-mutation
                 // Note: The device handles its own durations, but we ensure the first note gets returned
                 return finalizeNote(first);
             }
@@ -520,7 +545,7 @@ export function selectPitchAndDevices(
             polyResult[extra.length] = result;
 
             // We set busy steps for polyResult because they are playing simultaneously? No, wait.
-            // In the original code, `soloist.busySteps = result.durationSteps - 1` was done for polyphony too,
+            // In the original code, we assigned busySteps to result.durationSteps - 1 for polyphony too,
             // but we want to let rhythm node handle timing, EXCEPT polyResult needs busySteps to block if duration > 1?
             // Actually, wait: we said busySteps is obsolete for normal note generation.
             // If the rhythmPlan is handling timing, we shouldn't set busySteps for standard or poly notes

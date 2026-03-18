@@ -138,7 +138,8 @@
         "appinstalled",
         "octaveNode",
         "fifthsNode",
-        "alterNode"
+        "alterNode",
+        "shreddy"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

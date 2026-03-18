@@ -12,7 +12,7 @@ import { ACTIONS } from './types.js';
 // --- Global Export for E2E ---
 if (typeof window !== 'undefined') {
     import('./chords-engine.js').then(({ validateProgression }) => {
-        window.ensemble = {
+        /** @type {any} */ (window).ensemble = {
             dispatch,
             getState,
             ACTIONS,

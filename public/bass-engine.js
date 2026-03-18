@@ -582,7 +582,7 @@ export function getBassNote(
 
     const isQuarter = stepInfo ? stepInfo.isBeatStart : step % ts.stepsPerBeat === 0;
     const is8th = step % (ts.stepsPerBeat / 2) === 0;
-    const stepInBeat = stepInfo ? stepInfo.stepInBeat : step % ts.stepsPerBeat;
+    const stepInBeat = stepInfo ? stepInfo.stepInBeat || 0 : step % ts.stepsPerBeat;
 
     const styleResult = getBassNoteStyle(
         style,
@@ -602,8 +602,8 @@ export function getBassNote(
         stepInMeasure,
         stepInBeat,
         baseRoot,
-        prevFreq,
-        prevMidi,
+        prevFreq || 0,
+        /** @type {number} */ (prevMidi || baseRoot),
         centerMidi,
         absMin,
         absMax,

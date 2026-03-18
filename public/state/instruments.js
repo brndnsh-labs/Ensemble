@@ -81,6 +81,7 @@ export const bass = {
  * @property {boolean} isYielding - Whether yielding space to other instruments.
  * @property {boolean} motifTracking - Whether tracking motifs is enabled.
  * @property {number} phraseCount - Total phrases played.
+ * @property {number} notesInPhrase - Number of notes played in the current phrase.
  * @property {number} rhythmicEntropy - Entropy level of the current rhythm.
  * @property {number|null} lastFreq - Last frequency played.
  * @property {number|null} lastPlayedFreq - Last frequency sent to visualizer.
@@ -109,7 +110,8 @@ export const bass = {
  * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
  * @property {number} octave - Base MIDI octave.
  * @property {number} lastNoteEnd - Last note end time.
- * @property {number} [busySteps] - Optional busy steps counter.
+ * @property {number} busySteps - Optional busy steps counter.
+ * @property {string|null} transitionState - Phrasing transition state.
  */
 export const soloist = {
     enabled: false,
@@ -141,6 +143,7 @@ export const soloist = {
         profile: 'srv', // 'srv', 'monk', 'armstrong', 'miles'
     },
     busySteps: 0,
+    transitionState: null,
     hookBuffer: [],
     sharedHookBuffer: [], // Shared hooks for band interaction
     tension: 0,
@@ -161,7 +164,12 @@ export const soloist = {
     leadSheetMelody: [],
     phrasingIntensity: 0.5,
     phraseCount: 0,
+    notesInPhrase: 0,
     rhythmicEntropy: 0,
+    hookRetentionProb: 0.5,
+    rhythmPlan: [],
+    embellishmentBuffer: [],
+    lastSmartStyle: 'scalar',
 };
 
 /**
@@ -191,6 +199,7 @@ export const harmony = {
     lastMidis: [],
     rhythmicMask: 0,
     activeTab: 'smart',
+    pocketOffset: 0,
 };
 
 /**
