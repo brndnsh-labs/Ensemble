@@ -12,21 +12,30 @@ let lastFrameTime = 0;
 let missedFrames = 0;
 
 /**
- * @param {Object} props
- * @param {any} props.enabled
- * @param {any} props.getVisualTime
+ * @typedef {Object} VisualizerProps
+ * @property {boolean} enabled - Whether the visualizer is enabled.
+ * @property {function(import('../state.js').StateMap): number} getVisualTime - Callback to get current visual time.
  */
-/** @param {any} props */
+
+/**
+ * @param {VisualizerProps} props
+ */
 export function Visualizer({ enabled, getVisualTime }) {
+    /** @type {import('preact').RefObject<HTMLDivElement>} */
     const containerRef = useRef(null);
+    /** @type {import('preact').RefObject<HTMLCanvasElement>} */
     const canvasRef = useRef(null);
+    /** @type {import('preact').RefObject<HTMLCanvasElement>} */
     const staticCanvasRef = useRef(null);
+    /** @type {import('preact').RefObject<import('../visualizer-proxy.js').UnifiedVisualizer|null>} */
     const vizRef = useRef(null);
+    /** @type {import('preact').RefObject<number|null>} */
     const loopRef = useRef(null);
     const prevPlayingRef = useRef(false);
 
     const { isPlaying, theme, bpm, timeSignature } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+        /** @param {import('../types.js').EnsembleState} s */
+        (s) => ({
             isPlaying: s.playback.isPlaying,
             theme: s.playback.theme,
             bpm: s.playback.bpm,
@@ -53,8 +62,10 @@ export function Visualizer({ enabled, getVisualTime }) {
         vizRef.current = viz;
 
         // Initial Resize
-        const rect = containerRef.current.getBoundingClientRect();
-        viz.resize(rect.width, rect.height, window.devicePixelRatio || 1);
+        if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            viz.resize(rect.width, rect.height, window.devicePixelRatio || 1);
+        }
 
         // Initial Theme
         updateTheme(viz);
@@ -94,6 +105,7 @@ export function Visualizer({ enabled, getVisualTime }) {
         const style = getComputedStyle(document.documentElement);
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
+        /** @type {Record<string, string|string[]>} */
         const themeCache = {
             bgColor: isDark ? '#0f172a' : '#f8fafc',
             keyWhite: isDark ? '#cbd5e1' : '#ffffff',
@@ -167,7 +179,7 @@ export function Visualizer({ enabled, getVisualTime }) {
             }
             lastFrameTime = nowFrame;
 
-            if (!playback.audio) {
+            if (!playback.audio || !playback.audio.currentTime) {
                 playback.isDrawing = false; // @direct-mutation
                 loopRef.current = requestAnimationFrame(loop);
                 return;
@@ -175,7 +187,9 @@ export function Visualizer({ enabled, getVisualTime }) {
 
             // Sync clock periodically or every frame for high precision
             // Apply visual offset to worker clock as well for perfect sync
-            const now = getVisualTime(stateMap);
+            /** @type {import('../state.js').StateMap} */
+            const typedStateMap = stateMap;
+            const now = getVisualTime(typedStateMap);
             if (enabled) {
                 vizRef.current.syncClock(now, performance.now());
             }
@@ -202,6 +216,7 @@ export function Visualizer({ enabled, getVisualTime }) {
             const spm = getStepsPerMeasure(arranger.timeSignature);
 
             while (playback.drawQueue.length && playback.drawQueue[0].time <= now) {
+                /** @type {any} */
                 const ev = playback.drawQueue.shift(); // @direct-mutation
                 if (ev.type === 'drum_vis') {
                     const stepMeasure = Math.floor(ev.step / spm);
@@ -210,6 +225,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                         stepMeasure !== groove.currentMeasure &&
                         playback.isPlaying
                     ) {
+                        // @ts-expect-error second arg isn't actually typed in instrument-controller
                         switchMeasure(stepMeasure, true);
                     }
                     playback.lastPlayingStep = ev.step; // @direct-mutation
@@ -260,9 +276,11 @@ export function Visualizer({ enabled, getVisualTime }) {
         };
 
         if (isPlaying) {
-            stateMap.playback.isDrawing = true; // @direct-mutation
+            /** @type {import('../state.js').StateMap} */
+            const typedStateMap2 = stateMap;
+            typedStateMap2.playback.isDrawing = true; // @direct-mutation
             if (enabled) {
-                const { playback, arranger } = stateMap;
+                const { playback, arranger } = typedStateMap2;
                 const secondsPerBeat = 60.0 / playback.bpm;
                 const sixteenth = 0.25 * secondsPerBeat;
                 const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);

@@ -23,7 +23,11 @@ if (typeof window !== 'undefined') {
 
 // Central State Map for Generic PARAM Updates
 /**
- * @type {import('./types.js').EnsembleState}
+ * @typedef {import('./types.js').EnsembleState} StateMap
+ */
+
+/**
+ * @type {StateMap}
  */
 export const stateMap = {
     playback,
