@@ -179,19 +179,22 @@ export function selectPitchAndDevices(
             switch (profile) {
                 case 'srv':
                     // SRV: High energy, favors pentatonic/blues notes
-                    if ([0, 3, 5, 6, 7, 10].includes(interval)) {
+                    // Optimization: 1257 = (1<<0) | (1<<3) | (1<<5) | (1<<6) | (1<<7) | (1<<10)
+                    if ((1257 >> interval) & 1) {
                         weight *= 1.2;
                     }
                     break;
                 case 'gilmour':
                     // Gilmour: Melodic, Root and 5th stability for singsong leads
-                    if ([0, 7].includes(interval)) {
+                    // Optimization: 129 = (1<<0) | (1<<7)
+                    if ((129 >> interval) & 1) {
                         weight *= 1.4;
                     }
                     break;
                 case 'slash':
                     // Slash: Classic rock, targets 3rds and 6ths
-                    if ([4, 9].includes(interval)) {
+                    // Optimization: 528 = (1<<4) | (1<<9)
+                    if ((528 >> interval) & 1) {
                         weight *= 1.3;
                     }
                     break;
@@ -235,7 +238,8 @@ export function selectPitchAndDevices(
                     break;
                 case 'miles':
                     // Miles: Modal, targets extensions (9, 11, 13)
-                    if ([2, 5, 9].includes(interval)) {
+                    // Optimization: 548 = (1<<2) | (1<<5) | (1<<9)
+                    if ((548 >> interval) & 1) {
                         weight *= 1.3;
                     }
                     break;
@@ -247,7 +251,8 @@ export function selectPitchAndDevices(
                     break;
                 case 'evans':
                     // Bill Evans: Upper Extensions (9, 11, #11, 13)
-                    if ([2, 5, 6, 9].includes(interval)) {
+                    // Optimization: 612 = (1<<2) | (1<<5) | (1<<6) | (1<<9)
+                    if ((612 >> interval) & 1) {
                         weight += 500; // Final boost to reliably exceed 40% target
                         weight *= 10.0;
                     }

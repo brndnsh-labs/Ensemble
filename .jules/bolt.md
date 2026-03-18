@@ -21,3 +21,7 @@
 ## 2025-10-27 - Bolt: Optimize Range Index Lookups with binarySearchMapIndex
 **Learning:** Just like `find()`, using `.findIndex((e) => step >= e.start && step < e.end)` on large sorted map arrays (like `arranger.stepMap`) inside frequent audio updates or UI loops causes O(N) linear scan overhead.
 **Action:** Add and use a custom `binarySearchMapIndex` function in `utils.js` to achieve O(log N) performance for retrieving the array index of the matching range block.
+
+## 2025-10-28 - Bolt: Replace .includes() with Bitwise Lookups for small integer sets
+**Learning:** Inside intense audio calculation loops (like evaluating many candidate pitches in `selectPitchAndDevices`), calling `[...].includes(interval)` inside switch statements causes repeated temporary array allocations and O(N) linear scanning.
+**Action:** For sets of small integers (e.g., musical intervals 0-11), pre-calculate a bitmask (like `1257 = (1<<0) | (1<<3)...`) and replace the `.includes(val)` lookup with a bitwise evaluation `((mask >> val) & 1)` to eliminate array operations and drastically speed up the hot path.
