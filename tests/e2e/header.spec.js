@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import playwright from '@playwright/test';
+
+const { expect, test } = playwright;
 
 test.describe('Header Visual Integrity', () => {
     test.beforeEach(async ({ page }) => {

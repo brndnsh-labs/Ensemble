@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import playwright from '@playwright/test';
+
+const { expect, test } = playwright;
 
 test.describe('Modals Responsiveness @ui', () => {
     test.beforeEach(async ({ page }) => {

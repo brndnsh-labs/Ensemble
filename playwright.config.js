@@ -1,4 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+import playwright from '@playwright/test';
+
+const { defineConfig, devices } = playwright;
 
 /**
  * @see https://playwright.dev/docs/test-configuration
