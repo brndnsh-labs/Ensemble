@@ -2,6 +2,16 @@ import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
 import { generateId } from './utils.js';
 
 /**
+ * @typedef {Object} Section
+ * @property {string} id
+ * @property {string} label
+ * @property {string} value
+ * @property {string} color
+ * @property {number} repeat
+ * @property {number[]} [syllables]
+ */
+
+/**
  * Validates a single chord symbol.
  * Handles roots, complex suffixes (maj7, sus4, add9, etc.), and slash chords.
  */
@@ -27,7 +37,7 @@ const SECTION_COLORS = [
 
 /**
  * Heuristic to detect the key of a song based on its chords.
- * @param {Array<any>} sections - Parsed song sections
+ * @param {Section[]} sections - Parsed song sections
  * @returns {Object} { key, isMinor, score, confidence }
  */
 export function detectKey(sections) {
@@ -35,12 +45,12 @@ export function detectKey(sections) {
         return { key: 'C', isMinor: false, confidence: 0 };
     }
 
-    /** @type {Array<any>} */
+    /** @type {Array<{chord: string, weight: number}>} */
     const allChords = [];
     sections.forEach((/** @type {any} */ s) => {
         const parts = s.value.split(' | ');
         for (let i = 0; i < s.repeat; i++) {
-            parts.forEach((/** @type {any} */ p, idx) => {
+            parts.forEach((/** @type {any} */ p, /** @type {number} */ idx) => {
                 const isFirst = idx === 0 && i === 0 && sections.indexOf(s) === 0;
                 const isLast =
                     idx === parts.length - 1 &&
@@ -55,6 +65,7 @@ export function detectKey(sections) {
         return { key: 'C', isMinor: false, confidence: 0 };
     }
 
+    /** @type {Array<{key: string, isMinor: boolean, score: number}>} */
     const scores = [];
 
     // Scoring logic
@@ -74,7 +85,7 @@ export function detectKey(sections) {
                     return;
                 }
                 const rootName = chordRoot.toUpperCase();
-                const normalizedRoot = ENHARMONIC_MAP[rootName] || rootName;
+                const normalizedRoot = /** @type {any} */ (ENHARMONIC_MAP)[rootName] || rootName;
                 const chordIndex = KEY_ORDER.indexOf(normalizedRoot);
                 const offset = (chordIndex - rootIndex + 12) % 12;
 
@@ -111,8 +122,10 @@ export function detectKey(sections) {
                 if (!c1 || !c2) {
                     continue;
                 }
-                const n1 = ENHARMONIC_MAP[c1.toUpperCase()] || c1.toUpperCase();
-                const n2 = ENHARMONIC_MAP[c2.toUpperCase()] || c2.toUpperCase();
+                const n1 =
+                    /** @type {any} */ (ENHARMONIC_MAP)[c1.toUpperCase()] || c1.toUpperCase();
+                const n2 =
+                    /** @type {any} */ (ENHARMONIC_MAP)[c2.toUpperCase()] || c2.toUpperCase();
                 const o1 = (KEY_ORDER.indexOf(n1) - rootIndex + 12) % 12;
                 const o2 = (KEY_ORDER.indexOf(n2) - rootIndex + 12) % 12;
 
@@ -208,11 +221,13 @@ export function countSyllables(text) {
 /**
  * Parses a raw chord chart text.
  * @param {string} text
- * @returns {Object} { sections: Array, capo: number }
+ * @returns {Object} { sections: Section[], capo: number }
  */
 export function parseTab(text) {
     const lines = text.split('\n');
+    /** @type {Section[]} */
     const sections = [];
+    /** @type {{label: string, measures: Array<{chord: string, syllables: number}>, repeat: number} | null} */
     let currentSection = null;
     let capo = 0;
 
@@ -292,12 +307,14 @@ export function parseTab(text) {
 
             if (validBars.length > 0) {
                 let foundChords = false;
+                /** @type {Array<{chord: string, syllables: number}>} */
                 const newMeasures = [];
 
                 validBars.forEach((/** @type {string} */ bar) => {
                     const tokens = bar
                         .split(/\s+/)
                         .filter((/** @type {string} */ t) => t.length > 0);
+                    /** @type {string[]} */
                     const barChords = [];
                     let repeatBar = false;
 
@@ -315,7 +332,9 @@ export function parseTab(text) {
                         if (repeatBar) {
                             const last =
                                 newMeasures[newMeasures.length - 1] ||
-                                currentSection.measures[currentSection.measures.length - 1];
+                                (currentSection
+                                    ? currentSection.measures[currentSection.measures.length - 1]
+                                    : null);
                             if (last) {
                                 newMeasures.push({ ...last });
                             }
@@ -336,7 +355,9 @@ export function parseTab(text) {
                     const syllablesPerBar = Math.ceil(totalSyllables / newMeasures.length);
                     newMeasures.forEach((/** @type {any} */ m) => {
                         m.syllables = syllablesPerBar;
-                        currentSection.measures.push(m);
+                        if (currentSection) {
+                            currentSection.measures.push(m);
+                        }
                     });
                     return;
                 }
@@ -378,19 +399,23 @@ export function parseTab(text) {
 
             cleanTokens.forEach((/** @type {string} */ token) => {
                 if (token === '%') {
-                    const last = currentSection.measures[currentSection.measures.length - 1];
-                    if (last) {
+                    const last = currentSection
+                        ? currentSection.measures[currentSection.measures.length - 1]
+                        : null;
+                    if (last && currentSection) {
                         currentSection.measures.push({ ...last });
                     }
                 } else {
-                    currentSection.measures.push({
-                        chord: token === 'N.C.' ? 'R' : token,
-                        syllables: syllablesPerMeasure,
-                    });
+                    if (currentSection) {
+                        currentSection.measures.push({
+                            chord: token === 'N.C.' ? 'R' : token,
+                            syllables: syllablesPerMeasure,
+                        });
+                    }
                 }
             });
 
-            if (repeatValue > 1) {
+            if (repeatValue > 1 && currentSection) {
                 currentSection.repeat = repeatValue;
             }
         } else {

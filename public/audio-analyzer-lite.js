@@ -1270,7 +1270,7 @@ export class ChordAnalyzerLite {
         for (let root = 0; root < 12; root++) {
             for (const [type, profile] of CHORD_PROFILE_ENTRIES) {
                 let score = 0;
-                const typedProfile = /** @type {any} */ (profile);
+                const _typedProfile = /** @type {any} */ (profile);
 
                 // 1. Profile Match
                 for (let i = 0; i < 12; i++) {

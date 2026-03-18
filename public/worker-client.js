@@ -15,10 +15,15 @@ let exportProgressHandler = null;
 
 export const getTimerWorker = () => timerWorker;
 
+/** @param {Function} handler */
 export function setExportProgressHandler(handler) {
     exportProgressHandler = handler;
 }
 
+/**
+ * @param {Function} onSchedulerRequest
+ * @param {Function} onNotesReceived
+ */
 export function initWorker(onSchedulerRequest, onNotesReceived) {
     if (timerWorker) {
         schedulerRequestHandler = onSchedulerRequest;
@@ -77,6 +82,7 @@ export function initWorker(onSchedulerRequest, onNotesReceived) {
     };
 }
 
+/** @param {any} options */
 export function startExport(options) {
     if (timerWorker) {
         timerWorker.postMessage({ type: WORKER_MSG.EXPORT, data: options });
@@ -95,6 +101,11 @@ export function stopWorker() {
     }
 }
 
+/**
+ * @param {number} step
+ * @param {any} [syncData]
+ * @param {number} [primeSteps]
+ */
 export function flushWorker(step, syncData = null, primeSteps = 0) {
     if (timerWorker) {
         timerWorker.postMessage({
@@ -104,6 +115,7 @@ export function flushWorker(step, syncData = null, primeSteps = 0) {
     }
 }
 
+/** @param {number} step */
 export function requestBuffer(step) {
     if (timerWorker) {
         timerWorker.postMessage({
@@ -113,6 +125,7 @@ export function requestBuffer(step) {
     }
 }
 
+/** @param {number} step */
 export function requestResolution(step) {
     if (timerWorker) {
         timerWorker.postMessage({
@@ -231,7 +244,7 @@ export function syncWorker(action, payload) {
                 break;
             case 'SET_PARAM':
                 if (payload.module) {
-                    data[payload.module] = { [payload.param]: payload.value };
+                    /** @type {any} */ (data)[payload.module] = { [payload.param]: payload.value };
                 }
                 break;
             case 'UPDATE_CONDUCTOR_DECISION':
@@ -244,17 +257,17 @@ export function syncWorker(action, payload) {
                 break;
             case 'SET_STYLE':
                 if (payload.module) {
-                    data[payload.module] = { style: payload.style };
+                    /** @type {any} */ (data)[payload.module] = { style: payload.style };
                 }
                 break;
             case 'SET_VOLUME':
                 if (payload.module) {
-                    data[payload.module] = { volume: payload.value };
+                    /** @type {any} */ (data)[payload.module] = { volume: payload.value };
                 }
                 break;
             case 'SET_OCTAVE':
                 if (payload.module) {
-                    data[payload.module] = { octave: payload.value };
+                    /** @type {any} */ (data)[payload.module] = { octave: payload.value };
                 }
                 break;
             case 'SET_GENRE_FEEL':

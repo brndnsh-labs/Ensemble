@@ -3,18 +3,28 @@ import { clampFreq, safeDisconnect } from '../utils.js';
 import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
 
 /**
+ * @typedef {Object} SoloistVoice
+ * @property {GainNode} gain
+ * @property {number} time
+ * @property {number} duration
+ * @property {AudioNode[]} nodes
+ */
+
+/**
  * Stop any currently playing soloist notes.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killSoloistNote(state) {
     const { playback, soloist } = state;
-    killActiveVoices(soloist.activeVoices, playback.audio.currentTime, 0.01);
+    if (playback.audio) {
+        killActiveVoices(soloist.activeVoices, playback.audio.currentTime, 0.01);
+    }
 }
 
 /**
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} freq - Frequency in Hz.
  * @param {number} time - Start time in seconds.
  * @param {number} duration - Note duration in seconds.
@@ -42,6 +52,9 @@ export function playSoloNote(
 
     const preset = soloist.preset || 'trumpet';
     const ctx = playback.audio;
+    if (!ctx) {
+        return;
+    }
     const now = ctx.currentTime;
     const playTime = Math.max(time, now);
 
@@ -67,9 +80,10 @@ export function playSoloNote(
 
     // Common output chain
     gain.connect(pan);
-    pan.connect(playback.soloistGain);
+    pan.connect(/** @type {any} */ (playback).soloistGain);
 
     // We store nodes in a single array for the utility to handle stopping/cleanup
+    /** @type {SoloistVoice} */
     const voiceObj = { gain, time: playTime, duration, nodes: [gain, pan] };
 
     // Retrieve last frequency for portamento
@@ -204,7 +218,7 @@ export function playSoloNote(
 /**
  * Manages active voices for the soloist synthesizer.
  * @param {number} playTime - The current play time.
- * @param {Object} soloist - The soloist state object.
+ * @param {import('../types.js').EnsembleState['soloist']} soloist - The soloist state object.
  */
 function manageVoices(playTime, soloist) {
     if (!soloist.activeVoices) {
@@ -241,7 +255,7 @@ function manageVoices(playTime, soloist) {
 // --- PRESET IMPLEMENTATIONS ---
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} playTime
@@ -250,7 +264,7 @@ function manageVoices(playTime, soloist) {
  * @param {number} bendStartInterval
  * @param {string} style
  * @param {GainNode} outputGain
- * @param {Object} voiceObj
+ * @param {SoloistVoice} voiceObj
  * @param {boolean} isLegato
  * @param {number} prevFreq
  * @param {boolean} vibratoFlag
@@ -306,8 +320,8 @@ function playTrumpet(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        vibGain.connect(osc2.frequency);
+        vibGain.connect(/** @type {any} */ (osc1.frequency));
+        vibGain.connect(/** @type {any} */ (osc2.frequency));
         voiceObj.nodes.push(vibrato, vibGain);
     }
 
@@ -349,7 +363,7 @@ function playTrumpet(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} playTime
@@ -358,7 +372,7 @@ function playTrumpet(
  * @param {number} bendStartInterval
  * @param {string} style
  * @param {GainNode} outputGain
- * @param {Object} voiceObj
+ * @param {SoloistVoice} voiceObj
  * @param {boolean} isLegato
  * @param {number} prevFreq
  * @param {boolean} vibratoFlag
@@ -414,8 +428,8 @@ function playSaxophone(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        vibGain.connect(osc2.frequency);
+        vibGain.connect(/** @type {any} */ (osc1.frequency));
+        vibGain.connect(/** @type {any} */ (osc2.frequency));
         voiceObj.nodes.push(vibrato, vibGain);
     }
 
@@ -470,7 +484,7 @@ function playSaxophone(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} playTime
@@ -479,7 +493,7 @@ function playSaxophone(
  * @param {number} bendStartInterval
  * @param {string} style
  * @param {GainNode} outputGain
- * @param {Object} voiceObj
+ * @param {SoloistVoice} voiceObj
  * @param {boolean} isLegato
  * @param {number} prevFreq
  * @param {boolean} vibratoFlag
@@ -540,8 +554,8 @@ function playClassic(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        vibGain.connect(osc2.frequency);
+        vibGain.connect(/** @type {any} */ (osc1.frequency));
+        vibGain.connect(/** @type {any} */ (osc2.frequency));
         voiceObj.nodes.push(vibrato, vibGain);
     }
 
@@ -606,7 +620,7 @@ function playClassic(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} playTime
@@ -615,7 +629,7 @@ function playClassic(
  * @param {number} bendStartInterval
  * @param {string} style
  * @param {GainNode} outputGain
- * @param {Object} voiceObj
+ * @param {SoloistVoice} voiceObj
  * @param {boolean} isLegato
  * @param {number} prevFreq
  * @param {boolean} vibratoFlag
@@ -652,9 +666,9 @@ function playNeoJuno(
     lfo2Gain.gain.value = -7;
 
     lfo1.connect(lfo1Gain);
-    lfo1Gain.connect(osc1.detune);
+    lfo1Gain.connect(/** @type {any} */ (osc1.detune));
     lfo2.connect(lfo2Gain);
-    lfo2Gain.connect(osc2.detune);
+    lfo2Gain.connect(/** @type {any} */ (osc2.detune));
 
     voiceObj.nodes.push(osc1, osc2, lfo1, lfo1Gain, lfo2, lfo2Gain);
 
@@ -683,8 +697,8 @@ function playNeoJuno(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        vibGain.connect(osc2.frequency);
+        vibGain.connect(/** @type {any} */ (osc1.frequency));
+        vibGain.connect(/** @type {any} */ (osc2.frequency));
         voiceObj.nodes.push(vibrato, vibGain);
     }
 
@@ -721,7 +735,7 @@ function playNeoJuno(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} playTime
@@ -730,7 +744,7 @@ function playNeoJuno(
  * @param {number} bendStartInterval
  * @param {string} style
  * @param {GainNode} outputGain
- * @param {Object} voiceObj
+ * @param {SoloistVoice} voiceObj
  * @param {boolean} isLegato
  * @param {number} prevFreq
  * @param {boolean} vibratoFlag
@@ -784,8 +798,8 @@ function playVowel(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        vibGain.connect(osc2.frequency);
+        vibGain.connect(/** @type {any} */ (osc1.frequency));
+        vibGain.connect(/** @type {any} */ (osc2.frequency));
         voiceObj.nodes.push(vibrato, vibGain);
     }
 
@@ -817,7 +831,7 @@ function playVowel(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} playTime
@@ -826,7 +840,7 @@ function playVowel(
  * @param {number} bendStartInterval
  * @param {string} style
  * @param {GainNode} outputGain
- * @param {Object} voiceObj
+ * @param {SoloistVoice} voiceObj
  * @param {boolean} isLegato
  * @param {number} prevFreq
  * @param {boolean} vibratoFlag
@@ -880,8 +894,8 @@ function playShred(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency);
-        vibGain.connect(osc2.frequency);
+        vibGain.connect(/** @type {any} */ (osc1.frequency));
+        vibGain.connect(/** @type {any} */ (osc2.frequency));
         voiceObj.nodes.push(vibrato, vibGain);
     }
 
@@ -911,7 +925,7 @@ function playShred(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {OscillatorNode} osc1
  * @param {OscillatorNode} osc2
  * @param {number} freq
@@ -964,7 +978,7 @@ function applyPitchEnvelope(
 }
 
 /**
- * @param {Object} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {AudioContext} ctx
  * @param {number} freq
  * @param {number} time
@@ -975,7 +989,7 @@ function applyPitchEnvelope(
  */
 function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = false) {
     const { soloist, playback } = state;
-    const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
+    const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
     const intensity = playback.bandIntensity || 0.5;
     const vibrato = ctx.createOscillator();
 

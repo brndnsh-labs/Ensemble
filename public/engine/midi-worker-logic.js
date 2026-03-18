@@ -24,13 +24,15 @@ export const PPQ = 480;
 // Internal variable tracking export state for message queueing in logic-worker
 let _isExporting = false;
 export const isExporting = () => _isExporting;
+/** @type {Function | null} */
 let _onExportEnd = null;
+/** @param {Function} fn */
 export const setOnExportEnd = (fn) => (_onExportEnd = fn);
 
 export class ExportProcessor {
     /**
      * @param {import('../types.js').EnsembleState} state
-     * @param {Object} options
+     * @param {any} options
      */
     constructor(state, options) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
@@ -50,10 +52,12 @@ export class ExportProcessor {
         this.CHUNK_MS = 12; // Allow execution for ~12ms per frame
 
         // Initialize Export State
-        this.ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        this.ts =
+            /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
         this.totalStepsOneLoop = arranger.totalSteps;
         this.stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
-        const loopSeconds = (this.totalStepsOneLoop / this.ts.stepsPerBeat) * (60 / playback.bpm);
+        const loopSeconds =
+            (this.totalStepsOneLoop / (this.ts.stepsPerBeat || 4)) * (60 / (playback.bpm || 120));
         this.loopCount =
             this.loopMode === 'once'
                 ? 1
@@ -96,8 +100,12 @@ export class ExportProcessor {
         this.drumTrack = new MidiTrack();
 
         this.metaTrack.setName(0, 'Ensemble Export');
-        this.metaTrack.setTempo(0, playback.bpm);
-        this.metaTrack.setKeySig(0, arranger.key, arranger.isMinor);
+        this.metaTrack.setTempo(0, playback.bpm || 120);
+        this.metaTrack.setKeySig(
+            0,
+            /** @type {any} */ (arranger.key) || 'C',
+            arranger.isMinor || false,
+        );
         const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
         this.metaTrack.setTimeSig(0, tsNum, tsDenom);
 
@@ -160,13 +168,20 @@ export class ExportProcessor {
         this.processChunk();
     }
 
+    /**
+     * @param {number} t
+     */
     toPulses(t) {
         const { playback } = this.state;
         return Math.round(t * (playback.bpm / 60.0) * PPQ);
     }
 
+    /**
+     * @param {number} step
+     */
     checkWorkerTransition(step) {
         const { groove, playback, arranger, harmony } = this.state;
+        const _currentLoopCount = playback.currentLoopCount || 0;
         if (!groove.enabled) {
             return;
         }
@@ -195,7 +210,11 @@ export class ExportProcessor {
                 isLoopEnd = true;
             }
 
-            if (nextEntry.chord.sectionId !== entry.chord.sectionId || isLoopEnd) {
+            if (
+                /** @type {any} */ (nextEntry.chord).sectionId !==
+                    /** @type {any} */ (entry.chord).sectionId ||
+                isLoopEnd
+            ) {
                 let shouldFill = groove.creativity;
                 if (shouldFill && isLoopEnd && this.totalStepsOneLoop <= 64) {
                     const freq =
@@ -258,11 +277,18 @@ export class ExportProcessor {
 
             this.finish();
         } catch (e) {
-            postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
+            postMessage({
+                type: WORKER_RESP.ERROR,
+                data: /** @type {Error} */ (e).message,
+                stack: /** @type {Error} */ (e).stack,
+            });
             this.cleanup();
         }
     }
 
+    /**
+     * @param {number} globalStep
+     */
     processStep(globalStep) {
         this.checkWorkerTransition(globalStep);
         const { arranger, groove, playback, soloist, bass, harmony } = this.state;
@@ -288,18 +314,20 @@ export class ExportProcessor {
             barInSection % measuresInSection === measuresInSection - 1;
 
         // 1. Context Assembly (Anchor: Groove)
-        const coordination = createCoordinationContext(globalStep, stepInfo);
+        const coordination = createCoordinationContext(globalStep, /** @type {any} */ (stepInfo));
         coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
-            const { sectionEnd, sectionStart } = chordData;
+            const sectionEnd = chordData.sectionEnd || 0;
+            const sectionStart = chordData.sectionStart || 0;
             const remainingSteps = sectionEnd - globalStep;
             const stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
 
             // --- Structural Awareness: Turnaround Detection ---
             const sectionSteps = sectionEnd - sectionStart;
             const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
-            coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
+            /** @type {any} */ (coordination).isTurnaround =
+                isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
             if (remainingSteps <= stepsPerMeasure) {
                 const nextSectionChordData = getChordAtStep(sectionEnd, this.exportLookaheadCursor);
@@ -312,19 +340,26 @@ export class ExportProcessor {
         // Pre-calculate Drum Hits for Coordination
         if (this.includedTracks.includes('drums')) {
             const drumStep = globalStep % (groove.measures * this.stepsPerMeasure);
-            const sectionId = chordData?.chord?.sectionId || null;
+            const sectionId = /** @type {any} */ (chordData?.chord)?.sectionId || null;
             const seedIdx =
-                groove.sectionSeedMap && sectionId ? groove.sectionSeedMap[sectionId] || 0 : 0;
-            const preset = DRUM_PRESETS[groove.lastDrumPreset];
+                groove.sectionSeedMap && sectionId
+                    ? /** @type {any} */ (groove).sectionSeedMap[sectionId] || 0
+                    : 0;
+            const preset = /** @type {any} */ (DRUM_PRESETS)[groove.lastDrumPreset || 'Standard'];
 
+            /**
+             * @param {string} instName
+             */
             const checkHit = (instName) => {
                 const inst = groove.instruments.find((i) => i.name === instName);
                 if (!inst || inst.muted) {
                     return false;
                 }
                 let stepVal = inst.steps[drumStep];
-                if (groove.creativity && preset?.variations?.[seedIdx]) {
-                    const varInst = preset.variations[seedIdx][instName];
+                if (groove.creativity && /** @type {any} */ (preset)?.variations?.[seedIdx]) {
+                    const varInst = /** @type {any} */ (preset).variations[seedIdx][
+                        /** @type {any} */ (instName)
+                    ];
                     if (varInst) {
                         stepVal = varInst[drumStep];
                     }
@@ -370,10 +405,10 @@ export class ExportProcessor {
                 if (section && section.start === modStep) {
                     this.metaTrack.marker(pulse, `--- ${section.label} ---`);
                 }
-                this.metaTrack.marker(pulse, chord.absName || 'Chord');
+                this.metaTrack.marker(pulse, /** @type {string} */ (chord.absName || 'Chord'));
 
                 if (this.includedTracks.includes('chords')) {
-                    this.chordTrack.text(pulse, chord.absName || 'Chord');
+                    this.chordTrack.text(pulse, /** @type {string} */ (chord.absName || 'Chord'));
                 }
             }
 
@@ -382,12 +417,12 @@ export class ExportProcessor {
             if (this.includedTracks.includes('soloist')) {
                 const { sectionStart, sectionEnd } = chordData;
                 soloResult = getSoloistNote(
-                    chord,
+                    /** @type {any} */ (chord),
                     nextChordData?.chord,
                     globalStep,
                     soloist.lastFreq,
                     soloist.octave,
-                    soloist.style,
+                    /** @type {string} */ (soloist.style),
                     stepInChord,
                     false,
                     { sectionStart, sectionEnd, stepCoordination: coordination },
@@ -409,29 +444,41 @@ export class ExportProcessor {
 
                             // Enforce Contract: Register Slotting (with smooth octave shift)
                             const lastSoloMidi = soloist.lastFreq
-                                ? getMidi(soloist.lastFreq)
+                                ? getMidi(/** @type {any} */ (soloist.lastFreq))
                                 : null;
                             res.midi = enforceRegisterSlotting(
                                 'soloist',
-                                res.midi,
+                                /** @type {any} */ (res.midi),
                                 coordination,
-                                lastSoloMidi,
+                                /** @type {any} */ (lastSoloMidi),
                             );
 
-                            if (res.bendStartInterval) {
+                            if (/** @type {any} */ (res).bendStartInterval) {
                                 this.soloistTrack.pitchBend(
                                     notePulse,
                                     2,
-                                    Math.round(-(res.bendStartInterval / 2) * 8192),
+                                    Math.round(
+                                        -(/** @type {any} */ (res.bendStartInterval / 2)) * 8192,
+                                    ),
                                 );
-                                this.soloistTrack.noteOn(notePulse, 2, res.midi, midiVel);
+                                this.soloistTrack.noteOn(
+                                    notePulse,
+                                    2,
+                                    /** @type {any} */ (res.midi),
+                                    midiVel,
+                                );
                                 this.soloistTrack.pitchBend(
                                     this.toPulses(stepTimeS + this.sixteenthSec),
                                     2,
                                     0,
                                 );
                             } else {
-                                this.soloistTrack.noteOn(notePulse, 2, res.midi, midiVel);
+                                this.soloistTrack.noteOn(
+                                    notePulse,
+                                    2,
+                                    /** @type {any} */ (res.midi),
+                                    midiVel,
+                                );
                             }
 
                             let endTimeS;
@@ -448,7 +495,11 @@ export class ExportProcessor {
                             }
                             endTimeS += 0.015;
 
-                            this.soloistTrack.noteOff(this.toPulses(endTimeS), 2, res.midi);
+                            this.soloistTrack.noteOff(
+                                this.toPulses(endTimeS),
+                                2,
+                                /** @type {any} */ (res.midi),
+                            );
                             if (!res.isDoubleStop) {
                                 soloist.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
                             }
@@ -461,16 +512,22 @@ export class ExportProcessor {
             // 3. Bass Generation (Yields to Soloist, Locks to Kick)
             if (
                 this.includedTracks.includes('bass') &&
-                isBassActive(bass.style, globalStep, stepInChord, stepInfo, coordination)
+                isBassActive(
+                    /** @type {string} */ (bass.style),
+                    globalStep,
+                    stepInChord,
+                    stepInfo,
+                    coordination,
+                )
             ) {
                 const { sectionStart, sectionEnd } = chordData;
                 const res = getBassNote(
-                    chord,
+                    /** @type {any} */ (chord),
                     nextChordData?.chord,
                     stepInChord / this.ts.stepsPerBeat,
                     bass.lastFreq,
                     bass.octave,
-                    bass.style,
+                    /** @type {string} */ (bass.style),
                     chordData.chordIndex,
                     globalStep,
                     stepInChord,
@@ -491,12 +548,12 @@ export class ExportProcessor {
                     const lastBassMidi = bass.lastFreq ? getMidi(bass.lastFreq) : null;
                     res.midi = enforceRegisterSlotting(
                         'bass',
-                        res.midi,
+                        /** @type {any} */ (res.midi),
                         coordination,
-                        lastBassMidi,
+                        /** @type {any} */ (lastBassMidi),
                     );
 
-                    this.bassTrack.noteOn(notePulse, 1, res.midi, midiVel);
+                    this.bassTrack.noteOn(notePulse, 1, /** @type {any} */ (res.midi), midiVel);
 
                     let endTimeS;
                     if (res.durationSteps < 1) {
@@ -512,7 +569,11 @@ export class ExportProcessor {
                     }
                     endTimeS += 0.02;
 
-                    this.bassTrack.noteOff(this.toPulses(endTimeS), 1, res.midi);
+                    this.bassTrack.noteOff(
+                        this.toPulses(endTimeS),
+                        1,
+                        /** @type {any} */ (res.midi),
+                    );
                     bass.lastFreq = 440 * 2 ** ((res.midi - 69) / 12); // @worker-mutation
                     updateCoordinationContext(coordination, 'bass', res);
                 }
@@ -528,18 +589,20 @@ export class ExportProcessor {
                     stepInfo,
                     coordination,
                 );
-                const numVoices = notes.filter((/** @type {any} */ n) => n.midi > 0).length;
+                const numVoices = notes.filter(
+                    (/** @type {any} */ n) => n.midi && n.midi > 0,
+                ).length;
                 const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
 
                 notes.forEach((/** @type {any} */ n) => {
                     const noteTimeS = stepTimeS + (n.timingOffset || 0);
                     const notePulse = Math.max(0, this.toPulses(noteTimeS));
 
-                    if (n.midi > 0) {
+                    if (n.midi && n.midi > 0) {
                         // Enforce Contract: Register Slotting
                         n.midi = enforceRegisterSlotting('chords', n.midi, coordination);
 
-                        n.ccEvents.forEach((cc) =>
+                        n.ccEvents.forEach((/** @type {any} */ cc) =>
                             this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
                         );
 
@@ -549,7 +612,7 @@ export class ExportProcessor {
                         }
                         const midiVel = Math.max(1, Math.min(127, Math.round(finalVel * 127)));
 
-                        this.chordTrack.noteOn(notePulse, 0, n.midi, midiVel);
+                        this.chordTrack.noteOn(notePulse, 0, n.midi || 0, midiVel);
 
                         let endTimeS;
                         if (n.durationSteps < 1) {
@@ -564,9 +627,9 @@ export class ExportProcessor {
                             endTimeS = noteTimeS + 0.05;
                         }
 
-                        this.chordTrack.noteOff(this.toPulses(endTimeS), 0, n.midi);
+                        this.chordTrack.noteOff(this.toPulses(endTimeS), 0, n.midi || 0);
                     } else if (n.ccEvents.length > 0) {
-                        n.ccEvents.forEach((cc) =>
+                        n.ccEvents.forEach((/** @type {any} */ cc) =>
                             this.chordTrack.cc(notePulse, 0, cc.controller, cc.value),
                         );
                     }
@@ -578,11 +641,11 @@ export class ExportProcessor {
             if (this.includedTracks.includes('harmonies')) {
                 const harmonyNotes = getHarmonyNotes(
                     this.state,
-                    chord,
+                    /** @type {any} */ (chord),
                     nextChordData?.chord,
                     globalStep,
                     harmony.octave,
-                    harmony.style,
+                    /** @type {string} */ (harmony.style),
                     stepInChord,
                     soloResult,
                     coordination,
@@ -598,7 +661,7 @@ export class ExportProcessor {
                         Math.min(127, Math.round(n.velocity * polyphonyComp * 127)),
                     );
 
-                    this.harmonyTrack.noteOn(notePulse, 3, n.midi, midiVel);
+                    this.harmonyTrack.noteOn(notePulse, 3, n.midi || 0, midiVel);
 
                     let endTimeS;
                     if (n.durationSteps < 1) {
@@ -609,7 +672,7 @@ export class ExportProcessor {
                             this.stepTimes[targetStepIdx] ||
                             noteTimeS + n.durationSteps * this.sixteenthSec;
                     }
-                    this.harmonyTrack.noteOff(this.toPulses(endTimeS), 3, n.midi);
+                    this.harmonyTrack.noteOff(this.toPulses(endTimeS), 3, n.midi || 0);
                 });
             }
 
@@ -620,6 +683,7 @@ export class ExportProcessor {
                 const nextStepTimeS =
                     this.stepTimes[globalStep + 1] || stepTimeS + this.sixteenthSec;
                 const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;
+                /** @type {Record<string, number>} */
                 const drumMap = {
                     Kick: 36,
                     Snare: 38,
@@ -644,10 +708,10 @@ export class ExportProcessor {
 
                     if (fillStep >= 0 && fillStep < groove.fillLength) {
                         if (playback.bandIntensity >= 0.5 || fillStep >= groove.fillLength / 2) {
-                            const fillNotes = groove.fillSteps[fillStep];
+                            const fillNotes = /** @type {any} */ (groove.fillSteps)[fillStep];
                             if (fillNotes && fillNotes.length > 0) {
                                 fillNotes.forEach((/** @type {any} */ n) => {
-                                    const midi = drumMap[n.name];
+                                    const midi = drumMap[/** @type {any} */ (n).name];
                                     if (midi) {
                                         const durS =
                                             n.name === 'Crash'
@@ -684,17 +748,24 @@ export class ExportProcessor {
 
                 if (!fillPlayed) {
                     const drumStep = globalStep % (groove.measures * this.stepsPerMeasure);
-                    const sectionId = chordData?.chord?.sectionId || null;
+                    const sectionId = /** @type {any} */ (chordData?.chord)?.sectionId || null;
                     const seedIdx =
                         groove.sectionSeedMap && sectionId
-                            ? groove.sectionSeedMap[sectionId] || 0
+                            ? /** @type {any} */ (groove).sectionSeedMap[sectionId] || 0
                             : 0;
-                    const preset = DRUM_PRESETS[groove.lastDrumPreset];
+                    const preset = /** @type {any} */ (DRUM_PRESETS)[
+                        groove.lastDrumPreset || 'Standard'
+                    ];
 
                     groove.instruments.forEach((inst) => {
                         let stepVal = inst.steps[drumStep];
-                        if (groove.creativity && preset?.variations?.[seedIdx]) {
-                            const varInst = preset.variations[seedIdx][inst.name];
+                        if (
+                            groove.creativity &&
+                            /** @type {any} */ (preset)?.variations?.[seedIdx]
+                        ) {
+                            const varInst = /** @type {any} */ (preset).variations[seedIdx][
+                                /** @type {any} */ (inst).name
+                            ];
                             if (varInst) {
                                 stepVal = varInst[drumStep];
                             }
@@ -723,7 +794,9 @@ export class ExportProcessor {
                             });
 
                         if (shouldPlay && !inst.muted) {
-                            const midi = drumMap[soundName] || drumMap[inst.name];
+                            const midi =
+                                drumMap[/** @type {any} */ (soundName)] ||
+                                drumMap[/** @type {any} */ (inst).name];
                             if (midi) {
                                 const durS =
                                     soundName === 'Open' || soundName === 'Crash'
@@ -796,7 +869,7 @@ export class ExportProcessor {
             const notePulse = this.toPulses(resTimeS + offsetS);
 
             if (n.ccEvents) {
-                n.ccEvents.forEach((cc) => {
+                n.ccEvents.forEach((/** @type {any} */ cc) => {
                     track.cc(
                         this.toPulses(resTimeS + (cc.timingOffset || 0)),
                         channel,
@@ -806,7 +879,7 @@ export class ExportProcessor {
                 });
             }
 
-            if (n.midi > 0) {
+            if (n.midi && n.midi > 0) {
                 if (n.module === 'soloist' && n.bendStartInterval) {
                     track.pitchBend(
                         notePulse,
@@ -824,6 +897,7 @@ export class ExportProcessor {
                 const durationS = (n.durationSteps || 1) * this.sixteenthSec;
                 track.noteOff(this.toPulses(resTimeS + offsetS + durationS), channel, n.midi);
             } else if (n.module === 'groove' && n.name) {
+                /** @type {Record<string, number>} */
                 const drumMap = {
                     Kick: 36,
                     Snare: 38,
@@ -840,7 +914,7 @@ export class ExportProcessor {
                     'Mid Tom': 47,
                     'Low Tom': 43,
                 };
-                const midi = drumMap[n.name];
+                const midi = drumMap[/** @type {any} */ (n).name];
                 if (midi) {
                     track.noteOn(notePulse, channel, midi, n.midiVelocity || 110);
                     const durS = n.name === 'Crash' ? 3.0 : 0.1;
@@ -867,8 +941,8 @@ export class ExportProcessor {
         };
         ['chords', 'bass', 'soloist', 'harmonies', 'drums'].forEach((key) => {
             if (this.includedTracks.includes(key)) {
-                trackRefs[key].endOfTrack(finalPulse);
-                finalTrackList.push(trackRefs[key]);
+                /** @type {any} */ (trackRefs)[key].endOfTrack(finalPulse);
+                finalTrackList.push(/** @type {any} */ (trackRefs)[key]);
             }
         });
         this.metaTrack.endOfTrack(finalPulse);
@@ -934,11 +1008,19 @@ export class ExportProcessor {
  * @param {import('../types.js').EnsembleState} state
  * @param {Object} options
  */
+/**
+ * @param {import('../types.js').EnsembleState} state
+ * @param {any} options
+ */
 export function handleExport(state, options) {
     try {
         const processor = new ExportProcessor(state, options);
         processor.start();
     } catch (e) {
-        postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
+        postMessage({
+            type: WORKER_RESP.ERROR,
+            data: /** @type {Error} */ (e).message,
+            stack: /** @type {Error} */ (e).stack,
+        });
     }
 }

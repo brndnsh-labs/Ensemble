@@ -76,7 +76,8 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
         head = currentStep;
     }
 
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts =
+        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
 
     while (head < targetStep) {
@@ -85,8 +86,8 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
         const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
         // 1. Context Assembly (Anchor: Groove)
-        const coordination = createCoordinationContext(step, stepInfo);
-        coordination.pocketOffset = calculatePocketOffset(playback, groove);
+        const coordination = createCoordinationContext(step, /** @type {any} */ (stepInfo));
+        /** @type {any} */ (coordination).pocketOffset = calculatePocketOffset(playback, groove);
 
         if (chordData) {
             const { sectionEnd, sectionStart } = chordData;
@@ -96,7 +97,8 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
             // --- Structural Awareness: Turnaround Detection ---
             const sectionSteps = sectionEnd - sectionStart;
             const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
-            coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
+            /** @type {any} */ (coordination).isTurnaround =
+                isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
             if (remainingSteps <= stepsPerMeasure) {
                 const nextSectionChordData = getChordAtStep(sectionEnd, arranger, lookaheadCursor);
@@ -110,8 +112,10 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
         const drumStep = step % (groove.measures * stepsPerBar);
         const sectionId = chordData?.chord?.sectionId || null;
         const seedIdx =
-            groove.sectionSeedMap && sectionId ? groove.sectionSeedMap[sectionId] || 0 : 0;
-        const preset = DRUM_PRESETS[groove.lastDrumPreset];
+            groove.sectionSeedMap && sectionId
+                ? /** @type {any} */ (groove.sectionSeedMap)[sectionId] || 0
+                : 0;
+        const preset = /** @type {any} */ (DRUM_PRESETS)[groove.lastDrumPreset];
 
         // --- Calculate Turnaround State ---
         const sectionEntry = binarySearchMap(arranger.sectionMap || [], step);
@@ -127,7 +131,7 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
             measuresInSection > 1 &&
             barInSection % measuresInSection === measuresInSection - 1;
 
-        const checkHit = (instName) => {
+        const checkHit = (/** @type {string} */ instName) => {
             const inst = groove.instruments.find((i) => i.name === instName);
             if (!inst || inst.muted) {
                 return false;
@@ -174,16 +178,16 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
                 const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
                 const nextChordData = getChordAtStep(step + 4, arranger, lookaheadCursor);
                 soloResult = getSoloistNote(
-                    chord,
-                    nextChordData?.chord,
+                    chord || '',
+                    nextChordData?.chord || '',
                     step,
-                    soloist.lastFreq,
+                    /** @type {any} */ (soloist.lastFreq || null),
                     soloist.octave,
-                    soloist.style,
+                    soloist.style || '',
                     stepInChord,
                     false,
                     { sectionStart, sectionEnd, stepCoordination: coordination },
-                    stepInfo,
+                    stepInfo || null,
                 );
 
                 if (soloResult) {
@@ -202,7 +206,7 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
                                 'soloist',
                                 res.midi,
                                 coordination,
-                                lastSoloMidi,
+                                /** @type {any} */ (lastSoloMidi),
                             );
 
                             if (!res.freq) {
@@ -231,14 +235,14 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
                         chord,
                         nextChordData?.chord,
                         stepInChord / ts.stepsPerBeat,
-                        bass.lastFreq,
+                        /** @type {any} */ (bass.lastFreq || null),
                         bass.octave,
                         bass.style,
                         chordData.chordIndex,
                         step,
                         stepInChord,
                         { sectionStart, sectionEnd, stepCoordination: coordination },
-                        stepInfo,
+                        stepInfo || null,
                     );
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                         if (!bassResult.midi) {
@@ -250,7 +254,7 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
                             'bass',
                             bassResult.midi,
                             coordination,
-                            lastBassMidi,
+                            /** @type {any} */ (lastBassMidi),
                         );
 
                         if (!bassResult.freq) {
@@ -438,7 +442,7 @@ function processMessage(type, data, startTime) {
                 hbBufferHead = data.step;
                 soloist.isResting = true; // @worker-mutation
                 soloist.phrasingState = 'rest'; // @worker-mutation
-                soloist.transitionState = null; // @worker-mutation
+                /** @type {any} */ (soloist).transitionState = null; // @worker-mutation
                 soloist.rhythmicMotif = []; // @worker-mutation
                 soloist.busySteps = 0; // @worker-mutation
                 soloist.activeSteps = 0; // @worker-mutation
@@ -453,7 +457,7 @@ function processMessage(type, data, startTime) {
                 harmony.lastMidis = []; // @worker-mutation
                 compingState.lastChordIndex = -1;
                 compingState.lockedUntil = 0;
-                compingState.rhythmPattern = [];
+                /** @type {any} */ (compingState).rhythmPattern = [];
                 if (data.primeSteps > 0) {
                     handlePrime(state, data.primeSteps);
                 }
@@ -470,14 +474,18 @@ function processMessage(type, data, startTime) {
                 break;
         }
     } catch (err) {
-        postMessage({ type: WORKER_RESP.ERROR, data: err.message, stack: err.stack });
+        const e = /** @type {Error} */ (err);
+        postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
     }
 }
 
 function processMessageQueue() {
     while (messageQueue.length > 0) {
-        const { type, data, startTime } = messageQueue.shift();
-        processMessage(type, data, startTime);
+        const msg = messageQueue.shift();
+        if (msg) {
+            const { type, data, startTime } = msg;
+            processMessage(type, data, startTime);
+        }
         if (isExporting()) {
             break;
         }
@@ -506,9 +514,21 @@ if (typeof self !== 'undefined') {
  */
 export function handleResolution(state, step, requestTimestamp = null, processStartTime = null) {
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
-    const coordination = createCoordinationContext(step, stepInfo);
+    const ts =
+        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES) || {
+        mStep: 0,
+        isMeasureStart: false,
+        isBeatStart: false,
+        isBackbeat: false,
+        isGroupStart: false,
+        beatIndex: 0,
+        isOffbeat: false,
+        isEOfBeat: false,
+        isAOfBeat: false,
+        tsConfig: ts,
+    };
+    const _coordination = createCoordinationContext(step, /** @type {any} */ (stepInfo));
     const notesToMain = generateResolutionNotes(
         state,
         step,
@@ -523,7 +543,6 @@ export function handleResolution(state, step, requestTimestamp = null, processSt
         playback.bpm,
         groove,
         soloist,
-        coordination,
     );
     var workerProcessTime = processStartTime ? performance.now() - processStartTime : 0;
     postMessage({
@@ -551,7 +570,7 @@ function handlePrime(state, steps) {
     }
     soloist.isResting = true; // @worker-mutation
     soloist.phrasingState = 'rest'; // @worker-mutation
-    soloist.transitionState = null; // @worker-mutation
+    /** @type {any} */ (soloist).transitionState = null; // @worker-mutation
     soloist.rhythmicMotif = []; // @worker-mutation
     soloist.busySteps = 0; // @worker-mutation
     bass.busySteps = 0; // @worker-mutation
@@ -569,17 +588,30 @@ function handlePrime(state, steps) {
         if (chordData) {
             const { chord, stepInChord } = chordData;
             const nextChordData = getChordAtStep(s, arranger, primeLookaheadCursor);
-            const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-            const stepInfo = getStepInfo(s, ts, arranger.measureMap, TIME_SIGNATURES);
-            const coordination = createCoordinationContext(s, stepInfo);
+            const ts =
+                /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] ||
+                TIME_SIGNATURES['4/4'];
+            const stepInfo = getStepInfo(s, ts, arranger.measureMap, TIME_SIGNATURES) || {
+                mStep: 0,
+                isMeasureStart: false,
+                isBeatStart: false,
+                isBackbeat: false,
+                isGroupStart: false,
+                beatIndex: 0,
+                isOffbeat: false,
+                isEOfBeat: false,
+                isAOfBeat: false,
+                tsConfig: ts,
+            };
+            const coordination = createCoordinationContext(s, /** @type {any} */ (stepInfo));
             const { sectionStart, sectionEnd } = chordData;
             const soloResult = getSoloistNote(
-                chord,
-                nextChordData?.chord,
+                chord || '',
+                nextChordData?.chord || '',
                 s,
-                soloist.lastFreq,
+                /** @type {any} */ (soloist.lastFreq || null),
                 soloist.octave,
-                soloist.style,
+                soloist.style || '',
                 stepInChord,
                 true,
                 { sectionStart, sectionEnd, stepCoordination: coordination },
@@ -599,19 +631,20 @@ function handlePrime(state, steps) {
                 updateCoordinationContext(coordination, 'soloist', soloResult);
             }
             if (bass.enabled) {
-                if (isBassActive(bass.style, s, stepInChord, null, coordination)) {
+                if (isBassActive(bass.style, s, stepInChord, stepInfo, coordination)) {
                     const centerMidi = bass.octave;
                     const bassResult = getBassNote(
                         chord,
-                        nextChordData?.chord,
+                        nextChordData?.chord || '',
                         stepInChord / ts.stepsPerBeat,
-                        bass.lastFreq,
+                        bass.lastFreq || null,
                         centerMidi,
                         bass.style,
                         chordData.chordIndex,
                         s,
                         stepInChord,
                         { sectionStart, sectionEnd, stepCoordination: coordination },
+                        stepInfo || null,
                     );
                     if (bassResult && (bassResult.freq || bassResult.midi)) {
                         if (!bassResult.freq) {

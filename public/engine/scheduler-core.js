@@ -1012,7 +1012,7 @@ function scheduleChords(state, _chordData, step, time) {
                 durationSteps,
                 muted,
                 instrument,
-                dry,
+
                 ccEvents,
             } = n;
             const playTime = time + (timingOffset || 0);

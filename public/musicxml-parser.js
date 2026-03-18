@@ -12,6 +12,26 @@ const REGEX_MI7 = /mi7/g;
 const REGEX_MA7 = /ma7/g;
 const REGEX_MI = /mi/g;
 
+/**
+ * @typedef {Object} Section
+ * @property {string} id
+ * @property {string} label
+ * @property {string} value
+ * @property {string} color
+ * @property {number} repeat
+ */
+
+/**
+ * @typedef {Object} LeadSheetNote
+ * @property {number} midi
+ * @property {number} globalStep
+ * @property {number} durationSteps
+ */
+
+/**
+ * Parses MusicXML string into sections and melody.
+ * @param {string} xmlString
+ */
 export function parseMusicXML(xmlString) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlString, 'application/xml');
@@ -25,7 +45,7 @@ export function parseMusicXML(xmlString) {
     // Extract Key Signature
     let xmlKey = 'C';
     const fifthsNode = doc.querySelector('fifths');
-    if (fifthsNode) {
+    if (fifthsNode?.textContent) {
         const fifths = parseInt(fifthsNode.textContent, 10);
         const keys = {
             0: 'C',
@@ -44,13 +64,15 @@ export function parseMusicXML(xmlString) {
             '-6': 'Gb',
             '-7': 'Cb',
         };
-        xmlKey = keys[fifths] || 'C';
+        xmlKey = /** @type {any} */ (keys)[fifths] || 'C';
     }
 
     const parts = doc.querySelectorAll('part');
     const firstPart = parts.length > 0 ? parts[0] : doc;
     const measures = firstPart.querySelectorAll('measure');
+    /** @type {Section[]} */
     const sections = [];
+    /** @type {LeadSheetNote[]} */
     const leadSheetMelody = [];
     let _currentTimeSignature = '4/4';
     let hasChords = false;
@@ -91,6 +113,7 @@ export function parseMusicXML(xmlString) {
 
     const stepZeroOffset = measureStepOffsets[firstChordMeasureIndex];
 
+    /** @type {Section} */
     const currentSection = {
         id: `s${Date.now()}`,
         label: 'A',
@@ -98,11 +121,13 @@ export function parseMusicXML(xmlString) {
         color: '#3b82f6',
         repeat: 1,
     };
+    /** @type {string[]} */
     let currentChords = [];
 
     measures.forEach((measureNode, measureIndex) => {
         let measureStep = 0;
         const currentGlobalStep = measureStepOffsets[measureIndex] - stepZeroOffset;
+        /** @type {string[]} */
         const measureChords = [];
 
         // Check for time signature in attributes
@@ -119,22 +144,24 @@ export function parseMusicXML(xmlString) {
         // 1 quarter note = 4 steps.
         // divisions = divisions per quarter note.
         // So steps = (duration / divisions) * 4
+        /** @param {number} duration */
         const durationToSteps = (duration) => Math.round((duration / divisions) * 4);
 
         measureNode.childNodes.forEach((node) => {
-            if (node.nodeName === 'harmony') {
+            const el = /** @type {Element} */ (node);
+            if (el.nodeName === 'harmony') {
                 hasChords = true;
                 let root = '';
                 let kind = '';
                 let alter = '';
 
-                const rootStepNode = node.querySelector('root-step');
-                if (rootStepNode) {
+                const rootStepNode = el.querySelector('root-step');
+                if (rootStepNode?.textContent) {
                     root = rootStepNode.textContent;
                 }
 
-                const rootAlterNode = node.querySelector('root-alter');
-                if (rootAlterNode) {
+                const rootAlterNode = el.querySelector('root-alter');
+                if (rootAlterNode?.textContent) {
                     const alterVal = parseInt(rootAlterNode.textContent, 10);
                     if (alterVal === -1) {
                         alter = 'b';
@@ -144,12 +171,12 @@ export function parseMusicXML(xmlString) {
                     }
                 }
 
-                const kindNode = node.querySelector('kind');
+                const kindNode = el.querySelector('kind');
                 if (kindNode) {
                     const textAttr = kindNode.getAttribute('text');
                     if (textAttr) {
                         kind = textAttr;
-                    } else {
+                    } else if (kindNode.textContent) {
                         // Fallback translation if 'text' attribute is missing
                         const kindText = kindNode.textContent;
                         if (kindText === 'major-seventh') {
@@ -185,26 +212,28 @@ export function parseMusicXML(xmlString) {
                 measureChords.push(chordString);
             }
 
-            if (node.nodeName === 'note') {
-                const isRest = node.querySelector('rest') !== null;
-                const durationNode = node.querySelector('duration');
+            if (el.nodeName === 'note') {
+                const isRest = el.querySelector('rest') !== null;
+                const durationNode = el.querySelector('duration');
                 let duration = 0;
-                if (durationNode) {
+                if (durationNode?.textContent) {
                     duration = parseInt(durationNode.textContent, 10);
                 }
                 const steps = durationToSteps(duration);
 
                 if (!isRest) {
-                    const pitchNode = node.querySelector('pitch');
+                    const pitchNode = el.querySelector('pitch');
                     if (pitchNode) {
                         const stepNode = pitchNode.querySelector('step');
                         const octaveNode = pitchNode.querySelector('octave');
                         const alterNode = pitchNode.querySelector('alter');
 
-                        const noteStep = stepNode ? stepNode.textContent : 'C';
-                        const octave = octaveNode ? parseInt(octaveNode.textContent, 10) : 4;
+                        const noteStep = stepNode?.textContent ? stepNode.textContent : 'C';
+                        const octave = octaveNode?.textContent
+                            ? parseInt(octaveNode.textContent, 10)
+                            : 4;
                         let noteAlter = '';
-                        if (alterNode) {
+                        if (alterNode?.textContent) {
                             const alterVal = parseInt(alterNode.textContent, 10);
                             if (alterVal === -1) {
                                 noteAlter = 'b';
@@ -219,7 +248,7 @@ export function parseMusicXML(xmlString) {
 
                         // Very simple mapping for parsing. Let's write a simple midi converter
                         const noteMap = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-                        let midi = noteMap[noteStep] + (octave + 1) * 12;
+                        let midi = /** @type {any} */ (noteMap)[noteStep] + (octave + 1) * 12;
                         if (noteAlter === 'b') {
                             midi -= 1;
                         }
@@ -239,16 +268,16 @@ export function parseMusicXML(xmlString) {
             }
 
             // Backup handle 'forward' nodes (multiple voices)
-            if (node.nodeName === 'forward') {
-                const durationNode = node.querySelector('duration');
-                if (durationNode) {
+            if (el.nodeName === 'forward') {
+                const durationNode = el.querySelector('duration');
+                if (durationNode?.textContent) {
                     measureStep += durationToSteps(parseInt(durationNode.textContent, 10));
                 }
             }
             // Backup handle 'backup' nodes
-            if (node.nodeName === 'backup') {
-                const durationNode = node.querySelector('duration');
-                if (durationNode) {
+            if (el.nodeName === 'backup') {
+                const durationNode = el.querySelector('duration');
+                if (durationNode?.textContent) {
                     measureStep -= durationToSteps(parseInt(durationNode.textContent, 10));
                 }
             }
@@ -301,10 +330,10 @@ export function parseMusicXML(xmlString) {
 
 /**
  * Re-harmonizes a melody by analyzing the notes and suggesting chords.
- * @param {Array} leadSheetMelody - Array of melody notes.
+ * @param {LeadSheetNote[]} leadSheetMelody - Array of melody notes.
  * @param {string} key - Current song key.
  * @param {number} totalSteps - Total steps in the arrangement.
- * @returns {Array} Updated sections array.
+ * @returns {Section[] | null} Updated sections array.
  */
 export function reharmonizeMelody(leadSheetMelody, key, totalSteps) {
     if (!leadSheetMelody || leadSheetMelody.length === 0) {
@@ -336,6 +365,7 @@ export function reharmonizeMelody(leadSheetMelody, key, totalSteps) {
 
     // Split the progression into measures
     const measures = progressionStr.split(' | ');
+    /** @type {Section[]} */
     const sections = [];
     const sectionSize = 8;
 
