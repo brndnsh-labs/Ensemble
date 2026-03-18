@@ -15,6 +15,7 @@ class AudioHealthMonitor {
         this.dataBuffer = null;
         this.crashCount = 0;
         this.isRecovering = false;
+        /** @type {any} */
         this.onRecover = null;
     }
 

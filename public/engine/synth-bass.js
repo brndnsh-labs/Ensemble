@@ -3,10 +3,13 @@ import { rampGain, updateDensityDucking } from './synth-utils.js';
 
 /**
  * Stop any currently playing bass note.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killBassNote(state) {
     const { playback, bass } = state;
+    if (!playback.audio) {
+        return;
+    }
     if (bass.lastBassGain) {
         rampGain(bass.lastBassGain.gain, 0, playback.audio.currentTime, 0.005);
         bass.lastBassGain = null; // @direct-mutation
@@ -22,7 +25,7 @@ const mixState = {
 
 /**
  * P-Bass Synthesis: Layered physical model
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} freq - Frequency in Hz.
  * @param {number} time - Start time in seconds.
  * @param {number} duration - Note duration in seconds.
@@ -31,6 +34,9 @@ const mixState = {
  */
 export function playBassNote(state, freq, time, duration, velocity = 1.0, muted = false) {
     const { playback, bass, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
     if (!Number.isFinite(freq) || !Number.isFinite(time) || !Number.isFinite(duration)) {
         return;
     }
@@ -142,7 +148,9 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         impactGain.connect(mainGain);
 
         mainGain.connect(bodyEQ);
-        bodyEQ.connect(playback.bassGain);
+        if (playback.bassGain) {
+            bodyEQ.connect(playback.bassGain);
+        }
 
         // Monophonic Note-Offs
         if (bass.lastBassGain && bass.lastBassGain !== mainGain) {

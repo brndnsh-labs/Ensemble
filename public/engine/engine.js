@@ -283,7 +283,9 @@ export function initAudio(state) {
         /** @type {any} */ (groove.audioBuffers).noise = buffer;
     }
     if (playback.audio && playback.audio.state === 'suspended') {
-        playback.audio.resume();
+        if (playback.audio) {
+            playback.audio.resume();
+        }
     }
 }
 

@@ -14,10 +14,13 @@ const RIGHT_PANNED_INSTRUMENTS = new Set([
 
 /**
  * Stop any currently decaying drum sounds (specifically hat/ride).
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killDrumNote(state) {
     const { playback, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
     if (groove.lastHatGain) {
         rampGain(groove.lastHatGain.gain, 0, playback.audio.currentTime, 0.005);
         groove.lastHatGain = null; // @direct-mutation
@@ -37,14 +40,14 @@ const mixState = {
 
 /**
  * Drum synthesis engine.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {string} name - Drum instrument name.
  * @param {number} time - Start time in seconds.
  * @param {number} [velocity=1.0] - Note velocity (0.0 - 1.0).
  */
 export function playDrumSound(state, name, time, velocity = 1.0) {
     const { playback, groove } = state;
-    if (!name) {
+    if (!name || !playback.audio) {
         return;
     }
     const now = playback.audio.currentTime;
@@ -70,7 +73,9 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         panValue = (Math.random() * 2 - 1) * 0.25;
     }
     const panner = createSimplePanner(playback.audio, panValue, playTime);
-    panner.connect(playback.drumsGain);
+    if (playback.drumsGain) {
+        panner.connect(playback.drumsGain);
+    }
 
     // Round-robin variation (±1.5%)
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;

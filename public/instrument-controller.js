@@ -19,6 +19,7 @@ import { showToast } from './ui.js';
 import { getStepsPerMeasure } from './utils.js';
 import { flushWorker, syncWorker } from './worker-client.js';
 
+/** @param {any} _scheduler */
 export function setInstrumentControllerRefs(_scheduler) {}
 
 /** @param {number} idx */
@@ -32,7 +33,7 @@ export function switchMeasure(idx) {
 
 /** @param {string|number} val */
 export function updateMeasures(val) {
-    const numVal = parseInt(val, 10);
+    const numVal = parseInt(val.toString(), 10);
     dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: numVal });
 
     const { groove } = getState();
@@ -45,15 +46,15 @@ export function updateMeasures(val) {
 /** @param {string} name */
 export function loadDrumPreset(name) {
     const { groove, arranger } = getState();
-    let p = DRUM_PRESETS[name];
-    if (p[arranger.timeSignature]) {
-        p = { ...p, ...p[arranger.timeSignature] };
+    let p = /** @type {any} */ (DRUM_PRESETS)[name];
+    if (/** @type {any} */ (p)[arranger.timeSignature]) {
+        p = { ...p, .../** @type {any} */ (p)[arranger.timeSignature] };
     }
     const newInstruments = groove.instruments.map((inst) => {
         const spm = getStepsPerMeasure(arranger.timeSignature);
         const pattern = p[inst.name] || new Array(spm).fill(0);
         const newSteps = new Array(128).fill(0);
-        pattern.forEach((v, i) => {
+        pattern.forEach((/** @type {any} */ v, /** @type {number} */ i) => {
             if (i < 128) {
                 newSteps[i] = v;
             }
@@ -134,6 +135,7 @@ export function clearDrumPresetHighlight() {
     dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'lastDrumPreset', value: null });
 }
 
+/** @type {number[]} */
 let tapTimes = [];
 /** @param {Function} setBpmRef */
 export function handleTap(setBpmRef) {
@@ -307,7 +309,7 @@ export function togglePower(type) {
         viz: vizState,
     };
 
-    const state = stateMap[normalizedType];
+    const state = /** @type {any} */ (stateMap)[normalizedType];
     if (!state) {
         return;
     }
@@ -352,11 +354,11 @@ export function togglePower(type) {
     if (['chord', 'bass', 'soloist', 'harmony'].includes(normalizedType)) {
         flushBuffer(normalizedType);
     } else {
-        restoreGains(stateMap);
+        restoreGains(getState());
     }
 
     if (newState) {
-        restoreGains(stateMap);
+        restoreGains(getState());
     }
 
     saveCurrentState();

@@ -44,7 +44,7 @@ export const chords = {
  * @property {string} style - Playing style ID (e.g., 'walking', 'funk').
  * @property {number} busySteps - Counter for "busy" playing periods.
  * @property {string} activeTab - Currently active UI tab.
- * @property {number|null} lastBassGain - Last velocity/gain value for dynamic continuity.
+ * @property {GainNode|null} lastBassGain - Last gain node for dynamic continuity.
  */
 export const bass = {
     enabled: true,
@@ -112,6 +112,8 @@ export const bass = {
  * @property {number} lastNoteEnd - Last note end time.
  * @property {number} busySteps - Optional busy steps counter.
  * @property {string|null} transitionState - Phrasing transition state.
+ * @property {number} notesInPhrase - Current phrase note counter.
+ * @property {string} lastSmartStyle - Last active smart style.
  */
 export const soloist = {
     enabled: false,
@@ -144,6 +146,8 @@ export const soloist = {
     },
     busySteps: 0,
     transitionState: null,
+    notesInPhrase: 0,
+    lastSmartStyle: 'scalar',
     hookBuffer: [],
     sharedHookBuffer: [], // Shared hooks for band interaction
     tension: 0,
@@ -164,12 +168,10 @@ export const soloist = {
     leadSheetMelody: [],
     phrasingIntensity: 0.5,
     phraseCount: 0,
-    notesInPhrase: 0,
     rhythmicEntropy: 0,
     hookRetentionProb: 0.5,
     rhythmPlan: [],
     embellishmentBuffer: [],
-    lastSmartStyle: 'scalar',
 };
 
 /**
@@ -185,6 +187,7 @@ export const soloist = {
  * @property {number} rhythmicMask - 16-bit mask of the current rhythmic motif (16th notes).
  * @property {string} activeTab - Currently active UI tab.
  * @property {Array<number>} lastMidis - Array of recently played MIDI notes.
+ * @property {Array<any>} activeVoices - Currently playing polyphonic voices.
  * @property {number} pocketOffset - Current micro-timing offset.
  */
 export const harmony = {
@@ -197,6 +200,7 @@ export const harmony = {
     complexity: 0.5,
     motifBuffer: [],
     lastMidis: [],
+    activeVoices: [],
     rhythmicMask: 0,
     activeTab: 'smart',
     pocketOffset: 0,

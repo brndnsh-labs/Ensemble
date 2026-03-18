@@ -52,6 +52,7 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} isEndingPending - Whether the resolution sequence is about to trigger.
  * @property {import('../types.js').PlaybackIntent} intent - Current rhythmic intent (syncopation, anticipation, etc).
  * @property {Array<HTMLElement>|null} lastActiveDrumElements - Cache of currently animating drum UI elements.
+ * @property {Set<any>} heldNotes - Currently sustaining piano notes.
  * @property {number} lastPlayingStep - The last step index processed by the UI loop.
  * @property {boolean} workerLogging - Whether to log messages from the audio worker.
  * @property {number|null|any} suspendTimeout - ID of the timeout for audio context suspension.
@@ -71,6 +72,9 @@ import { ACTIONS } from '../types.js';
  * @property {import('../types.js').ModalsState} modals - Visibility state for various UI modals.
  * @property {number} loopLimit - Number of loops before stopping (0 = infinite).
  * @property {number} currentLoopCount - Current loop iteration counter.
+ */
+/**
+ * @type {GlobalContext}
  */
 export const playback = {
     audio: null,
@@ -123,13 +127,14 @@ export const playback = {
     stopAtEnd: false,
     isEndingPending: false,
     intent: {
-        syncopation: 0.2,
-        anticipation: 0.1,
-        layBack: 0.0,
+        syncopation: 0.5,
+        anticipation: 0.2,
+        layBack: 0,
         density: 0.5,
     },
     lastActiveDrumElements: null,
-    lastPlayingStep: 0,
+    heldNotes: new Set(),
+    lastPlayingStep: -1,
     workerLogging: false,
     suspendTimeout: null,
     currentKey: null,
@@ -140,7 +145,7 @@ export const playback = {
     countIn: true,
     visualFlash: false,
     haptic: false,
-    toasts: [],
+    toasts: /** @type {any[]} */ ([]),
     flashIntensity: 0,
     updateAvailable: false,
     resolutionTriggered: false,

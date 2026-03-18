@@ -47,13 +47,16 @@ let cachedShaperDrive = -1;
 
 /**
  * Updates the sustain pedal state, precisely scheduled.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {boolean} active - Sustain state.
  * @param {number|null} [time=null] - Scheduled time.
  */
 export function updateSustain(state, active, time = null) {
     const { playback } = state;
-    const scheduleTime = time !== null ? time : playback.audio?.currentTime || 0;
+    if (!playback.audio) {
+        return;
+    }
+    const scheduleTime = time !== null ? time : playback.audio.currentTime;
     playback.sustainActive = active; // @direct-mutation
 
     if (!active && playback.heldNotes) {
@@ -68,7 +71,7 @@ export function updateSustain(state, active, time = null) {
 
 /**
  * Forcefully kills all ringing piano notes (panic button).
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
 export function killAllPianoNotes(state) {
     const { playback } = state;
@@ -88,7 +91,7 @@ export function killAllPianoNotes(state) {
 
 /**
  * Plays a musical note with advanced synthesis based on instrument presets.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} freq - Frequency in Hz.
  * @param {number} time - Start time in seconds.
  * @param {number} duration - Note duration in seconds.
@@ -107,7 +110,7 @@ export function playNote(
     { vol = 0.1, index = 0, instrument = 'Piano', muted = false, numVoices = 1 } = {},
 ) {
     const { playback, groove } = state;
-    if (!Number.isFinite(freq)) {
+    if (!playback.audio || !Number.isFinite(freq)) {
         return;
     }
 
@@ -123,7 +126,8 @@ export function playNote(
             instrument = 'Piano';
         }
 
-        const preset = INSTRUMENT_PRESETS[instrument] || INSTRUMENT_PRESETS.Piano;
+        const preset =
+            /** @type {any} */ (INSTRUMENT_PRESETS)[instrument] || INSTRUMENT_PRESETS.Piano;
         const now = playback.audio.currentTime;
         const baseTime = Math.max(time, now);
 
@@ -161,7 +165,9 @@ export function playNote(
 
             strike.connect(strikeFilter);
             strikeFilter.connect(strikeGain);
-            strikeGain.connect(playback.chordsGain);
+            if (playback.chordsGain) {
+                strikeGain.connect(playback.chordsGain);
+            }
             strike.start(startTime);
             strike.stop(startTime + 0.1);
             strike.onended = () => safeDisconnect([strike, strikeFilter, strikeGain]);
@@ -172,7 +178,7 @@ export function playNote(
         const mainGain = playback.audio.createGain();
         const filter = playback.audio.createBiquadFilter();
 
-        if (isPiano) {
+        if (isPiano && pianoWave) {
             osc.setPeriodicWave(pianoWave);
         } else {
             osc.type = preset.fundamental || 'sine';
@@ -222,6 +228,7 @@ export function playNote(
 
         osc.connect(filter);
 
+        /** @type {AudioNode} */
         let lastNode = filter;
         if (intensity >= 0.8 && !muted) {
             const shaper = playback.audio.createWaveShaper();
@@ -238,10 +245,10 @@ export function playNote(
                 cachedShaperDrive = drive;
             }
 
-            shaper.curve = cachedShaperCurve;
+            shaper.curve = /** @type {any} */ (cachedShaperCurve);
             shaper.oversample = '2x';
             filter.connect(shaper);
-            lastNode = shaper;
+            lastNode = /** @type {AudioNode} */ (shaper);
         }
 
         lastNode.connect(mainGain);
@@ -254,7 +261,9 @@ export function playNote(
 
         mainGain.connect(hpf);
         hpf.connect(panner);
-        panner.connect(playback.chordsGain);
+        if (playback.chordsGain) {
+            panner.connect(playback.chordsGain);
+        }
 
         osc.start(startTime);
         if (!playback.sustainActive || muted) {
@@ -269,12 +278,15 @@ export function playNote(
 
 /**
  * Plays a percussive "scratch" or muted strum sound for chord rhythms.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} time - Scheduled time.
  * @param {number} [vol=0.1] - Output volume.
  */
 export function playChordScratch(state, time, vol = 0.1) {
     const { playback, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
     try {
         const randomizedVol = vol * (0.8 + Math.random() * 0.4);
         const gain = playback.audio.createGain();
@@ -295,7 +307,9 @@ export function playChordScratch(state, time, vol = 0.1) {
 
         noise.connect(filter);
         filter.connect(gain);
-        gain.connect(playback.chordsGain);
+        if (playback.chordsGain) {
+            gain.connect(playback.chordsGain);
+        }
 
         noise.start(time);
         noise.stop(time + 0.2);

@@ -27,7 +27,7 @@ export function generateGenreTable() {
 
 /**
  * Generates a Markdown list of instrument styles by category.
- * @param {Array} stylesArray - e.g. BASS_STYLES
+ * @param {Array<any>} stylesArray - e.g. BASS_STYLES
  * @returns {string} Markdown list
  */
 function generateStyleMD(stylesArray) {

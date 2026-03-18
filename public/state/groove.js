@@ -21,7 +21,7 @@ import { ACTIONS } from '../types.js';
  * @property {number} swing - Swing percentage (0-100).
  * @property {string} swingSub - Swing subdivision ('8th' or '16th').
  * @property {string} lastDrumPreset - Name of the last loaded drum preset.
- * @property {Object} audioBuffers - Cache for decoded drum samples.
+ * @property {any} audioBuffers - Cache for decoded drum samples.
  * @property {string} genreFeel - Active genre for procedural nuances ('Rock', 'Jazz', 'Funk').
  * @property {boolean} larsMode - Whether "Lars Mode" (tempo drift) is active.
  * @property {number} larsIntensity - Intensity of tempo drift (0.0 - 1.0).
@@ -29,7 +29,8 @@ import { ACTIONS } from '../types.js';
  * @property {Object} fillSteps - Transient storage for the generated fill pattern.
  * @property {string} activeTab - Currently active UI tab.
  * @property {string} mobileTab - Currently active mobile tab.
- * @property {number|null} lastHatGain - Last velocity for the hi-hat (for dynamics).
+ * @property {GainNode|null} lastHatGain - Last gain node for the hi-hat.
+ * @property {GainNode|null} lastRideGain - Last gain node for the ride cymbal.
  * @property {number} fillStartStep - Step index where the current fill began.
  * @property {number} fillLength - Length of the current fill in steps.
  * @property {number} snareMask - 16-bit mask of the current snare pattern.
@@ -82,6 +83,7 @@ export const groove = {
     activeTab: 'smart',
     mobileTab: 'chords',
     lastHatGain: null,
+    lastRideGain: null,
     fillStartStep: 0,
     fillLength: 0,
     snareMask: 0,
@@ -112,7 +114,7 @@ export function grooveReducer(action, payload, playback) {
                 payload.module === 'drum' ||
                 payload.module === 'drums'
             ) {
-                groove[payload.param] = payload.value;
+                /** @type {any} */ (groove)[payload.param] = payload.value;
                 return true;
             }
             break;
@@ -148,7 +150,7 @@ export function grooveReducer(action, payload, playback) {
             const inst = groove.instruments.find((i) => i.name === payload.instrument);
             if (inst) {
                 inst.steps.fill(0);
-                payload.steps.forEach((v, i) => {
+                payload.steps.forEach((/** @type {number} */ v, /** @type {number} */ i) => {
                     if (i < 128) {
                         inst.steps[i] = v;
                     }
@@ -205,7 +207,7 @@ export function grooveReducer(action, payload, playback) {
             if (!groove.sectionSeedMap) {
                 groove.sectionSeedMap = {};
             }
-            groove.sectionSeedMap[payload.sectionId] = payload.seed;
+            /** @type {any} */ (groove.sectionSeedMap)[payload.sectionId] = payload.seed;
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== payload) {

@@ -10,6 +10,10 @@ import { ACTIONS } from './types.js';
 /**
  * Handle side effects for specific actions.
  * Extracted from state.js to break circular dependencies with the engine.
+ * @param {string} action
+ * @param {any} payload
+ * @param {import('./types.js').EnsembleState} stateMap
+ * @param {any} [context={}]
  */
 export function handleEffects(action, payload, stateMap, context = {}) {
     const { dispatch } = context;

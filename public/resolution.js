@@ -40,6 +40,15 @@ const GENRE_MAP = {
     Reggae: { profile: 'BUTTON', ritardando: 0.0 },
 };
 
+/**
+ * @param {import('./types.js').EnsembleState} state
+ * @param {number} step
+ * @param {import('./state/arranger.js').ArrangerState} arranger
+ * @param {any} enabled
+ * @param {number} [bpm=100]
+ * @param {any} [groove={}]
+ * @param {any} [soloist={}]
+ */
 export function generateResolutionNotes(
     state,
     step,
@@ -49,22 +58,24 @@ export function generateResolutionNotes(
     groove = {},
     soloist = {},
 ) {
+    /** @type {any[]} */
     const notes = [];
     const genre = groove.genreFeel || 'Rock';
-    const config = GENRE_MAP[genre] || GENRE_MAP.Rock;
+    const config = /** @type {any} */ (GENRE_MAP)[genre] || GENRE_MAP.Rock;
 
     // Use current song key as tonic
     const resolutionKey = arranger.key || 'C';
     const isMinor = arranger.isMinor;
     const keyIndex = KEY_ORDER.indexOf(resolutionKey);
 
-    const cadenceSteps = CADENCE_PROFILES[config.profile] || CADENCE_PROFILES.BUTTON;
+    const cadenceSteps =
+        /** @type {any} */ (CADENCE_PROFILES)[config.profile] || CADENCE_PROFILES.BUTTON;
     const ritardandoAmount = config.ritardando;
 
     // 1. Timing Map
     const spb = 60.0 / bpm;
     let currentTime = 0;
-    const timingMap = cadenceSteps.map((s, idx) => {
+    const timingMap = cadenceSteps.map((/** @type {any} */ s, /** @type {number} */ idx) => {
         const time = currentTime;
         let duration = s.beats * spb;
 
@@ -78,7 +89,7 @@ export function generateResolutionNotes(
     const anchor = 60 + keyIndex; // Middle C range
     let lastMidis = [60, 64, 67];
 
-    timingMap.forEach((entry, idx) => {
+    timingMap.forEach((/** @type {any} */ entry, /** @type {number} */ idx) => {
         const { time, step: cadenceStep } = entry;
         const isLast = idx === cadenceSteps.length - 1;
         const targetPC = (keyIndex + cadenceStep.degree) % 12;

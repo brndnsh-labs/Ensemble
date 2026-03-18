@@ -1,6 +1,7 @@
 import { showToast } from './ui.js';
 import { startExport, syncWorker } from './worker-client.js';
 
+/** @param {any} [options={}] */
 export function exportToMidi(options = {}) {
     showToast('Starting MIDI Export...');
 

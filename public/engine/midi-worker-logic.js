@@ -330,9 +330,14 @@ export class ExportProcessor {
                 isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
             if (remainingSteps <= stepsPerMeasure) {
-                const nextSectionChordData = getChordAtStep(sectionEnd, this.exportLookaheadCursor);
+                const nextSectionChordData = getChordAtStep(
+                    sectionEnd,
+                    arranger,
+                    this.exportLookaheadCursor,
+                );
                 if (nextSectionChordData?.chord) {
-                    coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
+                    /** @type {any} */ (coordination).upcomingSectionFirstChord =
+                        nextSectionChordData.chord;
                 }
             }
         }
@@ -394,7 +399,11 @@ export class ExportProcessor {
 
         if (chordData) {
             const { chord, stepInChord } = chordData;
-            const nextChordData = getChordAtStep(globalStep + 4, this.exportLookaheadCursor);
+            const nextChordData = getChordAtStep(
+                globalStep + 4,
+                arranger,
+                this.exportLookaheadCursor,
+            );
 
             // Emit Metadata on Chord/Section Change
             if (stepInChord === 0) {
@@ -405,10 +414,16 @@ export class ExportProcessor {
                 if (section && section.start === modStep) {
                     this.metaTrack.marker(pulse, `--- ${section.label} ---`);
                 }
-                this.metaTrack.marker(pulse, /** @type {string} */ (chord.absName || 'Chord'));
+                this.metaTrack.marker(
+                    pulse,
+                    /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
+                );
 
                 if (this.includedTracks.includes('chords')) {
-                    this.chordTrack.text(pulse, /** @type {string} */ (chord.absName || 'Chord'));
+                    this.chordTrack.text(
+                        pulse,
+                        /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
+                    );
                 }
             }
 
@@ -829,13 +844,13 @@ export class ExportProcessor {
             this.state,
             resolutionStep,
             arranger,
-            {
+            /** @type {any} */ ({
                 bass: this.includedTracks.includes('bass'),
                 chords: this.includedTracks.includes('chords'),
                 soloist: this.includedTracks.includes('soloist'),
                 harmony: this.includedTracks.includes('harmonies'),
                 groove: this.includedTracks.includes('drums'),
-            },
+            }),
             playback.bpm,
             groove,
             soloist,

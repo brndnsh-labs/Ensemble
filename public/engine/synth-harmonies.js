@@ -8,17 +8,20 @@ import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js
 
 /**
  * Stop any currently playing harmony notes.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} fadeTime - Fade out time in seconds.
  */
 export function killHarmonyNote(state, fadeTime = 0.05) {
     const { playback, harmony } = state;
+    if (!playback.audio) {
+        return;
+    }
     killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
 }
 
 /**
  * Plays a harmony note with genre-specific synthesis and articulations.
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} freq - Frequency in Hz.
  * @param {number} time - Start time in seconds.
  * @param {number} duration - Note duration in seconds.
@@ -100,6 +103,7 @@ export function playHarmonyNote(
     const useSub = freq > 250;
     const sub = useSub ? playback.audio.createOscillator() : null;
 
+    /** @type {AudioNode[]} */
     const voiceNodes = [gain, filter, panner, osc1, osc2];
     if (sub) {
         voiceNodes.push(sub);
@@ -156,11 +160,11 @@ export function playHarmonyNote(
         tremAmp.connect(gain.gain);
         tremoloLfo.start(playTime);
         voiceNodes.push(tremoloLfo, tremoloGain, tremAmp);
-    } else if (vibrato && vibrato.rate > 0 && vibrato.depth > 0) {
+    } else if (vibrato && (vibrato.rate || 0) > 0 && (vibrato.depth || 0) > 0) {
         lfo = playback.audio.createOscillator();
         lfoGain = playback.audio.createGain();
-        lfo.frequency.setValueAtTime(vibrato.rate, playTime);
-        lfoGain.gain.setValueAtTime(vibrato.depth, playTime);
+        lfo.frequency.setValueAtTime(vibrato.rate || 0, playTime);
+        lfoGain.gain.setValueAtTime(vibrato.depth || 0, playTime);
         lfo.connect(lfoGain);
         lfoGain.connect(osc1.frequency);
         lfoGain.connect(osc2.frequency);

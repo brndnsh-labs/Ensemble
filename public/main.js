@@ -99,7 +99,9 @@ function init() {
                     }
                 });
                 if (playback.isPlaying) {
-                    scheduler(getState(), (a, p) => window.ensemble?.dispatch(a, p));
+                    scheduler(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
+                        /** @type {any} */ (window).ensemble?.dispatch(a, p),
+                    );
                 }
             },
         );
@@ -146,7 +148,7 @@ function init() {
     }
 }
 
-/** @type {any} */ (window).previewChord = (index) => {
+/** @type {any} */ (window).previewChord = (/** @type {number} */ index) => {
     const { playback, arranger } = getState();
     if (playback.isPlaying) {
         return;
@@ -161,7 +163,7 @@ function init() {
     const now = playback.audio?.currentTime || 0;
     if (playback.audio) {
         chord.freqs.forEach((/** @type {number} */ f) =>
-            playNote(f, now, 1.0, { vol: 0.15, instrument: 'Piano' }),
+            playNote(getState(), f, now, 1.0, { vol: 0.15, instrument: 'Piano' }),
         );
     }
     playback.sustainActive = wasSustainActive; // @direct-mutation

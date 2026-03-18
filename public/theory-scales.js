@@ -128,7 +128,8 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         if (
             quality === '7alt' ||
             quality === '7#9' ||
-            (soloist.tension > 0.7 && !['rock', 'scalar', 'country'].includes(style))
+            (soloist.tension > 0.7 &&
+                !['rock', 'scalar', 'country'].includes(/** @type {string} */ (style)))
         ) {
             if (style === 'funk' || style === 'blues') {
                 return SCALE_INTERVALS.BLUES;
@@ -142,7 +143,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         }
 
         // Lydian Dominant detection for Jazz/Bossa
-        if (arranger.key && ['jazz', 'bird', 'bossa'].includes(style)) {
+        if (arranger.key && ['jazz', 'bird', 'bossa'].includes(/** @type {string} */ (style))) {
             const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
             const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
             if (intervalFromKey === 10 || intervalFromKey === 2) {
@@ -186,7 +187,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     if (isMinor) {
         // Flavor overrides: Neo-Soul/Jazz/Funk often prefer Dorian over Aeolian
         const favorDorian =
-            ['neo', 'bird', 'funk', 'bossa'].includes(style) ||
+            ['neo', 'bird', 'funk', 'bossa'].includes(/** @type {string} */ (style)) ||
             groove.genreFeel === 'Jazz' ||
             groove.genreFeel === 'Neo-Soul';
 
@@ -254,7 +255,7 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
     }
 
     // Jazz/Bossa/Neo prefer Lydian for non-diatonic Major chords (e.g. bIImaj7, bVImaj7) to avoid clash with Key
-    if (['bird', 'bossa', 'jazz', 'neo'].includes(style)) {
+    if (['bird', 'bossa', 'jazz', 'neo'].includes(/** @type {string} */ (style))) {
         return SCALE_INTERVALS.LYDIAN;
     }
 

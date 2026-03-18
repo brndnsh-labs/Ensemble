@@ -486,8 +486,9 @@ export function getBassNote(
 
     // --- Ensemble Awareness (Kick Drum Mirroring) ---
     const kickInst = (groove.instruments || []).find((i) => i.name === 'Kick');
-    const hasKickTrigger =
-        kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0;
+    const hasKickTrigger = !!(
+        kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
+    );
 
     if ((style === 'rock' || style === 'funk') && hasKickTrigger) {
         const kickVel =
@@ -600,7 +601,7 @@ export function getBassNote(
         isBeatStart,
         isDownbeat,
         stepInMeasure,
-        stepInBeat,
+        /** @type {number} */ (stepInBeat),
         baseRoot,
         prevFreq || 0,
         /** @type {number} */ (prevMidi || baseRoot),

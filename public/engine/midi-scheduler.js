@@ -10,7 +10,7 @@ import { getMidi } from '../utils.js';
 
 /**
  * Stops MIDI transport and sends panic.
- * @param {import('../types.js').EnsembleState} _state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} time - AudioContext time
  */
 export function stopMidiTransport(_state, time) {
@@ -20,7 +20,7 @@ export function stopMidiTransport(_state, time) {
 
 /**
  * Starts MIDI transport and sends panic.
- * @param {import('../types.js').EnsembleState} _state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
  * @param {number} time - AudioContext time
  */
 export function startMidiTransport(_state, time) {
@@ -30,12 +30,16 @@ export function startMidiTransport(_state, time) {
 
 /**
  * Dispatches a MIDI count-in note for the soloist.
- * @param {import('../types.js').EnsembleState} _state - Global ensemble state
- * @param {Object} res - Resolution object
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state
+ * @param {any} res - Resolution object
  * @param {number} time - AudioContext time
  */
-export function dispatchMidiCountInSoloist(_state, res, time) {
-    sendMIDINote('Soloist', res.midi, res.velocity, time, res.duration || 0.25);
+export function dispatchMidiCountInSoloist(state, res, time) {
+    const { midi } = state;
+    if (!midi) {
+        return;
+    }
+    sendMIDINote(midi.soloistChannel, res.midi, res.velocity, time, res.duration || 0.25);
 }
 
 /**
@@ -121,17 +125,24 @@ export function dispatchMidiChordSustain(state, value, ccTime) {
 
 /**
  * Dispatches a MIDI chord note.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state
+ * @param {any} state - Global ensemble state
  * @param {number} freq - Note frequency
  * @param {number} velocity - Note velocity
  * @param {number} playTime - AudioContext time
  * @param {number} duration - Note duration
  */
 export function dispatchMidiChordNote(state, freq, velocity, playTime, duration) {
-    const { midi } = state;
+    if (!state || !state.midi) {
+        return;
+    }
+    const midiNote = getMidi(freq);
+    if (midiNote === null) {
+        return;
+    }
+
     sendMIDINote(
-        midi.chordsChannel,
-        getMidi(freq) + midi.chordsOctave * 12,
+        state.midi.chordsChannel,
+        midiNote + state.midi.chordsOctave * 12,
         normalizeMidiVelocity(velocity),
         playTime,
         duration,
@@ -148,6 +159,9 @@ export function dispatchMidiChordNote(state, freq, velocity, playTime, duration)
  */
 export function dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration) {
     const { midi } = state;
+    if (!midi) {
+        return;
+    }
     sendMIDINote(
         midi.harmonyChannel,
         m + midi.harmonyOctave * 12,

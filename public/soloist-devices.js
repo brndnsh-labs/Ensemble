@@ -8,20 +8,7 @@ import { getScaleForChord } from './theory-scales.js';
 /**
  * Generates a sequence of notes for a specific melodic device.
  * @param {string} deviceType - The ID of the device to generate (e.g., 'bluesLick', 'run').
- * @param {Object} ctx - Context object containing necessary state for generation.
- * @param {number} ctx.selectedMidi - The target MIDI pitch for the device.
- * @param {Object} ctx.targetChord - Current chord object.
- * @param {string} ctx.activeStyle - Style ID (e.g., 'bird', 'blues').
- * @param {number} ctx.effectiveIntensity - Normalized intensity (0.0 - 1.0).
- * @param {number} ctx.minMidi - Minimum allowed MIDI pitch.
- * @param {number} ctx.maxMidi - Maximum allowed MIDI pitch.
- * @param {number} ctx.lastMidi - Previously played MIDI pitch.
- * @param {Object} ctx.playback - Global playback state.
- * @param {Object} ctx.soloist - Global soloist state.
- * @param {boolean} ctx.isPolyphonic - Whether double stops are permitted.
- * @param {boolean} ctx.isPiano - Whether the current instrument is a piano.
- * @param {number} ctx.dynamicCenter - The current melodic center pitch.
- * @param {number} ctx.scaleMask - Bitmask of valid scale tones.
+ * @param {any} ctx - Context object containing necessary state for generation.
  * @returns {Object[]|null} An array of note objects for the device buffer, or null if none generated.
  */
 export function generateMelodicDevice(deviceType, ctx) {
@@ -47,6 +34,7 @@ export function generateMelodicDevice(deviceType, ctx) {
     if (deviceType === 'bluesLick') {
         const root = targetChord.rootMidi;
         const relInt = (selectedMidi - root + 120) % 12;
+        /** @type {any[]} */
         let lick = [];
         const duration = 2; // 8th notes
 
@@ -406,6 +394,7 @@ export function generateMelodicDevice(deviceType, ctx) {
 
 /**
  * Generates additional notes for double stops based on style and mode.
+ * @param {any} ctx
  */
 export function generateExtraNotes(ctx) {
     const { soloist, currentChord, activeStyle, effectiveIntensity, selectedMidi } = ctx;

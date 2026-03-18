@@ -725,7 +725,7 @@ export const DRUM_PRESETS = {
 
 // Auto-expand string patterns into numeric arrays upon import
 for (const p of Object.values(DRUM_PRESETS)) {
-    const expand = (obj) => {
+    const expand = (/** @type {any} */ obj) => {
         for (const [key, val] of Object.entries(obj)) {
             if (typeof val === 'string' && /^[0-2]+$/.test(val)) {
                 obj[key] = Array.from(val, Number);

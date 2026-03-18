@@ -14,6 +14,16 @@ import { stateMap } from './state.js';
  * Ensures the 'stateMap' is always correctly injected into engine calls.
  */
 
+/**
+ * @param {number} freq
+ * @param {number} time
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} [bend=0]
+ * @param {string} [style='scalar']
+ * @param {boolean} [isLegato=false]
+ * @param {boolean} [vibrato=false]
+ */
 export function triggerSoloNote(
     freq,
     time,
@@ -33,6 +43,11 @@ export function stopSoloist() {
     killSoloistNote(stateMap);
 }
 
+/**
+ * @param {string} name
+ * @param {number} time
+ * @param {number} velocity
+ */
 export function triggerDrumSound(name, time, velocity) {
     initAudio(stateMap);
     playDrumSound(stateMap, name, time, velocity);

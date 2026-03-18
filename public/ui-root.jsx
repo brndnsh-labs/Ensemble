@@ -6,10 +6,15 @@ class ErrorBoundary extends Component {
         super();
         this.state = { errored: false };
     }
+    /** @param {any} error */
     componentDidCatch(error) {
         this.setState({ errored: true });
         console.error('[UI-Root] Component Crash:', error);
     }
+    /**
+     * @param {any} props
+     * @param {any} state
+     */
     render(props, state) {
         if (state.errored) {
             return (
@@ -26,6 +31,9 @@ class ErrorBoundary extends Component {
     }
 }
 
+/**
+ * @param {function(any): number} getVisualTime
+ */
 export function mountComponents(getVisualTime) {
     console.log('[UI-Root] Mounting Preact Root...');
 

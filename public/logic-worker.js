@@ -103,14 +103,15 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
             if (remainingSteps <= stepsPerMeasure) {
                 const nextSectionChordData = getChordAtStep(sectionEnd, arranger, lookaheadCursor);
                 if (nextSectionChordData?.chord) {
-                    coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
+                    /** @type {any} */ (coordination).upcomingSectionFirstChord =
+                        nextSectionChordData.chord;
                 }
             }
         }
 
         // Pre-calculate Drum Hits for Coordination
         const drumStep = step % (groove.measures * stepsPerBar);
-        const sectionId = chordData?.chord?.sectionId || null;
+        const sectionId = /** @type {any} */ (chordData?.chord)?.sectionId || null;
         const seedIdx =
             groove.sectionSeedMap && sectionId
                 ? /** @type {any} */ (groove.sectionSeedMap)[sectionId] || 0
@@ -529,17 +530,17 @@ export function handleResolution(state, step, requestTimestamp = null, processSt
         tsConfig: ts,
     };
     const _coordination = createCoordinationContext(step, /** @type {any} */ (stepInfo));
-    const notesToMain = generateResolutionNotes(
+    const resolutionNotes = generateResolutionNotes(
         state,
         step,
         arranger,
-        {
+        /** @type {any} */ ({
             bass: bass.enabled,
             chords: chords.enabled,
             soloist: soloist.enabled,
             harmony: harmony.enabled,
             groove: groove.enabled,
-        },
+        }),
         playback.bpm,
         groove,
         soloist,
@@ -547,7 +548,7 @@ export function handleResolution(state, step, requestTimestamp = null, processSt
     var workerProcessTime = processStartTime ? performance.now() - processStartTime : 0;
     postMessage({
         type: WORKER_RESP.NOTES,
-        notes: notesToMain,
+        notes: resolutionNotes,
         isResolution: true,
         requestTimestamp,
         workerProcessTime,
