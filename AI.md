@@ -49,8 +49,9 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ## 3. Musical Logic & Generative Standards
 
-### A. The "Musical Intent" Rule
-In generative logic (bass, drums, soloist), always add JSDoc comments explaining **why** a specific probability or offset exists (e.g., `// 15% probability to add a 'ghost' note on step 14 for Jazz feel`). This prevents future agents from "optimizing" away intentional nuances.
+### A. The "Musical Intent" & Type Safety Rule
+*   **Musical Intent**: In generative logic (bass, drums, soloist), always add JSDoc comments explaining **why** a specific probability or offset exists (e.g., `// 15% probability to add a 'ghost' note on step 14 for Jazz feel`). This prevents future agents from "optimizing" away intentional nuances.
+*   **Type Safety**: Achieve project-wide type safety via **Hardened JSDoc**. All new state properties, reducer actions, and musical engine functions MUST include explicit JSDoc `@type`, `@param`, and `@returns` tags. Use the global interfaces defined in `public/types.js` (e.g., `EnsembleState`, `StepInfo`) to ensure architectural consistency. ALWAYS run `npm run typecheck` before concluding a task.
 
 ### B. Deterministic Phrasing
 Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js`.

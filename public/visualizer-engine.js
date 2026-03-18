@@ -3,10 +3,24 @@ import { INTERVAL_CATEGORY, IS_BLACK, RingBuffer } from './visualizer-utils.js';
 
 const { min, max, floor, PI, round, ceil } = Math;
 
+/**
+ * @param {number} m
+ * @param {number} midY
+ * @param {number} centerMidi
+ * @param {number} yScale
+ * @returns {number}
+ */
 function getYStandalone(m, midY, centerMidi, yScale) {
     return midY - (m - centerMidi) * yScale;
 }
 
+/**
+ * @param {number} t
+ * @param {number} currentTime
+ * @param {number} pianoRollWidth
+ * @param {number} timeScale
+ * @returns {number}
+ */
 function getXStandalone(t, currentTime, pianoRollWidth, timeScale) {
     return pianoRollWidth + (currentTime - t) * timeScale;
 }
@@ -17,30 +31,61 @@ function getXStandalone(t, currentTime, pianoRollWidth, timeScale) {
  * Operates on Canvas or OffscreenCanvas.
  */
 export class VisualizerEngine {
+    /**
+     * @param {any} canvas
+     * @param {any} staticCanvas
+     */
     constructor(canvas, staticCanvas) {
         this.canvas = canvas;
+        /** @type {any} */
         this.ctx = this.canvas.getContext('2d', { alpha: false });
 
         this.staticCanvas = staticCanvas;
+        /** @type {any} */
         this.staticCtx = this.staticCanvas.getContext('2d', { alpha: false });
 
+        /** @type {Record<string, any>} */
         this.tracks = {};
+        /** @type {Array<any>} */
         this.chordEvents = [];
         this.windowSize = 4.0;
         this.visualRange = 60;
         this.centerMidi = 60;
         this.pianoRollWidth = 50;
+        /** @type {Record<string, number>} */
         this.registers = { chords: 60 };
+        /** @type {number|null} */
         this.beatReferenceTime = null;
+        /** @type {any} */
         this.themeCache = null;
         this.isFillActive = false;
 
         this.cNotesBuffer = new Uint8Array(128);
+        /** @type {Array<Array<number>>} */
         this.soloistBuffers = [[], [], [], []];
+        /** @type {Array<Array<number>>} */
         this.activeChordBuffers = [[], [], [], []];
+        /** @type {Array<Array<number>>} */
         this.guideToneBuffers = [[], [], [], []];
+
+        /** @type {number} */
+        this.width = 0;
+        /** @type {number} */
+        this.height = 0;
+        /** @type {number} */
+        this.dpr = 1;
+        /** @type {number} */
+        this.yScale = 1;
+        /** @type {number} */
+        this.midY = 0;
+        /** @type {number} */
+        this.timeScale = 1;
     }
 
+    /**
+     * @param {any} themeCache
+     * @returns {void}
+     */
     setTheme(themeCache) {
         this.themeCache = themeCache;
         this.intervalColors = Array.from(INTERVAL_CATEGORY).map(
@@ -53,6 +98,12 @@ export class VisualizerEngine {
         }
     }
 
+    /**
+     * @param {number} width
+     * @param {number} height
+     * @param {number} [dpr=1]
+     * @returns {void}
+     */
     resize(width, height, dpr = 1) {
         this.width = width;
         this.height = height;
@@ -75,10 +126,19 @@ export class VisualizerEngine {
         this.renderStaticLayer();
     }
 
+    /**
+     * @param {number} m
+     * @returns {number}
+     */
     getY(m) {
         return getYStandalone(m, this.midY, this.centerMidi, this.yScale);
     }
 
+    /**
+     * @param {number} t
+     * @param {number} currentTime
+     * @returns {number}
+     */
     getX(t, currentTime) {
         return getXStandalone(t, currentTime, this.pianoRollWidth, this.timeScale);
     }
@@ -173,6 +233,12 @@ export class VisualizerEngine {
         ctx.stroke();
     }
 
+    /**
+     * @param {string} name
+     * @param {string} color
+     * @param {string} [resolvedColor]
+     * @returns {void}
+     */
     addTrack(name, color, resolvedColor) {
         this.tracks[name] = {
             color,
@@ -185,14 +251,28 @@ export class VisualizerEngine {
         }
     }
 
+    /**
+     * @param {string} name
+     * @param {number} midi
+     * @returns {void}
+     */
     setRegister(name, midi) {
         this.registers[name] = midi;
     }
 
+    /**
+     * @param {number} time
+     * @returns {void}
+     */
     setBeatReference(time) {
         this.beatReferenceTime = time;
     }
 
+    /**
+     * @param {string} name
+     * @param {any} event
+     * @returns {void}
+     */
     pushNote(name, event) {
         if (!this.tracks[name]) {
             return;
@@ -203,6 +283,10 @@ export class VisualizerEngine {
         }
     }
 
+    /**
+     * @param {any} event
+     * @returns {void}
+     */
     pushChord(event) {
         this.chordEvents.push(event);
         while (this.chordEvents.length > 40) {
@@ -210,6 +294,11 @@ export class VisualizerEngine {
         }
     }
 
+    /**
+     * @param {string} name
+     * @param {number} time
+     * @returns {void}
+     */
     truncateNotes(name, time) {
         if (!this.tracks[name]) {
             return;
@@ -222,6 +311,12 @@ export class VisualizerEngine {
         }
     }
 
+    /**
+     * @param {number} currentTime
+     * @param {number} bpm
+     * @param {any} tsConfig
+     * @returns {void}
+     */
     render(currentTime, bpm, tsConfig) {
         if (!this.themeCache || !this.width || !this.height) {
             return;

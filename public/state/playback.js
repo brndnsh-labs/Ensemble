@@ -46,7 +46,7 @@ import { ACTIONS } from '../types.js';
  * @property {number} sessionStartTime - The performance.now() timestamp when playback started.
  * @property {boolean} stopAtEnd - Whether to stop at the end of the current progression/loop.
  * @property {boolean} isEndingPending - Whether the resolution sequence is about to trigger.
- * @property {Object} intent - Current rhythmic intent (syncopation, anticipation, etc).
+ * @property {import('../types.js').PlaybackIntent} intent - Current rhythmic intent (syncopation, anticipation, etc).
  * @property {Array<HTMLElement>|null} lastActiveDrumElements - Cache of currently animating drum UI elements.
  * @property {number} lastPlayingStep - The last step index processed by the UI loop.
  * @property {boolean} workerLogging - Whether to log messages from the audio worker.
@@ -63,7 +63,7 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} resolutionTriggered - Whether the resolution ending sequence has been triggered.
  * @property {boolean} isScheduling - Whether the scheduler is currently active.
  * @property {number} stateVersion - Counter used to force UI re-renders.
- * @property {Object} modals - Visibility state for various UI modals.
+ * @property {import('../types.js').ModalsState} modals - Visibility state for various UI modals.
  * @property {number} loopLimit - Number of loops before stopping (0 = infinite).
  * @property {number} currentLoopCount - Current loop iteration counter.
  */

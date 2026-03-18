@@ -11,6 +11,11 @@ import { UnifiedVisualizer } from '../visualizer-proxy.js';
 let lastFrameTime = 0;
 let missedFrames = 0;
 
+/**
+ * @param {Object} props
+ * @param {any} props.enabled
+ * @param {any} props.getVisualTime
+ */
 export function Visualizer({ enabled, getVisualTime }) {
     const containerRef = useRef(null);
     const canvasRef = useRef(null);
@@ -19,12 +24,14 @@ export function Visualizer({ enabled, getVisualTime }) {
     const loopRef = useRef(null);
     const prevPlayingRef = useRef(false);
 
-    const { isPlaying, theme, bpm, timeSignature } = useEnsembleState((s) => ({
-        isPlaying: s.playback.isPlaying,
-        theme: s.playback.theme,
-        bpm: s.playback.bpm,
-        timeSignature: s.arranger.timeSignature,
-    }));
+    const { isPlaying, theme, bpm, timeSignature } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            isPlaying: s.playback.isPlaying,
+            theme: s.playback.theme,
+            bpm: s.playback.bpm,
+            timeSignature: s.arranger.timeSignature,
+        }),
+    );
 
     // Initialize visualizer with OffscreenCanvas
     useLayoutEffect(() => {

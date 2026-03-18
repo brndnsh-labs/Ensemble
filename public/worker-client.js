@@ -4,9 +4,13 @@ import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 
+/** @type {Worker|null} */
 let timerWorker = null;
+/** @type {Function|null} */
 let schedulerRequestHandler = null;
+/** @type {Function|null} */
 let notesReceivedHandler = null;
+/** @type {Function|null} */
 let exportProgressHandler = null;
 
 export const getTimerWorker = () => timerWorker;
@@ -118,17 +122,22 @@ export function requestResolution(step) {
     }
 }
 
+/**
+ * @param {string} [action]
+ * @param {any} [payload]
+ */
 export function syncWorker(action, payload) {
     if (!timerWorker) {
         return;
     }
     const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
 
-    let data = {};
+    /** @type {Partial<Record<keyof import('./types.js').EnsembleState, any>>} */
+    const data = {};
 
     if (!action) {
         // Full Sync
-        data = {
+        Object.assign(data, {
             arranger: {
                 progression: arranger.progression,
                 stepMap: arranger.stepMap,
@@ -195,7 +204,7 @@ export function syncWorker(action, payload) {
                 sessionStartTime: playback.sessionStartTime,
                 modals: { performance: playback.modals?.performance || false },
             },
-        };
+        });
     } else {
         // Delta Sync
         switch (action) {

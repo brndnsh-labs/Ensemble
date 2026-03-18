@@ -38,6 +38,10 @@ export const midi = {
     velocitySensitivity: 1.0,
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ */
 export function midiReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_PARAM:

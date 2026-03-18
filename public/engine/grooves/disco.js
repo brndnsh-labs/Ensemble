@@ -8,10 +8,9 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Disco.
- * 0: Classic Disco (Grounded/Offbeat Hats)
- * 1: Shimmering Hats (16th variations)
- * 2: Syncopated Snare/Hats Interplay
- * 3: Maximum Energy (Octave Cowbells/Percussion)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity]
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -37,6 +36,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3; // Octave Percussion
 }
 
+/**
+ * @param {any} context
+ * @param {any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

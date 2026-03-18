@@ -52,6 +52,10 @@ export const arranger = {
     isDirty: false,
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ */
 export function arrangerReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_PARAM:

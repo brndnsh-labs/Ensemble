@@ -8,10 +8,9 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Funk.
- * 0: Standard Syncopated Funk (Grounded)
- * 1: The Funky Drummer (Ghost Note heavy)
- * 2: Displaced Backbeats ("Cold Sweat")
- * 3: Busy Linear (Garibaldi)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity]
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -38,6 +37,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3; // Linear
 }
 
+/**
+ * @param {any} context
+ * @param {any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

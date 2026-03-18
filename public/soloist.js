@@ -9,6 +9,16 @@ import { calculateTimingOffset, getFrequency } from './utils.js';
  * Simplified soloist engine.
  * Focuses on lively, probabilistic phrasing with form and meter awareness.
  * Uses a two-phase Rhythm and Pitch engine.
+ * @param {any} currentChord
+ * @param {any} nextChord
+ * @param {number} step
+ * @param {number|null} _prevFreq
+ * @param {number} _octave
+ * @param {string} style
+ * @param {number} stepInChord
+ * @param {boolean} isPriming
+ * @param {any} [coordination]
+ * @param {import('./types.js').StepInfo} [stepInfo]
  */
 export function getSoloistNote(
     currentChord,
@@ -22,7 +32,9 @@ export function getSoloistNote(
     coordination = {},
     stepInfo,
 ) {
-    const { playback, groove, soloist, arranger } = getState();
+    /** @type {import('./types.js').EnsembleState} */
+    const state = getState();
+    const { playback, groove, soloist, arranger } = state;
     if (!currentChord) {
         return null;
     }
@@ -49,6 +61,7 @@ export function getSoloistNote(
         intensity *= 0.6; // Miles uses much more space
     }
 
+    /** @param {string} msg */
     const logDebug = (msg) => {
         if (playback.debugSoloist) {
             console.log(`[Soloist Debug] Step ${step}: ${msg}`);
@@ -75,6 +88,10 @@ export function getSoloistNote(
     }
 
     // --- Helper to finalize legacy notes (Lead Sheet / Devices) ---
+    /**
+     * @param {any} res
+     * @returns {any}
+     */
     const finalizeNote = (res) => {
         if (!res) {
             return null;

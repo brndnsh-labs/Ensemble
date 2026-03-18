@@ -13,6 +13,9 @@ export const config = {
  * 1: Driving Double-Kick (Kick on 1, 1&, 3, 3&)
  * 2: Half-time Feel (Snare on beat 3)
  * 3: Anthem/Stadium (Feathered 4-on-the-floor, Ride/Open focus)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} intensity
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -50,6 +53,10 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3;
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState} state
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

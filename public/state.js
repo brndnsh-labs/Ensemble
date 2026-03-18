@@ -22,6 +22,9 @@ if (typeof window !== 'undefined') {
 }
 
 // Central State Map for Generic PARAM Updates
+/**
+ * @type {import('./types.js').EnsembleState}
+ */
 export const stateMap = {
     playback,
     chords,
@@ -68,6 +71,10 @@ export {
 
 // Persistence Helpers
 export const storage = {
+    /**
+     * @param {string} key
+     * @returns {any}
+     */
     get: (key) => {
         if (typeof localStorage === 'undefined' || !localStorage?.getItem) {
             return [];
@@ -79,6 +86,10 @@ export const storage = {
             return [];
         }
     },
+    /**
+     * @param {string} key
+     * @param {any} val
+     */
     save: (key, val) => {
         if (typeof localStorage === 'undefined' || !localStorage?.setItem) {
             return;
@@ -93,12 +104,13 @@ export const storage = {
 
 // --- Event Bus / State Manager ---
 
+/** @type {Set<Function>} */
 const listeners = new Set();
 
 /**
  * Dispatch a state change action.
  * @param {string} action - The action type (e.g., ACTIONS.SET_INTENSITY).
- * @param {*} [payload] - The data associated with the action.
+ * @param {any} [payload] - The data associated with the action.
  */
 export function dispatch(action, payload) {
     const oldBpm = playback.bpm;

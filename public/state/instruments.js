@@ -13,7 +13,7 @@ import { arranger } from './arranger.js';
  * @property {boolean} pianoRoots - Whether the piano should play roots even if bass is enabled.
  * @property {number|null} lastActiveChordIndex - Index of the currently playing chord (UI).
  * @property {number|null} scheduledChordIndex - Index of the last scheduled chord (Internal).
- * @property {Map<number, Object>} buffer - Scheduled notes buffer.
+ * @property {Map<number, any>} buffer - Scheduled notes buffer.
  * @property {number} rhythmicMask - 16-bit mask of the current comping pattern.
  * @property {string} activeTab - Currently active UI tab ('classic' or 'smart').
  */
@@ -39,7 +39,7 @@ export const chords = {
  * @property {number} reverb - Reverb level.
  * @property {number|null} lastFreq - Frequency of the last played note.
  * @property {number|null} lastPlayedFreq - Frequency of the note currently ringing.
- * @property {Map<number, Object>} buffer - Map of scheduled notes from the worker.
+ * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
  * @property {number} octave - Base MIDI octave.
  * @property {string} style - Playing style ID (e.g., 'walking', 'funk').
  * @property {number} busySteps - Counter for "busy" playing periods.
@@ -64,16 +64,17 @@ export const bass = {
  * @typedef {Object} SoloistState
  * @property {boolean} enabled - Whether the soloist is active.
  * @property {number} volume - Mix volume (0.0 - 1.0).
+ * @property {number} reverb - Reverb level.
  * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
  * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
  * @property {number} hookRetentionProb - Probability of retaining a hook motif.
- * @property {Array<Object>} leadSheetMelody - Imported melody array.
- * @property {Array<Object>} rhythmPlan - Planned rhythmic phrase.
- * @property {Array<Object>} deviceBuffer - Buffer for melodic embellishments.
- * @property {Array<Object>} embellishmentBuffer - Buffer for melodic embellishments.
- * @property {Array<Object>} hookBuffer - Short term hook memory.
- * @property {Array<Object>} sharedHookBuffer - Hooks shared from other instruments.
+ * @property {Array<any>} leadSheetMelody - Imported melody array.
+ * @property {Array<any>} rhythmPlan - Planned rhythmic phrase.
+ * @property {Array<any>} deviceBuffer - Buffer for melodic embellishments.
+ * @property {Array<any>} embellishmentBuffer - Buffer for melodic embellishments.
+ * @property {Array<any>} hookBuffer - Short term hook memory.
+ * @property {Array<any>} sharedHookBuffer - Hooks shared from other instruments.
  * @property {number} sessionSteps - Total steps played in current session.
  * @property {string} tradeMode - Mode for trading fours ('manual', 'auto').
  * @property {boolean} isWaitingForEntry - Whether waiting to start a phrase.
@@ -81,8 +82,9 @@ export const bass = {
  * @property {boolean} motifTracking - Whether tracking motifs is enabled.
  * @property {number} phraseCount - Total phrases played.
  * @property {number} rhythmicEntropy - Entropy level of the current rhythm.
- * @property {number} lastFreq - Last frequency played.
- * @property {number} lastRenderedFreq - Last frequency sent to visualizer.
+ * @property {number|null} lastFreq - Last frequency played.
+ * @property {number|null} lastPlayedFreq - Last frequency sent to visualizer.
+ * @property {number|null} lastRenderedFreq - Last frequency sent to visualizer.
  * @property {number} tension - Current melodic tension level.
  * @property {number} activeSteps - Steps the soloist has been active.
  * @property {number} restSteps - Steps the soloist has been resting.
@@ -93,15 +95,21 @@ export const bass = {
  * @property {number} complexity - Local complexity level.
  * @property {number} lastAttackStep - Step of the last note attack.
  * @property {string} phrasingState - Current state in the phrasing lifecycle.
- * @property {Object} motifCache - Cached motif data.
- * @property {Array<Object>} rhythmicMotif - Current rhythmic motif.
- * @property {Array<Object>} lickDictionary - Dictionary of loaded licks.
- * @property {Array<Object>} recentNotes - Recently played notes.
- * @property {number} phraseStartStep - Step when the current phrase started.
- * @property {Object} phraseContext - Context data for the current phrase.
+ * @property {any} motifCache - Cached motif data.
+ * @property {Array<any>} rhythmicMotif - Current rhythmic motif.
+ * @property {Array<any>} lickDictionary - Dictionary of loaded licks.
+ * @property {Array<any>} recentNotes - Recently played notes.
+ * @property {number|null} phraseStartStep - Step when the current phrase started.
+ * @property {any} phraseContext - Context data for the current phrase.
  * @property {number} doubleStopProb - Probability of playing double stops.
- * @property {Array<Object>} activeVoices - Active polyphonic voices.
- * @property {number} lastMidiPlayed - Last MIDI note value played.
+ * @property {Array<any>} activeVoices - Active polyphonic voices.
+ * @property {number|null} lastMidiPlayed - Last MIDI note value played.
+ * @property {string} [style] - Optional playing style.
+ * @property {string} [activeTab] - Optional active UI tab.
+ * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
+ * @property {number} octave - Base MIDI octave.
+ * @property {number} lastNoteEnd - Last note end time.
+ * @property {number} [busySteps] - Optional busy steps counter.
  */
 export const soloist = {
     enabled: false,
@@ -161,11 +169,11 @@ export const soloist = {
  * @property {boolean} enabled - Whether the harmony engine is active.
  * @property {number} volume - Volume level.
  * @property {number} reverb - Reverb level.
- * @property {Map<number, Object>} buffer - Map of scheduled notes from the worker.
+ * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
  * @property {number} octave - Base MIDI octave.
  * @property {string} style - Playing style ID (e.g., 'horns', 'strings').
  * @property {number} complexity - Local complexity override (0.0 - 1.0).
- * @property {Array<Object>} motifBuffer - Short-term memory for current section hooks.
+ * @property {Array<any>} motifBuffer - Short-term memory for current section hooks.
  * @property {number} rhythmicMask - 16-bit mask of the current rhythmic motif (16th notes).
  * @property {string} activeTab - Currently active UI tab.
  * @property {Array<number>} lastMidis - Array of recently played MIDI notes.
@@ -185,6 +193,9 @@ export const harmony = {
     activeTab: 'smart',
 };
 
+/**
+ * @type {Record<string, any>}
+ */
 const instrumentStateMap = {
     cb: chords,
     chords,
@@ -196,6 +207,10 @@ const instrumentStateMap = {
     harmony,
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ */
 export function instrumentReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_PARAM: {

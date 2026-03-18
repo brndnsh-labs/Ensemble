@@ -9,6 +9,10 @@ import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
+/**
+ * @param {Object} props
+ * @param {any} props.module
+ */
 export function InstrumentSettings({ module }) {
     const state = useEnsembleState((s) => {
         const key = module === 'groove' ? 'groove' : module;
@@ -230,11 +234,17 @@ export function InstrumentSettings({ module }) {
     );
 }
 
+/**
+ * @param {Object} props
+ * @param {any} props.state
+ */
 function GrooveControls({ state }) {
-    const { swing, swingSub } = useEnsembleState((s) => ({
-        swing: s.groove.swing,
-        swingSub: s.groove.swingSub,
-    }));
+    const { swing, swingSub } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            swing: s.groove.swing,
+            swingSub: s.groove.swingSub,
+        }),
+    );
 
     return (
         <Fragment>

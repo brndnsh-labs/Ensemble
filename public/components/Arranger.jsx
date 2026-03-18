@@ -5,11 +5,16 @@ import { onSectionUpdate } from '../arranger-controller.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { SectionCard } from './SectionCard.jsx';
 
+/**
+ * @param {Object} props
+ */
 export function Arranger() {
-    const { sections, lastInteractedSectionId } = useEnsembleState((s) => ({
-        sections: s.arranger.sections,
-        lastInteractedSectionId: s.arranger.lastInteractedSectionId,
-    }));
+    const { sections, lastInteractedSectionId } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            sections: s.arranger.sections,
+            lastInteractedSectionId: s.arranger.lastInteractedSectionId,
+        }),
+    );
 
     const sectionRefs = useRef({});
 

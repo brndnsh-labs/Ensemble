@@ -10,6 +10,10 @@ export const vizState = {
     isMaximized: false,
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ */
 export function vizReducer(action, payload) {
     switch (action) {
         case ACTIONS.SET_VIZ_ENABLED:

@@ -10,6 +10,12 @@ import { SymbolMenu } from './SymbolMenu.jsx';
 
 const { arranger } = getState();
 
+/**
+ * @param {Object} props
+ * @param {any} props.section
+ * @param {any} props.index
+ * @param {any} props.totalSections
+ */
 export const SectionCard = forwardRef(({ section, index, totalSections }, ref) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const textareaRef = useRef(null);
@@ -46,10 +52,12 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
         },
     }));
 
-    const { isMinor, mutatedSectionId } = useEnsembleState((s) => ({
-        isMinor: s.arranger.isMinor,
-        mutatedSectionId: s.arranger.mutatedSectionId,
-    }));
+    const { isMinor, mutatedSectionId } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            isMinor: s.arranger.isMinor,
+            mutatedSectionId: s.arranger.mutatedSectionId,
+        }),
+    );
 
     const isMutated = mutatedSectionId === section.id;
 

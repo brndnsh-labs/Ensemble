@@ -5,6 +5,11 @@ export const config = {
     entropyMultiplier: 0.05,
 };
 
+/**
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} intensity
+ */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0;
@@ -39,6 +44,10 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 4;
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState} state
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

@@ -121,9 +121,6 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
             }
             playback.suspendTimeout = setTimeout(() => {
                 // @direct-mutation
-                // @direct-mutation
-                // @direct-mutation
-                // @direct-mutation
                 if (!playback.isPlaying && playback.audio.state === 'running') {
                     playback.audio.suspend();
                 }
@@ -176,6 +173,11 @@ export function togglePlay(state, fromDispatch = false, dispatch = null) {
     }
 }
 
+/**
+ * @param {import('../types.js').EnsembleState} state
+ * @param {number} time
+ * @param {Function} [dispatch]
+ */
 function triggerResolution(state, time, dispatch) {
     const { playback, bass, soloist, chords, harmony, groove } = state;
 
@@ -198,6 +200,11 @@ function triggerResolution(state, time, dispatch) {
     }, 50);
 }
 
+/**
+ * @param {import('../types.js').EnsembleState} state
+ * @param {number} time
+ * @param {Function} [dispatch]
+ */
 function scheduleResolution(state, time, dispatch) {
     const { playback, bass, soloist, chords, harmony, groove, conductor } = state;
     // Schedule the final resolution measure (Tonic chord, Kick+Crash, etc.)
@@ -254,7 +261,7 @@ function scheduleResolution(state, time, dispatch) {
  * Looks ahead by `playback.scheduleAheadTime` and schedules notes for all enabled instruments.
  * Handles count-in, session timing, and resolution triggers.
  *
- * @param {Object} state - Global ensemble state.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {Function} [dispatch] - State dispatch function.
  */
 export function scheduler(state, dispatch) {
@@ -334,6 +341,9 @@ export function scheduler(state, dispatch) {
     }
 }
 
+/**
+ * @param {import('../types.js').EnsembleState} state
+ */
 function applyPendingGenre(state) {
     const { groove, playback } = state;
     const payload = groove.pendingGenreFeel;
@@ -364,6 +374,9 @@ function applyPendingGenre(state) {
     triggerFlash(0.15);
 }
 
+/**
+ * @param {import('../types.js').EnsembleState} state
+ */
 function advanceCountIn(state) {
     const { playback, arranger, conductor } = state;
     const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);

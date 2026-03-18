@@ -10,6 +10,9 @@ export const INTENSITY_BANDS = {
 
 /**
  * Returns true if a random roll is successful, scaled by intensity.
+ * @param {number} probability - Value between 0 and 1
+ * @param {number} [intensity=1.0] - Optional intensity multiplier
+ * @returns {boolean}
  */
 export function roll(probability, intensity = 1.0) {
     return Math.random() < probability * intensity;
@@ -17,6 +20,10 @@ export function roll(probability, intensity = 1.0) {
 
 /**
  * Scales a velocity value based on intensity.
+ * @param {number} base - Base velocity
+ * @param {number} intensity - Current performance intensity
+ * @param {number} [factor=0.2] - Scaling factor
+ * @returns {number}
  */
 export function scaleVelocity(base, intensity, factor = 0.2) {
     return base + intensity * factor;

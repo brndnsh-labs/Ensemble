@@ -14,6 +14,9 @@ import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 
+/**
+ * @param {Object} props
+ */
 export function Settings() {
     const {
         theme,
@@ -33,37 +36,37 @@ export function Settings() {
         midiOctaves,
         midiLatency,
         midiVelocity,
-    } = useEnsembleState((state) => ({
-        theme: state.playback.theme,
-        countIn: state.playback.countIn,
-        metronome: state.playback.metronome,
-        practiceMode: state.playback.practiceMode,
-        visualFlash: state.playback.visualFlash,
-        haptic: state.playback.haptic,
-        sessionTimer: state.playback.sessionTimer,
-        loopLimit: state.playback.loopLimit,
-        songMode: state.playback.songMode,
+    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
+        theme: s.playback.theme,
+        countIn: s.playback.countIn,
+        metronome: s.playback.metronome,
+        practiceMode: s.playback.practiceMode,
+        visualFlash: s.playback.visualFlash,
+        haptic: s.playback.haptic,
+        sessionTimer: s.playback.sessionTimer,
+        loopLimit: s.playback.loopLimit,
+        songMode: s.playback.songMode,
 
-        midiEnabled: state.midi.enabled,
-        midiMuteLocal: state.midi.muteLocal,
-        midiSelectedOutputId: state.midi.selectedOutputId,
-        midiOutputs: state.midi.outputs,
+        midiEnabled: s.midi.enabled,
+        midiMuteLocal: s.midi.muteLocal,
+        midiSelectedOutputId: s.midi.selectedOutputId,
+        midiOutputs: s.midi.outputs,
         midiChannels: {
-            chords: state.midi.chordsChannel,
-            bass: state.midi.bassChannel,
-            soloist: state.midi.soloistChannel,
-            harmony: state.midi.harmonyChannel,
-            drums: state.midi.drumsChannel,
+            chords: s.midi.chordsChannel,
+            bass: s.midi.bassChannel,
+            soloist: s.midi.soloistChannel,
+            harmony: s.midi.harmonyChannel,
+            drums: s.midi.drumsChannel,
         },
         midiOctaves: {
-            chords: state.midi.chordsOctave,
-            bass: state.midi.bassOctave,
-            soloist: state.midi.soloistOctave,
-            harmony: state.midi.harmonyOctave,
-            drums: state.midi.drumsOctave,
+            chords: s.midi.chordsOctave,
+            bass: s.midi.bassOctave,
+            soloist: s.midi.soloistOctave,
+            harmony: s.midi.harmonyOctave,
+            drums: s.midi.drumsOctave,
         },
-        midiLatency: state.midi.latency,
-        midiVelocity: state.midi.velocitySensitivity,
+        midiLatency: s.midi.latency,
+        midiVelocity: s.midi.velocitySensitivity,
     }));
 
     const masterVolume = useEnsembleState((s) => s.playback.masterVolume);

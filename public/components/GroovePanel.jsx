@@ -16,13 +16,19 @@ import { PresetLibrary } from './PresetLibrary.jsx';
 import { SequencerGrid } from './SequencerGrid.jsx';
 import { SettingRow, Slider, Toggle } from './UIControls.jsx';
 
+/**
+ * @param {Object} props
+ * @param {boolean} props.isActiveMobile
+ */
 export function GroovePanel({ isActiveMobile }) {
-    const { activeTab, enabled, measures, fillActive } = useEnsembleState((s) => ({
-        activeTab: s.groove.activeTab,
-        enabled: s.groove.enabled,
-        measures: s.groove.measures,
-        fillActive: s.groove.fillActive,
-    }));
+    const { activeTab, enabled, measures, fillActive } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            activeTab: s.groove.activeTab,
+            enabled: s.groove.enabled,
+            measures: s.groove.measures,
+            fillActive: s.groove.fillActive,
+        }),
+    );
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef(null);
@@ -32,6 +38,7 @@ export function GroovePanel({ isActiveMobile }) {
             return;
         }
 
+        /** @param {MouseEvent} event */
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setIsMenuOpen(false);
@@ -44,6 +51,7 @@ export function GroovePanel({ isActiveMobile }) {
         };
     }, [isMenuOpen]);
 
+    /** @param {string} tab */
     const switchTab = (tab) => {
         dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab });
         syncWorker();
@@ -140,7 +148,7 @@ export function GroovePanel({ isActiveMobile }) {
                             id="drumBarsSelect"
                             aria-label="Number of Drum Measures"
                             value={measures}
-                            onChange={(e) => updateMeasures(e.target.value)}
+                            onChange={(/** @type {any} */ e) => updateMeasures(e.target.value)}
                         >
                             <option value="1">1</option>
                             <option value="2">2</option>
@@ -185,10 +193,12 @@ export function GroovePanel({ isActiveMobile }) {
 }
 
 function IntensitySlider() {
-    const { bandIntensity, autoIntensity } = useEnsembleState((s) => ({
-        bandIntensity: s.playback.bandIntensity,
-        autoIntensity: s.playback.autoIntensity,
-    }));
+    const { bandIntensity, autoIntensity } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            bandIntensity: s.playback.bandIntensity,
+            autoIntensity: s.playback.autoIntensity,
+        }),
+    );
 
     return (
         <div class="smart-control-group" style="margin-bottom: 1.5rem;">
@@ -206,7 +216,7 @@ function IntensitySlider() {
                             id="autoIntensityCheck"
                             label="Auto Intensity"
                             checked={autoIntensity}
-                            onChange={(val) => {
+                            onChange={(/** @type {boolean} */ val) => {
                                 dispatch(ACTIONS.SET_AUTO_INTENSITY, val);
                                 saveCurrentState();
                             }}
@@ -219,7 +229,7 @@ function IntensitySlider() {
                             min="0"
                             max="100"
                             value={Math.round(bandIntensity * 100)}
-                            onInput={(val) => {
+                            onInput={(/** @type {string} */ val) => {
                                 dispatch(ACTIONS.SET_BAND_INTENSITY, parseInt(val, 10) / 100);
                             }}
                             ariaValueText={`${Math.round(bandIntensity * 100)}%`}
@@ -232,7 +242,9 @@ function IntensitySlider() {
 }
 
 function CreativityToggle() {
-    const creativity = useEnsembleState((s) => s.groove.creativity);
+    const creativity = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => s.groove.creativity,
+    );
 
     return (
         <div class="smart-control-group" style="margin-bottom: 1rem;">
@@ -245,7 +257,7 @@ function CreativityToggle() {
                     id="creativityCheck"
                     label="Creativity"
                     checked={creativity}
-                    onChange={(val) => {
+                    onChange={(/** @type {boolean} */ val) => {
                         dispatch(ACTIONS.SET_CREATIVITY, val);
                         syncWorker();
                         saveCurrentState();
@@ -257,11 +269,13 @@ function CreativityToggle() {
 }
 
 function GenreSelector() {
-    const { lastSmartGenre, pendingGenreFeel, genreSwitchCountdown } = useEnsembleState((s) => ({
-        lastSmartGenre: s.groove.lastSmartGenre,
-        pendingGenreFeel: s.groove.pendingGenreFeel,
-        genreSwitchCountdown: s.groove.genreSwitchCountdown,
-    }));
+    const { lastSmartGenre, pendingGenreFeel, genreSwitchCountdown } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            lastSmartGenre: s.groove.lastSmartGenre,
+            pendingGenreFeel: s.groove.pendingGenreFeel,
+            genreSwitchCountdown: s.groove.genreSwitchCountdown,
+        }),
+    );
 
     const genres = [
         'Rock',
@@ -279,6 +293,7 @@ function GenreSelector() {
         'Ska-Punk',
     ];
 
+    /** @param {string} genre */
     const handleGenreClick = (genre) => {
         import('../data/smart-genres.js').then(({ SMART_GENRES }) => {
             const config = SMART_GENRES[genre];

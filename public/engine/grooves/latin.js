@@ -7,10 +7,9 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Latin / Bossa.
- * 0: Classic 2-Bar Bossa (Deterministic Clave)
- * 1: Busy Bossa / Songo Style (Increased Syncopation)
- * 2: Driving Samba (High 16th Density)
- * 3: Partido Alto (Syncopated Displacement)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity]
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -37,6 +36,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3; // Partido Alto
 }
 
+/**
+ * @param {any} context
+ * @param {any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         step,

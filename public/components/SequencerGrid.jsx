@@ -46,13 +46,18 @@ const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) =>
     );
 });
 
+/**
+ * @param {Object} props
+ */
 export function SequencerGrid() {
-    const { instruments, measures, timeSignature, isPlaying } = useEnsembleState((s) => ({
-        instruments: s.groove.instruments,
-        measures: s.groove.measures,
-        timeSignature: s.arranger.timeSignature,
-        isPlaying: s.playback.isPlaying,
-    }));
+    const { instruments, measures, timeSignature, isPlaying } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            instruments: s.groove.instruments,
+            measures: s.groove.measures,
+            timeSignature: s.arranger.timeSignature,
+            isPlaying: s.playback.isPlaying,
+        }),
+    );
 
     const isDraggingRef = useRef(false);
     const dragTypeRef = useRef(0);

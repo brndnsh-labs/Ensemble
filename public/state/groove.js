@@ -99,6 +99,11 @@ export const groove = {
     },
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ * @param {any} playback
+ */
 export function grooveReducer(action, payload, playback) {
     switch (action) {
         case ACTIONS.SET_PARAM:

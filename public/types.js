@@ -3,6 +3,26 @@
  */
 
 /**
+ * @typedef {Object} PlaybackIntent
+ * @property {number} syncopation - Level of rhythmic syncopation (0-1).
+ * @property {number} anticipation - Probability of rhythmic anticipation (0-1).
+ * @property {number} layBack - Level of rhythmic lag (Dilla feel) (0-1).
+ * @property {number} density - Overall rhythmic density (0-1).
+ */
+
+/**
+ * @typedef {Object} ModalsState
+ * @property {boolean} settings - Settings modal visibility.
+ * @property {boolean} editor - Song editor modal visibility.
+ * @property {boolean} share - Share modal visibility.
+ * @property {boolean} analyzer - Audio analyzer modal visibility.
+ * @property {boolean} generateSong - Song generator modal visibility.
+ * @property {boolean} performance - Performance mode modal visibility.
+ * @property {boolean} manual - User manual modal visibility.
+ * @property {boolean} drumPad - Drum pad modal visibility.
+ */
+
+/**
  * @typedef {Object} EnsembleState
  * @property {import('./state/arranger.js').ArrangerState} arranger - Chord progression and arrangement state.
  * @property {import('./state/playback.js').GlobalContext} playback - Real-time transport and intensity state.

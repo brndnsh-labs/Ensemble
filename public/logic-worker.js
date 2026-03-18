@@ -20,6 +20,7 @@ import { binarySearchMap, getFrequency, getMidi, getStepInfo } from './utils.js'
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
 // --- WORKER STATE ---
+/** @type {any} */
 let timerID = null;
 const interval = 25;
 let bbBufferHead = 0;
@@ -27,10 +28,14 @@ let sbBufferHead = 0;
 let cbBufferHead = 0;
 let hbBufferHead = 0;
 
+/** @typedef {{index: number, sectionIndex: number}} Cursor */
+/** @type {Cursor} */
 const mainCursor = { index: 0, sectionIndex: 0 };
+/** @type {Cursor} */
 const lookaheadCursor = { index: 0, sectionIndex: 0 };
 const LOOKAHEAD = 64;
 
+/** @type {Array<{type: string, data: any, startTime: number}>} */
 const messageQueue = [];
 
 // Ensure we resume processing messages after an export completes
@@ -332,10 +337,11 @@ function fillBuffers(state, currentStep, requestTimestamp = null, processStartTi
 /**
  * Process incoming messages from the main thread.
  * @param {string} type
- * @param {Object} data
+ * @param {any} data
  * @param {number} startTime
  */
 function processMessage(type, data, startTime) {
+    /** @type {import('./types.js').EnsembleState} */
     const state = getState();
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
     try {
@@ -479,9 +485,10 @@ function processMessageQueue() {
 }
 
 if (typeof self !== 'undefined') {
+    /** @param {MessageEvent} e */
     self.onmessage = (e) => {
         const { type, data } = e.data;
-        var startTime = performance.now();
+        const startTime = performance.now();
         if (isExporting()) {
             messageQueue.push({ type, data, startTime });
         } else {

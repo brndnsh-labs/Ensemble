@@ -14,6 +14,7 @@ export const compingState = {
     lockedUntil: 0,
     soloistActivity: 0,
     lastChordIndex: -1,
+    /** @type {string|null} */
     lastChordQuality: null, // Track quality for tension resolution
     grooveRetentionCount: 0,
     maxGrooveLength: 4,
@@ -25,21 +26,31 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
 /**
  * Algorithmic Pattern Generator
  * Replaces static PIANO_CELLS table to save space and increase variety.
+ * @param {string} genre
+ * @param {string} vibe
+ * @param {any} tsConfig
+ * @param {number} [length]
  */
 export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
-    const { playback } = getState();
+    /** @type {import('./types.js').EnsembleState} */
+    const state = getState();
+    const { playback } = state;
     const pattern = new Array(length).fill(0);
     const intensity = playback.bandIntensity;
     const ts = tsConfig || TIME_SIGNATURES['4/4'];
     const spb = ts.stepsPerBeat;
 
-    // Helper to set a beat if it's within bounds
+    /** @param {number} step */
     const hit = (step) => {
         if (step < length) {
             pattern[step] = 1;
         }
     };
 
+    /**
+     * @param {number} beatIdx
+     * @param {number} [offsetSteps]
+     */
     const getBeatStep = (beatIdx, offsetSteps = 0) => {
         return beatIdx * spb + offsetSteps;
     };
@@ -229,9 +240,17 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
     return pattern;
 }
 
+/**
+ * @param {number} step
+ * @param {number} soloistBusy
+ * @param {number} [spm]
+ * @param {string|null} [sectionId]
+ */
 function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     const { playback, chords, groove, arranger } = getState();
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    /** @type {any} */
+    const signatures = TIME_SIGNATURES;
+    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
 
     // --- Section Change Detection ---
     if (sectionId && compingState.lastSectionId !== sectionId) {
@@ -269,6 +288,7 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     }
 
     if (chords.style === 'smart') {
+        /** @type {any} */
         const smartMapping = {
             Afrobeat: 'Funk',
             Blues: 'Jazz',
@@ -413,6 +433,13 @@ function handleSustainEvents(
 /**
  * Main entry point for generating accompaniment notes.
  * Returns an array of standardized Note Objects.
+ * @param {any} chord
+ * @param {number} step
+ * @param {number} stepInChord
+ * @param {number} measureStep
+ * @param {import('./types.js').StepInfo} stepInfo
+ * @param {any} [coordination]
+ * @returns {Array<any>}
  */
 export function getAccompanimentNotes(
     chord,

@@ -18,6 +18,10 @@ export const conductor = {
     formIteration: 0,
 };
 
+/**
+ * @param {string} action
+ * @param {any} payload
+ */
 export function conductorReducer(action, payload) {
     switch (action) {
         case ACTIONS.UPDATE_CONDUCTOR_STATE:

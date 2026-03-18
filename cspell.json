@@ -108,7 +108,16 @@
         "sparkline",
         "sparklines",
         "swiftshader",
-        "viewports"
+        "viewports",
+        "lockfiles",
+        "skanks",
+        "Clav",
+        "CLAV",
+        "Arpeggiator",
+        "Fingerpicking",
+        "Partido",
+        "partido",
+        "Ganza"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

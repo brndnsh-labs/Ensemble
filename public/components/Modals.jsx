@@ -29,7 +29,7 @@ const DrumPadModal = lazy(() =>
  * It ensures the component stays in the DOM long enough for exit animations to play.
  * @param {Object} props
  * @param {boolean} props.isOpen - Whether the modal is globally open
- * @param {Component} props.component - The modal component to render
+ * @param {import('preact').ComponentType} props.component - The modal component to render
  */
 function AnimatedModalWrapper({ isOpen, component: Component }) {
     const [shouldRender, setShouldRender] = useState(isOpen);
@@ -62,6 +62,10 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
     );
 }
 
+/**
+ * Root component for all global modals.
+ * Monitors global state to determine which modal to show.
+ */
 export function Modals() {
     // Get modal visibility state from global store
     const {
@@ -73,7 +77,7 @@ export function Modals() {
         performanceOpen,
         manualOpen,
         drumPadOpen,
-    } = useEnsembleState((s) => ({
+    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
         settingsOpen: s.playback.modals.settings,
         editorOpen: s.playback.modals.editor,
         generateSongOpen: s.playback.modals.generateSong,
