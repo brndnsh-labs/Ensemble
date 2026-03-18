@@ -15,9 +15,11 @@ import { triggerInstall } from '../pwa.js';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 
 /**
- * @param {Object} props
+ * @typedef {Object} SettingsProps
+ * @property {boolean} isMobile - Whether the app is in mobile view.
  */
-export function Settings() {
+/** @param {SettingsProps} props */
+export function Settings({ isMobile }) {
     const {
         theme,
         countIn,
@@ -88,8 +90,9 @@ export function Settings() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
     };
 
+    /** @param {string|number} val */
     const handleMasterVolume = (val) => {
-        const numVal = parseFloat(val);
+        const numVal = parseFloat(val.toString());
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
 
         if (playback.masterGain && playback.audio) {
@@ -107,6 +110,7 @@ export function Settings() {
         saveCurrentState();
     };
 
+    /** @param {any} enabled */
     const handleMidiEnable = async (enabled) => {
         if (enabled) {
             const success = await initMIDI();
@@ -128,6 +132,7 @@ export function Settings() {
 
     const handleInstall = async () => {
         if (await triggerInstall()) {
+            /** @type {HTMLElement|null} */
             const btn = document.getElementById('installAppBtn');
             if (btn) {
                 btn.style.display = 'none';
@@ -149,10 +154,12 @@ export function Settings() {
     const playbackState = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback,
     );
+    /** @type {import('preact').RefObject<HTMLDivElement>} */
     const overlayRef = useRef(null);
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
+            /** @type {HTMLElement|null} */
             const focusable = overlayRef.current.querySelector(
                 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
             );
@@ -168,13 +175,13 @@ export function Settings() {
             ref={overlayRef}
             class={`settings-overlay ${isOpen ? 'active' : ''}`}
             aria-hidden={!isOpen ? 'true' : 'false'}
-            onClick={(e) => {
-                if (e.target.id === 'settingsOverlay') {
+            onClick={(/** @type {Event} */ e) => {
+                if (/** @type {HTMLElement} */ (e.target).id === 'settingsOverlay') {
                     closeSettings();
                 }
             }}
         >
-            <div class="settings-content" onClick={(e) => e.stopPropagation()}>
+            <div class="settings-content" onClick={(/** @type {Event} */ e) => e.stopPropagation()}>
                 <div class="modal-header-shared">
                     <h2>Settings</h2>
                     <button
@@ -326,7 +333,7 @@ export function Settings() {
                                 min="0"
                                 max="100"
                                 value={Math.round(complexity * 100)}
-                                onInput={(val) => {
+                                onInput={(/** @type {string} */ val) => {
                                     dispatch(ACTIONS.SET_COMPLEXITY, parseInt(val, 10) / 100);
                                 }}
                                 ariaValueText={complexityLabel}
@@ -508,9 +515,9 @@ export function Settings() {
                                     }}
                                     options={
                                         midiOutputs && midiOutputs.length > 0
-                                            ? midiOutputs.map((out) => ({
-                                                  value: out.id,
-                                                  label: out.name,
+                                            ? midiOutputs.map((/** @type {any} */ out) => ({
+                                                  value: /** @type {any} */ (out).id,
+                                                  label: /** @type {any} */ (out).name,
                                               }))
                                             : [{ value: '', label: 'No outputs found' }]
                                     }
@@ -528,10 +535,10 @@ export function Settings() {
                                                 min="1"
                                                 max="16"
                                                 value={midiChannels[ch.toLowerCase()]}
-                                                onChange={(e) => {
+                                                onChange={(/** @type {Event} */ e) => {
                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                         [`${ch.toLowerCase()}Channel`]: parseInt(
-                                                            e.target.value,
+                                                            /** @type {any} */ (e.target).value,
                                                             10,
                                                         ),
                                                     });
@@ -546,10 +553,10 @@ export function Settings() {
                                                 min="-2"
                                                 max="2"
                                                 value={midiOctaves[ch.toLowerCase()]}
-                                                onChange={(e) => {
+                                                onChange={(/** @type {Event} */ e) => {
                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                         [`${ch.toLowerCase()}Octave`]: parseInt(
-                                                            e.target.value,
+                                                            /** @type {any} */ (e.target).value,
                                                             10,
                                                         ),
                                                     });
@@ -574,7 +581,7 @@ export function Settings() {
                                     max="100"
                                     step="1"
                                     value={midiLatency}
-                                    onInput={(val) => {
+                                    onInput={(/** @type {any} */ val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             latency: parseInt(val, 10),
                                         });
@@ -595,7 +602,7 @@ export function Settings() {
                                     max="2.0"
                                     step="0.1"
                                     value={midiVelocity}
-                                    onInput={(val) => {
+                                    onInput={(/** @type {any} */ val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             velocitySensitivity: parseFloat(val),
                                         });
@@ -710,7 +717,7 @@ export function Settings() {
                             <Toggle
                                 id="debugSoloistToggle"
                                 checked={playbackState.debugSoloist}
-                                onChange={(val) =>
+                                onChange={(/** @type {any} */ val) =>
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'debugSoloist',

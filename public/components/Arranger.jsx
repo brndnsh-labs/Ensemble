@@ -6,9 +6,17 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { SectionCard } from './SectionCard.jsx';
 
 /**
- * @param {Object} props
+ * @typedef {import('preact').ComponentChildren} ComponentChildren
  */
-export function Arranger() {
+
+/**
+ * @typedef {Object} ArrangerProps
+ */
+
+/**
+ * @param {ArrangerProps} props
+ */
+export function Arranger(_props) {
     const { sections, lastInteractedSectionId } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             sections: s.arranger.sections,

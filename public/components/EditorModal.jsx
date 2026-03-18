@@ -25,9 +25,15 @@ import { showToast } from '../ui.js';
 import { generateId } from '../utils.js';
 
 /**
- * @param {Object} props
+ * @typedef {import('../ui-types.js').ComponentChildren} ComponentChildren
  */
-export function EditorModal() {
+
+/**
+ * @typedef {Object} EditorModalProps
+ */
+
+/** @param {EditorModalProps} _props */
+export function EditorModal(_props) {
     const { isOpen, hasLeadSheet, leadSheetMelody, currentKey, totalSteps } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             isOpen: s.playback.modals.editor,
@@ -106,6 +112,7 @@ export function EditorModal() {
             showToast('Failed to parse tab.');
         }
     };
+    /** @type {import('preact').RefObject<HTMLDivElement>} */
     const overlayRef = useRef(null);
 
     const closeEditor = () => {
@@ -123,7 +130,8 @@ export function EditorModal() {
         }
     }, [isOpen]);
 
-    const _handleAction = (/** @type {Function} */ fn) => {
+    /** @param {function(): void} fn */
+    const _handleAction = (fn) => {
         setIsMenuOpen(false);
         fn();
     };
@@ -227,16 +235,20 @@ export function EditorModal() {
         }
     };
 
-    const handleFileUpload = (/** @type {any} */ e) => {
-        const file = e.target.files[0];
-        if (!file) {
+    /** @param {Event} e */
+    const handleFileUpload = (e) => {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (!target.files || target.files.length === 0) {
             return;
         }
+        const file = target.files[0];
 
         const reader = new FileReader();
-        reader.onload = (/** @type {any} */ event) => {
+        /** @param {ProgressEvent<FileReader>} event */
+        reader.onload = (event) => {
             try {
-                const parsed = parseMusicXML(event.target.result);
+                const result = /** @type {string} */ (event.target?.result);
+                const parsed = parseMusicXML(result);
                 dispatch(ACTIONS.IMPORT_MUSICXML, parsed);
                 // The reducer already sets the style to lead_sheet and enables it
             } catch (err) {
@@ -252,15 +264,16 @@ export function EditorModal() {
             ref={overlayRef}
             class={`settings-overlay ${isOpen ? 'active' : ''}`}
             aria-hidden={!isOpen ? 'true' : 'false'}
-            onClick={(/** @type {any} */ e) => {
-                if (e.target.id === 'editorOverlay') {
+            onClick={(/** @type {MouseEvent} */ e) => {
+                const target = /** @type {HTMLElement} */ (e.target);
+                if (target.id === 'editorOverlay') {
                     closeEditor();
                 }
             }}
         >
             <div
                 class="settings-content editor-modal"
-                onClick={(/** @type {any} */ e) => e.stopPropagation()}
+                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
             >
                 <div class="modal-header">
                     <h2>{isImportMode ? 'Import Tab' : 'Arrangement Editor'}</h2>
@@ -289,7 +302,12 @@ export function EditorModal() {
                                     placeholder="[Intro]
 Em  C  G  D"
                                     value={tabText}
-                                    onInput={(/** @type {any} */ e) => setTabText(e.target.value)}
+                                    onInput={(/** @type {Event} */ e) => {
+                                        const target = /** @type {HTMLTextAreaElement} */ (
+                                            e.target
+                                        );
+                                        setTabText(target.value);
+                                    }}
                                     autoFocus
                                 />
                                 <div class="import-mode-actions">
@@ -334,7 +352,7 @@ Em  C  G  D"
                             class={`action-trigger-btn ${isMenuOpen ? 'active' : ''}`}
                             title="Arranger Actions"
                             style="justify-content: center; padding: 0.75rem 1rem;"
-                            onClick={(/** @type {any} */ e) => {
+                            onClick={(/** @type {MouseEvent} */ e) => {
                                 e.stopPropagation();
                                 setIsMenuOpen(!isMenuOpen);
                             }}
@@ -411,7 +429,10 @@ Em  C  G  D"
                                 aria-label="Import XML (Lead Seed from MusicXML)"
                                 onClick={() => {
                                     setIsMenuOpen(false);
-                                    document.getElementById('xml-upload-editor').click();
+                                    const input = document.getElementById('xml-upload-editor');
+                                    if (input) {
+                                        input.click();
+                                    }
                                 }}
                             >
                                 📥 <span>Import XML</span>

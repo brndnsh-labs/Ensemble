@@ -7,9 +7,15 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
 /**
- * @param {Object} props
+ * @typedef {import('../ui-types.js').ComponentChildren} ComponentChildren
  */
-export function AnalyzerModal() {
+
+/**
+ * @typedef {Object} AnalyzerModalProps
+ */
+
+/** @param {AnalyzerModalProps} _props */
+export function AnalyzerModal(_props) {
     const isOpen = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.analyzer,
     );
@@ -26,6 +32,7 @@ export function AnalyzerModal() {
 
     const analyzerRef = useRef(null);
     const micStreamRef = useRef(null);
+    /** @type {import('preact').RefObject<HTMLDivElement>} */
     const overlayRef = useRef(null);
     const autoAddTimerRef = useRef(null);
     const clearHistoryTimerRef = useRef(null);
@@ -108,8 +115,13 @@ export function AnalyzerModal() {
         setStatusMessage('Analyzer paused');
     }
 
-    async function handleFileUpload(/** @type {any} */ e) {
-        const file = e.target.files[0];
+    /** @param {Event} e */
+    async function handleFileUpload(e) {
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        if (!target.files || target.files.length === 0) {
+            return;
+        }
+        const file = target.files[0];
         if (!file) {
             return;
         }
@@ -185,11 +197,16 @@ export function AnalyzerModal() {
             id="analyzerOverlay"
             ref={overlayRef}
             class={`modal-overlay ${isOpen ? 'active' : ''}`}
-            onClick={(/** @type {any} */ e) => e.target.id === 'analyzerOverlay' && closeModal()}
+            onClick={(/** @type {MouseEvent} */ e) => {
+                const target = /** @type {HTMLElement} */ (e.target);
+                if (target.id === 'analyzerOverlay') {
+                    closeModal();
+                }
+            }}
         >
             <div
                 class="modal-content analyzer-modal"
-                onClick={(/** @type {any} */ e) => e.stopPropagation()}
+                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
                     <h2>Audio Chord Analyzer</h2>

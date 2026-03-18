@@ -10,16 +10,14 @@ import { saveCurrentState } from '../persistence.js';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 /**
- * @param {Object} props
- * @param {any} props.module
+ * @typedef {Object} InstrumentSettingsProps
+ * @property {string} module
  */
-/**
- * @param {Object} props
- */
+/** @param {InstrumentSettingsProps} props */
 export function InstrumentSettings({ module }) {
     const state = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
         const key = module === 'groove' ? 'groove' : module;
-        return s[key];
+        return /** @type {any} */ (s)[key];
     });
 
     if (!state) {
@@ -52,19 +50,16 @@ export function InstrumentSettings({ module }) {
             module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
 
         const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
-        const multiplier = isReverb ? 1.0 : MIXER_GAIN_MULTIPLIERS[internalName] || 1.0;
+        const multiplier = isReverb
+            ? 1.0
+            : /** @type {any} */ (MIXER_GAIN_MULTIPLIERS)[internalName] || 1.0;
 
-        if (playback[gainKey] && playback.audio) {
+        const node = /** @type {any} */ (playback)[gainKey];
+        if (node && playback.audio) {
             const target = Math.max(0.0001, numVal * multiplier);
-            playback[gainKey].gain.cancelScheduledValues(playback.audio.currentTime);
-            playback[gainKey].gain.setValueAtTime(
-                playback[gainKey].gain.value,
-                playback.audio.currentTime,
-            );
-            playback[gainKey].gain.exponentialRampToValueAtTime(
-                target,
-                playback.audio.currentTime + 0.04,
-            );
+            node.gain.cancelScheduledValues(playback.audio.currentTime);
+            node.gain.setValueAtTime(node.gain.value, playback.audio.currentTime);
+            node.gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
         }
     };
 
@@ -86,7 +81,7 @@ export function InstrumentSettings({ module }) {
                             id="densitySelect"
                             value={state.density || 'standard'}
                             onChange={(/** @type {any} */ val) => {
-                                dispatch(ACTIONS.SET_CHORD_DENSITY, val);
+                                dispatch(/** @type {any} */ (ACTIONS).SET_CHORD_DENSITY, val);
                                 saveCurrentState();
                             }}
                             options={[
@@ -238,12 +233,10 @@ export function InstrumentSettings({ module }) {
 }
 
 /**
- * @param {Object} props
- * @param {any} props.state
+ * @typedef {Object} GrooveControlsProps
+ * @property {import('../state/groove.js').GrooveState} state
  */
-/**
- * @param {Object} props
- */
+/** @param {GrooveControlsProps} props */
 function GrooveControls({ state }) {
     const { swing, swingSub } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({

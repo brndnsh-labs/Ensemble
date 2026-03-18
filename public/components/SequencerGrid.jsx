@@ -10,6 +10,25 @@ import { getStepInfo, getStepsPerMeasure } from '../utils.js';
 
 const { playback: playbackState } = getState();
 
+/**
+ * @typedef {import('preact').ComponentChildren} ComponentChildren
+ * @typedef {import('../state/groove.js').Instrument} Instrument
+ * @typedef {import('../types.js').StepInfo} StepInfo
+ */
+
+/**
+ * @typedef {Object} StepProps
+ * @property {number} instIdx
+ * @property {number} stepIdx
+ * @property {number} value
+ * @property {string} instName
+ * @property {StepInfo} stepInfo
+ * @property {(e: Event, instIdx: number, stepIdx: number) => void} onToggle
+ */
+
+/**
+ * @type {import('preact').FunctionComponent<StepProps>}
+ */
 const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) => {
     // Optimization: Removed per-step subscription to playback state.
     // Visual "playing" state is handled by parent via direct DOM manipulation.
@@ -47,9 +66,13 @@ const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) =>
 });
 
 /**
- * @param {Object} props
+ * @typedef {Object} SequencerGridProps
  */
-export function SequencerGrid() {
+
+/**
+ * @param {SequencerGridProps} props
+ */
+export function SequencerGrid(props) {
     const { instruments, measures, timeSignature, isPlaying } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             instruments: s.groove.instruments,
@@ -61,12 +84,12 @@ export function SequencerGrid() {
 
     const isDraggingRef = useRef(false);
     const dragTypeRef = useRef(0);
-    const _gridRef = useRef(null);
+    const gridRef = useRef(/** @type {HTMLDivElement|null} */ (null));
     const stepCache = useRef(new Map());
 
     const spm = getStepsPerMeasure(timeSignature);
     const totalSteps = measures * spm;
-    const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
 
     // Optimization: Memoize step info objects to prevent re-renders of memoized Step components
     const allStepInfos = useMemo(() => {
@@ -83,7 +106,7 @@ export function SequencerGrid() {
 
     // Optimization: Cache step elements to avoid thousands of querySelectorAll calls
     useLayoutEffect(() => {
-        const grid = _gridRef.current;
+        const grid = gridRef.current;
         if (!grid) {
             return;
         }
@@ -93,7 +116,8 @@ export function SequencerGrid() {
 
         for (let i = 0; i < steps.length; i++) {
             const stepEl = steps[i];
-            const idx = parseInt(stepEl.getAttribute('data-step-idx'), 10);
+            const attr = stepEl.getAttribute('data-step-idx');
+            const idx = attr ? parseInt(attr, 10) : NaN;
             if (!Number.isNaN(idx)) {
                 if (!stepCache.current.has(idx)) {
                     stepCache.current.set(idx, []);
@@ -106,7 +130,7 @@ export function SequencerGrid() {
     // Optimized visual update loop
     useEffect(() => {
         if (!isPlaying) {
-            const grid = _gridRef.current;
+            const grid = gridRef.current;
             if (grid) {
                 const playingSteps = grid.getElementsByClassName('playing');
                 while (playingSteps.length > 0) {
@@ -127,7 +151,7 @@ export function SequencerGrid() {
             const step = (playbackState.lastPlayingStep || 0) % totalSteps;
 
             if (step !== lastStep) {
-                const grid = _gridRef.current;
+                const grid = gridRef.current;
                 if (grid && grid.offsetParent !== null) {
                     if (lastStep !== -1) {
                         const prev = stepCache.current.get(lastStep);
@@ -154,56 +178,64 @@ export function SequencerGrid() {
         return () => cancelAnimationFrame(frameId);
     }, [isPlaying, totalSteps]);
 
-    const handleToggle = useCallback((e, instIdx, stepIdx) => {
-        if (e.type === 'mouseover' && !isDraggingRef.current) {
-            return;
-        }
-
-        // Optimization: Access global state directly to avoid dependency on 'instruments'
-        // which changes on every step toggle, preventing full grid re-renders.
-        const { groove } = getState();
-        const inst = groove.instruments[instIdx];
-
-        let newType = dragTypeRef.current;
-
-        if (e.type === 'mousedown' || e.type === 'keydown') {
-            if (inst.steps[stepIdx] === 0) {
-                newType = 1;
-            } else if (inst.steps[stepIdx] === 1) {
-                newType = 2;
-            } else {
-                newType = 0;
+    const handleToggle = useCallback(
+        (/** @type {any} */ e, /** @type {number} */ instIdx, /** @type {number} */ stepIdx) => {
+            if (e.type === 'mouseover' && !isDraggingRef.current) {
+                return;
             }
 
-            if (e.type === 'mousedown') {
-                dragTypeRef.current = newType;
-                isDraggingRef.current = true;
+            // Optimization: Access global state directly to avoid dependency on 'instruments'
+            // which changes on every step toggle, preventing full grid re-renders.
+            const { groove } = getState();
+            const inst = groove.instruments[instIdx];
+
+            let newType = dragTypeRef.current;
+
+            if (e.type === 'mousedown' || e.type === 'keydown') {
+                if (inst.steps[stepIdx] === 0) {
+                    newType = 1;
+                } else if (inst.steps[stepIdx] === 1) {
+                    newType = 2;
+                } else {
+                    newType = 0;
+                }
+
+                if (e.type === 'mousedown') {
+                    dragTypeRef.current = newType;
+                    isDraggingRef.current = true;
+                }
             }
-        }
 
-        // Only update if changed (though dispatch handles logic too)
-        if (inst.steps[stepIdx] !== newType) {
-            inst.steps[stepIdx] = newType;
-            clearDrumPresetHighlight();
-            dispatch(ACTIONS.STEP_TOGGLE);
-        }
-    }, []);
+            // Only update if changed (though dispatch handles logic too)
+            if (inst.steps[stepIdx] !== newType) {
+                inst.steps[stepIdx] = newType;
+                clearDrumPresetHighlight();
+                dispatch(ACTIONS.STEP_TOGGLE);
+            }
+        },
+        [],
+    );
 
-    const handleAudition = useCallback((inst) => {
+    const handleAudition = useCallback((/** @type {Instrument} */ inst) => {
         dispatch(ACTIONS.INIT_AUDIO);
         import('../performance-controller.js').then(({ triggerDrumSound }) => {
-            triggerDrumSound(inst.name, playbackState.audio.currentTime, 1.0);
+            if (playbackState.audio) {
+                triggerDrumSound(inst.name, playbackState.audio.currentTime, 1.0);
+            }
         });
     }, []);
 
-    const handleMute = useCallback((inst, _instIdx) => {
-        inst.muted = !inst.muted;
-        dispatch('MUTE_TOGGLE');
-    }, []);
+    const handleMute = useCallback(
+        (/** @type {Instrument} */ inst, /** @type {number} */ _instIdx) => {
+            inst.muted = !inst.muted;
+            dispatch('MUTE_TOGGLE');
+        },
+        [],
+    );
 
     return (
-        <div className="sequencer-grid" ref={_gridRef}>
-            {instruments.map((inst, instIdx) => (
+        <div className="sequencer-grid" ref={gridRef}>
+            {instruments.map((/** @type {Instrument} */ inst, /** @type {number} */ instIdx) => (
                 <div key={inst.name} className="track">
                     <div className="track-header">
                         <span
@@ -236,17 +268,19 @@ export function SequencerGrid() {
                         className="steps"
                         style={{ gridTemplateColumns: `repeat(${totalSteps}, 1fr)` }}
                     >
-                        {allStepInfos.map((stepInfo, stepIdx) => (
-                            <Step
-                                key={stepIdx}
-                                instIdx={instIdx}
-                                stepIdx={stepIdx}
-                                value={inst.steps[stepIdx]}
-                                instName={inst.name}
-                                stepInfo={stepInfo}
-                                onToggle={handleToggle}
-                            />
-                        ))}
+                        {allStepInfos.map(
+                            (/** @type {StepInfo} */ stepInfo, /** @type {number} */ stepIdx) => (
+                                <Step
+                                    key={stepIdx}
+                                    instIdx={instIdx}
+                                    stepIdx={stepIdx}
+                                    value={inst.steps[stepIdx]}
+                                    instName={inst.name}
+                                    stepInfo={stepInfo}
+                                    onToggle={handleToggle}
+                                />
+                            ),
+                        )}
                     </div>
                 </div>
             ))}

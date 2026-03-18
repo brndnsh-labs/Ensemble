@@ -9,9 +9,15 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
 /**
- * @param {Object} props
+ * @typedef {import('preact').ComponentChildren} ComponentChildren
  */
-export function ShareModal() {
+
+/**
+ * @typedef {Object} ShareModalProps
+ */
+
+/** @param {ShareModalProps} _props */
+export function ShareModal(_props) {
     const isOpen = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.share,
     );
@@ -31,6 +37,7 @@ export function ShareModal() {
     // --- Export State ---
     const [filename, setFilename] = useState('My Song');
 
+    /** @type {import('preact').RefObject<HTMLDivElement>} */
     const overlayRef = useRef(null);
     const dispatchAction = useDispatch();
 
@@ -46,8 +53,10 @@ export function ShareModal() {
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
-            const focusable = overlayRef.current.querySelector(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            const focusable = /** @type {HTMLElement} */ (
+                overlayRef.current.querySelector(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+                )
             );
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
@@ -76,13 +85,13 @@ export function ShareModal() {
             navigator.clipboard
                 .writeText(url)
                 .then(() => {
-                    dispatch(ACTIONS.NOTIFY, {
+                    dispatch(ACTIONS.SHOW_TOAST, {
                         message: 'Share link copied to clipboard!',
                         type: 'success',
                     });
                 })
                 .catch(() => {
-                    dispatch(ACTIONS.NOTIFY, {
+                    dispatch(ACTIONS.SHOW_TOAST, {
                         message: 'Failed to copy link. Try long-pressing the URL bar.',
                         type: 'error',
                     });
@@ -114,14 +123,14 @@ export function ShareModal() {
         try {
             const options = getExportOptions();
             await exportToMidi(options);
-            dispatch(ACTIONS.NOTIFY, {
+            dispatch(ACTIONS.SHOW_TOAST, {
                 message: 'MIDI Export complete!',
                 type: 'success',
             });
             closeModal();
         } catch (err) {
             console.error('Export failed:', err);
-            dispatch(ACTIONS.NOTIFY, {
+            dispatch(ACTIONS.SHOW_TOAST, {
                 message: 'Export failed.',
                 type: 'error',
             });
@@ -141,13 +150,17 @@ export function ShareModal() {
             id="shareOverlay"
             ref={overlayRef}
             class={`modal-overlay ${isOpen ? 'active' : ''}`}
-            onClick={(e) => {
-                if (e.target.id === 'shareOverlay') {
+            onClick={(/** @type {MouseEvent} */ e) => {
+                const target = /** @type {HTMLElement} */ (e.target);
+                if (target.id === 'shareOverlay') {
                     closeModal();
                 }
             }}
         >
-            <div class="modal-content settings-content" onClick={(e) => e.stopPropagation()}>
+            <div
+                class="modal-content settings-content"
+                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
+            >
                 <div class="modal-header-shared">
                     <h2>Share & Export</h2>
                     <button
@@ -291,9 +304,14 @@ export function ShareModal() {
                                         id="exportFilenameInput"
                                         type="text"
                                         value={filename}
-                                        onInput={(e) => setFilename(e.target.value)}
+                                        onInput={(/** @type {Event} */ e) => {
+                                            const target = /** @type {HTMLInputElement} */ (
+                                                e.target
+                                            );
+                                            setFilename(target.value);
+                                        }}
                                         placeholder="Filename..."
-                                        maxLength="64"
+                                        maxLength={64}
                                         class="w-full"
                                         style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; color: var(--text-color);"
                                     />

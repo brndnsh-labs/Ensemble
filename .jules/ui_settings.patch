@@ -1,0 +1,576 @@
+diff --git a/public/components/InstrumentSettings.jsx b/public/components/InstrumentSettings.jsx
+index a05cce4..66c2049 100644
+--- a/public/components/InstrumentSettings.jsx
++++ b/public/components/InstrumentSettings.jsx
+@@ -10,16 +10,14 @@ import { saveCurrentState } from '../persistence.js';
+ import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
+ 
+ /**
+- * @param {Object} props
+- * @param {any} props.module
+- */
+-/**
+- * @param {Object} props
++ * @typedef {Object} InstrumentSettingsProps
++ * @property {string} module
+  */
++/** @param {InstrumentSettingsProps} props */
+ export function InstrumentSettings({ module }) {
+     const state = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
+         const key = module === 'groove' ? 'groove' : module;
+-        return s[key];
++        return /** @type {any} */ (s)[key];
+     });
+ 
+     if (!state) {
+@@ -52,16 +50,17 @@ export function InstrumentSettings({ module }) {
+             module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
+ 
+         const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
+-        const multiplier = isReverb ? 1.0 : MIXER_GAIN_MULTIPLIERS[internalName] || 1.0;
++        const multiplier = isReverb ? 1.0 : /** @type {any} */ (MIXER_GAIN_MULTIPLIERS)[internalName] || 1.0;
+ 
+-        if (playback[gainKey] && playback.audio) {
++        const node = /** @type {any} */ (playback)[gainKey];
++        if (node && playback.audio) {
+             const target = Math.max(0.0001, numVal * multiplier);
+-            playback[gainKey].gain.cancelScheduledValues(playback.audio.currentTime);
+-            playback[gainKey].gain.setValueAtTime(
+-                playback[gainKey].gain.value,
++            node.gain.cancelScheduledValues(playback.audio.currentTime);
++            node.gain.setValueAtTime(
++                node.gain.value,
+                 playback.audio.currentTime,
+             );
+-            playback[gainKey].gain.exponentialRampToValueAtTime(
++            node.gain.exponentialRampToValueAtTime(
+                 target,
+                 playback.audio.currentTime + 0.04,
+             );
+@@ -85,8 +84,8 @@ export function InstrumentSettings({ module }) {
+                         <Select
+                             id="densitySelect"
+                             value={state.density || 'standard'}
+-                            onChange={(/** @type {any} */ val) => {
+-                                dispatch(ACTIONS.SET_CHORD_DENSITY, val);
++                            onChange={(val) => {
++                                dispatch(/** @type {any} */ (ACTIONS).SET_CHORD_DENSITY, val);
+                                 saveCurrentState();
+                             }}
+                             options={[
+@@ -103,7 +102,7 @@ export function InstrumentSettings({ module }) {
+                         <Toggle
+                             id="pianoRootsCheck"
+                             checked={state.pianoRoots}
+-                            onChange={(/** @type {any} */ val) => {
++                            onChange={(val) => {
+                                 dispatch(ACTIONS.SET_PIANO_ROOTS, val);
+                                 saveCurrentState();
+                             }}
+@@ -123,7 +122,7 @@ export function InstrumentSettings({ module }) {
+                             max="1"
+                             step="0.05"
+                             value={state.complexity || 0.5}
+-                            onInput={(/** @type {any} */ val) => {
++                            onInput={(val) => {
+                                 dispatch(ACTIONS.SET_PARAM, {
+                                     module: 'harmony',
+                                     param: 'complexity',
+@@ -149,7 +148,7 @@ export function InstrumentSettings({ module }) {
+                                 max="1"
+                                 step="0.05"
+                                 value={state.complexity !== undefined ? state.complexity : 0.5}
+-                                onInput={(/** @type {any} */ val) => {
++                                onInput={(val) => {
+                                     dispatch(ACTIONS.SET_PARAM, {
+                                         module: 'soloist',
+                                         param: 'complexity',
+@@ -165,7 +164,7 @@ export function InstrumentSettings({ module }) {
+                             <Select
+                                 id="soloistPresetSelect"
+                                 value={state.preset || 'classic'}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
+                                     saveCurrentState();
+                                 }}
+@@ -183,7 +182,7 @@ export function InstrumentSettings({ module }) {
+                             <Select
+                                 id="soloistModeSelect"
+                                 value={state.mode || 'monophonic'}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_SOLOIST_MODE, val);
+                                     saveCurrentState();
+                                 }}
+@@ -213,7 +212,7 @@ export function InstrumentSettings({ module }) {
+                         max="1"
+                         step="0.05"
+                         value={state.volume}
+-                        onInput={(/** @type {any} */ val) => updateAudio('volume', val)}
++                        onInput={(val) => updateAudio('volume', val)}
+                         ariaValueText={`${Math.round(state.volume * 100)}%`}
+                     />
+                 </SettingRow>
+@@ -228,7 +227,7 @@ export function InstrumentSettings({ module }) {
+                         max="1"
+                         step="0.05"
+                         value={state.reverb}
+-                        onInput={(/** @type {any} */ val) => updateAudio('reverb', val)}
++                        onInput={(val) => updateAudio('reverb', val)}
+                         ariaValueText={`${Math.round(state.reverb * 100)}%`}
+                     />
+                 </SettingRow>
+@@ -238,12 +237,10 @@ export function InstrumentSettings({ module }) {
+ }
+ 
+ /**
+- * @param {Object} props
+- * @param {any} props.state
+- */
+-/**
+- * @param {Object} props
++ * @typedef {Object} GrooveControlsProps
++ * @property {import('../state/groove.js').GrooveState} state
+  */
++/** @param {GrooveControlsProps} props */
+ function GrooveControls({ state }) {
+     const { swing, swingSub } = useEnsembleState(
+         (/** @type {import('../types.js').EnsembleState} */ s) => ({
+@@ -261,7 +258,7 @@ function GrooveControls({ state }) {
+                         min="0"
+                         max="100"
+                         value={swing || 0}
+-                        onInput={(/** @type {any} */ val) => {
++                        onInput={(val) => {
+                             dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
+                             saveCurrentState();
+                         }}
+@@ -270,7 +267,7 @@ function GrooveControls({ state }) {
+                     <Select
+                         id="swingBaseSelect"
+                         value={swingSub || '8th'}
+-                        onChange={(/** @type {any} */ val) => {
++                        onChange={(val) => {
+                             dispatch(ACTIONS.SET_SWING_SUB, val);
+                             saveCurrentState();
+                         }}
+@@ -292,7 +289,7 @@ function GrooveControls({ state }) {
+                     min="0"
+                     max="100"
+                     value={state.humanize || 0}
+-                    onInput={(/** @type {any} */ val) => {
++                    onInput={(val) => {
+                         dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
+                         saveCurrentState();
+                     }}
+@@ -305,7 +302,7 @@ function GrooveControls({ state }) {
+                     <Toggle
+                         id="larsModeCheck"
+                         checked={state.larsMode}
+-                        onChange={(/** @type {any} */ val) => {
++                        onChange={(val) => {
+                             dispatch(ACTIONS.SET_LARS_MODE, val);
+                             saveCurrentState();
+                         }}
+@@ -322,7 +319,7 @@ function GrooveControls({ state }) {
+                             min="0"
+                             max="100"
+                             value={Math.round(state.larsIntensity * 100)}
+-                            onInput={(/** @type {any} */ val) => {
++                            onInput={(val) => {
+                                 dispatch(ACTIONS.SET_LARS_INTENSITY, parseInt(val, 10) / 100);
+                                 saveCurrentState();
+                             }}
+diff --git a/public/components/Settings.jsx b/public/components/Settings.jsx
+index ad203e6..8fa8bd8 100644
+--- a/public/components/Settings.jsx
++++ b/public/components/Settings.jsx
+@@ -15,9 +15,10 @@ import { triggerInstall } from '../pwa.js';
+ import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
+ 
+ /**
+- * @param {Object} props
++ * @typedef {Object} SettingsProps
+  */
+-export function Settings() {
++/** @param {SettingsProps} props */
++export function Settings(props) {
+     const {
+         theme,
+         countIn,
+@@ -88,6 +89,7 @@ export function Settings() {
+         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
+     };
+ 
++    /** @param {string} val */
+     const handleMasterVolume = (val) => {
+         const numVal = parseFloat(val);
+         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
+@@ -107,6 +109,7 @@ export function Settings() {
+         saveCurrentState();
+     };
+ 
++    /** @param {boolean} enabled */
+     const handleMidiEnable = async (enabled) => {
+         if (enabled) {
+             const success = await initMIDI();
+@@ -128,6 +131,7 @@ export function Settings() {
+ 
+     const handleInstall = async () => {
+         if (await triggerInstall()) {
++            /** @type {HTMLElement|null} */
+             const btn = document.getElementById('installAppBtn');
+             if (btn) {
+                 btn.style.display = 'none';
+@@ -149,10 +153,12 @@ export function Settings() {
+     const playbackState = useEnsembleState(
+         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback,
+     );
++    /** @type {import('preact').RefObject<HTMLDivElement>} */
+     const overlayRef = useRef(null);
+ 
+     useEffect(() => {
+         if (isOpen && overlayRef.current) {
++            /** @type {HTMLElement|null} */
+             const focusable = overlayRef.current.querySelector(
+                 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+             );
+@@ -168,13 +174,13 @@ export function Settings() {
+             ref={overlayRef}
+             class={`settings-overlay ${isOpen ? 'active' : ''}`}
+             aria-hidden={!isOpen ? 'true' : 'false'}
+-            onClick={(e) => {
+-                if (e.target.id === 'settingsOverlay') {
++            onClick={(/** @type {Event} */ e) => {
++                if (/** @type {HTMLElement} */ (e.target).id === 'settingsOverlay') {
+                     closeSettings();
+                 }
+             }}
+         >
+-            <div class="settings-content" onClick={(e) => e.stopPropagation()}>
++            <div class="settings-content" onClick={(/** @type {Event} */ e) => e.stopPropagation()}>
+                 <div class="modal-header-shared">
+                     <h2>Settings</h2>
+                     <button
+@@ -210,7 +216,7 @@ export function Settings() {
+                             <Toggle
+                                 id="metronomeCheck"
+                                 checked={metronome}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_METRONOME, val);
+                                     saveCurrentState();
+                                 }}
+@@ -221,7 +227,7 @@ export function Settings() {
+                             <Toggle
+                                 id="countInCheck"
+                                 checked={countIn}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_PARAM, {
+                                         module: 'playback',
+                                         param: 'countIn',
+@@ -236,7 +242,7 @@ export function Settings() {
+                             <Toggle
+                                 id="practiceModeCheck"
+                                 checked={practiceMode}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_PARAM, {
+                                         module: 'playback',
+                                         param: 'practiceMode',
+@@ -254,7 +260,7 @@ export function Settings() {
+                             <Select
+                                 id="themeSelect"
+                                 value={theme}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     applyTheme(val);
+                                     saveCurrentState();
+                                 }}
+@@ -270,7 +276,7 @@ export function Settings() {
+                             <Select
+                                 id="notationSelect"
+                                 value={notation}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_NOTATION, val);
+                                     saveCurrentState();
+                                 }}
+@@ -286,7 +292,7 @@ export function Settings() {
+                             <Toggle
+                                 id="visualFlashCheck"
+                                 checked={visualFlash}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_PARAM, {
+                                         module: 'playback',
+                                         param: 'visualFlash',
+@@ -301,7 +307,7 @@ export function Settings() {
+                             <Toggle
+                                 id="hapticCheck"
+                                 checked={haptic}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_PARAM, {
+                                         module: 'playback',
+                                         param: 'haptic',
+@@ -339,7 +345,7 @@ export function Settings() {
+                                     <Toggle
+                                         id="sessionTimerCheck"
+                                         checked={songMode}
+-                                        onChange={(/** @type {any} */ val) => {
++                                        onChange={(val) => {
+                                             dispatch(ACTIONS.SET_SONG_MODE, val);
+                                             saveCurrentState();
+                                         }}
+@@ -459,7 +465,7 @@ export function Settings() {
+                             <Toggle
+                                 id="applyPresetSettingsCheck"
+                                 checked={applyPresetSettings}
+-                                onChange={(/** @type {any} */ val) => {
++                                onChange={(val) => {
+                                     dispatch(ACTIONS.SET_PRESET_SETTINGS_MODE, val);
+                                     saveCurrentState();
+                                 }}
+@@ -486,7 +492,7 @@ export function Settings() {
+                                 <Toggle
+                                     id="midiMuteLocalCheck"
+                                     checked={midiMuteLocal}
+-                                    onChange={(/** @type {any} */ val) => {
++                                    onChange={(val) => {
+                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
+                                             muteLocal: val,
+                                         });
+@@ -500,7 +506,7 @@ export function Settings() {
+                                 <Select
+                                     id="midiOutputSelect"
+                                     value={midiSelectedOutputId || ''}
+-                                    onChange={(/** @type {any} */ val) => {
++                                    onChange={(val) => {
+                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
+                                             selectedOutputId: val,
+                                         });
+@@ -508,9 +514,9 @@ export function Settings() {
+                                     }}
+                                     options={
+                                         midiOutputs && midiOutputs.length > 0
+-                                            ? midiOutputs.map((out) => ({
+-                                                  value: out.id,
+-                                                  label: out.name,
++                                            ? midiOutputs.map((/** @type {any} */ out) => ({
++                                                  value: /** @type {any} */ (out).id,
++                                                  label: /** @type {any} */ (out).name,
+                                               }))
+                                             : [{ value: '', label: 'No outputs found' }]
+                                     }
+@@ -528,10 +534,10 @@ export function Settings() {
+                                                 min="1"
+                                                 max="16"
+                                                 value={midiChannels[ch.toLowerCase()]}
+-                                                onChange={(e) => {
++                                                onChange={(/** @type {Event} */ e) => {
+                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, {
+                                                         [`${ch.toLowerCase()}Channel`]: parseInt(
+-                                                            e.target.value,
++                                                            /** @type {any} */ (e.target).value,
+                                                             10,
+                                                         ),
+                                                     });
+@@ -546,10 +552,10 @@ export function Settings() {
+                                                 min="-2"
+                                                 max="2"
+                                                 value={midiOctaves[ch.toLowerCase()]}
+-                                                onChange={(e) => {
++                                                onChange={(/** @type {Event} */ e) => {
+                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, {
+                                                         [`${ch.toLowerCase()}Octave`]: parseInt(
+-                                                            e.target.value,
++                                                            /** @type {any} */ (e.target).value,
+                                                             10,
+                                                         ),
+                                                     });
+diff --git a/public/components/UIControls.jsx b/public/components/UIControls.jsx
+index 1068a13..f576a24 100644
+--- a/public/components/UIControls.jsx
++++ b/public/components/UIControls.jsx
+@@ -1,12 +1,20 @@
+ import { Fragment, h } from 'preact';
+ 
++/**
++ * @typedef {import('preact').ComponentChildren} ComponentChildren
++ */
++
+ /**
+  * SettingGroup wraps a set of related settings with a consistent title and spacing.
+  */
+-/** @param {any} props */
+ /**
+- * @param {Object} props
++ * @typedef {Object} SettingGroupProps
++ * @property {string} [title]
++ * @property {ComponentChildren} [children]
++ * @property {string|import('preact').JSX.CSSProperties} [style]
++ * @property {string} [className]
+  */
++/** @param {SettingGroupProps} props */
+ export function SettingGroup({ title, children, style = '', className = '' }) {
+     return (
+         <div class={`setting-group ${className}`} style={style}>
+@@ -20,10 +28,15 @@ export function SettingGroup({ title, children, style = '', className = '' }) {
+  * SettingRow provides a standard layout for a single setting:
+  * [ Label + Description ] [ Control Element ]
+  */
+-/** @param {any} props */
+ /**
+- * @param {Object} props
++ * @typedef {Object} SettingRowProps
++ * @property {string} label
++ * @property {string} [description]
++ * @property {ComponentChildren} [children]
++ * @property {string|number|ComponentChildren} [valueDisplay]
++ * @property {string} id
+  */
++/** @param {SettingRowProps} props */
+ export function SettingRow({ label, description, children, valueDisplay, id }) {
+     return (
+         <div class="setting-row">
+@@ -44,10 +57,15 @@ export function SettingRow({ label, description, children, valueDisplay, id }) {
+ /**
+  * Reusable Toggle (Switch) component.
+  */
+-/** @param {any} props */
+ /**
+- * @param {Object} props
++ * @typedef {Object} ToggleProps
++ * @property {string} id
++ * @property {boolean} checked
++ * @property {function(boolean): void} onChange
++ * @property {string} [ariaLabel]
++ * @property {string} [label]
+  */
++/** @param {ToggleProps} props */
+ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
+     return (
+         <label class="toggle-switch" htmlFor={id}>
+@@ -56,7 +74,7 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
+                 type="checkbox"
+                 id={id}
+                 checked={checked}
+-                onChange={(e) => onChange(e.target.checked)}
++                onChange={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).checked)}
+                 aria-label={ariaLabel || label || id}
+             />
+             <span class="toggle-slider" />
+@@ -67,10 +85,19 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
+ /**
+  * Reusable Slider component.
+  */
+-/** @param {any} props */
+ /**
+- * @param {Object} props
++ * @typedef {Object} SliderProps
++ * @property {string} id
++ * @property {string|number} min
++ * @property {string|number} max
++ * @property {string|number} [step]
++ * @property {string|number} value
++ * @property {function(string): void} onInput
++ * @property {string} [ariaLabel]
++ * @property {string} [ariaValueText]
++ * @property {boolean} [disabled]
+  */
++/** @param {SliderProps} props */
+ export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValueText, disabled }) {
+     return (
+         <input
+@@ -80,7 +107,7 @@ export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValu
+             max={max}
+             step={step}
+             value={value}
+-            onInput={(e) => onInput(e.target.value)}
++            onInput={(e) => onInput(/** @type {HTMLInputElement} */ (e.target).value)}
+             aria-label={ariaLabel || id}
+             aria-valuetext={ariaValueText}
+             disabled={disabled}
+@@ -91,16 +118,26 @@ export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValu
+ /**
+  * Reusable Select component.
+  */
+-/** @param {any} props */
+ /**
+- * @param {Object} props
++ * @typedef {Object} SelectOption
++ * @property {string|number} value
++ * @property {string} label
++ */
++/**
++ * @typedef {Object} SelectProps
++ * @property {string} id
++ * @property {string|number} value
++ * @property {function(string): void} onChange
++ * @property {SelectOption[]} options
++ * @property {string} [ariaLabel]
+  */
++/** @param {SelectProps} props */
+ export function Select({ id, value, onChange, options, ariaLabel }) {
+     return (
+         <select
+             id={id}
+             value={value}
+-            onChange={(e) => onChange(e.target.value)}
++            onChange={(e) => onChange(/** @type {HTMLSelectElement} */ (e.target).value)}
+             aria-label={ariaLabel || id}
+         >
+             {options.map((/** @type {any} */ opt) => (
+@@ -115,7 +152,18 @@ export function Select({ id, value, onChange, options, ariaLabel }) {
+ /**
+  * Reusable Stepper component for numeric inputs.
+  */
+-/** @param {any} props */
++/**
++ * @typedef {Object} StepperProps
++ * @property {number} value
++ * @property {function(): void} onDecrement
++ * @property {function(): void} onIncrement
++ * @property {number} min
++ * @property {number} max
++ * @property {string} [id]
++ * @property {string} [decAriaLabel]
++ * @property {string} [incAriaLabel]
++ */
++/** @param {StepperProps} props */
+ export function Stepper({
+     value,
+     onDecrement,
+@@ -167,11 +215,26 @@ export function Stepper({
+  * Reusable ButtonGroup for mutually exclusive options (chips).
+  */
+ /**
+- * @param {Object} props
++ * @typedef {Object} ButtonGroupOption
++ * @property {string|number} value
++ * @property {string|ComponentChildren} label
++ * @property {import('preact').JSX.CSSProperties} [style]
+  */
++/**
++ * @typedef {Object} ButtonGroupProps
++ * @property {ButtonGroupOption[]} options
++ * @property {string|number} value
++ * @property {function(string|number): void} onChange
++ * @property {string} [className]
++ * @property {import('preact').JSX.CSSProperties} [style]
++ */
++/** @param {ButtonGroupProps} props */
+ export function ButtonGroup({ options, value, onChange, className = '', style = {} }) {
++    const defaultStyle = /** @type {import('preact').JSX.CSSProperties} */ ({});
++    const mergedStyle = /** @type {import('preact').JSX.CSSProperties} */ ({ gap: '0.25rem', ...(style || defaultStyle) });
++
+     return (
+-        <div class={`flex-row ${className}`} style={{ gap: '0.25rem', ...style }}>
++        <div class={`flex-row ${className}`} style={mergedStyle}>
+             {options.map((/** @type {any} */ opt) => (
+                 <button
+                     key={opt.value}
+

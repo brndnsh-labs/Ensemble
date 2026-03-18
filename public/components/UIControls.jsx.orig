@@ -92,7 +92,7 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
  * @property {string} [id]
  * @property {number|string} min
  * @property {number|string} max
- * @property {number|string} [step]
+ * @property {number|string} step
  * @property {number|string} value
  * @property {function(string): void} onInput
  * @property {string} [ariaLabel]
@@ -100,17 +100,7 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
  * @property {boolean} [disabled]
  */
 /** @param {SliderProps} props */
-export function Slider({
-    id,
-    min,
-    max,
-    step = '1',
-    value,
-    onInput,
-    ariaLabel,
-    ariaValueText,
-    disabled,
-}) {
+export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValueText, disabled }) {
     return (
         <input
             type="range"

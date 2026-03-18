@@ -31,8 +31,16 @@ import { useEnsembleState } from './ui-bridge.js';
 import { syncWorker } from './worker-client.js';
 
 /**
- * @param {Object} props
- * @param {Function} props.getVisualTime
+ * @typedef {import('./types.js').EnsembleState} EnsembleState
+ */
+
+/**
+ * @typedef {Object} AppProps
+ * @property {() => number} getVisualTime
+ */
+
+/**
+ * @param {AppProps} props
  */
 export function App({ getVisualTime }) {
     const { vizEnabled, grooveMobileTab, theme, isMaximized } = useEnsembleState(
@@ -162,9 +170,13 @@ function ArrangerPanel() {
 }
 
 /**
- * @param {Object} props
- * @param {boolean} props.enabled
- * @param {Function} props.getVisualTime
+ * @typedef {Object} VisualizerPanelProps
+ * @property {boolean} enabled
+ * @property {() => number} getVisualTime
+ */
+
+/**
+ * @param {VisualizerPanelProps} props
  */
 function VisualizerPanel({ enabled, getVisualTime }) {
     const handleToggle = () => {
