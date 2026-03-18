@@ -41,19 +41,22 @@ const SCALE_INTERVALS = {
 /**
  * Determines the most appropriate musical scale for a given chord and context.
  *
- * @param {Object} chord - The current chord object.
- * @param {Object} [nextChord] - The upcoming chord object (for resolution logic).
+ * @param {any} chord - The current chord object.
+ * @param {any} [nextChord] - The upcoming chord object (for resolution logic).
  * @param {string} [style] - The soloist or instrument style (e.g., 'smart', 'blues').
  * @returns {number[]} An array of semitone intervals representing the selected scale.
  */
 export function getScaleForChord(chord, nextChord = null, style = 'smart') {
-    const { arranger, groove, soloist } = getState();
+    /** @type {import('./types.js').EnsembleState} */
+    const state = getState();
+    const { arranger, groove, soloist } = state;
     if (!chord) {
         return SCALE_INTERVALS.MAJOR;
     }
 
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
+        /** @type {any} */
         const mapping = {
             Rock: 'rock',
             Jazz: 'jazz',
@@ -225,17 +228,19 @@ export function getScaleForChord(chord, nextChord = null, style = 'smart') {
         const keyIntervals = arranger.isMinor
             ? SCALE_INTERVALS.NATURAL_MINOR
             : SCALE_INTERVALS.MAJOR;
-        const keyNotes = keyIntervals.map((i) => (keyRootIdx + i) % 12);
+        const keyNotes = keyIntervals.map((/** @type {number} */ i) => (keyRootIdx + i) % 12);
 
         const chordRootPC = chord.rootMidi % 12;
-        const chordTones = chord.intervals.map((i) => (chordRootPC + i) % 12);
+        const chordTones = chord.intervals.map((/** @type {number} */ i) => (chordRootPC + i) % 12);
 
-        const isDiatonic = chordTones.every((note) => keyNotes.includes(note));
+        const isDiatonic = chordTones.every((/** @type {number} */ note) =>
+            keyNotes.includes(note),
+        );
 
         if (isDiatonic) {
             // Build the mode
             const mode = keyNotes
-                .map((note) => (note - chordRootPC + 12) % 12)
+                .map((/** @type {number} */ note) => (note - chordRootPC + 12) % 12)
                 .sort((a, b) => a - b);
             return mode;
         }

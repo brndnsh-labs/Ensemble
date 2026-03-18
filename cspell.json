@@ -117,7 +117,8 @@
         "Fingerpicking",
         "Partido",
         "partido",
-        "Ganza"
+        "Ganza",
+        "Pentatonics"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

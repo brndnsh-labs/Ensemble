@@ -27,7 +27,7 @@ const SECTION_COLORS = [
 
 /**
  * Heuristic to detect the key of a song based on its chords.
- * @param {Array} sections - Parsed song sections
+ * @param {Array<any>} sections - Parsed song sections
  * @returns {Object} { key, isMinor, score, confidence }
  */
 export function detectKey(sections) {
@@ -35,11 +35,12 @@ export function detectKey(sections) {
         return { key: 'C', isMinor: false, confidence: 0 };
     }
 
+    /** @type {Array<any>} */
     const allChords = [];
-    sections.forEach((s) => {
+    sections.forEach((/** @type {any} */ s) => {
         const parts = s.value.split(' | ');
         for (let i = 0; i < s.repeat; i++) {
-            parts.forEach((p, idx) => {
+            parts.forEach((/** @type {any} */ p, idx) => {
                 const isFirst = idx === 0 && i === 0 && sections.indexOf(s) === 0;
                 const isLast =
                     idx === parts.length - 1 &&
@@ -124,9 +125,12 @@ export function detectKey(sections) {
         });
     });
 
-    scores.sort((a, b) => b.score - a.score);
+    scores.sort((/** @type {any} */ a, /** @type {any} */ b) => b.score - a.score);
     const best = scores[0];
-    const totalPossible = allChords.reduce((acc, curr) => acc + curr.weight, 0);
+    const totalPossible = allChords.reduce(
+        (/** @type {number} */ acc, /** @type {any} */ curr) => acc + curr.weight,
+        0,
+    );
     const confidence = best.score / (totalPossible + 1);
 
     return { ...best, confidence };
@@ -134,6 +138,8 @@ export function detectKey(sections) {
 
 /**
  * Checks if a line is likely a "measure grid" line like | / / / / |
+ * @param {string} line
+ * @returns {boolean}
  */
 function isMeasureGrid(line) {
     const hasSlashesOrDots = line.includes('/') || line.includes('..');
@@ -143,6 +149,8 @@ function isMeasureGrid(line) {
 
 /**
  * Attempts to extract a section header from a line.
+ * @param {string} line
+ * @returns {string|null}
  */
 function getSectionHeader(line) {
     // [Chorus]
@@ -213,8 +221,8 @@ export function parseTab(text) {
             sections.push({
                 id: generateId(),
                 label: currentSection.label || 'Import',
-                value: currentSection.measures.map((m) => m.chord).join(' | '),
-                syllables: currentSection.measures.map((m) => m.syllables),
+                value: currentSection.measures.map((/** @type {any} */ m) => m.chord).join(' | '),
+                syllables: currentSection.measures.map((/** @type {any} */ m) => m.syllables),
                 repeat: currentSection.repeat || 1,
                 color: '#3b82f6',
             });
@@ -262,6 +270,10 @@ export function parseTab(text) {
         processLine(line, i);
     }
 
+    /**
+     * @param {string} line
+     * @param {number} lineIndex
+     */
     function processLine(line, lineIndex) {
         if (!currentSection) {
             currentSection = { label: 'Import', measures: [], repeat: 1 };
@@ -269,9 +281,9 @@ export function parseTab(text) {
 
         // --- A. Pipe-Aware Parsing (Standard Tab Format) ---
         if (line.includes('|')) {
-            const bars = line.split('|').map((b) => b.trim());
+            const bars = line.split('|').map((/** @type {string} */ b) => b.trim());
             // Filter out empty bars at start/end of line
-            const validBars = bars.filter((b, idx) => {
+            const validBars = bars.filter((/** @type {string} */ b, idx) => {
                 if (b === '' && (idx === 0 || idx === bars.length - 1)) {
                     return false;
                 }
@@ -282,12 +294,14 @@ export function parseTab(text) {
                 let foundChords = false;
                 const newMeasures = [];
 
-                validBars.forEach((bar) => {
-                    const tokens = bar.split(/\s+/).filter((t) => t.length > 0);
+                validBars.forEach((/** @type {string} */ bar) => {
+                    const tokens = bar
+                        .split(/\s+/)
+                        .filter((/** @type {string} */ t) => t.length > 0);
                     const barChords = [];
                     let repeatBar = false;
 
-                    tokens.forEach((t) => {
+                    tokens.forEach((/** @type {string} */ t) => {
                         const clean = t.replace(PARENTHESES_PATTERN, '');
                         if (clean === '%') {
                             repeatBar = true;
@@ -320,7 +334,7 @@ export function parseTab(text) {
                     const lyricLine = lookAheadForLyrics(lineIndex);
                     const totalSyllables = countSyllables(lyricLine);
                     const syllablesPerBar = Math.ceil(totalSyllables / newMeasures.length);
-                    newMeasures.forEach((m) => {
+                    newMeasures.forEach((/** @type {any} */ m) => {
                         m.syllables = syllablesPerBar;
                         currentSection.measures.push(m);
                     });
@@ -330,11 +344,11 @@ export function parseTab(text) {
         }
 
         // --- B. Traditional Free-Text Parsing ---
-        const tokens = line.split(/[\s,.]+/).filter((t) => t.length > 0);
+        const tokens = line.split(/[\s,.]+/).filter((/** @type {string} */ t) => t.length > 0);
         let chordCount = 0;
         let repeatValue = 1;
 
-        const possibleChords = tokens.filter((t) => {
+        const possibleChords = tokens.filter((/** @type {string} */ t) => {
             const clean = t.replace(PIPE_PARENTHESES_PATTERN, '');
             if (clean === '') {
                 return false;
@@ -354,13 +368,15 @@ export function parseTab(text) {
         const isChordLine = chordCount > 0 && (chordCount / tokens.length > 0.4 || chordCount > 3);
 
         if (isChordLine) {
-            const cleanTokens = possibleChords.map((c) => c.replace(PIPE_PARENTHESES_PATTERN, ''));
+            const cleanTokens = possibleChords.map((/** @type {string} */ c) =>
+                c.replace(PIPE_PARENTHESES_PATTERN, ''),
+            );
             const lyricLine = lookAheadForLyrics(lineIndex);
             const totalSyllables = countSyllables(lyricLine);
             const syllablesPerMeasure =
                 cleanTokens.length > 0 ? Math.ceil(totalSyllables / cleanTokens.length) : 0;
 
-            cleanTokens.forEach((token) => {
+            cleanTokens.forEach((/** @type {string} */ token) => {
                 if (token === '%') {
                     const last = currentSection.measures[currentSection.measures.length - 1];
                     if (last) {
@@ -389,6 +405,7 @@ export function parseTab(text) {
         }
     }
 
+    /** @param {number} lineIndex */
     function lookAheadForLyrics(lineIndex) {
         for (let j = lineIndex + 1; j < lines.length; j++) {
             const nextLine = lines[j].trim();
@@ -399,8 +416,10 @@ export function parseTab(text) {
                 break;
             }
 
-            const nextTokens = nextLine.split(/[\s,.]+/).filter((t) => t.length > 0);
-            const nextChordCount = nextTokens.filter((t) => {
+            const nextTokens = nextLine
+                .split(/[\s,.]+/)
+                .filter((/** @type {string} */ t) => t.length > 0);
+            const nextChordCount = nextTokens.filter((/** @type {string} */ t) => {
                 const clean = t.replace(PIPE_PARENTHESES_PATTERN, '');
                 return clean !== '' && (CHORD_REGEX.test(clean) || clean === '%');
             }).length;
@@ -425,7 +444,7 @@ export function parseTab(text) {
     }
 
     // 6. Assign Colors
-    sections.forEach((s, i) => {
+    sections.forEach((/** @type {any} */ s, i) => {
         s.color = SECTION_COLORS[i % SECTION_COLORS.length];
     });
 
