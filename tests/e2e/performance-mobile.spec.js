@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import pkg from '@playwright/test';
+
+const { expect, test } = pkg;
 
 test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
     test.beforeEach(async ({ page }) => {

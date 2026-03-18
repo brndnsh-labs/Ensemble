@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import pkg from '@playwright/test';
+
+const { expect, test } = pkg;
 
 test.describe('Theme Reproduction Bug', () => {
     test.use({ colorScheme: 'light' });
