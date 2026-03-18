@@ -64,6 +64,11 @@ export function refreshArrangerUI() {
     saveCurrentState();
 }
 
+/**
+ * @param {string} id
+ * @param {string} field
+ * @param {any} value
+ */
 export function onSectionUpdate(id, field, value) {
     const { arranger } = getState();
     if (field === 'reorder') {
@@ -115,6 +120,7 @@ export function onSectionUpdate(id, field, value) {
     saveCurrentState();
 }
 
+/** @param {string} id */
 export function onSectionDelete(id) {
     const { arranger } = getState();
     if (arranger.sections.length <= 1) {
@@ -135,6 +141,7 @@ export function onSectionDelete(id) {
     refreshArrangerUI();
 }
 
+/** @param {string} id */
 export function onSectionDuplicate(id) {
     const { arranger } = getState();
     const section = arranger.sections.find((s) => s.id === id);
@@ -168,6 +175,7 @@ export function addSection() {
     refreshArrangerUI();
 }
 
+/** @param {number} delta */
 export function transposeKey(delta) {
     const { arranger } = getState();
     // Use arranger.key as the source of truth

@@ -21,6 +21,7 @@ import { flushWorker, syncWorker } from './worker-client.js';
 
 export function setInstrumentControllerRefs(_scheduler) {}
 
+/** @param {number} idx */
 export function switchMeasure(idx) {
     const { groove } = getState();
     if (groove.currentMeasure === idx) {
@@ -29,6 +30,7 @@ export function switchMeasure(idx) {
     dispatch(ACTIONS.SET_ACTIVE_MEASURE, idx);
 }
 
+/** @param {string|number} val */
 export function updateMeasures(val) {
     const numVal = parseInt(val, 10);
     dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: numVal });
@@ -40,6 +42,7 @@ export function updateMeasures(val) {
     saveCurrentState();
 }
 
+/** @param {string} name */
 export function loadDrumPreset(name) {
     const { groove, arranger } = getState();
     let p = DRUM_PRESETS[name];
@@ -132,6 +135,7 @@ export function clearDrumPresetHighlight() {
 }
 
 let tapTimes = [];
+/** @param {Function} setBpmRef */
 export function handleTap(setBpmRef) {
     const now = performance.now();
     if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) {
@@ -157,6 +161,7 @@ export function handleTap(setBpmRef) {
     }
 }
 
+/** @param {number} [primeSteps] */
 export function flushBuffers(primeSteps = 0) {
     const { groove, arranger, playback, chords, bass, soloist, harmony } = getState();
     // 1. Clear local buffers
@@ -244,6 +249,10 @@ export function flushBuffers(primeSteps = 0) {
     restoreGains(stateMap);
 }
 
+/**
+ * @param {string} type
+ * @param {number} [primeSteps]
+ */
 function flushBuffer(type, primeSteps = 0) {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
@@ -284,6 +293,7 @@ function flushBuffer(type, primeSteps = 0) {
     restoreGains(stateMap);
 }
 
+/** @param {string} type */
 export function togglePower(type) {
     const { groove, vizState, chords, bass, soloist, harmony } = getState();
     const normalizedType = type === 'chords' ? 'chord' : type === 'harmonies' ? 'harmony' : type;

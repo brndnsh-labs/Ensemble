@@ -30,13 +30,19 @@ import { ACTIONS } from './types.js';
 import { useEnsembleState } from './ui-bridge.js';
 import { syncWorker } from './worker-client.js';
 
+/**
+ * @param {Object} props
+ * @param {Function} props.getVisualTime
+ */
 export function App({ getVisualTime }) {
-    const { vizEnabled, grooveMobileTab, theme, isMaximized } = useEnsembleState((s) => ({
-        vizEnabled: s.vizState.enabled,
-        grooveMobileTab: s.groove.mobileTab,
-        theme: s.playback.theme,
-        isMaximized: s.vizState.isMaximized,
-    }));
+    const { vizEnabled, grooveMobileTab, theme, isMaximized } = useEnsembleState(
+        (/** @type {import('./types.js').EnsembleState} */ s) => ({
+            vizEnabled: s.vizState.enabled,
+            grooveMobileTab: s.groove.mobileTab,
+            theme: s.playback.theme,
+            isMaximized: s.vizState.isMaximized,
+        }),
+    );
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -89,10 +95,12 @@ function Header() {
 }
 
 function ArrangerPanel() {
-    const { soloistStyle, hasLeadSheet } = useEnsembleState((s) => ({
-        soloistStyle: s.soloist.style,
-        hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
-    }));
+    const { soloistStyle, hasLeadSheet } = useEnsembleState(
+        (/** @type {import('./types.js').EnsembleState} */ s) => ({
+            soloistStyle: s.soloist.style,
+            hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
+        }),
+    );
 
     const openEditor = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
@@ -153,6 +161,11 @@ function ArrangerPanel() {
     );
 }
 
+/**
+ * @param {Object} props
+ * @param {boolean} props.enabled
+ * @param {Function} props.getVisualTime
+ */
 function VisualizerPanel({ enabled, getVisualTime }) {
     const handleToggle = () => {
         togglePower('viz');
@@ -185,6 +198,10 @@ function VisualizerPanel({ enabled, getVisualTime }) {
     );
 }
 
+/**
+ * @param {Object} props
+ * @param {string} props.grooveMobileTab
+ */
 function Sidebar({ grooveMobileTab }) {
     const activeMobileTab = grooveMobileTab === 'mobile' ? 'grooves' : grooveMobileTab;
 
@@ -223,12 +240,23 @@ function Sidebar({ grooveMobileTab }) {
     );
 }
 
+/**
+ * @param {Object} props
+ * @param {any} props.tab
+ * @param {string} props.activeTab
+ * @param {Function} props.onSwitch
+ */
 function MobileNavTab({ tab, activeTab, onSwitch }) {
     const isActive = activeTab === tab.id || (activeTab === 'mobile' && tab.id === 'grooves');
-    const { enabled, tradeMode } = useEnsembleState((s) => ({
-        enabled: s[tab.module].enabled,
-        tradeMode: s[tab.module].tradeMode,
-    }));
+    const { enabled, tradeMode } = useEnsembleState(
+        (/** @type {import('./types.js').EnsembleState} */ s) => {
+            const mod = /** @type {any} */ (s)[tab.module];
+            return {
+                enabled: mod.enabled,
+                tradeMode: mod.tradeMode,
+            };
+        },
+    );
 
     const isWaiting = tab.module === 'soloist' && !enabled && tradeMode !== 'manual';
     const powerClass = `power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''}`;
@@ -254,7 +282,12 @@ function MobileNavTab({ tab, activeTab, onSwitch }) {
     );
 }
 
+/**
+ * @param {Object} props
+ * @param {string} props.activeTab
+ */
 function MobileNav({ activeTab }) {
+    /** @param {string} tab */
     const switchMobileTab = (tab) => {
         if (tab === 'grooves') {
             dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'smart' });
