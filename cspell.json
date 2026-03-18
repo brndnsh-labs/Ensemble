@@ -132,7 +132,8 @@
         "APOS",
         "microtonal",
         "Vivm",
-        "chicka"
+        "chicka",
+        "ascript"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

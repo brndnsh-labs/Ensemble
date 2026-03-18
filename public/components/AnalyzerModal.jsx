@@ -6,6 +6,9 @@ import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
+/**
+ * @param {Object} props
+ */
 export function AnalyzerModal() {
     const isOpen = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.analyzer,
@@ -75,7 +78,7 @@ export function AnalyzerModal() {
             setIsListening(true);
             setStatusMessage('Listening...');
 
-            analyzerRef.current.onUpdate = (data) => {
+            analyzerRef.current.onUpdate = (/** @type {any} */ data) => {
                 if (data.chord) {
                     setCurrentStableChord(data.chord);
                     // Add to history if unique
@@ -95,7 +98,7 @@ export function AnalyzerModal() {
 
     function stopListening() {
         if (micStreamRef.current) {
-            micStreamRef.current.getTracks().forEach((t) => t.stop());
+            micStreamRef.current.getTracks().forEach((/** @type {any} */ t) => t.stop());
             micStreamRef.current = null;
         }
         if (analyzerRef.current) {
@@ -105,7 +108,7 @@ export function AnalyzerModal() {
         setStatusMessage('Analyzer paused');
     }
 
-    async function handleFileUpload(e) {
+    async function handleFileUpload(/** @type {any} */ e) {
         const file = e.target.files[0];
         if (!file) {
             return;
@@ -120,9 +123,12 @@ export function AnalyzerModal() {
                 analyzerRef.current = new ChordAnalyzerLite();
             }
 
-            const results = await analyzerRef.current.analyzeFile(file, (progress) => {
-                setProcessingProgress(Math.round(progress * 100));
-            });
+            const results = await analyzerRef.current.analyzeFile(
+                file,
+                (/** @type {any} */ progress) => {
+                    setProcessingProgress(Math.round(progress * 100));
+                },
+            );
 
             if (results.progression && results.progression.length > 0) {
                 setHistory(results.progression);
@@ -179,9 +185,12 @@ export function AnalyzerModal() {
             id="analyzerOverlay"
             ref={overlayRef}
             class={`modal-overlay ${isOpen ? 'active' : ''}`}
-            onClick={(e) => e.target.id === 'analyzerOverlay' && closeModal()}
+            onClick={(/** @type {any} */ e) => e.target.id === 'analyzerOverlay' && closeModal()}
         >
-            <div class="modal-content analyzer-modal" onClick={(e) => e.stopPropagation()}>
+            <div
+                class="modal-content analyzer-modal"
+                onClick={(/** @type {any} */ e) => e.stopPropagation()}
+            >
                 <div class="modal-header-shared">
                     <h2>Audio Chord Analyzer</h2>
                     <button
@@ -229,7 +238,7 @@ export function AnalyzerModal() {
 
                     {/* History / Tape Strip View */}
                     <div class="analyzer-history-strip">
-                        {history.map((c, i) => (
+                        {history.map((/** @type {any} */ c, /** @type {any} */ i) => (
                             <span key={i} class="history-chord-tag">
                                 {formatUnicodeSymbols(c)}
                             </span>

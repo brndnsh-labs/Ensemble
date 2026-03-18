@@ -24,9 +24,12 @@ import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { generateId } from '../utils.js';
 
+/**
+ * @param {Object} props
+ */
 export function EditorModal() {
     const { isOpen, hasLeadSheet, leadSheetMelody, currentKey, totalSteps } = useEnsembleState(
-        (s) => ({
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
             isOpen: s.playback.modals.editor,
             hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
             leadSheetMelody: s.soloist.leadSheetMelody,
@@ -62,7 +65,7 @@ export function EditorModal() {
 
                 // Handle Capo Transposition
                 if (capo > 0) {
-                    finalSections = parsedSections.map((s) => ({
+                    finalSections = parsedSections.map((/** @type {any} */ s) => ({
                         ...s,
                         value: transformRelativeProgression(s.value, capo),
                     }));
@@ -120,7 +123,7 @@ export function EditorModal() {
         }
     }, [isOpen]);
 
-    const _handleAction = (fn) => {
+    const _handleAction = (/** @type {Function} */ fn) => {
         setIsMenuOpen(false);
         fn();
     };
@@ -151,7 +154,7 @@ export function EditorModal() {
     const handleMutate = () => {
         setIsMenuOpen(false);
         const targetId = arranger.lastInteractedSectionId;
-        const section = arranger.sections.find((s) => s.id === targetId);
+        const section = arranger.sections.find((/** @type {any} */ s) => s.id === targetId);
         if (!section) {
             return;
         }
@@ -224,14 +227,14 @@ export function EditorModal() {
         }
     };
 
-    const handleFileUpload = (e) => {
+    const handleFileUpload = (/** @type {any} */ e) => {
         const file = e.target.files[0];
         if (!file) {
             return;
         }
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (/** @type {any} */ event) => {
             try {
                 const parsed = parseMusicXML(event.target.result);
                 dispatch(ACTIONS.IMPORT_MUSICXML, parsed);
@@ -249,13 +252,16 @@ export function EditorModal() {
             ref={overlayRef}
             class={`settings-overlay ${isOpen ? 'active' : ''}`}
             aria-hidden={!isOpen ? 'true' : 'false'}
-            onClick={(e) => {
+            onClick={(/** @type {any} */ e) => {
                 if (e.target.id === 'editorOverlay') {
                     closeEditor();
                 }
             }}
         >
-            <div class="settings-content editor-modal" onClick={(e) => e.stopPropagation()}>
+            <div
+                class="settings-content editor-modal"
+                onClick={(/** @type {any} */ e) => e.stopPropagation()}
+            >
                 <div class="modal-header">
                     <h2>{isImportMode ? 'Import Tab' : 'Arrangement Editor'}</h2>
                     <input
@@ -283,7 +289,7 @@ export function EditorModal() {
                                     placeholder="[Intro]
 Em  C  G  D"
                                     value={tabText}
-                                    onInput={(e) => setTabText(e.target.value)}
+                                    onInput={(/** @type {any} */ e) => setTabText(e.target.value)}
                                     autoFocus
                                 />
                                 <div class="import-mode-actions">
@@ -328,7 +334,7 @@ Em  C  G  D"
                             class={`action-trigger-btn ${isMenuOpen ? 'active' : ''}`}
                             title="Arranger Actions"
                             style="justify-content: center; padding: 0.75rem 1rem;"
-                            onClick={(e) => {
+                            onClick={(/** @type {any} */ e) => {
                                 e.stopPropagation();
                                 setIsMenuOpen(!isMenuOpen);
                             }}

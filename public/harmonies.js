@@ -633,7 +633,7 @@ export function getHarmonyNotes(
     const intensity = playback.bandIntensity;
     const basePocketOffset = calculateTimingOffset('chords', groove.pocket, intensity); // Harmonies share Chord gravity
 
-    const styleOffset = config.octaveOffset || 0;
+    const styleOffset = /** @type {any} */ (config).octaveOffset || 0;
     const finalMidisForMemory = [];
 
     for (let i = 0; i < currentMidis.length; i++) {
@@ -677,14 +677,16 @@ export function getHarmonyNotes(
             vibrato = { rate: 5.0, depth: 10 * intensity };
         }
 
-        let baseVol = (config.velocity || 0.75) * (0.6 + intensity * 0.4);
+        let baseVol = /** @type {any} */ (config.velocity || 0.75) * (0.6 + intensity * 0.4);
         if (isGhost) {
             baseVol *= 0.4; // Ghost notes are much softer
         }
 
         const stagger = (i - (currentMidis.length - 1) / 2) * 0.005;
         let finalOffset =
-            basePocketOffset + stagger + Math.random() * (config.timingJitter || 0.008);
+            basePocketOffset +
+            stagger +
+            Math.random() * /** @type {any} */ (config.timingJitter || 0.008);
 
         // Neo-Soul "Dilla" Pocket (Late): Layered on top
         if (feel === 'Neo-Soul') {

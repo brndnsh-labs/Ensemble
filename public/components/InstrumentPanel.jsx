@@ -10,7 +10,9 @@ import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { SoloistSmartTab } from './SoloistSmartTab.jsx';
 import { StyleSelector } from './StyleSelector.jsx';
 
-/** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
     const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -29,7 +31,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
             return;
         }
 
-        const handleClickOutside = (event) => {
+        const handleClickOutside = (/** @type {any} */ event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setIsMenuOpen(false);
             }
@@ -41,7 +43,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
         };
     }, [isMenuOpen]);
 
-    const switchTab = (tab) => {
+    const switchTab = (/** @type {any} */ tab) => {
         dispatch(ACTIONS.SET_ACTIVE_TAB, { module, tab });
         syncWorker();
         saveCurrentState();

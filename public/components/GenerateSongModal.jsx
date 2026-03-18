@@ -16,6 +16,9 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { generateId } from '../utils.js';
 import { ButtonGroup, SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
+/**
+ * @param {Object} props
+ */
 export function GenerateSongModal() {
     const { arranger } = getState();
     const dispatch = useDispatch();
@@ -91,7 +94,7 @@ export function GenerateSongModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
     };
 
-    const applyTemplate = (template) => {
+    const applyTemplate = (/** @type {any} */ template) => {
         if (confirmTemplate !== template.name) {
             setConfirmTemplate(template.name);
             return;
@@ -101,7 +104,7 @@ export function GenerateSongModal() {
         try {
             pushHistory();
 
-            const newSections = template.sections.map((s) => ({
+            const newSections = template.sections.map((/** @type {any} */ s) => ({
                 id: generateId(),
                 label: s.label,
                 value: s.value,
@@ -148,7 +151,9 @@ export function GenerateSongModal() {
         try {
             let seed = null;
             if (seedMode === 'existing') {
-                const section = sections.find((s) => s.id === selectedSectionId) || sections[0];
+                const section =
+                    sections.find((/** @type {any} */ s) => s.id === selectedSectionId) ||
+                    sections[0];
                 if (section?.value) {
                     seed = {
                         type: seedType,
@@ -223,7 +228,7 @@ export function GenerateSongModal() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="generate-song-title"
-            onClick={(e) => {
+            onClick={(/** @type {any} */ e) => {
                 if (e.target.id === 'generateSongOverlay') {
                     close();
                 }
@@ -232,7 +237,7 @@ export function GenerateSongModal() {
             <div
                 class="modal-content settings-content"
                 style="min-height: 700px; display: flex; flex-direction: column;"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(/** @type {any} */ e) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
                     <h2 id="generate-song-title">Inspiration Hub</h2>
@@ -314,19 +319,19 @@ export function GenerateSongModal() {
                                         class="template-grid"
                                         style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding-bottom: 1rem;"
                                     >
-                                        {SONG_TEMPLATES.map((template) => (
+                                        {SONG_TEMPLATES.map((/** @type {any} */ template) => (
                                             <button
                                                 key={template.name}
                                                 class="template-card-btn"
                                                 style="padding: 1.25rem; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-color); cursor: pointer; text-align: left; transition: all 0.2s; display: flex; flex-direction: column; gap: 0.25rem;"
                                                 onClick={() => applyTemplate(template)}
-                                                onMouseOver={(e) => {
+                                                onMouseOver={(/** @type {any} */ e) => {
                                                     e.currentTarget.style.borderColor =
                                                         'var(--accent-color)';
                                                     e.currentTarget.style.transform =
                                                         'translateY(-2px)';
                                                 }}
-                                                onMouseOut={(e) => {
+                                                onMouseOut={(/** @type {any} */ e) => {
                                                     e.currentTarget.style.borderColor =
                                                         'var(--border-color)';
                                                     e.currentTarget.style.transform =
@@ -354,7 +359,10 @@ export function GenerateSongModal() {
                                                 <div style="font-size: 0.75rem; color: var(--text-muted);">
                                                     {template.sections.length} Sections •{' '}
                                                     {template.sections.reduce(
-                                                        (acc, s) => acc + (s.repeat || 1),
+                                                        (
+                                                            /** @type {any} */ acc,
+                                                            /** @type {any} */ s,
+                                                        ) => acc + (s.repeat || 1),
                                                         0,
                                                     )}{' '}
                                                     Blocks
@@ -374,7 +382,9 @@ export function GenerateSongModal() {
                                             <select
                                                 id="gen-root-key"
                                                 value={key}
-                                                onChange={(e) => setKey(e.target.value)}
+                                                onChange={(/** @type {any} */ e) =>
+                                                    setKey(e.target.value)
+                                                }
                                                 style="min-width: 100px;"
                                             >
                                                 <option value="Random">Random</option>
@@ -418,7 +428,9 @@ export function GenerateSongModal() {
                                             <select
                                                 id="gen-time-sig"
                                                 value={timeSignature}
-                                                onChange={(e) => setTimeSignature(e.target.value)}
+                                                onChange={(/** @type {any} */ e) =>
+                                                    setTimeSignature(e.target.value)
+                                                }
                                                 style="min-width: 100px;"
                                             >
                                                 <option value="Random">Random</option>
@@ -442,10 +454,12 @@ export function GenerateSongModal() {
                                             <select
                                                 id="gen-structure"
                                                 value={structure}
-                                                onChange={(e) => setStructure(e.target.value)}
+                                                onChange={(/** @type {any} */ e) =>
+                                                    setStructure(e.target.value)
+                                                }
                                                 style="min-width: 150px;"
                                             >
-                                                {structureOptions.map((opt) => (
+                                                {structureOptions.map((/** @type {any} */ opt) => (
                                                     <option key={opt.id} value={opt.id}>
                                                         {opt.label}
                                                     </option>
@@ -474,7 +488,7 @@ export function GenerateSongModal() {
                                                 max="1"
                                                 step="0.1"
                                                 value={complexity}
-                                                onInput={(e) =>
+                                                onInput={(/** @type {any} */ e) =>
                                                     setComplexity(parseFloat(e.target.value))
                                                 }
                                                 style="width: 100px;"
@@ -493,7 +507,9 @@ export function GenerateSongModal() {
                                         >
                                             <select
                                                 value={seedMode}
-                                                onChange={(e) => setSeedMode(e.target.value)}
+                                                onChange={(/** @type {any} */ e) =>
+                                                    setSeedMode(e.target.value)
+                                                }
                                                 style="min-width: 150px;"
                                             >
                                                 <option value="none">None</option>
@@ -510,12 +526,12 @@ export function GenerateSongModal() {
                                                 >
                                                     <select
                                                         value={selectedSectionId}
-                                                        onChange={(e) =>
+                                                        onChange={(/** @type {any} */ e) =>
                                                             setSelectedSectionId(e.target.value)
                                                         }
                                                         style="min-width: 150px;"
                                                     >
-                                                        {sections.map((s) => (
+                                                        {sections.map((/** @type {any} */ s) => (
                                                             <option key={s.id} value={s.id}>
                                                                 {s.label}
                                                             </option>
@@ -534,7 +550,7 @@ export function GenerateSongModal() {
                                                     <input
                                                         type="text"
                                                         value={manualSeedValue}
-                                                        onInput={(e) =>
+                                                        onInput={(/** @type {any} */ e) =>
                                                             setManualSeedValue(e.target.value)
                                                         }
                                                         placeholder="I | IV | V"
@@ -553,7 +569,7 @@ export function GenerateSongModal() {
                                                     <select
                                                         id="gen-seed-type"
                                                         value={seedType}
-                                                        onChange={(e) =>
+                                                        onChange={(/** @type {any} */ e) =>
                                                             setSeedType(e.target.value)
                                                         }
                                                         style="min-width: 100px;"

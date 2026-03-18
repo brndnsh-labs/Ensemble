@@ -49,7 +49,7 @@ const ChordCard = memo(
             }
         }, [disp, chord.absName, isMaximized, totalMeasures]);
 
-        const handleClick = (e) => {
+        const handleClick = (/** @type {any} */ e) => {
             e.stopPropagation();
             if (window.previewChord) {
                 window.previewChord(chord.globalIndex);
@@ -78,7 +78,7 @@ const ChordCard = memo(
 
             // Filter notes for this specific chord's step range
             return leadSheetMelody.filter(
-                (n) => n.globalStep >= chord.start && n.globalStep < chord.end,
+                (/** @type {any} */ n) => n.globalStep >= chord.start && n.globalStep < chord.end,
             );
         }, [leadSheetMelody, soloistStyle, chord.start, chord.end]);
 
@@ -98,7 +98,7 @@ const ChordCard = memo(
 
                 {sparklineNotes.length > 0 && (
                     <div className="sparkline-container">
-                        {sparklineNotes.map((n, i) => {
+                        {sparklineNotes.map((/** @type {any} */ n, /** @type {any} */ i) => {
                             // Normalize MIDI 48-84 to 0-100% height
                             const height = Math.min(100, Math.max(15, ((n.midi - 48) / 36) * 100));
                             return (
@@ -116,6 +116,9 @@ const ChordCard = memo(
     },
 );
 
+/**
+ * @param {Object} props
+ */
 export function ChordVisualizer() {
     const {
         progression,
@@ -147,8 +150,10 @@ export function ChordVisualizer() {
         let currentMeasureBeats = 0;
         let currentStep = 0;
 
-        progression.forEach((chord, i) => {
-            const sectionData = sectionsState.find((s) => s.id === chord.sectionId);
+        progression.forEach((/** @type {any} */ chord, /** @type {any} */ i) => {
+            const sectionData = sectionsState.find(
+                (/** @type {any} */ s) => s.id === chord.sectionId,
+            );
             const isSeamless = sectionData?.seamless;
             const isNewSection = !currentBlock || currentBlock.lastSectionId !== chord.sectionId;
 
@@ -242,7 +247,7 @@ export function ChordVisualizer() {
             ref={containerRef}
             data-total-measures={totalMeasures}
         >
-            {groupedSections.map((section) => (
+            {groupedSections.map((/** @type {any} */ section) => (
                 <div
                     key={section.id}
                     className="section-block"
@@ -255,27 +260,29 @@ export function ChordVisualizer() {
                         {formatUnicodeSymbols(section.label)}
                     </div>
                     <div className="section-block-content">
-                        {section.measures.map((measure, mIdx) => (
-                            <div key={mIdx} className="measure-box">
-                                {measure.sectionLabel && (
-                                    <div className="key-label">
-                                        {formatUnicodeSymbols(measure.sectionLabel)}
-                                    </div>
-                                )}
-                                {measure.chords.map((chord) => (
-                                    <ChordCard
-                                        key={chord.globalIndex}
-                                        chord={chord}
-                                        isActive={chord.globalIndex === lastActiveChordIndex}
-                                        totalMeasures={totalMeasures}
-                                        isMaximized={isMaximized}
-                                        notation={notation}
-                                        leadSheetMelody={leadSheetMelody}
-                                        soloistStyle={soloistStyle}
-                                    />
-                                ))}
-                            </div>
-                        ))}
+                        {section.measures.map(
+                            (/** @type {any} */ measure, /** @type {any} */ mIdx) => (
+                                <div key={mIdx} className="measure-box">
+                                    {measure.sectionLabel && (
+                                        <div className="key-label">
+                                            {formatUnicodeSymbols(measure.sectionLabel)}
+                                        </div>
+                                    )}
+                                    {measure.chords.map((/** @type {any} */ chord) => (
+                                        <ChordCard
+                                            key={chord.globalIndex}
+                                            chord={chord}
+                                            isActive={chord.globalIndex === lastActiveChordIndex}
+                                            totalMeasures={totalMeasures}
+                                            isMaximized={isMaximized}
+                                            notation={notation}
+                                            leadSheetMelody={leadSheetMelody}
+                                            soloistStyle={soloistStyle}
+                                        />
+                                    ))}
+                                </div>
+                            ),
+                        )}
                     </div>
                 </div>
             ))}

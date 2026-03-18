@@ -31,6 +31,9 @@ const DrumPadModal = lazy(() =>
  * @param {boolean} props.isOpen - Whether the modal is globally open
  * @param {import('preact').ComponentType} props.component - The modal component to render
  */
+/**
+ * @param {Object} props
+ */
 function AnimatedModalWrapper({ isOpen, component: Component }) {
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [isClosing, setIsClosing] = useState(false);
@@ -65,6 +68,9 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
 /**
  * Root component for all global modals.
  * Monitors global state to determine which modal to show.
+ */
+/**
+ * @param {Object} props
  */
 export function Modals() {
     // Get modal visibility state from global store

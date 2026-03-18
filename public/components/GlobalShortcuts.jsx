@@ -11,9 +11,12 @@ import { ACTIONS } from '../types.js';
  * Logic is kept direct and low-overhead for performance.
  * For a description of these shortcuts, see public/data/shortcut-config.js.
  */
+/**
+ * @param {Object} props
+ */
 export function GlobalShortcuts() {
     useEffect(() => {
-        const handleKeyDown = (e) => {
+        const handleKeyDown = (/** @type {any} */ e) => {
             const { playback, groove } = getState();
             const isTyping =
                 ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) ||
@@ -105,7 +108,7 @@ export function GlobalShortcuts() {
                 }
 
                 // Close any open modals
-                Object.keys(playback.modals).forEach((key) => {
+                Object.keys(playback.modals).forEach((/** @type {any} */ key) => {
                     if (playback.modals[key]) {
                         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });
                     }
@@ -113,7 +116,7 @@ export function GlobalShortcuts() {
             }
         };
 
-        const handleOpenEditor = (e) => {
+        const handleOpenEditor = (/** @type {any} */ e) => {
             const { sectionId } = e.detail || {};
             if (sectionId) {
                 import('../state.js').then(({ arranger }) => {

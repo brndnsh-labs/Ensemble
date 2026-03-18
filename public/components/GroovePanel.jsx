@@ -20,7 +20,9 @@ import { SettingRow, Slider, Toggle } from './UIControls.jsx';
  * @param {Object} props
  * @param {boolean} props.isActiveMobile
  */
-/** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function GroovePanel({ isActiveMobile }) {
     const { activeTab, enabled, measures, fillActive } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -40,7 +42,7 @@ export function GroovePanel({ isActiveMobile }) {
         }
 
         /** @param {MouseEvent} event */
-        const handleClickOutside = (event) => {
+        const handleClickOutside = (/** @type {any} */ event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setIsMenuOpen(false);
             }
@@ -53,7 +55,7 @@ export function GroovePanel({ isActiveMobile }) {
     }, [isMenuOpen]);
 
     /** @param {string} tab */
-    const switchTab = (tab) => {
+    const switchTab = (/** @type {any} */ tab) => {
         dispatch(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab });
         syncWorker();
         saveCurrentState();
@@ -193,6 +195,9 @@ export function GroovePanel({ isActiveMobile }) {
     );
 }
 
+/**
+ * @param {Object} props
+ */
 function IntensitySlider() {
     const { bandIntensity, autoIntensity } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -242,6 +247,9 @@ function IntensitySlider() {
     );
 }
 
+/**
+ * @param {Object} props
+ */
 function CreativityToggle() {
     const creativity = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.groove.creativity,
@@ -269,6 +277,9 @@ function CreativityToggle() {
     );
 }
 
+/**
+ * @param {Object} props
+ */
 function GenreSelector() {
     const { lastSmartGenre, pendingGenreFeel, genreSwitchCountdown } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -321,7 +332,7 @@ function GenreSelector() {
                 Genre
             </label>
             <div class="genre-selector">
-                {genres.map((genre) => {
+                {genres.map((/** @type {any} */ genre) => {
                     const isActive = genre === lastSmartGenre && !pendingGenreFeel;
                     const isPending = pendingGenreFeel && pendingGenreFeel.genreName === genre;
 

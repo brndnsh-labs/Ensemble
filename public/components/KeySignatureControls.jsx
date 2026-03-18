@@ -24,6 +24,9 @@ const GROUPING_OPTIONS = {
     ],
 };
 
+/**
+ * @param {Object} props
+ */
 export function KeySignatureControls() {
     const dispatch = useDispatch();
     const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset, isMaximized } =
@@ -36,7 +39,7 @@ export function KeySignatureControls() {
             isMaximized: s.vizState.isMaximized,
         }));
 
-    const handleKeyChange = (e) => {
+    const handleKeyChange = (/** @type {any} */ e) => {
         const newKey = e.target.value;
         import('../state.js').then(({ arranger }) => {
             arranger.key = newKey;
@@ -46,7 +49,7 @@ export function KeySignatureControls() {
         });
     };
 
-    const handleTimeSigChange = (e) => {
+    const handleTimeSigChange = (/** @type {any} */ e) => {
         const newTS = e.target.value;
         import('../state.js').then(({ arranger }) => {
             arranger.timeSignature = newTS;
@@ -68,7 +71,9 @@ export function KeySignatureControls() {
 
         import('../state.js').then(({ arranger }) => {
             const current = arranger.grouping || TIME_SIGNATURES[timeSignature].grouping;
-            const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
+            const currentIndex = options.findIndex(
+                (/** @type {any} */ opt) => opt.join('+') === current.join('+'),
+            );
             const nextIndex = (currentIndex + 1) % options.length;
 
             arranger.grouping = options[nextIndex];
@@ -101,7 +106,7 @@ export function KeySignatureControls() {
                     onChange={handleTimeSigChange}
                     aria-label="Time Signature"
                 >
-                    {timeSignatures.map((ts) => (
+                    {timeSignatures.map((/** @type {any} */ ts) => (
                         <option key={ts} value={ts}>
                             {ts}
                         </option>
@@ -136,7 +141,7 @@ export function KeySignatureControls() {
                 onChange={handleKeyChange}
                 aria-label="Select Key"
             >
-                {keys.map((k) => (
+                {keys.map((/** @type {any} */ k) => (
                     <option key={k} value={k}>
                         {formatUnicodeSymbols(k)}
                         {isMinor ? 'm' : ''}

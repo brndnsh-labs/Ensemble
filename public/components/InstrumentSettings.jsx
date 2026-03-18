@@ -13,7 +13,9 @@ import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.j
  * @param {Object} props
  * @param {any} props.module
  */
-/** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function InstrumentSettings({ module }) {
     const state = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
         const key = module === 'groove' ? 'groove' : module;
@@ -34,7 +36,7 @@ export function InstrumentSettings({ module }) {
                 : module;
 
     // Helper to update Volume/Reverb with audio ramping
-    const updateAudio = (type, val) => {
+    const updateAudio = (/** @type {string} */ type, /** @type {any} */ val) => {
         const numVal = parseFloat(val);
         const isReverb = type === 'reverb';
 
@@ -83,7 +85,7 @@ export function InstrumentSettings({ module }) {
                         <Select
                             id="densitySelect"
                             value={state.density || 'standard'}
-                            onChange={(val) => {
+                            onChange={(/** @type {any} */ val) => {
                                 dispatch(ACTIONS.SET_CHORD_DENSITY, val);
                                 saveCurrentState();
                             }}
@@ -101,7 +103,7 @@ export function InstrumentSettings({ module }) {
                         <Toggle
                             id="pianoRootsCheck"
                             checked={state.pianoRoots}
-                            onChange={(val) => {
+                            onChange={(/** @type {any} */ val) => {
                                 dispatch(ACTIONS.SET_PIANO_ROOTS, val);
                                 saveCurrentState();
                             }}
@@ -121,7 +123,7 @@ export function InstrumentSettings({ module }) {
                             max="1"
                             step="0.05"
                             value={state.complexity || 0.5}
-                            onInput={(val) => {
+                            onInput={(/** @type {any} */ val) => {
                                 dispatch(ACTIONS.SET_PARAM, {
                                     module: 'harmony',
                                     param: 'complexity',
@@ -147,7 +149,7 @@ export function InstrumentSettings({ module }) {
                                 max="1"
                                 step="0.05"
                                 value={state.complexity !== undefined ? state.complexity : 0.5}
-                                onInput={(val) => {
+                                onInput={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'soloist',
                                         param: 'complexity',
@@ -163,7 +165,7 @@ export function InstrumentSettings({ module }) {
                             <Select
                                 id="soloistPresetSelect"
                                 value={state.preset || 'classic'}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
                                     saveCurrentState();
                                 }}
@@ -181,7 +183,7 @@ export function InstrumentSettings({ module }) {
                             <Select
                                 id="soloistModeSelect"
                                 value={state.mode || 'monophonic'}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_SOLOIST_MODE, val);
                                     saveCurrentState();
                                 }}
@@ -211,7 +213,7 @@ export function InstrumentSettings({ module }) {
                         max="1"
                         step="0.05"
                         value={state.volume}
-                        onInput={(val) => updateAudio('volume', val)}
+                        onInput={(/** @type {any} */ val) => updateAudio('volume', val)}
                         ariaValueText={`${Math.round(state.volume * 100)}%`}
                     />
                 </SettingRow>
@@ -226,7 +228,7 @@ export function InstrumentSettings({ module }) {
                         max="1"
                         step="0.05"
                         value={state.reverb}
-                        onInput={(val) => updateAudio('reverb', val)}
+                        onInput={(/** @type {any} */ val) => updateAudio('reverb', val)}
                         ariaValueText={`${Math.round(state.reverb * 100)}%`}
                     />
                 </SettingRow>
@@ -238,6 +240,9 @@ export function InstrumentSettings({ module }) {
 /**
  * @param {Object} props
  * @param {any} props.state
+ */
+/**
+ * @param {Object} props
  */
 function GrooveControls({ state }) {
     const { swing, swingSub } = useEnsembleState(
@@ -256,7 +261,7 @@ function GrooveControls({ state }) {
                         min="0"
                         max="100"
                         value={swing || 0}
-                        onInput={(val) => {
+                        onInput={(/** @type {any} */ val) => {
                             dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
                             saveCurrentState();
                         }}
@@ -265,7 +270,7 @@ function GrooveControls({ state }) {
                     <Select
                         id="swingBaseSelect"
                         value={swingSub || '8th'}
-                        onChange={(val) => {
+                        onChange={(/** @type {any} */ val) => {
                             dispatch(ACTIONS.SET_SWING_SUB, val);
                             saveCurrentState();
                         }}
@@ -287,7 +292,7 @@ function GrooveControls({ state }) {
                     min="0"
                     max="100"
                     value={state.humanize || 0}
-                    onInput={(val) => {
+                    onInput={(/** @type {any} */ val) => {
                         dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
                         saveCurrentState();
                     }}
@@ -300,7 +305,7 @@ function GrooveControls({ state }) {
                     <Toggle
                         id="larsModeCheck"
                         checked={state.larsMode}
-                        onChange={(val) => {
+                        onChange={(/** @type {any} */ val) => {
                             dispatch(ACTIONS.SET_LARS_MODE, val);
                             saveCurrentState();
                         }}
@@ -317,7 +322,7 @@ function GrooveControls({ state }) {
                             min="0"
                             max="100"
                             value={Math.round(state.larsIntensity * 100)}
-                            onInput={(val) => {
+                            onInput={(/** @type {any} */ val) => {
                                 dispatch(ACTIONS.SET_LARS_INTENSITY, parseInt(val, 10) / 100);
                                 saveCurrentState();
                             }}

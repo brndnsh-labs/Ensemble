@@ -16,6 +16,9 @@ function useMobile() {
     return isMobile;
 }
 
+/**
+ * @param {Object} props
+ */
 export function DrumPadModal() {
     const modalRef = useRef(null);
     const isMobile = useMobile();
@@ -51,7 +54,7 @@ export function DrumPadModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'drumPad', open: false });
     };
 
-    const triggerDrum = (name) => {
+    const triggerDrum = (/** @type {string} */ name) => {
         dispatch(ACTIONS.INIT_AUDIO);
         dispatch(ACTIONS.RESTORE_GAINS);
         const { playback } = useEnsembleState.getState();
@@ -158,7 +161,7 @@ export function DrumPadModal() {
     const ALL_PADS = Object.values(PAD_GROUPS).flat();
 
     useEffect(() => {
-        const handleKeyDown = (e) => {
+        const handleKeyDown = (/** @type {any} */ e) => {
             if (modalRef.current?.closest('.closing')) {
                 return;
             }
@@ -181,23 +184,23 @@ export function DrumPadModal() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [velocity, autoVelocity]); // Re-bind if velocity or mode changes
 
-    const renderPad = (pad) => {
+    const renderPad = (/** @type {any} */ pad) => {
         const isActive = activePads.has(pad.name);
         return (
             <button
                 key={pad.name}
                 class={`drum-pad ${isActive ? 'active' : ''}`}
-                onPointerDown={(e) => {
+                onPointerDown={(/** @type {any} */ e) => {
                     e.preventDefault();
                     triggerDrum(pad.name);
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(/** @type {any} */ e) => {
                     if (!isActive) {
                         e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
                         e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
                     }
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(/** @type {any} */ e) => {
                     if (!isActive) {
                         e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
                         e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
@@ -239,7 +242,7 @@ export function DrumPadModal() {
         <div ref={modalRef} tabIndex={0} class="modal-overlay active" onClick={close}>
             <div
                 class="modal PerformanceSurfaceModal"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(/** @type {any} */ e) => e.stopPropagation()}
                 style={
                     isMobile
                         ? 'width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius: 0; border: none; padding: 0;'
@@ -265,7 +268,7 @@ export function DrumPadModal() {
                     <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2.5rem; align-items: center; width: 100%;">
                         {/* Upper Deck */}
                         <div style="display: flex; gap: 1rem; justify-content: center; width: 100%; max-width: 500px;">
-                            {PAD_GROUPS.upper.map((pad) => (
+                            {PAD_GROUPS.upper.map((/** @type {any} */ pad) => (
                                 <div
                                     key={pad.name}
                                     style="flex: 1; min-width: 80px; max-width: 120px;"
@@ -278,14 +281,14 @@ export function DrumPadModal() {
                         {/* Home Row: Left & Right */}
                         <div style="display: flex; gap: 2rem; justify-content: center; width: 100%; max-width: 600px;">
                             <div style="display: flex; gap: 1rem; flex: 1; justify-content: flex-end;">
-                                {PAD_GROUPS.left.map((pad) => (
+                                {PAD_GROUPS.left.map((/** @type {any} */ pad) => (
                                     <div key={pad.name} style="width: 100%; max-width: 120px;">
                                         {renderPad(pad)}
                                     </div>
                                 ))}
                             </div>
                             <div style="display: flex; gap: 1rem; flex: 1.5; justify-content: flex-start;">
-                                {PAD_GROUPS.right.map((pad) => (
+                                {PAD_GROUPS.right.map((/** @type {any} */ pad) => (
                                     <div key={pad.name} style="width: 100%; max-width: 120px;">
                                         {renderPad(pad)}
                                     </div>
@@ -298,11 +301,11 @@ export function DrumPadModal() {
                             <div style="width: 100%; max-width: 400px; height: 80px;">
                                 <button
                                     class={`drum-pad ${activePads.has('Kick') ? 'active' : ''}`}
-                                    onPointerDown={(e) => {
+                                    onPointerDown={(/** @type {any} */ e) => {
                                         e.preventDefault();
                                         triggerDrum('Kick');
                                     }}
-                                    onMouseEnter={(e) => {
+                                    onMouseEnter={(/** @type {any} */ e) => {
                                         if (!activePads.has('Kick')) {
                                             e.currentTarget.style.background =
                                                 'rgba(255,255,255,0.1)';
@@ -310,7 +313,7 @@ export function DrumPadModal() {
                                                 'rgba(255,255,255,0.3)';
                                         }
                                     }}
-                                    onMouseLeave={(e) => {
+                                    onMouseLeave={(/** @type {any} */ e) => {
                                         if (!activePads.has('Kick')) {
                                             e.currentTarget.style.background =
                                                 'rgba(255,255,255,0.05)';
@@ -390,7 +393,9 @@ export function DrumPadModal() {
                                             min="10"
                                             max="150"
                                             value={Math.round(velocity * 100)}
-                                            onInput={(val) => setVelocity(parseInt(val, 10) / 100)}
+                                            onInput={(/** @type {any} */ val) =>
+                                                setVelocity(parseInt(val, 10) / 100)
+                                            }
                                             disabled={autoVelocity}
                                         />
                                     </div>{' '}
