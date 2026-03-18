@@ -135,7 +135,7 @@ function calculateChromagramStandalone(signal, sampleRate, options, pitchFrequen
         let imag = 0;
         let cosDelta, sinDelta;
 
-        if (useTrigCache) {
+        if (useTrigCache && options.buffers) {
             cosDelta = options.buffers.cosTable[pfIdx];
             sinDelta = options.buffers.sinTable[pfIdx];
         } else {
@@ -276,6 +276,7 @@ export class ChordAnalyzerLite {
     /**
      * Identifies the global key and tuning offset of the audio.
      * Includes a high-res rotation check to handle tuning drift.
+     * @param {Float32Array} totalChroma
      * @returns {{root: number, type: string, tuningOffset: number}}
      */
     identifyGlobalKey(totalChroma) {
@@ -292,7 +293,9 @@ export class ChordAnalyzerLite {
                 for (const type of KEY_TYPES) {
                     let score = 0;
                     for (let i = 0; i < 12; i++) {
-                        score += rotatedChroma[(root + i) % 12] * this.keyProfiles[type][i];
+                        score +=
+                            rotatedChroma[(root + i) % 12] *
+                            /** @type {any} */ (this.keyProfiles)[type][i];
                     }
 
                     // Bias towards zero tuning offset (favors standard 440Hz)
@@ -319,6 +322,7 @@ export class ChordAnalyzerLite {
     /**
      * Identifies the key from a chromagram without tuning search.
      * Used for fast local key estimation during analysis.
+     * @param {Float32Array} chroma
      * @returns {{root: number, type: string, score: number}}
      */
     identifySimpleKey(chroma) {
@@ -330,7 +334,8 @@ export class ChordAnalyzerLite {
             for (const type of KEY_TYPES) {
                 let score = 0;
                 for (let i = 0; i < 12; i++) {
-                    score += chroma[(root + i) % 12] * this.keyProfiles[type][i];
+                    score +=
+                        chroma[(root + i) % 12] * /** @type {any} */ (this.keyProfiles)[type][i];
                 }
 
                 // Bias (same as Global)
@@ -579,6 +584,7 @@ export class ChordAnalyzerLite {
         for (let i = 0; i < results.length; i++) {
             // Sliding window: [Previous, Current, Next]
             const window = results.slice(max(0, i - 1), min(results.length, i + 2));
+            /** @type {Record<string, number>} */
             const counts = {};
 
             window.forEach((/** @type {{chord: string}} */ r) => {
@@ -631,7 +637,7 @@ export class ChordAnalyzerLite {
         }
 
         // Cleanup large local references to assist GC
-        fullSignal = null;
+        /** @type {any} */ (fullSignal) = null;
 
         return {
             chords: smoothed,
@@ -955,6 +961,7 @@ export class ChordAnalyzerLite {
 
         // 2. Generate Structural BPM Candidates (Top-Down)
         // If the user meant 120BPM for a 16-bar phrase, it's 32.0s exactly.
+        /** @type {any[]} */
         const structuralCandidates = [];
         const commonBarCounts = [4, 8, 12, 16, 24, 32, 48, 64];
         const commonMeters = [4, 3];
@@ -1039,7 +1046,7 @@ export class ChordAnalyzerLite {
         }
 
         // Harmonic Check: Detect if we picked a "sub-beat" pulse (too fast) or "measure" pulse (too slow)
-        const checkHarmonic = (targetLag) => {
+        const checkHarmonic = (/** @type {number} */ targetLag) => {
             let currentLag = targetLag;
 
             // 1. Check for slower tempos (downward)
@@ -1123,6 +1130,7 @@ export class ChordAnalyzerLite {
             // 2. Otherwise, check if the RAW primary BPM matches a structural anchor for the FULL duration
             // This handles perfectly trimmed loops where tail-trimming might be too aggressive.
             const fullDuration = rawEndTime - startTime;
+            /** @type {any[]} */
             const structuralCandidatesFull = [];
             [4, 8, 12, 16, 24, 32, 48, 64].forEach((/** @type {number} */ bars) => {
                 [4, 3].forEach((/** @type {number} */ meter) => {
@@ -1208,7 +1216,7 @@ export class ChordAnalyzerLite {
             }
         }
 
-        lastSpectrum = null;
+        lastSpectrum = /** @type {any} */ (null);
 
         let finalBpm = candidates[0]?.bpm || primaryBPM;
         // Near-integer rounding (e.g. 119.78 -> 120)
@@ -1226,6 +1234,7 @@ export class ChordAnalyzerLite {
 
     /**
      * Extracts the single strongest note from a bass-specific chromagram.
+     * @param {Float32Array} bassChroma
      */
     getStrongestBassNote(bassChroma) {
         let maxBass = 0;
@@ -1242,6 +1251,9 @@ export class ChordAnalyzerLite {
     /**
      * Calculates energy in 12 semitone bins using a bank of targeted
      * single-frequency filters with Hann windowing and Harmonic Suppression.
+     * @param {Float32Array} signal
+     * @param {number} sampleRate
+     * @param {ChromagramOptions} [options={}]
      */
     calculateChromagram(signal, sampleRate, options = {}) {
         return calculateChromagramStandalone(signal, sampleRate, options, this.pitchFrequencies);
@@ -1264,7 +1276,7 @@ export class ChordAnalyzerLite {
                 for (let i = 0; i < 12; i++) {
                     const chromaIdx = (root + i) % 12;
                     const val = chroma[chromaIdx];
-                    if (typedProfile[i]) {
+                    if (/** @type {any} */ (profile)[i]) {
                         let effectiveVal = val;
                         if (
                             val < 0.1 &&
@@ -1274,7 +1286,7 @@ export class ChordAnalyzerLite {
                             effectiveVal = options.bassChroma[chromaIdx];
                         }
 
-                        score += effectiveVal * profile[i];
+                        score += effectiveVal * /** @type {any} */ (profile)[i];
                         if (effectiveVal < 0.1) {
                             score -= 2.0; // Penalty for missing a required note
                         }
