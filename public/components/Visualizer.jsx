@@ -52,7 +52,8 @@ export function Visualizer({ enabled, getVisualTime }) {
         const viz = new UnifiedVisualizer(canvasRef.current, staticCanvasRef.current);
         const style = getComputedStyle(document.documentElement);
 
-        const resolve = (v, fallback) => style.getPropertyValue(v).trim() || fallback;
+        const resolve = (/** @type {any} */ v, /** @type {any} */ fallback) =>
+            style.getPropertyValue(v).trim() || fallback;
 
         viz.addTrack('bass', 'var(--success-color)', resolve('--success-color', '#22c55e'));
         viz.addTrack('soloist', 'var(--soloist-color)', resolve('--soloist-color', '#3b82f6'));
@@ -68,7 +69,9 @@ export function Visualizer({ enabled, getVisualTime }) {
         }
 
         // Initial Theme
-        updateTheme(viz);
+        if (vizRef.current) {
+            updateTheme(vizRef.current);
+        }
 
         return () => {
             if (vizRef.current) {
@@ -87,7 +90,7 @@ export function Visualizer({ enabled, getVisualTime }) {
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 const { width, height } = entry.contentRect;
-                if (width > 0 && height > 0) {
+                if (width > 0 && height > 0 && vizRef.current) {
                     vizRef.current.resize(width, height, window.devicePixelRatio || 1);
                 }
             }
@@ -98,6 +101,7 @@ export function Visualizer({ enabled, getVisualTime }) {
     }, []);
 
     // Helper to extract theme colors for the worker
+    /** @param {import('../visualizer-proxy.js').UnifiedVisualizer|null} viz */
     const updateTheme = (viz) => {
         if (!viz) {
             return;
@@ -144,7 +148,9 @@ export function Visualizer({ enabled, getVisualTime }) {
     // Update worker loop parameters
     useEffect(() => {
         if (vizRef.current) {
-            const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
+            /** @type {any} */
+            const signatures = TIME_SIGNATURES;
+            const ts = signatures[timeSignature] || signatures['4/4'];
             vizRef.current.render(0, bpm, ts); // Note: 0 is ignored by worker loop, but triggers param update
         }
     }, [bpm, timeSignature]);
@@ -190,7 +196,7 @@ export function Visualizer({ enabled, getVisualTime }) {
             /** @type {import('../state.js').StateMap} */
             const typedStateMap = stateMap;
             const now = getVisualTime(typedStateMap);
-            if (enabled) {
+            if (enabled && vizRef.current) {
                 vizRef.current.syncClock(now, performance.now());
             }
 
@@ -200,14 +206,17 @@ export function Visualizer({ enabled, getVisualTime }) {
                     chords.lastActiveChordIndex = null; // @direct-mutation
                     dispatch('VIS_RESET');
                 }
-                if (enabled) {
+                if (enabled && vizRef.current) {
                     vizRef.current.clear();
                 }
                 loopRef.current = requestAnimationFrame(loop);
                 return;
             }
 
-            while (playback.drawQueue.length > 0 && playback.drawQueue[0].time < now - 2.0) {
+            while (
+                playback.drawQueue.length > 0 &&
+                /** @type {any} */ (playback.drawQueue[0]).time < now - 2.0
+            ) {
                 playback.drawQueue.shift(); // @direct-mutation
             }
             if (playback.drawQueue.length > 300) {
@@ -215,9 +224,16 @@ export function Visualizer({ enabled, getVisualTime }) {
             }
             const spm = getStepsPerMeasure(arranger.timeSignature);
 
-            while (playback.drawQueue.length && playback.drawQueue[0].time <= now) {
+            while (
+                playback.drawQueue.length &&
+                /** @type {any} */ (playback.drawQueue[0]).time <= now
+            ) {
                 /** @type {any} */
                 const ev = playback.drawQueue.shift(); // @direct-mutation
+                if (!ev) {
+                    continue;
+                }
+
                 if (ev.type === 'drum_vis') {
                     const stepMeasure = Math.floor(ev.step / spm);
                     if (
@@ -234,38 +250,38 @@ export function Visualizer({ enabled, getVisualTime }) {
                         chords.lastActiveChordIndex = ev.index; // @direct-mutation
                         dispatch('VIS_UPDATE', { type: 'chord', index: ev.index });
                     }
-                    if (enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing && vizRef.current) {
                         ev.notes = ev.chordNotes;
                         vizRef.current.pushChord(ev);
                     }
                 } else if (ev.type === 'bass_vis') {
-                    if (enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing && vizRef.current) {
                         ev.noteName = ev.name;
                         vizRef.current.pushNote('bass', ev);
                     }
                 } else if (ev.type === 'soloist_vis') {
-                    if (enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing && vizRef.current) {
                         vizRef.current.truncateNotes('soloist', ev.time);
                         ev.noteName = ev.name;
                         vizRef.current.pushNote('soloist', ev);
                     }
                 } else if (ev.type === 'harmony_vis') {
-                    if (enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing && vizRef.current) {
                         ev.noteName = ev.name;
                         vizRef.current.pushNote('harmony', ev);
                     }
                 } else if (ev.type === 'drums_vis') {
-                    if (enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing && vizRef.current) {
                         vizRef.current.pushNote('drums', ev);
                     }
                 } else if (ev.type === 'fill_active') {
-                    if (enabled && playback.isDrawing) {
+                    if (enabled && playback.isDrawing && vizRef.current?.worker) {
                         vizRef.current.worker.postMessage({ type: 'SET_FILL', active: ev.active });
                     }
                 }
             }
 
-            if (enabled && playback.isDrawing) {
+            if (enabled && playback.isDrawing && vizRef.current) {
                 vizRef.current.setRegister('bass', bass.octave);
                 vizRef.current.setRegister('soloist', soloist.octave);
                 vizRef.current.setRegister('chords', chords.octave);
