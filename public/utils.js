@@ -6,7 +6,9 @@ import { ENHARMONIC_MAP } from './config.js';
  * @returns {string} The normalized note name.
  */
 export function normalizeKey(k) {
-    return ENHARMONIC_MAP[k] || k;
+    /** @type {any} */
+    const map = ENHARMONIC_MAP;
+    return map[k] || k;
 }
 
 const REGEX_AMP = /&/g;
@@ -120,11 +122,9 @@ export function generateId() {
  * Calculates MIDI notes for specific scale degrees (Full 10-note scale)
  * based on a given chord object.
  *
- * @param {{ rootMidi: number, quality?: string }} chordObj - The chord object containing rootMidi and quality.
- * @param {number} baseOctave - The default octave to use (default: 4 for Soloist).
+ * @param {any} chordObj - The chord object containing rootMidi and quality.
+ * @param {number} [baseOctave] - The default octave to use (default: 4 for Soloist).
  * @returns {number[]} Array of 10 MIDI note numbers.
- *                     [0-4]: Odd degrees (1, 3, 5, 7, 9)
- *                     [5-9]: Even degrees (2, 4, 6, 8, 10)
  */
 export function getChordMidiNotes(chordObj, baseOctave = 4) {
     if (!chordObj || typeof chordObj.rootMidi !== 'number' || !Number.isFinite(chordObj.rootMidi)) {
@@ -328,9 +328,9 @@ export function binarySearchMap(mapArray, step) {
 /**
  * Returns detailed structural information about a specific step in a measure.
  * @param {number} step - The global step counter.
- * @param {string | { tsName?: string, beats: number, stepsPerBeat: number, grouping?: number[], backbeat?: number[], isCompound?: boolean }} tsConfig - The global time signature configuration (fallback).
- * @param {Array<{start: number, end: number, ts: string}>} [measureMap] - Optional map of measure boundaries for variable time signatures.
- * @param {Record<string, { tsName?: string, beats: number, stepsPerBeat: number, grouping?: number[], backbeat?: number[], isCompound?: boolean }>} [allTSConfigs] - Map of all available time signature configurations.
+ * @param {any} tsConfig - The global time signature configuration (fallback).
+ * @param {Array<any>} [measureMap] - Optional map of measure boundaries for variable time signatures.
+ * @param {any} [allTSConfigs] - Map of all available time signature configurations.
  * @returns {import('./types.js').StepInfo}
  */
 export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
@@ -550,7 +550,7 @@ export function clampFreq(freq, max = 24000) {
 /**
  * Calculates a unified timing offset for an instrument based on the global pocket state.
  * @param {string} instrument - 'drums', 'bass', 'chords', or 'soloist'.
- * @param {import('./state/groove.js').GrooveState['pocket']} pocket - The global pocket state.
+ * @param {any} pocket - The global pocket state.
  * @param {number} intensity - Current band intensity.
  * @returns {number} Offset in seconds.
  */
@@ -561,11 +561,11 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
 
     // 1. Global Drive (The whole band pushes or pulls)
     // Scale: 1.0 drive = -12ms (ahead), -1.0 drive = +12ms (behind)
-    const driveBase = -(pocket.globalDrive * 0.012);
+    const driveBase = -(/** @type {any} */ (pocket.globalDrive * 0.012));
 
     // 2. Tightness (Inverse variance)
     // High tightness (1.0) = no random jitter. Low tightness (0.0) = ±8ms jitter.
-    const jitter = (1.0 - pocket.tightness) * (Math.random() - 0.5) * 0.016;
+    const jitter = (1.0 - /** @type {any} */ (pocket).tightness) * (Math.random() - 0.5) * 0.016;
 
     let instrumentSpecific = 0;
 
@@ -580,17 +580,17 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
         case 'bass':
             // Bass follows Kick. High gravity = perfectly with Kick.
             // Low gravity = adds 'human' displacement (usually laid back).
-            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.008;
+            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).bassGravity) * 0.008;
             break;
         case 'chords':
             // Chords follow Bass.
-            instrumentSpecific += (1.0 - pocket.chordGravity) * 0.006;
+            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).chordGravity) * 0.006;
             // Inherit 30% of the bass's expected displacement for cohesion
-            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.003;
+            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).bassGravity) * 0.003;
             break;
         case 'soloist':
             // Soloist is the most elastic, but still feels the 'pull' of the band.
-            instrumentSpecific += (1.0 - pocket.soloistGravity) * 0.012;
+            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).soloistGravity) * 0.012;
             break;
     }
 

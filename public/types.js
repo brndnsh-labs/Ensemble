@@ -51,6 +51,10 @@
  * @property {boolean} isBeatStart - True if the step is on a beat boundary.
  * @property {boolean} isBackbeat - True if the step is on a semantic backbeat (e.g., 2 & 4).
  * @property {boolean} isGroupStart - True if the step is on a rhythmic group boundary (e.g., 1 & 3).
+ * @property {boolean} isOffbeat - True if the step is on an 8th-note offbeat.
+ * @property {boolean} isEOfBeat - True if the step is on the "e" of a 16th-note beat.
+ * @property {boolean} isAOfBeat - True if the step is on the "a" of a 16th-note beat.
+ * @property {boolean} [isCompound] - True if the time signature is compound (e.g., 6/8).
  * @property {number} beatIndex - 0-indexed beat number within the measure.
  * @property {number} mStep - 0-indexed step within the current measure.
  */
