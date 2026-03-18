@@ -15,7 +15,12 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ## 2. Core Protocols
 
-### A. Refactoring & File Movements
+### A. Infrastructure & Dependencies
+*   **Strict Package Manager:** This project is **strictly npm-based**. Use `npm install` for dependencies.
+*   **Lockfile Integrity:** ALWAYS preserve `package-lock.json`. **NEVER** create or commit `pnpm-lock.yaml`, `yarn.lock`, or other alternative lockfiles.
+*   **Node.js Version:** Use the engine version specified in `package.json` (if any).
+
+### B. Refactoring & File Movements
 *   **Global Search is Mandatory:** Before moving a function or constant, search the **entire** codebase (including `tests/` and `scripts/`) for usages.
 *   **Update Imports Immediately:** Do not rely on IDE auto-imports. Manually verify and update import paths in all consuming files.
 *   **Verify Exports:** Ensure symbols are properly exported and check for circular dependencies.
