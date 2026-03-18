@@ -3,6 +3,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { skipWaiting } from '../pwa.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
+/**
+ * @param {Object} props
+ */
 export function PWAUpdateBanner() {
     const updateAvailable = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.updateAvailable,

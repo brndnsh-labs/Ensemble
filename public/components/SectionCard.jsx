@@ -85,7 +85,7 @@ export const SectionCard = forwardRef(({ section, index, totalSections }, ref) =
         e.currentTarget.classList.remove('drag-over');
     };
 
-    const handleDrop = (e) => {
+    const handleDrop = (/** @type {Event} */ e) => {
         e.preventDefault();
         e.currentTarget.classList.remove('drag-over');
         const draggedId = e.dataTransfer.getData('text/plain');

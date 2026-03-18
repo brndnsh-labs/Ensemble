@@ -2,6 +2,9 @@ import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
+/**
+ * @param {Object} props
+ */
 export function NotificationLayer() {
     const notifications = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.notifications,

@@ -210,7 +210,7 @@ export function Settings() {
                             <Toggle
                                 id="metronomeCheck"
                                 checked={metronome}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_METRONOME, val);
                                     saveCurrentState();
                                 }}
@@ -221,7 +221,7 @@ export function Settings() {
                             <Toggle
                                 id="countInCheck"
                                 checked={countIn}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'countIn',
@@ -236,7 +236,7 @@ export function Settings() {
                             <Toggle
                                 id="practiceModeCheck"
                                 checked={practiceMode}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'practiceMode',
@@ -254,7 +254,7 @@ export function Settings() {
                             <Select
                                 id="themeSelect"
                                 value={theme}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     applyTheme(val);
                                     saveCurrentState();
                                 }}
@@ -270,7 +270,7 @@ export function Settings() {
                             <Select
                                 id="notationSelect"
                                 value={notation}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_NOTATION, val);
                                     saveCurrentState();
                                 }}
@@ -286,7 +286,7 @@ export function Settings() {
                             <Toggle
                                 id="visualFlashCheck"
                                 checked={visualFlash}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'visualFlash',
@@ -301,7 +301,7 @@ export function Settings() {
                             <Toggle
                                 id="hapticCheck"
                                 checked={haptic}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'haptic',
@@ -339,7 +339,7 @@ export function Settings() {
                                     <Toggle
                                         id="sessionTimerCheck"
                                         checked={songMode}
-                                        onChange={(val) => {
+                                        onChange={(/** @type {any} */ val) => {
                                             dispatch(ACTIONS.SET_SONG_MODE, val);
                                             saveCurrentState();
                                         }}
@@ -459,7 +459,7 @@ export function Settings() {
                             <Toggle
                                 id="applyPresetSettingsCheck"
                                 checked={applyPresetSettings}
-                                onChange={(val) => {
+                                onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_PRESET_SETTINGS_MODE, val);
                                     saveCurrentState();
                                 }}
@@ -486,7 +486,7 @@ export function Settings() {
                                 <Toggle
                                     id="midiMuteLocalCheck"
                                     checked={midiMuteLocal}
-                                    onChange={(val) => {
+                                    onChange={(/** @type {any} */ val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             muteLocal: val,
                                         });
@@ -500,7 +500,7 @@ export function Settings() {
                                 <Select
                                     id="midiOutputSelect"
                                     value={midiSelectedOutputId || ''}
-                                    onChange={(val) => {
+                                    onChange={(/** @type {any} */ val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             selectedOutputId: val,
                                         });

@@ -23,6 +23,9 @@ function useMobile() {
     return isMobile;
 }
 
+/**
+ * @param {Object} props
+ */
 export function PerformanceModal() {
     const modalRef = useRef(null);
     const [currentNoteName, setCurrentNoteName] = useState('');
@@ -219,7 +222,7 @@ export function PerformanceModal() {
     };
 
     useEffect(() => {
-        const handleKeyDown = (e) => {
+        const handleKeyDown = (/** @type {KeyboardEvent} */ e) => {
             // Ignore if we are closing (AnimatedModalWrapper adds .closing)
             if (modalRef.current?.closest('.closing')) {
                 return;
@@ -286,7 +289,7 @@ export function PerformanceModal() {
             }
         };
 
-        const handleKeyUp = (e) => {
+        const handleKeyUp = (/** @type {KeyboardEvent} */ e) => {
             const key = e.key.toLowerCase();
             stopNote(key);
         };
@@ -667,7 +670,7 @@ export function PerformanceModal() {
                         modalRef.current.focus({ preventScroll: true });
                     }
                 }}
-                onClick={(e) => {
+                onClick={(/** @type {Event} */ e) => {
                     e.stopPropagation();
                 }}
                 style={

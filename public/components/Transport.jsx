@@ -6,9 +6,12 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
+/**
+ * @param {Object} props
+ */
 export function Transport() {
     const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode, larsMode, larsBpmOffset } =
-        useEnsembleState((state) => ({
+        useEnsembleState((/** @type {import('../types.js').EnsembleState} */ state) => ({
             isPlaying: state.playback.isPlaying,
             bpm: state.playback.bpm,
             sessionTimer: state.playback.sessionTimer,
@@ -39,6 +42,8 @@ export function Transport() {
     }
 
     useEffect(() => {
+        /** @type {number | NodeJS.Timeout} */
+        /** @type {number | NodeJS.Timeout} */
         let interval;
         if (isPlaying && songMode && sessionTimer > 0 && sessionStartTime) {
             const updateTimer = () => {

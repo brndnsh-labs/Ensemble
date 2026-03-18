@@ -117,6 +117,8 @@ export function SequencerGrid() {
         }
 
         let lastStep = -1;
+        /** @type {number} */
+        /** @type {number} */
         let frameId;
 
         const loop = () => {

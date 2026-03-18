@@ -7,6 +7,9 @@ import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function StyleSelector({ module, styles }) {
     const dispatch = useDispatch();
 
@@ -21,7 +24,7 @@ export function StyleSelector({ module, styles }) {
         return modState.state?.style || modState.style;
     });
 
-    const onSelect = (styleId) => {
+    const onSelect = (/** @type {string} */ styleId) => {
         dispatch(ACTIONS.SET_STYLE, { module, style: styleId });
 
         if (styleId !== 'smart') {

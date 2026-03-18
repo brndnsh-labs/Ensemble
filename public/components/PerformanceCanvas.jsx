@@ -247,6 +247,7 @@ export function PerformanceCanvas({
     }, []);
 
     useEffect(() => {
+        /** @type {number} */
         let frameId;
         const loop = () => {
             render();

@@ -8,6 +8,9 @@ import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
+/**
+ * @param {Object} props
+ */
 export function ShareModal() {
     const isOpen = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.share,

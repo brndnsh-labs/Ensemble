@@ -5,6 +5,9 @@ import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { ButtonGroup } from './UIControls.jsx';
 
+/**
+ * @param {Object} props
+ */
 export function SoloistSmartTab() {
     const { tradeMode } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({

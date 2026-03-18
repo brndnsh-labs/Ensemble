@@ -4,6 +4,9 @@ import { Fragment, h } from 'preact';
  * SettingGroup wraps a set of related settings with a consistent title and spacing.
  */
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function SettingGroup({ title, children, style = '', className = '' }) {
     return (
         <div class={`setting-group ${className}`} style={style}>
@@ -18,6 +21,9 @@ export function SettingGroup({ title, children, style = '', className = '' }) {
  * [ Label + Description ] [ Control Element ]
  */
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function SettingRow({ label, description, children, valueDisplay, id }) {
     return (
         <div class="setting-row">
@@ -39,6 +45,9 @@ export function SettingRow({ label, description, children, valueDisplay, id }) {
  * Reusable Toggle (Switch) component.
  */
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function Toggle({ id, checked, onChange, ariaLabel, label }) {
     return (
         <label class="toggle-switch" htmlFor={id}>
@@ -59,6 +68,9 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
  * Reusable Slider component.
  */
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValueText, disabled }) {
     return (
         <input
@@ -80,6 +92,9 @@ export function Slider({ id, min, max, step, value, onInput, ariaLabel, ariaValu
  * Reusable Select component.
  */
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function Select({ id, value, onChange, options, ariaLabel }) {
     return (
         <select
@@ -88,7 +103,7 @@ export function Select({ id, value, onChange, options, ariaLabel }) {
             onChange={(e) => onChange(e.target.value)}
             aria-label={ariaLabel || id}
         >
-            {options.map((opt) => (
+            {options.map((/** @type {any} */ opt) => (
                 <option key={opt.value} value={opt.value}>
                     {opt.label}
                 </option>
@@ -151,10 +166,13 @@ export function Stepper({
 /**
  * Reusable ButtonGroup for mutually exclusive options (chips).
  */
+/**
+ * @param {Object} props
+ */
 export function ButtonGroup({ options, value, onChange, className = '', style = {} }) {
     return (
         <div class={`flex-row ${className}`} style={{ gap: '0.25rem', ...style }}>
-            {options.map((opt) => (
+            {options.map((/** @type {any} */ opt) => (
                 <button
                     key={opt.value}
                     class={`chip-btn ${value === opt.value ? 'active' : ''}`}

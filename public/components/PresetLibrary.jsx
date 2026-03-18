@@ -11,6 +11,9 @@ import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.j
 import { syncWorker } from '../worker-client.js';
 
 /** @param {any} props */
+/**
+ * @param {Object} props
+ */
 export function PresetLibrary({ type }) {
     const dispatch = useDispatch();
     const { lastChordPreset, lastDrumPreset, isDirty } = useEnsembleState(
@@ -178,7 +181,7 @@ export function PresetLibrary({ type }) {
         }
     };
 
-    const handleDelete = (e, index) => {
+    const handleDelete = (/** @type {Event} */ e, /** @type {number} */ index) => {
         e.stopPropagation();
         if (confirmDelete !== index) {
             setConfirmDelete(index);
