@@ -43,7 +43,21 @@ export function GenerateSongModal() {
     const [confirmTemplate, setConfirmTemplate] = useState(null);
     const [confirmGen, setConfirmGen] = useState(false);
 
+    const confirmTemplateTimerRef = useRef(null);
+    const confirmGenTimerRef = useRef(null);
+
     const prevOpenRef = useRef(false);
+
+    useEffect(() => {
+        return () => {
+            if (confirmTemplateTimerRef.current) {
+                clearTimeout(confirmTemplateTimerRef.current);
+            }
+            if (confirmGenTimerRef.current) {
+                clearTimeout(confirmGenTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (isOpen && !prevOpenRef.current) {
@@ -85,9 +99,18 @@ export function GenerateSongModal() {
     const applyTemplate = (template) => {
         if (confirmTemplate !== template.name) {
             setConfirmTemplate(template.name);
+            if (confirmTemplateTimerRef.current) {
+                clearTimeout(confirmTemplateTimerRef.current);
+            }
+            confirmTemplateTimerRef.current = setTimeout(() => {
+                setConfirmTemplate(null);
+            }, 3000);
             return;
         }
         setConfirmTemplate(null);
+        if (confirmTemplateTimerRef.current) {
+            clearTimeout(confirmTemplateTimerRef.current);
+        }
 
         try {
             pushHistory();
@@ -131,10 +154,19 @@ export function GenerateSongModal() {
         if (isDirty && sections.length > 1) {
             if (!confirmGen) {
                 setConfirmGen(true);
+                if (confirmGenTimerRef.current) {
+                    clearTimeout(confirmGenTimerRef.current);
+                }
+                confirmGenTimerRef.current = setTimeout(() => {
+                    setConfirmGen(false);
+                }, 3000);
                 return;
             }
         }
         setConfirmGen(false);
+        if (confirmGenTimerRef.current) {
+            clearTimeout(confirmGenTimerRef.current);
+        }
 
         try {
             let seed = null;

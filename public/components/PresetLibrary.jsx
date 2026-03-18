@@ -1,5 +1,5 @@
 import { Fragment, h } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { validateAndAnalyze } from '../arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
@@ -21,6 +21,20 @@ export function PresetLibrary({ type }) {
     const [userPresets, setUserPresets] = useState([]);
     const [confirmSelect, setConfirmSelect] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
+
+    const confirmSelectTimerRef = useRef(null);
+    const confirmDeleteTimerRef = useRef(null);
+
+    useEffect(() => {
+        return () => {
+            if (confirmSelectTimerRef.current) {
+                clearTimeout(confirmSelectTimerRef.current);
+            }
+            if (confirmDeleteTimerRef.current) {
+                clearTimeout(confirmDeleteTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
@@ -57,10 +71,23 @@ export function PresetLibrary({ type }) {
                 const itemId = item.id || item.name;
                 if (confirmSelect !== itemId) {
                     setConfirmSelect(itemId);
+                    if (confirmSelectTimerRef.current) {
+                        clearTimeout(confirmSelectTimerRef.current);
+                    }
+                    confirmSelectTimerRef.current = setTimeout(() => {
+                        setConfirmSelect(null);
+                    }, 3000);
+
                     setConfirmDelete(null); // Clear other
+                    if (confirmDeleteTimerRef.current) {
+                        clearTimeout(confirmDeleteTimerRef.current);
+                    }
                     return;
                 }
                 setConfirmSelect(null);
+                if (confirmSelectTimerRef.current) {
+                    clearTimeout(confirmSelectTimerRef.current);
+                }
             }
 
             const newSections = isUser
@@ -179,10 +206,23 @@ export function PresetLibrary({ type }) {
         e.stopPropagation();
         if (confirmDelete !== index) {
             setConfirmDelete(index);
+            if (confirmDeleteTimerRef.current) {
+                clearTimeout(confirmDeleteTimerRef.current);
+            }
+            confirmDeleteTimerRef.current = setTimeout(() => {
+                setConfirmDelete(null);
+            }, 3000);
+
             setConfirmSelect(null); // Clear other
+            if (confirmSelectTimerRef.current) {
+                clearTimeout(confirmSelectTimerRef.current);
+            }
             return;
         }
         setConfirmDelete(null);
+        if (confirmDeleteTimerRef.current) {
+            clearTimeout(confirmDeleteTimerRef.current);
+        }
 
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
         const updated = [...userPresets];
