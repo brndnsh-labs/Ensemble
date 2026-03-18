@@ -1,5 +1,6 @@
 import { getState, storage } from './state.js';
 
+/** @type {ReturnType<typeof setTimeout> | undefined} */
 let saveTimeout;
 
 export function saveCurrentState() {
@@ -31,7 +32,7 @@ export function saveCurrentState() {
         chords: {
             enabled: chords.enabled,
             style: chords.style,
-            instrument: chords.instrument,
+            instrument: /** @type {any} */ (chords).instrument,
             octave: chords.octave,
             density: chords.density,
             volume: chords.volume,

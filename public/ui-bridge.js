@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { getState, dispatch as internalDispatch, subscribe } from './state.js';
 
+/**
+ * @param {any} objA
+ * @param {any} objB
+ */
 function shallowEqual(objA, objB) {
     if (Object.is(objA, objB)) {
         return true;
@@ -41,6 +45,11 @@ export function useEnsembleState(selector) {
     lastRenderedSliceRef.current = currentSlice;
 
     useEffect(() => {
+        /**
+         * @param {string} _action
+         * @param {any} _payload
+         * @param {any} updatedStateMap
+         */
         const update = (_action, _payload, updatedStateMap) => {
             const nextSlice = selectorRef.current(updatedStateMap);
             const stateVersion = updatedStateMap.playback.stateVersion;
@@ -56,7 +65,9 @@ export function useEnsembleState(selector) {
         };
 
         const unsubscribe = subscribe(update);
-        return unsubscribe;
+        return () => {
+            unsubscribe();
+        };
     }, []);
 
     return currentSlice;
@@ -68,7 +79,12 @@ useEnsembleState.getState = getState;
  * Hook to get the dispatch function.
  */
 export function useDispatch() {
-    return useCallback((action, payload) => {
-        internalDispatch(action, payload);
-    }, []);
+    return useCallback(
+        /** @type {(action: string, payload?: any) => void} */ (
+            (action, payload) => {
+                internalDispatch(action, payload);
+            }
+        ),
+        [],
+    );
 }

@@ -122,10 +122,18 @@ const PROGRESSIONS = {
     },
 };
 
+/**
+ * @template T
+ * @param {Array<T>} arr
+ * @returns {T}
+ */
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 /**
  * Adds extensions to basic Roman Numeral chords based on complexity.
+ * @param {string} chord
+ * @param {number} complexity
+ * @returns {string}
  */
 function applyComplexity(chord, complexity) {
     if (complexity < 0.2) {
@@ -175,6 +183,14 @@ function applyComplexity(chord, complexity) {
     return newChord;
 }
 
+/**
+ * Formats a progression by looping/truncating chord array to desired bar length
+ * and optionally adding complexity extensions.
+ * @param {Array<string>} chordArray
+ * @param {number} bars
+ * @param {number} [complexity=0.3]
+ * @returns {string}
+ */
 function formatProgression(chordArray, bars, complexity = 0.3) {
     if (chordArray.length === 12) {
         return chordArray.join(' | ');
@@ -192,6 +208,11 @@ function formatProgression(chordArray, bars, complexity = 0.3) {
     return result.join(' | ');
 }
 
+/**
+ * Generates a song structure and progressions based on options.
+ * @param {any} [options={}]
+ * @returns {Array<{id: string, label: string, value: string, key: string, timeSignature: string, repeat: number}>}
+ */
 export function generateSong(options = {}) {
     const key = options.key === 'Random' ? rand(KEY_ORDER) : options.key || 'C';
     const isMinor = !!options.isMinor;
@@ -216,14 +237,18 @@ export function generateSong(options = {}) {
     }
 
     let poolKey = style;
-    if (isMinor && PROGRESSIONS[`${style}_minor`]) {
+    if (isMinor && /** @type {any} */ (PROGRESSIONS)[`${style}_minor`]) {
         poolKey = `${style}_minor`;
     }
 
-    const structureTemplate = STRUCTURES[style] || STRUCTURES.pop;
-    const pool = PROGRESSIONS[poolKey] || PROGRESSIONS.pop;
+    /** @type {Array<string>} */
+    const structureTemplate = /** @type {any} */ (STRUCTURES)[style] || STRUCTURES.pop;
+    /** @type {any} */
+    const pool = /** @type {any} */ (PROGRESSIONS)[poolKey] || PROGRESSIONS.pop;
 
+    /** @type {Array<{id: string, label: string, value: string, key: string, timeSignature: string, repeat: number}>} */
     const sections = [];
+    /** @type {Record<string, string>} */
     const memory = {}; // Remember what "Verse" (or "A") sounds like
 
     // If a seed is provided, pre-populate memory for that section type

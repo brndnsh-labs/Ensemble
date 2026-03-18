@@ -147,7 +147,11 @@ describe('Arranger Controller', () => {
     describe('validateAndAnalyze', () => {
         it('should validate progression and trigger form analysis', () => {
             validateAndAnalyze();
-            expect(validateProgression).toHaveBeenCalledWith(stateMap, null, expect.any(Function));
+            expect(validateProgression).toHaveBeenCalledWith(
+                stateMap,
+                undefined,
+                expect.any(Function),
+            );
             expect(analyzeFormUI).toHaveBeenCalled();
         });
     });

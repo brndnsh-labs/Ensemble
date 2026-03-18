@@ -1,6 +1,9 @@
 const { min } = Math;
 
 export class RingBuffer {
+    /**
+     * @param {number} capacity
+     */
     constructor(capacity) {
         this.buffer = new Array(capacity);
         this.capacity = capacity;
@@ -12,6 +15,9 @@ export class RingBuffer {
         return this.count;
     }
 
+    /**
+     * @param {any} item
+     */
     push(item) {
         if (this.count < this.capacity) {
             this.buffer[(this.start + this.count) % this.capacity] = item;
@@ -22,6 +28,9 @@ export class RingBuffer {
         }
     }
 
+    /**
+     * @param {number} index
+     */
     at(index) {
         if (index < 0 || index >= this.count) {
             return undefined;
@@ -40,6 +49,9 @@ export class RingBuffer {
         }
     }
 
+    /**
+     * @param {function(any, number): any} callback
+     */
     forEach(callback) {
         const buffer = this.buffer;
         const capacity = this.capacity;

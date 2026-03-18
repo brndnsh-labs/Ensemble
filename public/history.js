@@ -13,13 +13,20 @@ export function pushHistory() {
     }
 }
 
+/**
+ * @param {Function} [refreshArrangerUI]
+ */
 export function undo(refreshArrangerUI) {
     const { arranger } = getState();
     if (arranger.history.length === 0) {
         return;
     }
     const last = arranger.history.pop();
+    if (!last) {
+        return;
+    }
     try {
+        /** @type {any} */
         const parsed = JSON.parse(last);
         if (Array.isArray(parsed)) {
             arranger.sections = parsed;

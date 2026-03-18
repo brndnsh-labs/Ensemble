@@ -1,7 +1,9 @@
 import { VisualizerEngine } from './visualizer-engine.js';
 
+/** @type {VisualizerEngine | null} */
 let engine = null;
 let currentBpm = 120;
+/** @type {{ beats: number, grouping: number[], stepsPerBeat: number }} */
 let currentTS = { beats: 4, grouping: [4], stepsPerBeat: 4 };
 let syncAudioTime = 0;
 let syncPerfTime = 0;
@@ -32,7 +34,7 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-self.onmessage = (e) => {
+self.onmessage = (/** @type {MessageEvent} */ e) => {
     const {
         type,
         canvas,

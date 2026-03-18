@@ -133,7 +133,12 @@
         "microtonal",
         "Vivm",
         "chicka",
-        "ascript"
+        "ascript",
+        "beforeinstallprompt",
+        "appinstalled",
+        "octaveNode",
+        "fifthsNode",
+        "alterNode"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

@@ -4,6 +4,14 @@
  * to keep the core scheduler pure.
  */
 
+/**
+ * @typedef {Object} PlatformState
+ * @property {WakeLockSentinel | null} wakeLock
+ * @property {HTMLAudioElement | {pause: () => void, play: () => Promise<void>, currentTime: number} | null} silentAudio
+ * @property {boolean} iosAudioUnlocked
+ */
+
+/** @type {PlatformState} */
 const state = {
     wakeLock: null,
     silentAudio: null,
@@ -12,12 +20,13 @@ const state = {
 
 export function initPlatform() {
     if (typeof Audio !== 'undefined') {
-        state.silentAudio = new Audio(
+        const audio = new Audio(
             'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ',
         );
-        if (state.silentAudio.loop !== undefined) {
-            state.silentAudio.loop = true;
+        if (audio.loop !== undefined) {
+            audio.loop = true;
         }
+        state.silentAudio = audio;
     } else {
         state.silentAudio = { pause: () => {}, play: () => Promise.resolve(), currentTime: 0 };
     }

@@ -1,6 +1,23 @@
 // Fill Generation Logic
 // Uses block-based generation and templates for natural sounding fills
 
+/**
+ * @typedef {Object} FillTemplate
+ * @property {number[]} steps
+ * @property {string[]} instruments
+ * @property {number[]} velocities
+ */
+
+/**
+ * @typedef {Object} GenreFills
+ * @property {FillTemplate[]} low
+ * @property {FillTemplate[]} medium
+ * @property {FillTemplate[]} high
+ */
+
+/**
+ * @type {Record<string, GenreFills>}
+ */
 export const FILL_TEMPLATES = {
     Rock: {
         low: [
@@ -228,9 +245,11 @@ export const FILL_TEMPLATES = {
  * @returns {Object} Map of step -> array of {name, vel}
  */
 export function generateProceduralFill(genre, intensity, stepsPerMeasure) {
+    /** @type {Record<number, {name: string, vel: number}[]>} */
     const fill = {};
     const templates = FILL_TEMPLATES[genre] || FILL_TEMPLATES.Rock;
 
+    /** @type {'low' | 'medium' | 'high'} */
     let level = 'low';
     if (intensity > 0.4) {
         level = 'medium';
@@ -252,7 +271,7 @@ export function generateProceduralFill(genre, intensity, stepsPerMeasure) {
     // We shift them to align with the actual stepsPerMeasure.
     const offset = stepsPerMeasure - 16;
 
-    template.steps.forEach((stepIdx, i) => {
+    template.steps.forEach((/** @type {number} */ stepIdx, /** @type {number} */ i) => {
         const inst = template.instruments[i];
         const vel = template.velocities[i];
 

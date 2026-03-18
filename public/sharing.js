@@ -3,7 +3,18 @@ import { showToast } from './ui.js';
 import { compressSections } from './utils.js';
 
 /**
+ * @typedef {Object} ShareOptions
+ * @property {boolean} [includeSolo]
+ * @property {boolean} [includeBass]
+ * @property {boolean} [includeChords]
+ * @property {boolean} [includeHarmony]
+ * @property {boolean} [includeDrums]
+ * @property {number} [targetDuration]
+ */
+
+/**
  * Compresses the full band/mixer state into a Base64 string.
+ * @param {ShareOptions} options
  */
 function compressBandSettings(options = {}) {
     const { soloist, bass, chords, harmony, groove } = getState();
@@ -62,13 +73,16 @@ function compressBandSettings(options = {}) {
     return btoa(binString);
 }
 
+/**
+ * @param {ShareOptions} options
+ */
 export function generateShareUrl(options = {}) {
     const { arranger, chords, groove, playback } = getState();
     const params = new URLSearchParams();
     params.set('s', compressSections(arranger.sections));
     params.set('key', arranger.key);
     params.set('ts', arranger.timeSignature);
-    params.set('bpm', playback.bpm);
+    params.set('bpm', playback.bpm.toString());
     params.set('style', chords.style);
     params.set('genre', groove.genreFeel);
     params.set('int', playback.bandIntensity.toFixed(2));
@@ -76,8 +90,8 @@ export function generateShareUrl(options = {}) {
     params.set('notation', arranger.notation);
 
     // Add target duration if provided
-    if (options.targetDuration > 0) {
-        params.set('tmr', options.targetDuration);
+    if (options.targetDuration && options.targetDuration > 0) {
+        params.set('tmr', options.targetDuration.toString());
     }
 
     // High-fidelity band settings

@@ -34,6 +34,8 @@ export function getSectionEnergy(label) {
 /**
  * Calculates the "Harmonic Flux" (rate of change) for a specific section.
  * Higher flux implies higher energy/complexity.
+ * @param {Array<any>} sectionSteps
+ * @returns {number}
  */
 function calculateHarmonicFlux(sectionSteps) {
     if (!sectionSteps.length) {
@@ -42,6 +44,7 @@ function calculateHarmonicFlux(sectionSteps) {
 
     // Count distinct chord changes within the step range
     let changes = 0;
+    /** @type {string | null} */
     let lastChordId = null;
 
     sectionSteps.forEach((entry) => {
@@ -68,14 +71,18 @@ export function analyzeForm() {
     }
 
     // 1. Group by Sections
+    /** @type {Array<any>} */
     const sections = [];
+    /** @type {any} */
     let currentSection = null;
 
     arranger.stepMap.forEach((entry) => {
-        if (!currentSection || entry.chord.sectionId !== currentSection.id) {
+        /** @type {any} */
+        const chord = entry.chord;
+        if (!currentSection || chord.sectionId !== currentSection.id) {
             currentSection = {
-                id: entry.chord.sectionId,
-                label: entry.chord.sectionLabel,
+                id: chord.sectionId,
+                label: chord.sectionLabel,
                 steps: [],
                 chords: [],
             };
@@ -83,7 +90,7 @@ export function analyzeForm() {
         }
         currentSection.steps.push(entry);
         // Track unique chord symbols in this section for similarity matching
-        const chordSym = entry.chord.value;
+        const chordSym = chord.value;
         if (currentSection.chords[currentSection.chords.length - 1] !== chordSym) {
             currentSection.chords.push(chordSym);
         }
@@ -91,6 +98,7 @@ export function analyzeForm() {
 
     // 2. Identify Patterns (Saliency)
     const sectionSignatures = sections.map((/** @type {any} */ s) => s.chords.join('|'));
+    /** @type {Record<string, number>} */
     const occurrenceCount = {};
 
     sections.forEach((s, i) => {

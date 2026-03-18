@@ -3,6 +3,18 @@ import { getFrequency } from './utils.js';
 
 const BOSSA_STEPS = [0, 6, 8, 14];
 
+/**
+ * @param {string} style
+ * @param {number} step
+ * @param {number} stepInChord
+ * @param {import('./types.js').StepInfo | null} stepInfo
+ * @param {any} ts
+ * @param {number} intBeat
+ * @param {boolean} isQuarter
+ * @param {boolean} is8th
+ * @param {import('./types.js').EnsembleState['playback']} playback
+ * @param {import('./types.js').EnsembleState['groove']} groove
+ */
 export function checkBassActiveStyle(
     style,
     step,
@@ -160,6 +172,42 @@ export function checkBassActiveStyle(
     return false;
 }
 
+/**
+ * @param {string} style
+ * @param {any} chord
+ * @param {any} nextChord
+ * @param {number} step
+ * @param {number} stepInChord
+ * @param {import('./types.js').StepInfo | null} _stepInfo
+ * @param {any} context
+ * @param {any} ts
+ * @param {number} stepsPerMeasure
+ * @param {number} intBeat
+ * @param {boolean} _isQuarter
+ * @param {boolean} _is8th
+ * @param {boolean} isBeatStart
+ * @param {boolean} isDownbeat
+ * @param {number} stepInMeasure
+ * @param {number} _stepInBeat
+ * @param {number} baseRoot
+ * @param {number} _prevFreq
+ * @param {number | null} prevMidi
+ * @param {number} _centerMidi
+ * @param {number} absMin
+ * @param {number} absMax
+ * @param {number[]} scale
+ * @param {import('./types.js').EnsembleState['playback']} playback
+ * @param {import('./types.js').EnsembleState['groove']} groove
+ * @param {import('./types.js').EnsembleState['soloist']} soloist
+ * @param {number} intensity
+ * @param {number} velocity
+ * @param {boolean} isSoloistBusy
+ * @param {number} beatsInChord
+ * @param {Function} result
+ * @param {boolean} isGroupStart
+ * @param {boolean} hasKickTrigger
+ * @param {any} kickInst
+ */
 export function getBassNoteStyle(
     style,
     chord,
@@ -491,7 +539,7 @@ export function getBassNoteStyle(
 
         // 3. Syncopated "Pushes" & "Gallops" (16ths)
         if (stepInBeat % 2 !== 0) {
-            const isSoloistBusy = soloist.enabled && soloist.busySteps > 0;
+            const isSoloistBusy = soloist.enabled && (soloist.busySteps || 0) > 0;
 
             // High complexity "Pop" on the 'a'
             if (
@@ -680,8 +728,8 @@ export function getBassNoteStyle(
             selectedRiddim = 'One Drop';
         }
 
-        const riddim = REGGAE_RIDDIMS[selectedRiddim];
-        const match = riddim.find((r) => r[0] === stepInMeasure);
+        const riddim = /** @type {any} */ (REGGAE_RIDDIMS)[selectedRiddim];
+        const match = riddim.find((/** @type {any} */ r) => r[0] === stepInMeasure);
 
         if (match) {
             const [, interval, vel, dur] = match;

@@ -18,9 +18,14 @@ import {
 
 /**
  * Helper to safely clamp numeric values.
+ * @param {any} val
+ * @param {number} min
+ * @param {number} max
+ * @param {number} defaultVal
+ * @returns {number}
  */
 const clamp = (val, min, max, defaultVal) => {
-    const num = parseFloat(val);
+    const num = typeof val === 'string' ? parseFloat(val) : Number(val);
     if (Number.isNaN(num)) {
         return defaultVal;
     }
@@ -29,11 +34,12 @@ const clamp = (val, min, max, defaultVal) => {
 
 /**
  * Decompresses the Base64 band settings string.
+ * @param {string} str
  */
 function decompressBandSettings(str) {
     try {
         const binString = atob(str);
-        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
         const json = new TextDecoder().decode(bytes);
         return JSON.parse(json);
     } catch (e) {
@@ -44,6 +50,7 @@ function decompressBandSettings(str) {
 
 /**
  * Validates and sanitizes sections array from untrusted source.
+ * @param {any[]} sections
  */
 function validateSections(sections) {
     if (!Array.isArray(sections)) {
@@ -89,7 +96,8 @@ function validateSections(sections) {
             key: safeKey,
             repeat: Math.min(Math.max(1, parseInt(s.repeat, 10) || 1), 64),
             timeSignature:
-                typeof s.timeSignature === 'string' && TIME_SIGNATURES[s.timeSignature]
+                typeof s.timeSignature === 'string' &&
+                /** @type {any} */ (TIME_SIGNATURES)[s.timeSignature]
                     ? s.timeSignature
                     : '',
             seamless: !!s.seamless,
@@ -112,7 +120,10 @@ export function hydrateState() {
         }
 
         let validatedTS = '4/4';
-        if (savedState.timeSignature && TIME_SIGNATURES[savedState.timeSignature]) {
+        if (
+            savedState.timeSignature &&
+            /** @type {any} */ (TIME_SIGNATURES)[savedState.timeSignature]
+        ) {
             validatedTS = savedState.timeSignature;
         }
 
@@ -237,7 +248,9 @@ export function hydrateState() {
                 lastSmartGenre:
                     savedState.groove.lastSmartGenre ||
                     Object.keys(SMART_GENRES).find(
-                        (k) => SMART_GENRES[k].feel === savedState.groove.genreFeel,
+                        (k) =>
+                            /** @type {any} */ (SMART_GENRES)[k].feel ===
+                            savedState.groove.genreFeel,
                     ) ||
                     'Rock',
                 activeTab: savedState.groove.activeTab || 'smart',
@@ -251,11 +264,11 @@ export function hydrateState() {
             });
 
             if (savedState.groove.pattern && savedState.groove.pattern.length > 0) {
-                savedState.groove.pattern.forEach((savedInst) => {
+                savedState.groove.pattern.forEach((/** @type {any} */ savedInst) => {
                     const inst = groove.instruments.find((i) => i.name === savedInst.name);
                     if (inst) {
                         inst.steps.fill(0);
-                        savedInst.steps.forEach((v, i) => {
+                        savedInst.steps.forEach((/** @type {any} */ v, /** @type {number} */ i) => {
                             if (i < 128) {
                                 inst.steps[i] = v;
                             }
@@ -298,90 +311,100 @@ export function loadFromUrl() {
     const params = new URLSearchParams(window.location.search);
     let hasParams = false;
 
-    if (params.get('s')) {
-        arranger.sections = decompressSections(params.get('s'));
+    const sParam = params.get('s');
+    if (sParam) {
+        arranger.sections = decompressSections(sParam);
         hasParams = true;
-    } else if (params.get('prog')) {
-        let prog = params.get('prog');
-        if (prog.length > 1000) {
-            prog = prog.substring(0, 1000);
+    } else {
+        const progParam = params.get('prog');
+        if (progParam) {
+            let prog = progParam;
+            if (prog.length > 1000) {
+                prog = prog.substring(0, 1000);
+            }
+            prog = stripDangerousChars(prog);
+            arranger.sections = [{ id: generateId(), label: 'Main', value: prog }];
+            hasParams = true;
         }
-        prog = stripDangerousChars(prog);
-        arranger.sections = [{ id: generateId(), label: 'Main', value: prog }];
-        hasParams = true;
     }
 
     if (hasParams) {
         clearChordPresetHighlight();
     }
 
-    if (params.get('key')) {
-        const rawKey = normalizeKey(params.get('key'));
+    const keyParam = params.get('key');
+    if (keyParam) {
+        const rawKey = normalizeKey(keyParam);
         if (KEY_ORDER.includes(rawKey)) {
             arranger.key = rawKey;
         }
     }
 
-    if (params.get('ts')) {
-        const ts = params.get('ts');
-        if (TIME_SIGNATURES[ts]) {
-            arranger.timeSignature = ts;
+    const tsParam = params.get('ts');
+    if (tsParam) {
+        if (/** @type {any} */ (TIME_SIGNATURES)[tsParam]) {
+            arranger.timeSignature = tsParam;
         }
     }
 
-    if (params.get('bpm')) {
-        const bpm = parseFloat(params.get('bpm'));
+    const bpmParam = params.get('bpm');
+    if (bpmParam) {
+        const bpm = parseFloat(bpmParam);
         if (!Number.isNaN(bpm) && bpm >= 20 && bpm <= 300) {
             dispatch(ACTIONS.SET_BPM, bpm);
         }
     }
 
-    if (params.get('style')) {
-        const style = params.get('style');
-        if (CHORD_STYLES.some((s) => s.id === style)) {
-            dispatch(ACTIONS.SET_STYLE, { module: 'chords', style });
+    const styleParam = params.get('style');
+    if (styleParam) {
+        if (CHORD_STYLES.some((s) => s.id === styleParam)) {
+            dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: styleParam });
         }
     }
 
-    if (params.get('genre')) {
-        const genre = params.get('genre');
-        if (SMART_GENRES[genre]) {
-            groove.lastSmartGenre = genre; // @direct-mutation
-            groove.genreFeel = genre; // @direct-mutation
+    const genreParam = params.get('genre');
+    if (genreParam) {
+        if (/** @type {any} */ (SMART_GENRES)[genreParam]) {
+            groove.lastSmartGenre = genreParam; // @direct-mutation
+            groove.genreFeel = genreParam; // @direct-mutation
         }
     }
 
-    if (params.get('int')) {
-        const val = parseFloat(params.get('int'));
+    const intParam = params.get('int');
+    if (intParam) {
+        const val = parseFloat(intParam);
         if (!Number.isNaN(val)) {
             dispatch(ACTIONS.SET_BAND_INTENSITY, Math.max(0, Math.min(1, val)));
         }
     }
 
-    if (params.get('comp')) {
-        const val = parseFloat(params.get('comp'));
+    const compParam = params.get('comp');
+    if (compParam) {
+        const val = parseFloat(compParam);
         if (!Number.isNaN(val)) {
             dispatch(ACTIONS.SET_COMPLEXITY, Math.max(0, Math.min(1, val)));
         }
     }
 
-    if (params.get('notation')) {
-        const not = params.get('notation');
-        if (['roman', 'name', 'nns'].includes(not)) {
-            arranger.notation = not;
+    const notationParam = params.get('notation');
+    if (notationParam) {
+        if (['roman', 'name', 'nns'].includes(notationParam)) {
+            arranger.notation = notationParam;
         }
     }
 
-    if (params.get('tmr')) {
-        const tmr = parseInt(params.get('tmr'), 10);
+    const tmrParam = params.get('tmr');
+    if (tmrParam) {
+        const tmr = parseInt(tmrParam, 10);
         if (!Number.isNaN(tmr)) {
             dispatch(ACTIONS.SET_SESSION_TIMER, clamp(tmr, 0, 60, 0));
         }
     }
 
     // High-fidelity band settings
-    if (params.get('bnd')) {
-        const band = decompressBandSettings(params.get('bnd'));
+    const bndParam = params.get('bnd');
+    if (bndParam) {
+        const band = decompressBandSettings(bndParam);
         if (band) {
             if (band.s) {
                 Object.assign(soloist, {

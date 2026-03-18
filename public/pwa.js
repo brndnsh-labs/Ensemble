@@ -1,7 +1,9 @@
 import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 
+/** @type {any} */
 let deferredPrompt;
+/** @type {ServiceWorker | null} */
 let newWorker;
 
 export function initPWA() {
@@ -47,11 +49,17 @@ export function initPWA() {
                 // 2. Check if a worker is currently installing
                 if (reg.installing) {
                     newWorker = reg.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
-                        }
-                    });
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (
+                                newWorker &&
+                                newWorker.state === 'installed' &&
+                                navigator.serviceWorker.controller
+                            ) {
+                                dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
+                            }
+                        });
+                    }
                 }
 
                 // 3. Check for updates every hour, but also check immediately on load
@@ -72,17 +80,23 @@ export function initPWA() {
                 // 3. Listen for new workers being installed
                 reg.addEventListener('updatefound', () => {
                     newWorker = reg.installing;
-                    newWorker.addEventListener('statechange', () => {
-                        // Only notify the user once the new worker is fully installed (waiting to activate)
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
-                        }
-                    });
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            // Only notify the user once the new worker is fully installed (waiting to activate)
+                            if (
+                                newWorker &&
+                                newWorker.state === 'installed' &&
+                                navigator.serviceWorker.controller
+                            ) {
+                                dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
+                            }
+                        });
+                    }
                 });
             })
             .catch((err) => console.log('SW failed', err));
 
-        let refreshing;
+        let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (refreshing) {
                 return;

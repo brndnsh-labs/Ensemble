@@ -1,20 +1,26 @@
+/// <reference lib="webworker" />
+
+/** @type {ServiceWorkerGlobalScope} */
+const sw = /** @type {any} */ (self);
+
 // Note: Keep CACHE_NAME version in sync with APP_VERSION in config.js
 const CACHE_NAME = '/* CACHE_NAME_PLACEHOLDER */';
+/** @type {string[]} */
 const ASSETS = [
     /* ASSETS_PLACEHOLDER */
 ];
 
-self.addEventListener('install', (e) => {
+sw.addEventListener('install', (/** @type {ExtendableEvent} */ e) => {
     e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
 });
 
-self.addEventListener('message', (event) => {
+sw.addEventListener('message', (/** @type {ExtendableMessageEvent} */ event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
+        sw.skipWaiting();
     }
 });
 
-self.addEventListener('activate', (e) => {
+sw.addEventListener('activate', (/** @type {ExtendableEvent} */ e) => {
     e.waitUntil(
         caches.keys().then((keys) => {
             return Promise.all([
@@ -22,14 +28,14 @@ self.addEventListener('activate', (e) => {
                     if (key !== CACHE_NAME) {
                         return caches.delete(key);
                     }
-                    return Promise.resolve();
+                    return Promise.resolve(false);
                 }),
-                self.clients.claim(),
+                sw.clients.claim(),
             ]);
         }),
     );
 });
 
-self.addEventListener('fetch', (e) => {
+sw.addEventListener('fetch', (/** @type {FetchEvent} */ e) => {
     e.respondWith(caches.match(e.request).then((response) => response || fetch(e.request)));
 });

@@ -58,7 +58,9 @@ export class Harmonizer {
 
     /**
      * Generates multiple options for harmonization.
-     * @returns {Array} Array of option objects { name, description, chords, progression }
+     * @param {Array<any>} melodyLine
+     * @param {string} key
+     * @returns {Array<{type: string, description: string, chords: Array<any>, progression: string}>}
      */
     generateOptions(melodyLine, key) {
         if (!melodyLine || melodyLine.length === 0) {
@@ -69,6 +71,7 @@ export class Harmonizer {
         const measures = Math.ceil(melodyLine.length / 4);
 
         // Pre-calculate prominent notes and structural states per measure
+        /** @type {Array<Array<{pc: number, weight: number}>>} */
         const measureNotes = [];
         for (let m = 0; m < measures; m++) {
             const measureBeats = melodyLine.slice(m * 4, m * 4 + 4);
@@ -77,6 +80,7 @@ export class Harmonizer {
 
         const structuralStates = this.detectStructure(measureNotes, measures);
 
+        /** @type {Array<{type: string, description: string, chords: Array<any>, progression: string}>} */
         const options = [];
 
         Object.values(this.strategies).forEach((strategy) => {
@@ -100,6 +104,9 @@ export class Harmonizer {
 
     /**
      * Detects SRDC (Statement, Restatement, Departure, Conclusion) structure.
+     * @param {Array<Array<{pc: number, weight: number}>>} _measureNotes
+     * @param {number} totalMeasures
+     * @returns {Array<string>}
      */
     detectStructure(_measureNotes, totalMeasures) {
         const states = [];
@@ -121,6 +128,10 @@ export class Harmonizer {
 
     /**
      * Backward compatibility wrapper
+     * @param {Array<any>} melodyLine
+     * @param {string} key
+     * @param {number} [creativity=0.5]
+     * @returns {string}
      */
     generateProgression(melodyLine, key, creativity = 0.5) {
         const options = this.generateOptions(melodyLine, key);
@@ -139,6 +150,11 @@ export class Harmonizer {
         return options[1].progression;
     }
 
+    /**
+     * Parses the key string.
+     * @param {string} key
+     * @returns {{rootIndex: number, isMinor: boolean}}
+     */
     parseKey(key) {
         const normKey = normalizeKey(key);
         const isMinor = key.includes('m') && !key.includes('maj');
@@ -147,7 +163,13 @@ export class Harmonizer {
         return { rootIndex: rootIndex === -1 ? 0 : rootIndex, isMinor };
     }
 
+    /**
+     * Gets prominent notes from beats.
+     * @param {Array<any>} beats
+     * @returns {Array<{pc: number, weight: number}>}
+     */
     getProminentNotes(beats) {
+        /** @type {Record<number, number>} */
         const counts = {};
         beats.forEach((b, idx) => {
             if (b.midi && b.energy > 0) {
@@ -165,6 +187,12 @@ export class Harmonizer {
 
     /**
      * Viterbi Algorithm implementation
+     * @param {Array<Array<{pc: number, weight: number}>>} measureNotes
+     * @param {number} keyRoot
+     * @param {boolean} isMinor
+     * @param {any} strategy
+     * @param {Array<string>} structuralStates
+     * @returns {Array<any>}
      */
     runViterbi(measureNotes, keyRoot, isMinor, strategy, structuralStates) {
         const T = measureNotes.length;
@@ -290,6 +318,11 @@ export class Harmonizer {
         return resultPath;
     }
 
+    /**
+     * Decodes state index into root and quality.
+     * @param {number} s
+     * @returns {{root: number, quality: string}}
+     */
     decodeState(s) {
         return {
             root: Math.floor(s / 2),
@@ -297,6 +330,17 @@ export class Harmonizer {
         };
     }
 
+    /**
+     * Calculates the emission score for a given state.
+     * @param {Array<{pc: number, weight: number}>} notes
+     * @param {number} root
+     * @param {string} quality
+     * @param {number} keyRoot
+     * @param {boolean} isMinor
+     * @param {any} strategy
+     * @param {string} structuralState
+     * @returns {{score: number, reasons: Array<string>}}
+     */
     calculateEmission(notes, root, quality, keyRoot, isMinor, strategy, structuralState) {
         let score = 0;
         const reasons = [];
@@ -314,6 +358,7 @@ export class Harmonizer {
 
         // 2. Diatonic Check
         const distFromKey = (root - keyRoot + 12) % 12;
+        /** @type {Record<number, number>} */
         const diatonicMap = isMinor ? this.diatonicWeights.minor : this.diatonicWeights.major;
         const diatonicVal = diatonicMap[distFromKey];
 
@@ -326,6 +371,7 @@ export class Harmonizer {
         // 3. Melody Fit
         const chordTones = this.getChordTones(root, quality);
         let fitScore = 0;
+        /** @type {Array<string>} */
         const matchedNotes = [];
 
         notes.forEach((note) => {
@@ -353,6 +399,14 @@ export class Harmonizer {
         return { score, reasons };
     }
 
+    /**
+     * Calculates transition score.
+     * @param {number} prevRoot
+     * @param {number} currRoot
+     * @param {any} strategy
+     * @param {string} structuralState
+     * @returns {{score: number, reason: string}}
+     */
     calculateTransition(prevRoot, currRoot, strategy, structuralState) {
         let score = 0;
         let reason = '';
@@ -381,25 +435,49 @@ export class Harmonizer {
         return { score, reason };
     }
 
+    /**
+     * Gets chord tones.
+     * @param {number} root
+     * @param {string} quality
+     * @returns {Array<number>}
+     */
     getChordTones(root, quality) {
         const third = quality === 'minor' ? 3 : 4;
         return [root, (root + third) % 12, (root + 7) % 12];
     }
 
+    /**
+     * Gets note name.
+     * @param {number} midi
+     * @returns {string}
+     */
     getNoteName(midi) {
         const names = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
         return names[midi % 12];
     }
 
+    /**
+     * Converts absolute root to roman numeral.
+     * @param {number} absRoot
+     * @param {string} quality
+     * @param {number} keyRoot
+     * @returns {{roman: string, absRoot: number}}
+     */
     convertRootToRoman(absRoot, quality, keyRoot) {
         const interval = (absRoot - keyRoot + 12) % 12;
-        let roman = INTERVAL_TO_ROMAN[interval] || 'I';
+        /** @type {string} */
+        let roman = /** @type {any} */ (INTERVAL_TO_ROMAN)[interval] || 'I';
         if (quality === 'minor') {
             roman = roman.toLowerCase();
         }
         return { roman, absRoot };
     }
 
+    /**
+     * Formats progression.
+     * @param {Array<string>} chords
+     * @returns {string}
+     */
     formatProgression(chords) {
         // Post-processing: If "I | . | . | IV", fill in
         const res = [...chords];

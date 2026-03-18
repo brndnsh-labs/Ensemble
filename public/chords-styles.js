@@ -1,3 +1,10 @@
+/**
+ * @param {import('./types.js').EnsembleState} state
+ * @param {string} quality
+ * @param {boolean} is7th
+ * @param {boolean} isRich
+ * @returns {number[] | null}
+ */
 export function getRootlessVoicing(state, quality, is7th, isRich) {
     const { groove, playback } = state;
     const genre = groove.genreFeel;
@@ -118,6 +125,15 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
     return null; // Fallback to standard triads
 }
 
+/**
+ * @param {import('./types.js').EnsembleState} state
+ * @param {string} quality
+ * @param {boolean} is7th
+ * @param {string} density
+ * @param {string} genre
+ * @param {boolean} bassEnabled
+ * @returns {number[]}
+ */
 export function getIntervals(state, quality, is7th, density, genre = 'Rock', bassEnabled = true) {
     const { playback, groove } = state;
     const isRich = density === 'rich';
@@ -276,7 +292,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock', bas
             intervals = intervals.filter((/** @type {any} */ i) => i !== 7);
         }
     } else if (isRich && intervals.length <= 5 && quality !== '5') {
-        const safeExtensions = {
+        const safeExtensions = /** @type {any} */ ({
             major: [14], // 9
             maj7: [14, 18], // 9, #11
             minor: [14, 17], // 9, 11
@@ -288,7 +304,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock', bas
             '7alt': [13, 15, 20], // b9, #9, b13
             9: [21], // 13
             13: [18], // #11
-        };
+        });
 
         const potential = safeExtensions[quality] || (isAltered5 ? [14, 18] : [14]);
         for (const ext of potential) {
