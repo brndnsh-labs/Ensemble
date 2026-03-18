@@ -466,7 +466,9 @@ export function getAccompanimentNotes(
     const notes = /** @type {any[]} */ ([]);
     const genre = groove.genreFeel;
     const intensity = playback.bandIntensity;
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    /** @type {any} */
+    const signatures = TIME_SIGNATURES;
+    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
 
     // --- Sustain / CC Handling ---
@@ -663,13 +665,13 @@ export function getAccompanimentNotes(
                     voicing.push(chord.rootMidi + ext);
                 }
             } else {
-                voicing = chord.freqs.slice(0, 3).map((f) => getMidi(f));
+                voicing = chord.freqs.slice(0, 3).map((/** @type {number} */ f) => getMidi(f));
             }
 
             // Neo-Soul "Drunken" Timing (Randomized displacement) - TIGHTENED
             const drunk = (Math.random() - 0.5) * (intensity * 0.02);
 
-            voicing.forEach((m, i) => {
+            voicing.forEach((/** @type {any} */ m, /** @type {number} */ i) => {
                 notes.push({
                     midi: m,
                     velocity: (isGhost ? 0.2 : 0.55) * (0.5 + intensity * 0.9),
@@ -804,7 +806,7 @@ export function getAccompanimentNotes(
             if (third !== undefined && seven !== undefined) {
                 voicing = [chord.rootMidi + third, chord.rootMidi + seven];
             } else {
-                voicing = chord.freqs.slice(0, 2).map((f) => getMidi(f));
+                voicing = chord.freqs.slice(0, 2).map((/** @type {number} */ f) => getMidi(f));
             }
 
             // Register Slotting: Ensure it stays in a punchy mid-register (E3-C6)
@@ -818,7 +820,7 @@ export function getAccompanimentNotes(
                 return m;
             });
 
-            voicing.forEach((m, i) => {
+            voicing.forEach((/** @type {any} */ m, /** @type {number} */ i) => {
                 notes.push({
                     midi: m,
                     velocity:
@@ -1015,7 +1017,8 @@ export function getAccompanimentNotes(
         }
 
         // --- Frequency Slotting & Soloist Pocket ---
-        const soloistMidi = soloist.enabled ? getMidi(soloist.lastFreq) : 0;
+        const lastSolFreq = soloist.lastFreq || 0;
+        const soloistMidi = soloist.enabled ? getMidi(lastSolFreq) : 0;
         const useClarity = (soloistMidi || 0) > 72;
         if (chords.style === 'smart') {
             // Jazz Shell Lesson: If things are hot and harmony is complex, stick to shells (3 & 7)
@@ -1075,7 +1078,8 @@ export function getAccompanimentNotes(
                 voicing.sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
 
                 const lowestMidi = getMidi(voicing[0]) || 0;
-                const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq) || 0;
+                const lastBassFreq = bass.lastFreq || 0;
+                const bassMidi = coordination.bassMidi || getMidi(lastBassFreq) || 0;
 
                 // --- Dynamic Slotting ---
                 // If the bass is high, we MUST shift up.
@@ -1114,7 +1118,9 @@ export function getAccompanimentNotes(
             if (voicing.length >= 3 && Math.random() < 0.6) {
                 const targetIdx = 1;
                 const midi = getMidi(voicing[targetIdx]);
-                voicing[targetIdx] = getFrequency(midi + 12);
+                if (midi) {
+                    voicing[targetIdx] = getFrequency(midi + 12);
+                }
             }
         }
 
