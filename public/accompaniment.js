@@ -60,14 +60,14 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
     if (genre === 'Neo-Soul') {
         // Lay back heavily on the "and" of beats 2 and 4 (in 4/4) or semantic backbeats
         const backbeats = ts.backbeat || [1, 3];
-        backbeats.forEach((b) => {
+        backbeats.forEach((/** @type {number} */ b) => {
             hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
         });
 
         // Add random syncopated "filler" at high intensity
         if (intensity > 0.6) {
             // fillers roughly on offbeats of 1, 3 etc
-            [0, 2].forEach((b) => {
+            [0, 2].forEach((/** @type {number} */ b) => {
                 if (Math.random() < intensity * 0.4) {
                     hit(getBeatStep(b, Math.floor(spb * 0.75)));
                 }
@@ -79,13 +79,13 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
     if (genre === 'Reggae') {
         // Skank on backbeats
         const backbeats = ts.backbeat || [1, 3];
-        backbeats.forEach((b) => {
+        backbeats.forEach((/** @type {number} */ b) => {
             hit(getBeatStep(b));
         });
 
         // Sometimes double skank if active
         if (vibe === 'active' || intensity > 0.7) {
-            backbeats.forEach((b) => {
+            backbeats.forEach((/** @type {number} */ b) => {
                 hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
             });
         }
@@ -242,7 +242,7 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
 
 /**
  * @param {number} step
- * @param {number} soloistBusy
+ * @param {boolean} soloistBusy
  * @param {number} [spm]
  * @param {string|null} [sectionId]
  */
@@ -255,7 +255,7 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     // --- Section Change Detection ---
     if (sectionId && compingState.lastSectionId !== sectionId) {
         compingState.grooveRetentionCount = 0;
-        compingState.lastSectionId = sectionId;
+        compingState.lastSectionId = /** @type {any} */ (sectionId);
         compingState.lockedUntil = 0; // Force update
     }
 
@@ -374,6 +374,15 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
     compingState.lockedUntil = step + spm;
 }
 
+/**
+ * @param {number} _step
+ * @param {number} measureStep
+ * @param {number} chordIndex
+ * @param {number} intensity
+ * @param {string} genre
+ * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {string|null} [currentQuality]
+ */
 function handleSustainEvents(
     _step,
     measureStep,
@@ -395,7 +404,7 @@ function handleSustainEvents(
     if (isNewMeasure || isNewChord) {
         // BREATH STRATEGY: If coming from a high-tension chord, cut sustain early to clear the air.
         const wasTense = ['7alt', 'dim', 'halfdim', '7b9', '7#9'].includes(
-            compingState.lastChordQuality,
+            compingState.lastChordQuality || '',
         );
         const clearOffset = wasTense ? -0.15 : 0; // 150ms breath for tension resolution
 
@@ -403,12 +412,12 @@ function handleSustainEvents(
         events.push({ type: 'cc', controller: 64, value: 127, timingOffset: 0.01 }); // On
 
         compingState.lastChordIndex = chordIndex;
-        compingState.lastChordQuality = currentQuality;
+        compingState.lastChordQuality = currentQuality || null;
         return events;
     }
 
     // Update quality tracker even if not new chord (in case of init)
-    compingState.lastChordQuality = currentQuality;
+    compingState.lastChordQuality = currentQuality || null;
 
     if (stepInfo?.isGroupStart && Math.random() < intensity * 0.5) {
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: -0.01 });
@@ -454,7 +463,7 @@ export function getAccompanimentNotes(
         return [];
     }
 
-    const notes = [];
+    const notes = /** @type {any[]} */ ([]);
     const genre = groove.genreFeel;
     const intensity = playback.bandIntensity;
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -473,7 +482,8 @@ export function getAccompanimentNotes(
     );
 
     // Rhythmic Yielding (Contract Compliance)
-    const isSoloistBusy = coordination?.soloistBusy || (soloist.enabled && soloist.busySteps > 0);
+    const isSoloistBusy =
+        coordination?.soloistBusy || (soloist.enabled && (soloist.busySteps || 0) > 0);
     updateRhythmicIntent(step, isSoloistBusy, spm, chord.sectionId);
 
     if (isSoloistBusy && step % 16 !== 0 && Math.random() < 0.7) {
@@ -641,9 +651,11 @@ export function getAccompanimentNotes(
         if (isHit || isGhost) {
             let voicing = [];
             // Strategy: Pick the 3rd, 7th, and 9th/11th for a rich, rootless cluster
-            const three = chord.intervals.find((i) => i === 3 || i === 4);
-            const seven = chord.intervals.find((i) => i === 10 || i === 11);
-            const ext = chord.intervals.find((i) => i === 2 || i === 5 || i === 9 || i === 14); // 9, 11, 13
+            const three = chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4);
+            const seven = chord.intervals.find((/** @type {number} */ i) => i === 10 || i === 11);
+            const ext = chord.intervals.find(
+                (/** @type {number} */ i) => i === 2 || i === 5 || i === 9 || i === 14,
+            ); // 9, 11, 13
 
             if (three !== undefined && seven !== undefined) {
                 voicing = [chord.rootMidi + three, chord.rootMidi + seven];
@@ -764,7 +776,12 @@ export function getAccompanimentNotes(
         let isHit = compingState.currentCell[measureStep % spm] === 1;
 
         // Conversational Displacement: Occasionally shift a hit by 16th if complexity is high
-        if (isHit && playback.complexity > 0.7 && soloist.busySteps > 0 && Math.random() < 0.4) {
+        if (
+            isHit &&
+            playback.complexity > 0.7 &&
+            (soloist.busySteps || 0) > 0 &&
+            Math.random() < 0.4
+        ) {
             isHit = false;
         }
 
@@ -778,10 +795,10 @@ export function getAccompanimentNotes(
 
             // Extract 3rd and 7th from intervals if possible, otherwise use slice
             const third = chord.intervals
-                ? chord.intervals.find((i) => i === 3 || i === 4)
+                ? chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4)
                 : undefined;
             const seven = chord.intervals
-                ? chord.intervals.find((i) => i === 10 || i === 11 || i === 9)
+                ? chord.intervals.find((/** @type {number} */ i) => i === 10 || i === 11 || i === 9)
                 : undefined;
 
             if (third !== undefined && seven !== undefined) {
@@ -884,7 +901,12 @@ export function getAccompanimentNotes(
 
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
         // Conversational Displacement for Jazz/Blues
-        if (isHit && soloist.busySteps > 0 && playback.complexity > 0.6 && Math.random() < 0.3) {
+        if (
+            isHit &&
+            (soloist.busySteps || 0) > 0 &&
+            playback.complexity > 0.6 &&
+            Math.random() < 0.3
+        ) {
             isHit = false;
         }
     }
@@ -962,7 +984,8 @@ export function getAccompanimentNotes(
         if (complexity > 0.5 && chord.intervals && chord.intervals.length > 3) {
             // If we have extensions beyond the triad/7th, prioritize them in the voicing
             const extensions = chord.intervals.filter(
-                (i) => i !== 0 && i !== 3 && i !== 4 && i !== 7 && i !== 10 && i !== 11,
+                (/** @type {number} */ i) =>
+                    i !== 0 && i !== 3 && i !== 4 && i !== 7 && i !== 10 && i !== 11,
             );
             if (extensions.length > 0 && Math.random() < (complexity - 0.4) * 1.5) {
                 // Shift voicing to include more color tones
@@ -993,7 +1016,7 @@ export function getAccompanimentNotes(
 
         // --- Frequency Slotting & Soloist Pocket ---
         const soloistMidi = soloist.enabled ? getMidi(soloist.lastFreq) : 0;
-        const useClarity = soloistMidi > 72;
+        const useClarity = (soloistMidi || 0) > 72;
         if (chords.style === 'smart') {
             // Jazz Shell Lesson: If things are hot and harmony is complex, stick to shells (3 & 7)
             const isComplex =
@@ -1008,9 +1031,9 @@ export function getAccompanimentNotes(
             // HIGH INTENSITY & COMPLEX: Shells to avoid mud
             else if (genre === 'Jazz' && intensity > 0.6 && isComplex) {
                 // Find 3rd and 7th
-                const third = chord.intervals.find((i) => i === 3 || i === 4);
+                const third = chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4);
                 const seventh = chord.intervals.find(
-                    (i) => i === 10 || i === 11 || i === 9 || i === 6,
+                    (/** @type {number} */ i) => i === 10 || i === 11 || i === 9 || i === 6,
                 ); // 6 for dim
                 if (third !== undefined && seventh !== undefined) {
                     voicing = [
@@ -1034,9 +1057,9 @@ export function getAccompanimentNotes(
             // HIGH INTENSITY: Add Octave sparkle
             if (intensity > 0.75 && voicing.length > 0 && Math.random() < 0.6) {
                 // Double the highest note up an octave
-                const sorted = [...voicing].sort((a, b) => getMidi(a) - getMidi(b));
+                const sorted = [...voicing].sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
                 const topMidi = getMidi(sorted[sorted.length - 1]);
-                if (topMidi < 84) {
+                if (topMidi && topMidi < 84) {
                     // Don't go too high
                     voicing.push(getFrequency(topMidi + 12));
                 }
@@ -1049,9 +1072,9 @@ export function getAccompanimentNotes(
                 voicing.length > 0
             ) {
                 // Ensure sorted for predictable slotting
-                voicing.sort((a, b) => getMidi(a) - getMidi(b));
+                voicing.sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
 
-                const lowestMidi = getMidi(voicing[0]);
+                const lowestMidi = getMidi(voicing[0]) || 0;
                 const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq) || 0;
 
                 // --- Dynamic Slotting ---
@@ -1059,12 +1082,12 @@ export function getAccompanimentNotes(
                 if (lowestMidi <= bassMidi + 12) {
                     voicing = voicing.map((f) => {
                         const m = getMidi(f);
-                        if (m <= bassMidi + 12) {
+                        if (m && m <= bassMidi + 12) {
                             return getFrequency(m + 12);
                         }
                         return f;
                     });
-                    voicing.sort((a, b) => getMidi(a) - getMidi(b));
+                    voicing.sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
                 }
 
                 // If soloist is high, drop the highest note to leave air
@@ -1078,7 +1101,9 @@ export function getAccompanimentNotes(
                     if ((chord.is7th || chord.quality.includes('9')) && voicing.length > 3) {
                         const rootPC = chord.rootMidi % 12;
                         const fifthPC = (rootPC + 7) % 12;
-                        voicing = voicing.filter((f) => getMidi(f) % 12 !== fifthPC);
+                        voicing = voicing.filter(
+                            (/** @type {number} */ f) => (getMidi(f) || 0) % 12 !== fifthPC,
+                        );
                     }
                 }
             }
@@ -1093,7 +1118,7 @@ export function getAccompanimentNotes(
             }
         }
 
-        voicing.forEach((f, i) => {
+        voicing.forEach((/** @type {number} */ f, i) => {
             const humanShift = Math.random() * 0.006 - 0.003;
             const humanVol = 0.95 + Math.random() * 0.1;
 

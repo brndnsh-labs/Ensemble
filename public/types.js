@@ -50,6 +50,7 @@
  * @property {boolean} isMeasureStart - True if the step is on the first beat of a measure.
  * @property {boolean} isBeatStart - True if the step is on a beat boundary.
  * @property {boolean} isBackbeat - True if the step is on a semantic backbeat (e.g., 2 & 4).
+ * @property {boolean} isGroupStart - True if the step is on a rhythmic group boundary (e.g., 1 & 3).
  * @property {number} beatIndex - 0-indexed beat number within the measure.
  * @property {number} mStep - 0-indexed step within the current measure.
  */
