@@ -14,6 +14,10 @@ export const config = {
  * 2: The Gallop (16-16-8 Kick pattern)
  * 3: Double Kick 16ths (Continuous wall of sound)
  * 4: Blast Beat (16th Snare + 16th Kick synchronization)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ * @returns {number}
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -47,6 +51,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 4; // Blast Beat
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState & any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

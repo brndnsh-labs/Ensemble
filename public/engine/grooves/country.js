@@ -12,6 +12,10 @@ export const config = {
  * 0: Traditional Two-Step (Kick on 1/3, Snare on 2/4)
  * 1: Train Beat Light (Brushes/Ghost 16ths)
  * 2: Full Heavy Train Beat
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ * @returns {number}
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -29,6 +33,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 2;
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState & any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,

@@ -17,6 +17,7 @@ import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG } from './grooves/utils.js';
 
+/** @type {Record<string, any>} */
 const strategies = {
     Jazz: jazz,
     Blues: blues,
@@ -36,6 +37,8 @@ const strategies = {
     Shred: shred,
 };
 
+/** @param {any} groove */
+/** @param {any} groove */
 function getStrategy(groove) {
     const isLatinStyle =
         groove.genreFeel === 'Bossa Nova' ||
@@ -48,10 +51,26 @@ function getStrategy(groove) {
     return strategies[groove.genreFeel] || null;
 }
 
+/**
+ * @param {number} vel
+ * @param {number} [amount=0.05]
+ */
+/**
+ * @param {number} vel
+ * @param {number} [amount=0.05]
+ */
 function humanizeVelocity(vel, amount = 0.05) {
     return vel * (1.0 + (Math.random() - 0.5) * amount);
 }
 
+/**
+ * @param {any} state
+ * @param {any} options
+ */
+/**
+ * @param {any} state
+ * @param {any} options
+ */
 export function applyGrooveOverrides(
     state,
     {
@@ -251,6 +270,14 @@ export function applyGrooveOverrides(
     return currentState;
 }
 
+/**
+ * @param {any} playback
+ * @param {any} groove
+ */
+/**
+ * @param {any} playback
+ * @param {any} groove
+ */
 export function calculatePocketOffset(playback, groove) {
     let pocketOffset = calculateTimingOffset('drums', groove.pocket, playback.bandIntensity);
     const strategy = getStrategy(groove);
@@ -260,6 +287,18 @@ export function calculatePocketOffset(playback, groove) {
     return pocketOffset;
 }
 
+/**
+ * @param {number} seed
+ * @param {string} genreFeel
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ */
+/**
+ * @param {number} seed
+ * @param {string} genreFeel
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ */
 export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
     const mockGroove = { genreFeel };
     const strategy = getStrategy(mockGroove);

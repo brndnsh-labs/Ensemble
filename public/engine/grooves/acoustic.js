@@ -12,6 +12,10 @@ export const config = {
  * 1: Driving Folk (Kick on 1/3, Sidestick on 2/4)
  * 2: Soft Rock / Shaker-driven
  * 3: Dynamic Build (Soft Snare runs)
+ * @param {number} seed
+ * @param {number} complexity
+ * @param {number} [intensity=1.0]
+ * @returns {number}
  */
 export function getMotif(seed, complexity, intensity = 1.0) {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
@@ -38,6 +42,11 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3; // Dynamic Build
 }
 
+/**
+ * @param {any} context
+ * @param {import('../../types.js').EnsembleState & any} state
+ * @returns {any}
+ */
 export function applyOverrides(context, state) {
     const {
         inst,
