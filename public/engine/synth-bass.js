@@ -26,8 +26,8 @@ const mixState = {
  * @param {number} freq - Frequency in Hz.
  * @param {number} time - Start time in seconds.
  * @param {number} duration - Note duration in seconds.
- * @param {number} velocity - Note velocity (0.0 - 1.0).
- * @param {boolean} muted - Whether the note is palm-muted.
+ * @param {number} [velocity=1.0] - Note velocity (0.0 - 1.0).
+ * @param {boolean} [muted=false] - Whether the note is palm-muted.
  */
 export function playBassNote(state, freq, time, duration, velocity = 1.0, muted = false) {
     const { playback, bass, groove } = state;

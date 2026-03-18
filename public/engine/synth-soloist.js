@@ -15,6 +15,14 @@ export function killSoloistNote(state) {
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
  * @param {Object} state - Global ensemble state.
+ * @param {number} freq - Frequency in Hz.
+ * @param {number} time - Start time in seconds.
+ * @param {number} duration - Note duration in seconds.
+ * @param {number} vol - Output volume.
+ * @param {number} [bendStartInterval=0] - Interval in semitones to bend from.
+ * @param {string} [style='scalar'] - Synthesis style preset.
+ * @param {boolean} [isLegato=false] - Whether to use legato articulation.
+ * @param {boolean} [vibrato=false] - Whether to apply vibrato.
  */
 export function playSoloNote(
     state,
@@ -68,56 +76,146 @@ export function playSoloNote(
     const prevFreq = soloist.lastRenderedFreq || freq;
     soloist.lastRenderedFreq = freq; // @direct-mutation
 
-    const args = [
-        state,
-        ctx,
-        freq,
-        playTime,
-        duration,
-        vol,
-        bendStartInterval,
-        style,
-        gain,
-        voiceObj,
-        isLegato,
-        prevFreq,
-        vibrato,
-    ];
-
     switch (preset) {
         case 'neo':
-            playNeoJuno(...args);
+            playNeoJuno(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
         case 'vowel':
-            playVowel(...args);
+            playVowel(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
         case 'trumpet':
-            playTrumpet(...args);
+            playTrumpet(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
         case 'saxophone':
-            playSaxophone(...args);
+            playSaxophone(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
         case 'shred':
-            playShred(...args);
+            playShred(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
         case 'classic':
-            playClassic(...args);
+            playClassic(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
         default:
-            playNeoJuno(...args);
+            playNeoJuno(
+                state,
+                ctx,
+                freq,
+                playTime,
+                duration,
+                vol,
+                bendStartInterval,
+                style,
+                gain,
+                voiceObj,
+                isLegato,
+                prevFreq,
+                vibrato,
+            );
             break;
     }
 
     soloist.activeVoices.push(voiceObj); // @direct-mutation
 }
 
+/**
+ * Manages active voices for the soloist synthesizer.
+ * @param {number} playTime - The current play time.
+ * @param {Object} soloist - The soloist state object.
+ */
 function manageVoices(playTime, soloist) {
     if (!soloist.activeVoices) {
         soloist.activeVoices = []; // @direct-mutation
     }
 
     // Clean up finished voices
-    soloist.activeVoices = soloist.activeVoices.filter((v) => v.time + v.duration + 1.0 > playTime); // @direct-mutation
+    soloist.activeVoices = soloist.activeVoices.filter(
+        // @worker-mutation
+        /** @param {any} v */ (v) => v.time + v.duration + 1.0 > playTime,
+    );
 
     const VOICE_LIMIT = soloist.mode === 'piano' ? 4 : soloist.mode === 'guitar' ? 2 : 1;
 
@@ -142,6 +240,21 @@ function manageVoices(playTime, soloist) {
 
 // --- PRESET IMPLEMENTATIONS ---
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} bendStartInterval
+ * @param {string} style
+ * @param {GainNode} outputGain
+ * @param {Object} voiceObj
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} vibratoFlag
+ */
 function playTrumpet(
     state,
     ctx,
@@ -235,6 +348,21 @@ function playTrumpet(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} bendStartInterval
+ * @param {string} style
+ * @param {GainNode} outputGain
+ * @param {Object} voiceObj
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} vibratoFlag
+ */
 function playSaxophone(
     state,
     ctx,
@@ -341,6 +469,21 @@ function playSaxophone(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} bendStartInterval
+ * @param {string} style
+ * @param {GainNode} outputGain
+ * @param {Object} voiceObj
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} vibratoFlag
+ */
 function playClassic(
     state,
     ctx,
@@ -462,6 +605,21 @@ function playClassic(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} bendStartInterval
+ * @param {string} style
+ * @param {GainNode} outputGain
+ * @param {Object} voiceObj
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} vibratoFlag
+ */
 function playNeoJuno(
     state,
     ctx,
@@ -562,6 +720,21 @@ function playNeoJuno(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} bendStartInterval
+ * @param {string} style
+ * @param {GainNode} outputGain
+ * @param {Object} voiceObj
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} vibratoFlag
+ */
 function playVowel(
     state,
     ctx,
@@ -643,6 +816,21 @@ function playVowel(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} vol
+ * @param {number} bendStartInterval
+ * @param {string} style
+ * @param {GainNode} outputGain
+ * @param {Object} voiceObj
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} vibratoFlag
+ */
 function playShred(
     state,
     ctx,
@@ -722,6 +910,19 @@ function playShred(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
+/**
+ * @param {Object} state
+ * @param {OscillatorNode} osc1
+ * @param {OscillatorNode} osc2
+ * @param {number} freq
+ * @param {number} playTime
+ * @param {number} duration
+ * @param {number} bendStartInterval
+ * @param {string} _style
+ * @param {boolean} isLegato
+ * @param {number} prevFreq
+ * @param {boolean} [isPiano=false]
+ */
 function applyPitchEnvelope(
     state,
     osc1,
@@ -762,6 +963,16 @@ function applyPitchEnvelope(
     }
 }
 
+/**
+ * @param {Object} state
+ * @param {AudioContext} ctx
+ * @param {number} freq
+ * @param {number} time
+ * @param {number} duration
+ * @param {string} style
+ * @param {boolean} [forceVibrato=false]
+ * @returns {{vibrato: OscillatorNode, vibGain: GainNode}}
+ */
 function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = false) {
     const { soloist, playback } = state;
     const config = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;

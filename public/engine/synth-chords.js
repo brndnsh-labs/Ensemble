@@ -29,13 +29,19 @@ export const INSTRUMENT_PRESETS = {
     },
 };
 
+/**
+ * @param {AudioContext} audioCtx
+ * @returns {PeriodicWave}
+ */
 function createPianoWave(audioCtx) {
     const real = new Float32Array([0, 1, 0.6, 0.4, 0.25, 0.15, 0.1, 0.08, 0.05, 0.03]);
     const imag = new Float32Array(real.length).fill(0);
     return audioCtx.createPeriodicWave(real, imag);
 }
 
+/** @type {PeriodicWave|null} */
 let pianoWave = null;
+/** @type {Float32Array|null} */
 let cachedShaperCurve = null;
 let cachedShaperDrive = -1;
 
@@ -43,7 +49,7 @@ let cachedShaperDrive = -1;
  * Updates the sustain pedal state, precisely scheduled.
  * @param {Object} state - Global ensemble state.
  * @param {boolean} active - Sustain state.
- * @param {number|null} time - Scheduled time.
+ * @param {number|null} [time=null] - Scheduled time.
  */
 export function updateSustain(state, active, time = null) {
     const { playback } = state;
@@ -51,9 +57,11 @@ export function updateSustain(state, active, time = null) {
     playback.sustainActive = active; // @direct-mutation
 
     if (!active && playback.heldNotes) {
-        playback.heldNotes.forEach((note) => {
-            note.stop(scheduleTime);
-        });
+        playback.heldNotes.forEach(
+            /** @param {any} note */ (note) => {
+                note.stop(scheduleTime);
+            },
+        );
         playback.heldNotes.clear();
     }
 }
@@ -66,11 +74,13 @@ export function killAllPianoNotes(state) {
     const { playback } = state;
     const now = playback.audio?.currentTime || 0;
     if (playback.heldNotes) {
-        playback.heldNotes.forEach((note) => {
-            if (typeof note.stop === 'function') {
-                note.stop(now, true);
-            }
-        });
+        playback.heldNotes.forEach(
+            /** @param {any} note */ (note) => {
+                if (typeof note.stop === 'function') {
+                    note.stop(now, true);
+                }
+            },
+        );
         playback.heldNotes.clear();
     }
     playback.sustainActive = false; // @direct-mutation
@@ -79,6 +89,15 @@ export function killAllPianoNotes(state) {
 /**
  * Plays a musical note with advanced synthesis based on instrument presets.
  * @param {Object} state - Global ensemble state.
+ * @param {number} freq - Frequency in Hz.
+ * @param {number} time - Start time in seconds.
+ * @param {number} duration - Note duration in seconds.
+ * @param {Object} [options={}] - Options object.
+ * @param {number} [options.vol=0.1] - Output volume.
+ * @param {number} [options.index=0] - Note index for staggering.
+ * @param {string} [options.instrument='Piano'] - Instrument preset name.
+ * @param {boolean} [options.muted=false] - Whether the note is muted.
+ * @param {number} [options.numVoices=1] - Number of active voices for polyphony comp.
  */
 export function playNote(
     state,
@@ -174,6 +193,10 @@ export function playNote(
             preset.attack,
         );
 
+        /**
+         * @param {number} t
+         * @param {boolean} [isPanic=false]
+         */
         const stopNote = (t, isPanic = false) => {
             const dampingConstant = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
             rampGain(mainGain.gain, 0, t, dampingConstant);
@@ -248,7 +271,7 @@ export function playNote(
  * Plays a percussive "scratch" or muted strum sound for chord rhythms.
  * @param {Object} state - Global ensemble state.
  * @param {number} time - Scheduled time.
- * @param {number} vol - Output volume.
+ * @param {number} [vol=0.1] - Output volume.
  */
 export function playChordScratch(state, time, vol = 0.1) {
     const { playback, groove } = state;

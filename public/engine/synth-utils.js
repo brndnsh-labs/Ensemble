@@ -28,9 +28,9 @@ export function rampGain(param, target, time, duration = 0.01, isExponential = f
 
 /**
  * Fades out and stops a list of active voices.
- * @param {Array} voices - Array of voice objects { gain, nodes, ... }.
+ * @param {Array<any>} voices - Array of voice objects { gain, nodes, ... }.
  * @param {number} time - Current AudioContext time.
- * @param {number} fadeTime - Time constant for the fade out.
+ * @param {number} [fadeTime=0.01] - Time constant for the fade out.
  */
 export function killActiveVoices(voices, time, fadeTime = 0.01) {
     if (!voices || voices.length === 0) {
@@ -43,15 +43,17 @@ export function killActiveVoices(voices, time, fadeTime = 0.01) {
             rampGain(g, 0, time, fadeTime);
         }
         if (v.nodes) {
-            v.nodes.forEach((node) => {
-                try {
-                    if (node.stop) {
-                        node.stop(time + fadeTime + 0.05);
+            v.nodes.forEach(
+                /** @param {AudioNode|any} node */ (node) => {
+                    try {
+                        if (node.stop) {
+                            node.stop(time + fadeTime + 0.05);
+                        }
+                    } catch {
+                        /* ignore stop errors */
                     }
-                } catch {
-                    /* ignore stop errors */
-                }
-            });
+                },
+            );
         }
     });
     voices.length = 0; // Clear the array in-place
@@ -59,10 +61,10 @@ export function killActiveVoices(voices, time, fadeTime = 0.01) {
 
 /**
  * Updates a density-aware ducking factor based on recent hits.
- * @param {Object} mixState - Object tracking hits { recentHits, lastTick, densityDuck }.
+ * @param {{recentHits: number, lastTick: number, densityDuck: number}} mixState - Object tracking hits { recentHits, lastTick, densityDuck }.
  * @param {number} now - Current AudioContext time.
- * @param {number} threshold - Hits threshold before ducking begins.
- * @param {number} factor - Ducking intensity per hit over threshold.
+ * @param {number} [threshold=4] - Hits threshold before ducking begins.
+ * @param {number} [factor=0.02] - Ducking intensity per hit over threshold.
  * @returns {number} The calculated density ducking factor.
  */
 export function updateDensityDucking(mixState, now, threshold = 4, factor = 0.02) {
@@ -84,10 +86,12 @@ export function updateDensityDucking(mixState, now, threshold = 4, factor = 0.02
  * @param {AudioContext} ctx
  * @param {number} panValue - Pan value (-1 to 1).
  * @param {number} time - Scheduling time.
+ * @returns {StereoPannerNode | GainNode}
  */
 export function createSimplePanner(ctx, panValue, time) {
-    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-    if (ctx.createStereoPanner) {
+    const panner =
+        typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : ctx.createGain();
+    if (typeof ctx.createStereoPanner === 'function' && 'pan' in panner) {
         panner.pan.setValueAtTime(panValue, time);
     }
     return panner;

@@ -40,7 +40,7 @@ const mixState = {
  * @param {Object} state - Global ensemble state.
  * @param {string} name - Drum instrument name.
  * @param {number} time - Start time in seconds.
- * @param {number} velocity - Note velocity (0.0 - 1.0).
+ * @param {number} [velocity=1.0] - Note velocity (0.0 - 1.0).
  */
 export function playDrumSound(state, name, time, velocity = 1.0) {
     const { playback, groove } = state;
@@ -621,6 +621,10 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
     }
 }
 
+/**
+ * @param {AudioContext} audioCtx
+ * @returns {AudioBuffer}
+ */
 function createMetallicBuffer(audioCtx) {
     const duration = 2.0;
     const sampleRate = audioCtx.sampleRate;

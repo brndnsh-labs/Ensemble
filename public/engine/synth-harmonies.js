@@ -19,6 +19,17 @@ export function killHarmonyNote(state, fadeTime = 0.05) {
 /**
  * Plays a harmony note with genre-specific synthesis and articulations.
  * @param {Object} state - Global ensemble state.
+ * @param {number} freq - Frequency in Hz.
+ * @param {number} time - Start time in seconds.
+ * @param {number} duration - Note duration in seconds.
+ * @param {number} [vol=0.4] - Output volume.
+ * @param {string} [style='stabs'] - Synthesis style preset.
+ * @param {number|null} [midi=null] - Optional MIDI note number for voice stealing.
+ * @param {number} [slideInterval=0] - Interval in semitones to slide from.
+ * @param {number} [slideDuration=0] - Duration of the slide in seconds.
+ * @param {Object} [vibrato={rate: 0, depth: 0}] - Vibrato settings.
+ * @param {number} [vibrato.rate] - Vibrato rate in Hz.
+ * @param {number} [vibrato.depth] - Vibrato depth.
  */
 export function playHarmonyNote(
     state,
@@ -45,16 +56,20 @@ export function playHarmonyNote(
         harmony.activeVoices = []; // @direct-mutation
     }
 
-    // 1. Strict Voice Management & Stealing
-    // Remove expired voices
-    harmony.activeVoices = harmony.activeVoices.filter((v) => v.time + v.duration + 0.1 > playTime); // @direct-mutation
+    harmony.activeVoices = harmony.activeVoices.filter(
+        // @worker-mutation
+        /** @param {any} v */ (v) => v.time + v.duration + 0.1 > playTime,
+    );
 
     // Pitch-aware Stealing
     if (midi !== null) {
-        const existing = harmony.activeVoices.find((v) => v.midi === midi);
+        const existing = harmony.activeVoices.find(/** @param {any} v */ (v) => v.midi === midi);
         if (existing) {
             killActiveVoices([existing], playTime, 0.005);
-            harmony.activeVoices = harmony.activeVoices.filter((v) => v !== existing); // @direct-mutation
+            harmony.activeVoices = harmony.activeVoices.filter(
+                // @worker-mutation
+                /** @param {any} v */ (v) => v !== existing,
+            );
         }
     }
 
