@@ -30,6 +30,48 @@ const CHORD_PROFILE_ENTRIES = Object.entries(CHORD_PROFILES);
 const MAJOR_DIATONIC = [0, 2, 4, 5, 7, 9, 11]; // I ii iii IV V vi vii°
 const MINOR_DIATONIC = [0, 2, 3, 5, 7, 8, 10]; // i ii° III iv v VI VII
 
+/**
+ * @typedef {Object} SharedBuffers
+ * @property {Float32Array} chroma
+ * @property {Float32Array} pitchEnergy
+ * @property {Float32Array} windowValues
+ * @property {Float32Array} windowedSignal
+ * @property {Float32Array} cosTable
+ * @property {Float32Array} sinTable
+ */
+
+/**
+ * @typedef {Object} ChromagramOptions
+ * @property {number} [step]
+ * @property {number} [minMidi]
+ * @property {number} [maxMidi]
+ * @property {boolean} [suppressHarmonics]
+ * @property {boolean} [skipSharpening]
+ * @property {SharedBuffers} [buffers]
+ * @property {number} [startTime]
+ * @property {number} [endTime]
+ * @property {number} [bpm]
+ * @property {Function} [onProgress]
+ * @property {any} [keyBias]
+ * @property {string|null} [bassNote]
+ * @property {Float32Array} [bassChroma]
+ */
+
+/**
+ * @typedef {Object} PulseData
+ * @property {number} bpm
+ * @property {number} beatsPerMeasure
+ * @property {number} downbeatOffset
+ * @property {Array<{bpm: number, score: number}>} candidates
+ */
+
+/**
+ * @param {Float32Array} signal
+ * @param {number} sampleRate
+ * @param {ChromagramOptions} options
+ * @param {Array<{midi: number, freq: number, bin: number}>} pitchFrequencies
+ * @returns {Float32Array}
+ */
 function calculateChromagramStandalone(signal, sampleRate, options, pitchFrequencies) {
     let chroma, pitchEnergy, windowValues;
 
@@ -189,7 +231,7 @@ function calculateChromagramStandalone(signal, sampleRate, options, pitchFrequen
     }
 
     // Normalize
-    const maxVal = max(...sharpened);
+    const maxVal = max.apply(null, Array.from(sharpened));
     if (maxVal > 0) {
         for (let i = 0; i < 12; i++) {
             sharpened[i] /= maxVal;
@@ -220,6 +262,7 @@ export class ChordAnalyzerLite {
         /**
          * Krumhansl-Schmuckler Key Profiles (Major and Minor)
          * Weights used for global key identification.
+         * @type {Record<string, number[]>}
          */
         this.keyProfiles = {
             major: [6.5, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 5.0, 2.0, 3.5, 2.0, 3.0],
@@ -233,9 +276,11 @@ export class ChordAnalyzerLite {
     /**
      * Identifies the global key and tuning offset of the audio.
      * Includes a high-res rotation check to handle tuning drift.
+     * @returns {{root: number, type: string, tuningOffset: number}}
      */
     identifyGlobalKey(totalChroma) {
         let bestScore = -1;
+        /** @type {{root: number, type: string, tuningOffset: number}} */
         let bestKey = { root: 0, type: 'major', tuningOffset: 0 };
         const rotatedBuffer = new Float32Array(12);
 
@@ -274,10 +319,12 @@ export class ChordAnalyzerLite {
     /**
      * Identifies the key from a chromagram without tuning search.
      * Used for fast local key estimation during analysis.
+     * @returns {{root: number, type: string, score: number}}
      */
     identifySimpleKey(chroma) {
         let bestScore = -1;
-        let bestKey = { root: 0, type: 'major' };
+        /** @type {{root: number, type: string, score: number}} */
+        let bestKey = { root: 0, type: 'major', score: 0 };
 
         for (let root = 0; root < 12; root++) {
             for (const type of KEY_TYPES) {
@@ -301,6 +348,9 @@ export class ChordAnalyzerLite {
 
     /**
      * Rotates a 12-bin chromagram by a fractional semitone using linear interpolation.
+     * @param {Float32Array} chroma
+     * @param {number} amount
+     * @param {Float32Array|null} [output=null]
      */
     rotateChroma(chroma, amount, output = null) {
         if (!output && amount === 0) {
@@ -328,6 +378,8 @@ export class ChordAnalyzerLite {
 
     /**
      * Analyzes an AudioBuffer and returns detected chords and pulse metadata.
+     * @param {AudioBuffer} audioBuffer
+     * @param {ChromagramOptions} [options={}]
      */
     async analyze(audioBuffer, options = {}) {
         // 1. Identify Pulse (BPM, Meter, Downbeat)
@@ -529,7 +581,7 @@ export class ChordAnalyzerLite {
             const window = results.slice(max(0, i - 1), min(results.length, i + 2));
             const counts = {};
 
-            window.forEach((r) => {
+            window.forEach((/** @type {{chord: string}} */ r) => {
                 const chord = r.chord;
                 // We keep it simple for now: raw count.
                 counts[chord] = (counts[chord] || 0) + 1;
@@ -596,7 +648,10 @@ export class ChordAnalyzerLite {
      * Extracts the single strongest note per beat from the audio.
      * Used for the "Harmonize Melody" feature.
      * Includes Diatonic Gravity to favor notes within the detected key.
-     * @returns {Promise<Array<{beat: number, midi: number, energy: number}>>}
+     * @param {AudioBuffer} audioBuffer
+     * @param {PulseData} pulseData
+     * @param {ChromagramOptions} [options={}]
+     * @returns {Promise<Array<{beat: number, midi: number | null, energy: number}>>}
      */
     async extractMelody(audioBuffer, pulseData, options = {}) {
         const signal = audioBuffer.getChannelData(0);
@@ -780,6 +835,8 @@ export class ChordAnalyzerLite {
      * Identifies the "Pulse" (BPM, Meter, and Downbeat) of the audio using
      * Spectral Flux for robust onset detection and autocorrelation.
      * Includes "Top-Down" structural snapping based on clip duration.
+     * @param {AudioBuffer} audioBuffer
+     * @param {ChromagramOptions} [options={}]
      */
     async identifyPulse(audioBuffer, options = {}) {
         const signal = audioBuffer.getChannelData(0);
@@ -885,7 +942,7 @@ export class ChordAnalyzerLite {
         const duration = effectiveEndTime - startTime;
 
         // Half-wave rectification and normalization of flux
-        const maxFlux = max(...flux);
+        const maxFlux = max.apply(null, Array.from(flux));
         const onsets = new Float32Array(flux.length);
         const invMaxFlux = 1 / (maxFlux || 1);
         for (let i = 0; i < flux.length; i++) {
@@ -902,8 +959,8 @@ export class ChordAnalyzerLite {
         const commonBarCounts = [4, 8, 12, 16, 24, 32, 48, 64];
         const commonMeters = [4, 3];
 
-        commonBarCounts.forEach((bars) => {
-            commonMeters.forEach((meter) => {
+        commonBarCounts.forEach((/** @type {number} */ bars) => {
+            commonMeters.forEach((/** @type {number} */ meter) => {
                 const totalBeats = bars * meter;
                 let bpm = (totalBeats * 60) / duration;
 
@@ -1067,8 +1124,8 @@ export class ChordAnalyzerLite {
             // This handles perfectly trimmed loops where tail-trimming might be too aggressive.
             const fullDuration = rawEndTime - startTime;
             const structuralCandidatesFull = [];
-            [4, 8, 12, 16, 24, 32, 48, 64].forEach((bars) => {
-                [4, 3].forEach((meter) => {
+            [4, 8, 12, 16, 24, 32, 48, 64].forEach((/** @type {number} */ bars) => {
+                [4, 3].forEach((/** @type {number} */ meter) => {
                     const bpm = (bars * meter * 60) / fullDuration;
                     if (bpm >= 50 && bpm <= 200) {
                         structuralCandidatesFull.push({ bpm, bars, meter });
@@ -1088,7 +1145,7 @@ export class ChordAnalyzerLite {
 
         // Generate candidates
         const candidatesMap = new Map();
-        [2, 1, 0.5, 4, 0.25].forEach((mult) => {
+        [2, 1, 0.5, 4, 0.25].forEach((/** @type {number} */ mult) => {
             const lag = round(bestLag * mult);
             if (lag >= minLag && lag <= maxLag) {
                 const bpm = mult === 1 ? primaryBPM : round(60 / (lag * 0.01));
@@ -1099,16 +1156,23 @@ export class ChordAnalyzerLite {
         });
 
         const candidates = [];
-        for (const [bpm, score] of candidatesMap.entries()) {
+        for (const [bpm, score] of Array.from(candidatesMap.entries())) {
             candidates.push({ bpm, score });
         }
-        const primaryCandidate = candidates.find((c) => c.bpm === primaryBPM);
+        const primaryCandidate = candidates.find(
+            (/** @type {{bpm: number, score: number}} */ c) => c.bpm === primaryBPM,
+        );
 
         // If we have a structural match, give it an overwhelming score boost to ensure it wins
         if (primaryCandidate) {
             primaryCandidate.score *= bestStructuralMatch ? 100.0 : 3.0;
         }
-        candidates.sort((a, b) => b.score - a.score);
+        candidates.sort(
+            (
+                /** @type {{bpm: number, score: number}} */ a,
+                /** @type {{bpm: number, score: number}} */ b,
+            ) => b.score - a.score,
+        );
 
         // 4. Meter Detection (3/4 vs 4/4)
         // If we snapped to a structural match, use its meter!
@@ -1183,6 +1247,10 @@ export class ChordAnalyzerLite {
         return calculateChromagramStandalone(signal, sampleRate, options, this.pitchFrequencies);
     }
 
+    /**
+     * @param {Float32Array} chroma
+     * @param {ChromagramOptions} [options={}]
+     */
     identifyChord(chroma, options = {}) {
         let bestScore = -1;
         let bestChordData = { root: 0, type: 'maj' };
@@ -1190,12 +1258,13 @@ export class ChordAnalyzerLite {
         for (let root = 0; root < 12; root++) {
             for (const [type, profile] of CHORD_PROFILE_ENTRIES) {
                 let score = 0;
+                const typedProfile = /** @type {any} */ (profile);
 
                 // 1. Profile Match
                 for (let i = 0; i < 12; i++) {
                     const chromaIdx = (root + i) % 12;
                     const val = chroma[chromaIdx];
-                    if (profile[i]) {
+                    if (typedProfile[i]) {
                         let effectiveVal = val;
                         if (
                             val < 0.1 &&
@@ -1288,7 +1357,9 @@ export class ChordAnalyzerLite {
             for (let i = 0; i < chroma.length; i++) {
                 totalEnergy += chroma[i];
             }
-            const bassIdx = this.notes.indexOf(options.bassNote);
+            /** @type {any} */
+            const notes = this.notes;
+            const bassIdx = notes.indexOf(options.bassNote);
 
             let bassEnergy = chroma[bassIdx];
             // If bassChroma is provided, use it to capture energy below the main analysis range (e.g. C1-B2)
