@@ -54,8 +54,13 @@ This document is the primary operational guide for AI agents working on the Ense
 *   **Musical Intent**: In generative logic (bass, drums, soloist), always add JSDoc comments explaining **why** a specific probability or offset exists (e.g., `// 15% probability to add a 'ghost' note on step 14 for Jazz feel`). This prevents future agents from "optimizing" away intentional nuances.
 *   **Type Safety**: Achieve project-wide type safety via **Hardened JSDoc**. All new state properties, reducer actions, and musical engine functions MUST include explicit JSDoc `@type`, `@param`, and `@returns` tags. Use the global interfaces defined in `public/types.js` (e.g., `EnsembleState`, `StepInfo`) to ensure architectural consistency. ALWAYS run `npm run typecheck` before concluding a task.
 
-### B. Deterministic Phrasing
-Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js`.
+### B. Deterministic Phrasing & Dynamic Head
+*   **Dynamic Head (Soloist):** The soloist generates a session-wide "seed melody" (`soloist.sessionSeed`) at the start of playback. This melody uses **SRDC** (Statement, Restatement, Departure, Conclusion) structure.
+*   **Chorus Evolution:** Generative engines (especially Soloist) should look at `playback.currentLoopCount` to evolve their performance:
+    *   `Loop 0`: Adhere strictly to the "Head" (seed melody/simple rhythm).
+    *   `Loop 1`: Add "Ornamentation" (grace notes, slides, fills).
+    *   `Loop 2+`: Transition to "Exploration" while maintaining a slight magnetic pull to the original seed.
+*   **Motifs:** Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js`.
 
 ### C. Coordination & Register Slotting
 Always pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:

@@ -21,6 +21,12 @@ Ensemble is built for improvisation.
 - **Status Indicator:** Watch the Soloist power button (⏻). **Green** means the AI is playing; **Yellow** means it's your turn!
 - **Soloist Performance:** Press `S` to open the Performance Card. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
 
+### "I want the soloist to sound more intentional"
+The AI Soloist uses a **Dynamic Head** system to provide thematic direction to each session. Every time you press play, the soloist generates a unique "seed melody" that fits your specific chord progression.
+- **Chorus 1 (The Head):** The soloist plays the seed melody clearly and accurately to establish the "song" for the session.
+- **Chorus 2 (Evolution):** The soloist adds stylistic embellishments like slides, grace notes, and "blues curls" around the seed notes.
+- **Chorus 3+ (Improvisation):** The soloist begins to improvise freely, but still maintains a slight "magnetic pull" toward the original theme, ensuring the performance feels connected and intentional rather than random.
+
 ### "I want to play the drums manually"
 If you want to take over the rhythm section or just troubleshoot the kit:
 - **Drum Pad:** Press `D` (or click the 🥁 icon in the Grooves panel) to open the **Drum Pad & Diagnostic Lab**.

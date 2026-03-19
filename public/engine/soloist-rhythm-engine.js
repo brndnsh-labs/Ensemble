@@ -157,6 +157,17 @@ export function generateRhythmPlan(
                 }
             }
 
+            // --- Dynamic Head: Rhythmic Seeding ---
+            const sessionSeed = soloistState.sessionSeed;
+            if (sessionSeed && sessionSeed.notes.length > 0) {
+                const { notes, loopLengthSteps } = sessionSeed;
+                const stepInLoop = step % loopLengthSteps;
+                const hasSeedNote = notes.some((/** @type {any} */ n) => n.step === stepInLoop);
+                if (hasSeedNote) {
+                    attackProb += 0.4; // Strong boost for seed points
+                }
+            }
+
             if (isFinalMeasure && soloistState.transitionState === 'lead_in') {
                 attackProb *= 1.5;
             }

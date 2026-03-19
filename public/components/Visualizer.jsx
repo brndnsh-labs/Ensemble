@@ -186,7 +186,9 @@ export function Visualizer({ enabled, getVisualTime }) {
             lastFrameTime = nowFrame;
 
             if (!playback.audio || !playback.audio.currentTime) {
-                playback.isDrawing = false; // @direct-mutation
+                if (!playback.isPlaying) {
+                    playback.isDrawing = false; // @direct-mutation
+                }
                 loopRef.current = requestAnimationFrame(loop);
                 return;
             }

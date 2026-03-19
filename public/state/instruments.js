@@ -76,6 +76,7 @@ export const bass = deepSignal({
  * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
  * @property {number} hookRetentionProb - Probability of retaining a hook motif.
+ * @property {{notes: Array<any>, loopLengthSteps: number}|null} sessionSeed - Seed melody for the current session.
  * @property {Array<any>} leadSheetMelody - Imported melody array.
  * @property {Array<any>} rhythmPlan - Planned rhythmic phrase.
  * @property {Array<any>} deviceBuffer - Buffer for melodic embellishments.
@@ -174,6 +175,7 @@ export const soloist = deepSignal({
     isYielding: false,
     motifTracking: false,
     leadSheetMelody: [],
+    sessionSeed: null,
     phrasingIntensity: 0.5,
     phraseCount: 0,
     rhythmicEntropy: 0,
@@ -305,6 +307,7 @@ export function instrumentReducer(action, payload) {
             soloist.isWaitingForEntry = false;
             soloist.isYielding = false;
             soloist.motifTracking = false;
+            soloist.sessionSeed = null;
             soloist.phrasingIntensity = 0.5;
             soloist.busySteps = 0;
             soloist.sessionSteps = 0;

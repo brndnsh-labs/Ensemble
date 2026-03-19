@@ -122,7 +122,6 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
             playback.suspendTimeout = /** @type {any} */ (
                 // @direct-mutation
                 setTimeout(() => {
-                    // @direct-mutation
                     if (
                         !playback.isPlaying &&
                         playback.audio &&
@@ -156,6 +155,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
         playback.resolutionTriggered = false; // @direct-mutation
         playback.isScheduling = false; // @direct-mutation
         chords.scheduledChordIndex = 0; // @direct-mutation
+        chords.lastActiveChordIndex = null; // @direct-mutation
         if (dispatch) {
             dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
             dispatch(ACTIONS.SET_ENDING_PENDING, false);

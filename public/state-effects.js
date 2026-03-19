@@ -3,6 +3,7 @@ import { validateProgression } from './engine/chords-engine.js';
 import { applyConductor } from './engine/conductor.js';
 import { initAudio, restoreGains } from './engine/engine.js';
 import { togglePlay } from './engine/scheduler-core.js';
+import { generateSessionSeed } from './engine/soloist-seeder.js';
 import { loadDrumPreset } from './instrument-controller.js';
 import { initMIDI } from './midi-controller.js';
 import { ACTIONS } from './types.js';
@@ -19,6 +20,17 @@ export function handleEffects(action, payload, stateMap, context = {}) {
     const { dispatch } = context;
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
+            const { playback, arranger, soloist } = stateMap;
+            if (playback.isPlaying) {
+                const seed = generateSessionSeed(
+                    arranger,
+                    soloist.style || 'smart',
+                    playback.bandIntensity,
+                );
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: seed });
+            } else {
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null });
+            }
             togglePlay(stateMap, true, dispatch);
             break;
         }
@@ -30,6 +42,16 @@ export function handleEffects(action, payload, stateMap, context = {}) {
         case ACTIONS.SET_TIME_SIGNATURE:
         case ACTIONS.SET_IS_MINOR: {
             validateProgression(stateMap, dispatch);
+            // If arrangement changes during playback, we must regenerate the seed
+            // to ensure MIDI notes land on valid chord/scale tones for the new structure.
+            if (stateMap.playback.isPlaying) {
+                const seed = generateSessionSeed(
+                    stateMap.arranger,
+                    stateMap.soloist.style || 'smart',
+                    stateMap.playback.bandIntensity,
+                );
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: seed });
+            }
             break;
         }
         case ACTIONS.SET_BPM: {

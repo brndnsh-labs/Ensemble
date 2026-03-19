@@ -376,6 +376,39 @@ export function selectPitchAndDevices(
                 }
             }
         }
+
+        // --- Dynamic Head: Pitch Weighting (Thematic Consistency) ---
+        const seed = soloistState.sessionSeed;
+        if (seed?.notes && seed.notes.length > 0) {
+            const { notes, loopLengthSteps } = seed;
+            const loopCount = playback.currentLoopCount || 0;
+            const stepInLoop = step % loopLengthSteps;
+            const seedNote = notes.find((/** @type {any} */ n) => n.step === stepInLoop);
+
+            if (seedNote) {
+                const pcMatch = m % 12 === seedNote.midi % 12;
+                const exactMatch = m === seedNote.midi;
+
+                if (pcMatch) {
+                    let seedBoost = 0;
+                    if (loopCount === 0) {
+                        // Chorus 1: The Head. Direct adherence.
+                        seedBoost = exactMatch ? 5000 : 1000;
+                    } else if (loopCount === 1) {
+                        // Chorus 2: Embellished.
+                        seedBoost = exactMatch ? 2000 : 500;
+                    } else if (loopCount === 2) {
+                        // Chorus 3: Departure.
+                        seedBoost = exactMatch ? 800 : 200;
+                    } else {
+                        // Chorus 4+: Thematic Pull.
+                        seedBoost = exactMatch ? 300 : 100;
+                    }
+                    weight += seedBoost;
+                }
+            }
+        }
+
         CANDIDATE_WEIGHTS[m] = weight;
         totalWeight += weight;
     }
@@ -399,11 +432,16 @@ export function selectPitchAndDevices(
     }
 
     // --- Melodic Devices ---
-    const deviceBaseProb = config.deviceProb * (0.5 + intensity);
+    let deviceBaseProb = config.deviceProb * (0.5 + intensity);
+    const sessionSeed = soloistState.sessionSeed;
+    if ((playback.currentLoopCount || 0) === 0 && sessionSeed && sessionSeed.notes.length > 0) {
+        deviceBaseProb *= 0.2; // Clean head
+    }
     const isPolyphonic =
         soloistState.mode !== 'monophonic' &&
         (soloistState.doubleStopProb ?? 1.0) > 0 &&
-        config.doubleStopProb > 0;
+        config.doubleStopProb > 0 &&
+        ((playback.currentLoopCount || 0) > 0 || !sessionSeed || sessionSeed.notes.length === 0); // No double stops in the Head ONLY if seed exists
 
     // --- Structural Awareness: Turnaround Handling ---
     if (

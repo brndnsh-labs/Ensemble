@@ -35,6 +35,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
 | `public/engine/soloist.js` | Melodic soloist generation logic (Main). | `getSoloistNote` |
+| `public/engine/soloist-seeder.js` | Dynamic Head (Seed Melody) generation logic. | `generateSessionSeed` |
 | `public/engine/bass-engine.js` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
 | `public/engine/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/engine/chords-engine.js` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |

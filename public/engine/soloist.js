@@ -98,6 +98,12 @@ export function getSoloistNote(
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
+    const isHeadMode =
+        (playback.currentLoopCount || 0) === 0 &&
+        soloist.sessionSeed &&
+        soloist.sessionSeed.notes.length > 0 &&
+        step % soloist.sessionSeed.loopLengthSteps < soloist.sessionSeed.loopLengthSteps - 1;
+
     // Use stepInfo for all meter-aware timing calculations
     const measureStep = stepInfo
         ? stepInfo.mStep
@@ -304,7 +310,7 @@ export function getSoloistNote(
             }
         }
 
-        if ((soloist.restSteps || 0) <= 0 || coordination.bypassRhythm) {
+        if ((soloist.restSteps || 0) <= 0 || coordination.bypassRhythm || isHeadMode) {
             const isGoodEntry =
                 isBeatStart || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
             const preventBreakout =
@@ -315,6 +321,7 @@ export function getSoloistNote(
             if (
                 !preventBreakout &&
                 (isGoodEntry ||
+                    isHeadMode ||
                     coordination.bypassRhythm ||
                     (soloist.restSteps || 0) < -stepsPerMeasure)
             ) {
@@ -323,11 +330,18 @@ export function getSoloistNote(
                 soloist.phraseCount = (soloist.phraseCount || 0) + 1; // @worker-mutation
 
                 const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
-                const _nextActiveSteps = Math.floor(
+                let _nextActiveSteps = Math.floor(
                     baseLength * stepsPerBeat * (0.3 + Math.random() * 1.2),
                 );
+
+                if (isHeadMode && soloist.sessionSeed) {
+                    _nextActiveSteps = soloist.sessionSeed.loopLengthSteps;
+                }
+
                 soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
-                logDebug(`Waking up for ~${soloist.activeSteps} steps`);
+                logDebug(
+                    `Waking up for ~${soloist.activeSteps} steps${isHeadMode ? ' (Head Mode)' : ''}`,
+                );
 
                 // --- Call & Response Framework ---
                 if (['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle)) {
@@ -381,7 +395,12 @@ export function getSoloistNote(
         const isStrongResolution =
             measureStep === stepsPerMeasure - 1 || (isBackbeat && intensity > 0.5);
 
-        if ((soloist.activeSteps || 0) <= 0 && isStrongResolution && !coordination.bypassRhythm) {
+        if (
+            (soloist.activeSteps || 0) <= 0 &&
+            isStrongResolution &&
+            !coordination.bypassRhythm &&
+            !isHeadMode
+        ) {
             soloist.isResting = true; // @worker-mutation
             soloist.phrasingState = 'rest'; // @worker-mutation
             const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
