@@ -16,10 +16,9 @@ import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIC
 
 /**
  * @typedef {Object} SettingsProps
- * @property {boolean} isMobile - Whether the app is in mobile view.
+ * @property {string} [key]
  */
-/** @param {SettingsProps} props */
-export function Settings({ isMobile }) {
+export function Settings() {
     const {
         theme,
         countIn,

@@ -19,8 +19,6 @@ const { arranger } = getState();
  * @property {import('../state/arranger.js').Section} section
  * @property {number} index
  * @property {number} totalSections
- * @property {boolean} [isActive]
- * @property {boolean} [isPlaying]
  * @property {any} [ref]
  * @property {string} [key]
  */
@@ -28,10 +26,7 @@ const { arranger } = getState();
  * @type {import('preact/compat').ForwardFn<SectionCardProps>}
  */
 export const SectionCard = forwardRef(
-    (
-        /** @type {SectionCardProps} */ { section, index, totalSections, isActive, isPlaying },
-        ref,
-    ) => {
+    (/** @type {SectionCardProps} */ { section, index, totalSections }, ref) => {
         const [isMenuOpen, setIsMenuOpen] = useState(false);
         /** @type {import('preact/hooks').MutableRef<HTMLTextAreaElement|null>} */
         const textareaRef = useRef(null);
