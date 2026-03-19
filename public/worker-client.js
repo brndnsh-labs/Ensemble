@@ -102,18 +102,42 @@ export function stopWorker() {
 }
 
 /**
+ * Deeply unwrap proxy/signal objects into plain objects.
+ * Much faster than JSON.parse(JSON.stringify(val)).
  * @param {any} val
  * @returns {any}
  */
 function toRaw(val) {
-    if (!val || typeof val !== 'object') {
+    if (val === null || typeof val !== 'object') {
         return val;
     }
-    try {
-        return JSON.parse(JSON.stringify(val));
-    } catch (_e) {
-        return val;
+    if (Array.isArray(val)) {
+        const arr = new Array(val.length);
+        for (let i = 0; i < val.length; i++) {
+            const rawVal = toRaw(val[i]);
+            // JSON.stringify converts undefined in arrays to null
+            arr[i] = rawVal === undefined ? null : rawVal;
+        }
+        return arr;
     }
+    if (val instanceof Set) {
+        return new Set(Array.from(val).map(toRaw));
+    }
+    if (val instanceof Map) {
+        return new Map(Array.from(val.entries()).map(([k, v]) => [k, toRaw(v)]));
+    }
+    /** @type {Record<string, any>} */
+    const raw = {};
+    for (const key in val) {
+        if (Object.hasOwn(val, key)) {
+            const rawVal = toRaw(val[key]);
+            // JSON.stringify drops undefined values in objects
+            if (rawVal !== undefined) {
+                raw[key] = rawVal;
+            }
+        }
+    }
+    return raw;
 }
 
 /**
