@@ -142,7 +142,15 @@ export function dispatch(action, payload) {
             action.startsWith('SET_SWING') ||
             action.startsWith('SET_GENRE_FEEL') ||
             action.startsWith('SET_GROOVE') ||
-            action.startsWith('STEP_TOGGLE'));
+            action.startsWith('STEP_TOGGLE') ||
+            action.startsWith('SET_STYLE') ||
+            action.startsWith('SET_VOLUME') ||
+            action.startsWith('SET_REVERB') ||
+            action.startsWith('SET_OCTAVE') ||
+            action.startsWith('SET_DENSITY') ||
+            action.startsWith('SET_SOLOIST') ||
+            action.startsWith('UPDATE_HB') ||
+            action.startsWith('UPDATE_SB'));
 
     if (playback.stateVersion !== undefined && !isReactiveAction) {
         playback.stateVersion++;

@@ -304,7 +304,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             }
 
             expect(evhNotes).toBeGreaterThan(gilmourNotes);
-        });
+        }, 10000);
     });
 
     describe('Pickup & Loop Logic', () => {

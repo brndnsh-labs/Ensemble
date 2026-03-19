@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { KEY_ORDER } from '../config.js';
 import { ACTIONS } from '../types.js';
 import { arranger } from './arranger.js';
@@ -16,8 +17,10 @@ import { arranger } from './arranger.js';
  * @property {Map<number, any>} buffer - Scheduled notes buffer.
  * @property {number} rhythmicMask - 16-bit mask of the current comping pattern.
  * @property {string} activeTab - Currently active UI tab ('classic' or 'smart').
+ * @property {string} [instrument] - Optional instrument name.
  */
-export const chords = {
+/** @type {import('deepsignal').DeepSignal<ChordState>} */
+export const chords = deepSignal({
     enabled: true,
     style: 'smart',
     volume: 0.5,
@@ -30,7 +33,8 @@ export const chords = {
     buffer: new Map(),
     rhythmicMask: 0,
     activeTab: 'smart',
-};
+    instrument: 'Clean',
+});
 
 /**
  * @typedef {Object} BassState
@@ -46,7 +50,8 @@ export const chords = {
  * @property {string} activeTab - Currently active UI tab.
  * @property {GainNode|null} lastBassGain - Last gain node for dynamic continuity.
  */
-export const bass = {
+/** @type {import('deepsignal').DeepSignal<BassState>} */
+export const bass = deepSignal({
     enabled: true,
     volume: 0.45,
     reverb: 0.05,
@@ -58,7 +63,7 @@ export const bass = {
     busySteps: 0,
     activeTab: 'smart',
     lastBassGain: null,
-};
+});
 
 /**
  * @typedef {Object} SoloistState
@@ -115,7 +120,8 @@ export const bass = {
  * @property {number} notesInPhrase - Current phrase note counter.
  * @property {string} lastSmartStyle - Last active smart style.
  */
-export const soloist = {
+/** @type {import('deepsignal').DeepSignal<SoloistState>} */
+export const soloist = deepSignal({
     enabled: false,
     preset: 'trumpet',
     volume: 0.5,
@@ -123,7 +129,7 @@ export const soloist = {
     lastPlayedFreq: null,
     buffer: new Map(),
     lastNoteEnd: 0,
-    octave: 64,
+    octave: 72,
     style: 'smart',
     direction: 1,
     melodicTrend: 'Static',
@@ -172,7 +178,7 @@ export const soloist = {
     hookRetentionProb: 0.5,
     rhythmPlan: [],
     embellishmentBuffer: [],
-};
+});
 
 /**
  * @typedef {Object} HarmonyState
@@ -190,7 +196,8 @@ export const soloist = {
  * @property {Array<any>} activeVoices - Currently playing polyphonic voices.
  * @property {number} pocketOffset - Current micro-timing offset.
  */
-export const harmony = {
+/** @type {import('deepsignal').DeepSignal<HarmonyState>} */
+export const harmony = deepSignal({
     enabled: false,
     volume: 0.4,
     reverb: 0.4,
@@ -204,7 +211,7 @@ export const harmony = {
     rhythmicMask: 0,
     activeTab: 'smart',
     pocketOffset: 0,
-};
+});
 
 /**
  * @type {Record<string, any>}
@@ -257,141 +264,134 @@ export function instrumentReducer(action, payload) {
                 }));
             }
 
-            Object.assign(soloist, {
-                leadSheetMelody: transposedMelody,
-                style: 'lead_sheet',
-                enabled: true,
-            });
+            soloist.leadSheetMelody = transposedMelody;
+            soloist.style = 'lead_sheet';
+            soloist.enabled = true;
             break;
         }
         case ACTIONS.CLEAR_LEAD_SHEET:
-            Object.assign(soloist, {
-                leadSheetMelody: [],
-                style: soloist.lastSmartStyle || 'smart',
-            });
+            soloist.leadSheetMelody = [];
+            soloist.style = soloist.lastSmartStyle || 'smart';
             break;
         case ACTIONS.RESET_STATE:
-            Object.assign(chords, {
-                enabled: true,
-                volume: 0.5,
-                reverb: 0.3,
-                instrument: 'Clean',
-                octave: 65,
-                density: 'standard',
-                pianoRoots: false,
-                activeTab: 'smart',
-            });
-            Object.assign(bass, {
-                enabled: true,
-                volume: 0.45,
-                reverb: 0.05,
-                octave: 38,
-                style: 'smart',
-                activeTab: 'smart',
-            });
-            Object.assign(soloist, {
-                enabled: false,
-                preset: 'trumpet',
-                volume: 0.5,
-                reverb: 0.6,
-                octave: 72,
-                style: 'smart',
-                activeTab: 'smart',
-                mode: 'monophonic',
-                complexity: 0.5,
-                tradeMode: 'manual',
-                isWaitingForEntry: false,
-                isYielding: false,
-                motifTracking: false,
-                phrasingIntensity: 0.5,
-                busySteps: 0,
-                sessionSteps: 0,
-                phraseCount: 0,
-                isResting: true,
-                restSteps: 0,
-                activeSteps: 0,
-                rhythmicEntropy: 0,
-                rhythmPlan: [],
-                deviceBuffer: [],
-                embellishmentBuffer: [],
-                hookBuffer: [],
-                sharedHookBuffer: [],
-                phraseContext: {
-                    role: 'call',
-                    skeleton: [],
-                    lastInterval: null,
-                    profile: 'srv',
-                },
-            });
-            Object.assign(harmony, {
-                enabled: false,
-                volume: 0.4,
-                reverb: 0.4,
-                octave: 60,
-                style: 'smart',
-                complexity: 0.5,
-                activeTab: 'smart',
-            });
+            chords.enabled = true;
+            chords.volume = 0.5;
+            chords.reverb = 0.3;
+            chords.instrument = 'Clean';
+            chords.octave = 65;
+            chords.density = 'standard';
+            chords.pianoRoots = false;
+            chords.activeTab = 'smart';
+
+            bass.enabled = true;
+            bass.volume = 0.45;
+            bass.reverb = 0.05;
+            bass.octave = 38;
+            bass.style = 'smart';
+            bass.activeTab = 'smart';
+
+            soloist.enabled = false;
+            soloist.preset = 'trumpet';
+            soloist.volume = 0.5;
+            soloist.reverb = 0.6;
+            soloist.octave = 72;
+            soloist.style = 'smart';
+            soloist.activeTab = 'smart';
+            soloist.mode = 'monophonic';
+            soloist.complexity = 0.5;
+            soloist.tradeMode = 'manual';
+            soloist.isWaitingForEntry = false;
+            soloist.isYielding = false;
+            soloist.motifTracking = false;
+            soloist.phrasingIntensity = 0.5;
+            soloist.busySteps = 0;
+            soloist.sessionSteps = 0;
+            soloist.phraseCount = 0;
+            soloist.isResting = true;
+            soloist.restSteps = 0;
+            soloist.activeSteps = 0;
+            soloist.rhythmicEntropy = 0;
+            soloist.rhythmPlan = [];
+            soloist.deviceBuffer = [];
+            soloist.embellishmentBuffer = [];
+            soloist.hookBuffer = [];
+            soloist.sharedHookBuffer = [];
+            soloist.phraseContext.role = 'call';
+            soloist.phraseContext.skeleton = [];
+            soloist.phraseContext.lastInterval = null;
+            soloist.phraseContext.profile = 'srv';
+
+            harmony.enabled = false;
+            harmony.volume = 0.4;
+            harmony.reverb = 0.4;
+            harmony.octave = 60;
+            harmony.style = 'smart';
+            harmony.complexity = 0.5;
+            harmony.activeTab = 'smart';
             return true;
         case ACTIONS.SET_STYLE:
             if (instrumentStateMap[payload.module]) {
-                Object.assign(instrumentStateMap[payload.module], { style: payload.style });
+                instrumentStateMap[payload.module].style = payload.style;
             }
             return true;
         case ACTIONS.SET_DENSITY:
-            Object.assign(chords, { density: payload });
+            chords.density = payload;
             return true;
         case ACTIONS.SET_VOLUME:
             if (instrumentStateMap[payload.module]) {
-                Object.assign(instrumentStateMap[payload.module], { volume: payload.value });
+                instrumentStateMap[payload.module].volume = payload.value;
             }
             return true;
         case ACTIONS.SET_REVERB:
             if (instrumentStateMap[payload.module]) {
-                Object.assign(instrumentStateMap[payload.module], { reverb: payload.value });
+                instrumentStateMap[payload.module].reverb = payload.value;
             }
             return true;
         case ACTIONS.SET_OCTAVE:
             if (instrumentStateMap[payload.module]) {
-                Object.assign(instrumentStateMap[payload.module], { octave: payload.value });
+                instrumentStateMap[payload.module].octave = payload.value;
             }
             return true;
         case ACTIONS.SET_PIANO_ROOTS:
-            Object.assign(chords, { pianoRoots: payload });
+            chords.pianoRoots = payload;
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
-            Object.assign(soloist, { mode: payload });
+            soloist.mode = payload;
             return true;
         case ACTIONS.SET_SOLOIST_PRESET:
-            Object.assign(soloist, { preset: payload });
+            soloist.preset = payload;
             return true;
         case ACTIONS.RESET_SESSION:
-            Object.assign(soloist, { sessionSteps: 0 });
+            soloist.sessionSteps = 0;
             return true;
         case ACTIONS.SET_SESSION_STEPS:
-            Object.assign(soloist, { sessionSteps: payload });
+            soloist.sessionSteps = payload;
             return true;
         case ACTIONS.SET_GENRE_FEEL:
             // When a smart genre is selected, update all instrument styles and switch to smart mode
             if (payload.chord) {
-                Object.assign(chords, { style: payload.chord, activeTab: 'smart' });
+                chords.style = payload.chord;
+                chords.activeTab = 'smart';
             }
             if (payload.bass) {
-                Object.assign(bass, { style: payload.bass, activeTab: 'smart' });
+                bass.style = payload.bass;
+                bass.activeTab = 'smart';
             }
             if (payload.soloist) {
-                Object.assign(soloist, { style: payload.soloist, activeTab: 'smart' });
+                soloist.style = payload.soloist;
+                soloist.activeTab = 'smart';
             }
             if (payload.harmony) {
-                Object.assign(harmony, { style: payload.harmony, activeTab: 'smart' });
+                harmony.style = payload.harmony;
+                harmony.activeTab = 'smart';
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
             if (payload.density) {
-                Object.assign(chords, { density: payload.density });
+                chords.density = payload.density;
             }
             if (payload.hookProb) {
-                Object.assign(soloist, { hookRetentionProb: payload.hookProb });
+                soloist.hookRetentionProb = payload.hookProb;
             }
             return true;
         case ACTIONS.SET_ACTIVE_TAB:
@@ -399,14 +399,22 @@ export function instrumentReducer(action, payload) {
                 // We'll handle this in state.js or groove.js instead to avoid circularity
                 return false;
             } else if (instrumentStateMap[payload.module]) {
-                Object.assign(instrumentStateMap[payload.module], { activeTab: payload.tab });
+                instrumentStateMap[payload.module].activeTab = payload.tab;
             }
             return true;
         case ACTIONS.UPDATE_HB:
-            Object.assign(harmony, payload);
+            for (const key in payload) {
+                if (Object.hasOwn(harmony, key)) {
+                    /** @type {any} */ (harmony)[key] = payload[key];
+                }
+            }
             return true;
         case ACTIONS.UPDATE_SB:
-            Object.assign(soloist, payload);
+            for (const key in payload) {
+                if (Object.hasOwn(soloist, key)) {
+                    /** @type {any} */ (soloist)[key] = payload[key];
+                }
+            }
             return true;
     }
     return false;
