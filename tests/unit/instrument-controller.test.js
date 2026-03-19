@@ -27,10 +27,10 @@ vi.mock('../../public/engine/engine.js', () => ({
     killSoloistBus: vi.fn(),
     killAllPianoNotes: vi.fn(),
     killChordBus: vi.fn(),
-    killHarmonyNote: vi.fn(),
-    killHarmonyBus: vi.fn(),
     killDrumNote: vi.fn(),
+    killHarmonyNote: vi.fn(),
     killDrumBus: vi.fn(),
+    killHarmonyBus: vi.fn(),
 }));
 
 vi.mock('../../public/engine/synth-drums.js', () => ({

@@ -30,7 +30,9 @@ vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn(), flushWork
 vi.mock('../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     killSoloistNote: vi.fn(),
+    killHarmonyNote: vi.fn(),
     killSoloistBus: vi.fn(),
+    killHarmonyBus: vi.fn(),
 }));
 
 describe('Soloist Power Logic', () => {

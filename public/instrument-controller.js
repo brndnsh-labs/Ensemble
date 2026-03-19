@@ -177,11 +177,13 @@ export function flushBuffers(primeSteps = 0) {
     killSoloistNote(stateMap);
     killBassNote(stateMap);
     killDrumNote(stateMap);
+    killHarmonyNote(stateMap);
 
     killChordBus(stateMap);
     killBassBus(stateMap);
     killSoloistBus(stateMap);
     killDrumBus(stateMap);
+    killHarmonyBus(stateMap);
 
     // 3. Prepare sync data for atomicity
     const syncData = {
