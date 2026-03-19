@@ -1,5 +1,5 @@
-import { REGGAE_RIDDIMS } from './config.js';
-import { getFrequency } from './utils.js';
+import { REGGAE_RIDDIMS } from '../config.js';
+import { getFrequency } from '../utils.js';
 
 const BOSSA_STEPS = [0, 6, 8, 14];
 
@@ -7,13 +7,13 @@ const BOSSA_STEPS = [0, 6, 8, 14];
  * @param {string} style
  * @param {number} step
  * @param {number} stepInChord
- * @param {import('./types.js').StepInfo | null} stepInfo
+ * @param {import('../types.js').StepInfo | null} stepInfo
  * @param {any} ts
  * @param {number} intBeat
  * @param {boolean} isQuarter
  * @param {boolean} is8th
- * @param {import('./types.js').EnsembleState['playback']} playback
- * @param {import('./types.js').EnsembleState['groove']} groove
+ * @param {import('../types.js').EnsembleState['playback']} playback
+ * @param {import('../types.js').EnsembleState['groove']} groove
  */
 export function checkBassActiveStyle(
     style,
@@ -178,7 +178,7 @@ export function checkBassActiveStyle(
  * @param {any} nextChord
  * @param {number} step
  * @param {number} stepInChord
- * @param {import('./types.js').StepInfo | null} _stepInfo
+ * @param {import('../types.js').StepInfo | null} _stepInfo
  * @param {any} context
  * @param {any} ts
  * @param {number} stepsPerMeasure
@@ -196,9 +196,9 @@ export function checkBassActiveStyle(
  * @param {number} absMin
  * @param {number} absMax
  * @param {number[]} scale
- * @param {import('./types.js').EnsembleState['playback']} playback
- * @param {import('./types.js').EnsembleState['groove']} groove
- * @param {import('./types.js').EnsembleState['soloist']} soloist
+ * @param {import('../types.js').EnsembleState['playback']} playback
+ * @param {import('../types.js').EnsembleState['groove']} groove
+ * @param {import('../types.js').EnsembleState['soloist']} soloist
  * @param {number} intensity
  * @param {number} velocity
  * @param {boolean} isSoloistBusy

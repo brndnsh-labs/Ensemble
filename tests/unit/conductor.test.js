@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition } from '../../public/conductor.js';
+import { checkSectionTransition } from '../../public/engine/conductor.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 

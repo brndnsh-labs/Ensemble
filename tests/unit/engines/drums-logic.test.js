@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
-import { FILL_TEMPLATES, generateProceduralFill } from '../../../public/fills.js';
+import { FILL_TEMPLATES, generateProceduralFill } from '../../../public/engine/fills.js';
 
 describe('Drums Engine Logic (Fills)', () => {
     describe('Fill Generation', () => {

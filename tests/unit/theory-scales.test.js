@@ -31,7 +31,7 @@ vi.mock('../../public/config.js', async (importOriginal) => {
 });
 
 // --- Import Module Under Test ---
-import { getScaleForChord } from '../../public/theory-scales.js';
+import { getScaleForChord } from '../../public/engine/theory-scales.js';
 
 describe('Music Theory: Scale Correctness', () => {
     beforeEach(() => {

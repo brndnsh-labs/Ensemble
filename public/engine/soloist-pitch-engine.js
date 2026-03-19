@@ -1,7 +1,7 @@
-import { STYLE_CONFIG } from '../soloist-config.js';
-import { generateExtraNotes, generateMelodicDevice } from '../soloist-devices.js';
-import { getScaleForChord } from '../theory-scales.js';
 import { calculateTimingOffset, getFrequency } from '../utils.js';
+import { STYLE_CONFIG } from './soloist-config.js';
+import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
+import { getScaleForChord } from './theory-scales.js';
 
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 

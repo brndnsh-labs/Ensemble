@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccompanimentNotes } from '../../public/accompaniment.js';
-import { getBassNote } from '../../public/bass-engine.js';
 import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { BASS_STYLES, CHORD_STYLES, SOLOIST_STYLES } from '../../public/data/instrument-styles.js';
+import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { getBassNote } from '../../public/engine/bass-engine.js';
+import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
-import { getScaleForChord } from '../../public/theory-scales.js';
 
 const { chords, groove } = getState();
 

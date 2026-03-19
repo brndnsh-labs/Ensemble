@@ -1,8 +1,6 @@
-import { checkSectionTransition, updateAutoConductor, updateLarsTempo } from '../conductor.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
-import { getSoloistNote } from '../soloist.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -21,6 +19,7 @@ import {
     stopWorker,
     syncWorker,
 } from '../worker-client.js';
+import { checkSectionTransition, updateAutoConductor, updateLarsTempo } from './conductor.js';
 import {
     initAudio,
     killAllNotes,
@@ -51,6 +50,7 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
+import { getSoloistNote } from './soloist.js';
 
 const DRUM_VIS_PITCHES = {
     Kick: 36,
@@ -120,6 +120,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
                 clearTimeout(playback.suspendTimeout);
             }
             playback.suspendTimeout = /** @type {any} */ (
+                // @direct-mutation
                 setTimeout(() => {
                     // @direct-mutation
                     if (

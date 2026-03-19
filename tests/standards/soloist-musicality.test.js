@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 
 // Define mockState in a way that vi.mock can capture it
 const { testState } = vi.hoisted(() => ({

@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateResolutionNotes } from '../../public/resolution.js';
+import { generateResolutionNotes } from '../../public/engine/resolution.js';
 import { getState } from '../../public/state.js';
 
 describe('Resolution Musicality: Final Button Overhaul', () => {

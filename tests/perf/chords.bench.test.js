@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateProgression } from '../../public/chords-engine.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getState } from '../../public/state.js';
 
 const { arranger } = getState();

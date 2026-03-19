@@ -1,5 +1,5 @@
 // tests/standards/jazz-soloist-authenticity.test.js
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 

@@ -66,11 +66,11 @@ vi.mock('../../public/utils.js', () => ({
     calculateTimingOffset: vi.fn(() => 0),
 }));
 
-vi.mock('../../public/theory-scales.js', () => ({
+vi.mock('../../public/engine/theory-scales.js', () => ({
     getScaleForChord: () => [0, 2, 4, 5, 7, 9, 11], // C Major scale
 }));
 
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
 const { soloist } = getState();

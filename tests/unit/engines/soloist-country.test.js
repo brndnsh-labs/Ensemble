@@ -31,9 +31,9 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-import { getSoloistNote } from '../../../public/soloist.js';
+import { getSoloistNote } from '../../../public/engine/soloist.js';
+import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
-import { getScaleForChord } from '../../../public/theory-scales.js';
 
 const { soloist, groove } = getState();
 

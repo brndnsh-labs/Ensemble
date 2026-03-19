@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccompanimentNotes } from '../../public/accompaniment.js';
+import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getState } from '../../public/state.js';
 
 // Mock state

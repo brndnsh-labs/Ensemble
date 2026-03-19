@@ -9,7 +9,7 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 
 ## Project Overview
 
-*   **Architecture**: Modular ES6 architecture with domain-specific controllers (`app`, `arranger`, `instrument`, `ui`, `midi`) and specialized musical engines (`bass`, `soloist`, `accompaniment`, `harmonies`, `fills`). Core logic is modularized into high-precision scheduling (`scheduler-core.js`), visual rendering (`visualizer.js`), and decentralized synthesis (`synth-*.js`).
+*   **Architecture**: Modular ES6 architecture with domain-specific controllers (`app`, `arranger`, `instrument`, `ui`, `midi`) and specialized musical engines (`bass`, `soloist`, `accompaniment`, `harmonies`, `fills`) consolidated in `public/engine/`. Core logic is modularized into high-precision scheduling (`scheduler-core.js`), visual rendering (`visualizer.js`), and decentralized synthesis (`synth-*.js`).
 *   **State Architecture**: **Domain Slices Pattern**. State is decomposed into autonomous modules within `public/state/`. Each slice is a **reactive deepSignal**, providing fine-grained updates without the need for manual versioning or deep comparisons.
 *   **UI Layer**: **Preact (v10)** Component-Based Architecture. Logic is decentralized into functional components within `public/components/`.
 *   **Visualizer**: High-performance **OffscreenCanvas** implementation. The rendering engine (`VisualizerEngine`) runs in a dedicated background worker (`visualizer-worker.js`), ensuring 60fps visual stability independent of main thread UI load. Synchronized via high-precision interpolation.
@@ -18,9 +18,9 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 *   **Domain Controllers**: Specialized logic resides in `app-controller.js`, `instrument-controller.js`, `arranger-controller.js`, and `midi-controller.js`.
 *   `types.js`: Centralized `ACTIONS` constants for the state dispatch system.
 *   **Engine Architecture**:
-    *   `soloist.js`: Main entry for melodic generation. Delegates to `soloist-pitch-engine.js` and `soloist-rhythm-engine.js` for phasing and pitch selection.
-    *   `bass-engine.js` / `accompaniment.js`: Orchestrators for rhythm section generation.
-    *   `*-styles.js`: Dedicated modules (`bass-styles.js`, `chords-styles.js`) housing genre-specific algorithms and rhythmic patterns.
+    *   `public/engine/soloist.js`: Main entry for melodic generation. Delegates to `soloist-pitch-engine.js` and `soloist-rhythm-engine.js` for phasing and pitch selection.
+    *   `public/engine/bass-engine.js` / `public/engine/accompaniment.js`: Orchestrators for rhythm section generation.
+    *   `public/engine/bass-styles.js` / `public/engine/chords-styles.js`: Dedicated modules housing genre-specific algorithms and rhythmic patterns.
     *   `logic-worker.js`: Background thread orchestrator for all real-time generative logic.
 *   **State Access**: Read state through the `useEnsembleState` hook in components, or the exported state objects in engine code. **NEVER** modify state objects directly in components. Use `dispatch(ACTIONS.ACTION_TYPE, payload)` from `state.js` using constants from `types.js` to trigger updates. Since all state is powered by `deepSignal`, accessing a property automatically establishes a reactive dependency.
 *   **Precision Timing**: Use `playback.audio.currentTime` for all audio scheduling. Visual events should be pushed to `playback.drawQueue` for synchronization in `requestAnimationFrame` loop.

@@ -36,7 +36,7 @@ vi.mock('../../public/config.js', () => ({
     },
 }));
 
-import { compingState, getAccompanimentNotes } from '../../public/accompaniment.js';
+import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getState } from '../../public/state.js';
 
 const { arranger, chords, bass, groove } = getState();

@@ -13,8 +13,11 @@ import {
     transposeKey,
     validateAndAnalyze,
 } from '../../public/arranger-controller.js';
-import { transformRelativeProgression, validateProgression } from '../../public/chords-engine.js';
-import { analyzeFormUI } from '../../public/conductor.js';
+import {
+    transformRelativeProgression,
+    validateProgression,
+} from '../../public/engine/chords-engine.js';
+import { analyzeFormUI } from '../../public/engine/conductor.js';
 import { restoreGains } from '../../public/engine/engine.js';
 import { pushHistory } from '../../public/history.js';
 import { flushBuffers } from '../../public/instrument-controller.js';
@@ -28,7 +31,7 @@ vi.mock('../../public/state.js', () => ({
     stateMap: { mockState: true },
 }));
 
-vi.mock('../../public/chords-engine.js', () => ({
+vi.mock('../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn((_state, _, cb) => {
         if (cb) {
             cb();
@@ -37,7 +40,7 @@ vi.mock('../../public/chords-engine.js', () => ({
     transformRelativeProgression: vi.fn((val) => `rel-${val}`),
 }));
 
-vi.mock('../../public/conductor.js', () => ({
+vi.mock('../../public/engine/conductor.js', () => ({
     analyzeFormUI: vi.fn(),
 }));
 

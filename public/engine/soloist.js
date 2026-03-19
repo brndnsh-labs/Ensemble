@@ -1,14 +1,14 @@
-import { TIME_SIGNATURES } from './config.js';
-import { selectPitchAndDevices } from './engine/soloist-pitch-engine.js';
-import { generateRhythmPlan } from './engine/soloist-rhythm-engine.js';
+import { TIME_SIGNATURES } from '../config.js';
+import { getState } from '../state.js';
+import { calculateTimingOffset, getFrequency } from '../utils.js';
 import { GENRE_STYLE_MAPPING, INFLUENCE_POOLS, STYLE_CONFIG } from './soloist-config.js';
-import { getState } from './state.js';
-import { calculateTimingOffset, getFrequency } from './utils.js';
+import { selectPitchAndDevices } from './soloist-pitch-engine.js';
+import { generateRhythmPlan } from './soloist-rhythm-engine.js';
 
 /**
  * Resets the internal generative state of the soloist.
  * Called when the transport is flushed or reset.
- * @param {import('./types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} state
  */
 export function resetSoloistState(state) {
     const { soloist } = state;
@@ -40,7 +40,7 @@ export function resetSoloistState(state) {
  * @param {number} stepInChord
  * @param {boolean} isPriming
  * @param {any} [coordination]
- * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {import('../types.js').StepInfo} [stepInfo]
  */
 export function getSoloistNote(
     currentChord,
@@ -54,7 +54,7 @@ export function getSoloistNote(
     coordination = {},
     stepInfo,
 ) {
-    /** @type {import('./types.js').EnsembleState} */
+    /** @type {import('../types.js').EnsembleState} */
     const state = getState();
     const { playback, groove, soloist, arranger } = state;
     if (!currentChord) {

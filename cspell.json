@@ -140,7 +140,12 @@
         "fifthsNode",
         "alterNode",
         "shreddy",
-        "deepsignal"
+        "deepsignal",
+        "melo",
+        "fingerpick",
+        "Dorham",
+        "partwise",
+        "IMPROV"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

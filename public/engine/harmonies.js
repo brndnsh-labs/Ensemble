@@ -1,8 +1,8 @@
+import { TIME_SIGNATURES } from '../config.js';
+import { getState } from '../state.js';
+import { calculateTimingOffset } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
-import { TIME_SIGNATURES } from './config.js';
-import { getWorkerState } from './engine/worker-orchestrator.js';
-import { getState } from './state.js';
-import { calculateTimingOffset } from './utils.js';
+import { getWorkerState } from './worker-orchestrator.js';
 
 /**
  * HARMONIES.JS
@@ -14,7 +14,7 @@ let lastPlayedStep = -1;
 
 /**
  * Clears the internal motif memory. Used for section changes or testing.
- * @param {import('./types.js').EnsembleState} [state]
+ * @param {import('../types.js').EnsembleState} [state]
  */
 export function clearHarmonyMemory(state) {
     // If state is not provided, try to get it from worker context or global state
@@ -195,7 +195,7 @@ export function generateCompingPattern(feel, seed, tsConfig) {
 
 /**
  * Generates harmony notes for a given step.
- * @param {import('./types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {any} chord
  * @param {any} _nextChord
  * @param {number} step
@@ -204,7 +204,7 @@ export function generateCompingPattern(feel, seed, tsConfig) {
  * @param {number} stepInChord
  * @param {any} [soloistResult]
  * @param {any} [coordination]
- * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {import('../types.js').StepInfo} [stepInfo]
  * @returns {Array<any>}
  */
 export function getHarmonyNotes(

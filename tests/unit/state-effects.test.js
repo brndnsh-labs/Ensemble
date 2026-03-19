@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTheme, setBpm } from '../../public/app-controller.js';
-import { validateProgression } from '../../public/chords-engine.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { initAudio, restoreGains } from '../../public/engine/engine.js';
 import { togglePlay } from '../../public/engine/scheduler-core.js';
 import { loadDrumPreset } from '../../public/instrument-controller.js';
@@ -12,7 +12,7 @@ import { ACTIONS } from '../../public/types.js';
 vi.mock('../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn(),
 }));
-vi.mock('../../public/chords-engine.js', () => ({
+vi.mock('../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn(),
 }));
 vi.mock('../../public/app-controller.js', () => ({

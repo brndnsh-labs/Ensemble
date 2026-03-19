@@ -79,7 +79,7 @@ vi.mock('../../public/utils.js', () => ({
 }));
 
 // 4. Mock Theory Scales
-vi.mock('../../public/theory-scales.js', () => ({
+vi.mock('../../public/engine/theory-scales.js', () => ({
     getScaleForChord: (chord) => {
         // Simple C Mixolydian/Major for testing
         const root = chord.rootMidi % 12;
@@ -87,7 +87,7 @@ vi.mock('../../public/theory-scales.js', () => ({
     },
 }));
 
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
 function runSimulation(bpm, steps = 256) {

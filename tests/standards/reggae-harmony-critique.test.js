@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getHarmonyNotes } from '../../public/harmonies.js';
+import { getHarmonyNotes } from '../../public/engine/harmonies.js';
 import { getState } from '../../public/state.js';
 
 // Mock state

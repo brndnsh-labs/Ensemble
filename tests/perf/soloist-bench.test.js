@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 
 // Mock state
 vi.mock('../../public/state.js', () => ({

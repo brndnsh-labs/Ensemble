@@ -113,7 +113,7 @@ const files = [
 ];
 
 // Simulate Soloist Engine over the same progressions
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 
 // We need to mock the dispatch and getState from state.js
 let { mockState } = vi.hoisted(() => ({ mockState: {} }));

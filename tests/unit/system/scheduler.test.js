@@ -167,7 +167,7 @@ vi.mock('../../../public/worker-client.js', () => ({
     requestResolution: vi.fn(),
 }));
 
-vi.mock('../../../public/conductor.js', () => ({
+vi.mock('../../../public/engine/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     updateLarsTempo: vi.fn(),
     checkSectionTransition: vi.fn(),

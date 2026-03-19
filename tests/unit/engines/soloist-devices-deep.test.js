@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateExtraNotes, generateMelodicDevice } from '../../../public/soloist-devices.js';
+import {
+    generateExtraNotes,
+    generateMelodicDevice,
+} from '../../../public/engine/soloist-devices.js';
 
 describe('Soloist Melodic Devices Deep Dive', () => {
     let ctx;

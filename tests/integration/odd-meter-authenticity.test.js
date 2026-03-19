@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getStepInfo } from '../../public/utils.js';
 
 describe('Odd-Meter Authenticity Integration', () => {

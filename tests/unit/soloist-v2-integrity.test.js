@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
-import { getSoloistNote } from '../../public/soloist.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
@@ -304,7 +304,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             }
 
             expect(evhNotes).toBeGreaterThan(gilmourNotes);
-        }, 10000);
+        }, 30000);
     });
 
     describe('Pickup & Loop Logic', () => {

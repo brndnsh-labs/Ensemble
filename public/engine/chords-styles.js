@@ -1,5 +1,5 @@
 /**
- * @param {import('./types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {string} quality
  * @param {boolean} is7th
  * @param {boolean} isRich
@@ -126,7 +126,7 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
 }
 
 /**
- * @param {import('./types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {string} quality
  * @param {boolean} is7th
  * @param {string} density

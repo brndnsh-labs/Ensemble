@@ -1,5 +1,5 @@
-import { KEY_ORDER } from './config.js';
-import { getState } from './state.js';
+import { KEY_ORDER } from '../config.js';
+import { getState } from '../state.js';
 
 /**
  * THEORY-SCALES.JS
@@ -47,7 +47,7 @@ const SCALE_INTERVALS = {
  * @returns {number[]} An array of semitone intervals representing the selected scale.
  */
 export function getScaleForChord(chord, nextChord = null, style = 'smart') {
-    /** @type {import('./types.js').EnsembleState} */
+    /** @type {import('../types.js').EnsembleState} */
     const state = getState();
     const { arranger, groove, soloist } = state;
     if (!chord) {

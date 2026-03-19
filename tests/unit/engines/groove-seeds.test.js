@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition } from '../../../public/conductor.js';
+import { checkSectionTransition } from '../../../public/engine/conductor.js';
 
 // Mock state
 const { mockState } = vi.hoisted(() => ({
@@ -48,7 +48,7 @@ vi.mock('../../../public/state.js', () => ({
     }),
 }));
 
-vi.mock('../../../public/fills.js', () => ({
+vi.mock('../../../public/engine/fills.js', () => ({
     generateProceduralFill: () => ({}),
 }));
 

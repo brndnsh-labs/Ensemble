@@ -90,11 +90,11 @@ vi.mock('../../public/config.js', async (importOriginal) => {
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 
-import { getBassNote } from '../../public/bass-engine.js';
-import { validateProgression } from '../../public/chords-engine.js';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getBassNote } from '../../public/engine/bass-engine.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
-import { getScaleForChord } from '../../public/theory-scales.js';
 import { getFrequency } from '../../public/utils.js';
 
 const { arranger, playback, soloist, groove } = getState();

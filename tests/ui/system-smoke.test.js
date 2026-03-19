@@ -224,7 +224,7 @@ import { dispatch, getState } from '../../public/state.js';
 const { arranger, playback } = getState();
 
 import { addSection, onSectionUpdate } from '../../public/arranger-controller.js';
-import { validateProgression } from '../../public/chords-engine.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { initAudio } from '../../public/engine/engine.js';
 import { togglePlay } from '../../public/engine/scheduler-core.js';
 

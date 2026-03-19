@@ -1,5 +1,5 @@
-import { validateProgression } from './chords-engine.js';
-import { analyzeFormUI } from './conductor.js';
+import { validateProgression } from './engine/chords-engine.js';
+import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
 import { scheduler } from './engine/scheduler-core.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';

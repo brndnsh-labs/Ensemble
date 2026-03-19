@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
-import { getSoloistNote } from '../../public/soloist.js';
 import * as stateModule from '../../public/state.js';
 
 vi.mock('../../public/state.js');

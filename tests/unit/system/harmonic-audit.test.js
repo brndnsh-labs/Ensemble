@@ -1,14 +1,14 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccompanimentNotes } from '../../../public/accompaniment.js';
-import { getBassNote, isBassActive } from '../../../public/bass-engine.js';
-import { validateProgression } from '../../../public/chords-engine.js';
 import { CHORD_PRESETS } from '../../../public/data/chord-presets.js';
 import { SONG_TEMPLATES } from '../../../public/data/song-templates.js';
-import { getHarmonyNotes } from '../../../public/harmonies.js';
-import { getSoloistNote } from '../../../public/soloist.js';
+import { getAccompanimentNotes } from '../../../public/engine/accompaniment.js';
+import { getBassNote, isBassActive } from '../../../public/engine/bass-engine.js';
+import { validateProgression } from '../../../public/engine/chords-engine.js';
+import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
+import { getSoloistNote } from '../../../public/engine/soloist.js';
+import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
-import { getScaleForChord } from '../../../public/theory-scales.js';
 
 const { arranger, playback, chords, bass, soloist, harmony, groove } = getState();
 

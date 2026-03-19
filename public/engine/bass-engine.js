@@ -1,6 +1,6 @@
-import { getState } from './state.js';
+import { getState } from '../state.js';
+import { binarySearchMap, calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
-import { binarySearchMap, calculateTimingOffset, getFrequency, getMidi } from './utils.js';
 
 /**
  * BASS ENGINE - Procedural Line Generation
@@ -12,13 +12,13 @@ import { binarySearchMap, calculateTimingOffset, getFrequency, getMidi } from '.
  * 4. Select pitches with voice-leading constraints.
  */
 
-import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 // (Old getScaleForBass removed, using imported version)
-import { TIME_SIGNATURES } from './config.js';
+import { TIME_SIGNATURES } from '../config.js';
+import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 
 /**
  * Resets the internal generative state of the bass.
- * @param {import('./types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} state
  */
 export function resetBassState(state) {
     const { bass } = state;
@@ -31,7 +31,7 @@ export function resetBassState(state) {
  * @param {string} style
  * @param {number} step
  * @param {number} stepInChord
- * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {import('../types.js').StepInfo} [stepInfo]
  * @param {any} [coordination]
  * @returns {boolean}
  */
@@ -99,7 +99,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
  * @param {number} step
  * @param {number} stepInChord
  * @param {any} [context]
- * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {import('../types.js').StepInfo} [stepInfo]
  * @returns {any}
  */
 export function getBassNote(

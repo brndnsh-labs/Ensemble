@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccompanimentNotes } from '../../../public/accompaniment.js';
-import { getBassNote, isBassActive } from '../../../public/bass-engine.js';
 import { TIME_SIGNATURES } from '../../../public/config.js';
+import { getAccompanimentNotes } from '../../../public/engine/accompaniment.js';
+import { getBassNote, isBassActive } from '../../../public/engine/bass-engine.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
-import { getHarmonyNotes } from '../../../public/harmonies.js';
-import { getSoloistNote } from '../../../public/soloist.js';
+import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
+import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { getState } from '../../../public/state.js';
 import { getStepInfo } from '../../../public/utils.js';
 

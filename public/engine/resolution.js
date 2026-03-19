@@ -1,6 +1,6 @@
+import { KEY_ORDER } from '../config.js';
+import { getFrequency } from '../utils.js';
 import { getBestInversion, getIntervals } from './chords-engine.js';
-import { KEY_ORDER } from './config.js';
-import { getFrequency } from './utils.js';
 
 /**
  * PUBLIC/RESOLUTION.JS
@@ -41,9 +41,9 @@ const GENRE_MAP = {
 };
 
 /**
- * @param {import('./types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} state
  * @param {number} step
- * @param {import('./state/arranger.js').ArrangerState} arranger
+ * @param {import('../state/arranger.js').ArrangerState} arranger
  * @param {any} enabled
  * @param {number} [bpm=100]
  * @param {any} [groove={}]
@@ -141,7 +141,7 @@ export function generateResolutionNotes(
                     ccEvents: [{ controller: 64, value: 127, timingOffset: 0 }],
                 });
             }
-            voicings.forEach((m, vIdx) => {
+            voicings.forEach((/** @type {number} */ m, /** @type {number} */ vIdx) => {
                 const vel = cadenceStep.velocity || 0.8;
                 const offset = genre === 'Acoustic' ? vIdx * 0.03 : 0;
                 notes.push({

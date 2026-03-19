@@ -107,10 +107,10 @@ vi.mock('../../../public/config.js', () => {
     };
 });
 
-import { clearHarmonyMemory } from '../../../public/harmonies.js';
-import { getSoloistNote } from '../../../public/soloist.js';
+import { clearHarmonyMemory } from '../../../public/engine/harmonies.js';
+import { getSoloistNote } from '../../../public/engine/soloist.js';
+import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
-import { getScaleForChord } from '../../../public/theory-scales.js';
 import { getFrequency } from '../../../public/utils.js';
 
 const { soloist, groove } = getState();

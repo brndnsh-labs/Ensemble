@@ -7,7 +7,7 @@ import {
     applyConductor,
     checkSectionTransition,
     updateAutoConductor,
-} from '../../../public/conductor.js';
+} from '../../../public/engine/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
@@ -70,7 +70,7 @@ vi.mock('../../../public/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 
-vi.mock('../../../public/fills.js', () => ({
+vi.mock('../../../public/engine/fills.js', () => ({
     generateProceduralFill: vi.fn(() => ({})),
 }));
 

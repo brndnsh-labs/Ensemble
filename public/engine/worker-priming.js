@@ -1,8 +1,8 @@
-import { getBassNote, isBassActive } from '../bass-engine.js';
 import { TIME_SIGNATURES } from '../config.js';
-import { getSoloistNote } from '../soloist.js';
 import { getFrequency, getStepInfo } from '../utils.js';
+import { getBassNote, isBassActive } from './bass-engine.js';
 import { createCoordinationContext, updateCoordinationContext } from './coordination-engine.js';
+import { getSoloistNote } from './soloist.js';
 import { workerContext } from './worker-orchestrator.js';
 import { getChordAtStep } from './worker-utils.js';
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
-import { getSoloistNote } from '../../public/soloist.js';
 import * as stateModule from '../../public/state.js';
 
 vi.mock('../../public/state.js');
@@ -22,7 +22,7 @@ vi.mock('../../public/soloist-config.js', () => ({
     },
 }));
 
-vi.mock('../../public/theory-scales.js', () => ({
+vi.mock('../../public/engine/theory-scales.js', () => ({
     getScaleForChord: vi.fn(() => [0, 2, 4, 5, 7, 9, 11]),
 }));
 

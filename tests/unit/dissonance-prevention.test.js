@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
-import { getScaleForChord } from '../../public/theory-scales.js';
 
 const { arranger, soloist, groove } = getState();
 

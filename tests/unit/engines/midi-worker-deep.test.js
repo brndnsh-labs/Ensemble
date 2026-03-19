@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportProcessor } from '../../../public/engine/midi-worker-logic.js';
-import { generateResolutionNotes } from '../../../public/resolution.js';
+import { generateResolutionNotes } from '../../../public/engine/resolution.js';
 
 // We need to mock worker-utils because getChordAtStep is used in processStep
 vi.mock('../../../public/engine/worker-utils.js', () => ({
@@ -10,7 +10,7 @@ vi.mock('../../../public/engine/worker-utils.js', () => ({
     })),
 }));
 
-vi.mock('../../../public/resolution.js', () => ({
+vi.mock('../../../public/engine/resolution.js', () => ({
     generateResolutionNotes: vi.fn(),
 }));
 

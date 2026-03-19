@@ -18,7 +18,7 @@ vi.mock('../../public/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 
-vi.mock('../../public/fills.js', () => ({
+vi.mock('../../public/engine/fills.js', () => ({
     generateProceduralFill: vi.fn(() => ({})),
 }));
 
@@ -28,7 +28,7 @@ import { clampFreq, createSoftClipCurve } from '../../public/utils.js';
 
 const { playback, chords, bass } = getState();
 
-import { applyConductor } from '../../public/conductor.js';
+import { applyConductor } from '../../public/engine/conductor.js';
 
 describe('DSP & Signal Safety', () => {
     beforeEach(() => {

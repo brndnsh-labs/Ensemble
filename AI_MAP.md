@@ -34,22 +34,26 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/soloist.js` | Melodic soloist generation logic (Main). | `getSoloistNote` |
-| `public/bass-engine.js` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
-| `public/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
-| `public/chords-engine.js` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
-| `public/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
-| `public/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
-| `public/conductor.js` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
+| `public/engine/soloist.js` | Melodic soloist generation logic (Main). | `getSoloistNote` |
+| `public/engine/bass-engine.js` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
+| `public/engine/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
+| `public/engine/chords-engine.js` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
+| `public/engine/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
+| `public/engine/soloist-config.js` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
+| `public/engine/soloist-devices.js` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
+| `public/engine/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
+| `public/engine/conductor.js` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
+| `public/engine/theory-scales.js` | Scale degrees and mode definitions. | `getScaleForChord` |
+| `public/engine/resolution.js` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
 
 ## Engine Styles (Genre Logic)
 
 | Path | Responsibility | Key Patterns |
 | :--- | :--- | :--- |
-| `public/bass-styles.js` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
-| `public/chords-styles.js` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
-| `public/soloist-config.js` | Style definitions and influence pools. | `STYLE_CONFIG` |
-| `public/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
+| `public/engine/bass-styles.js` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
+| `public/engine/chords-styles.js` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
+| `public/engine/soloist-config.js` | Style definitions and influence pools. | `STYLE_CONFIG` |
+| `public/engine/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
 | `public/engine/grooves/` | Directory of 15+ genre-specific drum strategies. | `jazz.js`, `rock.js`, `funk.js`, etc. |
 
 ## Engine Core (Internal)
@@ -133,11 +137,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/melody-harmonizer.js` | Monophonic analysis for chord generation. |
 | `public/persistence.js` | LocalStorage session saving. |
 | `public/platform.js` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/sharing.js` | URL-based song sharing. |
-| `public/utils.js` | General-purpose musical and math utilities. |
-| `public/theory-scales.js` | Scale degrees and mode definitions. |
-| `public/resolution.js` | Harmonic resolution and transition logic. |
-| `public/visualizer-engine.js` | High-performance Canvas rendering logic. |
+| `public/sharing.js` | URL-based song sharing. | `getShareURL` |
+| `public/utils.js` | General-purpose musical and math utilities. | `getFrequency` |
+| `public/visualizer-engine.js` | High-performance Canvas rendering logic. | `VisualizerEngine` |
 | `public/visualizer-proxy.js` | Main-thread bridge to visualizer worker. |
 
 ## Infrastructure & Lifecycle (Internal)

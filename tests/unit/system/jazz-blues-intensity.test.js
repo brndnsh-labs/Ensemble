@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition } from '../../../public/conductor.js';
+import { checkSectionTransition } from '../../../public/engine/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
 
 const { arranger, playback, groove, conductor } = getState();
@@ -74,7 +74,7 @@ vi.mock('../../../public/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 
-vi.mock('../../../public/fills.js', () => ({
+vi.mock('../../../public/engine/fills.js', () => ({
     generateProceduralFill: vi.fn(() => ({})),
 }));
 

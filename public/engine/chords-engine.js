@@ -5,8 +5,8 @@ import {
     NNS_OFFSETS,
     ROMAN_VALS,
     TIME_SIGNATURES,
-} from './config.js';
-import { getFrequency, normalizeKey } from './utils.js';
+} from '../config.js';
+import { getFrequency, normalizeKey } from '../utils.js';
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;

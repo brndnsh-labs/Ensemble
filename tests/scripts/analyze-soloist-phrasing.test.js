@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
@@ -89,7 +89,7 @@ vi.mock('../../public/utils.js', () => ({
     getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
     calculateTimingOffset: vi.fn(() => 0),
 }));
-vi.mock('../../public/theory-scales.js', () => ({
+vi.mock('../../public/engine/theory-scales.js', () => ({
     getScaleForChord: () => [0, 2, 3, 4, 5, 7, 9, 10, 11],
 }));
 

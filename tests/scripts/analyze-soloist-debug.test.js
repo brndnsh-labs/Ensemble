@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import { SMART_GENRES } from '../../public/data/smart-genres.js';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
@@ -39,7 +39,7 @@ vi.mock('../../public/utils.js', () => ({
     getMidi: () => 60,
     calculateTimingOffset: vi.fn(() => 0),
 }));
-vi.mock('../../public/theory-scales.js', () => ({
+vi.mock('../../public/engine/theory-scales.js', () => ({
     getScaleForChord: () => [0, 2, 4, 5, 7, 9, 11],
 }));
 

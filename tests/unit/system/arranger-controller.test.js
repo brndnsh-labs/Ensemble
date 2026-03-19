@@ -57,7 +57,7 @@ vi.mock('../../../public/ui.js', () => ({
     updateRelKeyButton: vi.fn(),
 }));
 
-vi.mock('../../../public/chords-engine.js', () => ({
+vi.mock('../../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn((_state, _dispatch, renderCallback) => renderCallback?.()),
     transformRelativeProgression: vi.fn((val, shift) => {
         if (val === 'I | V' && shift === -3) {

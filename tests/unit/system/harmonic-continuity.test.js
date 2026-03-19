@@ -103,7 +103,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
 }));
 
 // Mock conductor
-vi.mock('../../../public/conductor.js', () => ({
+vi.mock('../../../public/engine/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),

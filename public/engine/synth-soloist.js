@@ -1,5 +1,5 @@
-import { STYLE_CONFIG } from '../soloist-config.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
+import { STYLE_CONFIG } from './soloist-config.js';
 import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
 
 /**
@@ -227,7 +227,7 @@ function manageVoices(playTime, soloist) {
 
     // Clean up finished voices
     soloist.activeVoices = soloist.activeVoices.filter(
-        // @worker-mutation
+        // @direct-mutation
         /** @param {any} v */ (v) => v.time + v.duration + 1.0 > playTime,
     );
 

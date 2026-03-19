@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateResolutionNotes } from '../../public/resolution.js';
+import { generateResolutionNotes } from '../../public/engine/resolution.js';
 
 // Mock state.js to provide necessary state for chords.js
 vi.mock('../../public/state.js', () => ({

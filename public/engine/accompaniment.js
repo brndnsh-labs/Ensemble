@@ -1,6 +1,6 @@
-import { TIME_SIGNATURES } from './config.js';
-import { getState } from './state.js';
-import { calculateTimingOffset, getFrequency, getMidi } from './utils.js';
+import { TIME_SIGNATURES } from '../config.js';
+import { getState } from '../state.js';
+import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 
 /**
  * ACCOMPANIMENT.JS - Rhythmic Style Engine
@@ -32,7 +32,7 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
  * @param {number} [length]
  */
 export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
-    /** @type {import('./types.js').EnsembleState} */
+    /** @type {import('../types.js').EnsembleState} */
     const state = getState();
     const { playback } = state;
     const pattern = new Array(length).fill(0);
@@ -380,7 +380,7 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
  * @param {number} chordIndex
  * @param {number} intensity
  * @param {string} genre
- * @param {import('./types.js').StepInfo} [stepInfo]
+ * @param {import('../types.js').StepInfo} [stepInfo]
  * @param {string|null} [currentQuality]
  */
 function handleSustainEvents(
@@ -446,7 +446,7 @@ function handleSustainEvents(
  * @param {number} step
  * @param {number} stepInChord
  * @param {number} measureStep
- * @param {import('./types.js').StepInfo} stepInfo
+ * @param {import('../types.js').StepInfo} stepInfo
  * @param {any} [coordination]
  * @returns {Array<any>}
  */

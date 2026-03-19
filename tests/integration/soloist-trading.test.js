@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition } from '../../public/conductor.js';
+import { checkSectionTransition } from '../../public/engine/conductor.js';
 import { getState } from '../../public/state.js';
 
 // Mock State
@@ -64,7 +64,7 @@ vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn(), flushWorker: vi.fn() }));
-vi.mock('../../public/fills.js', () => ({ generateProceduralFill: vi.fn(() => ({})) }));
+vi.mock('../../public/engine/fills.js', () => ({ generateProceduralFill: vi.fn(() => ({})) }));
 vi.mock('../../public/ui.js', () => ({ triggerFlash: vi.fn() }));
 vi.mock('../../public/form-analysis.js', () => ({ getSectionEnergy: vi.fn(() => 0.5) }));
 

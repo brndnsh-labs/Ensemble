@@ -1,10 +1,10 @@
+import { analyzeForm, getSectionEnergy } from '../form-analysis.js';
+import { debounceSaveState, saveCurrentState } from '../persistence.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
+import { triggerFlash } from '../ui.js';
+import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { generateProceduralFill } from './fills.js';
-import { analyzeForm, getSectionEnergy } from './form-analysis.js';
-import { debounceSaveState, saveCurrentState } from './persistence.js';
-import { dispatch, getState } from './state.js';
-import { ACTIONS } from './types.js';
-import { triggerFlash } from './ui.js';
-import { binarySearchMap, binarySearchMapIndex } from './utils.js';
 
 export function analyzeFormUI() {
     const form = analyzeForm();
@@ -376,7 +376,9 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
 
             // CHECK FOR SEAMLESS TRANSITION
             const nextSectionId = /** @type {any} */ (nextEntry.chord).sectionId;
-            const nextSection = arranger.sections.find((s) => s.id === nextSectionId);
+            const nextSection = arranger.sections.find(
+                (/** @type {any} */ s) => s.id === nextSectionId,
+            );
             if (nextSection?.seamless) {
                 shouldFill = false;
             }

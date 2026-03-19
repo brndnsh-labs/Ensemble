@@ -1,9 +1,9 @@
 // tests/standards/ensemble-coordination.test.js
 
-import { getAccompanimentNotes } from '../../public/accompaniment.js';
-import { getBassNote, isBassActive } from '../../public/bass-engine.js';
-import { getHarmonyNotes } from '../../public/harmonies.js';
-import { getSoloistNote } from '../../public/soloist.js';
+import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { getHarmonyNotes } from '../../public/engine/harmonies.js';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 

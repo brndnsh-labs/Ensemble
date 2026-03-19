@@ -1,4 +1,4 @@
-import { STYLE_CONFIG, STYLE_EMPHASIS } from '../soloist-config.js';
+import { STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
 
 /**
  * @param {number} startStep

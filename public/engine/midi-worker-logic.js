@@ -1,21 +1,21 @@
-import { compingState, getAccompanimentNotes } from '../accompaniment.js';
-import { getBassNote, isBassActive } from '../bass-engine.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
-import { generateProceduralFill } from '../fills.js';
 import { analyzeForm } from '../form-analysis.js';
-import { getHarmonyNotes } from '../harmonies.js';
-import { generateResolutionNotes } from '../resolution.js';
-import { getSoloistNote } from '../soloist.js';
 import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
+import { compingState, getAccompanimentNotes } from './accompaniment.js';
+import { getBassNote, isBassActive } from './bass-engine.js';
 import {
     createCoordinationContext,
     enforceRegisterSlotting,
     updateCoordinationContext,
 } from './coordination-engine.js';
+import { generateProceduralFill } from './fills.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
+import { getHarmonyNotes } from './harmonies.js';
 import { MidiTrack, writeInt16, writeInt32, writeString, writeVarInt } from './midi-utils.js';
+import { generateResolutionNotes } from './resolution.js';
+import { getSoloistNote } from './soloist.js';
 import { getChordAtStep } from './worker-utils.js';
 
 export const MIDI_EXTENSION_PATTERN = /\.midi?$/i;

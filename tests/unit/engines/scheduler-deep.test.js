@@ -45,7 +45,7 @@ vi.mock('../../../public/midi-controller.js', () => ({
     normalizeMidiVelocity: vi.fn((v) => Math.floor(v * 127)),
 }));
 
-vi.mock('../../../public/conductor.js', () => ({
+vi.mock('../../../public/engine/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
     updateLarsTempo: vi.fn(),

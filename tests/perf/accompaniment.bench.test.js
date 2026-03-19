@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { compingState, getAccompanimentNotes } from '../../public/accompaniment.js';
+import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getState } from '../../public/state.js';
 
 const { arranger, playback, chords } = getState();

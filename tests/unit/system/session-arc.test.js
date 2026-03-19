@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition } from '../../../public/conductor.js';
+import { checkSectionTransition } from '../../../public/engine/conductor.js';
 import { getState } from '../../../public/state.js';
 
 // Mock dependencies
@@ -7,7 +7,7 @@ vi.mock('../../../public/ui.js', () => ({
     triggerFlash: vi.fn(),
 }));
 
-vi.mock('../../../public/fills.js', () => ({
+vi.mock('../../../public/engine/fills.js', () => ({
     generateProceduralFill: () => ({ 0: [] }),
 }));
 

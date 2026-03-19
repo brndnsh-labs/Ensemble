@@ -40,12 +40,12 @@ vi.mock('../../../public/config.js', () => ({
     },
 }));
 
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import {
     compingState,
     generateCompingPattern,
     getAccompanimentNotes,
-} from '../../../public/accompaniment.js';
-import { TIME_SIGNATURES } from '../../../public/config.js';
+} from '../../../public/engine/accompaniment.js';
 import { getState } from '../../../public/state.js';
 
 const { arranger, playback, chords, bass, groove } = getState();

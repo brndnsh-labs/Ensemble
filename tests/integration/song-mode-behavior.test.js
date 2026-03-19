@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyConductor } from '../../public/conductor.js';
+import { applyConductor } from '../../public/engine/conductor.js';
 import { scheduler } from '../../public/engine/scheduler-core.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
