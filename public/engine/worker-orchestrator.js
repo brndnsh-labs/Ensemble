@@ -12,7 +12,8 @@ import { WORKER_MSG, WORKER_RESP } from '../worker-types.js';
  *   mainCursor: { index: number, sectionIndex: number },
  *   lookaheadCursor: { index: number, sectionIndex: number },
  *   LOOKAHEAD: number,
- *   messageQueue: Array<{type: string, data: any, startTime: number}>
+ *   messageQueue: Array<{type: string, data: any, startTime: number}>,
+ *   state: import('../types.js').EnsembleState|null
  * }}
  */
 export const workerContext = {
@@ -26,7 +27,16 @@ export const workerContext = {
     lookaheadCursor: { index: 0, sectionIndex: 0 },
     LOOKAHEAD: 64,
     messageQueue: [],
+    state: null,
 };
+
+/**
+ * Helper to get the worker-local state.
+ * @returns {import('../types.js').EnsembleState|null}
+ */
+export function getWorkerState() {
+    return workerContext.state;
+}
 
 /**
  * Resets all buffer heads and cursors to a specific step.

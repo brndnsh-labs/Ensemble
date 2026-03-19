@@ -4,7 +4,6 @@ import { TIME_SIGNATURES } from '../config.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { getHarmonyNotes } from '../harmonies.js';
 import { getSoloistNote } from '../soloist.js';
-import { getState } from '../state.js';
 import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import {
@@ -13,7 +12,7 @@ import {
     updateCoordinationContext,
 } from './coordination-engine.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
-import { workerContext } from './worker-orchestrator.js';
+import { getWorkerState, workerContext } from './worker-orchestrator.js';
 import { getChordAtStep } from './worker-utils.js';
 
 /**
@@ -294,7 +293,7 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
                     workerContext.lookaheadCursor,
                 );
                 const harmonyNotes = getHarmonyNotes(
-                    getState(),
+                    getWorkerState() || state,
                     chord,
                     nextChordData?.chord,
                     step,

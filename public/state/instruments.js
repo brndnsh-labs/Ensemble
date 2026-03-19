@@ -47,6 +47,7 @@ export const chords = deepSignal({
  * @property {number} octave - Base MIDI octave.
  * @property {string} style - Playing style ID (e.g., 'walking', 'funk').
  * @property {number} busySteps - Counter for "busy" playing periods.
+ * @property {number|null} lastMidiPlayed - Last MIDI note value played.
  * @property {string} activeTab - Currently active UI tab.
  * @property {GainNode|null} lastBassGain - Last gain node for dynamic continuity.
  */
@@ -61,6 +62,7 @@ export const bass = deepSignal({
     octave: 38,
     style: 'smart',
     busySteps: 0,
+    lastMidiPlayed: null,
     activeTab: 'smart',
     lastBassGain: null,
 });

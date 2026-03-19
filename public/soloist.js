@@ -6,6 +6,28 @@ import { getState } from './state.js';
 import { calculateTimingOffset, getFrequency } from './utils.js';
 
 /**
+ * Resets the internal generative state of the soloist.
+ * Called when the transport is flushed or reset.
+ * @param {import('./types.js').EnsembleState} state
+ */
+export function resetSoloistState(state) {
+    const { soloist } = state;
+    soloist.isResting = true; // @worker-mutation
+    soloist.phrasingState = 'rest'; // @worker-mutation
+    /** @type {any} */ (soloist).transitionState = null; // @worker-mutation
+    soloist.rhythmicMotif = []; // @worker-mutation
+    soloist.busySteps = 0; // @worker-mutation
+    soloist.activeSteps = 0; // @worker-mutation
+    soloist.restSteps = 0; // @worker-mutation
+    soloist.sessionSteps = 0; // @worker-mutation
+    soloist.deviceBuffer = []; // @worker-mutation
+    soloist.hookBuffer = []; // @worker-mutation
+    soloist.sharedHookBuffer = []; // @worker-mutation
+    soloist.lickDictionary = []; // @worker-mutation
+    soloist.recentNotes = []; // @worker-mutation
+}
+
+/**
  * Simplified soloist engine.
  * Focuses on lively, probabilistic phrasing with form and meter awareness.
  * Uses a two-phase Rhythm and Pitch engine.

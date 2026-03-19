@@ -48,19 +48,50 @@ export function resetCursors() {
 
 /**
  * Safely merges state from the main thread while preserving worker-managed properties.
+ * Handles nested objects and arrays recursively.
  * @param {any} target
  * @param {any} source
  * @param {string} moduleName
  */
-export function safeSync(target, source, moduleName) {
-    if (!source) {
+export function recursiveSafeSync(target, source, moduleName) {
+    if (!source || typeof source !== 'object') {
         return;
     }
     const protectedKeys = /** @type {any} */ (WORKER_MANAGED_KEYS)[moduleName] || [];
+
     for (const key in source) {
-        if (!protectedKeys.includes(key)) {
-            // Only update if it's not a protected generative property
-            target[key] = source[key];
+        if (protectedKeys.includes(key)) {
+            continue;
+        }
+
+        const sourceVal = source[key];
+        const targetVal = target[key];
+
+        if (sourceVal !== null && typeof sourceVal === 'object' && !Array.isArray(sourceVal)) {
+            if (targetVal === null || typeof targetVal !== 'object') {
+                target[key] = sourceVal;
+            } else {
+                recursiveSafeSync(targetVal, sourceVal, `${moduleName}.${key}`);
+            }
+        } else if (Array.isArray(sourceVal)) {
+            // Special handling for instrument arrays to avoid full replacement
+            if (key === 'instruments' && Array.isArray(targetVal)) {
+                const instrumentMap = new Map();
+                for (let i = 0; i < targetVal.length; i++) {
+                    instrumentMap.set(targetVal[i].name, targetVal[i]);
+                }
+                for (let i = 0; i < sourceVal.length; i++) {
+                    const si = sourceVal[i];
+                    const ti = instrumentMap.get(si.name);
+                    if (ti) {
+                        recursiveSafeSync(ti, si, `${moduleName}.instruments`);
+                    }
+                }
+            } else {
+                target[key] = sourceVal;
+            }
+        } else {
+            target[key] = sourceVal;
         }
     }
 }

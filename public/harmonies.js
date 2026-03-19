@@ -1,5 +1,6 @@
 import { getBestInversion } from './chords-engine.js';
 import { TIME_SIGNATURES } from './config.js';
+import { getWorkerState } from './engine/worker-orchestrator.js';
 import { getState } from './state.js';
 import { calculateTimingOffset } from './utils.js';
 
@@ -13,9 +14,15 @@ let lastPlayedStep = -1;
 
 /**
  * Clears the internal motif memory. Used for section changes or testing.
+ * @param {import('./types.js').EnsembleState} [state]
  */
-export function clearHarmonyMemory() {
-    const { harmony } = getState();
+export function clearHarmonyMemory(state) {
+    // If state is not provided, try to get it from worker context or global state
+    const targetState = state || (typeof window === 'undefined' ? getWorkerState() : getState());
+    if (!targetState) {
+        return;
+    }
+    const { harmony } = targetState;
     motifCache.clear();
     harmony.lastMidis = []; // @worker-mutation
     lastPlayedStep = -1;
@@ -595,8 +602,8 @@ export function getHarmonyNotes(
     const _avgChordMidi = coordination.avgChordMidi || 60;
 
     // Increased minimums to avoid bass mud (MIDI 57 = A3, MIDI 53 = F3)
-    // If space is NOT reserved, allow it to drop to 43 (G2) to fill the gap.
-    let rangeMin = reserveBassSpace ? (activeStyle === 'organ' ? 57 : 53) : 43;
+    // If space is NOT reserved, allow it to drop to 40 (E2) to fill the gap.
+    let rangeMin = reserveBassSpace ? (activeStyle === 'organ' ? 57 : 53) : 40;
     if (reserveBassSpace) {
         rangeMin = Math.max(rangeMin, 52); // Never drop below E3 in practice mode
     }
@@ -640,13 +647,13 @@ export function getHarmonyNotes(
         const midi = currentMidis[i];
         let finalMidi = midi + styleOffset;
 
-        // Safety Filter: Hard cut below G3 (55) for most styles to prevent muddy collisions with bass
+        // Safety Filter: Hard cut below MIDI 40 (E2) for most styles to prevent muddy collisions with bass
         // If in practice mode, ensure we stay above E3 (52) even for plucks/counter
-        // If space is NOT reserved, allow it to drop to G2 (43) to fill the gap.
+        // If space is NOT reserved, allow it to drop to MIDI 40 to fill the gap.
         const safetyFloor = reserveBassSpace
             ? 52
             : activeStyle !== 'counter' && activeStyle !== 'plucks'
-              ? 43
+              ? 40
               : 0;
         if (finalMidi < safetyFloor) {
             continue;

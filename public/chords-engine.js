@@ -211,7 +211,7 @@ export function getBestInversion(
         candidates.sort((a, b) => Math.abs(a - targetCenter) - Math.abs(b - targetCenter));
 
         let best = candidates[0];
-        if (i > 0 && best < 48) {
+        if (i > 0 && best < RANGE_MIN) {
             while (best - result[i - 1] < 7) {
                 best += 12;
             }

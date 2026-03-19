@@ -17,6 +17,17 @@ import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 import { TIME_SIGNATURES } from './config.js';
 
 /**
+ * Resets the internal generative state of the bass.
+ * @param {import('./types.js').EnsembleState} state
+ */
+export function resetBassState(state) {
+    const { bass } = state;
+    bass.busySteps = 0; // @worker-mutation
+    bass.lastFreq = null; // @worker-mutation
+    bass.lastMidiPlayed = null; // @worker-mutation
+}
+
+/**
  * @param {string} style
  * @param {number} step
  * @param {number} stepInChord

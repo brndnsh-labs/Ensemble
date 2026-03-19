@@ -353,9 +353,9 @@ describe('Harmony Engine Logic', () => {
             _bass.enabled = false;
             _groove.genreFeel = 'Rock';
 
-            const chord = { rootMidi: 48, intervals: [0, 4, 7], sectionId: 'p3', beats: 4 };
-            // Use anchor of 48 so it stays low
-            const notes = getHarmonyNotes(getState(), chord, null, 0, 48, 'smart', 0);
+            const chord = { rootMidi: 40, intervals: [0, 4, 7], sectionId: 'p3', beats: 4 };
+            // Use anchor of 40 so it stays low
+            const notes = getHarmonyNotes(getState(), chord, null, 0, 40, 'smart', 0);
 
             // Should be allowed to drop below 52 to fill the gap
             const hasLowNotes = notes.some((n) => n.midi < 52);
