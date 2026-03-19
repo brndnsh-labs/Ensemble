@@ -10,9 +10,12 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
-/** @param {any} props */
 /**
- * @param {Object} props
+ * @typedef {Object} PresetLibraryProps
+ * @property {string} type
+ */
+/**
+ * @param {PresetLibraryProps} props
  */
 export function PresetLibrary({ type }) {
     const dispatch = useDispatch();
@@ -24,9 +27,9 @@ export function PresetLibrary({ type }) {
         }),
     );
 
-    const [userPresets, setUserPresets] = useState([]);
-    const [confirmSelect, setConfirmSelect] = useState(null);
-    const [confirmDelete, setConfirmDelete] = useState(null);
+    const [userPresets, setUserPresets] = useState(/** @type {any[]} */ ([]));
+    const [confirmSelect, setConfirmSelect] = useState(/** @type {string|number|null} */ (null)); // stores id of preset to confirm
+    const [confirmDelete, setConfirmDelete] = useState(/** @type {string|number|null} */ (null)); // stores id of preset to delete
 
     useEffect(() => {
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
@@ -52,12 +55,15 @@ export function PresetLibrary({ type }) {
     const presets =
         type === 'chord'
             ? CHORD_PRESETS
-            : Object.keys(DRUM_PRESETS).map((name) => ({ name, ...DRUM_PRESETS[name] }));
+            : Object.keys(DRUM_PRESETS).map((name) => ({
+                  name,
+                  .../** @type {any} */ (DRUM_PRESETS)[name],
+              }));
 
     // Optimization: Check isDirty state instead of manual DOM manipulation in arranger-controller
     const activeId = type === 'chord' ? (isDirty ? null : lastChordPreset) : lastDrumPreset;
 
-    const handleSelect = (item, isUser = false) => {
+    const handleSelect = (/** @type {any} */ item, isUser = false) => {
         if (type === 'chord') {
             if (isDirty) {
                 const itemId = item.id || item.name;
@@ -73,7 +79,7 @@ export function PresetLibrary({ type }) {
                 ? item.sections
                     ? decompressSections(item.sections)
                     : [{ id: generateId(), label: 'Main', value: item.prog }]
-                : item.sections.map((s) => ({
+                : item.sections.map((/** @type {any} */ s) => ({
                       id: generateId(),
                       label: s.label,
                       value: s.value,
@@ -141,7 +147,7 @@ export function PresetLibrary({ type }) {
                         value: 0,
                     });
                 }
-                item.pattern.forEach((savedInst) => {
+                item.pattern.forEach((/** @type {any} */ savedInst) => {
                     dispatch(ACTIONS.SET_GROOVE_STEPS, {
                         instrument: savedInst.name,
                         steps: savedInst.steps,
@@ -191,6 +197,7 @@ export function PresetLibrary({ type }) {
         setConfirmDelete(null);
 
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
+        /** @type {any[]} */
         const updated = [...userPresets];
         updated.splice(index, 1);
         localStorage.setItem(key, JSON.stringify(updated));
@@ -248,7 +255,7 @@ export function PresetLibrary({ type }) {
                         User
                     </label>
                     <div className="presets-container">
-                        {userPresets.map((item, idx) => {
+                        {userPresets.map((/** @type {any} */ item, /** @type {number} */ idx) => {
                             const id = item.id || item.name;
                             return (
                                 <button

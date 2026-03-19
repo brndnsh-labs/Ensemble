@@ -21,15 +21,23 @@ const { arranger } = getState();
  * @property {number} totalSections
  * @property {boolean} [isActive]
  * @property {boolean} [isPlaying]
+ * @property {any} [ref]
+ * @property {string} [key]
  */
 /**
  * @type {import('preact/compat').ForwardFn<SectionCardProps>}
  */
 export const SectionCard = forwardRef(
-    ({ section, index, totalSections, isActive, isPlaying }, ref) => {
+    (
+        /** @type {SectionCardProps} */ { section, index, totalSections, isActive, isPlaying },
+        ref,
+    ) => {
         const [isMenuOpen, setIsMenuOpen] = useState(false);
+        /** @type {import('preact/hooks').MutableRef<HTMLTextAreaElement|null>} */
         const textareaRef = useRef(null);
+        /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
         const rootRef = useRef(null);
+        /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
         const menuRef = useRef(null);
 
         useEffect(() => {
@@ -37,8 +45,12 @@ export const SectionCard = forwardRef(
                 return;
             }
 
-            const handleClickOutside = (event) => {
-                if (menuRef.current && !menuRef.current.contains(event.target)) {
+            const handleClickOutside = (/** @type {MouseEvent} */ event) => {
+                if (
+                    menuRef.current &&
+                    event.target instanceof Node &&
+                    !menuRef.current.contains(event.target)
+                ) {
                     setIsMenuOpen(false);
                 }
             };
@@ -50,7 +62,7 @@ export const SectionCard = forwardRef(
         }, [isMenuOpen]);
 
         useImperativeHandle(ref, () => ({
-            scrollIntoView: (options) => {
+            scrollIntoView: (/** @type {ScrollIntoViewOptions} */ options) => {
                 if (rootRef.current) {
                     rootRef.current.scrollIntoView(options);
                 }
@@ -71,39 +83,53 @@ export const SectionCard = forwardRef(
 
         const isMutated = mutatedSectionId === section.id;
 
-        const handleDragStart = (/** @type {any} */ e) => {
-            e.dataTransfer.setData('text/plain', section.id);
-            e.currentTarget.classList.add('dragging');
+        const handleDragStart = (/** @type {DragEvent} */ e) => {
+            if (e.dataTransfer) {
+                e.dataTransfer.setData('text/plain', section.id);
+            }
+            if (e.currentTarget instanceof HTMLElement) {
+                e.currentTarget.classList.add('dragging');
+            }
         };
 
-        const handleDragEnd = (/** @type {any} */ e) => {
-            e.currentTarget.classList.remove('dragging');
+        const handleDragEnd = (/** @type {DragEvent} */ e) => {
+            if (e.currentTarget instanceof HTMLElement) {
+                e.currentTarget.classList.remove('dragging');
+            }
             document
                 .querySelectorAll('.section-card')
                 .forEach((el) => el.classList.remove('drag-over'));
         };
 
-        const handleDragEnter = (/** @type {any} */ e) => {
+        const handleDragEnter = (/** @type {DragEvent} */ e) => {
             e.preventDefault();
-            const draggedId = e.dataTransfer.getData('text/plain');
-            if (draggedId !== section.id) {
-                e.currentTarget.classList.add('drag-over');
+            if (e.dataTransfer) {
+                const draggedId = e.dataTransfer.getData('text/plain');
+                if (draggedId !== section.id && e.currentTarget instanceof HTMLElement) {
+                    e.currentTarget.classList.add('drag-over');
+                }
             }
         };
 
-        const handleDragLeave = (/** @type {any} */ e) => {
-            e.currentTarget.classList.remove('drag-over');
+        const handleDragLeave = (/** @type {DragEvent} */ e) => {
+            if (e.currentTarget instanceof HTMLElement) {
+                e.currentTarget.classList.remove('drag-over');
+            }
         };
 
-        const handleDrop = (/** @type {Event} */ e) => {
+        const handleDrop = (/** @type {DragEvent} */ e) => {
             e.preventDefault();
-            e.currentTarget.classList.remove('drag-over');
-            const draggedId = e.dataTransfer.getData('text/plain');
-            if (draggedId && draggedId !== section.id) {
-                const event = new CustomEvent('reorder-sections', {
-                    detail: { draggedId, targetId: section.id },
-                });
-                window.dispatchEvent(event);
+            if (e.currentTarget instanceof HTMLElement) {
+                e.currentTarget.classList.remove('drag-over');
+            }
+            if (e.dataTransfer) {
+                const draggedId = e.dataTransfer.getData('text/plain');
+                if (draggedId && draggedId !== section.id) {
+                    const event = new CustomEvent('reorder-sections', {
+                        detail: { draggedId, targetId: section.id },
+                    });
+                    window.dispatchEvent(event);
+                }
             }
         };
 
@@ -113,8 +139,8 @@ export const SectionCard = forwardRef(
                 return;
             }
 
-            const start = input.selectionStart;
-            const end = input.selectionEnd;
+            const start = input.selectionStart || 0;
+            const end = input.selectionEnd || 0;
             const text = input.value;
             const before = text.substring(0, start);
             const after = text.substring(end);
@@ -124,8 +150,10 @@ export const SectionCard = forwardRef(
 
             // Restore focus and cursor position after render
             setTimeout(() => {
-                input.focus();
-                input.selectionStart = input.selectionEnd = start + sym.length;
+                if (input) {
+                    input.focus();
+                    input.selectionStart = input.selectionEnd = start + sym.length;
+                }
             }, 0);
         };
 
@@ -162,7 +190,9 @@ export const SectionCard = forwardRef(
                             value={section.label}
                             aria-label="Section Name"
                             maxLength={100}
-                            onChange={(e) => onSectionUpdate(section.id, 'label', e.target.value)}
+                            onChange={(/** @type {any} */ e) =>
+                                onSectionUpdate(section.id, 'label', e.target.value)
+                            }
                         />
                     </div>
 
@@ -178,7 +208,7 @@ export const SectionCard = forwardRef(
                                     min="1"
                                     max="8"
                                     aria-label="Repeat Count"
-                                    onChange={(e) =>
+                                    onChange={(/** @type {any} */ e) =>
                                         onSectionUpdate(
                                             section.id,
                                             'repeat',
@@ -193,7 +223,9 @@ export const SectionCard = forwardRef(
                                 class="section-key-select"
                                 value={section.key || ''}
                                 aria-label="Section Key"
-                                onChange={(e) => onSectionUpdate(section.id, 'key', e.target.value)}
+                                onChange={(/** @type {any} */ e) =>
+                                    onSectionUpdate(section.id, 'key', e.target.value)
+                                }
                             >
                                 <option value="">Key: Auto</option>
                                 {KEY_ORDER.map((k) => (
@@ -209,7 +241,7 @@ export const SectionCard = forwardRef(
                                 class="section-ts-select"
                                 value={section.timeSignature || ''}
                                 aria-label="Time Signature"
-                                onChange={(e) =>
+                                onChange={(/** @type {any} */ e) =>
                                     onSectionUpdate(section.id, 'timeSignature', e.target.value)
                                 }
                             >
@@ -322,7 +354,9 @@ export const SectionCard = forwardRef(
                     aria-label="Chord Progression"
                     maxLength={1000}
                     placeholder="Enter chords (e.g. C Am F G)"
-                    onInput={(e) => onSectionUpdate(section.id, 'value', e.target.value)}
+                    onInput={(/** @type {any} */ e) =>
+                        onSectionUpdate(section.id, 'value', e.target.value)
+                    }
                     onFocus={() => {
                         // Update legacy state for mutation logic
                         arranger.lastInteractedSectionId = section.id;

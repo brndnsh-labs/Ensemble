@@ -23,10 +23,8 @@ function useMobile() {
     return isMobile;
 }
 
-/**
- * @param {Object} props
- */
 export function PerformanceModal() {
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const modalRef = useRef(null);
     const [currentNoteName, setCurrentNoteName] = useState('');
     const isMobile = useMobile();
@@ -121,7 +119,7 @@ export function PerformanceModal() {
         };
     }
 
-    const getChordName = (chordObj) => {
+    const getChordName = (/** @type {any} */ chordObj) => {
         if (!chordObj) {
             return '---';
         }
@@ -158,23 +156,29 @@ export function PerformanceModal() {
         nextNotesRef.current = nextNotes;
     }, [currentNotes, nextNotes]);
 
+    /** @type {import('preact/hooks').MutableRef<{key: string, midi: number}[]>} */
     const heldKeysRef = useRef([]); // Stack of { key, midi }
-    const [activeKeys, setActiveKeys] = useState(new Set()); // Keys that are held
+    const [activeKeys_set, setActiveKeys_set] = useState(new Set()); // Keys that are held
+    /** @type {import('preact/hooks').StateUpdater<string|null>|any} */
     const [playingKey, setPlayingKey] = useState(null); // The one currently sounding
 
     const activeNoteNames = useMemo(() => {
         const names = new Set();
         heldKeysRef.current.forEach((h) => {
-            const info = midiToNote(h.midi);
+            const info = /** @type {any} */ (midiToNote(h.midi));
             if (info) {
                 names.add(info.name);
             }
         });
         return names;
-    }, [activeKeys]);
+    }, [activeKeys_set]);
 
     // Unified trigger for both keyboard and pointer events
-    const triggerNote = (midiNote, sourceKey, isLegato = false) => {
+    const triggerNote = (
+        /** @type {number} */ midiNote,
+        /** @type {string} */ sourceKey,
+        isLegato = false,
+    ) => {
         dispatch(ACTIONS.INIT_AUDIO);
         dispatch(ACTIONS.RESTORE_GAINS);
 
@@ -182,18 +186,18 @@ export function PerformanceModal() {
         // Use a very long duration (60s) for manual performance to allow sustains
         triggerSoloNote(freq, 0, 60.0, 0.8, 0, 'scalar', isLegato);
 
-        const noteInfo = midiToNote(midiNote);
+        const noteInfo = /** @type {any} */ (midiToNote(midiNote));
         setCurrentNoteName(`${noteInfo.name}${noteInfo.octave}`);
         setPlayingKey(sourceKey);
     };
 
-    const stopNote = (sourceKey = null) => {
+    const stopNote = (/** @type {string|null} */ sourceKey = null) => {
         if (!sourceKey) {
             // Kill everything
             stopSoloist();
             setCurrentNoteName('');
             heldKeysRef.current = [];
-            setActiveKeys(new Set());
+            setActiveKeys_set(new Set());
             setPlayingKey(null);
             return;
         }
@@ -208,7 +212,7 @@ export function PerformanceModal() {
 
         // Update UI state
         const nextHeld = new Set(heldKeysRef.current.map((h) => h.key));
-        setActiveKeys(nextHeld);
+        setActiveKeys_set(nextHeld);
 
         if (heldKeysRef.current.length === 0) {
             stopSoloist();
@@ -224,7 +228,7 @@ export function PerformanceModal() {
     useEffect(() => {
         const handleKeyDown = (/** @type {KeyboardEvent} */ e) => {
             // Ignore if we are closing (AnimatedModalWrapper adds .closing)
-            if (modalRef.current?.closest('.closing')) {
+            if (/** @type {any} */ (modalRef.current)?.closest('.closing')) {
                 return;
             }
 
@@ -238,6 +242,7 @@ export function PerformanceModal() {
             // Group 2: 5-9 (Right Hand Range)
 
             // Layout per row: [A S D F G] [H J K L ;]
+            /** @type {Record<string, number>} */
             const currentKeys = {
                 a: 0,
                 s: 1,
@@ -252,6 +257,7 @@ export function PerformanceModal() {
             };
 
             // Layout per row: [Q W E R T] [Y U I O P]
+            /** @type {Record<string, number>} */
             const nextKeys = {
                 q: 0,
                 w: 1,
@@ -268,9 +274,9 @@ export function PerformanceModal() {
             let midiNote = null;
 
             if (key in currentKeys && currentNotesRef.current.length > 0) {
-                midiNote = currentNotesRef.current[currentKeys[key]];
+                midiNote = currentNotesRef.current[/** @type {any} */ (currentKeys)[key]];
             } else if (key in nextKeys && nextNotesRef.current.length > 0) {
-                midiNote = nextNotesRef.current[nextKeys[key]];
+                midiNote = nextNotesRef.current[/** @type {any} */ (nextKeys)[key]];
             }
 
             if (midiNote !== null) {
@@ -279,7 +285,7 @@ export function PerformanceModal() {
 
                 // Push to stack
                 heldKeysRef.current.push({ key, midi: midiNote });
-                setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
+                setActiveKeys_set(new Set(heldKeysRef.current.map((h) => h.key)));
 
                 triggerNote(midiNote, key, isLegato);
             } else if (key === 'escape' || key === ' ' || key in currentKeys || key in nextKeys) {
@@ -308,10 +314,16 @@ export function PerformanceModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: false });
     };
 
-    const renderKey = (label, midi, sourceKey, type, isNext = false) => {
-        const isHeld = activeKeys.has(sourceKey);
+    const renderKey = (
+        /** @type {any} */ label,
+        /** @type {any} */ midi,
+        /** @type {any} */ sourceKey,
+        /** @type {any} */ type,
+        isNext = false,
+    ) => {
+        const isHeld = activeKeys_set.has(sourceKey);
         const isPlaying = playingKey === sourceKey;
-        const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
+        const noteInfo = typeof midi === 'number' ? /** @type {any} */ (midiToNote(midi)) : null;
         const noteLabel = noteInfo ? `${noteInfo.name}${noteInfo.octave}` : '';
         const isSympathetic = noteInfo && activeNoteNames.has(noteInfo.name) && !isPlaying;
 
@@ -321,7 +333,7 @@ export function PerformanceModal() {
             bridge: { var: 'var(--magenta)', rgb: 'var(--magenta-rgb)', hex: '211, 54, 130' },
         };
 
-        const config = COLOR_MAP[type] || COLOR_MAP.safe;
+        const config = /** @type {any} */ (COLOR_MAP)[type] || COLOR_MAP.safe;
         const baseColor = config.var;
         const rgbColor = config.rgb;
         const shadowColor = `rgba(${config.hex}, 0.4)`;
@@ -333,14 +345,14 @@ export function PerformanceModal() {
                 onPointerDown={(e) => {
                     e.preventDefault();
                     if (modalRef.current) {
-                        modalRef.current.focus({ preventScroll: true });
+                        /** @type {any} */ (modalRef.current).focus({ preventScroll: true });
                     }
                     if (midi === null || midi === undefined) {
                         return;
                     }
                     const isLegato = heldKeysRef.current.length > 0;
                     heldKeysRef.current.push({ key: sourceKey, midi });
-                    setActiveKeys(new Set(heldKeysRef.current.map((h) => h.key)));
+                    setActiveKeys_set(new Set(heldKeysRef.current.map((h) => h.key)));
                     triggerNote(midi, sourceKey, isLegato);
                 }}
                 onPointerUp={(e) => {
@@ -349,7 +361,7 @@ export function PerformanceModal() {
                 }}
                 onPointerLeave={(e) => {
                     e.preventDefault();
-                    if (activeKeys.has(sourceKey)) {
+                    if (activeKeys_set.has(sourceKey)) {
                         stopNote(sourceKey);
                     }
                 }}
@@ -390,7 +402,12 @@ export function PerformanceModal() {
         );
     };
 
-    const renderDeckRow = (keys, notes, chordObj, isNext = false) => {
+    const renderDeckRow = (
+        /** @type {any} */ keys,
+        /** @type {any} */ notes,
+        /** @type {any} */ chordObj,
+        isNext = false,
+    ) => {
         const chordName = getChordName(chordObj);
         const accentColor = isNext ? '#94a3b8' : 'var(--soloist-color)';
         const safeLabelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--yellow)'}; margin-bottom: 0.5rem;`;
@@ -441,9 +458,12 @@ export function PerformanceModal() {
                 <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
                     {/* CHORD ZONE */}
                     <div style="display: flex; gap: 0.5rem;">
-                        {keys.slice(0, 5).map((k, i) => {
+                        {keys.slice(0, 5).map((/** @type {any} */ k, /** @type {any} */ i) => {
                             const midi = notes[i];
-                            const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
+                            const noteInfo =
+                                typeof midi === 'number'
+                                    ? /** @type {any} */ (midiToNote(midi))
+                                    : null;
                             const type =
                                 noteInfo && bridgePitchNames.has(noteInfo.name) ? 'bridge' : 'safe';
                             return renderKey(k, midi, k.toLowerCase(), type, isNext);
@@ -455,9 +475,12 @@ export function PerformanceModal() {
 
                     {/* TENSION ZONE */}
                     <div style="display: flex; gap: 0.5rem;">
-                        {keys.slice(5).map((k, i) => {
+                        {keys.slice(5).map((/** @type {any} */ k, /** @type {any} */ i) => {
                             const midi = notes[i + 5];
-                            const noteInfo = typeof midi === 'number' ? midiToNote(midi) : null;
+                            const noteInfo =
+                                typeof midi === 'number'
+                                    ? /** @type {any} */ (midiToNote(midi))
+                                    : null;
                             const type =
                                 noteInfo && bridgePitchNames.has(noteInfo.name)
                                     ? 'bridge'
@@ -470,7 +493,7 @@ export function PerformanceModal() {
         );
     };
 
-    const handleNoteChange = (midi) => {
+    const handleNoteChange = (/** @type {any} */ midi) => {
         if (midi === null || midi === undefined) {
             setCurrentNoteName('');
             return;

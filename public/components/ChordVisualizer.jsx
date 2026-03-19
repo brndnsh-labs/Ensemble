@@ -5,120 +5,135 @@ import { TIME_SIGNATURES } from '../config.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
-const ChordCard = memo(
-    ({ chord, isActive, totalMeasures, isMaximized, notation, leadSheetMelody, soloistStyle }) => {
-        const disp = chord.display ? chord.display[notation] : null;
+/**
+ * @typedef {Object} ChordCardProps
+ * @property {any} chord
+ * @property {boolean} isActive
+ * @property {number} totalMeasures
+ * @property {boolean} isMaximized
+ * @property {string} notation
+ * @property {any[]} [leadSheetMelody]
+ * @property {string} soloistStyle
+ */
+/**
+ * @param {ChordCardProps} props
+ */
+const ChordCardComponent = ({
+    chord,
+    isActive,
+    totalMeasures,
+    isMaximized,
+    notation,
+    leadSheetMelody,
+    soloistStyle,
+}) => {
+    const disp = chord.display ? chord.display[notation] : null;
 
-        const cardRef = useRef(null);
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
+    const cardRef = useRef(null);
 
-        useEffect(() => {
-            if (!cardRef.current) {
-                return;
-            }
-            const card = cardRef.current;
-            const charCount = disp
-                ? disp.root.length + disp.suffix.length + (disp.bass ? disp.bass.length + 1 : 0)
-                : chord.absName?.length || 0;
+    useEffect(() => {
+        if (!cardRef.current) {
+            return;
+        }
+        const card = cardRef.current;
+        const charCount = disp
+            ? disp.root.length + disp.suffix.length + (disp.bass ? disp.bass.length + 1 : 0)
+            : chord.absName?.length || 0;
 
-            let scale = 1.0;
-            if (isMaximized) {
-                if (totalMeasures > 24) {
-                    scale *= 0.9;
-                }
-                if (totalMeasures > 32) {
-                    scale *= 0.8;
-                }
-                if (totalMeasures > 48) {
-                    scale *= 0.7;
-                }
-            }
-            if (charCount > 7) {
+        let scale = 1.0;
+        if (isMaximized) {
+            if (totalMeasures > 24) {
                 scale *= 0.9;
             }
-            if (charCount > 10) {
+            if (totalMeasures > 32) {
                 scale *= 0.8;
             }
-
-            // Note: measure chord count scaling is harder without measure context here,
-            // but we can pass it if needed.
-
-            if (scale < 1.0) {
-                card.style.setProperty('--font-scale', scale.toFixed(2));
-            } else {
-                card.style.removeProperty('--font-scale');
+            if (totalMeasures > 48) {
+                scale *= 0.7;
             }
-        }, [disp, chord.absName, isMaximized, totalMeasures]);
+        }
+        if (charCount > 7) {
+            scale *= 0.9;
+        }
+        if (charCount > 10) {
+            scale *= 0.8;
+        }
 
-        const handleClick = (/** @type {any} */ e) => {
-            e.stopPropagation();
-            if (window.previewChord) {
-                window.previewChord(chord.globalIndex);
-            }
-        };
+        // Note: measure chord count scaling is harder without measure context here,
+        // but we can pass it if needed.
 
-        const classNames = [
-            'chord-card',
-            chord.isMinor ? 'minor' : '',
-            chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
-            isActive ? 'active' : '',
-        ]
-            .filter(Boolean)
-            .join(' ');
+        if (scale < 1.0) {
+            card.style.setProperty('--font-scale', scale.toFixed(2));
+        } else {
+            card.style.removeProperty('--font-scale');
+        }
+    }, [disp, chord.absName, isMaximized, totalMeasures]);
 
-        // --- Melody Sparkline Logic ---
-        const sparklineNotes = useMemo(() => {
-            if (
-                soloistStyle !== 'lead_sheet' ||
-                !leadSheetMelody ||
-                leadSheetMelody.length === 0 ||
-                chord.start === undefined
-            ) {
-                return [];
-            }
+    const handleClick = (/** @type {any} */ e) => {
+        e.stopPropagation();
+        if (/** @type {any} */ (window).previewChord) {
+            /** @type {any} */ (window).previewChord(chord.globalIndex);
+        }
+    };
 
-            // Filter notes for this specific chord's step range
-            return leadSheetMelody.filter(
-                (/** @type {any} */ n) => n.globalStep >= chord.start && n.globalStep < chord.end,
-            );
-        }, [leadSheetMelody, soloistStyle, chord.start, chord.end]);
+    const classNames = [
+        'chord-card',
+        chord.isMinor ? 'minor' : '',
+        chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
+        isActive ? 'active' : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
 
-        return (
-            <div className={classNames} ref={cardRef} onClick={handleClick}>
-                {disp ? (
-                    <Fragment>
-                        <span className="root">{formatUnicodeSymbols(disp.root)}</span>
-                        <span className="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
-                        {disp.bass && (
-                            <span className="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>
-                        )}
-                    </Fragment>
-                ) : (
-                    formatUnicodeSymbols(chord.absName) || '...'
-                )}
+    // --- Melody Sparkline Logic ---
+    const sparklineNotes = useMemo(() => {
+        if (
+            soloistStyle !== 'lead_sheet' ||
+            !leadSheetMelody ||
+            leadSheetMelody.length === 0 ||
+            chord.start === undefined
+        ) {
+            return [];
+        }
 
-                {sparklineNotes.length > 0 && (
-                    <div className="sparkline-container">
-                        {sparklineNotes.map((/** @type {any} */ n, /** @type {any} */ i) => {
-                            // Normalize MIDI 48-84 to 0-100% height
-                            const height = Math.min(100, Math.max(15, ((n.midi - 48) / 36) * 100));
-                            return (
-                                <div
-                                    key={i}
-                                    className="sparkline-bar"
-                                    style={`height: ${height}%`}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+        // Filter notes for this specific chord's step range
+        return leadSheetMelody.filter(
+            (/** @type {any} */ n) => n.globalStep >= chord.start && n.globalStep < chord.end,
         );
-    },
-);
+    }, [leadSheetMelody, soloistStyle, chord.start, chord.end]);
 
-/**
- * @param {Object} props
- */
+    return (
+        <div className={classNames} ref={cardRef} onClick={handleClick}>
+            {disp ? (
+                <Fragment>
+                    <span className="root">{formatUnicodeSymbols(disp.root)}</span>
+                    <span className="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
+                    {disp.bass && (
+                        <span className="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>
+                    )}
+                </Fragment>
+            ) : (
+                formatUnicodeSymbols(chord.absName) || '...'
+            )}
+
+            {sparklineNotes.length > 0 && (
+                <div className="sparkline-container">
+                    {sparklineNotes.map((/** @type {any} */ n, /** @type {any} */ i) => {
+                        // Normalize MIDI 48-84 to 0-100% height
+                        const height = Math.min(100, Math.max(15, ((n.midi - 48) / 36) * 100));
+                        return (
+                            <div key={i} className="sparkline-bar" style={`height: ${height}%`} />
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ChordCard = memo(ChordCardComponent);
+
 export function ChordVisualizer() {
     const {
         progression,
@@ -140,12 +155,16 @@ export function ChordVisualizer() {
         isMaximized: s.vizState.isMaximized,
     }));
 
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const containerRef = useRef(null);
-    const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
 
     const groupedSections = useMemo(() => {
+        /** @type {any[]} */
         const blocks = [];
+        /** @type {any} */
         let currentBlock = null;
+        /** @type {any} */
         let currentMeasure = null;
         let currentMeasureBeats = 0;
         let currentStep = 0;

@@ -275,8 +275,15 @@ export function Visualizer({ enabled, getVisualTime }) {
                         vizRef.current.pushNote('drums', ev);
                     }
                 } else if (ev.type === 'fill_active') {
-                    if (enabled && playback.isDrawing && vizRef.current?.worker) {
-                        vizRef.current.worker.postMessage({ type: 'SET_FILL', active: ev.active });
+                    if (
+                        enabled &&
+                        playback.isDrawing &&
+                        /** @type {any} */ (vizRef.current)?.worker
+                    ) {
+                        /** @type {any} */ (vizRef.current).worker.postMessage({
+                            type: 'SET_FILL',
+                            active: ev.active,
+                        });
                     }
                 }
             }

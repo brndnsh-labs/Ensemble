@@ -17,11 +17,11 @@ import { SequencerGrid } from './SequencerGrid.jsx';
 import { SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 /**
- * @param {Object} props
- * @param {boolean} props.isActiveMobile
+ * @typedef {Object} GroovePanelProps
+ * @property {boolean} isActiveMobile
  */
 /**
- * @param {Object} props
+ * @param {GroovePanelProps} props
  */
 export function GroovePanel({ isActiveMobile }) {
     const { activeTab, enabled, measures, fillActive } = useEnsembleState(
@@ -34,6 +34,7 @@ export function GroovePanel({ isActiveMobile }) {
     );
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -41,9 +42,12 @@ export function GroovePanel({ isActiveMobile }) {
             return;
         }
 
-        /** @param {MouseEvent} event */
-        const handleClickOutside = (/** @type {any} */ event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
+        const handleClickOutside = (/** @type {MouseEvent} */ event) => {
+            if (
+                menuRef.current &&
+                event.target instanceof Node &&
+                !menuRef.current.contains(event.target)
+            ) {
                 setIsMenuOpen(false);
             }
         };
@@ -195,9 +199,6 @@ export function GroovePanel({ isActiveMobile }) {
     );
 }
 
-/**
- * @param {Object} props
- */
 function IntensitySlider() {
     const { bandIntensity, autoIntensity } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -247,9 +248,6 @@ function IntensitySlider() {
     );
 }
 
-/**
- * @param {Object} props
- */
 function CreativityToggle() {
     const creativity = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => s.groove.creativity,
@@ -277,9 +275,6 @@ function CreativityToggle() {
     );
 }
 
-/**
- * @param {Object} props
- */
 function GenreSelector() {
     const { lastSmartGenre, pendingGenreFeel, genreSwitchCountdown } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -308,7 +303,7 @@ function GenreSelector() {
     /** @param {string} genre */
     const handleGenreClick = (genre) => {
         import('../data/smart-genres.js').then(({ SMART_GENRES }) => {
-            const config = SMART_GENRES[genre];
+            const config = /** @type {any} */ (SMART_GENRES)[genre];
             if (config) {
                 dispatch(ACTIONS.SET_GENRE_FEEL, {
                     genreName: genre,

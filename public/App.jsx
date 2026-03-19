@@ -211,8 +211,11 @@ function VisualizerPanel({ enabled, getVisualTime }) {
 }
 
 /**
- * @param {Object} props
- * @param {string} props.grooveMobileTab
+ * @typedef {Object} SidebarProps
+ * @property {string} grooveMobileTab
+ */
+/**
+ * @param {SidebarProps} props
  */
 function Sidebar({ grooveMobileTab }) {
     const activeMobileTab = grooveMobileTab === 'mobile' ? 'grooves' : grooveMobileTab;
@@ -253,10 +256,13 @@ function Sidebar({ grooveMobileTab }) {
 }
 
 /**
- * @param {Object} props
- * @param {any} props.tab
- * @param {string} props.activeTab
- * @param {Function} props.onSwitch
+ * @typedef {Object} MobileNavTabProps
+ * @property {{id: string, label: string, module: string}} tab
+ * @property {string} activeTab
+ * @property {function(string): void} onSwitch
+ */
+/**
+ * @param {MobileNavTabProps} props
  */
 function MobileNavTab({ tab, activeTab, onSwitch }) {
     const isActive = activeTab === tab.id || (activeTab === 'mobile' && tab.id === 'grooves');
@@ -295,8 +301,11 @@ function MobileNavTab({ tab, activeTab, onSwitch }) {
 }
 
 /**
- * @param {Object} props
- * @param {string} props.activeTab
+ * @typedef {Object} MobileNavProps
+ * @property {string} activeTab
+ */
+/**
+ * @param {MobileNavProps} props
  */
 function MobileNav({ activeTab }) {
     /** @param {string} tab */

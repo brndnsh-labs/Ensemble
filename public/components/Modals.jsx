@@ -25,14 +25,14 @@ const DrumPadModal = lazy(() =>
 );
 
 /**
- * AnimatedModalWrapper handles the entrance and exit lifecycle for modals.
- * It ensures the component stays in the DOM long enough for exit animations to play.
- * @param {Object} props
- * @param {boolean} props.isOpen - Whether the modal is globally open
- * @param {import('preact').ComponentType} props.component - The modal component to render
+ * @typedef {Object} AnimatedModalWrapperProps
+ * @property {boolean} isOpen
+ * @property {import('preact').ComponentType<any>} component
  */
 /**
- * @param {Object} props
+ * AnimatedModalWrapper handles the entrance and exit lifecycle for modals.
+ * It ensures the component stays in the DOM long enough for exit animations to play.
+ * @param {AnimatedModalWrapperProps} props
  */
 function AnimatedModalWrapper({ isOpen, component: Component }) {
     const [shouldRender, setShouldRender] = useState(isOpen);
@@ -68,9 +68,6 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
 /**
  * Root component for all global modals.
  * Monitors global state to determine which modal to show.
- */
-/**
- * @param {Object} props
  */
 export function Modals() {
     // Get modal visibility state from global store

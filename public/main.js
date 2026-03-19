@@ -28,7 +28,7 @@ function init() {
         );
 
         // --- ASSEMBLE UI ---
-        mountComponents(getVisualTime);
+        mountComponents(() => getVisualTime(getState()));
 
         // --- WORKER INIT ---
         initWorker(

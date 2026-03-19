@@ -6,9 +6,6 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
-/**
- * @param {Object} props
- */
 export function Transport() {
     const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode, larsMode, larsBpmOffset } =
         useEnsembleState((/** @type {import('../types.js').EnsembleState} */ state) => ({
@@ -22,6 +19,7 @@ export function Transport() {
         }));
 
     const [tapActive, setTapActive] = useState(false);
+    /** @type {import('preact/hooks').StateUpdater<string|null>|any} */
     const [timeLeft, setTimeLeft] = useState(null);
 
     // Calculate effective BPM and visual style for Lars Mode
@@ -68,12 +66,12 @@ export function Transport() {
         dispatch(ACTIONS.TOGGLE_PLAY);
     };
 
-    const onBpmInput = (e) => {
+    const onBpmInput = (/** @type {any} */ e) => {
         dispatch(ACTIONS.SET_BPM, e.target.value);
     };
 
-    const onTap = (_e) => {
-        handleTap((val) => dispatch(ACTIONS.SET_BPM, val));
+    const onTap = (/** @type {any} */ _e) => {
+        handleTap((/** @type {any} */ val) => dispatch(ACTIONS.SET_BPM, val));
 
         setTapActive(true);
         setTimeout(() => setTapActive(false), 100);

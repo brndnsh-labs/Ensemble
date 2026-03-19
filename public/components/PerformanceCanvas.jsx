@@ -18,9 +18,11 @@ export function PerformanceCanvas({
     currentChordName,
     nextChordName,
 }) {
+    /** @type {import('preact/hooks').MutableRef<HTMLCanvasElement|null>} */
     const canvasRef = useRef(null);
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const containerRef = useRef(null);
-    const [activePointers, setActivePointers] = useState(new Map()); // id -> { lane, zone, midi }
+    const [activePointers, setActivePointers] = useState(/** @type {Map<any, any>} */ (new Map())); // id -> { lane, zone, midi }
     const audioInitializedRef = useRef(false);
 
     const render = () => {
@@ -28,7 +30,7 @@ export function PerformanceCanvas({
         if (!canvas) {
             return;
         }
-        const ctx = canvas.getContext('2d');
+        const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
         const dpr = window.devicePixelRatio || 1;
         const width = canvas.width / dpr;
         const height = canvas.height / dpr;
@@ -100,8 +102,8 @@ export function PerformanceCanvas({
                 if (bridgeMidis.has(midi)) {
                     type = 'bridge';
                 }
-                const baseColor = PALETTE[type];
-                const rgbColor = COLOR_RGB_MAP[type];
+                const baseColor = /** @type {any} */ (PALETTE)[type];
+                const rgbColor = /** @type {any} */ (COLOR_RGB_MAP)[type];
 
                 // Zone background tint
                 ctx.fillStyle = `rgba(${rgbColor}, 0.06)`;
@@ -195,7 +197,11 @@ export function PerformanceCanvas({
         }
 
         // 4. Wing Headers
-        const drawHeader = (name, x, color) => {
+        const drawHeader = (
+            /** @type {any} */ name,
+            /** @type {any} */ x,
+            /** @type {any} */ color,
+        ) => {
             const textWidth = ctx.measureText(name).width + 30;
             ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
             ctx.beginPath();
@@ -257,7 +263,7 @@ export function PerformanceCanvas({
         return () => cancelAnimationFrame(frameId);
     }, [activePointers, noteGroups, bpm, currentNoteName, currentChordName, nextChordName]);
 
-    const handleTouch = (e) => {
+    const handleTouch = (/** @type {TouchEvent|MouseEvent|any} */ e) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -268,6 +274,12 @@ export function PerformanceCanvas({
             audioInitializedRef.current = true;
         }
 
+        if (!canvasRef.current) {
+            return;
+        }
+        if (!canvasRef.current) {
+            return;
+        }
         const rect = canvasRef.current.getBoundingClientRect();
         const width = rect.width;
         const height = rect.height;

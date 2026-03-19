@@ -10,6 +10,10 @@ import { SectionCard } from './SectionCard.jsx';
  */
 
 /**
+ * @typedef {import('../state/arranger.js').Section} Section
+ */
+
+/**
  * @typedef {Object} ArrangerProps
  */
 
@@ -24,6 +28,7 @@ export function Arranger(_props) {
         }),
     );
 
+    /** @type {import('preact/hooks').MutableRef<Record<string, any>>} */
     const sectionRefs = useRef({});
 
     useEffect(() => {
@@ -57,7 +62,7 @@ export function Arranger(_props) {
             newOrder.splice(draggedIdx, 1);
             newOrder.splice(targetIdx, 0, draggedId);
 
-            onSectionUpdate(null, 'reorder', newOrder);
+            onSectionUpdate(/** @type {any} */ (null), 'reorder', newOrder);
         };
 
         window.addEventListener('reorder-sections', handleReorder);
@@ -68,8 +73,9 @@ export function Arranger(_props) {
         return null;
     }
 
+    /** @type {Section[][]} */
     const groupedSections = [];
-    sections.forEach((/** @type {any} */ section) => {
+    sections.forEach((/** @type {Section} */ section) => {
         if (section.seamless && groupedSections.length > 0) {
             groupedSections[groupedSections.length - 1].push(section);
         } else {
@@ -79,14 +85,16 @@ export function Arranger(_props) {
 
     return (
         <Fragment>
-            {groupedSections.map((/** @type {any} */ group) => {
+            {groupedSections.map((group) => {
                 if (group.length === 1) {
                     const section = group[0];
-                    const index = sections.findIndex((/** @type {any} */ s) => s.id === section.id);
+                    const index = sections.findIndex(
+                        (/** @type {Section} */ s) => s.id === section.id,
+                    );
                     return (
                         <SectionCard
                             key={section.id}
-                            ref={(el) => (sectionRefs.current[section.id] = el)}
+                            ref={(/** @type {any} */ el) => (sectionRefs.current[section.id] = el)}
                             section={section}
                             index={index}
                             totalSections={sections.length}
@@ -96,14 +104,16 @@ export function Arranger(_props) {
 
                 return (
                     <div className="section-group" key={`group-${group[0].id}`}>
-                        {group.map((/** @type {any} */ section) => {
+                        {group.map((section) => {
                             const index = sections.findIndex(
-                                (/** @type {any} */ s) => s.id === section.id,
+                                (/** @type {Section} */ s) => s.id === section.id,
                             );
                             return (
                                 <SectionCard
                                     key={section.id}
-                                    ref={(el) => (sectionRefs.current[section.id] = el)}
+                                    ref={(/** @type {any} */ el) =>
+                                        (sectionRefs.current[section.id] = el)
+                                    }
                                     section={section}
                                     index={index}
                                     totalSections={sections.length}

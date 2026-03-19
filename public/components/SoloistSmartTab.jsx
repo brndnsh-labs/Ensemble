@@ -5,9 +5,6 @@ import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { ButtonGroup } from './UIControls.jsx';
 
-/**
- * @param {Object} props
- */
 export function SoloistSmartTab() {
     const { tradeMode } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -15,7 +12,7 @@ export function SoloistSmartTab() {
         }),
     );
 
-    const updateTradeMode = (mode) => {
+    const updateTradeMode = (/** @type {any} */ mode) => {
         dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
         saveCurrentState();
     };

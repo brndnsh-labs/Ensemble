@@ -6,23 +6,29 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
-/** @param {any} props */
 /**
- * @param {Object} props
+ * @typedef {Object} StyleSelectorProps
+ * @property {string} module
+ * @property {any[]} styles
+ */
+/**
+ * @param {StyleSelectorProps} props
  */
 export function StyleSelector({ module, styles }) {
     const dispatch = useDispatch();
 
     // Select the current style for this module.
     // Note: State structure varies slightly by module.
-    const currentStyle = useEnsembleState((state) => {
-        const modState = state[module];
-        if (!modState) {
-            return null;
-        }
-        // Handle nested state vs direct property
-        return modState.state?.style || modState.style;
-    });
+    const currentStyle = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ state) => {
+            const modState = /** @type {any} */ (state)[module];
+            if (!modState) {
+                return null;
+            }
+            // Handle nested state vs direct property
+            return modState.state?.style || modState.style;
+        },
+    );
 
     const onSelect = (/** @type {string} */ styleId) => {
         dispatch(ACTIONS.SET_STYLE, { module, style: styleId });
@@ -38,14 +44,17 @@ export function StyleSelector({ module, styles }) {
     };
 
     // Group styles by category
-    const categorized = styles.reduce((acc, item) => {
-        const cat = item.category || 'Other';
-        if (!acc[cat]) {
-            acc[cat] = [];
-        }
-        acc[cat].push(item);
-        return acc;
-    }, {});
+    const categorized = styles.reduce(
+        (/** @type {Record<string, any[]>} */ acc, /** @type {any} */ item) => {
+            const cat = item.category || 'Other';
+            if (!acc[cat]) {
+                acc[cat] = [];
+            }
+            acc[cat].push(item);
+            return acc;
+        },
+        /** @type {Record<string, any[]>} */ ({}),
+    );
 
     const categories = Object.keys(categorized).sort();
 
@@ -72,7 +81,7 @@ export function StyleSelector({ module, styles }) {
                         class="chip-grid"
                         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}
                     >
-                        {categorized[cat].map((item) => (
+                        {categorized[cat].map((/** @type {any} */ item) => (
                             <button
                                 key={item.id}
                                 type="button"

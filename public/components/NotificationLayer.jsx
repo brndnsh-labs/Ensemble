@@ -2,13 +2,12 @@ import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
-/**
- * @param {Object} props
- */
 export function NotificationLayer() {
     const notifications = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.notifications,
+        (/** @type {import('../types.js').EnsembleState} */ s) =>
+            /** @type {any} */ (s.playback).notifications || [],
     );
+    /** @type {import('preact/hooks').StateUpdater<any[]>|any} */
     const [visibleNotify, setVisibleNotify] = useState([]);
 
     useEffect(() => {
@@ -23,7 +22,7 @@ export function NotificationLayer() {
 
     return (
         <div id="notificationLayer" class="notification-layer" role="alert" aria-live="polite">
-            {visibleNotify.map((n) => (
+            {visibleNotify.map((/** @type {any} */ n) => (
                 <div key={n.id} class="notification-box">
                     <span class="notification-icon">
                         {n.type === 'error' ? '⚠️' : n.type === 'success' ? '✅' : 'ℹ️'}

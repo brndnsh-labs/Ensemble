@@ -68,9 +68,6 @@ function simpleMarkdown(/** @type {string} */ text) {
     );
 }
 
-/**
- * @param {Object} props
- */
 export function ManualModal() {
     const [content, setContent] = useState('Loading manual...');
 

@@ -24,9 +24,6 @@ const GROUPING_OPTIONS = {
     ],
 };
 
-/**
- * @param {Object} props
- */
 export function KeySignatureControls() {
     const dispatch = useDispatch();
     const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset, isMaximized } =
@@ -64,13 +61,14 @@ export function KeySignatureControls() {
     };
 
     const toggleGrouping = () => {
-        const options = GROUPING_OPTIONS[timeSignature];
+        const options = /** @type {any} */ (GROUPING_OPTIONS)[timeSignature];
         if (!options) {
             return;
         }
 
         import('../state.js').then(({ arranger }) => {
-            const current = arranger.grouping || TIME_SIGNATURES[timeSignature].grouping;
+            const current =
+                arranger.grouping || /** @type {any} */ (TIME_SIGNATURES)[timeSignature].grouping;
             const currentIndex = options.findIndex(
                 (/** @type {any} */ opt) => opt.join('+') === current.join('+'),
             );
@@ -130,7 +128,9 @@ export function KeySignatureControls() {
                     >
                         {grouping
                             ? grouping.join('+')
-                            : TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2'}
+                            : /** @type {any} */ (TIME_SIGNATURES)[timeSignature]?.grouping.join(
+                                  '+',
+                              ) || '3+2'}
                     </button>
                 </div>
             </div>

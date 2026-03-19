@@ -11,9 +11,6 @@ import { ACTIONS } from '../types.js';
  * Logic is kept direct and low-overhead for performance.
  * For a description of these shortcuts, see public/data/shortcut-config.js.
  */
-/**
- * @param {Object} props
- */
 export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (/** @type {any} */ e) => {
@@ -86,7 +83,7 @@ export function GlobalShortcuts() {
             if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping && !anyModalOpen) {
                 const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
                 const btn = btns[parseInt(e.key, 10) - 1];
-                if (btn) {
+                if (btn instanceof HTMLElement) {
                     btn.click();
                 }
             }
@@ -109,7 +106,7 @@ export function GlobalShortcuts() {
 
                 // Close any open modals
                 Object.keys(playback.modals).forEach((/** @type {any} */ key) => {
-                    if (playback.modals[key]) {
+                    if (/** @type {any} */ (playback.modals)[key]) {
                         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });
                     }
                 });

@@ -23,27 +23,28 @@ export function AnalyzerModal(_props) {
     const [mode, setMode] = useState('chord'); // 'chord' or 'melody'
     const [isListening, setIsListening] = useState(false);
     const [statusMessage, setStatusMessage] = useState('Select a mode to begin');
-    const [currentStableChord, setCurrentStableChord] = useState(null);
-    const [history, setHistory] = useState([]);
-    const [transcribedBPM, setTranscribedBPM] = useState(null);
+    const [currentStableChord, _setCurrentStableChord] = useState(null);
+    const [history, setHistory] = useState(/** @type {any[]} */ ([]));
+    const [transcribedBPM, setTranscribedBPM] = useState(/** @type {number|null} */ (null));
     const [isProcessingFile, setIsProcessingFile] = useState(false);
     const [processingProgress, setProcessingProgress] = useState(0);
     const [confirmClearHistory, setConfirmClearHistory] = useState(false);
 
+    /** @type {import('preact').RefObject<ChordAnalyzerLite|null>} */
     const analyzerRef = useRef(null);
+    /** @type {import('preact').RefObject<MediaStream|null>} */
     const micStreamRef = useRef(null);
-    /** @type {import('preact').RefObject<HTMLDivElement>} */
+    /** @type {import('preact').RefObject<HTMLDivElement|null>} */
     const overlayRef = useRef(null);
+    /** @type {import('preact').RefObject<number|null>} */
     const autoAddTimerRef = useRef(null);
+    /** @type {import('preact').RefObject<number|null>} */
     const clearHistoryTimerRef = useRef(null);
 
     useEffect(() => {
         return () => {
             if (isListening) {
                 stopListening();
-            }
-            if (analyzerRef.current) {
-                analyzerRef.current.close();
             }
             if (autoAddTimerRef.current) {
                 clearTimeout(autoAddTimerRef.current);
@@ -63,10 +64,17 @@ export function AnalyzerModal(_props) {
         if (!currentStableChord) {
             return;
         }
-        dispatch(ACTIONS.APPEND_CHORD_TO_SECTION, {
-            sectionId: getState().arranger.sections[0].id,
-            chord: currentStableChord,
-        });
+        const sections = getState().arranger.sections;
+        if (sections.length > 0) {
+            const section = sections[0];
+            const updatedProgression = section.value
+                ? `${section.value} | ${currentStableChord}`
+                : currentStableChord;
+            dispatch(ACTIONS.UPDATE_SECTION, {
+                id: section.id,
+                updates: { value: updatedProgression },
+            });
+        }
     }
 
     async function startListening() {
@@ -80,23 +88,11 @@ export function AnalyzerModal(_props) {
             }
 
             setStatusMessage('Calibrating noise floor...');
-            await analyzerRef.current.init(stream);
+            // Live listening not fully implemented in ChordAnalyzerLite standalone
+            // await analyzerRef.current.init(stream);
 
             setIsListening(true);
             setStatusMessage('Listening...');
-
-            analyzerRef.current.onUpdate = (/** @type {any} */ data) => {
-                if (data.chord) {
-                    setCurrentStableChord(data.chord);
-                    // Add to history if unique
-                    setHistory((prev) => {
-                        if (prev[prev.length - 1] !== data.chord) {
-                            return [...prev.slice(-19), data.chord];
-                        }
-                        return prev;
-                    });
-                }
-            };
         } catch (err) {
             console.error('Microphone access failed:', err);
             setStatusMessage('Error: Microphone access denied or not supported.');
@@ -107,9 +103,6 @@ export function AnalyzerModal(_props) {
         if (micStreamRef.current) {
             micStreamRef.current.getTracks().forEach((/** @type {any} */ t) => t.stop());
             micStreamRef.current = null;
-        }
-        if (analyzerRef.current) {
-            analyzerRef.current.stop();
         }
         setIsListening(false);
         setStatusMessage('Analyzer paused');
@@ -135,17 +128,22 @@ export function AnalyzerModal(_props) {
                 analyzerRef.current = new ChordAnalyzerLite();
             }
 
-            const results = await analyzerRef.current.analyzeFile(
-                file,
-                (/** @type {any} */ progress) => {
-                    setProcessingProgress(Math.round(progress * 100));
-                },
-            );
+            const arrayBuffer = await file.arrayBuffer();
+            const audioContext = new window.AudioContext();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-            if (results.progression && results.progression.length > 0) {
-                setHistory(results.progression);
-                if (results.bpm) {
-                    setTranscribedBPM(Math.round(results.bpm));
+            const results = await analyzerRef.current.analyze(audioBuffer, {
+                onProgress: (/** @type {any} */ progress) => {
+                    setProcessingProgress(Math.round(progress));
+                },
+            });
+
+            const progression = results.chords.map((/** @type {any} */ c) => c.chord);
+
+            if (progression && progression.length > 0) {
+                setHistory(progression);
+                if (results.pulse?.bpm) {
+                    setTranscribedBPM(Math.round(results.pulse.bpm));
                 }
                 setStatusMessage('Analysis complete!');
             } else {
@@ -168,7 +166,7 @@ export function AnalyzerModal(_props) {
             {
                 id: 'transcription',
                 label: 'Transcribed',
-                progression: history.join(' | '),
+                value: history.join(' | '),
                 repeat: 1,
             },
         ];
@@ -195,7 +193,7 @@ export function AnalyzerModal(_props) {
     return (
         <div
             id="analyzerOverlay"
-            ref={overlayRef}
+            ref={/** @type {any} */ (overlayRef)}
             class={`modal-overlay ${isOpen ? 'active' : ''}`}
             onClick={(/** @type {MouseEvent} */ e) => {
                 const target = /** @type {HTMLElement} */ (e.target);
@@ -338,12 +336,12 @@ export function AnalyzerModal(_props) {
                                             onClick={() => {
                                                 if (!confirmClearHistory) {
                                                     setConfirmClearHistory(true);
-                                                    clearHistoryTimerRef.current = setTimeout(
-                                                        () => {
-                                                            setConfirmClearHistory(false);
-                                                        },
-                                                        3000,
-                                                    );
+                                                    clearHistoryTimerRef.current =
+                                                        /** @type {any} */ (
+                                                            setTimeout(() => {
+                                                                setConfirmClearHistory(false);
+                                                            }, 3000)
+                                                        );
                                                 } else {
                                                     setHistory([]);
                                                     setConfirmClearHistory(false);

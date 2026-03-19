@@ -32,7 +32,7 @@ class ErrorBoundary extends Component {
 }
 
 /**
- * @param {function(any): number} getVisualTime
+ * @param {function(): number} getVisualTime
  */
 export function mountComponents(getVisualTime) {
     console.log('[UI-Root] Mounting Preact Root...');

@@ -16,9 +16,6 @@ import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { generateId } from '../utils.js';
 import { ButtonGroup, SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
-/**
- * @param {Object} props
- */
 export function GenerateSongModal() {
     const { arranger } = getState();
     const dispatch = useDispatch();
@@ -36,6 +33,7 @@ export function GenerateSongModal() {
         (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.isDirty,
     );
 
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const overlayRef = useRef(null);
 
     // Internal component state for form values
@@ -63,8 +61,10 @@ export function GenerateSongModal() {
 
             // Focus first element
             if (overlayRef.current) {
-                const focusable = overlayRef.current.querySelector(
-                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+                const focusable = /** @type {HTMLElement} */ (
+                    overlayRef.current.querySelector(
+                        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+                    )
                 );
                 if (focusable) {
                     setTimeout(() => focusable.focus(), 50);
@@ -123,7 +123,7 @@ export function GenerateSongModal() {
                 showToast('✨ Template Applied!');
                 setHasGenerated(true);
             }, 50);
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             if (e.name === 'TypeError' && e.message.includes('currentTime')) {
                 // Audio not initialized, ignore this error as it's expected if no user gesture yet
                 setHasGenerated(true);
@@ -200,7 +200,7 @@ export function GenerateSongModal() {
                 showToast('✨ Arrangement Ready!');
                 setHasGenerated(true);
             }, 50);
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             if (e.name === 'TypeError' && e.message.includes('currentTime')) {
                 // Audio not initialized, ignore this error as it's expected if no user gesture yet
                 setHasGenerated(true);
@@ -228,8 +228,9 @@ export function GenerateSongModal() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="generate-song-title"
-            onClick={(/** @type {any} */ e) => {
-                if (e.target.id === 'generateSongOverlay') {
+            onClick={(/** @type {MouseEvent} */ e) => {
+                const target = /** @type {HTMLElement} */ (e.target);
+                if (target.id === 'generateSongOverlay') {
                     close();
                 }
             }}
@@ -237,7 +238,7 @@ export function GenerateSongModal() {
             <div
                 class="modal-content settings-content"
                 style="min-height: 700px; display: flex; flex-direction: column;"
-                onClick={(/** @type {any} */ e) => e.stopPropagation()}
+                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
                     <h2 id="generate-song-title">Inspiration Hub</h2>
@@ -305,7 +306,7 @@ export function GenerateSongModal() {
                                         },
                                     ]}
                                     value={activeTab}
-                                    onChange={setActiveTab}
+                                    onChange={(/** @type {any} */ v) => setActiveTab(v)}
                                 />
                             </div>
 

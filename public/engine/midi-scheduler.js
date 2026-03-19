@@ -10,7 +10,7 @@ import { getMidi } from '../utils.js';
 
 /**
  * Stops MIDI transport and sends panic.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} _state - Global ensemble state
  * @param {number} time - AudioContext time
  */
 export function stopMidiTransport(_state, time) {
@@ -20,7 +20,7 @@ export function stopMidiTransport(_state, time) {
 
 /**
  * Starts MIDI transport and sends panic.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state
+ * @param {import('../types.js').EnsembleState} _state - Global ensemble state
  * @param {number} time - AudioContext time
  */
 export function startMidiTransport(_state, time) {

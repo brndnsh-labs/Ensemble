@@ -11,19 +11,31 @@ import { SoloistSmartTab } from './SoloistSmartTab.jsx';
 import { StyleSelector } from './StyleSelector.jsx';
 
 /**
- * @param {Object} props
+ * @typedef {Object} InstrumentPanelProps
+ * @property {string} id
+ * @property {string} module
+ * @property {string} title
+ * @property {any} styles
+ * @property {boolean} isActiveMobile
+ */
+/**
+ * @param {InstrumentPanelProps} props
  */
 export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
     const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            activeTab: s[module].activeTab,
-            enabled: s[module].enabled,
-            tradeMode: s[module].tradeMode,
-            performanceOpen: s.playback.modals?.performance,
-        }),
+        (/** @type {import('../types.js').EnsembleState} */ s) => {
+            const modState = /** @type {any} */ (s)[module];
+            return {
+                activeTab: modState.activeTab,
+                enabled: modState.enabled,
+                tradeMode: modState.tradeMode,
+                performanceOpen: s.playback.modals?.performance,
+            };
+        },
     );
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const menuRef = useRef(null);
 
     useEffect(() => {

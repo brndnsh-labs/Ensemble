@@ -72,7 +72,7 @@ const Step = memo(({ instIdx, stepIdx, value, instName, stepInfo, onToggle }) =>
 /**
  * @param {SequencerGridProps} props
  */
-export function SequencerGrid(props) {
+export function SequencerGrid(_props) {
     const { instruments, measures, timeSignature, isPlaying } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             instruments: s.groove.instruments,

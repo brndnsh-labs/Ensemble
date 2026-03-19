@@ -182,22 +182,28 @@ describe('Visualizer System', () => {
 
         it('should forward resize messages', () => {
             proxy.resize(1024, 768, 2);
-            expect(proxy.worker.postMessage).toHaveBeenCalledWith({
-                type: 'RESIZE',
-                width: 1024,
-                height: 768,
-                dpr: 2,
-            });
+            expect(proxy.worker.postMessage).toHaveBeenCalledWith(
+                {
+                    type: 'RESIZE',
+                    width: 1024,
+                    height: 768,
+                    dpr: 2,
+                },
+                [],
+            );
         });
 
         it('should forward data messages', () => {
             const note = { time: 1 };
             proxy.pushNote('bass', note);
-            expect(proxy.worker.postMessage).toHaveBeenCalledWith({
-                type: 'PUSH_NOTE',
-                name: 'bass',
-                event: note,
-            });
+            expect(proxy.worker.postMessage).toHaveBeenCalledWith(
+                {
+                    type: 'PUSH_NOTE',
+                    name: 'bass',
+                    event: note,
+                },
+                [],
+            );
         });
 
         it('should terminate worker on destroy', () => {

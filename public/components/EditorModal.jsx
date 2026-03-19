@@ -61,13 +61,15 @@ export function EditorModal(_props) {
 
         try {
             const { parseTab, detectKey } = await import('../tab-parser.js');
-            const { sections: parsedSections, capo } = parseTab(tabText);
+            const parsed = /** @type {any} */ (parseTab(tabText));
+            const parsedSections = parsed.sections;
+            const capo = parsed.capo;
 
             if (parsedSections.length > 0) {
                 pushHistory();
 
                 let finalSections = parsedSections;
-                let detected = detectKey(parsedSections);
+                let detected = /** @type {any} */ (detectKey(parsedSections));
 
                 // Handle Capo Transposition
                 if (capo > 0) {
@@ -121,8 +123,10 @@ export function EditorModal(_props) {
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
-            const focusable = overlayRef.current.querySelector(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            const focusable = /** @type {HTMLElement} */ (
+                overlayRef.current.querySelector(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+                )
             );
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
@@ -152,8 +156,8 @@ export function EditorModal(_props) {
 
     const handleAnalyze = () => {
         setIsMenuOpen(false);
-        if (window.resetAnalyzer) {
-            window.resetAnalyzer();
+        if (/** @type {any} */ (window).resetAnalyzer) {
+            /** @type {any} */ (window).resetAnalyzer();
         }
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'analyzer', open: true });

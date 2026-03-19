@@ -3,7 +3,12 @@ import React from 'preact/compat';
 
 /** @param {any} props */
 /**
- * @param {Object} props
+ * @typedef {Object} SymbolMenuProps
+ * @property {function(string): void} onSelect
+ * @property {function(): void} onClose
+ */
+/**
+ * @param {SymbolMenuProps} props
  */
 export function SymbolMenu({ onSelect, onClose }) {
     const symbols = [
@@ -23,6 +28,7 @@ export function SymbolMenu({ onSelect, onClose }) {
         '-',
     ];
 
+    /** @type {Record<string, string>} */
     const SYMBOL_LABELS = {
         '|': 'Bar Line',
         maj7: 'Major 7th',

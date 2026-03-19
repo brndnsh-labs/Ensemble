@@ -16,15 +16,14 @@ function useMobile() {
     return isMobile;
 }
 
-/**
- * @param {Object} props
- */
 export function DrumPadModal() {
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const modalRef = useRef(null);
     const isMobile = useMobile();
     const [velocity, setVelocity] = useState(1.0);
     const [autoVelocity, setAutoVelocity] = useState(true);
     const [activePads, setActivePads] = useState(new Set());
+    /** @type {import('preact/hooks').MutableRef<Record<string, number>>} */
     const timeoutsRef = useRef({});
 
     useLayoutEffect(() => {
@@ -33,7 +32,7 @@ export function DrumPadModal() {
         stopDrums(); // Silence automatic drums immediately
 
         if (modalRef.current) {
-            modalRef.current.focus({ preventScroll: true });
+            /** @type {any} */ (modalRef.current).focus();
         }
 
         return () => {
@@ -79,14 +78,16 @@ export function DrumPadModal() {
             clearTimeout(timeoutsRef.current[name]);
         }
 
-        timeoutsRef.current[name] = setTimeout(() => {
-            setActivePads((prev) => {
-                const next = new Set(prev);
-                next.delete(name);
-                return next;
-            });
-            delete timeoutsRef.current[name];
-        }, 120);
+        timeoutsRef.current[name] = /** @type {any} */ (
+            setTimeout(() => {
+                setActivePads((prev) => {
+                    const next = new Set(prev);
+                    next.delete(name);
+                    return next;
+                });
+                delete timeoutsRef.current[name];
+            }, 120)
+        );
     };
 
     const PAD_GROUPS = {
@@ -162,7 +163,7 @@ export function DrumPadModal() {
 
     useEffect(() => {
         const handleKeyDown = (/** @type {any} */ e) => {
-            if (modalRef.current?.closest('.closing')) {
+            if (/** @type {any} */ (modalRef.current)?.closest('.closing')) {
                 return;
             }
             if (e.repeat) {
