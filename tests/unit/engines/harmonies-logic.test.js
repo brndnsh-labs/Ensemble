@@ -386,5 +386,47 @@ describe('Harmony Engine Logic', () => {
             expect(notes.length).toBeGreaterThanOrEqual(2);
             expect(notes[0].velocity).toBeGreaterThan(0.35);
         });
+
+        it('should apply Harmonic Bloom (increased polyphony and velocity) on anchors', () => {
+            _soloist.enabled = true;
+            _playback.bandIntensity = 0.8;
+            _playback.currentLoopCount = 0;
+            _soloist.sessionSeed = {
+                notes: [{ step: 0, midi: 72, isAnchor: true }],
+                loopLengthSteps: 16,
+            };
+
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+
+            // 1. Check an anchor hit (should bloom)
+            const bloomNotes = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
+            expect(bloomNotes.length).toBeGreaterThan(2); // Polyphony boost
+            expect(bloomNotes[0].velocity).toBeGreaterThan(0.4); // Velocity boost (with polyphony comp)
+
+            // 2. Check a non-anchor hit (standard comping suppressed in Chorus 1)
+            const standardNotes = getHarmonyNotes(getState(), chordC, null, 4, 60, 'smart', 4);
+            expect(standardNotes.length).toBe(0);
+
+            randomSpy.mockRestore();
+        });
+
+        it('should trigger Hype Man (Anticipation) hits before anchors', () => {
+            _soloist.enabled = true;
+            _playback.bandIntensity = 0.8;
+            _playback.currentLoopCount = 0;
+            _soloist.sessionSeed = {
+                notes: [{ step: 8, midi: 72, isAnchor: true }], // Anchor on beat 3
+                loopLengthSteps: 16,
+            };
+
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+
+            // Step 6 should anticipate the anchor on Step 8
+            const hypeNotes = getHarmonyNotes(getState(), chordC, null, 6, 60, 'smart', 6);
+            expect(hypeNotes.length).toBeGreaterThan(0);
+            expect(hypeNotes[0].isLatched).toBe(true);
+
+            randomSpy.mockRestore();
+        });
     });
 });

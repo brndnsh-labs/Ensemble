@@ -440,14 +440,16 @@ export function getHarmonyNotes(
     let durationSteps = 1;
     let isLatched = false;
     let isGhost = false;
+    let isBloom = false;
 
     // Latching Logic (Soloist Hook Reinforcement)
-    if (soloist.enabled && soloistResult && playback.bandIntensity > 0.6) {
+    if (soloist.enabled && playback.bandIntensity > 0.6) {
         let reinforce = false;
+        let seedMidi = -1;
+        const loopCount = playback.currentLoopCount || 0;
 
-        // -- Shared Hook Reinforcement --
-        if (feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
-            // Check if the soloist is currently playing a known shared hook
+        // --- Shared Hook Reinforcement (Live interactions) ---
+        if (feel === 'Ska-Punk' && soloist.sharedHookBuffer && soloistResult) {
             const hookMatch = soloist.sharedHookBuffer.find(
                 (/** @type {any} */ h) => h.step === step,
             );
@@ -456,11 +458,60 @@ export function getHarmonyNotes(
             }
         }
 
+        // --- Dynamic Head: Structural Reinforcement ---
+        const seed = soloist.sessionSeed;
+        if (seed?.notes && seed.notes.length > 0) {
+            const { notes, loopLengthSteps } = seed;
+            const stepInLoop = step % loopLengthSteps;
+            const seedNote = notes.find((/** @type {any} */ n) => n.step === stepInLoop);
+
+            // Reinforce anchor points, or any seed note at very high intensity
+            if (seedNote && (seedNote.isAnchor || playback.bandIntensity > 0.85)) {
+                // Higher probability of reinforcement during Chorus 1 (The Head)
+                const reinforceProb = loopCount === 0 ? 0.95 : 0.4;
+
+                if (Math.random() < reinforceProb) {
+                    reinforce = true;
+                    seedMidi = seedNote.midi;
+                    if (seedNote.isAnchor) {
+                        isBloom = true;
+                    }
+                }
+            }
+
+            // --- Hype Man: Anticipation ---
+            if (!reinforce && playback.bandIntensity > 0.7) {
+                // Lookahead 2 steps (8th note anticipation)
+                const nextStepInLoop = (step + 2) % loopLengthSteps;
+                const nextSeedNote = notes.find(
+                    (/** @type {any} */ n) => n.step === nextStepInLoop,
+                );
+                // Only anticipate "Anchor" notes on strong beats (0 or 8)
+                if (nextSeedNote?.isAnchor && nextSeedNote.step % 8 === 0) {
+                    const pushProb = loopCount === 0 ? 0.8 : 0.3;
+                    if (Math.random() < pushProb) {
+                        reinforce = true;
+                        isBloom = true;
+                    }
+                }
+            }
+        }
+
         if (reinforce) {
             shouldPlay = true;
             isLatched = true;
             durationSteps = 1;
             rhythmicStyle = 'stabs';
+
+            // Optional: Melodic Doubling (Tutti effect)
+            // If intensity is very high, occasionally double the actual seed note (transposed down)
+            if (seedMidi !== -1 && playback.bandIntensity > 0.8 && Math.random() < 0.5) {
+                // Find relative interval for seedMidi
+                const relativeSeedInterval = (seedMidi - chord.rootMidi + 120) % 12;
+                if (!intervals.includes(relativeSeedInterval)) {
+                    intervals = [...intervals, relativeSeedInterval];
+                }
+            }
         }
     }
 
@@ -469,6 +520,13 @@ export function getHarmonyNotes(
     }
 
     if (!isLatched) {
+        // --- Chorus 1: Strict Adherence ---
+        // During the Head, the harmony section ONLY plays reinforcement stabs to establish the theme.
+        const seed = soloist.sessionSeed;
+        if ((playback.currentLoopCount || 0) === 0 && seed && seed.notes && seed.notes.length > 0) {
+            return [];
+        }
+
         // -- Pads Logic --
         if (rhythmicStyle === 'pads') {
             if (isChordStart || measureStep === 0) {
@@ -574,7 +632,20 @@ export function getHarmonyNotes(
     const rootMidi = chord.rootMidi;
     let finalIntervals = [...intervals];
 
-    let polyphony = Math.floor(1 + playback.bandIntensity * 3 * harmony.complexity);
+    // --- Harmonic Bloom: Thickening the reinforcement hits ---
+    let polyphonyBoost = 0;
+    let velocityMult = 1.0;
+    if (isBloom) {
+        polyphonyBoost = Math.floor(1 + playback.bandIntensity * 2);
+        velocityMult = 1.25;
+        // Add a sub-octave if not already present
+        if (!finalIntervals.includes(-12)) {
+            finalIntervals.unshift(-12);
+        }
+    }
+
+    let polyphony =
+        Math.floor(1 + playback.bandIntensity * 3 * harmony.complexity) + polyphonyBoost;
     if (activeStyle === 'organ' || activeStyle === 'strings') {
         polyphony = Math.max(2, polyphony);
     }
@@ -684,7 +755,8 @@ export function getHarmonyNotes(
             vibrato = { rate: 5.0, depth: 10 * intensity };
         }
 
-        let baseVol = /** @type {any} */ (config.velocity || 0.75) * (0.6 + intensity * 0.4);
+        let baseVol =
+            /** @type {any} */ (config.velocity || 0.75) * (0.6 + intensity * 0.4) * velocityMult;
         if (isGhost) {
             baseVol *= 0.4; // Ghost notes are much softer
         }
