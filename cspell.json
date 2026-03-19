@@ -139,7 +139,8 @@
         "octaveNode",
         "fifthsNode",
         "alterNode",
-        "shreddy"
+        "shreddy",
+        "deepsignal"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

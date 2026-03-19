@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
@@ -74,9 +75,9 @@ import { ACTIONS } from '../types.js';
  * @property {number} currentLoopCount - Current loop iteration counter.
  */
 /**
- * @type {GlobalContext}
+ * @type {import('deepsignal').DeepSignal<GlobalContext>}
  */
-export const playback = {
+export const playback = deepSignal({
     audio: null,
     masterGain: null,
     saturator: null,
@@ -161,7 +162,7 @@ export const playback = {
         manual: false,
         drumPad: false,
     },
-};
+});
 
 /**
  * @param {string} action
@@ -170,21 +171,19 @@ export const playback = {
 export function playbackReducer(action, payload) {
     switch (action) {
         case ACTIONS.RESET_STATE:
-            Object.assign(playback, {
-                bpm: 100,
-                theme: 'auto',
-                bandIntensity: 0.35,
-                complexity: 0.3,
-                autoIntensity: true,
-                metronome: false,
-                countIn: true,
-                visualFlash: false,
-                haptic: false,
-                sessionTimer: 5,
-                applyPresetSettings: false,
-                conductorVelocity: 1.0,
-                updateAvailable: false,
-            });
+            playback.bpm = 100;
+            playback.theme = 'auto';
+            playback.bandIntensity = 0.35;
+            playback.complexity = 0.3;
+            playback.autoIntensity = true;
+            playback.metronome = false;
+            playback.countIn = true;
+            playback.visualFlash = false;
+            playback.haptic = false;
+            playback.sessionTimer = 5;
+            playback.applyPresetSettings = false;
+            playback.conductorVelocity = 1.0;
+            playback.updateAvailable = false;
             return true;
         case ACTIONS.SET_UPDATE_AVAILABLE:
             playback.updateAvailable = !!payload;
@@ -215,40 +214,40 @@ export function playbackReducer(action, payload) {
             }
             break;
         case ACTIONS.SET_BAND_INTENSITY:
-            Object.assign(playback, { bandIntensity: Math.max(0, Math.min(1, payload)) });
+            playback.bandIntensity = Math.max(0, Math.min(1, payload));
             return true;
         case ACTIONS.SET_COMPLEXITY:
-            Object.assign(playback, { complexity: Math.max(0, Math.min(1, payload)) });
+            playback.complexity = Math.max(0, Math.min(1, payload));
             return true;
         case ACTIONS.SET_AUTO_INTENSITY:
-            Object.assign(playback, { autoIntensity: !!payload });
+            playback.autoIntensity = !!payload;
             return true;
         case ACTIONS.SET_METRONOME:
-            Object.assign(playback, { metronome: payload });
+            playback.metronome = payload;
             return true;
         case ACTIONS.SET_PRESET_SETTINGS_MODE:
-            Object.assign(playback, { applyPresetSettings: payload });
+            playback.applyPresetSettings = payload;
             return true;
         case ACTIONS.SET_SONG_MODE:
-            Object.assign(playback, { songMode: !!payload });
+            playback.songMode = !!payload;
             return true;
         case ACTIONS.SET_SESSION_TIMER:
-            Object.assign(playback, { sessionTimer: payload });
+            playback.sessionTimer = payload;
             return true;
         case ACTIONS.SET_STOP_AT_END:
-            Object.assign(playback, { stopAtEnd: payload });
+            playback.stopAtEnd = payload;
             return true;
         case ACTIONS.SET_ENDING_PENDING:
-            Object.assign(playback, { isEndingPending: payload });
+            playback.isEndingPending = payload;
             return true;
         case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
             if (playback.scheduleAheadTime < 0.4) {
-                Object.assign(playback, { scheduleAheadTime: playback.scheduleAheadTime * 2.0 });
+                playback.scheduleAheadTime = playback.scheduleAheadTime * 2.0;
                 console.warn(
                     `[Performance] Emergency Lookahead Triggered: ${playback.scheduleAheadTime}s`,
                 );
                 setTimeout(() => {
-                    Object.assign(playback, { scheduleAheadTime: 0.2 });
+                    playback.scheduleAheadTime = 0.2;
                     console.log('[Performance] Lookahead reset to normal.');
                 }, 10000);
             }
@@ -261,7 +260,18 @@ export function playbackReducer(action, payload) {
                 playback.lyricalBias = payload.lyricalBias;
             }
             if (payload.intent) {
-                Object.assign(playback.intent, payload.intent);
+                if (payload.intent.syncopation !== undefined) {
+                    playback.intent.syncopation = payload.intent.syncopation;
+                }
+                if (payload.intent.anticipation !== undefined) {
+                    playback.intent.anticipation = payload.intent.anticipation;
+                }
+                if (payload.intent.layBack !== undefined) {
+                    playback.intent.layBack = payload.intent.layBack;
+                }
+                if (payload.intent.density !== undefined) {
+                    playback.intent.density = payload.intent.density;
+                }
             }
             break;
         case ACTIONS.SHOW_TOAST: {

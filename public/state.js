@@ -117,6 +117,7 @@ const listeners = new Set();
  * @param {any} [payload] - The data associated with the action.
  */
 export function dispatch(action, payload) {
+    // Accessing deepSignal property directly works like a getter
     const oldBpm = playback.bpm;
 
     // Delegate to Reducers
@@ -128,8 +129,18 @@ export function dispatch(action, payload) {
     midiReducer(action, payload);
     vizReducer(action, payload);
 
-    // Always increment version on dispatch to force UI updates for in-place mutations
-    playback.stateVersion++;
+    // Legacy support: Manually increment stateVersion for non-deepSignal observers if they exist.
+    // We skip this for 'playback' actions because playback is a deepSignal and
+    // handles its own fine-grained reactivity.
+    const isPlaybackAction =
+        typeof action === 'string' &&
+        (action.startsWith('SET_BPM') ||
+            action.startsWith('SET_BAND_INTENSITY') ||
+            action.startsWith('TOGGLE_PLAY'));
+
+    if (playback.stateVersion !== undefined && !isPlaybackAction) {
+        playback.stateVersion++;
+    }
 
     // Notify listeners
     listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));

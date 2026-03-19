@@ -34,7 +34,7 @@ export function useEnsembleState(selector) {
     const selectorRef = useRef(selector);
     selectorRef.current = selector;
 
-    // Trigger re-renders via a version counter
+    // Trigger re-renders via a version counter (Legacy)
     const [, forceUpdate] = useState(0);
 
     const currentState = getState();
@@ -52,15 +52,15 @@ export function useEnsembleState(selector) {
          */
         const update = (_action, _payload, updatedStateMap) => {
             const nextSlice = selectorRef.current(updatedStateMap);
-            const stateVersion = updatedStateMap.playback.stateVersion;
 
+            // If the slice has changed, force a re-render.
+            // If it's a deepSignal, the access in the selector during render
+            // will automatically subscribe the component to fine-grained updates.
             if (!shallowEqual(lastRenderedSliceRef.current, nextSlice)) {
-                // If data has changed, force a re-render
                 forceUpdate((v) => v + 1);
-            } else if (typeof nextSlice === 'object' && nextSlice !== null) {
-                // If data is an object, it might have been mutated in-place.
-                // We use the global stateVersion to guarantee a re-render.
-                forceUpdate(stateVersion);
+            } else if (updatedStateMap.playback.stateVersion !== undefined) {
+                // Legacy support for stateVersion re-renders
+                forceUpdate(updatedStateMap.playback.stateVersion);
             }
         };
 
