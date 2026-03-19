@@ -22,12 +22,23 @@ export function handleEffects(action, payload, stateMap, context = {}) {
         case ACTIONS.TOGGLE_PLAY: {
             const { playback, arranger, soloist } = stateMap;
             if (playback.isPlaying) {
-                const seed = generateSessionSeed(
+                // If user didn't provide a seed, generate one and save it so they can see/share it
+                let currentSeed = soloist.seed;
+                if (!currentSeed) {
+                    currentSeed = Math.floor(Math.random() * 0xffffff)
+                        .toString(16)
+                        .padStart(6, '0')
+                        .toUpperCase();
+                    dispatch(ACTIONS.SET_SOLOIST_SEED, currentSeed);
+                }
+
+                const generated = generateSessionSeed(
                     arranger,
                     soloist.style || 'smart',
                     playback.bandIntensity,
+                    currentSeed,
                 );
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: seed });
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: generated });
             } else {
                 dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null });
             }
@@ -45,12 +56,13 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             // If arrangement changes during playback, we must regenerate the seed
             // to ensure MIDI notes land on valid chord/scale tones for the new structure.
             if (stateMap.playback.isPlaying) {
-                const seed = generateSessionSeed(
+                const generated = generateSessionSeed(
                     stateMap.arranger,
                     stateMap.soloist.style || 'smart',
                     stateMap.playback.bandIntensity,
+                    stateMap.soloist.seed,
                 );
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: seed });
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: generated });
             }
             break;
         }

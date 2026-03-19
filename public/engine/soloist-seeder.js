@@ -1,3 +1,4 @@
+import { createPRNG, generateRandomSeed } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -19,12 +20,15 @@ import { getScaleForChord } from './theory-scales.js';
  * @param {import('../state/arranger.js').ArrangerState} arranger
  * @param {string} style
  * @param {number} [_intensity]
+ * @param {string} [seedStr]
  * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
  */
-export function generateSessionSeed(arranger, style, _intensity) {
+export function generateSessionSeed(arranger, style, _intensity, seedStr) {
     if (!arranger.stepMap || arranger.stepMap.length === 0) {
         return { notes: [], loopLengthSteps: 0 };
     }
+
+    const prng = createPRNG(seedStr || generateRandomSeed());
 
     const stepsPerMeasure = 16;
     const totalSteps = arranger.totalSteps || arranger.stepMap.length;
@@ -88,7 +92,7 @@ export function generateSessionSeed(arranger, style, _intensity) {
         if (!labelMotifs.has(category)) {
             const pool =
                 TEMPLATES[/** @type {keyof typeof TEMPLATES} */ (category)] || TEMPLATES.verse;
-            const template = pool[Math.floor(Math.random() * pool.length)];
+            const template = pool[Math.floor(prng() * pool.length)];
             const motif = [];
             let lastInterval = 0;
 
@@ -96,13 +100,13 @@ export function generateSessionSeed(arranger, style, _intensity) {
                 if (template[i] === 1) {
                     let intervalChange = 0;
                     if (motif.length > 0) {
-                        const r = Math.random();
+                        const r = prng();
                         if (r < 0.75) {
-                            intervalChange = Math.random() > 0.5 ? 1 : -1; // Stepwise
+                            intervalChange = prng() > 0.5 ? 1 : -1; // Stepwise
                         } else if (r < 0.95) {
-                            intervalChange = Math.random() > 0.5 ? 2 : -2; // Skip
+                            intervalChange = prng() > 0.5 ? 2 : -2; // Skip
                         } else {
-                            intervalChange = Math.random() > 0.5 ? 4 : -4; // Leap
+                            intervalChange = prng() > 0.5 ? 4 : -4; // Leap
                         }
                     }
                     lastInterval += intervalChange;

@@ -74,6 +74,7 @@ export const bass = deepSignal({
  * @property {number} reverb - Reverb level.
  * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
  * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
+ * @property {string} seed - Thematic seed for deterministic generation.
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
  * @property {number} hookRetentionProb - Probability of retaining a hook motif.
  * @property {{notes: Array<any>, loopLengthSteps: number}|null} sessionSeed - Seed melody for the current session.
@@ -166,6 +167,7 @@ export const soloist = deepSignal({
     sessionSteps: 0,
     deviceBuffer: [],
     activeTab: 'smart',
+    seed: '',
     lastMidiPlayed: null,
     lastFreq: null,
     lastRenderedFreq: null,
@@ -307,6 +309,7 @@ export function instrumentReducer(action, payload) {
             soloist.isWaitingForEntry = false;
             soloist.isYielding = false;
             soloist.motifTracking = false;
+            soloist.seed = '';
             soloist.sessionSeed = null;
             soloist.phrasingIntensity = 0.5;
             soloist.busySteps = 0;
@@ -362,6 +365,9 @@ export function instrumentReducer(action, payload) {
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
             soloist.mode = payload;
+            return true;
+        case ACTIONS.SET_SOLOIST_SEED:
+            soloist.seed = payload;
             return true;
         case ACTIONS.SET_SOLOIST_PRESET:
             soloist.preset = payload;

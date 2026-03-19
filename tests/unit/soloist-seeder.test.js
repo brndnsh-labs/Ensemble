@@ -163,6 +163,20 @@ describe('Soloist Seeder', () => {
         }
     });
 
+    it('should generate identical melodies for the same seed string', () => {
+        const seedStr = 'JAZZ';
+        const seed1 = generateSessionSeed(mockArranger, 'scalar', 0.5, seedStr);
+        const seed2 = generateSessionSeed(mockArranger, 'scalar', 0.5, seedStr);
+        expect(seed1.notes).toEqual(seed2.notes);
+        expect(seed1.loopLengthSteps).toEqual(seed2.loopLengthSteps);
+    });
+
+    it('should generate different melodies for different seed strings', () => {
+        const seed1 = generateSessionSeed(mockArranger, 'scalar', 0.5, 'APPLE');
+        const seed2 = generateSessionSeed(mockArranger, 'scalar', 0.5, 'BANANA');
+        expect(seed1.notes).not.toEqual(seed2.notes);
+    });
+
     it('should return empty result for empty arranger', () => {
         const seed = generateSessionSeed({ stepMap: [] }, 'scalar', 0.5);
         expect(seed.notes).toEqual([]);

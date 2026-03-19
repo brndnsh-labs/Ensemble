@@ -207,6 +207,7 @@ export function hydrateState() {
                       ? 'guitar'
                       : 'monophonic',
                 activeTab: savedState.soloist.activeTab || 'smart',
+                seed: savedState.soloist.seed || '',
                 leadSheetMelody: savedState.soloist.leadSheetMelody || [],
             });
         }
@@ -417,6 +418,7 @@ export function loadFromUrl() {
                     mode: ['monophonic', 'guitar', 'polyphonic'].includes(band.s.m)
                         ? band.s.m
                         : soloist.mode,
+                    seed: typeof band.s.sd === 'string' ? band.s.sd : '',
                 });
             }
             if (band.b) {

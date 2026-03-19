@@ -28,6 +28,7 @@ function compressBandSettings(options = {}) {
             v: parseFloat(soloist.volume.toFixed(2)),
             r: parseFloat(soloist.reverb.toFixed(2)),
             m: soloist.mode,
+            sd: soloist.seed || '',
         },
         b: {
             e: (options.includeBass !== undefined ? options.includeBass : bass.enabled) ? 1 : 0,

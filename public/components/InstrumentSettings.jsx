@@ -189,6 +189,50 @@ export function InstrumentSettings({ module }) {
                                 ]}
                             />
                         </SettingRow>
+
+                        <SettingRow
+                            label="Thematic Seed"
+                            id="soloistSeedInput"
+                            description="For deterministic melodies"
+                        >
+                            <div class="flex-row">
+                                <input
+                                    id="soloistSeedInput"
+                                    type="text"
+                                    value={state.seed || ''}
+                                    placeholder="Random"
+                                    class="seed-input"
+                                    style={{
+                                        width: '80px',
+                                        fontFamily: 'monospace',
+                                        textTransform: 'uppercase',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--surface-sunken)',
+                                        color: 'var(--text-primary)',
+                                    }}
+                                    onInput={(/** @type {any} */ e) => {
+                                        dispatch(ACTIONS.SET_SOLOIST_SEED, e.target.value);
+                                        saveCurrentState();
+                                    }}
+                                />
+                                <button
+                                    class="icon-btn"
+                                    title="Generate Random Seed"
+                                    onClick={() => {
+                                        const newSeed = Math.floor(Math.random() * 0xffffff)
+                                            .toString(16)
+                                            .padStart(6, '0')
+                                            .toUpperCase();
+                                        dispatch(ACTIONS.SET_SOLOIST_SEED, newSeed);
+                                        saveCurrentState();
+                                    }}
+                                >
+                                    🎲
+                                </button>
+                            </div>
+                        </SettingRow>
                     </Fragment>
                 )}
 

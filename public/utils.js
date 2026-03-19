@@ -1,6 +1,46 @@
 import { ENHARMONIC_MAP } from './config.js';
 
 /**
+ * Creates a seeded pseudo-random number generator (Mulberry32).
+ * @param {number|string} seed - The seed value.
+ * @returns {() => number} A function that returns a random number between 0 and 1.
+ */
+export function createPRNG(seed) {
+    let s = typeof seed === 'string' ? hashString(seed) : seed;
+    return () => {
+        s |= 0;
+        s = (s + 0x6d2b79f5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) | 0;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+/**
+ * Simple string hash function (djb2).
+ * @param {string} str
+ * @returns {number}
+ */
+export function hashString(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) + hash + str.charCodeAt(i);
+    }
+    return hash >>> 0;
+}
+
+/**
+ * Generates a random 6-character hex string to act as a default seed.
+ * @returns {string}
+ */
+export function generateRandomSeed() {
+    return Math.floor(Math.random() * 0xffffff)
+        .toString(16)
+        .padStart(6, '0')
+        .toUpperCase();
+}
+
+/**
  * Normalizes a note name (e.g., C# to Db) based on the project's map.
  * @param {string} k - The note name to normalize.
  * @returns {string} The normalized note name.
