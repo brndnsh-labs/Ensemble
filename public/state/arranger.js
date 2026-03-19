@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
@@ -32,7 +33,10 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} isDirty - Whether the arrangement has been manually modified.
  * @property {Array<number>|null} grouping - Custom rhythmic grouping array (e.g. [3, 2]).
  */
-export const arranger = {
+/**
+ * @type {import('deepsignal').DeepSignal<ArrangerState>}
+ */
+export const arranger = deepSignal({
     sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', color: '#3b82f6', repeat: 1 }],
     progression: [],
     key: 'C',
@@ -50,7 +54,7 @@ export const arranger = {
     lastChordPreset: 'Pop (Standard)',
     mutatedSectionId: null,
     isDirty: false,
-};
+});
 
 /**
  * @param {string} action
@@ -66,44 +70,40 @@ export function arrangerReducer(action, payload) {
             break;
         case ACTIONS.IMPORT_MUSICXML:
             if (payload.hasChords) {
-                Object.assign(arranger, {
-                    sections: payload.sections,
-                    isDirty: true,
-                    notation: 'name',
-                });
+                arranger.sections = payload.sections;
+                arranger.isDirty = true;
+                arranger.notation = 'name';
             } else {
                 arranger.isDirty = true;
             }
             break;
         case ACTIONS.RESET_STATE:
-            Object.assign(arranger, {
-                sections: [
-                    {
-                        id: 's1',
-                        label: 'Intro',
-                        value: 'I | V | vi | IV',
-                        color: '#3b82f6',
-                        repeat: 1,
-                    },
-                ],
-                key: 'C',
-                timeSignature: '4/4',
-                notation: 'roman',
-                isMinor: false,
-                isDirty: false,
-                history: [],
-                grouping: null,
-            });
+            arranger.sections = [
+                {
+                    id: 's1',
+                    label: 'Intro',
+                    value: 'I | V | vi | IV',
+                    color: '#3b82f6',
+                    repeat: 1,
+                },
+            ];
+            arranger.key = 'C';
+            arranger.timeSignature = '4/4';
+            arranger.notation = 'roman';
+            arranger.isMinor = false;
+            arranger.isDirty = false;
+            arranger.history = [];
+            arranger.grouping = null;
             return true;
         case ACTIONS.SET_NOTATION:
-            Object.assign(arranger, { notation: payload });
+            arranger.notation = payload;
             return true;
         case ACTIONS.LOAD_TEMPLATE:
-            Object.assign(arranger, {
-                sections: payload.sections,
-                isMinor: payload.isMinor !== undefined ? payload.isMinor : arranger.isMinor,
-                isDirty: true,
-            });
+            arranger.sections = payload.sections;
+            if (payload.isMinor !== undefined) {
+                arranger.isMinor = payload.isMinor;
+            }
+            arranger.isDirty = true;
             return true;
         case ACTIONS.SET_ARRANGEMENT:
             arranger.sections = payload;

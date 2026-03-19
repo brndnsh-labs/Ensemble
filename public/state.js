@@ -130,15 +130,17 @@ export function dispatch(action, payload) {
     vizReducer(action, payload);
 
     // Legacy support: Manually increment stateVersion for non-deepSignal observers if they exist.
-    // We skip this for 'playback' actions because playback is a deepSignal and
-    // handles its own fine-grained reactivity.
-    const isPlaybackAction =
+    // We skip this for reactive slices because deepSignals handle their own fine-grained reactivity.
+    const isReactiveAction =
         typeof action === 'string' &&
         (action.startsWith('SET_BPM') ||
             action.startsWith('SET_BAND_INTENSITY') ||
-            action.startsWith('TOGGLE_PLAY'));
+            action.startsWith('TOGGLE_PLAY') ||
+            action.startsWith('SET_ARRANGEMENT') ||
+            action.startsWith('SET_NOTATION') ||
+            action.startsWith('LOAD_TEMPLATE'));
 
-    if (playback.stateVersion !== undefined && !isPlaybackAction) {
+    if (playback.stateVersion !== undefined && !isReactiveAction) {
         playback.stateVersion++;
     }
 
