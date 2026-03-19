@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
@@ -6,6 +7,15 @@ import { ACTIONS } from '../types.js';
  * @property {string} symbol - Display emoji/symbol.
  * @property {Array<number>} steps - Sequencer steps (0=off, 1=on, 2=accent).
  * @property {boolean} muted - Whether the instrument is muted.
+ */
+
+/**
+ * @typedef {Object} PocketState
+ * @property {number} globalDrive - -1.0 (behind) to 1.0 (ahead)
+ * @property {number} tightness - 0.0 (loose/jittery) to 1.0 (grid-locked)
+ * @property {number} bassGravity - 0.0 to 1.0 (how much bass follows Kick)
+ * @property {number} chordGravity - 0.0 to 1.0 (how much chords follow Bass)
+ * @property {number} soloistGravity - 0.0 to 1.0 (how much soloist follows Snare/Hats)
  */
 
 /**
@@ -38,13 +48,16 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} creativity - Whether generative fills/variations are enabled.
  * @property {Object} sectionSeedMap - Random seeds for each song section.
  * @property {number} gridVersion - Counter for grid UI updates.
- * @property {Object} pocket - Unified rhythmic pocket configuration.
+ * @property {PocketState} pocket - Unified rhythmic pocket configuration.
  * @property {string} lastSmartGenre - Last selected smart genre.
  * @property {string|null} pendingGenreFeel - Genre queued for the next measure.
  * @property {number|null} genreSwitchCountdown - Beats until genre switch.
  * @property {Map<number, any>} buffer - Map of scheduled drum events.
  */
-export const groove = {
+/**
+ * @type {import('deepsignal').DeepSignal<GrooveState>}
+ */
+export const groove = deepSignal({
     enabled: true,
     instruments: [
         { name: 'Kick', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
@@ -99,7 +112,7 @@ export const groove = {
         chordGravity: 0.6, // 0.0 to 1.0 (how much chords follow Bass)
         soloistGravity: 0.4, // 0.0 to 1.0 (how much soloist follows Snare/Hats)
     },
-};
+});
 
 /**
  * @param {string} action
@@ -119,32 +132,44 @@ export function grooveReducer(action, payload, playback) {
             }
             break;
         case ACTIONS.RESET_STATE:
-            Object.assign(groove, {
-                enabled: true,
-                volume: 0.5,
-                reverb: 0.2,
-                swing: 0,
-                swingSub: '8th',
-                genreFeel: 'Rock',
-                activeTab: 'smart',
-                lastSmartGenre: 'Rock',
-                measures: 1,
-                currentMeasure: 0,
-            });
-            Object.assign(groove.pocket, {
-                globalDrive: 0,
-                tightness: 0.5,
-                bassGravity: 0.8,
-                chordGravity: 0.6,
-                soloistGravity: 0.4,
-            });
+            groove.enabled = true;
+            groove.volume = 0.5;
+            groove.reverb = 0.2;
+            groove.swing = 0;
+            groove.swingSub = '8th';
+            groove.genreFeel = 'Rock';
+            groove.activeTab = 'smart';
+            groove.lastSmartGenre = 'Rock';
+            groove.measures = 1;
+            groove.currentMeasure = 0;
+
+            groove.pocket.globalDrive = 0;
+            groove.pocket.tightness = 0.5;
+            groove.pocket.bassGravity = 0.8;
+            groove.pocket.chordGravity = 0.6;
+            groove.pocket.soloistGravity = 0.4;
+
             groove.instruments.forEach((inst) => {
                 inst.steps.fill(0);
                 inst.muted = false;
             });
             return true;
         case ACTIONS.SET_POCKET_CONFIG:
-            Object.assign(groove.pocket, payload);
+            if (payload.globalDrive !== undefined) {
+                groove.pocket.globalDrive = payload.globalDrive;
+            }
+            if (payload.tightness !== undefined) {
+                groove.pocket.tightness = payload.tightness;
+            }
+            if (payload.bassGravity !== undefined) {
+                groove.pocket.bassGravity = payload.bassGravity;
+            }
+            if (payload.chordGravity !== undefined) {
+                groove.pocket.chordGravity = payload.chordGravity;
+            }
+            if (payload.soloistGravity !== undefined) {
+                groove.pocket.soloistGravity = payload.soloistGravity;
+            }
             return true;
         case ACTIONS.SET_GROOVE_STEPS: {
             const inst = groove.instruments.find((i) => i.name === payload.instrument);
@@ -160,16 +185,16 @@ export function grooveReducer(action, payload, playback) {
             return false;
         }
         case ACTIONS.SET_ACTIVE_MEASURE:
-            Object.assign(groove, { currentMeasure: parseInt(payload, 10) });
+            groove.currentMeasure = parseInt(payload, 10);
             return true;
         case ACTIONS.SET_SWING:
-            Object.assign(groove, { swing: payload });
+            groove.swing = payload;
             return true;
         case ACTIONS.SET_SWING_SUB:
-            Object.assign(groove, { swingSub: payload });
+            groove.swingSub = payload;
             return true;
         case ACTIONS.SET_HUMANIZE:
-            Object.assign(groove, { humanize: payload });
+            groove.humanize = payload;
             return true;
         case ACTIONS.SET_VOLUME:
             if (
@@ -177,7 +202,7 @@ export function grooveReducer(action, payload, playback) {
                 payload.module === 'drum' ||
                 payload.module === 'drums'
             ) {
-                Object.assign(groove, { volume: payload.value });
+                groove.volume = payload.value;
                 return true;
             }
             return false;
@@ -187,21 +212,21 @@ export function grooveReducer(action, payload, playback) {
                 payload.module === 'drum' ||
                 payload.module === 'drums'
             ) {
-                Object.assign(groove, { reverb: payload.value });
+                groove.reverb = payload.value;
                 return true;
             }
             return false;
         case ACTIONS.SET_FOLLOW_PLAYBACK:
-            Object.assign(groove, { followPlayback: payload });
+            groove.followPlayback = payload;
             return true;
         case ACTIONS.SET_LARS_MODE:
-            Object.assign(groove, { larsMode: !!payload });
+            groove.larsMode = !!payload;
             return true;
         case ACTIONS.SET_LARS_INTENSITY:
-            Object.assign(groove, { larsIntensity: Math.max(0, Math.min(1, payload)) });
+            groove.larsIntensity = Math.max(0, Math.min(1, payload));
             return true;
         case ACTIONS.SET_CREATIVITY:
-            Object.assign(groove, { creativity: !!payload });
+            groove.creativity = !!payload;
             return true;
         case ACTIONS.SET_GROOVE_SEED:
             if (!groove.sectionSeedMap) {
@@ -211,52 +236,46 @@ export function grooveReducer(action, payload, playback) {
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== payload) {
-                Object.assign(groove, { genreSwitchCountdown: payload });
+                groove.genreSwitchCountdown = payload;
                 return true;
             }
             return false;
         case ACTIONS.SET_GENRE_FEEL:
             if (playback.isPlaying) {
-                Object.assign(groove, {
-                    pendingGenreFeel: payload,
-                    lastSmartGenre: payload.genreName || groove.lastSmartGenre,
-                });
+                groove.pendingGenreFeel = payload;
+                groove.lastSmartGenre = payload.genreName || groove.lastSmartGenre;
             } else {
-                /** @type {any} */
-                const updates = {
-                    genreFeel: payload.feel,
-                    pendingGenreFeel: null,
-                    lastSmartGenre: payload.genreName || groove.lastSmartGenre,
-                    activeTab: 'smart',
-                    // Create a fresh array reference to ensure UI components like SequencerGrid re-render
-                    instruments: groove.instruments.map((inst) => ({
-                        ...inst,
-                        steps: [...inst.steps],
-                    })),
-                };
+                groove.genreFeel = payload.feel;
+                groove.pendingGenreFeel = null;
+                groove.lastSmartGenre = payload.genreName || groove.lastSmartGenre;
+                groove.activeTab = 'smart';
+                // DeepSignal handles nested reactivity, but we still map to ensure fresh references
+                // for any legacy components that might rely on shallow comparison.
+                groove.instruments = groove.instruments.map((inst) => ({
+                    ...inst,
+                    steps: [...inst.steps],
+                }));
+
                 if (payload.swing !== undefined) {
-                    updates.swing = payload.swing;
+                    groove.swing = payload.swing;
                 }
                 if (payload.sub !== undefined) {
-                    updates.swingSub = payload.sub;
+                    groove.swingSub = payload.sub;
                 }
-                Object.assign(groove, updates);
             }
             return true;
         case ACTIONS.SET_ACTIVE_TAB:
             if (payload.module === 'groove') {
-                Object.assign(groove, { activeTab: payload.tab });
+                groove.activeTab = payload.tab;
                 return true;
             }
             return false;
         case ACTIONS.TRIGGER_FILL:
-            Object.assign(groove, {
-                fillSteps: payload.steps,
-                fillActive: true,
-                fillStartStep: payload.startStep,
-                fillLength: payload.length,
-                pendingCrash: !!payload.crash,
-            });
+            groove.fillSteps = payload.steps;
+            groove.fillActive = true;
+            groove.fillStartStep = payload.startStep;
+            groove.fillLength = payload.length;
+            groove.pendingCrash = !!payload.crash;
             return true;
         case ACTIONS.STEP_TOGGLE:
             groove.gridVersion++;

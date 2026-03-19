@@ -138,7 +138,11 @@ export function dispatch(action, payload) {
             action.startsWith('TOGGLE_PLAY') ||
             action.startsWith('SET_ARRANGEMENT') ||
             action.startsWith('SET_NOTATION') ||
-            action.startsWith('LOAD_TEMPLATE'));
+            action.startsWith('LOAD_TEMPLATE') ||
+            action.startsWith('SET_SWING') ||
+            action.startsWith('SET_GENRE_FEEL') ||
+            action.startsWith('SET_GROOVE') ||
+            action.startsWith('STEP_TOGGLE'));
 
     if (playback.stateVersion !== undefined && !isReactiveAction) {
         playback.stateVersion++;
