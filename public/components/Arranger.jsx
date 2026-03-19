@@ -18,7 +18,7 @@ import { SectionCard } from './SectionCard.jsx';
  */
 
 /**
- * @param {ArrangerProps} props
+ * @param {ArrangerProps} _props
  */
 export function Arranger(_props) {
     const { sections, lastInteractedSectionId } = useEnsembleState(
