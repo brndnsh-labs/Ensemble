@@ -58,12 +58,27 @@ export class UnifiedVisualizer {
     }
 
     /**
+     * @param {any} val
+     * @returns {any}
+     */
+    toRaw(val) {
+        if (!val || typeof val !== 'object') {
+            return val;
+        }
+        try {
+            return JSON.parse(JSON.stringify(val));
+        } catch (_e) {
+            return val;
+        }
+    }
+
+    /**
      * @param {any} themeCache
      */
     setTheme(themeCache) {
         this.themeCache = themeCache;
         if (this.worker) {
-            this.worker.postMessage({ type: 'THEME', themeCache }, []);
+            this.worker.postMessage({ type: 'THEME', themeCache: this.toRaw(themeCache) }, []);
         }
     }
 
@@ -96,7 +111,7 @@ export class UnifiedVisualizer {
      */
     setRegister(name, midi) {
         if (this.worker) {
-            this.worker.postMessage({ type: 'SET_REGISTER', name, midi }, []);
+            this.worker.postMessage({ type: 'SET_REGISTER', name, midi: this.toRaw(midi) }, []);
         }
     }
 
@@ -124,7 +139,7 @@ export class UnifiedVisualizer {
      */
     pushNote(name, event) {
         if (this.worker) {
-            this.worker.postMessage({ type: 'PUSH_NOTE', name, event }, []);
+            this.worker.postMessage({ type: 'PUSH_NOTE', name, event: this.toRaw(event) }, []);
         }
     }
 
@@ -133,7 +148,7 @@ export class UnifiedVisualizer {
      */
     pushChord(event) {
         if (this.worker) {
-            this.worker.postMessage({ type: 'PUSH_CHORD', event }, []);
+            this.worker.postMessage({ type: 'PUSH_CHORD', event: this.toRaw(event) }, []);
         }
     }
 
@@ -160,7 +175,10 @@ export class UnifiedVisualizer {
      */
     render(currentTime, bpm, tsConfig) {
         if (this.worker) {
-            this.worker.postMessage({ type: 'RENDER', currentTime, bpm, tsConfig }, []);
+            this.worker.postMessage(
+                { type: 'RENDER', currentTime, bpm, tsConfig: this.toRaw(tsConfig) },
+                [],
+            );
         }
     }
 

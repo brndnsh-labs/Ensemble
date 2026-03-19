@@ -333,6 +333,9 @@ export function syncWorker(action, payload) {
     }
 
     if (Object.keys(data).length > 0) {
-        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data });
+        // DeepSignal proxies cannot be cloned by structuredClone (postMessage).
+        // We strip them by converting to a plain JSON object.
+        const rawData = JSON.parse(JSON.stringify(data));
+        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data: rawData });
     }
 }
