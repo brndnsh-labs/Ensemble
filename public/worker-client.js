@@ -102,6 +102,21 @@ export function stopWorker() {
 }
 
 /**
+ * @param {any} val
+ * @returns {any}
+ */
+function toRaw(val) {
+    if (!val || typeof val !== 'object') {
+        return val;
+    }
+    try {
+        return JSON.parse(JSON.stringify(val));
+    } catch (_e) {
+        return val;
+    }
+}
+
+/**
  * @param {number} step
  * @param {any} [syncData]
  * @param {number} [primeSteps]
@@ -110,7 +125,12 @@ export function flushWorker(step, syncData = null, primeSteps = 0) {
     if (timerWorker) {
         timerWorker.postMessage({
             type: WORKER_MSG.FLUSH,
-            data: { step, syncData, primeSteps, requestTimestamp: performance.now() },
+            data: {
+                step,
+                syncData: toRaw(syncData),
+                primeSteps,
+                requestTimestamp: performance.now(),
+            },
         });
     }
 }
@@ -335,7 +355,6 @@ export function syncWorker(action, payload) {
     if (Object.keys(data).length > 0) {
         // DeepSignal proxies cannot be cloned by structuredClone (postMessage).
         // We strip them by converting to a plain JSON object.
-        const rawData = JSON.parse(JSON.stringify(data));
-        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data: rawData });
+        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data: toRaw(data) });
     }
 }
