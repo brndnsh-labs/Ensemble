@@ -61,7 +61,7 @@ export function playHarmonyNote(
 
     harmony.activeVoices = harmony.activeVoices.filter(
         // @worker-mutation
-        /** @param {any} v */ (v) => v.time + v.duration + 0.1 > playTime,
+        /** @param {any} v */ (v) => v.time + v.duration + 1.0 > playTime,
     );
 
     // Pitch-aware Stealing
@@ -397,6 +397,9 @@ export function playHarmonyNote(
     }
     if (lfo) {
         lfo.stop(stopTime);
+    }
+    if (tremoloLfo) {
+        tremoloLfo.stop(stopTime);
     }
 
     osc1.onended = () => safeDisconnect(voiceNodes);

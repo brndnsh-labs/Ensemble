@@ -23,6 +23,7 @@ vi.mock('../../public/state.js', () => ({
 vi.mock('../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     killDrumNote: vi.fn(),
+    killHarmonyNote: vi.fn(),
     killSoloistNote: vi.fn(),
     playDrumSound: vi.fn(),
     playSoloNote: vi.fn(),
