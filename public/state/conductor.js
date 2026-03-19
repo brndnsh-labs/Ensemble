@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
@@ -9,14 +10,17 @@ import { ACTIONS } from '../types.js';
  * @property {number} loopCount - Number of times the current section has looped.
  * @property {number} formIteration - Number of times the entire song has looped.
  */
-export const conductor = {
+/**
+ * @type {import('deepsignal').DeepSignal<ConductorState>}
+ */
+export const conductor = deepSignal({
     targetIntensity: 0.35,
     stepSize: 0.0005,
     larsBpmOffset: 0,
     form: null,
     loopCount: 0,
     formIteration: 0,
-};
+});
 
 /**
  * @param {string} action
@@ -25,16 +29,31 @@ export const conductor = {
 export function conductorReducer(action, payload) {
     switch (action) {
         case ACTIONS.UPDATE_CONDUCTOR_STATE:
-            Object.assign(conductor, payload);
+            if (payload.targetIntensity !== undefined) {
+                conductor.targetIntensity = payload.targetIntensity;
+            }
+            if (payload.stepSize !== undefined) {
+                conductor.stepSize = payload.stepSize;
+            }
+            if (payload.larsBpmOffset !== undefined) {
+                conductor.larsBpmOffset = payload.larsBpmOffset;
+            }
+            if (payload.form !== undefined) {
+                conductor.form = payload.form;
+            }
+            if (payload.loopCount !== undefined) {
+                conductor.loopCount = payload.loopCount;
+            }
+            if (payload.formIteration !== undefined) {
+                conductor.formIteration = payload.formIteration;
+            }
             return true;
         case ACTIONS.RESET_STATE:
-            Object.assign(conductor, {
-                targetIntensity: 0.35,
-                stepSize: 0.0005,
-                larsBpmOffset: 0,
-                loopCount: 0,
-                formIteration: 0,
-            });
+            conductor.targetIntensity = 0.35;
+            conductor.stepSize = 0.0005;
+            conductor.larsBpmOffset = 0;
+            conductor.loopCount = 0;
+            conductor.formIteration = 0;
             return true;
     }
     return false;

@@ -7,7 +7,7 @@ vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
     dispatch: vi.fn(),
     subscribe: vi.fn(),
-    playback: { bpm: 120, stateVersion: 0 },
+    playback: { bpm: 120 },
     arranger: {},
     groove: {},
     chords: {},

@@ -64,12 +64,6 @@ describe('State Core Manager', () => {
             unsubscribe();
         });
 
-        it('should increment stateVersion on every dispatch', () => {
-            const initialVersion = playback.stateVersion;
-            dispatch('DUMMY_ACTION');
-            expect(playback.stateVersion).toBe(initialVersion + 1);
-        });
-
         it('should stop notifying after unsubscribe', () => {
             const listener = vi.fn();
             const unsubscribe = subscribe(listener);

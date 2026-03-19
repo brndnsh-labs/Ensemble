@@ -34,7 +34,7 @@ describe('State Reactivity Bridge Regression Tests', () => {
         vi.clearAllMocks();
     });
 
-    it('should force a re-render when stateVersion increments even if object reference is same', async () => {
+    it('should force a re-render when a state property is mutated via deepSignal', async () => {
         let renderCount = 0;
 
         function TestComponent() {
@@ -61,10 +61,5 @@ describe('State Reactivity Bridge Regression Tests', () => {
         // 3. Verify render count increased and UI updated
         expect(renderCount).toBeGreaterThan(initialCount);
         expect(container.textContent).toContain(`Volume: ${newVolume}`);
-    });
-
-    it('should NOT force a re-render if stateVersion does not change and data is same', async () => {
-        // This is harder to test without deep mocks, but we verified the logic above.
-        // The most important thing is that it DOES re-render when we need it to.
     });
 });

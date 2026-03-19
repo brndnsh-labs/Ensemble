@@ -50,7 +50,7 @@ import { ACTIONS } from '../types.js';
  * @property {number} gridVersion - Counter for grid UI updates.
  * @property {PocketState} pocket - Unified rhythmic pocket configuration.
  * @property {string} lastSmartGenre - Last selected smart genre.
- * @property {string|null} pendingGenreFeel - Genre queued for the next measure.
+ * @property {{genreName?: string, feel?: string}|null} pendingGenreFeel - Genre queued for the next measure.
  * @property {number|null} genreSwitchCountdown - Beats until genre switch.
  * @property {Map<number, any>} buffer - Map of scheduled drum events.
  */

@@ -9,6 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
 const mockDispatch = vi.fn();
+const mockGetState = vi.fn(() => ({
+    playback: { applyPresetSettings: true },
+}));
 
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
@@ -16,8 +19,8 @@ vi.mock('../../../public/ui-bridge.js', () => ({
 }));
 
 vi.mock('../../../public/state.js', () => ({
-    getState: vi.fn(),
-    dispatch: mockDispatch,
+    getState: () => mockGetState(),
+    dispatch: (action, payload) => mockDispatch(action, payload),
 }));
 
 // Mock Presets

@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
@@ -19,7 +20,10 @@ import { ACTIONS } from '../types.js';
  * @property {number} drumsOctave - Octave offset for drums.
  * @property {number} velocitySensitivity - Velocity scaling factor.
  */
-export const midi = {
+/**
+ * @type {import('deepsignal').DeepSignal<MidiState>}
+ */
+export const midi = deepSignal({
     enabled: false,
     outputs: [],
     selectedOutputId: null,
@@ -36,7 +40,7 @@ export const midi = {
     harmonyOctave: 0,
     drumsOctave: 0,
     velocitySensitivity: 1.0,
-};
+});
 
 /**
  * @param {string} action
@@ -51,7 +55,11 @@ export function midiReducer(action, payload) {
             }
             break;
         case ACTIONS.SET_MIDI_CONFIG:
-            Object.assign(midi, payload);
+            for (const key in payload) {
+                if (Object.hasOwn(midi, key)) {
+                    /** @type {any} */ (midi)[key] = payload[key];
+                }
+            }
             return true;
     }
     return false;

@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { stopDrums, triggerDrumSound } from '../performance-controller.js';
-import { dispatch } from '../state.js';
+import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { Slider } from './UIControls.jsx';
@@ -56,7 +56,7 @@ export function DrumPadModal() {
     const triggerDrum = (/** @type {string} */ name) => {
         dispatch(ACTIONS.INIT_AUDIO);
         dispatch(ACTIONS.RESTORE_GAINS);
-        const { playback } = useEnsembleState.getState();
+        const { playback } = getState();
         const time = playback.audio?.currentTime || 0;
 
         let finalVelocity = velocity;

@@ -58,45 +58,23 @@ describe('UI Bridge Integration: Preact & State Stability', () => {
         vi.clearAllMocks();
     });
 
-    describe('Memory Leak Prevention', () => {
-        it('should subscribe on mount and unsubscribe on unmount', async () => {
+    describe('State Access', () => {
+        it('should correctly select a state slice', async () => {
             function TestComponent() {
                 const bpm = useEnsembleState((s) => s.playback.bpm);
-                return <div>BPM: {bpm}</div>;
+                return <div id="bpm-val">{bpm}</div>;
             }
 
-            // 1. Mount
             act(() => {
                 render(<TestComponent />, container);
             });
-            expect(activeListeners.size).toBe(1);
 
-            // 2. Unmount
-            act(() => {
-                render(null, container);
-            });
-            expect(activeListeners.size).toBe(0);
-        });
-
-        it('should handle rapid mount/unmount cycles without leaking', async () => {
-            function TestComponent() {
-                useEnsembleState((s) => s.playback.bpm);
-                return <div>Test</div>;
-            }
-
-            for (let i = 0; i < 10; i++) {
-                act(() => {
-                    render(<TestComponent />, container);
-                });
-                act(() => {
-                    render(null, container);
-                });
-            }
-            expect(activeListeners.size).toBe(0);
+            const el = container.querySelector('#bpm-val');
+            expect(el?.textContent).toBe('100');
         });
     });
 
-    describe('Race Conditions & Rapid Updates', () => {
+    describe('Selective Re-renders', () => {
         it('should handle 50 rapid dispatches and settle on the final state', async () => {
             function TestComponent() {
                 const bpm = useEnsembleState((s) => s.playback.bpm);

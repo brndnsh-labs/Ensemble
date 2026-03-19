@@ -129,33 +129,6 @@ export function dispatch(action, payload) {
     midiReducer(action, payload);
     vizReducer(action, payload);
 
-    // Legacy support: Manually increment stateVersion for non-deepSignal observers if they exist.
-    // We skip this for reactive slices because deepSignals handle their own fine-grained reactivity.
-    const isReactiveAction =
-        typeof action === 'string' &&
-        (action.startsWith('SET_BPM') ||
-            action.startsWith('SET_BAND_INTENSITY') ||
-            action.startsWith('TOGGLE_PLAY') ||
-            action.startsWith('SET_ARRANGEMENT') ||
-            action.startsWith('SET_NOTATION') ||
-            action.startsWith('LOAD_TEMPLATE') ||
-            action.startsWith('SET_SWING') ||
-            action.startsWith('SET_GENRE_FEEL') ||
-            action.startsWith('SET_GROOVE') ||
-            action.startsWith('STEP_TOGGLE') ||
-            action.startsWith('SET_STYLE') ||
-            action.startsWith('SET_VOLUME') ||
-            action.startsWith('SET_REVERB') ||
-            action.startsWith('SET_OCTAVE') ||
-            action.startsWith('SET_DENSITY') ||
-            action.startsWith('SET_SOLOIST') ||
-            action.startsWith('UPDATE_HB') ||
-            action.startsWith('UPDATE_SB'));
-
-    if (playback.stateVersion !== undefined && !isReactiveAction) {
-        playback.stateVersion++;
-    }
-
     // Notify listeners
     listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));
 }

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock state and controller dependencies
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        playback: { stateVersion: 1 },
+        playback: {},
         groove: { enabled: true, activeTab: 'smart', lastDrumPreset: null, instruments: [] },
         arranger: { lastChordPreset: null, isDirty: false },
         chords: { enabled: true, activeTab: 'smart' },
@@ -28,7 +28,7 @@ vi.mock('../../public/state.js', () => {
 vi.mock('../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) =>
         selector({
-            playback: { stateVersion: 1 },
+            playback: {},
             groove: { enabled: true, activeTab: 'smart', lastDrumPreset: null, instruments: [] },
             arranger: { lastChordPreset: null, isDirty: false },
             chords: { enabled: true, activeTab: 'smart' },

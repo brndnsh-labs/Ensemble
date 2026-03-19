@@ -196,7 +196,6 @@ describe('Playback Reducer', () => {
                 updateAvailable: true,
                 resolutionTriggered: true,
                 isScheduling: true,
-                stateVersion: 10,
                 modals: { settings: true },
                 soloistEQ: { eq: 1 },
                 harmoniesGain: { g: 1 },

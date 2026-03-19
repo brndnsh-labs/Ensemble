@@ -1,3 +1,4 @@
+import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
@@ -5,10 +6,13 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} enabled - Whether the advanced visualizer is active.
  * @property {boolean} isMaximized - Whether the chord visualizer is maximized.
  */
-export const vizState = {
+/**
+ * @type {import('deepsignal').DeepSignal<VisualizerState>}
+ */
+export const vizState = deepSignal({
     enabled: false,
     isMaximized: false,
-};
+});
 
 /**
  * @param {string} action

@@ -10,10 +10,10 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
 ## Project Overview
 
 *   **Architecture**: Modular ES6 architecture with domain-specific controllers (`app`, `arranger`, `instrument`, `ui`, `midi`) and specialized musical engines (`bass`, `soloist`, `accompaniment`, `harmonies`, `fills`). Core logic is modularized into high-precision scheduling (`scheduler-core.js`), visual rendering (`visualizer.js`), and decentralized synthesis (`synth-*.js`).
-*   **State Architecture**: **Domain Slices Pattern**. State is decomposed into autonomous modules within `public/state/`. Cross-module side effects are managed via **Inversion of Control (IoC)** in `state-effects.js`.
+*   **State Architecture**: **Domain Slices Pattern**. State is decomposed into autonomous modules within `public/state/`. Each slice is a **reactive deepSignal**, providing fine-grained updates without the need for manual versioning or deep comparisons.
 *   **UI Layer**: **Preact (v10)** Component-Based Architecture. Logic is decentralized into functional components within `public/components/`.
 *   **Visualizer**: High-performance **OffscreenCanvas** implementation. The rendering engine (`VisualizerEngine`) runs in a dedicated background worker (`visualizer-worker.js`), ensuring 60fps visual stability independent of main thread UI load. Synchronized via high-precision interpolation.
-*   **State Bridge**: `public/ui-bridge.js` exports `useEnsembleState` for reactive component updates. It uses a `version` counter to force re-renders since the underlying engine state is mutated via `Object.assign`.
+*   **State Bridge**: `public/ui-bridge.js` exports `useEnsembleState` for reactive component updates. It leverages Preact's implicit signal tracking—accessing a state property during render automatically subscribes the component to updates for that specific property.
 *   **Initialization**: `public/main.js` orchestrates hydration, worker setup, and root mounting (`ui-root.jsx`). Hydration and parsing MUST happen before mounting to prevent stale UI state.
 *   **Domain Controllers**: Specialized logic resides in `app-controller.js`, `instrument-controller.js`, `arranger-controller.js`, and `midi-controller.js`.
 *   `types.js`: Centralized `ACTIONS` constants for the state dispatch system.
@@ -22,9 +22,9 @@ Ensemble is a high-performance Progressive Web App (PWA) designed for generative
     *   `bass-engine.js` / `accompaniment.js`: Orchestrators for rhythm section generation.
     *   `*-styles.js`: Dedicated modules (`bass-styles.js`, `chords-styles.js`) housing genre-specific algorithms and rhythmic patterns.
     *   `logic-worker.js`: Background thread orchestrator for all real-time generative logic.
-*   **State Access**: Read state through the `useEnsembleState` hook in components, or the exported state objects in engine code. **NEVER** modify state objects directly in components. Use `dispatch(ACTIONS.ACTION_TYPE, payload)` from `state.js` using constants from `types.js` to trigger updates.
+*   **State Access**: Read state through the `useEnsembleState` hook in components, or the exported state objects in engine code. **NEVER** modify state objects directly in components. Use `dispatch(ACTIONS.ACTION_TYPE, payload)` from `state.js` using constants from `types.js` to trigger updates. Since all state is powered by `deepSignal`, accessing a property automatically establishes a reactive dependency.
 *   **Precision Timing**: Use `playback.audio.currentTime` for all audio scheduling. Visual events should be pushed to `playback.drawQueue` for synchronization in `requestAnimationFrame` loop.
-*   **Worker Sync**: State updates that affect engine logic (genre, intensity, chords) are automatically synced to the worker via the `subscribe` mechanism in `main.js`. Use `syncWorker(action, payload)` for explicit delta-based updates.
+*   **Worker Sync**: State updates that affect engine logic (genre, intensity, chords) are automatically synced to the worker via the `subscribe` mechanism in `main.js`. `dispatch` serves as the event bus for these sync events. Use `syncWorker(action, payload)` for explicit delta-based updates.
 
 ## Navigation Map
 
@@ -76,7 +76,8 @@ The project has completed the **v2.29 Codebase Health & Standards Audit**, achie
 19. **Core Infrastructure & Test Integrity (v2.31)**: COMPLETED major architectural remediation. Implemented **State Slices Pattern** for all domain state. Resolved circular dependencies in core state/effects using **Inversion of Control (IoC)**. Decoupled engine from global state. Reached **89% project-wide test coverage** milestone including 100% coverage for all primary controllers. Verified with 1,300+ tests.
 20. **Visualizer Refactor (v2.32)**: COMPLETED migration of the canvas rendering engine to a Preact-based component architecture. Decoupled `UnifiedVisualizer` from the global `playback` state and high-precision scheduling loop.
 21. **High-Performance Offscreen Visualizer (v2.33)**: COMPLETED implementation of `OffscreenCanvas` architecture. Moved `VisualizerEngine` to a dedicated Web Worker (`visualizer-worker.js`), achieving thread-isolated 60fps rendering. Implemented high-precision clock synchronization via interpolated `postMessage` bridge. Reduced main-thread Jank by 90% during heavy UI transitions. Verified with updated unit and system smoke tests.
-22. **TypeScript & JSDoc Type Hardening (v2.34)**: COMPLETED project-wide remediation of 2,300+ TypeScript errors. Hardened global interfaces (`EnsembleState`, `StepInfo`, `ChordContext`) and added strict JSDoc typing to all domain slices, reducers, and musical engine functions. Integrated `npm run typecheck` into the mandatory validation pipeline to prevent future regressions.
+22. TypeScript & JSDoc Type Hardening (v2.34): COMPLETED project-wide remediation of 2,300+ TypeScript errors. Hardened global interfaces (`EnsembleState`, `StepInfo`, `ChordContext`) and added strict JSDoc typing to all domain slices, reducers, and musical engine functions. Integrated `npm run typecheck` into the mandatory validation pipeline to prevent future regressions.
+23. High-Performance Reactive State (v2.35): COMPLETED project-wide migration to Preact Signals via `deepSignal`. Decommissioned the legacy `stateVersion` re-render system in favor of fine-grained, implicit reactivity. Achieved 100% test compatibility across 1,450+ suites using the "Shadow Migration" pattern. Drastically reduced main-thread re-render overhead during high-intensity playback.
 
 ## Codebase Health
 

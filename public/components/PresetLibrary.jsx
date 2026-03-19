@@ -5,6 +5,7 @@ import { CHORD_PRESETS } from '../data/chord-presets.js';
 import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset, switchMeasure } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
+import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.js';
@@ -103,7 +104,7 @@ export function PresetLibrary({ type }) {
             });
 
             if (item.settings) {
-                if (useEnsembleState.getState().playback.applyPresetSettings) {
+                if (getState().playback.applyPresetSettings) {
                     if (item.settings.bpm) {
                         dispatch(ACTIONS.SET_BPM, item.settings.bpm);
                     }

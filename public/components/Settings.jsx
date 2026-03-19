@@ -52,20 +52,20 @@ export function Settings() {
         midiMuteLocal: s.midi.muteLocal,
         midiSelectedOutputId: s.midi.selectedOutputId,
         midiOutputs: s.midi.outputs,
-        midiChannels: {
+        midiChannels: /** @type {Record<string, number>} */ ({
             chords: s.midi.chordsChannel,
             bass: s.midi.bassChannel,
             soloist: s.midi.soloistChannel,
             harmony: s.midi.harmonyChannel,
             drums: s.midi.drumsChannel,
-        },
-        midiOctaves: {
+        }),
+        midiOctaves: /** @type {Record<string, number>} */ ({
             chords: s.midi.chordsOctave,
             bass: s.midi.bassOctave,
             soloist: s.midi.soloistOctave,
             harmony: s.midi.harmonyOctave,
             drums: s.midi.drumsOctave,
-        },
+        }),
         midiLatency: s.midi.latency,
         midiVelocity: s.midi.velocitySensitivity,
     }));
@@ -593,7 +593,7 @@ export function Settings() {
                             <SettingRow
                                 label="Velocity Sensitivity"
                                 id="midiVelocitySlider"
-                                valueDisplay={`${parseFloat(midiVelocity).toFixed(1)}x`}
+                                valueDisplay={`${midiVelocity.toFixed(1)}x`}
                             >
                                 <Slider
                                     id="midiVelocitySlider"
@@ -607,7 +607,7 @@ export function Settings() {
                                         });
                                         saveCurrentState();
                                     }}
-                                    ariaValueText={`${parseFloat(midiVelocity).toFixed(1)}x`}
+                                    ariaValueText={`${midiVelocity.toFixed(1)}x`}
                                 />
                             </SettingRow>
                         </div>

@@ -151,7 +151,7 @@ export function ChordVisualizer() {
         sectionsState: s.arranger.sections,
         notation: s.arranger.notation || 'roman',
         leadSheetMelody: s.soloist.leadSheetMelody,
-        soloistStyle: s.soloist.style,
+        soloistStyle: s.soloist.style || 'smart',
         isMaximized: s.vizState.isMaximized,
     }));
 

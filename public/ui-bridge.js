@@ -1,82 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { getState, dispatch as internalDispatch, subscribe } from './state.js';
+import { useCallback, useRef } from 'preact/hooks';
+import { getState, dispatch as internalDispatch } from './state.js';
 
 /**
- * @param {any} objA
- * @param {any} objB
- */
-function shallowEqual(objA, objB) {
-    if (Object.is(objA, objB)) {
-        return true;
-    }
-    if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
-        return false;
-    }
-    const keysA = Object.keys(objA);
-    const keysB = Object.keys(objB);
-    if (keysA.length !== keysB.length) {
-        return false;
-    }
-    for (let i = 0; i < keysA.length; i++) {
-        if (!Object.hasOwn(objB, keysA[i]) || !Object.is(objA[keysA[i]], objB[keysA[i]])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
- * Hook to access the Ensemble global state.
- * @param {Function} selector - Function taking (state) and returning a slice.
- * @returns {*} The selected state slice.
+ * Custom hook to access Ensemble state slices with fine-grained reactivity.
+ * Since the entire state is now powered by deepSignals, simply accessing
+ * a property in the selector will automatically subscribe the component to updates.
+ *
+ * @template T
+ * @param {(state: import('./types.js').EnsembleState) => T} selector - Function to select a state slice.
+ * @returns {T} The selected state slice.
  */
 export function useEnsembleState(selector) {
+    // We maintain the selectorRef pattern just in case of complex closures,
+    // though for signals it is often less critical.
     const selectorRef = useRef(selector);
     selectorRef.current = selector;
 
-    // Trigger re-renders via a version counter (Legacy)
-    const [, forceUpdate] = useState(0);
-
     const currentState = getState();
-    const currentSlice = selector(currentState);
-
-    // Track what we last rendered so the subscriber can perform an efficient comparison
-    const lastRenderedSliceRef = useRef(currentSlice);
-    lastRenderedSliceRef.current = currentSlice;
-
-    useEffect(() => {
-        /**
-         * @param {string} _action
-         * @param {any} _payload
-         * @param {any} updatedStateMap
-         */
-        const update = (_action, _payload, updatedStateMap) => {
-            const nextSlice = selectorRef.current(updatedStateMap);
-
-            // If the slice has changed, force a re-render.
-            // If it's a deepSignal, the access in the selector during render
-            // will automatically subscribe the component to fine-grained updates.
-            if (!shallowEqual(lastRenderedSliceRef.current, nextSlice)) {
-                forceUpdate((v) => v + 1);
-            } else if (updatedStateMap.playback.stateVersion !== undefined) {
-                // Legacy support for stateVersion re-renders
-                forceUpdate(updatedStateMap.playback.stateVersion);
-            }
-        };
-
-        const unsubscribe = subscribe(update);
-        return () => {
-            unsubscribe();
-        };
-    }, []);
-
-    return currentSlice;
+    return selectorRef.current(currentState);
 }
 
-useEnsembleState.getState = getState;
-
 /**
- * Hook to get the dispatch function.
+ * Hook to access the dispatch function.
+ * @returns {(action: string, payload?: any) => void}
  */
 export function useDispatch() {
     return useCallback(

@@ -69,7 +69,6 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} updateAvailable - Whether a PWA update is pending.
  * @property {boolean} resolutionTriggered - Whether the resolution ending sequence has been triggered.
  * @property {boolean} isScheduling - Whether the scheduler is currently active.
- * @property {number} stateVersion - Counter used to force UI re-renders.
  * @property {import('../types.js').ModalsState} modals - Visibility state for various UI modals.
  * @property {number} loopLimit - Number of loops before stopping (0 = infinite).
  * @property {number} currentLoopCount - Current loop iteration counter.
@@ -151,7 +150,6 @@ export const playback = deepSignal({
     updateAvailable: false,
     resolutionTriggered: false,
     isScheduling: false,
-    stateVersion: 0,
     modals: {
         settings: false,
         editor: false,
