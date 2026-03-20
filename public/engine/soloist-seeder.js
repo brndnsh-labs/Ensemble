@@ -180,7 +180,11 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
                         if (isBeatStart) {
                             const root = entryChord.rootMidi % 12;
                             // Stepwise contour (1, 2, 3, 5) simulated via primary tones based on beat index
-                            const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
                             blockNotes.push({
                                 step,
                                 midi,
@@ -191,7 +195,11 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
                     } else if (measureNumber === 1) {
                         if (isBeatStart && beatIndex === 0) {
                             const root = entryChord.rootMidi % 12;
-                            const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
                             blockNotes.push({
                                 step,
                                 midi,
@@ -223,18 +231,28 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
                     // Measure 3: Syncopated pickup on beat 2.5, quarter on beat 3, 8th on beat 4.5
                     // Measure 4: Whole note
                     if (measureNumber === 2) {
-                        if (measureStep === stepsPerBeat * 2.5) { // beat 3 "and" (pickup)
+                        if (measureStep === stepsPerBeat * 2.5) {
+                            // beat 3 "and" (pickup)
                             const root = entryChord.rootMidi % 12;
-                            const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
                             blockNotes.push({
                                 step,
                                 midi,
                                 isAnchor: false,
                                 durationSteps: stepsPerBeat * 0.5,
                             });
-                        } else if (isBeatStart && beatIndex === 3) { // beat 4
+                        } else if (isBeatStart && beatIndex === 3) {
+                            // beat 4
                             const root = entryChord.rootMidi % 12;
-                            const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
                             blockNotes.push({
                                 step,
                                 midi,

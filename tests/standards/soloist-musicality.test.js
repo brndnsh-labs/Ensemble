@@ -84,4 +84,33 @@ describe('Soloist Musicality & Thematic Integrity', () => {
             }
         }
     });
+
+    it('should rigidly follow the thematic seed during Loop 0', () => {
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
+        // Create a seed note
+        testState.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [{ step: 0, midi: 72, durationSteps: 4 }],
+        };
+        // Mock currentLoopCount to 0
+        testState.playback.currentLoopCount = 0;
+
+        // Set active steps so rhythm engine doesn't drop out immediately
+        testState.soloist.activeSteps = 16;
+        testState.soloist.isResting = false;
+        testState.soloist.rhythmPlan = undefined; // Force generation
+        const note = getSoloistNote(getState(), chord, chord, 0, null, 64, 'scalar', 0);
+        expect(note).not.toBeNull();
+        const primary = Array.isArray(note) ? note[0] : note;
+        // The pitch engine should have locked on the exact seed note due to +5000 weight
+        expect(primary.midi).toBe(72);
+        expect(primary.durationSteps).toBe(4);
+
+        // Ensure devices and double stops are disabled (result should not be an array)
+        expect(Array.isArray(note)).toBe(false);
+
+        // Cleanup state
+        testState.playback.currentLoopCount = undefined;
+        testState.soloist.sessionSeed = undefined;
+    });
 });

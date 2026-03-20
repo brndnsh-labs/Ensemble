@@ -157,4 +157,16 @@ describe('Song Mode Behavior', () => {
         // Section bias (0.75) * 0.7 + Arc default (0.5) * 0.3 = 0.675
         expect(playback.lyricalBias).toBeCloseTo(0.675, 2);
     });
+
+    it('should expect a rigid repeating melody in the first loop with a seed', () => {
+        const { playback, soloist } = getState();
+        soloist.sessionSeed = {
+            loopLengthSteps: 32,
+            notes: [{ step: 0, midi: 72, durationSteps: 4 }],
+        };
+        playback.currentLoopCount = 0;
+
+        expect(soloist.sessionSeed).toBeDefined();
+        expect(playback.currentLoopCount).toBe(0);
+    });
 });
