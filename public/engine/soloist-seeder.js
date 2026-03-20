@@ -149,16 +149,43 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 const scale = getScaleForChord(state, chord, null, style);
 
                 // Strategy Register: Intro is lower, Chorus is higher
-                let registerOffset = 72; // C5
+                let registerOffset = 12; // Adjusted to be relative so we don't force massive octave jumps
                 if (category === 'intro') {
-                    registerOffset = 60; // C4
+                    registerOffset = 0;
                 } else if (category === 'chorus') {
-                    registerOffset = 84; // C6
+                    registerOffset = 24;
                 }
 
                 const scaleIdx =
                     ((motifNote.interval % scale.length) + scale.length) % scale.length;
-                const midi = chord.rootMidi + registerOffset + scale[scaleIdx];
+
+                // Use a normalized base (like 60) plus the interval, rather than adding the chord root
+                // directly, which can cause wild octave leaps when the chords change.
+                const baseMidi = 60 + registerOffset; // e.g. 60 (C4) or 72 (C5)
+                const pitchClass = (chord.rootMidi + scale[scaleIdx]) % 12;
+
+                let midi =
+                    baseMidi + pitchClass + Math.floor(motifNote.interval / scale.length) * 12;
+
+                // Smooth out chord transitions by forcing the new note to be as close
+                // as possible to the last generated note in the sequence, UNLESS
+                // we've crossed into a new structural section (which defines its own register)
+                if (notes.length > 0 && motifNote.offset > 0) {
+                    const lastNote = notes[notes.length - 1];
+                    let bestMidi = midi;
+                    let minDistance = Math.abs(midi - lastNote.midi);
+
+                    // Try moving it up or down an octave to see if it's closer
+                    for (const offset of [-12, 12, -24, 24]) {
+                        const testMidi = midi + offset;
+                        const dist = Math.abs(testMidi - lastNote.midi);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            bestMidi = testMidi;
+                        }
+                    }
+                    midi = bestMidi;
+                }
 
                 notes.push({
                     step: globalStep,
