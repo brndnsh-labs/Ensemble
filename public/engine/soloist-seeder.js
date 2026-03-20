@@ -339,60 +339,46 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             // Determine macro-phrasing (4 or 8 measure arcs)
             const measureInBlock = (m - sectionStartMeasure) % blockMeasures;
 
-            // The user requested: "generate a 2-measure motif, repeat or mutate it in measures 3 and 4,
+            // For 8 measure blocks, the user requested "generate a 2-measure motif, repeat or mutate it in measures 3 and 4,
             // and then explicitly force a rest state for the remainder of the 8-measure block."
-            if (measureInBlock >= 4 && blockMeasures >= 8) {
-                // We are in measures 5-8 of an 8 measure block.
-                // However, check if we are in the absolute final resolution zone
-                if (isResolutionZone && m === sectionEndMeasure - 2) {
-                    const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
-                    if (stepEntry?.chord) {
-                        const chord = /** @type {any} */ (stepEntry.chord);
-                        // Using Root and 5th to avoid major/minor 3rd dissonance on unknown chords
-                        const stableIntervals = [0, 7];
-                        const pitchClass =
-                            (chord.rootMidi +
-                                stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
-                            12;
-                        const midi = registerBase + pitchClass;
-                        notes.push({
-                            step: baseStep,
-                            midi: midi,
-                            isAnchor: true,
-                            durationSteps: stepsPerMeasure * 2, // Let it ring out
-                            velocity: 0.9,
-                        });
-                        lastMidi = midi;
+            // However, 4 whole measures of rest is too much and sounds broken ("second four don't play").
+            // We will interpret "remainder" as the final 2 measures of the block to let it breathe,
+            // OR only explicitly force rest if we are in the macro-cycle turnaround resolution zone.
+            if (measureInBlock >= blockMeasures - 2) {
+                // We are in the final 2 measures of the 4 or 8 measure block.
+
+                // If this block is the macro-cycle turnaround, force a strong resolution and full rest.
+                if (isResolutionZone) {
+                    if (m === sectionEndMeasure - 2) {
+                        const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
+                        if (stepEntry?.chord) {
+                            const chord = /** @type {any} */ (stepEntry.chord);
+                            const stableIntervals = [0, 7];
+                            const pitchClass =
+                                (chord.rootMidi +
+                                    stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
+                                12;
+                            const midi = registerBase + pitchClass;
+                            notes.push({
+                                step: baseStep,
+                                midi: midi,
+                                isAnchor: true,
+                                durationSteps: stepsPerMeasure * 2, // Let it ring out
+                                velocity: 0.9,
+                            });
+                            lastMidi = midi;
+                        }
                     }
+                    continue; // Force rest for turnaround resolution
                 }
-                // Force rest for remainder of 8-block
-                continue;
             }
 
-            // For a 4 measure block, there is no "remainder" beyond measures 3 and 4.
-            // They are the repeat/mutate phase. We ONLY force a rest if it is the macro-cycle turnaround.
-            if (isResolutionZone && measureInBlock >= 2 && blockMeasures === 4) {
-                if (m === sectionEndMeasure - 2) {
-                    const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
-                    if (stepEntry?.chord) {
-                        const chord = /** @type {any} */ (stepEntry.chord);
-                        const stableIntervals = [0, 7];
-                        const pitchClass =
-                            (chord.rootMidi +
-                                stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
-                            12;
-                        const midi = registerBase + pitchClass;
-                        notes.push({
-                            step: baseStep,
-                            midi: midi,
-                            isAnchor: true,
-                            durationSteps: stepsPerMeasure * 2, // Let it ring out
-                            velocity: 0.9,
-                        });
-                        lastMidi = midi;
-                    }
+            // If it's NOT the macro-cycle turnaround, but we are in the final 2 measures of an 8-measure block,
+            // encourage a rest state to breathe (50% chance), but don't force a permanent 4-measure gap.
+            if (measureInBlock >= blockMeasures - 2 && blockMeasures >= 8) {
+                if (prng() > 0.5) {
+                    continue;
                 }
-                continue; // Force rest for turnaround resolution
             }
 
             // Pick a target chord tone for the downbeat of these 2 measures
