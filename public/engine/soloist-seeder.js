@@ -39,7 +39,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     const notes = [];
 
     // Motif Memory: Keyed by Category to ensure repetition across same section types
-    /** @type {Map<string, { startStep: number, notes: SeedNote[] }>} */
+    /** @type {Map<string, { startStep: number, lengthSteps: number, notes: SeedNote[] }>} */
     const categorySeeds = new Map();
 
     // Strategy Templates (Section Contours)
@@ -107,49 +107,52 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const cachedData = categorySeeds.get(category);
             const cachedNotes = cachedData ? cachedData.notes : [];
             const originalStart = cachedData ? cachedData.startStep : 0;
+            const originalLength = cachedData ? cachedData.lengthSteps : stepsPerMeasure * 2;
 
-            cachedNotes.forEach((cachedNote) => {
-                const relativeStep = cachedNote.step - originalStart;
-                const globalStep = sectionRange.start + relativeStep;
+            for (let offset = 0; offset < sectionSteps; offset += originalLength) {
+                cachedNotes.forEach((cachedNote) => {
+                    const relativeStep = cachedNote.step - originalStart;
+                    const globalStep = sectionRange.start + offset + relativeStep;
 
-                if (globalStep >= sectionRange.end || globalStep >= totalSteps) {
-                    return;
-                }
-
-                const entry = arranger.stepMap[globalStep];
-                if (!entry) {
-                    return;
-                }
-
-                const newChord = entry.chord;
-                let newMidi = cachedNote.midi;
-
-                // Turnaround handling: snap to primary chord tones if chords differ
-                if (globalStep >= isTurnaroundStart) {
-                    // We need the original chord at cachedNote.step to see if it differs
-                    const originalEntry = arranger.stepMap[cachedNote.step];
-                    const originalChord = /** @type {any} */ (
-                        originalEntry ? originalEntry.chord : null
-                    );
-                    const targetChord = /** @type {any} */ (newChord);
-
-                    if (
-                        originalChord &&
-                        (originalChord.rootMidi !== targetChord.rootMidi ||
-                            originalChord.quality !== targetChord.quality)
-                    ) {
-                        // Snap to primary chord tone
-                        newMidi = snapToPrimaryChordTone(cachedNote.midi, targetChord);
+                    if (globalStep >= sectionRange.end || globalStep >= totalSteps) {
+                        return;
                     }
-                }
 
-                notes.push({
-                    step: globalStep,
-                    midi: newMidi,
-                    isAnchor: cachedNote.isAnchor,
-                    durationSteps: cachedNote.durationSteps,
+                    const entry = arranger.stepMap[globalStep];
+                    if (!entry) {
+                        return;
+                    }
+
+                    const newChord = entry.chord;
+                    let newMidi = cachedNote.midi;
+
+                    // Turnaround handling: snap to primary chord tones if chords differ
+                    if (globalStep >= isTurnaroundStart) {
+                        // We need the original chord at cachedNote.step to see if it differs
+                        const originalEntry = arranger.stepMap[cachedNote.step];
+                        const originalChord = /** @type {any} */ (
+                            originalEntry ? originalEntry.chord : null
+                        );
+                        const targetChord = /** @type {any} */ (newChord);
+
+                        if (
+                            originalChord &&
+                            (originalChord.rootMidi !== targetChord.rootMidi ||
+                                originalChord.quality !== targetChord.quality)
+                        ) {
+                            // Snap to primary chord tone
+                            newMidi = snapToPrimaryChordTone(cachedNote.midi, targetChord);
+                        }
+                    }
+
+                    notes.push({
+                        step: globalStep,
+                        midi: newMidi,
+                        isAnchor: cachedNote.isAnchor,
+                        durationSteps: cachedNote.durationSteps,
+                    });
                 });
-            });
+            }
         } else {
             // GENERATE NEW SECTION
             const pool = TEMPLATES[/** @type {keyof typeof TEMPLATES} */ (category)] || TEMPLATES.a;
@@ -275,7 +278,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     }
                 }
             }
-            categorySeeds.set(category, { startStep: sectionRange.start, notes: generatedNotes });
+            categorySeeds.set(category, {
+                startStep: sectionRange.start,
+                lengthSteps: sectionSteps,
+                notes: generatedNotes,
+            });
         }
     });
 

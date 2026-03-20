@@ -243,4 +243,34 @@ describe('Soloist Seeder', () => {
             expect([2, 5, 7, 11]).toContain(pc);
         });
     });
+
+    it('should repeat cloned motifs to fill longer sections', () => {
+        const fillArranger = {
+            totalSteps: 48,
+            sectionMap: [
+                { id: 'v1', start: 0, end: 16, label: 'Verse' }, // 1 measure
+                { id: 'v2', start: 16, end: 48, label: 'Verse' }, // 2 measures
+            ],
+            stepMap: Array(48)
+                .fill(null)
+                .map((_, _i) => ({
+                    chord: {
+                        rootMidi: 60,
+                        quality: 'major',
+                        value: 'C',
+                        beats: 4,
+                        intervals: [0, 4, 7],
+                    },
+                })),
+        };
+
+        const seed = generateSessionSeed(getState(), fillArranger, 'scalar', 0.5);
+
+        const v1Notes = seed.notes.filter((n) => n.step < 16);
+        const v2Notes = seed.notes.filter((n) => n.step >= 16);
+
+        // v2 is exactly twice as long as v1.
+        // Thus, v2 should have exactly twice the number of notes generated from the cloned motif.
+        expect(v2Notes.length).toBe(v1Notes.length * 2);
+    });
 });
