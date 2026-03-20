@@ -225,6 +225,67 @@ export function getSoloistNote(
         }
     }
 
+    // --- Head Mode (Loop 0) Direct Playback Bypass ---
+    // If the test suite bypasses setting loop count, default to -1 so we don't accidentally override tests expecting normal logic.
+    // The main app usually starts loop count at 0.
+    const loopCount = playback.currentLoopCount !== undefined ? playback.currentLoopCount : -1;
+
+    // We only force strict head playback on loop 0, AND if there is actually a seed to play.
+    const isStrictHeadPlayback =
+        loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
+
+    if (isStrictHeadPlayback && soloist.sessionSeed) {
+        const stepInLoop =
+            ((step % soloist.sessionSeed.loopLengthSteps) + soloist.sessionSeed.loopLengthSteps) %
+            soloist.sessionSeed.loopLengthSteps;
+        const headNotes = soloist.sessionSeed.notes.filter(
+            (/** @type {any} */ n) => n.step === stepInLoop,
+        );
+
+        if (headNotes.length > 0) {
+            const headNote = headNotes[0];
+            soloist.busySteps = Math.max(0, (headNote.durationSteps || 1) - 1); // @worker-mutation
+
+            const pseudoRhythmNode = {
+                velocity: headNote.velocity || 0.8,
+                durationSteps: headNote.durationSteps,
+                isStrongBeat: isBeatStart,
+                vibrato: headNote.durationSteps > 4,
+                isSustained: headNote.durationSteps > 4,
+                isHeadBypass: true,
+                targetMidi: headNote.midi,
+            };
+
+            soloist.lastAttackStep = step; // @worker-mutation
+
+            return selectPitchAndDevices(
+                state,
+                step,
+                pseudoRhythmNode,
+                currentChord,
+                nextChord,
+                activeStyle,
+                intensity,
+                stepInChord,
+                coordination,
+                playback,
+                soloist,
+                groove,
+                arranger,
+                stepsPerMeasure,
+                stepsPerBeat,
+            );
+        }
+
+        if ((soloist.busySteps || 0) > 0) {
+            soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
+        }
+
+        // When strictly playing the head, if there's no note right now, we simply yield/rest.
+        // We do not evaluate the standard probability/state machine logic underneath.
+        return null;
+    }
+
     // --- Form Awareness & Phrasing States ---
     const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
     const stepInForm = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
