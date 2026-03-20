@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { getState } from '../../public/state.js';
 import { getFrequency } from '../../public/utils.js';
 
 // Mock state
@@ -26,11 +27,12 @@ describe('Funk Bass Critique', () => {
 
         for (let i = 0; i < totalSteps; i++) {
             const stepInMeasure = i % 16;
-            const active = isBassActive('smart', i, i % 16);
+            const active = isBassActive(getState(), 'smart', i, i % 16);
 
             if (active) {
                 totalActive++;
                 const note = getBassNote(
+                    getState(),
                     chordC,
                     null,
                     stepInMeasure / 4,

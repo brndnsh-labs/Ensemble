@@ -55,9 +55,10 @@ describe('Rock Bassist Critique', () => {
             const nextChord = (measure + 1) % 2 === 0 ? chordC : chordG;
             const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
 
-            const active = isBassActive('rock', i, stepInMeasure, info, {});
+            const active = isBassActive(getState(), 'rock', i, stepInMeasure, info, {});
             if (active) {
                 const note = getBassNote(
+                    getState(),
                     currentChord,
                     nextChord,
                     info.beatIndex,

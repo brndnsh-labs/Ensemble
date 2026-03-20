@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { getState } from '../../public/state.js';
 
 const { mockArranger, stepMap, TOTAL_SECTIONS, STEPS_PER_SECTION } = vi.hoisted(() => {
     const stepMap = [];

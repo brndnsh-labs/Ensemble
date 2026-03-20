@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
 import * as stateModule from '../../public/state.js';
+import { getState } from '../../public/state.js';
 
 vi.mock('../../public/state.js');
 vi.mock('../../public/config.js', () => ({
@@ -115,13 +116,13 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
 
         // Step 1: Not an end of measure
         localState.soloist.activeSteps = 1; // Will decrement to 0, but not rest
-        getSoloistNote(chord, null, 1, 440, 60, 'funk', 1);
+        getSoloistNote(getState(), chord, null, 1, 440, 60, 'funk', 1);
         expect(localState.soloist.phrasingState).toBe('IMPROV');
 
         // Step 15: End of measure transition point
         localState.soloist.activeSteps = 1; // Force expiration exactly on resolution
         randomSpy.mockReturnValue(0.01); // Force attack
-        getSoloistNote(chord, null, 15, 440, 60, 'funk', 15);
+        getSoloistNote(getState(), chord, null, 15, 440, 60, 'funk', 15);
         expect(localState.soloist.phrasingState).toBe('rest');
 
         randomSpy.mockRestore();
@@ -140,7 +141,7 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
 
         // Force resolution
         randomSpy.mockReturnValue(0.01);
-        getSoloistNote(chord, null, 15, 440, 60, 'funk', 15);
+        getSoloistNote(getState(), chord, null, 15, 440, 60, 'funk', 15);
 
         const highFatigueRest = localState.soloist.restSteps;
 
@@ -152,7 +153,7 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
 
         // Ensure Math.random() gives same deterministic output
         randomSpy.mockReturnValue(0.01); // Force attack probability to pass
-        getSoloistNote(chord, null, 31, 440, 60, 'funk', 15);
+        getSoloistNote(getState(), chord, null, 31, 440, 60, 'funk', 15);
 
         const lowFatigueRest = localState.soloist.restSteps;
         expect(highFatigueRest).toBeGreaterThanOrEqual(lowFatigueRest);
@@ -168,7 +169,7 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         localState.soloist.phrasingState = 'rest';
         localState.soloist.restSteps = 10;
 
-        getSoloistNote(chord, null, 100, 440, 72, 'funk', 4);
+        getSoloistNote(getState(), chord, null, 100, 440, 72, 'funk', 4);
 
         expect(localState.soloist.restSteps).toBe(9);
     });
@@ -180,7 +181,7 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
 
         localState.playback.bandIntensity = 0.05;
         // Verify it doesn't crash and still processes steps
-        getSoloistNote(chord, null, 16, 440, 60, 'funk', 0);
+        getSoloistNote(getState(), chord, null, 16, 440, 60, 'funk', 0);
         expect(localState.soloist.notesThisMeasure).toBeDefined();
     });
 });

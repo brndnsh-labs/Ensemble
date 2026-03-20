@@ -403,6 +403,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.lastAttackStep = -100;
                 const rhythmNode = { velocity: 1.0, durationSteps: 8, isStrongBeat: true };
                 const res = selectPitchAndDevices(
+                    getState(),
                     i * 4,
                     rhythmNode,
                     chordC,

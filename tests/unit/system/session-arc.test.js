@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../../public/engine/conductor.js';
-import { getState } from '../../../public/state.js';
+import { dispatch, getState } from '../../../public/state.js';
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({
@@ -50,7 +50,7 @@ describe('Session Timer Intensity Arc', () => {
         // Simulate end of loop (step 112 going to 128/0)
         // checkSectionTransition expects currentStep.
         // Trigger at step 112 (start of last measure, stepsPerMeasure=16)
-        checkSectionTransition(112, 16);
+        checkSectionTransition(getState(), 112, 16, dispatch);
 
         return mockState.conductor.targetIntensity;
     };

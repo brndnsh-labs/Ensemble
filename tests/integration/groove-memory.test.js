@@ -109,7 +109,7 @@ describe('Groove Section Memory (Creativity)', () => {
         const chorusMotifs = new Set();
         let chorusSeed = null;
         for (let step = 64; step < 128; step++) {
-            checkSectionTransition(step, stepsPerMeasure);
+            checkSectionTransition(getState(), step, stepsPerMeasure, dispatch);
             const entry = mockArranger.stepMap.find((e) => step >= e.start && step < e.end);
             const sectionId = entry.chord.sectionId;
             const seed = mockGroove.sectionSeedMap[sectionId];
@@ -125,7 +125,7 @@ describe('Groove Section Memory (Creativity)', () => {
         const verse2Motifs = new Set();
         let returningVerseSeed = null;
         for (let step = 128; step < 192; step++) {
-            checkSectionTransition(step, stepsPerMeasure);
+            checkSectionTransition(getState(), step, stepsPerMeasure, dispatch);
             const entry = mockArranger.stepMap.find((e) => step >= e.start && step < e.end);
             const sectionId = entry.chord.sectionId;
             const seed = mockGroove.sectionSeedMap[sectionId];

@@ -68,15 +68,15 @@ describe('Accompaniment Consistency Standards', () => {
         groove.genreFeel = 'Funk';
 
         // Measure 1 Generation
-        getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), mockChord, 0, 0, 0, { isBeatStart: true });
         const patternM1 = [...compingState.currentCell];
 
         // Advance to Measure 2 (Step 16)
-        getAccompanimentNotes(mockChord, 16, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), mockChord, 16, 0, 0, { isBeatStart: true });
         const patternM2 = [...compingState.currentCell];
 
         // Advance to Measure 3 (Step 32)
-        getAccompanimentNotes(mockChord, 32, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), mockChord, 32, 0, 0, { isBeatStart: true });
         const patternM3 = [...compingState.currentCell];
 
         // Expectation: Patterns should be identical
@@ -90,7 +90,7 @@ describe('Accompaniment Consistency Standards', () => {
         // Collect patterns over 5 measures
         const patterns = [];
         for (let i = 0; i < 5; i++) {
-            getAccompanimentNotes(mockChord, i * 16, 0, 0, { isBeatStart: true });
+            getAccompanimentNotes(getState(), mockChord, i * 16, 0, 0, { isBeatStart: true });
             patterns.push(JSON.stringify(compingState.currentCell));
         }
 
@@ -107,17 +107,17 @@ describe('Accompaniment Consistency Standards', () => {
 
         // Measure 1 (Section A)
         const chordA = { ...mockChord, sectionId: 'sectionA' };
-        getAccompanimentNotes(chordA, 0, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chordA, 0, 0, 0, { isBeatStart: true });
         const patternA = [...compingState.currentCell];
 
         // Measure 2 (Section A) - Should stick
-        getAccompanimentNotes(chordA, 16, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chordA, 16, 0, 0, { isBeatStart: true });
         expect(compingState.currentCell).toEqual(patternA);
 
         // Measure 3 (Section B) - CHANGE!
         const chordB = { ...mockChord, sectionId: 'sectionB' };
         // We need to simulate the step advancing
-        getAccompanimentNotes(chordB, 32, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chordB, 32, 0, 0, { isBeatStart: true });
 
         const _patternB = [...compingState.currentCell];
 
@@ -135,7 +135,7 @@ describe('Accompaniment Consistency Standards', () => {
 
         // Trigger switch logic again to verify it overwrites our tamper
         const chordC = { ...mockChord, sectionId: 'sectionC' };
-        getAccompanimentNotes(chordC, 48, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chordC, 48, 0, 0, { isBeatStart: true });
 
         expect(compingState.currentCell[0]).not.toBe(9);
     });
@@ -153,7 +153,7 @@ describe('Accompaniment Consistency Standards', () => {
         };
 
         // Accompaniment should shift up
-        const notes = getAccompanimentNotes(lowChord, 0, 0, 0, { isBeatStart: true });
+        const notes = getAccompanimentNotes(getState(), lowChord, 0, 0, 0, { isBeatStart: true });
 
         if (notes.length > 0) {
             const _lowestNote = Math.min(...notes.map((n) => n.midi).filter((m) => m > 0));

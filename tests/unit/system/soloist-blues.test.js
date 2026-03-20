@@ -67,7 +67,7 @@ describe('Soloist Blues Logic', () => {
 
             // Call getSoloistNote
             // Use attempts * 4 to ensure step % 16 == 0 regularly
-            getSoloistNote(C7, null, attempts * 4, 60, 4, 'blues', 0, {
+            getSoloistNote(getState(), C7, null, attempts * 4, 60, 4, 'blues', 0, {
                 bypassRhythm: true,
             });
 

@@ -23,7 +23,7 @@ vi.mock('../../public/engine/fills.js', () => ({
 }));
 
 import { initAudio } from '../../public/engine/engine.js';
-import { getState } from '../../public/state.js';
+import { dispatch, getState } from '../../public/state.js';
 import { clampFreq, createSoftClipCurve } from '../../public/utils.js';
 
 const { playback, chords, bass } = getState();
@@ -106,12 +106,12 @@ describe('DSP & Signal Safety', () => {
 
         // Low intensity
         playback.bandIntensity = 0.2;
-        applyConductor();
+        applyConductor(getState(), dispatch);
         const lowThreshold = playback.masterLimiter.threshold.setTargetAtTime.mock.calls[0][0];
 
         // High intensity
         playback.bandIntensity = 0.9;
-        applyConductor();
+        applyConductor(getState(), dispatch);
         const highThreshold = playback.masterLimiter.threshold.setTargetAtTime.mock.calls[1][0];
 
         // High intensity should have a lower threshold (more compression/limiting)

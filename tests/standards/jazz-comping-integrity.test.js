@@ -151,7 +151,7 @@ describe('Jazz Comping Integrity', () => {
         compingState.currentCell[0] = 1;
         compingState.lockedUntil = 100;
 
-        const notes = getAccompanimentNotes(a7alt, 0, 0, 0, {
+        const notes = getAccompanimentNotes(getState(), a7alt, 0, 0, 0, {
             isBeatStart: true,
             isGroupStart: true,
         });
@@ -187,7 +187,7 @@ describe('Jazz Comping Integrity', () => {
             // Check a random step within a 16-step window
             const s = Math.floor(Math.random() * 16);
             compingState.lockedUntil = 0; // Force re-eval
-            const notes = getAccompanimentNotes(chord, i * 16 + s, s, s, {
+            const notes = getAccompanimentNotes(getState(), chord, i * 16 + s, s, s, {
                 isBeatStart: s % 4 === 0,
             });
             if (notes.some((n) => n.midi > 0 && !n.muted)) {
@@ -214,7 +214,7 @@ describe('Jazz Comping Integrity', () => {
         soloist.busySteps = 0; // But now they stopped
 
         compingState.lockedUntil = 0;
-        getAccompanimentNotes(chord, 16, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chord, 16, 0, 0, { isBeatStart: true });
 
         // Should have switched to 'active' vibe
         expect(compingState.currentVibe).toBe('active');
@@ -242,7 +242,9 @@ describe('Jazz Comping Integrity', () => {
                 compingState.currentCell[s % 16] = 1;
                 compingState.lockedUntil = 1000; // Keep it locked
             }
-            const res = getAccompanimentNotes(chord, s, s, s % 16, { isBeatStart: s % 4 === 0 });
+            const res = getAccompanimentNotes(getState(), chord, s, s, s % 16, {
+                isBeatStart: s % 4 === 0,
+            });
             if (res.some((n) => n.midi > 0)) {
                 notes = res;
                 break;
@@ -274,7 +276,7 @@ describe('Jazz Comping Integrity', () => {
             // Try various steps until we find a hit to check voice leading
             let midis = [];
             for (let s = 0; s < 16; s++) {
-                const notes = getAccompanimentNotes(chord, i * 16 + s, s, s, {
+                const notes = getAccompanimentNotes(getState(), chord, i * 16 + s, s, s, {
                     isBeatStart: s % 4 === 0,
                 });
                 midis = notes.filter((n) => n.midi > 0).map((n) => n.midi);
@@ -309,7 +311,7 @@ describe('Jazz Comping Integrity', () => {
         const patterns = new Set();
         for (let i = 0; i < 10; i++) {
             compingState.lockedUntil = 0;
-            getAccompanimentNotes(chord, i * 16, 0, 0, { isBeatStart: true });
+            getAccompanimentNotes(getState(), chord, i * 16, 0, 0, { isBeatStart: true });
             patterns.add(compingState.currentCell.join(''));
         }
         expect(patterns.size).toBeGreaterThan(1);
@@ -317,11 +319,11 @@ describe('Jazz Comping Integrity', () => {
         // 2. Neo-Soul should stick
         groove.genreFeel = 'Neo-Soul';
         compingState.lockedUntil = 0;
-        getAccompanimentNotes(chord, 200, 0, 0, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chord, 200, 0, 0, { isBeatStart: true });
         const initialPattern = compingState.currentCell.join('');
 
         for (let i = 1; i < 4; i++) {
-            getAccompanimentNotes(chord, 200 + i * 16, 0, 0, { isBeatStart: true });
+            getAccompanimentNotes(getState(), chord, 200 + i * 16, 0, 0, { isBeatStart: true });
             expect(compingState.currentCell.join('')).toBe(initialPattern);
         }
     });

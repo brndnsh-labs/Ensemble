@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
 describe('Odd-Meter Authenticity Integration', () => {
@@ -91,6 +92,7 @@ describe('Odd-Meter Authenticity Integration', () => {
         // We can't easily test private variables, but we can verify that getSoloistNote
         // is callable and returns consistent results for step 0 in different meters.
         const note44 = getSoloistNote(
+            getState(),
             chordC,
             null,
             0.5,
@@ -103,6 +105,7 @@ describe('Odd-Meter Authenticity Integration', () => {
             info44,
         );
         const note34 = getSoloistNote(
+            getState(),
             chordC,
             null,
             0.5,

@@ -9,6 +9,9 @@ describe('Soloist Melodic Devices Deep Dive', () => {
 
     beforeEach(() => {
         ctx = {
+            state: {
+                arranger: { key: 'C', isMinor: false },
+            },
             selectedMidi: 60,
             targetChord: { rootMidi: 60, intervals: [0, 4, 7, 10], freqs: [] },
             currentChord: { rootMidi: 60, intervals: [0, 4, 7, 10] },

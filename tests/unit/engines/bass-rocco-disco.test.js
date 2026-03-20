@@ -90,12 +90,12 @@ describe('Bass Engine - Rocco & Disco', () => {
     describe('Rocco Style', () => {
         it('should be active on all 16th steps', () => {
             for (let i = 0; i < 4; i++) {
-                expect(isBassActive('rocco', i, i)).toBe(true);
+                expect(isBassActive(getState(), 'rocco', i, i)).toBe(true);
             }
         });
 
         it('should play Root on Downbeat (Step 0)', () => {
-            const result = getBassNote(chordC, null, 0, null, 38, 'rocco', 0, 0, 0);
+            const result = getBassNote(getState(), chordC, null, 0, null, 38, 'rocco', 0, 0, 0);
             expect(result).not.toBeNull();
             expect(result.midi).toBe(48); // Expected normalized C2 (since center is ~38)
             expect(result.muted).toBeFalsy();
@@ -106,7 +106,18 @@ describe('Bass Engine - Rocco & Disco', () => {
             let noteCount = 0;
             // Run many times because it's probabilistic
             for (let i = 0; i < 100; i++) {
-                const result = getBassNote(chordC, null, 0.25, null, 38, 'rocco', 0, 1, 1);
+                const result = getBassNote(
+                    getState(),
+                    chordC,
+                    null,
+                    0.25,
+                    null,
+                    38,
+                    'rocco',
+                    0,
+                    1,
+                    1,
+                );
                 if (result) {
                     noteCount++;
                     if (result.muted) {
@@ -124,12 +135,12 @@ describe('Bass Engine - Rocco & Disco', () => {
     describe('Disco Style', () => {
         it('should be active on all 16th steps', () => {
             for (let i = 0; i < 4; i++) {
-                expect(isBassActive('disco', i, i)).toBe(true);
+                expect(isBassActive(getState(), 'disco', i, i)).toBe(true);
             }
         });
 
         it('should play Root on Downbeat (Step 0)', () => {
-            const result = getBassNote(chordC, null, 0, null, 36, 'disco', 0, 0, 0);
+            const result = getBassNote(getState(), chordC, null, 0, null, 36, 'disco', 0, 0, 0);
             expect(result).not.toBeNull();
             // Accept C2 (36) or C3 (48) depending on intensity shift
             expect([36, 48]).toContain(result.midi);
@@ -137,7 +148,7 @@ describe('Bass Engine - Rocco & Disco', () => {
 
         it('should play Octave on Upbeat (Step 2)', () => {
             const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
-            const result = getBassNote(chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
+            const result = getBassNote(getState(), chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
             expect(result).not.toBeNull();
             expect(result.midi).toBe(48); // C3 (36 + 12)
             spy.mockRestore();
@@ -146,7 +157,7 @@ describe('Bass Engine - Rocco & Disco', () => {
         it('should handle range clamping correctly for octaves', () => {
             // Verify standard octave behavior works.
             const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
-            const result = getBassNote(chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
+            const result = getBassNote(getState(), chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
             expect(result.midi).toBe(48);
             spy.mockRestore();
         });

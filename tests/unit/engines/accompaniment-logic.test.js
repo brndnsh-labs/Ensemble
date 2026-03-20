@@ -75,7 +75,7 @@ describe('Accompaniment Engine Logic', () => {
 
     describe('Generation & Styles', () => {
         it('should generate notes on the downbeat (step 0) by default', () => {
-            const notes = getAccompanimentNotes(mockChord, 0, 0, 0, {
+            const notes = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,
             });
@@ -86,19 +86,21 @@ describe('Accompaniment Engine Logic', () => {
         it('should only play on the start of the chord in "pad" style', () => {
             chords.style = 'pad';
             expect(
-                getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true }).filter(
+                getAccompanimentNotes(getState(), mockChord, 0, 0, 0, { isBeatStart: true }).filter(
                     (n) => n.midi > 0,
                 ).length,
             ).toBeGreaterThan(0);
             expect(
-                getAccompanimentNotes(mockChord, 4, 4, 4, { isBeatStart: true }).filter(
+                getAccompanimentNotes(getState(), mockChord, 4, 4, 4, { isBeatStart: true }).filter(
                     (n) => n.midi > 0,
                 ).length,
             ).toBe(0);
         });
 
         it('should generate CC 64 (Sustain) events on new chords', () => {
-            const notes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
+            const notes = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+            });
             const sustainEvents = notes[0].ccEvents.filter((e) => e.controller === 64);
             expect(sustainEvents.some((e) => e.value === 0)).toBe(true);
             expect(sustainEvents.some((e) => e.value === 127)).toBe(true);
@@ -108,7 +110,7 @@ describe('Accompaniment Engine Logic', () => {
     describe('Genre-specific Logic', () => {
         it('should use short durations for Funk and disable sustain for Reggae', () => {
             groove.genreFeel = 'Funk';
-            const funkNotes = getAccompanimentNotes(mockChord, 0, 0, 0, {
+            const funkNotes = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
                 isBeatStart: true,
             }).filter((n) => n.midi > 0);
             if (funkNotes.length > 0) {
@@ -116,7 +118,9 @@ describe('Accompaniment Engine Logic', () => {
             }
 
             groove.genreFeel = 'Reggae';
-            const reggaeNotes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
+            const reggaeNotes = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+            });
             expect(
                 reggaeNotes[0].ccEvents
                     .filter((e) => e.controller === 64)
@@ -130,7 +134,7 @@ describe('Accompaniment Engine Logic', () => {
             bass.enabled = false;
             playback.practiceMode = false;
 
-            const notesNormal = getAccompanimentNotes(mockChord, 0, 0, 0, {
+            const notesNormal = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,
             });
@@ -138,7 +142,7 @@ describe('Accompaniment Engine Logic', () => {
             chords.pianoRoots = false;
             playback.practiceMode = true; // This reserves the space even if bass is disabled
 
-            const notesRootless = getAccompanimentNotes(mockChord, 16, 0, 0, {
+            const notesRootless = getAccompanimentNotes(getState(), mockChord, 16, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,
             });
@@ -149,13 +153,13 @@ describe('Accompaniment Engine Logic', () => {
     describe('Procedural Pattern Generation', () => {
         it('should generate a 16-step pattern and increase density with intensity', () => {
             const ts44 = TIME_SIGNATURES['4/4'];
-            const pattern = generateCompingPattern('Rock', 'balanced', ts44, 16);
+            const pattern = generateCompingPattern(getState(), 'Rock', 'balanced', ts44, 16);
             expect(pattern).toHaveLength(16);
 
-            const sparse = generateCompingPattern('Rock', 'sparse', ts44, 16).filter(
+            const sparse = generateCompingPattern(getState(), 'Rock', 'sparse', ts44, 16).filter(
                 (n) => n === 1,
             ).length;
-            const active = generateCompingPattern('Rock', 'active', ts44, 16).filter(
+            const active = generateCompingPattern(getState(), 'Rock', 'active', ts44, 16).filter(
                 (n) => n === 1,
             ).length;
             expect(active).toBeGreaterThanOrEqual(sparse);
@@ -165,7 +169,7 @@ describe('Accompaniment Engine Logic', () => {
             let foundCharleston = false;
             const ts44 = TIME_SIGNATURES['4/4'];
             for (let i = 0; i < 100; i++) {
-                const p = generateCompingPattern('Jazz', 'balanced', ts44, 16);
+                const p = generateCompingPattern(getState(), 'Jazz', 'balanced', ts44, 16);
                 if (p[0] === 1 && p[6] === 1) {
                     foundCharleston = true;
                     break;
@@ -194,7 +198,7 @@ describe('Accompaniment Engine Logic', () => {
             playback.bandIntensity = 0.6; // Higher intensity for more reliable hits
             for (let i = 0; i < 1000; i++) {
                 compingState.lockedUntil = 0;
-                notes = getAccompanimentNotes(chord, i * 16, 0, 0, {
+                notes = getAccompanimentNotes(getState(), chord, i * 16, 0, 0, {
                     isBeatStart: true,
                     isGroupStart: true,
                 });
