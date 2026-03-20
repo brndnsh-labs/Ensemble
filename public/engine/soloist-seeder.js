@@ -336,14 +336,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const measuresFromEnd = sectionEndMeasure - m;
             const isResolutionZone = isLastSectionOfForm && measuresFromEnd <= 2;
 
-            // In a 4 or 8 measure block, leave the final 4 measures (for 8-block) or 2 measures (for 4-block)
-            // explicitly empty to force a rest state.
+            // Determine macro-phrasing (4 or 8 measure arcs)
             const measureInBlock = (m - sectionStartMeasure) % blockMeasures;
 
-            // The user explicitly requested: "generate a 2-measure motif, repeat or mutate it in measures 3 and 4,
+            // The user requested: "generate a 2-measure motif, repeat or mutate it in measures 3 and 4,
             // and then explicitly force a rest state for the remainder of the 8-measure block."
             if (measureInBlock >= 4 && blockMeasures >= 8) {
-                // We are in measures 5-8 of an 8 measure block. Force rest!
+                // We are in measures 5-8 of an 8 measure block.
                 // However, check if we are in the absolute final resolution zone
                 if (isResolutionZone && m === sectionEndMeasure - 2) {
                     const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
@@ -366,41 +365,34 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         lastMidi = midi;
                     }
                 }
-                continue; // Always rest for remainder of 8-block
+                // Force rest for remainder of 8-block
+                continue;
             }
 
-            // For a 4 measure block, leave the last 2 measures relatively empty,
-            // but strongly encourage rests unless it's a dense style
-            if (measureInBlock >= 2 && blockMeasures === 4) {
-                if (isResolutionZone) {
-                    if (m === sectionEndMeasure - 2) {
-                        const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
-                        if (stepEntry?.chord) {
-                            const chord = /** @type {any} */ (stepEntry.chord);
-                            // Using Root and 5th to avoid major/minor 3rd dissonance on unknown chords
-                            const stableIntervals = [0, 7];
-                            const pitchClass =
-                                (chord.rootMidi +
-                                    stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
-                                12;
-                            const midi = registerBase + pitchClass;
-                            notes.push({
-                                step: baseStep,
-                                midi: midi,
-                                isAnchor: true,
-                                durationSteps: stepsPerMeasure * 2, // Let it ring out
-                                velocity: 0.9,
-                            });
-                            lastMidi = midi;
-                        }
-                    }
-                    continue; // Force rest for turnaround resolution
-                } else {
-                    // For regular 4 measure blocks, force a rest state frequently to breathe
-                    if (prng() > 0.3) {
-                        continue;
+            // For a 4 measure block, there is no "remainder" beyond measures 3 and 4.
+            // They are the repeat/mutate phase. We ONLY force a rest if it is the macro-cycle turnaround.
+            if (isResolutionZone && measureInBlock >= 2 && blockMeasures === 4) {
+                if (m === sectionEndMeasure - 2) {
+                    const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
+                    if (stepEntry?.chord) {
+                        const chord = /** @type {any} */ (stepEntry.chord);
+                        const stableIntervals = [0, 7];
+                        const pitchClass =
+                            (chord.rootMidi +
+                                stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
+                            12;
+                        const midi = registerBase + pitchClass;
+                        notes.push({
+                            step: baseStep,
+                            midi: midi,
+                            isAnchor: true,
+                            durationSteps: stepsPerMeasure * 2, // Let it ring out
+                            velocity: 0.9,
+                        });
+                        lastMidi = midi;
                     }
                 }
+                continue; // Force rest for turnaround resolution
             }
 
             // Pick a target chord tone for the downbeat of these 2 measures
