@@ -140,7 +140,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                note = getSoloistNote(chordC, null, i * 4, 440, 72, 'scalar', 0, false, {
+                note = getSoloistNote(chordC, null, i * 4, 440, 72, 'scalar', 0, {
                     bypassRhythm: true,
                 });
                 if (note) {
@@ -184,7 +184,7 @@ describe('Soloist Engine Logic', () => {
                     soloist.isResting = false;
                     soloist.currentPhraseSteps = 0;
                     soloist.lastAttackStep = -100;
-                    const res = getSoloistNote(chordC, null, i * 4, 440, 72, t.style, 0, false, {
+                    const res = getSoloistNote(chordC, null, i * 4, 440, 72, t.style, 0, {
                         bypassRhythm: true,
                     });
                     // Check buffer OR immediate double stop result (Quartal/GuitarDouble)
@@ -208,7 +208,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const result = getSoloistNote(chordC, null, i * 4, 440, 72, 'bird', 0, false, {
+                const result = getSoloistNote(chordC, null, i * 4, 440, 72, 'bird', 0, {
                     bypassRhythm: true,
                 });
                 if (result) {
@@ -229,17 +229,9 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const noteResult = getSoloistNote(
-                    chordC,
-                    chordC,
-                    i * 4,
-                    261.63,
-                    72,
-                    'smart',
-                    0,
-                    false,
-                    { bypassRhythm: true },
-                );
+                const noteResult = getSoloistNote(chordC, chordC, i * 4, 261.63, 72, 'smart', 0, {
+                    bypassRhythm: true,
+                });
                 if (noteResult) {
                     played++;
                     const primary = Array.isArray(noteResult)
@@ -267,7 +259,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.lastAttackStep = -100;
                 if (
                     Array.isArray(
-                        getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', i % 16, false, {
+                        getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', i % 16, {
                             bypassRhythm: true,
                         }),
                     )
@@ -428,7 +420,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.busySteps = 0;
                 soloist.notesInPhrase = 0;
                 soloist.lastAttackStep = -100;
-                const res = getSoloistNote(chord, null, i * 4, 440, 72, 'blues', 0, false, {
+                const res = getSoloistNote(chord, null, i * 4, 440, 72, 'blues', 0, {
                     bypassRhythm: true,
                 });
                 if (res && res.bendStartInterval !== 0) {
@@ -450,7 +442,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.activeSteps = 100;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', 0, {
                     bypassRhythm: true,
                 });
                 if (Array.isArray(res)) {
@@ -495,7 +487,6 @@ describe('Soloist Engine Logic', () => {
                         64,
                         'scalar',
                         stepIdx,
-                        false,
                         { bypassRhythm: true },
                     );
                     if (res) {

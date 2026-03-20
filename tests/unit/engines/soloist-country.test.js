@@ -88,7 +88,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
 
@@ -115,7 +115,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
 
@@ -145,7 +145,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (soloist.deviceBuffer.length === 3) {
@@ -170,7 +170,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (res && !Array.isArray(res) && res.bendStartInterval === 1) {
@@ -196,7 +196,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (Array.isArray(res)) {
@@ -224,7 +224,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (res) {
@@ -251,7 +251,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, false, {
+                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (res) {

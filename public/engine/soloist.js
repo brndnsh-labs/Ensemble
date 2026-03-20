@@ -38,7 +38,6 @@ export function resetSoloistState(state) {
  * @param {number} _octave
  * @param {string} style
  * @param {number} stepInChord
- * @param {boolean} isPriming
  * @param {any} [coordination]
  * @param {import('../types.js').StepInfo} [stepInfo]
  */
@@ -50,7 +49,6 @@ export function getSoloistNote(
     _octave,
     style,
     stepInChord,
-    isPriming,
     coordination = {},
     stepInfo,
 ) {
@@ -114,9 +112,7 @@ export function getSoloistNote(
     const isDownbeat = stepInfo ? stepInfo.isMeasureStart : measureStep === 0;
     const isBackbeat = stepInfo ? stepInfo.isBackbeat : false;
 
-    if (!isPriming) {
-        soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
-    }
+    soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
 
     /**
      * @param {any} res

@@ -156,7 +156,6 @@ describe('Soloist Phrasing Analysis', () => {
                 60,
                 'smart',
                 stepInMeasure,
-                false,
                 coordination,
             );
             const isResting = mockState.soloist.phrasingState === 'rest';

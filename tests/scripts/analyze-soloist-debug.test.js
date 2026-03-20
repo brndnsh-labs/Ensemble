@@ -72,7 +72,7 @@ describe('Soloist Phrasing Debugger', () => {
 
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
-            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure, false);
+            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure);
 
             const status = mockState.soloist.isResting ? 'REST' : 'PLAY';
             const noteChar = res ? '♫' : '.';

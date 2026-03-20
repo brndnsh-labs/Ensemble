@@ -73,7 +73,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/worker-utils.js` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
 | `public/engine/worker-orchestrator.js` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
 | `public/engine/worker-buffer-manager.js` | Generative buffer orchestration. | `fillBuffers` |
-| `public/engine/worker-priming.js` | Generative engine silent priming. | `handlePrime` |
 | `public/engine/audio-recovery.js` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
 | `public/engine/midi-utils.js` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |

@@ -83,7 +83,6 @@ describe('Soloist Blues Critique', () => {
                     64,
                     'blues',
                     step,
-                    false,
                 );
                 if (note) {
                     const primary = Array.isArray(note) ? note[0] : note;

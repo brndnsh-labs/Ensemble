@@ -83,7 +83,7 @@ initPlatformHacks();
  * @param {Function} [dispatch] - State dispatch function.
  */
 export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
-    const { playback, arranger, chords } = state;
+    const { playback, chords } = state;
 
     // Determine if we are STARTING or STOPPING based on current state.
     // If fromDispatch is true, isPlaying ALREADY reflects the target state.
@@ -161,8 +161,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
             dispatch(ACTIONS.SET_ENDING_PENDING, false);
         }
         syncWorker();
-        const primeSteps = arranger.totalSteps > 0 ? arranger.totalSteps * 2 : 0;
-        flushBuffers(primeSteps);
+        flushBuffers();
 
         startPlatformAudioAndWakeLock();
         restoreGains(state);
@@ -483,7 +482,6 @@ function scheduleCountIn(state, beat, time) {
         soloist.octave,
         /** @type {any} */ (soloist.style),
         0,
-        false,
         { sectionStart: 0, sectionEnd: arranger.totalSteps || 0, bypassRhythm: false },
         pickupStepInfo,
     );

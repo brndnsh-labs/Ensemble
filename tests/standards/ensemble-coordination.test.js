@@ -141,7 +141,7 @@ describe('Ensemble Coordination Contract', () => {
             // This test verifies the context is accepted and accessible
             const chord = { rootMidi: 60, intervals: [0, 4, 7] };
             const context = { isMeasureEnd: true };
-            const _note = getSoloistNote(chord, null, 12, 440, 0, 'scalar', 12, false, context, {
+            const _note = getSoloistNote(chord, null, 12, 440, 0, 'scalar', 12, context, {
                 mStep: 12,
             });
 

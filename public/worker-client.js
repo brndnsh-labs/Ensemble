@@ -143,16 +143,14 @@ function toRaw(val) {
 /**
  * @param {number} step
  * @param {any} [syncData]
- * @param {number} [primeSteps]
  */
-export function flushWorker(step, syncData = null, primeSteps = 0) {
+export function flushWorker(step, syncData = null) {
     if (timerWorker) {
         timerWorker.postMessage({
             type: WORKER_MSG.FLUSH,
             data: {
                 step,
                 syncData: toRaw(syncData),
-                primeSteps,
                 requestTimestamp: performance.now(),
             },
         });

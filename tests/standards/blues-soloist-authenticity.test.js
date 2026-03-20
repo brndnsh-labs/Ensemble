@@ -32,7 +32,6 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 0,
                 'blues',
                 0,
-                false,
                 { sectionStart: 0, sectionEnd: 128, bypassRhythm: true },
                 { mStep: 0 },
             );
@@ -73,7 +72,6 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 0,
                 'blues',
                 step % 16,
-                false,
                 { sectionStart: 0, sectionEnd: 50000 },
                 { mStep: step % 16 },
             );
@@ -129,7 +127,6 @@ describe('Blues Soloist Authenticity Benchmark', () => {
             0,
             'blues',
             4,
-            false,
             { sectionStart: 0, sectionEnd: 128, isTurnaround: true, bypassRhythm: false },
             { mStep: 4 },
         );

@@ -39,26 +39,13 @@ describe('Soloist Performance Benchmark', () => {
     const prevFreq = 440;
     const octave = 4;
     const style = 'smart';
-    const isPriming = false;
 
     it('benchmarks getSoloistNote', () => {
         const start = performance.now();
         const iterations = 50000;
 
         for (let i = 0; i < iterations; i++) {
-            // vary stepInBeat so it triggers the logic block that has reduce
-            const stepInBeat = i % 4;
-            const step = i;
-            getSoloistNote(
-                currentChord,
-                nextChord,
-                step,
-                prevFreq,
-                octave,
-                style,
-                stepInBeat,
-                isPriming,
-            );
+            getSoloistNote(currentChord, nextChord, i, prevFreq, octave, style, 0);
         }
 
         const end = performance.now();

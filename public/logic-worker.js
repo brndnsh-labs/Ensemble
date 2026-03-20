@@ -8,7 +8,6 @@ import { generateResolutionNotes } from './engine/resolution.js';
 import { resetSoloistState } from './engine/soloist.js';
 import { fillBuffers } from './engine/worker-buffer-manager.js';
 import { resetWorkerContext, workerContext } from './engine/worker-orchestrator.js';
-import { handlePrime } from './engine/worker-priming.js';
 import { recursiveSafeSync, resetCursors } from './engine/worker-utils.js';
 import { getState } from './state.js';
 import { getStepInfo } from './utils.js';
@@ -95,13 +94,7 @@ function processMessage(type, data, startTime) {
                 compingState.lastChordIndex = -1;
                 compingState.lockedUntil = 0;
                 /** @type {any} */ (compingState).rhythmPattern = [];
-                if (data.primeSteps > 0) {
-                    handlePrime(state, data.primeSteps);
-                }
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
-                break;
-            case WORKER_MSG.PRIME:
-                handlePrime(state, data);
                 break;
             case WORKER_MSG.RESOLUTION:
                 handleResolution(state, data.step, data.requestTimestamp, startTime);

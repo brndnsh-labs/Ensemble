@@ -85,14 +85,14 @@ describe('Ska-Punk Genre Integrity', () => {
         expect(result.velocity).toBeGreaterThan(1.0);
     });
 
-    it('should map Ska-Punk to ska soloist style', () => {
+    it('map Ska-Punk to ska soloist style', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         // Just verify it doesn't crash and returns something or null
-        const note = getSoloistNote(chord, null, 0, null, 5, 'smart', 0, false);
+        const note = getSoloistNote(chord, null, 0, null, 5, 'smart', 0);
         expect(note).toBeDefined();
     });
 
-    it('should handle high tempos (195 BPM) without logic failure', () => {
+    it('handle high tempos (195 BPM) without logic failure', () => {
         playback.bpm = 195;
         const chord = {
             rootMidi: 60,
@@ -113,12 +113,12 @@ describe('Ska-Punk Genre Integrity', () => {
         }
     });
 
-    it('should NOT strictly alternate activity between Soloist and Harmony (Antiphony removed)', () => {
+    it('NOT strictly alternate activity between Soloist and Harmony (Antiphony removed)', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         playback.bandIntensity = 0.5; // Medium intensity where antiphony used to happen
 
         // Measure 0 (Step 0)
-        const soloistM0 = getSoloistNote(chord, null, 0, null, 5, 'ska', 0, false);
+        const soloistM0 = getSoloistNote(chord, null, 0, null, 5, 'ska', 0);
         const _harmM0 = getHarmonyNotes(getState(), chord, null, 0, 0, 'horns', 0);
 
         // Previous behavior forced soloistM0 to be null here.
@@ -126,7 +126,7 @@ describe('Ska-Punk Genre Integrity', () => {
         expect(soloistM0 !== undefined).toBe(true);
 
         // Measure 1 (Step 16)
-        const soloistM1 = getSoloistNote(chord, null, 16, null, 5, 'ska', 0, false);
+        const soloistM1 = getSoloistNote(chord, null, 16, null, 5, 'ska', 0);
         const _harmonyM1 = getHarmonyNotes(getState(), chord, null, 16, 0, 'horns', 0);
 
         expect(soloistM1 !== undefined).toBe(true);

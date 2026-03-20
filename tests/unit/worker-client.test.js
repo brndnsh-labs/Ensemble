@@ -195,10 +195,10 @@ describe('Worker Client', () => {
 
         it('should send flush message with data', () => {
             vi.spyOn(performance, 'now').mockReturnValue(300);
-            flushWorker(0, { myData: true }, 5);
+            flushWorker(0, { myData: true });
             expect(mockPostMessage).toHaveBeenCalledWith({
                 type: WORKER_MSG.FLUSH,
-                data: { step: 0, syncData: { myData: true }, primeSteps: 5, requestTimestamp: 300 },
+                data: { step: 0, syncData: { myData: true }, requestTimestamp: 300 },
             });
         });
     });

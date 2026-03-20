@@ -56,10 +56,9 @@ Clears all internal buffers and primes the engine for a specific step. Used duri
   "data": {
     "step": 0,
     "syncData": { ... },
-    "primeSteps": 32,
-    "requestTimestamp": 123456789.0
-  }
-}
+    "requestTimestamp": 1709234567.89
+    }
+    }
 ```
 
 ### `export`
@@ -126,7 +125,6 @@ Reports an internal worker error.
 
 1.  **Step Mapping**: Both threads must use the same `arranger.stepMap`, `arranger.sectionMap`, and `totalSteps` to ensure harmonic and structural alignment.
 2.  **Lookahead**: The worker targets a `LOOKAHEAD` of 64 steps (typically 4 measures in 4/4) to prevent buffer underruns during CPU spikes.
-3.  **Priming**: During a `flush` operation, the worker can "prime" the engine by simulating multiple measures of playback to establish musical context (e.g., updating `bass.lastFreq`).
-4.  **Generative Drum Parity**: To ensure MIDI exports match live playback, the worker utilizes the shared `applyGrooveOverrides` strategy. This ensures that intensity-aware ghost notes, turnaround fills, and pocket timing offsets are identical in both environments.
+3.  **Generative Drum Parity**: To ensure MIDI exports match live playback, the worker utilizes the shared `applyGrooveOverrides` strategy. This ensures that intensity-aware ghost notes, turnaround fills, and pocket timing offsets are identical in both environments.
 5.  **Musical Coordination**: The worker enforces the `ENSEMBLE_COORDINATION.md` contract using a centralized `CoordinationContext`. To allow for rhythmic yielding, instruments MUST be generated in the following order: Soloist -> Bass -> Chords -> Harmony.
 6.  **Register Slotting Enforcement**: All generated notes MUST be wrapped in `enforceRegisterSlotting(module, midi, context)` before being returned to the main thread. This guarantees that Bass (28-51), Chords (52-84), and Soloist (60-90) never overlap in frequency, preserving harmonic clarity.

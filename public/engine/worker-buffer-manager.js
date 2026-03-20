@@ -168,7 +168,6 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
                     soloist.octave,
                     soloist.style || '',
                     stepInChord,
-                    false,
                     { sectionStart, sectionEnd, stepCoordination: coordination },
                     stepInfo || null,
                 );

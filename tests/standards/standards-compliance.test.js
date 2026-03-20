@@ -287,7 +287,6 @@ describe('Standards Compliance Test Suite', () => {
                     72,
                     'blues',
                     0,
-                    false,
                     { bypassRhythm: true },
                 );
                 if (result) {

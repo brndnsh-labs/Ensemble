@@ -263,7 +263,7 @@ describe('Instrument Controller', () => {
             expect(Engine.killSoloistBus).toHaveBeenCalled();
             expect(Engine.killDrumBus).toHaveBeenCalled();
 
-            expect(WorkerClient.flushWorker).toHaveBeenCalledWith(10, expect.any(Object), 0);
+            expect(WorkerClient.flushWorker).toHaveBeenCalledWith(10, expect.any(Object));
             expect(Engine.restoreGains).toHaveBeenCalled();
         });
     });

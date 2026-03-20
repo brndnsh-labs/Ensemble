@@ -82,7 +82,7 @@ describe('Soloist Smart Genre Statistics', () => {
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
 
-            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure, false);
+            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure);
 
             if (res) {
                 const notes = Array.isArray(res) ? res : [res];
@@ -196,7 +196,6 @@ describe('Soloist Smart Genre Statistics', () => {
                     60,
                     'smart',
                     stepInMeasure,
-                    false,
                 );
 
                 if (res) {
@@ -253,7 +252,6 @@ describe('Soloist Smart Genre Statistics', () => {
                 60,
                 'smart',
                 s % 16,
-                false,
             );
 
             const isRestingNow = mockState.soloist.isResting;
@@ -337,7 +335,6 @@ describe('Soloist Smart Genre Statistics', () => {
                     60,
                     'smart',
                     s % 16,
-                    false,
                 );
 
                 if (res) {
@@ -440,7 +437,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 mockState.playback.currentLoopCount = Math.floor(measure / progression.length);
 
                 const stepInMeasure = s % 16;
-                const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure, false);
+                const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure);
                 if (res) {
                     count += Array.isArray(res) ? res.length : 1;
                 }

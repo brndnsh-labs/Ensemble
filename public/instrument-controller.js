@@ -163,8 +163,10 @@ export function handleTap(setBpmRef) {
     }
 }
 
-/** @param {number} [primeSteps] */
-export function flushBuffers(primeSteps = 0) {
+/**
+ * Flushes all local buffers and kills current sounds.
+ */
+export function flushBuffers() {
     const { groove, arranger, playback, chords, bass, soloist, harmony } = getState();
     // 1. Clear local buffers
     bass.buffer.clear();
@@ -249,15 +251,14 @@ export function flushBuffers(primeSteps = 0) {
     };
 
     // 4. Trigger a BUNDLED worker flush
-    flushWorker(playback.step, syncData, primeSteps);
+    flushWorker(playback.step, syncData);
     restoreGains(stateMap);
 }
 
 /**
  * @param {string} type
- * @param {number} [primeSteps]
  */
-function flushBuffer(type, primeSteps = 0) {
+function flushBuffer(type) {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
         if (bass.lastPlayedFreq !== null) {
@@ -292,7 +293,7 @@ function flushBuffer(type, primeSteps = 0) {
 
     // Solo flush (usually from UI toggles)
     if (type !== 'none') {
-        flushWorker(playback.step, null, primeSteps);
+        flushWorker(playback.step, null);
     }
     restoreGains(stateMap);
 }

@@ -109,7 +109,7 @@ describe('Logic Worker Messaging', () => {
         expect(state.groove.instruments[0].steps[0]).toBe(1);
     });
 
-    it('should handle FLUSH message with priming', () => {
+    it('should handle FLUSH message', () => {
         const fullChord = {
             sectionId: 's1',
             rootMidi: 60,
@@ -131,7 +131,6 @@ describe('Logic Worker Messaging', () => {
                     stepMap: [{ start: 0, end: 32, chord: fullChord }],
                 },
             },
-            primeSteps: 16,
         };
         self.onmessage({ data: { type: WORKER_MSG.FLUSH, data: flushData } });
 
@@ -142,13 +141,6 @@ describe('Logic Worker Messaging', () => {
         expect(errorCalls.length).toBe(0);
     });
 
-    it('should handle PRIME messages directly', () => {
-        const state = getState();
-        state.soloist.sessionSteps = 100;
-        self.onmessage({ data: { type: WORKER_MSG.PRIME, data: 16 } });
-        expect(state.soloist.sessionSteps).toBe(0);
-    });
-
     it('should queue messages during export', () => {
         _setExporting(true);
         self.onmessage({ data: { type: WORKER_MSG.SYNC_STATE, data: { playback: { bpm: 200 } } } });
@@ -157,16 +149,13 @@ describe('Logic Worker Messaging', () => {
         expect(getState().playback.bpm).not.toBe(200);
     });
 
-    it('should handle RESOLUTION and PRIME messages', () => {
+    it('should handle RESOLUTION messages', () => {
         self.onmessage({ data: { type: WORKER_MSG.RESOLUTION, data: { step: 16 } } });
         expect(mockPostMessage).toHaveBeenCalledWith(
             expect.objectContaining({
                 isResolution: true,
             }),
         );
-
-        self.onmessage({ data: { type: WORKER_MSG.PRIME, data: 16 } });
-        // Priming completed silently
     });
 
     it('should handle ERROR during processing', () => {

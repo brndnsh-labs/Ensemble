@@ -439,7 +439,6 @@ export class ExportProcessor {
                     soloist.octave,
                     /** @type {string} */ (soloist.style),
                     stepInChord,
-                    false,
                     { sectionStart, sectionEnd, stepCoordination: coordination },
                     stepInfo,
                 );

@@ -201,25 +201,5 @@ describe('Logic Worker Integration', () => {
         mockPostMessage.mockClear();
         vi.advanceTimersByTime(25);
         expect(mockPostMessage).not.toHaveBeenCalled();
-
-        vi.useRealTimers();
-    });
-
-    it('should handle PRIME and establishment of musical context', () => {
-        const state = getState();
-        state.soloist.enabled = true;
-        state.soloist.style = 'rock';
-        state.playback.bandIntensity = 1.0;
-        state.soloist.lastFreq = 0;
-
-        self.onmessage({
-            data: {
-                type: WORKER_MSG.PRIME,
-                data: 16, // Prime for 16 steps
-            },
-        });
-
-        // After priming, soloist should have a lastFreq
-        expect(state.soloist.lastFreq).toBeGreaterThan(0);
     });
 });

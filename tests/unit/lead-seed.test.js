@@ -265,16 +265,16 @@ describe('Lead Seed - Soloist Integration', () => {
         const currentChord = { rootMidi: 60, intervals: [0, 4, 7] };
 
         // Step 0: Should trigger first note (MIDI 60)
-        const note0 = getSoloistNote(currentChord, null, 0, null, 64, 'lead_sheet', 0, false);
+        const note0 = getSoloistNote(currentChord, null, 0, null, 64, 'lead_sheet', 0);
         expect(note0.midi).toBe(60);
         expect(note0.durationSteps).toBe(4);
 
         // Step 1: Should return null because busySteps > 0
-        const note1 = getSoloistNote(currentChord, null, 1, null, 64, 'lead_sheet', 1, false);
+        const note1 = getSoloistNote(currentChord, null, 1, null, 64, 'lead_sheet', 1);
         expect(note1).toBeNull();
 
         // Step 4: Should trigger second note (MIDI 62)
-        const note4 = getSoloistNote(currentChord, null, 4, null, 64, 'lead_sheet', 0, false);
+        const note4 = getSoloistNote(currentChord, null, 4, null, 64, 'lead_sheet', 0);
         expect(note4.midi).toBe(62);
     });
 
@@ -296,7 +296,7 @@ describe('Lead Seed - Soloist Integration', () => {
         const currentChord = { rootMidi: 60, intervals: [0, 4, 7] };
 
         // Step 16: Should trigger the note again (0 % 16 = 0)
-        const note16 = getSoloistNote(currentChord, null, 16, null, 64, 'lead_sheet', 0, false);
+        const note16 = getSoloistNote(currentChord, null, 16, null, 64, 'lead_sheet', 0);
         expect(note16.midi).toBe(60);
     });
 });

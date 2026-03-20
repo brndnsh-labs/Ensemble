@@ -151,7 +151,7 @@ function simulateEngine(totalSteps, timeSignature = '4/4', style = 'bird') {
 
     for (let step = 0; step < totalSteps; step++) {
         const stepInMeasure = step % (stepsPerBeat * beatsPerMeasure);
-        const note = getSoloistNote(chord, chord, step, null, 64, style, stepInMeasure, false);
+        const note = getSoloistNote(chord, chord, step, null, 64, style, stepInMeasure);
 
         if (note && Array.isArray(note)) {
             engineMelody.push({

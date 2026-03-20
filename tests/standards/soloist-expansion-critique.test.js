@@ -84,7 +84,6 @@ describe('Soloist Expansion Critique', () => {
                     64,
                     'smart',
                     step,
-                    false,
                 );
                 if (note) {
                     const primary = Array.isArray(note) ? note[0] : note;

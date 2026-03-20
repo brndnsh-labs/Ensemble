@@ -124,7 +124,6 @@ function runSimulation(bpm, steps = 256) {
             60, // Octave
             'bird', // STYLE
             stepInChord,
-            false, // isPriming
         );
 
         if (res) {

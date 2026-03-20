@@ -208,7 +208,6 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                     0,
                     'smart',
                     0,
-                    false,
                     { sectionStart, sectionEnd, bypassRhythm: true },
                     { mStep: 0, isMeasureStart: true, isBeatStart: true },
                 );
@@ -235,7 +234,6 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 0,
                 'smart',
                 0,
-                false,
                 { sectionStart, sectionEnd, bypassRhythm: true },
                 { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
@@ -253,7 +251,6 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                     0,
                     'smart',
                     0,
-                    false,
                     { sectionStart, sectionEnd, bypassRhythm: true },
                     { mStep: 0, isMeasureStart: true, isBeatStart: true },
                 );
@@ -277,7 +274,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             let gilmourNotes = 0;
             for (let i = 0; i < 5000; i++) {
                 if (
-                    getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, false, {
+                    getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, {
                         sectionEnd: 8192,
                     })
                 ) {
@@ -295,7 +292,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             let evhNotes = 0;
             for (let i = 0; i < 5000; i++) {
                 if (
-                    getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, false, {
+                    getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, {
                         sectionEnd: 8192,
                     })
                 ) {
@@ -316,7 +313,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
 
             let notesFound = 0;
             for (let i = -16; i < 0; i++) {
-                const note = getSoloistNote(chord, chord, i, 440, 0, 'rock', 0, false, {
+                const note = getSoloistNote(chord, chord, i, 440, 0, 'rock', 0, {
                     sectionStart: 0,
                     sectionEnd: 64,
                     bypassRhythm: false,
@@ -341,7 +338,6 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 0,
                 'smart',
                 0,
-                false,
                 { sectionStart: 0, sectionEnd: 64, bypassRhythm: true },
                 { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
@@ -357,7 +353,6 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                     0,
                     'smart',
                     0,
-                    false,
                     { sectionStart: 0, sectionEnd: 64, bypassRhythm: true },
                     { mStep: 0, isMeasureStart: true, isBeatStart: true },
                 );

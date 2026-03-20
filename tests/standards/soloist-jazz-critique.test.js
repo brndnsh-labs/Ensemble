@@ -84,7 +84,6 @@ describe('Soloist Jazz Critique', () => {
                     64,
                     'bird',
                     step,
-                    false,
                 );
                 if (note) {
                     const primary = Array.isArray(note) ? note[0] : note;

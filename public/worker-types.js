@@ -14,7 +14,6 @@ export const WORKER_MSG = {
     FLUSH: 'flush',
     EXPORT: 'export',
     RESOLUTION: 'resolution',
-    PRIME: 'prime',
 };
 
 /**

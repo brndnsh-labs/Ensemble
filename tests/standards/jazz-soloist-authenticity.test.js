@@ -30,7 +30,6 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
                 0,
                 'jazz',
                 0,
-                false,
                 { sectionStart: 0, sectionEnd: 128, bypassRhythm: true },
                 { mStep: 0 },
             );
@@ -69,7 +68,6 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
                 0,
                 'jazz',
                 0,
-                false,
                 { sectionStart, sectionEnd, bypassRhythm: true },
                 { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
@@ -105,7 +103,6 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
                 0,
                 'jazz',
                 i % 16,
-                false,
                 { sectionStart: 0, sectionEnd: 128 },
                 { mStep: i % 16 },
             );
