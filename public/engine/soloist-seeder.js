@@ -108,7 +108,6 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const cachedNotes = cachedData ? cachedData.notes : [];
             const originalStart = cachedData ? cachedData.startStep : 0;
 
-
             cachedNotes.forEach((cachedNote) => {
                 const relativeStep = cachedNote.step - originalStart;
                 const globalStep = sectionRange.start + relativeStep;
