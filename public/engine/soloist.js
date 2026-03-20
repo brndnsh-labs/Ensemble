@@ -85,7 +85,7 @@ export function getSoloistNote(
     /** @param {string} msg */
     const logDebug = (msg) => {
         if (playback.debugSoloist) {
-            console.log(`[Soloist Debug] Step ${step}: ${msg}`);
+            console.log(`[Soloist Debug] Step ${step} (mStep: ${measureStep}): ${msg}`);
         }
     };
 
@@ -203,16 +203,21 @@ export function getSoloistNote(
         const embNote = soloist.embellishmentBuffer.shift();
         const primaryNote = Array.isArray(embNote) ? embNote[0] : embNote;
         soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        logDebug(`Playing embellishment note, busySteps remaining: ${soloist.busySteps}`);
         return finalizeNote(embNote);
     }
     if (soloist.deviceBuffer && soloist.deviceBuffer.length > 0) {
         const devNote = soloist.deviceBuffer.shift();
         const primaryNote = Array.isArray(devNote) ? devNote[0] : devNote;
         soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        logDebug(`Playing device note, busySteps remaining: ${soloist.busySteps}`);
         return finalizeNote(devNote);
     }
     if ((soloist.busySteps || 0) > 0) {
         soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
+        logDebug(
+            `Silenced because busy holding previous note. busySteps remaining: ${soloist.busySteps}`,
+        );
         return null;
     }
 
@@ -252,6 +257,10 @@ export function getSoloistNote(
             const headNote = headNotes[0];
             soloist.busySteps = Math.max(0, (headNote.durationSteps || 1) - 1); // @worker-mutation
 
+            logDebug(
+                `[Head Bypass] Playing exact head note: MIDI ${headNote.midi}, duration: ${headNote.durationSteps}. Triggering selectPitchAndDevices bypass.`,
+            );
+
             const pseudoRhythmNode = {
                 velocity: headNote.velocity || 0.8,
                 durationSteps: headNote.durationSteps,
@@ -289,6 +298,9 @@ export function getSoloistNote(
 
         // When strictly playing the head, if there's no note right now, we simply yield/rest.
         // We do not evaluate the standard probability/state machine logic underneath.
+        logDebug(
+            `[Head Bypass] No head note on this step. Yielding silence until next composed note.`,
+        );
         return null;
     }
 
@@ -369,6 +381,7 @@ export function getSoloistNote(
             // If we are in the last beat of the measure, force wake up to play pick-ups
             if (beatInMeasure === tsConfig.beats - 1) {
                 soloist.restSteps = 0; // @worker-mutation
+                logDebug(`Forced proactive wake-up for lead-in pickups (last beat of measure).`);
             }
         }
 
@@ -402,7 +415,7 @@ export function getSoloistNote(
 
                 soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
                 logDebug(
-                    `Waking up for ~${soloist.activeSteps} steps${isHeadMode ? ' (Head Mode)' : ''}`,
+                    `Waking up for ~${soloist.activeSteps} steps${isHeadMode ? ' (Head Mode)' : ''}. Generating new rhythm plan.`,
                 );
 
                 // --- Call & Response Framework ---
@@ -438,6 +451,8 @@ export function getSoloistNote(
                     stepInfo,
                 );
                 soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
+
+                logDebug(`Generated rhythm plan of length: ${soloist.rhythmPlan.length}`);
 
                 // Capture skeleton for future responses
                 if (nextRhythmPlan.length > 0) {
@@ -475,7 +490,9 @@ export function getSoloistNote(
             if (soloist.restSteps < 4) {
                 soloist.restSteps = 4; // @worker-mutation
             }
-            logDebug(`Resting for ~${soloist.restSteps} steps`);
+            logDebug(
+                `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.restSteps} steps.`,
+            );
             // Clear rhythm plan just in case
             soloist.rhythmPlan = []; // @worker-mutation
             return null;
