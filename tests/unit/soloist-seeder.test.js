@@ -20,6 +20,8 @@ describe('Soloist Seeder', () => {
         stepMap: Array(64)
             .fill(null)
             .map((_, _i) => ({
+                start: _i,
+                end: _i + 1,
                 chord: {
                     rootMidi: 60, // C
                     quality: 'major',
@@ -68,6 +70,8 @@ describe('Soloist Seeder', () => {
             stepMap: Array(64)
                 .fill(null)
                 .map((_, _i) => ({
+                    start: _i,
+                    end: _i + 1,
                     chord: {
                         rootMidi: 60,
                         quality: 'major',
@@ -106,6 +110,8 @@ describe('Soloist Seeder', () => {
             stepMap: Array(64)
                 .fill(null)
                 .map((_, _i) => ({
+                    start: _i,
+                    end: _i + 1,
                     chord: {
                         rootMidi: 60,
                         quality: 'major',
@@ -139,6 +145,8 @@ describe('Soloist Seeder', () => {
             stepMap: Array(64)
                 .fill(null)
                 .map((_, _i) => ({
+                    start: _i,
+                    end: _i + 1,
                     chord: {
                         rootMidi: 60,
                         quality: 'major',

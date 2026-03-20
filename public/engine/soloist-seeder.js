@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { createPRNG, generateRandomSeed } from '../utils.js';
+import { binarySearchMap, createPRNG, generateRandomSeed } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -191,13 +191,15 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const baseStep = m * stepsPerMeasure;
 
             // Pick a target chord tone for the downbeat of these 2 measures
-            const entryForMeasure = arranger.stepMap[Math.min(baseStep, totalSteps - 1)];
+            const stepToSearch = Math.min(baseStep, totalSteps - 1);
+            const entryForMeasure = binarySearchMap(arranger.stepMap, stepToSearch);
+
             if (!entryForMeasure || !entryForMeasure.chord) {
                 continue;
             }
             /** @type {any} */
             const targetChord = entryForMeasure.chord;
-            const chordTones = targetChord.intervals; // e.g., [0, 4, 7]
+            const chordTones = targetChord.intervals || [0, 4, 7]; // Fallback to triad if not parsed
             const targetInterval = chordTones[Math.floor(prng() * chordTones.length)]; // Root, 3rd, 5th, etc.
             const targetPitchClass = (targetChord.rootMidi + targetInterval) % 12;
 
@@ -228,7 +230,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     return;
                 }
 
-                const stepEntry = arranger.stepMap[exactStep];
+                const stepEntry = binarySearchMap(arranger.stepMap, exactStep);
                 if (!stepEntry || !stepEntry.chord) {
                     return;
                 }

@@ -19,7 +19,7 @@ describe('Soloist Seeder Module', () => {
         // Mock a simple step map with 1 chord per measure (16 steps)
         for (let i = 0; i < 128; i++) {
             mockArranger.stepMap.push({
-                step: i,
+                start: i,
                 end: i + 1,
                 chord: { rootMidi: 60, intervals: [0, 4, 7] },
             });
@@ -52,7 +52,7 @@ describe('Soloist Seeder Module', () => {
         // Mock a simple step map
         for (let i = 0; i < 128; i++) {
             mockArranger.stepMap.push({
-                step: i,
+                start: i,
                 end: i + 1,
                 chord: { rootMidi: 60, intervals: [0, 4, 7] },
             });
