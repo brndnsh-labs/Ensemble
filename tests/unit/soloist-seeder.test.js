@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { getState } from '../../public/state.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: () => ({
@@ -30,13 +31,13 @@ describe('Soloist Seeder', () => {
     };
 
     it('should generate a seed with correct loop length', () => {
-        const seed = generateSessionSeed(mockArranger, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5);
         expect(seed.notes.length).toBeGreaterThan(0);
         expect(seed.loopLengthSteps).toBe(64); // 4 measures * 16 steps
     });
 
     it('should have anchor notes on beat boundaries', () => {
-        const seed = generateSessionSeed(mockArranger, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5);
         const anchorSteps = seed.notes.filter((n) => n.isAnchor).map((n) => n.step % 16);
         // Anchor notes should always land on a beat (0, 4, 8, or 12)
         anchorSteps.forEach((step) => {
@@ -47,7 +48,7 @@ describe('Soloist Seeder', () => {
     });
 
     it('should resolve to a scale tone in the conclusion if notes exist', () => {
-        const seed = generateSessionSeed(mockArranger, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5);
         const conclusionNotes = seed.notes.filter((n) => n.step >= 48);
         if (conclusionNotes.length > 0) {
             const lastNote = conclusionNotes[conclusionNotes.length - 1];
@@ -79,7 +80,7 @@ describe('Soloist Seeder', () => {
                 })),
         };
 
-        const seed = generateSessionSeed(repeatingArranger, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), repeatingArranger, 'scalar', 0.5);
         const v1Notes = seed.notes.filter((n) => n.step < 16);
         const v2Notes = seed.notes.filter((n) => n.step >= 16 && n.step < 32);
         const v3Notes = seed.notes.filter((n) => n.step >= 48);
@@ -114,7 +115,7 @@ describe('Soloist Seeder', () => {
                 })),
         };
 
-        const seed = generateSessionSeed(structuralArranger, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), structuralArranger, 'scalar', 0.5);
         const introNotes = seed.notes.filter((n) => n.step < 32);
         const chorusNotes = seed.notes.filter((n) => n.step >= 32);
 
@@ -147,7 +148,7 @@ describe('Soloist Seeder', () => {
                 })),
         };
 
-        const seed = generateSessionSeed(labeledArranger, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), labeledArranger, 'scalar', 0.5);
         const v1Notes = seed.notes.filter((n) => n.step < 16);
         const v2Notes = seed.notes.filter((n) => n.step >= 16 && n.step < 32);
         const v3Notes = seed.notes.filter((n) => n.step >= 48);
@@ -165,20 +166,20 @@ describe('Soloist Seeder', () => {
 
     it('should generate identical melodies for the same seed string', () => {
         const seedStr = 'JAZZ';
-        const seed1 = generateSessionSeed(mockArranger, 'scalar', 0.5, seedStr);
-        const seed2 = generateSessionSeed(mockArranger, 'scalar', 0.5, seedStr);
+        const seed1 = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5, seedStr);
+        const seed2 = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5, seedStr);
         expect(seed1.notes).toEqual(seed2.notes);
         expect(seed1.loopLengthSteps).toEqual(seed2.loopLengthSteps);
     });
 
     it('should generate different melodies for different seed strings', () => {
-        const seed1 = generateSessionSeed(mockArranger, 'scalar', 0.5, 'APPLE');
-        const seed2 = generateSessionSeed(mockArranger, 'scalar', 0.5, 'BANANA');
+        const seed1 = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5, 'APPLE');
+        const seed2 = generateSessionSeed(getState(), mockArranger, 'scalar', 0.5, 'BANANA');
         expect(seed1.notes).not.toEqual(seed2.notes);
     });
 
     it('should return empty result for empty arranger', () => {
-        const seed = generateSessionSeed({ stepMap: [] }, 'scalar', 0.5);
+        const seed = generateSessionSeed(getState(), { stepMap: [] }, 'scalar', 0.5);
         expect(seed.notes).toEqual([]);
         expect(seed.loopLengthSteps).toBe(0);
     });

@@ -21,7 +21,7 @@ describe('MIDI Worker Logic Deep Dive', () => {
     beforeEach(() => {
         vi.stubGlobal('postMessage', vi.fn());
         state = {
-            playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5 },
+            playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, intent: {} },
             arranger: {
                 totalSteps: 32,
                 timeSignature: '4/4',
@@ -52,6 +52,7 @@ describe('MIDI Worker Logic Deep Dive', () => {
                 lastDrumPreset: 'Standard',
                 swing: 0,
                 reverb: 0,
+                anticipation: false,
             },
             midi: {
                 chordsChannel: 0,

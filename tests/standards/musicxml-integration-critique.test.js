@@ -179,7 +179,7 @@ describe('MusicXML Integration Critique', () => {
         };
         getState.mockReturnValue(state);
 
-        const note = getSoloistNote({}, {}, 0, 0, 64, 'lead_sheet', 0, false);
+        const note = getSoloistNote(getState(), {}, {}, 0, 0, 64, 'lead_sheet', 0, false);
 
         // First note in AllBlues.xml measure 1 is G3 (MIDI 55).
         // Expected transposed: A3 (MIDI 57)

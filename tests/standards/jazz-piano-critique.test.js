@@ -45,6 +45,7 @@ describe('Jazz Piano Critique', () => {
             mockState.playback.step = i;
             const stepInMeasure = i % 16;
             const notes = getAccompanimentNotes(
+                getState(),
                 chordC,
                 i,
                 stepInMeasure,
@@ -104,6 +105,7 @@ describe('Jazz Piano Critique', () => {
         // Scenario 1: Soloist Resting
         mockState.soloist.busySteps = 0;
         const notesQuiet = getAccompanimentNotes(
+            getState(),
             chord,
             0,
             0,
@@ -115,6 +117,7 @@ describe('Jazz Piano Critique', () => {
         // Scenario 2: Soloist Busy
         mockState.soloist.busySteps = 10;
         const notesBusy = getAccompanimentNotes(
+            getState(),
             chord,
             0,
             0,

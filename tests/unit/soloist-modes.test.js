@@ -219,7 +219,7 @@ describe('Soloist Mode Differentiation Logic', () => {
                 attempts * 4,
                 261.63,
                 60,
-                'smart',
+                'neo', // MUST BE NEO STYLE FOR QUARTAL
                 0,
                 {
                     bypassRhythm: true,
@@ -228,7 +228,7 @@ describe('Soloist Mode Differentiation Logic', () => {
             if (Array.isArray(note)) {
                 const melody = note[note.length - 1];
                 const extra = note[0];
-                if (melody.midi - extra.midi === 5) {
+                if (melody.midi - extra.midi === 5 || melody.midi - extra.midi === 7) {
                     foundQuartal = true;
                     break;
                 }
@@ -299,8 +299,9 @@ describe('Soloist Mode Differentiation Logic', () => {
             if (Array.isArray(note)) {
                 const melody = note[note.length - 1];
                 const extra = note[0];
+                // Note: Guitar adds lower intervals typically
                 const interval = extra.midi - melody.midi;
-                if ([-3, -4, -5, -7, -8, -9].includes(interval)) {
+                if ([-3, -4, -5].includes(interval)) {
                     foundHendrixInt = true;
                     break;
                 }

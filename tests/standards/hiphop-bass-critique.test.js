@@ -41,10 +41,18 @@ describe('Hip Hop Bassist Critique', () => {
 
             // Re-mock before active check to ensure internal isBassActive sees correct intensity
             getState.mockReturnValue(mockState);
-            const active = isBassActive('hiphop', globalStep, globalStep % 16, info, {});
+            const active = isBassActive(
+                getState(),
+                'hiphop',
+                globalStep,
+                globalStep % 16,
+                info,
+                {},
+            );
 
             if (active) {
                 const note = getBassNote(
+                    getState(),
                     chordC,
                     null,
                     info.beatIndex,

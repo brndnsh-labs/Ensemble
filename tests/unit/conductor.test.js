@@ -74,7 +74,7 @@ describe('Conductor Engine', () => {
 
     it('should trigger a fill and update intensity at section boundaries', () => {
         // Step 15 is the last step of the first section (0-16)
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
 
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.TRIGGER_FILL, expect.any(Object));
         // It should have calculated a new target energy based on 'Climax' role (s2)
@@ -92,7 +92,7 @@ describe('Conductor Engine', () => {
 
         roles.forEach(({ role }) => {
             state.arranger.form.sections[1].role = role;
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16, dispatch);
             // We just verify it doesn't crash and dispatches
             expect(dispatch).toHaveBeenCalled();
         });
@@ -100,14 +100,14 @@ describe('Conductor Engine', () => {
 
     it('should handle missing section data gracefully', () => {
         state.arranger.form = null;
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.TRIGGER_FILL, expect.any(Object));
     });
 
     it('should handle harmonic anticipation (ghost kick) at chord ends', () => {
         state.playback.bandIntensity = 0.8;
         // Step 15 is chord end
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
 
         // Should trigger fill twice: once for section transition, once for harmonic anticipation
         const triggerFillCalls = dispatch.mock.calls.filter(
@@ -118,7 +118,7 @@ describe('Conductor Engine', () => {
 
     it('should handle repetition-based logic for long jams', () => {
         state.arranger.form = { sections: [] }; // Force fallback logic
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
         expect(dispatch).toHaveBeenCalled();
     });
 });

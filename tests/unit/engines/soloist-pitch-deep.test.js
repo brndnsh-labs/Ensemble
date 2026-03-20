@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectPitchAndDevices } from '../../../public/engine/soloist-pitch-engine.js';
+import { getState } from '../../../public/state.js';
 
 describe('Soloist Pitch Engine Deep Dive', () => {
     let args;
@@ -25,31 +26,31 @@ describe('Soloist Pitch Engine Deep Dive', () => {
 
     it('should exercise Miles Davis modal style emphasis', () => {
         args[4] = 'miles';
-        const result = selectPitchAndDevices(...args);
+        const result = selectPitchAndDevices(getState(), ...args);
         expect(result).toBeDefined();
     });
 
     it('should exercise Charlie Parker bebop style emphasis', () => {
         args[4] = 'bird';
-        const result = selectPitchAndDevices(...args);
+        const result = selectPitchAndDevices(getState(), ...args);
         expect(result).toBeDefined();
     });
 
     it('should exercise Louis Armstrong classic style emphasis', () => {
         args[4] = 'armstrong';
-        const result = selectPitchAndDevices(...args);
+        const result = selectPitchAndDevices(getState(), ...args);
         expect(result).toBeDefined();
     });
 
     it('should exercise Thelonious Monk dissonant style emphasis', () => {
         args[4] = 'monk';
-        const result = selectPitchAndDevices(...args);
+        const result = selectPitchAndDevices(getState(), ...args);
         expect(result).toBeDefined();
     });
 
     it('should exercise Bill Evans upper extensions emphasis', () => {
         args[4] = 'evans';
-        const result = selectPitchAndDevices(...args);
+        const result = selectPitchAndDevices(getState(), ...args);
         expect(result).toBeDefined();
     });
 });

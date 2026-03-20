@@ -43,6 +43,7 @@ describe('Acoustic Piano Critique', () => {
             mockState.playback.step = i;
             const stepInMeasure = i % 16;
             const notes = getAccompanimentNotes(
+                getState(),
                 chordC,
                 i,
                 stepInMeasure,

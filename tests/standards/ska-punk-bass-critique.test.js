@@ -38,10 +38,18 @@ describe('Ska-Punk Bassist Critique', () => {
         let prevFreq = 0;
         for (let globalStep = 0; globalStep < numBars * 16; globalStep++) {
             const info = getStepInfo(globalStep, tsConfig, [], TIME_SIGNATURES);
-            const active = isBassActive('walking-ska', globalStep, globalStep % 16, info, {});
+            const active = isBassActive(
+                getState(),
+                'walking-ska',
+                globalStep,
+                globalStep % 16,
+                info,
+                {},
+            );
 
             if (active) {
                 const note = getBassNote(
+                    getState(),
                     chordC,
                     null,
                     info.beatIndex,

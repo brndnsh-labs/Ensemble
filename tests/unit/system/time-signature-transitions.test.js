@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../../public/engine/conductor.js';
-import { getState } from '../../../public/state.js';
+import { dispatch, getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
@@ -103,7 +103,7 @@ describe('Time Signature Transitions', () => {
         }
 
         // Check at the start of the last measure (step 84)
-        checkSectionTransition(84, stepsPerMeasure);
+        checkSectionTransition(getState(), 84, stepsPerMeasure, dispatch);
 
         expect(conductor.formIteration).toBe(1);
         expect(conductor.targetIntensity).not.toBe(0.5);
@@ -129,7 +129,7 @@ describe('Time Signature Transitions', () => {
         }
 
         // Check at the start of the last measure (step 60)
-        checkSectionTransition(60, stepsPerMeasure);
+        checkSectionTransition(getState(), 60, stepsPerMeasure, dispatch);
 
         expect(conductor.formIteration).toBe(1);
         expect(conductor.targetIntensity).not.toBe(0.5);
@@ -149,7 +149,7 @@ describe('Time Signature Transitions', () => {
         }
 
         // Check at the start of the last measure (step 84)
-        checkSectionTransition(84, stepsPerMeasure);
+        checkSectionTransition(getState(), 84, stepsPerMeasure, dispatch);
 
         expect(conductor.formIteration).toBe(1);
         expect(conductor.targetIntensity).not.toBe(0.5);

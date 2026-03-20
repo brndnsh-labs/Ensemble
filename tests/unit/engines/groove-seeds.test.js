@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../../public/engine/conductor.js';
+import { dispatch, getState } from '../../../public/state.js';
 
 // Mock state
 const { mockState } = vi.hoisted(() => ({
@@ -63,7 +64,7 @@ describe('Groove Engine - Multi-Seed Memory', () => {
     });
 
     it('should assign a seed to a new section', () => {
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
 
         // Verify seed was assigned to s2
         expect(mockState.groove.sectionSeedMap.s2).toBeDefined();
@@ -83,12 +84,12 @@ describe('Groove Engine - Multi-Seed Memory', () => {
 
         // 1. Transition to s2 -> seed is generated
         vi.spyOn(Math, 'random').mockReturnValue(0.123);
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
         expect(mockState.groove.sectionSeedMap.s2).toBe(0.123);
 
         // 2. Transition back to s1 -> seed should NOT be overwritten (remains 0.999)
         vi.spyOn(Math, 'random').mockReturnValue(0.456);
-        checkSectionTransition(16, 16);
+        checkSectionTransition(getState(), 16, 16, dispatch);
         expect(mockState.groove.sectionSeedMap.s1).toBe(0.999);
 
         // Restore random

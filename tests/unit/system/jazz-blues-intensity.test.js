@@ -103,7 +103,7 @@ describe('Jazz Blues Intensity Bug', () => {
         }
 
         // Check at the start of the last measure (step 176)
-        checkSectionTransition(176, 16);
+        checkSectionTransition(getState(), 176, 16, dispatch);
 
         // In 12-bar blues, step 176 should match fillStart (192 - 16 = 176)
         expect(conductor.formIteration).toBe(1);
@@ -138,7 +138,7 @@ describe('Jazz Blues Intensity Bug', () => {
         // We check every step in the last bar to see if it triggers
         let triggered = false;
         for (let step = 176; step < 192; step++) {
-            checkSectionTransition(step, 16);
+            checkSectionTransition(getState(), step, 16, dispatch);
             if (conductor.formIteration > 0) {
                 triggered = true;
                 break;
@@ -161,7 +161,7 @@ describe('Jazz Blues Intensity Bug', () => {
         ];
 
         // Check at step 0 (Start of Measure 1)
-        checkSectionTransition(0, 16);
+        checkSectionTransition(getState(), 0, 16, dispatch);
 
         // Expectation: TRIGGER_FILL should be dispatched
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.TRIGGER_FILL, expect.anything());
