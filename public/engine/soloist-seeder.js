@@ -158,7 +158,7 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
                 for (
                     let step = currentStep;
                     step < currentStep + stepsPerMeasure * 2 && step < blockEnd;
-                    step += stepsPerBeat
+                    step += stepsPerBeat / 2 // Iterate by 8th notes to allow syncopation
                 ) {
                     const entry = arranger.stepMap[step];
                     const entryChord = /** @type {any} */ (entry?.chord);
@@ -168,9 +168,10 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
 
                     const measureStep = step % stepsPerMeasure;
                     const beatIndex = Math.floor(measureStep / stepsPerBeat);
+                    const isBeatStart = measureStep % stepsPerBeat === 0;
 
                     // Simple rhythmic motif: Strong beats 1 & 3
-                    if (beatIndex === 0 || beatIndex === 2) {
+                    if (isBeatStart && (beatIndex === 0 || beatIndex === 2)) {
                         const root = entryChord.rootMidi % 12;
                         const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
                         blockNotes.push({
@@ -186,7 +187,7 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
                 for (
                     let step = currentStep + stepsPerMeasure * 2;
                     step < currentStep + stepsPerMeasure * 4 && step < blockEnd;
-                    step += stepsPerBeat
+                    step += stepsPerBeat / 2 // Iterate by 8th notes to allow syncopation
                 ) {
                     const entry = arranger.stepMap[step];
                     const entryChord = /** @type {any} */ (entry?.chord);
@@ -196,27 +197,55 @@ export function generateSessionSeed(_state, arranger, _style, _intensity, _seedS
 
                     const measureStep = step % stepsPerMeasure;
                     const beatIndex = Math.floor(measureStep / stepsPerBeat);
+                    const isBeatStart = measureStep % stepsPerBeat === 0;
+                    const measureNumber = Math.floor((step - currentStep) / stepsPerMeasure);
 
-                    // Consequent Motif: Strong beat 1, syncopated beat 2.5
-                    if (beatIndex === 0) {
-                        const root = entryChord.rootMidi % 12;
-                        const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
-                        blockNotes.push({
-                            step,
-                            midi,
-                            isAnchor: true,
-                            durationSteps: stepsPerBeat * 1.5,
-                        });
-                    } else if (measureStep === stepsPerBeat * 2.5) {
-                        // e.g. beat 3 "and"
-                        const root = entryChord.rootMidi % 12;
-                        const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
-                        blockNotes.push({
-                            step,
-                            midi,
-                            isAnchor: false,
-                            durationSteps: stepsPerBeat * 1.5,
-                        });
+                    // Consequent Motif: Measure 3 has Strong beat 1 and syncopated beat 2.5.
+                    // Measure 4 has a resolution on beat 1.
+                    if (measureNumber === 2) {
+                        if (isBeatStart && beatIndex === 0) {
+                            const root = entryChord.rootMidi % 12;
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
+                            blockNotes.push({
+                                step,
+                                midi,
+                                isAnchor: true,
+                                durationSteps: stepsPerBeat * 1.5,
+                            });
+                        } else if (measureStep === stepsPerBeat * 2.5) {
+                            // beat 3 "and"
+                            const root = entryChord.rootMidi % 12;
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
+                            blockNotes.push({
+                                step,
+                                midi,
+                                isAnchor: false,
+                                durationSteps: stepsPerBeat * 1.5,
+                            });
+                        }
+                    } else if (measureNumber === 3) {
+                        if (isBeatStart && beatIndex === 0) {
+                            const root = entryChord.rootMidi % 12;
+                            const midi = getPrimaryChordTone(
+                                entryChord,
+                                baseOctave + root,
+                                beatIndex,
+                            );
+                            blockNotes.push({
+                                step,
+                                midi,
+                                isAnchor: true,
+                                durationSteps: stepsPerMeasure - 1, // Let it ring until turnaround
+                            });
+                        }
                     }
                 }
 
