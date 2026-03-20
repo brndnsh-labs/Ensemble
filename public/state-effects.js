@@ -33,6 +33,7 @@ export function handleEffects(action, payload, stateMap, context = {}) {
                 }
 
                 const generated = generateSessionSeed(
+                    stateMap,
                     arranger,
                     soloist.style || 'smart',
                     playback.bandIntensity,
@@ -57,6 +58,7 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             // to ensure MIDI notes land on valid chord/scale tones for the new structure.
             if (stateMap.playback.isPlaying) {
                 const generated = generateSessionSeed(
+                    stateMap,
                     stateMap.arranger,
                     stateMap.soloist.style || 'smart',
                     stateMap.playback.bandIntensity,

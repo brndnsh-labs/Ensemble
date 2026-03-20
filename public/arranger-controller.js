@@ -1,7 +1,14 @@
 const NOTE_MATCH_PATTERN = /^([A-G](?:[#b\u266F\u266D])?)(.*)/i;
 
 import { KEY_ORDER } from './config.js';
-import { transformRelativeProgression, validateProgression } from './engine/chords-engine.js';
+import {
+    mutateProgression,
+    transformRelativeProgression,
+    validateProgression,
+} from './engine/chords-engine.js';
+
+export { mutateProgression, transformRelativeProgression, validateProgression };
+
 import { analyzeFormUI } from './engine/conductor.js';
 import { restoreGains } from './engine/engine.js';
 import { getSectionEnergy } from './form-analysis.js';

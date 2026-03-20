@@ -28,9 +28,9 @@ describe('Ska-Punk Genre Integrity', () => {
 
     it('should identify walking-ska as active on 8th notes', () => {
         // Steps 0, 2, 4, 6... in 16-step measure are 8th notes
-        expect(isBassActive('walking-ska', 0, 0)).toBe(true);
-        expect(isBassActive('walking-ska', 1, 1)).toBe(false);
-        expect(isBassActive('walking-ska', 2, 2)).toBe(true);
+        expect(isBassActive(getState(), 'walking-ska', 0, 0)).toBe(true);
+        expect(isBassActive(getState(), 'walking-ska', 1, 1)).toBe(false);
+        expect(isBassActive(getState(), 'walking-ska', 2, 2)).toBe(true);
     });
 
     it('should generate offbeat upstrokes for accompaniment', () => {
@@ -44,11 +44,11 @@ describe('Ska-Punk Genre Integrity', () => {
         // Step 0 (Downbeat): Should be empty (unless forced by 'One' logic, but Ska favors offbeats)
         // Wait, I implemented: if (measureStep === 0 && !isHit && Math.random() < 0.8) isHit = true;
         // So Step 0 might have a hit. Let's check Step 2 (The "And").
-        const notesAnd = getAccompanimentNotes(chord, 2, 2, 2, { isBeatStart: false });
+        const notesAnd = getAccompanimentNotes(getState(), chord, 2, 2, 2, { isBeatStart: false });
         expect(notesAnd.length).toBeGreaterThan(0);
 
         // Step 4 (Beat 2): Should be empty for Ska
-        getAccompanimentNotes(chord, 4, 4, 4, { isBeatStart: true });
+        getAccompanimentNotes(getState(), chord, 4, 4, 4, { isBeatStart: true });
         // It might have a hit if "forced", but ideally not.
     });
 
@@ -88,7 +88,7 @@ describe('Ska-Punk Genre Integrity', () => {
     it('map Ska-Punk to ska soloist style', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         // Just verify it doesn't crash and returns something or null
-        const note = getSoloistNote(chord, null, 0, null, 5, 'smart', 0);
+        const note = getSoloistNote(getState(), chord, null, 0, null, 5, 'smart', 0);
         expect(note).toBeDefined();
     });
 
@@ -102,12 +102,12 @@ describe('Ska-Punk Genre Integrity', () => {
         };
 
         // Check bass note generation at high BPM
-        const bassNote = getBassNote(chord, null, 0, null, 48, 'walking-ska', 0, 0, 0);
+        const bassNote = getBassNote(getState(), chord, null, 0, null, 48, 'walking-ska', 0, 0, 0);
         expect(bassNote).not.toBeNull();
         expect(bassNote.durationSteps).toBeLessThanOrEqual(1.0); // Should be tight
 
         // Check accompaniment notes at high BPM
-        const accNotes = getAccompanimentNotes(chord, 2, 2, 2, { isBeatStart: false });
+        const accNotes = getAccompanimentNotes(getState(), chord, 2, 2, 2, { isBeatStart: false });
         if (accNotes.length > 0 && accNotes[0].midi > 0) {
             expect(accNotes[0].durationSteps).toBeLessThanOrEqual(1.0); // Staccato
         }
@@ -118,7 +118,7 @@ describe('Ska-Punk Genre Integrity', () => {
         playback.bandIntensity = 0.5; // Medium intensity where antiphony used to happen
 
         // Measure 0 (Step 0)
-        const soloistM0 = getSoloistNote(chord, null, 0, null, 5, 'ska', 0);
+        const soloistM0 = getSoloistNote(getState(), chord, null, 0, null, 5, 'ska', 0);
         const _harmM0 = getHarmonyNotes(getState(), chord, null, 0, 0, 'horns', 0);
 
         // Previous behavior forced soloistM0 to be null here.
@@ -126,7 +126,7 @@ describe('Ska-Punk Genre Integrity', () => {
         expect(soloistM0 !== undefined).toBe(true);
 
         // Measure 1 (Step 16)
-        const soloistM1 = getSoloistNote(chord, null, 16, null, 5, 'ska', 0);
+        const soloistM1 = getSoloistNote(getState(), chord, null, 16, null, 5, 'ska', 0);
         const _harmonyM1 = getHarmonyNotes(getState(), chord, null, 16, 0, 'horns', 0);
 
         expect(soloistM1 !== undefined).toBe(true);

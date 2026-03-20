@@ -17,13 +17,14 @@ import { getScaleForChord } from './theory-scales.js';
 
 /**
  * Generates a song-wide seed melody for the soloist.
+ * @param {import('../types.js').EnsembleState} state
  * @param {import('../state/arranger.js').ArrangerState} arranger
  * @param {string} style
  * @param {number} [_intensity]
  * @param {string} [seedStr]
  * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
  */
-export function generateSessionSeed(arranger, style, _intensity, seedStr) {
+export function generateSessionSeed(state, arranger, style, _intensity, seedStr) {
     if (!arranger.stepMap || arranger.stepMap.length === 0) {
         return { notes: [], loopLengthSteps: 0 };
     }
@@ -145,7 +146,7 @@ export function generateSessionSeed(arranger, style, _intensity, seedStr) {
 
                 /** @type {any} */
                 const chord = entry.chord;
-                const scale = getScaleForChord(chord, null, style);
+                const scale = getScaleForChord(state, chord, null, style);
 
                 // Strategy Register: Intro is lower, Chorus is higher
                 let registerOffset = 72; // C5

@@ -13,6 +13,7 @@ import { getScaleForChord } from './theory-scales.js';
  */
 export function generateMelodicDevice(deviceType, ctx) {
     const {
+        state,
         selectedMidi,
         targetChord,
         activeStyle,
@@ -307,7 +308,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         ];
     } else if (deviceType === 'bebopScale') {
         // Run with chromatic passing tone
-        const _scale = getScaleForChord(targetChord, null, activeStyle);
+        const _scale = getScaleForChord(state, targetChord, null, activeStyle);
         const root = targetChord.rootMidi;
         const bebopNote = root + 11; // Major 7 passing tone for dominant
 
@@ -338,7 +339,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         ];
     } else if (deviceType === 'sheetsOfSound') {
         // Fast multi-octave run
-        const scale = getScaleForChord(targetChord, null, activeStyle);
+        const scale = getScaleForChord(state, targetChord, null, activeStyle);
         deviceBuffer = [];
         const startMidi = selectedMidi - 12;
         for (let i = 0; i < 8; i++) {

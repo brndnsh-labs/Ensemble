@@ -7,6 +7,7 @@ const CANDIDATE_WEIGHTS = new Float32Array(128);
 
 /**
  * Primary entry point for pitch selection.
+ * @param {import('../types.js').EnsembleState} state
  * @param {number} step
  * @param {any} rhythmNode
  * @param {any} currentChord
@@ -23,6 +24,7 @@ const CANDIDATE_WEIGHTS = new Float32Array(128);
  * @param {number} stepsPerBeat
  */
 export function selectPitchAndDevices(
+    state,
     step,
     rhythmNode,
     currentChord,
@@ -149,7 +151,7 @@ export function selectPitchAndDevices(
     // --- Pitch Selection ---
     CANDIDATE_WEIGHTS.fill(0);
 
-    const scaleIntervals = getScaleForChord(targetChord, null, activeStyle);
+    const scaleIntervals = getScaleForChord(state, targetChord, null, activeStyle);
     let scaleMask = 0;
     for (let i = 0; i < scaleIntervals.length; i++) {
         scaleMask |= 1 << scaleIntervals[i];
@@ -450,6 +452,7 @@ export function selectPitchAndDevices(
         Math.random() < 0.6
     ) {
         const deviceBuffer = generateMelodicDevice('bluesTurnaround', {
+            state,
             selectedMidi,
             targetChord,
             activeStyle,
@@ -513,6 +516,7 @@ export function selectPitchAndDevices(
             allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         if (deviceType) {
             const deviceBuffer = generateMelodicDevice(deviceType, {
+                state,
                 selectedMidi,
                 targetChord,
                 activeStyle,

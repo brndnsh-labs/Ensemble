@@ -1,5 +1,4 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getState } from '../state.js';
 import { calculateTimingOffset, getFrequency } from '../utils.js';
 import { GENRE_STYLE_MAPPING, INFLUENCE_POOLS, STYLE_CONFIG } from './soloist-config.js';
 import { selectPitchAndDevices } from './soloist-pitch-engine.js';
@@ -31,6 +30,7 @@ export function resetSoloistState(state) {
  * Simplified soloist engine.
  * Focuses on lively, probabilistic phrasing with form and meter awareness.
  * Uses a two-phase Rhythm and Pitch engine.
+ * @param {import('../types.js').EnsembleState} state
  * @param {any} currentChord
  * @param {any} nextChord
  * @param {number} step
@@ -42,6 +42,7 @@ export function resetSoloistState(state) {
  * @param {import('../types.js').StepInfo} [stepInfo]
  */
 export function getSoloistNote(
+    state,
     currentChord,
     nextChord,
     step,
@@ -52,8 +53,6 @@ export function getSoloistNote(
     coordination = {},
     stepInfo,
 ) {
-    /** @type {import('../types.js').EnsembleState} */
-    const state = getState();
     const { playback, groove, soloist, arranger } = state;
     if (!currentChord) {
         return null;
@@ -461,6 +460,7 @@ export function getSoloistNote(
             soloist.lastAttackStep = step; // @worker-mutation
 
             return selectPitchAndDevices(
+                state,
                 step,
                 rhythmNode,
                 currentChord,

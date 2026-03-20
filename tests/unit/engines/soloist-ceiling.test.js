@@ -77,7 +77,7 @@ describe('Soloist High Ceiling Constraints', () => {
         let lastFreq = 440 * 2 ** ((80 - 69) / 12);
 
         for (let i = 0; i < 1000; i++) {
-            const note = getSoloistNote(chordC, null, 16, lastFreq, 64, 'scalar', 0);
+            const note = getSoloistNote(getState(), chordC, null, 16, lastFreq, 64, 'scalar', 0);
             if (note) {
                 const primary = Array.isArray(note) ? note[0] : note;
                 if (primary.midi > maxMidi) {

@@ -161,6 +161,7 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
                     workerContext.lookaheadCursor,
                 );
                 soloResult = getSoloistNote(
+                    state,
                     chord || '',
                     nextChordData?.chord || '',
                     step,
@@ -210,7 +211,7 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
         if (bass.enabled && step >= workerContext.bbBufferHead) {
             if (chordData) {
                 const { chord, stepInChord } = chordData;
-                if (isBassActive(bass.style, step, stepInChord, stepInfo, coordination)) {
+                if (isBassActive(state, bass.style, step, stepInChord, stepInfo, coordination)) {
                     const nextChordData = getChordAtStep(
                         step + 4,
                         arranger,
@@ -218,6 +219,7 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
                     );
                     const { sectionStart, sectionEnd } = chordData;
                     const bassResult = getBassNote(
+                        state,
                         chord,
                         nextChordData?.chord,
                         stepInChord / ts.stepsPerBeat,
@@ -260,6 +262,7 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
             if (chordData) {
                 const { chord, stepInChord } = chordData;
                 const chordNotes = getAccompanimentNotes(
+                    state,
                     chord,
                     step,
                     stepInChord,

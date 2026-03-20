@@ -123,15 +123,23 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should identify correct relative scales', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // iim7
-            expect(getScaleForChord(p[1], p[2], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // V7
-            expect(getScaleForChord(p[4], p[5], 'bird')).toEqual([0, 1, 3, 5, 6, 8, 10]); // viiø7
-            expect(getScaleForChord(p[5], p[6], 'bird')).toEqual([0, 1, 3, 4, 6, 8, 10]); // III7alt
+            expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
+                0, 2, 3, 5, 7, 9, 10,
+            ]); // iim7
+            expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // V7
+            expect(getScaleForChord(getState(), p[4], p[5], 'bird')).toEqual([
+                0, 1, 3, 5, 6, 8, 10,
+            ]); // viiø7
+            expect(getScaleForChord(getState(), p[5], p[6], 'bird')).toEqual([
+                0, 1, 3, 4, 6, 8, 10,
+            ]); // III7alt
         });
 
         it('should generate valid bass notes', () => {
             const p = arranger.progression;
-            const result = getBassNote(p[0], p[1], 0, 55, 38, 'quarter', 0, 0, 0);
+            const result = getBassNote(getState(), p[0], p[1], 0, 55, 38, 'quarter', 0, 0, 0);
             expect(result).not.toBeNull();
             expect(result.midi % 12).toBe(p[0].rootMidi % 12);
         });
@@ -152,9 +160,15 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should select correct scales for rapid major-third key shifts', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 11]); // Imaj7
-            expect(getScaleForChord(p[1], p[2], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // V7 of bVI
-            expect(getScaleForChord(p[2], p[3], 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Imaj7 (Lydian default)
+            expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 11,
+            ]); // Imaj7
+            expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // V7 of bVI
+            expect(getScaleForChord(getState(), p[2], p[3], 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 11,
+            ]); // Imaj7 (Lydian default)
         });
 
         it('should select Phrygian Dominant when anticipating minor resolutions', () => {
@@ -164,7 +178,9 @@ describe('Standards Compliance Test Suite', () => {
                 quality: 'minor',
                 intervals: [0, 3, 7],
             };
-            expect(getScaleForChord(v7, minorTarget, 'bird')).toEqual([0, 1, 4, 5, 7, 8, 10]);
+            expect(getScaleForChord(getState(), v7, minorTarget, 'bird')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]);
         });
     });
 
@@ -196,7 +212,7 @@ describe('Standards Compliance Test Suite', () => {
                 (c) => c.sectionLabel === 'B (B)' && c.quality === 'maj7',
             );
             expect(bChord.key).toBe('B');
-            const scale = getScaleForChord(bChord, null, 'bird');
+            const scale = getScaleForChord(getState(), bChord, null, 'bird');
             expect(scale).toContain(0);
             expect(scale).toContain(4);
             expect(scale).toContain(11);
@@ -207,7 +223,7 @@ describe('Standards Compliance Test Suite', () => {
                 (c) => c.sectionLabel === 'B (A)' && c.quality === 'maj7',
             );
             expect(aSection.key).toBe('A');
-            const scale = getScaleForChord(aSection, null, 'bird');
+            const scale = getScaleForChord(getState(), aSection, null, 'bird');
             expect(scale).toContain(0);
             expect(scale).toContain(4);
             expect(scale).toContain(11);
@@ -229,10 +245,18 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should select correct scales for the descending minor progression', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'smart')).toEqual([0, 2, 3, 5, 7, 8, 10]); // i (Am)
-            expect(getScaleForChord(p[1], p[2], 'smart')).toEqual([0, 2, 4, 5, 7, 9, 10]); // bVII (G)
-            expect(getScaleForChord(p[2], p[3], 'smart')).toEqual([0, 2, 4, 6, 7, 9, 11]); // bVI (F) Lydian
-            expect(getScaleForChord(p[3], null, 'smart')).toEqual([0, 1, 4, 5, 7, 8, 10]); // V (E) Phryg Dom
+            expect(getScaleForChord(getState(), p[0], p[1], 'smart')).toEqual([
+                0, 2, 3, 5, 7, 8, 10,
+            ]); // i (Am)
+            expect(getScaleForChord(getState(), p[1], p[2], 'smart')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // bVII (G)
+            expect(getScaleForChord(getState(), p[2], p[3], 'smart')).toEqual([
+                0, 2, 4, 6, 7, 9, 11,
+            ]); // bVI (F) Lydian
+            expect(getScaleForChord(getState(), p[3], null, 'smart')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]); // V (E) Phryg Dom
         });
 
         it('should voice the E Major chord (V) with a natural 3', () => {
@@ -263,6 +287,7 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should prioritize the Blues Scale over Dominant I chords', () => {
             const scale = getScaleForChord(
+                getState(),
                 arranger.progression[0],
                 arranger.progression[1],
                 'blues',
@@ -280,6 +305,7 @@ describe('Standards Compliance Test Suite', () => {
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
                 const result = getSoloistNote(
+                    getState(),
                     arranger.progression[0],
                     null,
                     i * 4,
@@ -322,9 +348,13 @@ describe('Standards Compliance Test Suite', () => {
 
             it('should select correct scales for modulation to Db Major', () => {
                 const p = arranger.progression;
-                expect(getScaleForChord(p[8], p[9], 'bossa')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Ebm7 (Dorian)
-                expect(getScaleForChord(p[9], p[10], 'bossa')).toEqual([0, 2, 4, 5, 7, 9, 10]); // Ab7 (Mixolydian)
-                expect(getScaleForChord(p[10], null, 'bossa')).toContain(6); // Dbmaj7 (Lydian)
+                expect(getScaleForChord(getState(), p[8], p[9], 'bossa')).toEqual([
+                    0, 2, 3, 5, 7, 9, 10,
+                ]); // Ebm7 (Dorian)
+                expect(getScaleForChord(getState(), p[9], p[10], 'bossa')).toEqual([
+                    0, 2, 4, 5, 7, 9, 10,
+                ]); // Ab7 (Mixolydian)
+                expect(getScaleForChord(getState(), p[10], null, 'bossa')).toContain(6); // Dbmaj7 (Lydian)
             });
         });
 
@@ -341,7 +371,7 @@ describe('Standards Compliance Test Suite', () => {
             });
 
             it('should maintain Dorian mode', () => {
-                const scale = getScaleForChord(arranger.progression[0], null, 'bird');
+                const scale = getScaleForChord(getState(), arranger.progression[0], null, 'bird');
                 expect(scale).toEqual([0, 2, 3, 5, 7, 9, 10]);
                 expect(scale).not.toContain(8);
             });
@@ -359,6 +389,7 @@ describe('Standards Compliance Test Suite', () => {
 
             it('should handle 5/4 meter in bass', () => {
                 const note1 = getBassNote(
+                    getState(),
                     arranger.progression[0],
                     arranger.progression[1],
                     0,
@@ -393,6 +424,7 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should generate bass line respecting slash note', () => {
             const result = getBassNote(
+                getState(),
                 arranger.progression[0],
                 arranger.progression[1],
                 0,
@@ -426,9 +458,15 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should correctly select scales for shifting ii-V patterns', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 11]); // Gmaj7
-            expect(getScaleForChord(p[2], p[3], 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Gm7
-            expect(getScaleForChord(p[3], p[4], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // C7
+            expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 11,
+            ]); // Gmaj7
+            expect(getScaleForChord(getState(), p[2], p[3], 'bird')).toEqual([
+                0, 2, 3, 5, 7, 9, 10,
+            ]); // Gm7
+            expect(getScaleForChord(getState(), p[3], p[4], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // C7
         });
     });
 
@@ -462,8 +500,12 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should correctly handle the Bird-style chromatic shifts and Lydian Dominant II7', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[1], p[2], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // VI7 (F7)
-            expect(getScaleForChord(p[2], p[3], 'bird')).toEqual([0, 2, 4, 6, 7, 9, 10]); // II7 (Bb7) Lydian Dominant
+            expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // VI7 (F7)
+            expect(getScaleForChord(getState(), p[2], p[3], 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 10,
+            ]); // II7 (Bb7) Lydian Dominant
         });
 
         it('should select correct scales for the modulation to G Major (B)', () => {
@@ -473,9 +515,11 @@ describe('Standards Compliance Test Suite', () => {
             const d7 = p[14]; // #IV7
             const gmaj7 = p[15]; // VIImaj7
 
-            expect(getScaleForChord(am7, d7, 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Am7 Dorian
-            expect(getScaleForChord(d7, gmaj7, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // D7 Mixolydian
-            expect(getScaleForChord(gmaj7, null, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Gmaj7 Lydian
+            expect(getScaleForChord(getState(), am7, d7, 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // Am7 Dorian
+            expect(getScaleForChord(getState(), d7, gmaj7, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // D7 Mixolydian
+            expect(getScaleForChord(getState(), gmaj7, null, 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 11,
+            ]); // Gmaj7 Lydian
         });
 
         it('should handle the C section progression correctly', () => {
@@ -485,8 +529,12 @@ describe('Standards Compliance Test Suite', () => {
             const ddim7 = p[27]; // #IVdim7
             const ab_eb = p[28]; // Imaj7/V
 
-            expect(getScaleForChord(dbmaj7, ddim7, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Dbmaj7 Lydian
-            expect(getScaleForChord(ddim7, ab_eb, 'bird')).toEqual([0, 2, 3, 5, 6, 8, 9, 11]); // Ddim7 Whole-Half
+            expect(getScaleForChord(getState(), dbmaj7, ddim7, 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 11,
+            ]); // Dbmaj7 Lydian
+            expect(getScaleForChord(getState(), ddim7, ab_eb, 'bird')).toEqual([
+                0, 2, 3, 5, 6, 8, 9, 11,
+            ]); // Ddim7 Whole-Half
             expect(ab_eb.bassMidi % 12).toBe(3); // Eb bass (V of Ab)
         });
     });
@@ -503,8 +551,12 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should select correct scales', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'smart')).toEqual([0, 2, 4, 6, 7, 9, 11]); // Fmaj7 Lydian
-            expect(getScaleForChord(p[2], p[3], 'smart')).toEqual([0, 1, 3, 5, 7, 8, 10]); // Em7 Phrygian
+            expect(getScaleForChord(getState(), p[0], p[1], 'smart')).toEqual([
+                0, 2, 4, 6, 7, 9, 11,
+            ]); // Fmaj7 Lydian
+            expect(getScaleForChord(getState(), p[2], p[3], 'smart')).toEqual([
+                0, 1, 3, 5, 7, 8, 10,
+            ]); // Em7 Phrygian
         });
     });
 
@@ -525,9 +577,15 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should select appropriate scales', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'bird')).toEqual([0, 1, 3, 5, 6, 8, 10]); // Locrian
-            expect(getScaleForChord(p[1], p[2], 'bird')).toEqual([0, 1, 3, 4, 6, 8, 10]); // Altered
-            expect(getScaleForChord(p[7], null, 'bird')).toEqual([0, 2, 4, 6, 7, 9, 10]); // Lydian Dominant
+            expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
+                0, 1, 3, 5, 6, 8, 10,
+            ]); // Locrian
+            expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
+                0, 1, 3, 4, 6, 8, 10,
+            ]); // Altered
+            expect(getScaleForChord(getState(), p[7], null, 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 10,
+            ]); // Lydian Dominant
         });
     });
 
@@ -546,13 +604,19 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should select appropriate scales for turnaround', () => {
             const p = arranger.progression;
-            expect(getScaleForChord(p[0], p[1], 'bird')).toEqual([0, 2, 4, 5, 7, 9, 11]); // I
-            expect(getScaleForChord(p[1], p[2], 'bird')).toEqual([0, 2, 3, 5, 7, 9, 10]); // vi7
+            expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 11,
+            ]); // I
+            expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
+                0, 2, 3, 5, 7, 9, 10,
+            ]); // vi7
         });
 
         it('should handle Bridge secondary dominants', () => {
             const iii7 = arranger.progression.find((c) => c.sectionLabel === 'B');
-            expect(getScaleForChord(iii7, null, 'bird')).toEqual([0, 2, 4, 5, 7, 9, 10]); // III7
+            expect(getScaleForChord(getState(), iii7, null, 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // III7
         });
     });
 
@@ -594,17 +658,19 @@ describe('Standards Compliance Test Suite', () => {
 
         it('should navigate Cycle of Fifths', () => {
             const p = arranger.progression;
-            const scaleVi = getScaleForChord(p[0], p[1], 'bird');
+            const scaleVi = getScaleForChord(getState(), p[0], p[1], 'bird');
             expect(scaleVi).toContain(3);
             expect(scaleVi).toContain(10);
         });
 
         it('should handle Bridge modulation', () => {
             const b2Chords = arranger.progression.filter((c) => c.sectionId === 'B2');
-            expect(getScaleForChord(b2Chords[0], b2Chords[1], 'bird')).toEqual([
+            expect(getScaleForChord(getState(), b2Chords[0], b2Chords[1], 'bird')).toEqual([
                 0, 1, 3, 5, 6, 8, 10,
             ]); // Locrian
-            expect(getScaleForChord(b2Chords[3], null, 'bird')).toEqual([0, 1, 3, 4, 6, 8, 10]); // Altered
+            expect(getScaleForChord(getState(), b2Chords[3], null, 'bird')).toEqual([
+                0, 1, 3, 4, 6, 8, 10,
+            ]); // Altered
         });
     });
 });

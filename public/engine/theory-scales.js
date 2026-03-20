@@ -1,5 +1,4 @@
 import { KEY_ORDER } from '../config.js';
-import { getState } from '../state.js';
 
 /**
  * THEORY-SCALES.JS
@@ -41,14 +40,13 @@ const SCALE_INTERVALS = {
 /**
  * Determines the most appropriate musical scale for a given chord and context.
  *
+ * @param {import('../types.js').EnsembleState} state
  * @param {any} chord - The current chord object.
  * @param {any} [nextChord] - The upcoming chord object (for resolution logic).
  * @param {string} [style] - The soloist or instrument style (e.g., 'smart', 'blues').
  * @returns {number[]} An array of semitone intervals representing the selected scale.
  */
-export function getScaleForChord(chord, nextChord = null, style = 'smart') {
-    /** @type {import('../types.js').EnsembleState} */
-    const state = getState();
+export function getScaleForChord(state, chord, nextChord = null, style = 'smart') {
     const { arranger, groove, soloist } = state;
     if (!chord) {
         return SCALE_INTERVALS.MAJOR;

@@ -201,6 +201,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 const sectionEnd = (section + 1) * 64;
 
                 getSoloistNote(
+                    getState(),
                     chord,
                     null,
                     sectionStart,
@@ -227,6 +228,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             const sectionEnd = 128;
 
             getSoloistNote(
+                getState(),
                 chord,
                 null,
                 0,
@@ -244,6 +246,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 soloist.restSteps = 0;
 
                 getSoloistNote(
+                    getState(),
                     chord,
                     null,
                     i,
@@ -274,7 +277,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             let gilmourNotes = 0;
             for (let i = 0; i < 5000; i++) {
                 if (
-                    getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, {
+                    getSoloistNote(getState(), chord, null, i, 440, 0, 'rock', i % 16, {
                         sectionEnd: 8192,
                     })
                 ) {
@@ -292,7 +295,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             let evhNotes = 0;
             for (let i = 0; i < 5000; i++) {
                 if (
-                    getSoloistNote(chord, null, i, 440, 0, 'rock', i % 16, {
+                    getSoloistNote(getState(), chord, null, i, 440, 0, 'rock', i % 16, {
                         sectionEnd: 8192,
                     })
                 ) {
@@ -313,7 +316,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
 
             let notesFound = 0;
             for (let i = -16; i < 0; i++) {
-                const note = getSoloistNote(chord, chord, i, 440, 0, 'rock', 0, {
+                const note = getSoloistNote(getState(), chord, chord, i, 440, 0, 'rock', 0, {
                     sectionStart: 0,
                     sectionEnd: 64,
                     bypassRhythm: false,
@@ -331,6 +334,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             arranger.totalSteps = 64;
 
             getSoloistNote(
+                getState(),
                 chord,
                 null,
                 0,
@@ -346,6 +350,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             let rotated = false;
             for (let i = 0; i < 20; i++) {
                 getSoloistNote(
+                    getState(),
                     chord,
                     null,
                     64,

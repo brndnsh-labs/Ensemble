@@ -1,5 +1,4 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getState } from '../state.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 
 /**
@@ -26,14 +25,13 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
 /**
  * Algorithmic Pattern Generator
  * Replaces static PIANO_CELLS table to save space and increase variety.
+ * @param {import('../types.js').EnsembleState} state
  * @param {string} genre
  * @param {string} vibe
  * @param {any} tsConfig
  * @param {number} [length]
  */
-export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
-    /** @type {import('../types.js').EnsembleState} */
-    const state = getState();
+export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16) {
     const { playback } = state;
     const pattern = new Array(length).fill(0);
     const intensity = playback.bandIntensity;
@@ -241,13 +239,14 @@ export function generateCompingPattern(genre, vibe, tsConfig, length = 16) {
 }
 
 /**
+ * @param {import('../types.js').EnsembleState} state
  * @param {number} step
  * @param {boolean} soloistBusy
  * @param {number} [spm]
  * @param {string|null} [sectionId]
  */
-function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
-    const { playback, chords, groove, arranger } = getState();
+function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = null) {
+    const { playback, chords, groove, arranger } = state;
     /** @type {any} */
     const signatures = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
@@ -338,11 +337,11 @@ function updateRhythmicIntent(step, soloistBusy, spm = 16, sectionId = null) {
 
     // Replace static lookup with procedural generation
     // IMPLEMENT NO-REPEAT RULE: Keep trying until we get a different pattern (up to 3 times)
-    let newCell = generateCompingPattern(genre, compingState.currentVibe, ts, spm);
+    let newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
     if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-        newCell = generateCompingPattern(genre, compingState.currentVibe, ts, spm);
+        newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
         if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-            newCell = generateCompingPattern(genre, compingState.currentVibe, ts, spm);
+            newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
         }
     }
     compingState.currentCell = newCell;
@@ -442,6 +441,7 @@ function handleSustainEvents(
 /**
  * Main entry point for generating accompaniment notes.
  * Returns an array of standardized Note Objects.
+ * @param {import('../types.js').EnsembleState} state
  * @param {any} chord
  * @param {number} step
  * @param {number} stepInChord
@@ -451,6 +451,7 @@ function handleSustainEvents(
  * @returns {Array<any>}
  */
 export function getAccompanimentNotes(
+    state,
     chord,
     step,
     stepInChord,
@@ -458,7 +459,7 @@ export function getAccompanimentNotes(
     stepInfo,
     coordination = {},
 ) {
-    const { playback, arranger, chords, bass, soloist, groove, harmony } = getState();
+    const { playback, arranger, chords, bass, soloist, groove, harmony } = state;
     if (!chords.enabled || !chord) {
         return [];
     }
@@ -486,7 +487,7 @@ export function getAccompanimentNotes(
     // Rhythmic Yielding (Contract Compliance)
     const isSoloistBusy =
         coordination?.soloistBusy || (soloist.enabled && (soloist.busySteps || 0) > 0);
-    updateRhythmicIntent(step, isSoloistBusy, spm, chord.sectionId);
+    updateRhythmicIntent(state, step, isSoloistBusy, spm, chord.sectionId);
 
     if (isSoloistBusy && step % 16 !== 0 && Math.random() < 0.7) {
         // Yield density to busy soloist: Skip offbeats and less-foundational hits

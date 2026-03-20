@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 
 // Define mockState in a way that vi.mock can capture it
 const { testState } = vi.hoisted(() => ({
@@ -55,7 +56,7 @@ describe('Soloist Musicality & Thematic Integrity', () => {
         const iterations = 200;
 
         for (let i = 0; i < iterations; i++) {
-            const note = getSoloistNote(chord, chord, i, null, 64, 'scalar', i % 16);
+            const note = getSoloistNote(getState(), chord, chord, i, null, 64, 'scalar', i % 16);
             if (note) {
                 totalNotes++;
                 const primary = Array.isArray(note) ? note[0] : note;
@@ -75,7 +76,7 @@ describe('Soloist Musicality & Thematic Integrity', () => {
         const iterations = 100;
 
         for (let i = 0; i < iterations; i++) {
-            const note = getSoloistNote(chord, chord, i, null, 64, 'scalar', i % 16);
+            const note = getSoloistNote(getState(), chord, chord, i, null, 64, 'scalar', i % 16);
             if (note) {
                 const primary = Array.isArray(note) ? note[0] : note;
                 expect(primary.midi).toBeGreaterThanOrEqual(40);

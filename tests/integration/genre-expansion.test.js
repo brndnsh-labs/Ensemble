@@ -88,7 +88,9 @@ describe('Genre Expansion Integration', () => {
 
         it('should generate alternating bass on beats 1 and 3 for chords', () => {
             // Beat 1 (Step 0) -> Root Bass
-            const notes1 = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
+            const notes1 = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+            });
             expect(notes1.length).toBeGreaterThan(0);
             // Should be single note (Bass) usually around rootMidi
             // Our logic: notes.push({ midi: note ... })
@@ -98,21 +100,25 @@ describe('Genre Expansion Integration', () => {
             expect(bassNote.durationSteps).toBe(2);
 
             // Beat 3 (Step 8) -> Fifth Bass (usually)
-            const notes3 = getAccompanimentNotes(mockChord, 8, 0, 8, { isBeatStart: true });
+            const notes3 = getAccompanimentNotes(getState(), mockChord, 8, 0, 8, {
+                isBeatStart: true,
+            });
             // Should ideally trigger the fifth logic or at least a bass note
             expect(notes3.length).toBeGreaterThan(0);
         });
 
         it('should generate strums on beats 2 and 4', () => {
             // Beat 2 (Step 4)
-            const notes2 = getAccompanimentNotes(mockChord, 4, 0, 4, { isBeatStart: true });
+            const notes2 = getAccompanimentNotes(getState(), mockChord, 4, 0, 4, {
+                isBeatStart: true,
+            });
             // Expect full voicing (3 notes)
             expect(notes2.length).toBeGreaterThanOrEqual(2);
             expect(notes2[0].durationSteps).toBe(2);
         });
 
         it('should use Country scale for soloist', () => {
-            const scale = getScaleForChord(mockChord, null, 'country');
+            const scale = getScaleForChord(getState(), mockChord, null, 'country');
             // Country scale logic: Major Pentatonic [0, 2, 4, 7, 9]
             expect(scale).toContain(2);
             expect(scale).toContain(4); // Major 3rd
@@ -137,7 +143,9 @@ describe('Genre Expansion Integration', () => {
 
         it('should generate power chords (root+5) on 8th notes', () => {
             // Step 0 (Downbeat)
-            const notes = getAccompanimentNotes(mockChord, 0, 0, 0, { isBeatStart: true });
+            const notes = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+            });
             // Power chord: Root, 5th, Octave
             expect(notes.length).toBeGreaterThanOrEqual(2);
             const intervals = notes.map((n) => n.midi - 48);
@@ -147,14 +155,14 @@ describe('Genre Expansion Integration', () => {
         });
 
         it('should use Metal scale for soloist', () => {
-            const scale = getScaleForChord(mockChord, null, 'metal');
+            const scale = getScaleForChord(getState(), mockChord, null, 'metal');
             // Metal (Minor): [0, 2, 3, 5, 7, 8, 10]
             expect(scale).toContain(3); // Minor 3rd
             expect(scale).toContain(8); // Minor 6th
         });
 
         it('should produce galloping bass logic', () => {
-            const bassNote = getBassNote(mockChord, null, 0, 48, 36, 'metal', 0, 0, 0);
+            const bassNote = getBassNote(getState(), mockChord, null, 0, 48, 36, 'metal', 0, 0, 0);
             expect(bassNote).not.toBeNull();
             // Should be 8th note duration (step % (stepsPerBeat/2) === 0)
             // 4/4 stepsPerBeat is 4. Subdiv is 2. 0 % 2 === 0.

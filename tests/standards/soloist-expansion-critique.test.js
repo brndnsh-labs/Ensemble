@@ -77,6 +77,7 @@ describe('Soloist Expansion Critique', () => {
             const chord = progression[bar % 4];
             for (let step = 0; step < 16; step++) {
                 const note = getSoloistNote(
+                    getState(),
                     chord,
                     chord,
                     bar * 16 + step,

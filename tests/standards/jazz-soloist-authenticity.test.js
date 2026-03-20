@@ -23,6 +23,7 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
                 soloist.restSteps = 0;
             }
             getSoloistNote(
+                getState(),
                 chord,
                 null,
                 i,
@@ -61,6 +62,7 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
             const sectionEnd = (section + 1) * 64;
 
             getSoloistNote(
+                getState(),
                 chord,
                 null,
                 sectionStart,
@@ -96,6 +98,7 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
 
         for (let i = 1; i < 201; i++) {
             const note = getSoloistNote(
+                getState(),
                 chord,
                 null,
                 i,

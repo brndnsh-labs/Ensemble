@@ -120,7 +120,6 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
                 clearTimeout(playback.suspendTimeout);
             }
             playback.suspendTimeout = /** @type {any} */ (
-                // @direct-mutation
                 setTimeout(() => {
                     if (
                         !playback.isPlaying &&
@@ -345,7 +344,7 @@ export function scheduler(state, dispatch = undefined) {
                 }
 
                 scheduleGlobalEvent(state, playback.step, playback.nextNoteTime, dispatch);
-                advanceGlobalStep(state);
+                advanceGlobalStep(state, dispatch);
             }
         }
     } finally {
@@ -475,10 +474,11 @@ function scheduleCountIn(state, beat, time) {
     );
 
     const soloistNote = getSoloistNote(
+        state,
         firstChord,
         firstChord,
         pickupStep,
-        soloist.lastFreq,
+        /** @type {any} */ (soloist.lastFreq),
         soloist.octave,
         /** @type {any} */ (soloist.style),
         0,
@@ -517,10 +517,13 @@ function scheduleCountIn(state, beat, time) {
 
 /**
  * @param {import('../types.js').EnsembleState} state
+ * @param {Function} [dispatch]
  */
-function advanceGlobalStep(state) {
+function advanceGlobalStep(state, dispatch = undefined) {
     const { playback, groove, arranger, conductor } = state;
-    updateLarsTempo(playback.step);
+    if (dispatch) {
+        updateLarsTempo(state, playback.step, dispatch);
+    }
     const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
     const sixteenth = 0.25 * (60.0 / effectiveBpm);
     let duration = sixteenth;
@@ -1142,7 +1145,9 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
     const stepInfo = getStepInfo(step, globalTS, arranger.measureMap, signatures);
     const ts = signatures[stepInfo.tsName || '4/4'] || globalTS;
 
-    updateAutoConductor();
+    if (dispatch) {
+        updateAutoConductor(state, dispatch);
+    }
 
     // --- NEW: Rhythm Section Mask Calculation ---
     // Extract the snare pattern for the current measure to share with the ensemble
@@ -1168,7 +1173,9 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
         }
     }
 
-    checkSectionTransition(step, spm);
+    if (dispatch) {
+        checkSectionTransition(state, step, spm, dispatch);
+    }
 
     // MIDI Automation
     dispatchMidiAutomation(state, stepInfo, swungTime);

@@ -1,4 +1,3 @@
-import { getState } from '../state.js';
 import { binarySearchMap, calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -28,6 +27,7 @@ export function resetBassState(state) {
 }
 
 /**
+ * @param {import('../types.js').EnsembleState} state
  * @param {string} style
  * @param {number} step
  * @param {number} stepInChord
@@ -35,8 +35,8 @@ export function resetBassState(state) {
  * @param {any} [coordination]
  * @returns {boolean}
  */
-export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
-    const { playback, groove, arranger } = getState();
+export function isBassActive(state, style, step, stepInChord, stepInfo, coordination) {
+    const { playback, groove, arranger } = state;
 
     // Rhythmic Yielding: Lock to Kick if available
     if (coordination?.kickHit) {
@@ -89,6 +89,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
 }
 
 /**
+ * @param {import('../types.js').EnsembleState} state
  * @param {any} chord
  * @param {any} nextChord
  * @param {number} _beatInMeasure
@@ -103,6 +104,7 @@ export function isBassActive(style, step, stepInChord, stepInfo, coordination) {
  * @returns {any}
  */
 export function getBassNote(
+    state,
     chord,
     nextChord,
     _beatInMeasure,
@@ -115,7 +117,7 @@ export function getBassNote(
     context = {},
     stepInfo,
 ) {
-    const { playback, groove, soloist, arranger } = getState();
+    const { playback, groove, soloist, arranger } = state;
     if (!chord) {
         return null;
     }
@@ -184,7 +186,6 @@ export function getBassNote(
             } else {
                 // Slower fallback if sectionMap is missing (should not happen in normal flow)
                 const currentSectionId = /** @type {any} */ (entry.chord).sectionId;
-                const { arranger } = getState();
                 const sectionEntries = arranger.stepMap.filter(
                     (/** @type {any} */ e) =>
                         /** @type {any} */ (e.chord).sectionId === currentSectionId,
@@ -314,7 +315,7 @@ export function getBassNote(
     const baseRoot = normalizeToRange(rootToNormalize);
 
     // --- SCALE RETRIEVAL (Refactored) ---
-    const scale = getScaleForChord(chord, nextChord, style);
+    const scale = getScaleForChord(state, chord, nextChord, style);
 
     const beatsInChord = Math.round(chord.beats);
     const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;

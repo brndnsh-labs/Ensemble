@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { SMART_GENRES } from '../../public/data/smart-genres.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
@@ -82,7 +83,16 @@ describe('Soloist Smart Genre Statistics', () => {
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
 
-            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure);
+            const res = getSoloistNote(
+                getState(),
+                chord,
+                chord,
+                s,
+                440,
+                60,
+                'smart',
+                stepInMeasure,
+            );
 
             if (res) {
                 const notes = Array.isArray(res) ? res : [res];
@@ -189,6 +199,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 }
 
                 const res = getSoloistNote(
+                    getState(),
                     { rootMidi: 60, intervals: [0, 4, 7] },
                     { rootMidi: 60, intervals: [0, 4, 7] },
                     s,
@@ -245,6 +256,7 @@ describe('Soloist Smart Genre Statistics', () => {
         const totalMeasures = 128;
         for (let s = 0; s < totalMeasures * 16; s++) {
             const res = getSoloistNote(
+                getState(),
                 { rootMidi: 60, intervals: [0, 4, 7] },
                 null,
                 s,
@@ -328,6 +340,7 @@ describe('Soloist Smart Genre Statistics', () => {
             for (let s = 0; s < totalMeasures * 16; s++) {
                 const wasResting = mockState.soloist.isResting;
                 const res = getSoloistNote(
+                    getState(),
                     { rootMidi: 60, intervals: [0, 4, 7] },
                     null,
                     s,
@@ -437,7 +450,16 @@ describe('Soloist Smart Genre Statistics', () => {
                 mockState.playback.currentLoopCount = Math.floor(measure / progression.length);
 
                 const stepInMeasure = s % 16;
-                const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure);
+                const res = getSoloistNote(
+                    getState(),
+                    chord,
+                    chord,
+                    s,
+                    440,
+                    60,
+                    'smart',
+                    stepInMeasure,
+                );
                 if (res) {
                     count += Array.isArray(res) ? res.length : 1;
                 }

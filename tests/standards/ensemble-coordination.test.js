@@ -42,6 +42,7 @@ describe('Ensemble Coordination Contract', () => {
             }; // C4
             const context = { kickHit: true };
             const bassResult = getBassNote(
+                getState(),
                 chord,
                 null,
                 0,
@@ -70,6 +71,7 @@ describe('Ensemble Coordination Contract', () => {
             }; // C4
             const context = { soloistBusy: false };
             const chordNotes = getAccompanimentNotes(
+                getState(),
                 chord,
                 0,
                 0,
@@ -141,9 +143,20 @@ describe('Ensemble Coordination Contract', () => {
             // This test verifies the context is accepted and accessible
             const chord = { rootMidi: 60, intervals: [0, 4, 7] };
             const context = { isMeasureEnd: true };
-            const _note = getSoloistNote(chord, null, 12, 440, 0, 'scalar', 12, context, {
-                mStep: 12,
-            });
+            const _note = getSoloistNote(
+                getState(),
+                chord,
+                null,
+                12,
+                440,
+                0,
+                'scalar',
+                12,
+                context,
+                {
+                    mStep: 12,
+                },
+            );
 
             // We don't assert density here due to randomness,
             // but we ensure the function executes with the new context without error.
@@ -154,7 +167,14 @@ describe('Ensemble Coordination Contract', () => {
     describe('Rhythmic Yielding Hierarchy', () => {
         it('Bass locks rhythm to Kick drum', () => {
             const context = { kickHit: true };
-            const isActive = isBassActive('whole', 4, 4, { isBeatStart: true }, context);
+            const isActive = isBassActive(
+                getState(),
+                'whole',
+                4,
+                4,
+                { isBeatStart: true },
+                context,
+            );
 
             expect(isActive).toBe(true);
         });
@@ -167,6 +187,7 @@ describe('Ensemble Coordination Contract', () => {
             Math.random = () => 0.1; // Force yielding
 
             const chordResultBusyForced = getAccompanimentNotes(
+                getState(),
                 chord,
                 step,
                 step,

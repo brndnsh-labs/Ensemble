@@ -49,6 +49,7 @@ function analyzeNarrative(genre = 'Rock', bpm = 102, minutes = 3, intensity = 0.
     for (let s = -stepsPerMeasure; s < totalSteps; s++) {
         const stepInfo = getStepInfo(s, ts, null, TIME_SIGNATURES);
         const res = getSoloistNote(
+            getState(),
             chord,
             chord,
             s,
@@ -56,7 +57,6 @@ function analyzeNarrative(genre = 'Rock', bpm = 102, minutes = 3, intensity = 0.
             0,
             'smart',
             0,
-            false,
             { sectionStart: 0, sectionEnd: 64, bypassRhythm: false },
             stepInfo,
         );

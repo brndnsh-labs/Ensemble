@@ -39,6 +39,7 @@ function deepDiveSession(genre = 'Rock', bpm = 102, measures = 32, intensity = 0
     for (let s = 0; s < arranger.totalSteps; s++) {
         const stepInfo = getStepInfo(s, ts, null, TIME_SIGNATURES);
         const res = getSoloistNote(
+            getState(),
             chord,
             chord,
             s,
@@ -46,7 +47,6 @@ function deepDiveSession(genre = 'Rock', bpm = 102, measures = 32, intensity = 0
             0,
             'smart',
             s % 16,
-            false,
             { sectionStart: 0, sectionEnd: 64, bypassRhythm: false },
             stepInfo,
         );

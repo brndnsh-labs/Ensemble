@@ -78,8 +78,9 @@ describe('Arrangement Integrity & Clutter Audit', () => {
             };
 
             // 1. Bass
-            if (isBassActive(state.bass.style, s, s)) {
+            if (isBassActive(getState(), state.bass.style, s, s)) {
                 const b = getBassNote(
+                    getState(),
                     chord,
                     null,
                     s / 4,
@@ -100,6 +101,7 @@ describe('Arrangement Integrity & Clutter Audit', () => {
 
             // 2. Soloist
             const sol = getSoloistNote(
+                getState(),
                 chord,
                 null,
                 s,
@@ -107,7 +109,6 @@ describe('Arrangement Integrity & Clutter Audit', () => {
                 60,
                 'smart',
                 s,
-                false,
                 { stepCoordination: coordination },
             );
             if (sol) {
@@ -123,6 +124,7 @@ describe('Arrangement Integrity & Clutter Audit', () => {
 
             // 3. Accompaniment
             const acc = getAccompanimentNotes(
+                getState(),
                 chord,
                 s,
                 s,
@@ -208,6 +210,7 @@ describe('Arrangement Integrity & Clutter Audit', () => {
         for (let s = 0; s < steps; s++) {
             const coordQuiet = { soloistActive: false };
             const notesQuiet = getAccompanimentNotes(
+                getState(),
                 chord,
                 s,
                 s % 16,
@@ -221,6 +224,7 @@ describe('Arrangement Integrity & Clutter Audit', () => {
 
             const coordBusy = { soloistActive: true };
             const notesBusy = getAccompanimentNotes(
+                getState(),
                 chord,
                 s,
                 s % 16,

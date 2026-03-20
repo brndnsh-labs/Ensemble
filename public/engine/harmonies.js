@@ -1,5 +1,4 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getState } from '../state.js';
 import { calculateTimingOffset } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
 import { getWorkerState } from './worker-orchestrator.js';
@@ -14,15 +13,13 @@ let lastPlayedStep = -1;
 
 /**
  * Clears the internal motif memory. Used for section changes or testing.
- * @param {import('../types.js').EnsembleState} [state]
+ * @param {import('../types.js').EnsembleState} state
  */
 export function clearHarmonyMemory(state) {
-    // If state is not provided, try to get it from worker context or global state
-    const targetState = state || (typeof window === 'undefined' ? getWorkerState() : getState());
-    if (!targetState) {
+    if (!state) {
         return;
     }
-    const { harmony } = targetState;
+    const { harmony } = state;
     motifCache.clear();
     harmony.lastMidis = []; // @worker-mutation
     lastPlayedStep = -1;

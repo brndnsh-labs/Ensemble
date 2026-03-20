@@ -93,7 +93,7 @@ describe('Groove Section Memory (Creativity)', () => {
         mockGroove.sectionSeedMap.verse_id = 0.42;
 
         for (let step = 0; step < 64; step++) {
-            checkSectionTransition(step, stepsPerMeasure);
+            checkSectionTransition(getState(), step, stepsPerMeasure, dispatch);
             const entry = mockArranger.stepMap.find((e) => step >= e.start && step < e.end);
             const sectionId = entry.chord.sectionId;
             const seed = mockGroove.sectionSeedMap[sectionId];

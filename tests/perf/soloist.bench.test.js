@@ -93,7 +93,7 @@ describe('Soloist Performance Benchmark', () => {
             soloist.busySteps = 0;
             soloist.deviceBuffer = [];
 
-            getSoloistNote(chordC, null, i, 440, 72, 'scalar', i % 16);
+            getSoloistNote(getState(), chordC, null, i, 440, 72, 'scalar', i % 16);
         }
 
         const end = performance.now();

@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import { SMART_GENRES } from '../../public/data/smart-genres.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
@@ -72,7 +73,16 @@ describe('Soloist Phrasing Debugger', () => {
 
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
-            const res = getSoloistNote(chord, chord, s, 440, 60, 'smart', stepInMeasure);
+            const res = getSoloistNote(
+                getState(),
+                chord,
+                chord,
+                s,
+                440,
+                60,
+                'smart',
+                stepInMeasure,
+            );
 
             const status = mockState.soloist.isResting ? 'REST' : 'PLAY';
             const noteChar = res ? '♫' : '.';

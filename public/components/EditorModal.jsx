@@ -12,12 +12,14 @@ const { arranger } = getState();
 import {
     addSection,
     clearChordPresetHighlight,
+    mutateProgression,
     refreshArrangerUI,
     saveProgression,
+    transformRelativeProgression,
     validateAndAnalyze,
+    validateProgression,
 } from '../arranger-controller.js';
 import { KEY_ORDER } from '../config.js';
-import { mutateProgression, transformRelativeProgression } from '../engine/chords-engine.js';
 import { pushHistory, undo } from '../history.js';
 import { shareProgression } from '../sharing.js';
 import { ACTIONS } from '../types.js';
@@ -233,7 +235,6 @@ export function EditorModal(_props) {
         if (newSections) {
             dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
             // Re-validate to update the stepMap/progression
-            const { validateProgression } = await import('../engine/chords-engine.js');
             validateProgression(getState());
             syncWorker();
         }

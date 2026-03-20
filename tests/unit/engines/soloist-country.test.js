@@ -56,19 +56,19 @@ describe('Country Soloist Overhaul', () => {
 
     describe('Harmonic Accuracy', () => {
         it('should use pure Major Pentatonic for Major chords in Country style', () => {
-            const scale = getScaleForChord(chordC, null, 'country');
+            const scale = getScaleForChord(getState(), chordC, null, 'country');
             // Expected: [0, 2, 4, 7, 9] (Major Pentatonic)
             expect(scale).toEqual([0, 2, 4, 7, 9]);
         });
 
         it('should use Major Pentatonic + b3 if tension is high', () => {
             soloist.tension = 0.8;
-            const scale = getScaleForChord(chordC, null, 'country');
+            const scale = getScaleForChord(getState(), chordC, null, 'country');
             expect(scale).toEqual([0, 2, 3, 4, 7, 9]);
         });
 
         it('should use Minor Pentatonic for Minor chords in Country style', () => {
-            const scale = getScaleForChord(chordAm, null, 'country');
+            const scale = getScaleForChord(getState(), chordAm, null, 'country');
             // Expected: [0, 3, 5, 7, 10] (Minor Pentatonic)
             expect(scale).toEqual([0, 3, 5, 7, 10]);
         });
@@ -88,7 +88,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
 
@@ -115,7 +115,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
 
@@ -145,7 +145,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (soloist.deviceBuffer.length === 3) {
@@ -170,7 +170,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (res && !Array.isArray(res) && res.bendStartInterval === 1) {
@@ -196,7 +196,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (Array.isArray(res)) {
@@ -224,7 +224,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (res) {
@@ -251,7 +251,7 @@ describe('Country Soloist Overhaul', () => {
                 soloist.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'country', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
                 if (res) {

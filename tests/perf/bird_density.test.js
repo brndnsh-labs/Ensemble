@@ -117,6 +117,7 @@ function runSimulation(bpm, steps = 256) {
     for (let i = 0; i < steps; i++) {
         const stepInChord = i % 16;
         const res = getSoloistNote(
+            getState(),
             currentChord,
             nextChord,
             i,

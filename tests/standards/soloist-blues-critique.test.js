@@ -76,6 +76,7 @@ describe('Soloist Blues Critique', () => {
             const chord = progression[bar % 12];
             for (let step = 0; step < 16; step++) {
                 const note = getSoloistNote(
+                    getState(),
                     chord,
                     chord,
                     bar * 16 + step,

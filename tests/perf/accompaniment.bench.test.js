@@ -35,7 +35,9 @@ describe('Accompaniment Performance', () => {
             // Simulate stepping through a measure
             // We pass different step values to force some logic execution
             const step = i % 16;
-            getAccompanimentNotes(mockChord, i, step, step, { isBeatStart: step % 4 === 0 });
+            getAccompanimentNotes(getState(), mockChord, i, step, step, {
+                isBeatStart: step % 4 === 0,
+            });
         }
 
         const end = performance.now();

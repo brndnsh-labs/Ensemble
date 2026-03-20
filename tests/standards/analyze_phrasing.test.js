@@ -5,7 +5,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it, vi } from 'vitest';
+import { getSoloistNote } from '../../public/engine/soloist.js';
 import { parseMusicXML } from '../../public/musicxml-parser.js';
+import { getState } from '../../public/state.js';
 
 const fixturesDir = path.join(__dirname, '../fixtures/musicxml');
 
@@ -112,9 +114,6 @@ const files = [
     { name: 'Ornithology.xml', ts: '4/4' },
 ];
 
-// Simulate Soloist Engine over the same progressions
-import { getSoloistNote } from '../../public/engine/soloist.js';
-
 // We need to mock the dispatch and getState from state.js
 let { mockState } = vi.hoisted(() => ({ mockState: {} }));
 vi.mock('../../public/state.js', () => ({
@@ -151,7 +150,7 @@ function simulateEngine(totalSteps, timeSignature = '4/4', style = 'bird') {
 
     for (let step = 0; step < totalSteps; step++) {
         const stepInMeasure = step % (stepsPerBeat * beatsPerMeasure);
-        const note = getSoloistNote(chord, chord, step, null, 64, style, stepInMeasure);
+        const note = getSoloistNote(getState(), chord, chord, step, null, 64, style, stepInMeasure);
 
         if (note && Array.isArray(note)) {
             engineMelody.push({

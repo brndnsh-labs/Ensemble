@@ -87,7 +87,7 @@ describe('Soloist Trading Logic', () => {
         // measureEnd = 32. Step 32 is in s2.
         // s1 !== s2 -> TRIGGER.
 
-        checkSectionTransition(16, stepsPerMeasure);
+        checkSectionTransition(getState(), 16, stepsPerMeasure, dispatch);
 
         expect(getState().soloist.enabled).toBe(false);
     });
@@ -104,18 +104,18 @@ describe('Soloist Trading Logic', () => {
         ];
 
         // Transition 1: A -> B (at step 16 triggers for end at 32)
-        checkSectionTransition(16, stepsPerMeasure);
+        checkSectionTransition(getState(), 16, stepsPerMeasure, dispatch);
         expect(state.soloist.enabled).toBe(false);
         expect(state.soloist.isYielding).toBe(true);
 
         // Transition 2: B -> C (at step 48 triggers for end at 64)
-        checkSectionTransition(48, stepsPerMeasure);
+        checkSectionTransition(getState(), 48, stepsPerMeasure, dispatch);
         expect(state.soloist.enabled).toBe(true);
         expect(state.soloist.isYielding).toBe(false);
         expect(state.soloist.isWaitingForEntry).toBe(true);
 
         // Transition 3: C -> A (at step 80 triggers for end at 96)
-        checkSectionTransition(80, stepsPerMeasure);
+        checkSectionTransition(getState(), 80, stepsPerMeasure, dispatch);
         expect(state.soloist.enabled).toBe(false);
         expect(state.soloist.isYielding).toBe(true);
     });

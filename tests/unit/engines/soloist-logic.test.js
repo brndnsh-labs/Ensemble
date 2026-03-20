@@ -120,7 +120,7 @@ describe('Soloist Engine Logic', () => {
     const _chordF = { rootMidi: 65, intervals: [0, 4, 7], quality: 'major', beats: 4 };
 
     beforeEach(() => {
-        clearHarmonyMemory();
+        clearHarmonyMemory(getState());
         soloist.isResting = false;
         soloist.activeSteps = 100;
         soloist.restSteps = 0;
@@ -140,7 +140,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                note = getSoloistNote(chordC, null, i * 4, 440, 72, 'scalar', 0, {
+                note = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'scalar', 0, {
                     bypassRhythm: true,
                 });
                 if (note) {
@@ -156,7 +156,7 @@ describe('Soloist Engine Logic', () => {
             soloist.notesInPhrase = 20;
             let rests = 0;
             for (let i = 0; i < 100; i++) {
-                if (!getSoloistNote(chordC, null, i + 32, 440, 72, 'scalar', i % 4)) {
+                if (!getSoloistNote(getState(), chordC, null, i + 32, 440, 72, 'scalar', i % 4)) {
                     rests++;
                 }
             }
@@ -184,9 +184,19 @@ describe('Soloist Engine Logic', () => {
                     soloist.isResting = false;
                     soloist.currentPhraseSteps = 0;
                     soloist.lastAttackStep = -100;
-                    const res = getSoloistNote(chordC, null, i * 4, 440, 72, t.style, 0, {
-                        bypassRhythm: true,
-                    });
+                    const res = getSoloistNote(
+                        getState(),
+                        chordC,
+                        null,
+                        i * 4,
+                        440,
+                        72,
+                        t.style,
+                        0,
+                        {
+                            bypassRhythm: true,
+                        },
+                    );
                     // Check buffer OR immediate double stop result (Quartal/GuitarDouble)
                     if (
                         soloist.deviceBuffer.length > 0 ||
@@ -208,7 +218,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const result = getSoloistNote(chordC, null, i * 4, 440, 72, 'bird', 0, {
+                const result = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'bird', 0, {
                     bypassRhythm: true,
                 });
                 if (result) {
@@ -229,9 +239,19 @@ describe('Soloist Engine Logic', () => {
                 soloist.isResting = false;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const noteResult = getSoloistNote(chordC, chordC, i * 4, 261.63, 72, 'smart', 0, {
-                    bypassRhythm: true,
-                });
+                const noteResult = getSoloistNote(
+                    getState(),
+                    chordC,
+                    chordC,
+                    i * 4,
+                    261.63,
+                    72,
+                    'smart',
+                    0,
+                    {
+                        bypassRhythm: true,
+                    },
+                );
                 if (noteResult) {
                     played++;
                     const primary = Array.isArray(noteResult)
@@ -259,7 +279,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.lastAttackStep = -100;
                 if (
                     Array.isArray(
-                        getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', i % 16, {
+                        getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'blues', i % 16, {
                             bypassRhythm: true,
                         }),
                     )
@@ -282,6 +302,7 @@ describe('Soloist Engine Logic', () => {
                     }
                 }
                 const result = getSoloistNote(
+                    getState(),
                     chordC,
                     null,
                     step + 16,
@@ -304,18 +325,20 @@ describe('Soloist Engine Logic', () => {
     describe('Scale Selection & Harmonic Integrity', () => {
         it('should select Altered scale when tension is high', () => {
             soloist.tension = 0.8;
-            expect(getScaleForChord(chordC, null, 'bird')).toEqual([0, 1, 3, 4, 6, 8, 10]);
+            expect(getScaleForChord(getState(), chordC, null, 'bird')).toEqual([
+                0, 1, 3, 4, 6, 8, 10,
+            ]);
         });
 
         it('should select Phrygian Dominant for V7 to minor resolution', () => {
             const G7 = { rootMidi: 67, intervals: [0, 4, 7, 10], quality: '7' };
             const Cm = { rootMidi: 60, intervals: [0, 3, 7], quality: 'minor' };
-            expect(getScaleForChord(G7, Cm, 'bird')).toEqual([0, 1, 4, 5, 7, 8, 10]);
+            expect(getScaleForChord(getState(), G7, Cm, 'bird')).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
 
         it('should use Aeolian for vi chord in Neo-Soul to avoid clashes', () => {
             const viChord = { rootMidi: 57, quality: 'minor', intervals: [0, 3, 7], key: 'C' };
-            const scale = getScaleForChord(viChord, null, 'neo');
+            const scale = getScaleForChord(getState(), viChord, null, 'neo');
             // UPDATED: Better Theory engine prefers Dorian (9) for Neo-Soul minor chords for color
             expect(scale).toContain(9);
             expect(scale).not.toContain(8);
@@ -328,7 +351,7 @@ describe('Soloist Engine Logic', () => {
                 intervals: [0, 3, 7, 10, 14],
                 isMinor: true,
             };
-            const scale = getScaleForChord(m9Chord, null, 'funk');
+            const scale = getScaleForChord(getState(), m9Chord, null, 'funk');
             expect(scale).toContain(3); // Minor 3rd
             expect(scale).not.toContain(4); // No Major 3rd
         });
@@ -340,7 +363,7 @@ describe('Soloist Engine Logic', () => {
                 intervals: [0, 3, 7, 10, 14, 17],
                 isMinor: true,
             };
-            const scale = getScaleForChord(m11Chord, null, 'neo');
+            const scale = getScaleForChord(getState(), m11Chord, null, 'neo');
             expect(scale).toContain(3);
             expect(scale).toContain(10);
             expect(scale).not.toContain(4);
@@ -353,7 +376,7 @@ describe('Soloist Engine Logic', () => {
                 intervals: [0, 4, 7, 10, 14, 21],
                 isMinor: false,
             }; // F13
-            const scale = getScaleForChord(IV13, null, 'funk');
+            const scale = getScaleForChord(getState(), IV13, null, 'funk');
             expect(scale).toContain(4); // Major 3rd
             expect(scale).toContain(10); // Minor 7th
             expect(scale).toContain(9); // 13th (Major 6th)
@@ -361,7 +384,7 @@ describe('Soloist Engine Logic', () => {
 
         it('should correctly handle m6 chords (Dorian/Melodic Minor)', () => {
             const m6Chord = { rootMidi: 60, quality: 'm6', intervals: [0, 3, 7, 9], isMinor: true };
-            const scale = getScaleForChord(m6Chord, null, 'bird');
+            const scale = getScaleForChord(getState(), m6Chord, null, 'bird');
             expect(scale).toContain(3);
             expect(scale).toContain(9);
         });
@@ -420,7 +443,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.busySteps = 0;
                 soloist.notesInPhrase = 0;
                 soloist.lastAttackStep = -100;
-                const res = getSoloistNote(chord, null, i * 4, 440, 72, 'blues', 0, {
+                const res = getSoloistNote(getState(), chord, null, i * 4, 440, 72, 'blues', 0, {
                     bypassRhythm: true,
                 });
                 if (res && res.bendStartInterval !== 0) {
@@ -442,7 +465,7 @@ describe('Soloist Engine Logic', () => {
                 soloist.activeSteps = 100;
                 soloist.busySteps = 0;
                 soloist.lastAttackStep = -100;
-                const res = getSoloistNote(chordC, null, i * 4, 440, 72, 'blues', 0, {
+                const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'blues', 0, {
                     bypassRhythm: true,
                 });
                 if (Array.isArray(res)) {
@@ -480,6 +503,7 @@ describe('Soloist Engine Logic', () => {
                     soloist.busySteps = 0;
                     // Note: We DON'T reset lastAttackStep here because we WANT the gap protection to work naturally across steps
                     const res = getSoloistNote(
+                        getState(),
                         chord,
                         nextChord,
                         stepIdx + bar * 16,

@@ -118,7 +118,7 @@ describe('Soloist Mode Differentiation Logic', () => {
         // the final result is handled correctly based on mode.
         // But the logic in soloist.js skips extraNotes if !isPolyphonic.
 
-        const note = getSoloistNote(currentChord, null, 0, 440, 60, 'scalar', 0);
+        const note = getSoloistNote(getState(), currentChord, null, 0, 440, 60, 'scalar', 0);
         expect(Array.isArray(note)).toBe(false);
     });
 
@@ -132,9 +132,19 @@ describe('Soloist Mode Differentiation Logic', () => {
         // Try up to 1000 times to get a double stop (usually takes ~10-20)
         while (attempts < 1000) {
             state.soloist.busySteps = 0;
-            note = getSoloistNote(currentChord, null, attempts * 4, 261.63, 60, 'scalar', 0, {
-                bypassRhythm: true,
-            });
+            note = getSoloistNote(
+                getState(),
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'scalar',
+                0,
+                {
+                    bypassRhythm: true,
+                },
+            );
             if (Array.isArray(note)) {
                 break;
             }
@@ -161,9 +171,19 @@ describe('Soloist Mode Differentiation Logic', () => {
         let attempts = 0;
         while (attempts < 1000) {
             state.soloist.busySteps = 0;
-            note = getSoloistNote(currentChord, null, attempts * 4, 261.63, 60, 'scalar', 0, {
-                bypassRhythm: true,
-            });
+            note = getSoloistNote(
+                getState(),
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'scalar',
+                0,
+                {
+                    bypassRhythm: true,
+                },
+            );
             if (Array.isArray(note)) {
                 break;
             }
@@ -192,9 +212,19 @@ describe('Soloist Mode Differentiation Logic', () => {
         let foundQuartal = false;
         while (attempts < 1000) {
             state.soloist.busySteps = 0;
-            const note = getSoloistNote(currentChord, null, attempts * 4, 261.63, 60, 'neo', 0, {
-                bypassRhythm: true,
-            });
+            const note = getSoloistNote(
+                getState(),
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'smart',
+                0,
+                {
+                    bypassRhythm: true,
+                },
+            );
             if (Array.isArray(note)) {
                 const melody = note[note.length - 1];
                 const extra = note[0];
@@ -221,9 +251,19 @@ describe('Soloist Mode Differentiation Logic', () => {
         while (attempts < 5000) {
             state.soloist.busySteps = 0;
             // Devices usually only happen at stepInBeat === 0
-            const note = getSoloistNote(currentChord, null, attempts * 4, 261.63, 60, 'bird', 0, {
-                bypassRhythm: true,
-            });
+            const note = getSoloistNote(
+                getState(),
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'smart',
+                0,
+                {
+                    bypassRhythm: true,
+                },
+            );
             // Devices often return a single note initially (the grace note) and buffer the rest
             if (note && !Array.isArray(note) && state.soloist.deviceBuffer.length > 0) {
                 foundGraceNote = true;
@@ -243,9 +283,19 @@ describe('Soloist Mode Differentiation Logic', () => {
         let foundHendrixInt = false;
         while (attempts < 1000) {
             state.soloist.busySteps = 0;
-            const note = getSoloistNote(currentChord, null, attempts * 4, 261.63, 60, 'blues', 0, {
-                bypassRhythm: true,
-            });
+            const note = getSoloistNote(
+                getState(),
+                currentChord,
+                null,
+                attempts * 4,
+                261.63,
+                60,
+                'smart',
+                0,
+                {
+                    bypassRhythm: true,
+                },
+            );
             if (Array.isArray(note)) {
                 const melody = note[note.length - 1];
                 const extra = note[0];

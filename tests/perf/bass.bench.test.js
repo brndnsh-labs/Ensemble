@@ -99,7 +99,7 @@ describe('Bass Logic Performance', () => {
             // Cycle through steps 0-15 (one measure of 16th notes)
             const step = i % 16;
             // stepInChord is effectively same as step for this micro-benchmark
-            if (isBassActive(style, step, step)) {
+            if (isBassActive(getState(), style, step, step)) {
                 activeCount++;
             }
         }
@@ -131,6 +131,7 @@ describe('Bass Logic Performance', () => {
         const start = performance.now();
         for (let i = 0; i < ITERATIONS_LOOKUP; i++) {
             getBassNote(
+                getState(),
                 currentChord,
                 nextChord,
                 0,
@@ -151,6 +152,7 @@ describe('Bass Logic Performance', () => {
         const start = performance.now();
         for (let i = 0; i < ITERATIONS_LOOKUP; i++) {
             getBassNote(
+                getState(),
                 currentChord,
                 nextChord,
                 0,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 
 // Mock state
 vi.mock('../../public/state.js', () => ({
@@ -45,7 +46,7 @@ describe('Soloist Performance Benchmark', () => {
         const iterations = 50000;
 
         for (let i = 0; i < iterations; i++) {
-            getSoloistNote(currentChord, nextChord, i, prevFreq, octave, style, 0);
+            getSoloistNote(getState(), currentChord, nextChord, i, prevFreq, octave, style, 0);
         }
 
         const end = performance.now();

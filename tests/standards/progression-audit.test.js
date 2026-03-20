@@ -137,7 +137,7 @@ describe('Progression Audit: Verifying All Library Presets', () => {
             // We specifically check if 'Rich' density extensions clash with the soloist's scale
             arranger.progression.forEach((chord) => {
                 soloist.tension = 0; // Reset tension to avoid triggering Altered scale logic during basic audit
-                const soloistScale = getScaleForChord(chord, null, 'smart');
+                const soloistScale = getScaleForChord(getState(), chord, null, 'smart');
                 const accompanistIntervals = chord.intervals;
 
                 accompanistIntervals.forEach((interval) => {
@@ -183,12 +183,13 @@ describe('Progression Audit: Verifying All Library Presets', () => {
                 )?.chord;
 
                 // This ensures getScaleForChord doesn't crash on any chord type in the library
-                const scale = getScaleForChord(currentChord, nextChord, 'smart');
+                const scale = getScaleForChord(getState(), currentChord, nextChord, 'smart');
                 expect(scale).toBeDefined();
                 expect(scale.length).toBeGreaterThan(0);
 
                 // This ensures getSoloistNote doesn't crash
                 const result = getSoloistNote(
+                    getState(),
                     currentChord,
                     nextChord,
                     step,
@@ -235,7 +236,12 @@ describe('Progression Audit: Verifying All Library Presets', () => {
                         // ANTICIPATION CHECK: If it's not in the scale, maybe it anticipated the next chord?
                         if (!isInScale && nextChord) {
                             const nextInterval = (note.midi - nextChord.rootMidi + 120) % 12;
-                            const nextScale = getScaleForChord(nextChord, null, 'smart');
+                            const nextScale = getScaleForChord(
+                                getState(),
+                                nextChord,
+                                null,
+                                'smart',
+                            );
                             if (nextScale.includes(nextInterval)) {
                                 isInScale = true;
                             }
@@ -249,7 +255,7 @@ describe('Progression Audit: Verifying All Library Presets', () => {
 
                         if (!isInScale) {
                             throw new Error(
-                                `[Audit] Harmonic Clash in ${template.name}: Chord ${currentChord.absName} (${currentChord.quality}) at step ${step} plays PC ${interval}, but soloist scale is [${scale}] and next scale is [${nextChord ? getScaleForChord(nextChord, null, 'smart') : 'N/A'}]`,
+                                `[Audit] Harmonic Clash in ${template.name}: Chord ${currentChord.absName} (${currentChord.quality}) at step ${step} plays PC ${interval}, but soloist scale is [${scale}] and next scale is [${nextChord ? getScaleForChord(getState(), nextChord, null, 'smart') : 'N/A'}]`,
                             );
                         }
                         expect(isInScale).toBe(true);

@@ -29,7 +29,7 @@ describe('Dissonance Prevention', () => {
         // A is not in C Minor. 'every' check will fail.
         // Logic falls back to default.
 
-        const scale = getScaleForChord(chordF, null, 'scalar');
+        const scale = getScaleForChord(getState(), chordF, null, 'scalar');
 
         // Before Fix: Mixolydian (contains 10/Eb) -> Dissonant
         // After Fix: Ionian (contains 11/E) or Lydian -> Consonant-ish (Major 7)
@@ -50,7 +50,7 @@ describe('Dissonance Prevention', () => {
             key: 'C',
         };
 
-        const scale = getScaleForChord(chordFSharp, null, 'scalar');
+        const scale = getScaleForChord(getState(), chordFSharp, null, 'scalar');
         // Expect Ionian/Lydian default (clean), NOT Mixolydian (bluesy/clashing)
         expect(scale.includes(10)).toBe(false); // No b7
         expect(scale.includes(11)).toBe(true); // Major 7

@@ -80,6 +80,7 @@ describe('MusicXML Integration Critique', () => {
 
         for (let step = 0; step < totalSteps; step++) {
             const note = getSoloistNote(
+                getState(),
                 { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] }, // Dummy C Major chord
                 { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] },
                 step,
@@ -87,7 +88,6 @@ describe('MusicXML Integration Critique', () => {
                 64,
                 'lead_sheet',
                 step % 16,
-                false,
             );
 
             if (note) {

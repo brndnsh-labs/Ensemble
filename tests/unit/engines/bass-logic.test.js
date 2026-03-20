@@ -83,17 +83,17 @@ describe('Bass Engine Logic', () => {
     describe('Style Mapping & Activation', () => {
         it('should map genres to internal styles correctly', () => {
             groove.genreFeel = 'Rock';
-            expect(isBassActive('smart', 0, 0)).toBe(true);
-            expect(isBassActive('smart', 2, 2)).toBe(true);
-            expect(isBassActive('smart', 1, 1)).toBe(false);
+            expect(isBassActive(getState(), 'smart', 0, 0)).toBe(true);
+            expect(isBassActive(getState(), 'smart', 2, 2)).toBe(true);
+            expect(isBassActive(getState(), 'smart', 1, 1)).toBe(false);
 
             groove.genreFeel = 'Jazz';
-            expect(isBassActive('smart', 0, 0)).toBe(true);
-            expect(isBassActive('smart', 4, 4)).toBe(true);
+            expect(isBassActive(getState(), 'smart', 0, 0)).toBe(true);
+            expect(isBassActive(getState(), 'smart', 4, 4)).toBe(true);
         });
 
         it('should return a Root note frequency on the downbeat (step 0)', () => {
-            const result = getBassNote(chordC, null, 0, null, 38, 'rock', 0, 0, 0);
+            const result = getBassNote(getState(), chordC, null, 0, null, 38, 'rock', 0, 0, 0);
             expect(result).not.toBeNull();
             expect(result.midi % 12).toBe(0); // C
         });
@@ -101,7 +101,18 @@ describe('Bass Engine Logic', () => {
         it('should stay within a reasonable range of the center MIDI', () => {
             const center = 38;
             for (let i = 0; i < 50; i++) {
-                const result = getBassNote(chordC, null, 0, null, center, 'rock', 0, 0, 0);
+                const result = getBassNote(
+                    getState(),
+                    chordC,
+                    null,
+                    0,
+                    null,
+                    center,
+                    'rock',
+                    0,
+                    0,
+                    0,
+                );
                 expect(result.midi).toBeGreaterThanOrEqual(center - 15);
                 expect(result.midi).toBeLessThanOrEqual(center + 15);
             }
@@ -115,14 +126,16 @@ describe('Bass Engine Logic', () => {
 
             // Set high intensity to trigger high dynamic response
             playback.bandIntensity = 1.0;
-            const hitResult = getBassNote(chordC, null, 1, 110, 38, 'rock', 0, 4, 4);
+            const hitResult = getBassNote(getState(), chordC, null, 1, 110, 38, 'rock', 0, 4, 4);
             expect(hitResult).not.toBeNull();
             expect(hitResult.velocity).toBeGreaterThan(1.1);
 
             playback.bandIntensity = 0.1;
             let silentCount = 0;
             for (let i = 0; i < 20; i++) {
-                if (getBassNote(chordC, null, 0.25, 110, 38, 'rock', 0, 1, 1) === null) {
+                if (
+                    getBassNote(getState(), chordC, null, 0.25, 110, 38, 'rock', 0, 1, 1) === null
+                ) {
                     silentCount++;
                 }
             }
@@ -133,12 +146,25 @@ describe('Bass Engine Logic', () => {
             groove.genreFeel = 'Funk';
             soloist.enabled = true;
             soloist.busySteps = 4;
-            expect(getBassNote(chordC, null, 0.25, 110, 38, 'funk', 0, 1, 1)).toBeNull();
+            expect(
+                getBassNote(getState(), chordC, null, 0.25, 110, 38, 'funk', 0, 1, 1),
+            ).toBeNull();
 
             let rootOrFifthCount = 0;
             let totalNotes = 0;
             for (let i = 0; i < 100; i++) {
-                const result = getBassNote(chordC, null, 1, 110, 38, 'quarter', 0, 4, 4);
+                const result = getBassNote(
+                    getState(),
+                    chordC,
+                    null,
+                    1,
+                    110,
+                    38,
+                    'quarter',
+                    0,
+                    4,
+                    4,
+                );
                 if (result) {
                     totalNotes++;
                     const interval = (result.midi - chordC.rootMidi + 120) % 12;
@@ -159,7 +185,20 @@ describe('Bass Engine Logic', () => {
             // 62 % 4 === 2, which matches the "Pop" articulation on the & of the beat
             for (let i = 0; i < 500; i++) {
                 const info = getStepInfo(62, '4/4', [], TIME_SIGNATURES);
-                result = getBassNote(chordC, null, 0.5, 110, 38, 'funk', 0, 62, 2, {}, info);
+                result = getBassNote(
+                    getState(),
+                    chordC,
+                    null,
+                    0.5,
+                    110,
+                    38,
+                    'funk',
+                    0,
+                    62,
+                    2,
+                    {},
+                    info,
+                );
                 if (result && result.velocity >= 1.1) {
                     break;
                 }
@@ -173,7 +212,18 @@ describe('Bass Engine Logic', () => {
         it('should landing on the 5th on beat 3 frequently', () => {
             let fifthCount = 0;
             for (let i = 0; i < 100; i++) {
-                const result = getBassNote(chordC, chordF, 2, 38, 38, 'quarter', 0, 8, 8);
+                const result = getBassNote(
+                    getState(),
+                    chordC,
+                    chordF,
+                    2,
+                    38,
+                    38,
+                    'quarter',
+                    0,
+                    8,
+                    8,
+                );
                 if (result.midi % 12 === 7) {
                     fifthCount++;
                 }
@@ -185,7 +235,18 @@ describe('Bass Engine Logic', () => {
             groove.genreFeel = 'Jazz';
             let chromaticCount = 0;
             for (let i = 0; i < 500; i++) {
-                const result = getBassNote(chordC, chordF, 3, null, 38, 'quarter', 0, 12, 12);
+                const result = getBassNote(
+                    getState(),
+                    chordC,
+                    chordF,
+                    3,
+                    null,
+                    38,
+                    'quarter',
+                    0,
+                    12,
+                    12,
+                );
                 const pc = result.midi % 12;
                 if (pc === 4 || pc === 6) {
                     chromaticCount++;
@@ -196,7 +257,18 @@ describe('Bass Engine Logic', () => {
 
         it('should respect slash chord bass notes', () => {
             const slashChord = { ...chordC, bassMidi: 40 }; // C/E
-            const result = getBassNote(slashChord, chordF, 0, null, 38, 'quarter', 0, 0, 0);
+            const result = getBassNote(
+                getState(),
+                slashChord,
+                chordF,
+                0,
+                null,
+                38,
+                'quarter',
+                0,
+                0,
+                0,
+            );
             expect(result.midi % 12).toBe(4);
         });
 
@@ -205,6 +277,7 @@ describe('Bass Engine Logic', () => {
             const prevMidi = 38;
             for (let i = 0; i < 100; i++) {
                 const result = getBassNote(
+                    getState(),
                     chordC,
                     chordF,
                     1,
@@ -231,6 +304,7 @@ describe('Bass Engine Logic', () => {
                 // Step 60 in 64 total steps (downbeat)
                 const info = getStepInfo(60, '4/4', arranger.stepMap, TIME_SIGNATURES);
                 const result = getBassNote(
+                    getState(),
                     chordC,
                     chordF,
                     0,
@@ -258,7 +332,7 @@ describe('Bass Engine Logic', () => {
             const viChord = { rootMidi: 57, quality: 'minor', intervals: [0, 3, 7], key: 'C' };
             // Simulate Neo-Soul style context
             groove.genreFeel = 'Neo-Soul';
-            const scale = getScaleForChord(viChord, null, 'neo');
+            const scale = getScaleForChord(getState(), viChord, null, 'neo');
             // Better Theory engine prefers Dorian (9) for Neo-Soul minor chords for color
             expect(scale).toContain(9);
             expect(scale).not.toContain(8);
@@ -271,7 +345,7 @@ describe('Bass Engine Logic', () => {
                 intervals: [0, 3, 7, 10, 14],
                 isMinor: true,
             };
-            const scale = getScaleForChord(chord, null, 'funk');
+            const scale = getScaleForChord(getState(), chord, null, 'funk');
             expect(scale).toContain(3);
             expect(scale).not.toContain(4);
         });
@@ -283,7 +357,7 @@ describe('Bass Engine Logic', () => {
                 intervals: [0, 3, 7, 10, 14, 17],
                 isMinor: true,
             };
-            const scale = getScaleForChord(chord, null, 'smart');
+            const scale = getScaleForChord(getState(), chord, null, 'smart');
             expect(scale).toContain(3);
             expect(scale).not.toContain(4);
         });
@@ -296,7 +370,7 @@ describe('Bass Engine Logic', () => {
                 key: 'C',
                 beats: 4,
             };
-            const scale = getScaleForChord(fm7_in_C, null, 'smart');
+            const scale = getScaleForChord(getState(), fm7_in_C, null, 'smart');
             expect(scale.length).toBeGreaterThan(0);
             expect(scale).toContain(3); // Ab
         });
@@ -315,8 +389,9 @@ describe('Bass Engine Logic', () => {
                         activeNotes.splice(i, 1);
                     }
                 }
-                if (isBassActive(style, step, step % 16)) {
+                if (isBassActive(getState(), style, step, step % 16)) {
                     const result = getBassNote(
+                        getState(),
                         chordC,
                         null,
                         (step % 16) / 4,

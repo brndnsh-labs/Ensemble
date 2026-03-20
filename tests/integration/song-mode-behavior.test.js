@@ -147,13 +147,13 @@ describe('Song Mode Behavior', () => {
         playback.songMode = true;
         playback.sessionTimer = 0; // Disable arc for this test
 
-        applyConductor();
+        applyConductor(getState(), dispatch);
         // Section bias (0.2) * 0.7 + Arc default (0.5) * 0.3 = 0.29
         expect(playback.lyricalBias).toBeCloseTo(0.29, 2);
 
         // Setup "Verse" section
         arranger.stepMap = [{ start: 0, end: 16, chord: { sectionLabel: 'Verse' } }];
-        applyConductor();
+        applyConductor(getState(), dispatch);
         // Section bias (0.75) * 0.7 + Arc default (0.5) * 0.3 = 0.675
         expect(playback.lyricalBias).toBeCloseTo(0.675, 2);
     });

@@ -107,7 +107,7 @@ describe('Conductor Logic', () => {
     describe('applyConductor', () => {
         it('should dispatch density and velocity based on low intensity', () => {
             playback.bandIntensity = 0.2; // Low
-            applyConductor();
+            applyConductor(getState());
             expect(dispatch).toHaveBeenCalledWith(
                 'UPDATE_CONDUCTOR_DECISION',
                 expect.objectContaining({
@@ -119,7 +119,7 @@ describe('Conductor Logic', () => {
 
         it('should dispatch density based on high intensity', () => {
             playback.bandIntensity = 0.9; // High
-            applyConductor();
+            applyConductor(getState());
             expect(dispatch).toHaveBeenCalledWith(
                 'UPDATE_CONDUCTOR_DECISION',
                 expect.objectContaining({
@@ -133,7 +133,7 @@ describe('Conductor Logic', () => {
             soloist.busySteps = 5; // Busy
             playback.complexity = 0.8;
 
-            applyConductor();
+            applyConductor(getState());
 
             expect(dispatch).toHaveBeenCalledWith(
                 'UPDATE_CONDUCTOR_DECISION',
@@ -151,7 +151,7 @@ describe('Conductor Logic', () => {
             playback.sessionStartTime = performance.now() - 4 * 60000; // 4 mins elapsed
             playback.isEndingPending = true;
 
-            applyConductor();
+            applyConductor(getState());
 
             expect(dispatch).toHaveBeenCalledWith(
                 'UPDATE_HB',
@@ -171,7 +171,7 @@ describe('Conductor Logic', () => {
             ];
             playback.step = 0;
 
-            applyConductor();
+            applyConductor(getState());
 
             // Should blend Solo override (0.2) with arc bias
             expect(dispatch).toHaveBeenCalledWith(
@@ -184,7 +184,7 @@ describe('Conductor Logic', () => {
 
         it('should apply micro-timing pocket offsets for specific genres', () => {
             groove.genreFeel = 'Neo-Soul';
-            applyConductor();
+            applyConductor(getState());
             expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
                 module: 'bass',
                 param: 'pocketOffset',
@@ -192,7 +192,7 @@ describe('Conductor Logic', () => {
             });
 
             groove.genreFeel = 'Funk';
-            applyConductor();
+            applyConductor(getState());
             expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
                 module: 'bass',
                 param: 'pocketOffset',
@@ -209,7 +209,7 @@ describe('Conductor Logic', () => {
             };
             playback.bandIntensity = 0.8;
 
-            applyConductor();
+            applyConductor(getState());
 
             expect(playback.masterLimiter.threshold.setTargetAtTime).toHaveBeenCalled();
             expect(playback.masterLimiter.ratio.setTargetAtTime).toHaveBeenCalled();
@@ -219,7 +219,7 @@ describe('Conductor Logic', () => {
     describe('updateAutoConductor', () => {
         it('should ramp intensity towards target', () => {
             conductor.targetIntensity = 0.6;
-            updateAutoConductor();
+            updateAutoConductor(getState());
             expect(playback.bandIntensity).toBeGreaterThan(0.35);
         });
 
@@ -229,13 +229,13 @@ describe('Conductor Logic', () => {
             playback.bandIntensity = 0.35;
             conductor.targetIntensity = 0.7;
             conductor.stepSize = 0.01;
-            updateAutoConductor();
+            updateAutoConductor(getState());
             const buildDiff = playback.bandIntensity - 0.35;
 
             // Test Drop
             playback.bandIntensity = 0.35;
             conductor.targetIntensity = 0.1; // Lower than 0.35 to ensure a drop
-            updateAutoConductor();
+            updateAutoConductor(getState());
             const dropDiff = 0.35 - playback.bandIntensity;
 
             // Drop should be faster (multiplier 2.5 in code when intensity > target)
@@ -248,7 +248,7 @@ describe('Conductor Logic', () => {
             vi.spyOn(Math, 'random').mockReturnValue(0.5);
             groove.enabled = true;
             conductor.formIteration = 0;
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16);
             expect(conductor.formIteration).toBeGreaterThan(0);
         });
 
@@ -258,12 +258,12 @@ describe('Conductor Logic', () => {
 
             // Cycle 0: Warm up (Macro Ceiling 0.45)
             conductor.formIteration = 0;
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16);
             expect(conductor.targetIntensity).toBeLessThanOrEqual(0.45 + 0.15);
 
             // Cycle 4: The Peak (Macro Floor 0.6)
             conductor.formIteration = 4;
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16);
             expect(conductor.targetIntensity).toBeGreaterThanOrEqual(0.6 - 0.15);
         });
 
@@ -287,7 +287,7 @@ describe('Conductor Logic', () => {
             };
 
             // Transitioning from s1 -> s2
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16);
 
             // Expected target energy should be influenced by 'Climax' role and high flux
             expect(conductor.targetIntensity).toBeGreaterThan(0.6);
@@ -303,7 +303,7 @@ describe('Conductor Logic', () => {
             ];
             for (const role of roles) {
                 conductor.form.sections[0].role = role;
-                checkSectionTransition(0, 16);
+                checkSectionTransition(getState(), 0, 16);
                 expect(conductor.targetIntensity).toBeGreaterThan(0); // Basic assertion, main goal is coverage
             }
         });
@@ -321,7 +321,7 @@ describe('Conductor Logic', () => {
             arranger.sections = [{ id: 's1' }, { id: 's2' }];
             arranger.totalSteps = 32;
 
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16);
 
             expect(dispatch).toHaveBeenCalledWith(
                 'SET_GROOVE_SEED',
@@ -344,7 +344,7 @@ describe('Conductor Logic', () => {
                 { id: 's2', seamless: true }, // Target has seamless flag
             ];
 
-            checkSectionTransition(0, 16);
+            checkSectionTransition(getState(), 0, 16);
             expect(dispatch).not.toHaveBeenCalledWith('TRIGGER_FILL', expect.anything());
         });
 
@@ -359,7 +359,7 @@ describe('Conductor Logic', () => {
             ];
 
             // Step 15 is the very last step of the first chord (end: 16)
-            checkSectionTransition(15, 16);
+            checkSectionTransition(getState(), 15, 16);
 
             expect(dispatch).toHaveBeenCalledWith(
                 'TRIGGER_FILL',

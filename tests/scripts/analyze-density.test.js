@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
@@ -85,7 +86,7 @@ describe('Soloist Density Analysis', () => {
             // We need to simulate the state updates that happen inside the loop or external to it?
             // getSoloistNote modifies state internally (busySteps, isResting, etc.)
 
-            const res = getSoloistNote(chord, chord, s, 440, 60, style, stepInMeasure);
+            const res = getSoloistNote(getState(), chord, chord, s, 440, 60, style, stepInMeasure);
 
             if (res) {
                 attacks++;

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getState } from '../../public/state.js';
 
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
@@ -149,6 +150,7 @@ describe('Soloist Phrasing Analysis', () => {
             // Force wakeup at start
             const coordination = s === 0 ? { bypassRhythm: true } : {};
             const res = getSoloistNote(
+                getState(),
                 chord,
                 chord,
                 s,

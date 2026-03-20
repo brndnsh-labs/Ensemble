@@ -1,20 +1,24 @@
 import { analyzeForm, getSectionEnergy } from '../form-analysis.js';
 import { debounceSaveState, saveCurrentState } from '../persistence.js';
-import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { generateProceduralFill } from './fills.js';
 
-export function analyzeFormUI() {
+/** @param {Function} [dispatch] */
+export function analyzeFormUI(dispatch) {
     const form = analyzeForm();
-    if (form) {
+    if (form && dispatch) {
         dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { form });
     }
 }
 
-export function applyConductor() {
-    const { playback, soloist, groove, chords, bass, harmony, arranger } = getState();
+/**
+ * @param {import('../types.js').EnsembleState} state
+ * @param {Function} dispatch
+ */
+export function applyConductor(state, dispatch) {
+    const { playback, soloist, groove, chords, bass, harmony, arranger } = state;
     const intensity = playback.bandIntensity; // 0.0 - 1.0
     const complexity = playback.complexity; // 0.0 - 1.0
 
@@ -204,9 +208,11 @@ export function applyConductor() {
 
 /**
  * Updates auto-intensity and monitors the band's "conversation".
+ * @param {import('../types.js').EnsembleState} state
+ * @param {Function} dispatch
  */
-export function updateAutoConductor() {
-    const { playback, conductor } = getState();
+export function updateAutoConductor(state, dispatch) {
+    const { playback, conductor } = state;
     if (!playback.autoIntensity || !playback.isPlaying) {
         return;
     }
@@ -226,16 +232,18 @@ export function updateAutoConductor() {
             dispatch(ACTIONS.SET_BAND_INTENSITY, newIntensity);
         }
 
-        applyConductor();
+        applyConductor(state, dispatch);
     }
 }
 
 /**
  * Calculates and applies tempo drift for "Lars Mode".
+ * @param {import('../types.js').EnsembleState} state
  * @param {number} currentStep
+ * @param {Function} dispatch
  */
-export function updateLarsTempo(currentStep) {
-    const { groove, playback, arranger, conductor } = getState();
+export function updateLarsTempo(state, currentStep, dispatch) {
+    const { groove, playback, arranger, conductor } = state;
     if (!groove.larsMode || !playback.isPlaying) {
         if (conductor.larsBpmOffset !== 0) {
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { larsBpmOffset: 0 });
@@ -294,11 +302,13 @@ export function updateLarsTempo(currentStep) {
 }
 
 /**
+ * @param {import('../types.js').EnsembleState} state
  * @param {number} currentStep
  * @param {number} stepsPerMeasure
+ * @param {Function} dispatch
  */
-export function checkSectionTransition(currentStep, stepsPerMeasure) {
-    const { groove, arranger, playback, conductor } = getState();
+export function checkSectionTransition(state, currentStep, stepsPerMeasure, dispatch) {
+    const { groove, arranger, playback, conductor } = state;
     if (!groove.enabled) {
         return;
     }
@@ -340,7 +350,7 @@ export function checkSectionTransition(currentStep, stepsPerMeasure) {
         ) {
             // --- 1. THE SOLOIST TRADE ---
             // Real musicians trade even if there isn't a drum fill!
-            const { soloist: soloistState } = getState();
+            const { soloist: soloistState } = state;
             if (
                 soloistState &&
                 (soloistState.tradeMode === 'sections' ||

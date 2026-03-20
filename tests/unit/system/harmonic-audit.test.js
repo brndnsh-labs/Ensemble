@@ -76,8 +76,9 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                         const stepInChord = step - entry.start;
 
                         // 1. Bass Check
-                        if (isBassActive(bass.style, step, stepInChord)) {
+                        if (isBassActive(getState(), bass.style, step, stepInChord)) {
                             const bassNote = getBassNote(
+                                getState(),
                                 chord,
                                 null,
                                 step / 4,
@@ -116,8 +117,18 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                                     ].includes(genre) &&
                                     !bassNote.muted
                                 ) {
-                                    const scale = getScaleForChord(chord, null, 'smart');
-                                    const theoryScale = getScaleForChord(chord, null, 'theory');
+                                    const scale = getScaleForChord(
+                                        getState(),
+                                        chord,
+                                        null,
+                                        'smart',
+                                    );
+                                    const theoryScale = getScaleForChord(
+                                        getState(),
+                                        chord,
+                                        null,
+                                        'theory',
+                                    );
                                     const interval = (bassNote.midi - chord.rootMidi + 120) % 12;
 
                                     // Valid if it fits the Genre Scale OR the Chord's Theoretical Scale
@@ -141,6 +152,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
 
                         // 2. Soloist Check
                         const soloNote = getSoloistNote(
+                            getState(),
                             chord,
                             null,
                             step,
@@ -178,8 +190,18 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                                     ].includes(genre) &&
                                     !n.isDoubleStop
                                 ) {
-                                    const scale = getScaleForChord(chord, null, 'smart');
-                                    const theoryScale = getScaleForChord(chord, null, 'theory');
+                                    const scale = getScaleForChord(
+                                        getState(),
+                                        chord,
+                                        null,
+                                        'smart',
+                                    );
+                                    const theoryScale = getScaleForChord(
+                                        getState(),
+                                        chord,
+                                        null,
+                                        'theory',
+                                    );
                                     const interval = (n.midi - chord.rootMidi + 120) % 12;
 
                                     const isValid =
@@ -200,6 +222,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
 
                         // 3. Accompaniment Check
                         const accNotes = getAccompanimentNotes(
+                            getState(),
                             chord,
                             step,
                             stepInChord,
@@ -242,8 +265,13 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
 
                             // Scale Check
                             if (!['Jazz', 'Blues', 'Funk', 'Reggae', 'Neo-Soul'].includes(genre)) {
-                                const scale = getScaleForChord(chord, null, 'smart');
-                                const theoryScale = getScaleForChord(chord, null, 'theory');
+                                const scale = getScaleForChord(getState(), chord, null, 'smart');
+                                const theoryScale = getScaleForChord(
+                                    getState(),
+                                    chord,
+                                    null,
+                                    'theory',
+                                );
                                 const interval = (n.midi - chord.rootMidi + 120) % 12;
 
                                 const isValid =

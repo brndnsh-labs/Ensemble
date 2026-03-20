@@ -25,6 +25,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 soloist.restSteps = 0;
             }
             getSoloistNote(
+                getState(),
                 chord,
                 null,
                 i,
@@ -65,6 +66,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         for (let i = 0; i < 50000; i++) {
             const step = i;
             const note = getSoloistNote(
+                getState(),
                 chord,
                 null,
                 step,
@@ -120,6 +122,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
 
         getSoloistNote(
+            getState(),
             chord,
             null,
             100,

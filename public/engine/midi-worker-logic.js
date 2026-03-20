@@ -432,6 +432,7 @@ export class ExportProcessor {
             if (this.includedTracks.includes('soloist')) {
                 const { sectionStart, sectionEnd } = chordData;
                 soloResult = getSoloistNote(
+                    this.state,
                     /** @type {any} */ (chord),
                     nextChordData?.chord,
                     globalStep,
@@ -527,6 +528,7 @@ export class ExportProcessor {
             if (
                 this.includedTracks.includes('bass') &&
                 isBassActive(
+                    this.state,
                     /** @type {string} */ (bass.style),
                     globalStep,
                     stepInChord,
@@ -536,6 +538,7 @@ export class ExportProcessor {
             ) {
                 const { sectionStart, sectionEnd } = chordData;
                 const res = getBassNote(
+                    this.state,
                     /** @type {any} */ (chord),
                     nextChordData?.chord,
                     stepInChord / this.ts.stepsPerBeat,
@@ -596,6 +599,7 @@ export class ExportProcessor {
             // 4. Chords Generation (Yields Density to Soloist)
             if (this.includedTracks.includes('chords')) {
                 const notes = getAccompanimentNotes(
+                    this.state,
                     chord,
                     globalStep,
                     stepInChord,

@@ -73,7 +73,7 @@ describe('Harmony Engine Logic', () => {
         _bass = state.bass;
 
         vi.clearAllMocks();
-        clearHarmonyMemory();
+        clearHarmonyMemory(getState());
         _groove.genreFeel = 'Funk';
         _harmony.style = 'smart';
         _playback.bandIntensity = 0.5;
