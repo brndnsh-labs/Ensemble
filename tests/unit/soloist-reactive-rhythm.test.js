@@ -47,7 +47,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         playback: {
             bandIntensity: 0.5,
             bpm: 120,
-            intent: {},
+            intent: { currentLoopCount: 1 },
         },
         arranger: { totalSteps: 64, timeSignature: '4/4' },
     });
@@ -60,7 +60,11 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
         // 1. Setup: bypass rhythm to ensure it works
-        const contextBypass = { stepCoordination: { kickHit: true }, bypassRhythm: true };
+        const contextBypass = {
+            stepCoordination: { kickHit: true },
+            bypassRhythm: true,
+            currentLoopCount: 1,
+        };
         localState.soloist.rhythmPlan = undefined;
 
         const planBypass = generateRhythmPlan(
@@ -92,7 +96,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         // WITHOUT drum hit: 0.99 > 0.6 (FALSE)
         localState.soloist.busySteps = 0;
         localState.soloist.rhythmPlan = undefined;
-        const contextWithout = { stepCoordination: { kickHit: false } };
+        const contextWithout = { stepCoordination: { kickHit: false }, currentLoopCount: 1 };
         const planWithout = generateRhythmPlan(
             32,
             16,
@@ -111,7 +115,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         randomSpy.mockReturnValue(0.7);
 
         // WITH drum hit: 0.7 < 0.8 (TRUE)
-        const contextWith = { stepCoordination: { kickHit: true } };
+        const contextWith = { stepCoordination: { kickHit: true }, currentLoopCount: 1 };
         const planWith = generateRhythmPlan(
             16,
             16,
@@ -165,7 +169,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
                 0.01,
                 16,
                 4,
-                {},
+                { currentLoopCount: 1 },
                 64,
                 localState.soloist,
                 null,
@@ -185,7 +189,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
                 0.01,
                 16,
                 4,
-                {},
+                { currentLoopCount: 1 },
                 64,
                 localState.soloist,
                 null,

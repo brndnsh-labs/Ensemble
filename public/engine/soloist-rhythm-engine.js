@@ -26,6 +26,46 @@ export function generateRhythmPlan(
 ) {
     /** @type {any[]} */
     const plan = [];
+
+    // --- Strict Loop 0 Override: The Head ---
+    const currentLoopCount = coordination.currentLoopCount || 0;
+    const sessionSeed = soloistState.sessionSeed;
+    if (currentLoopCount === 0 && sessionSeed && sessionSeed.notes.length > 0) {
+        const { notes, loopLengthSteps } = sessionSeed;
+
+        for (let step = startStep; step < startStep + activeSteps; step++) {
+            const stepInLoop = step % loopLengthSteps;
+            const seedNote = notes.find((n) => n.step === stepInLoop);
+
+            if (seedNote) {
+                // Determine beat characteristics for velocity
+                const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+                const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
+                const isBeatStart = stepInBeat === 0;
+                const isDownbeat = measureStep === 0;
+                const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
+                const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+
+                let stepVelocity = 0.8;
+                if (isDownbeat) {
+                    stepVelocity = 1.0;
+                } else if (isBackbeat) {
+                    stepVelocity = 0.9;
+                }
+
+                plan.push({
+                    stepTarget: step,
+                    velocity: stepVelocity,
+                    isStrongBeat: isBeatStart || isDownbeat || isBackbeat,
+                    durationSteps: seedNote.durationSteps,
+                    isSustained: seedNote.durationSteps >= stepsPerBeat,
+                    vibrato: seedNote.durationSteps >= stepsPerBeat * 2,
+                });
+            }
+        }
+        return plan;
+    }
+
     const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
     const emphasisMap = /** @type {any} */ (STYLE_EMPHASIS)[style] || STYLE_EMPHASIS.scalar;
 

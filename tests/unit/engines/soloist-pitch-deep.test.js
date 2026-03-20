@@ -15,7 +15,7 @@ describe('Soloist Pitch Engine Deep Dive', () => {
             0.5, // intensity
             0, // stepInChord
             {}, // coordination
-            { bpm: 120 }, // playback
+            { bpm: 120, currentLoopCount: 1 }, // playback
             { mode: 'monophonic', tension: 0.5, lastMidi: 60, dynamicCenter: 60 }, // soloistState
             { humanize: 0 }, // groove
             {}, // _arranger

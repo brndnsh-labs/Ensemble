@@ -1,10 +1,8 @@
-import { createPRNG, generateRandomSeed } from '../utils.js';
-import { getScaleForChord } from './theory-scales.js';
+import { TIME_SIGNATURES } from '../config.js';
 
 /**
- * Soloist Seeder Module (v3)
- * Generates a "Dynamic Head" (Seed Melody) for the entire arrangement.
- * Implements Label-Aware Strategies, Thematic Repetition, and Melodic Sequencing.
+ * Soloist Seeder Module
+ * Generates a "Dynamic Head" (Seed Melody) for the entire arrangement using a Hierarchical Composition Engine.
  */
 
 /**
@@ -16,184 +14,217 @@ import { getScaleForChord } from './theory-scales.js';
  */
 
 /**
+ * Returns a primary chord tone (1, 3, 5, 7) for a given chord object
+ * @param {any} chord
+ * @param {number} rootMidi
+ * @param {number} beatIndex
+ * @returns {number}
+ */
+function getPrimaryChordTone(chord, rootMidi, beatIndex) {
+    const primaryIntervals = [0, 4, 7];
+    // Add 7th if present
+    if (chord.intervals.includes(10)) {
+        primaryIntervals.push(10); // m7 / dom7
+    }
+    if (chord.intervals.includes(11)) {
+        primaryIntervals.push(11); // maj7
+    }
+
+    // Check if the 3rd is minor
+    if (chord.intervals.includes(3)) {
+        primaryIntervals[1] = 3;
+    }
+
+    // Pick a tone based on the beat index to give some melodic shape
+    const interval = primaryIntervals[beatIndex % primaryIntervals.length];
+    return rootMidi + interval;
+}
+
+/**
  * Generates a song-wide seed melody for the soloist.
- * @param {import('../types.js').EnsembleState} state
+ * @param {import('../types.js').EnsembleState} _state
  * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {string} style
+ * @param {string} _style
  * @param {number} [_intensity]
- * @param {string} [seedStr]
+ * @param {string} [_seedStr]
  * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
  */
-export function generateSessionSeed(state, arranger, style, _intensity, seedStr) {
+export function generateSessionSeed(_state, arranger, _style, _intensity, _seedStr) {
     if (!arranger.stepMap || arranger.stepMap.length === 0) {
         return { notes: [], loopLengthSteps: 0 };
     }
 
-    const prng = createPRNG(seedStr || generateRandomSeed());
+    const timeSig = arranger.timeSignature || '4/4';
+    const sigConfig = /** @type {any} */ (TIME_SIGNATURES)[timeSig] || TIME_SIGNATURES['4/4'];
+    const stepsPerBeat = sigConfig.stepsPerBeat || 4;
+    const beatsPerMeasure = sigConfig.beats || 4;
+    const stepsPerMeasure = stepsPerBeat * beatsPerMeasure;
 
-    const stepsPerMeasure = 16;
     const totalSteps = arranger.totalSteps || arranger.stepMap.length;
 
     /** @type {SeedNote[]} */
     const notes = [];
 
-    // Motif Memory: Keyed by Label to ensure repetition across same section types
-    /** @type {Map<string, Array<{offset: number, interval: number, duration: number}>>} */
-    const labelMotifs = new Map();
+    // Form Analysis & Contour Mapping
+    const sections =
+        arranger.sectionMap && arranger.sectionMap.length > 0
+            ? arranger.sectionMap
+            : [{ id: 'main', start: 0, end: totalSteps, label: 'Main' }];
 
-    // Strategy Templates
-    const TEMPLATES = {
-        intro: [
-            [
-                1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0,
-            ],
-        ], // Spaced
-        chorus: [
-            [
-                1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0,
-                1, 0, 0, 0,
-            ],
-        ], // High Energy
-        verse: [
-            [
-                1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0,
-            ],
-        ], // Balanced
-        jazz: [
-            [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0,
-            ],
-        ], // Pickup (Autumn Leaves style)
-    };
+    // Thematic memory
+    const generatedContours = new Map();
+    const _nextContourId = 0;
 
-    if (!arranger.sectionMap || arranger.sectionMap.length === 0) {
-        return { notes: [], loopLengthSteps: totalSteps };
-    }
-
-    arranger.sectionMap.forEach((sectionRange) => {
+    sections.forEach((sectionRange) => {
         const label = (sectionRange.label || 'Main').toLowerCase();
-        // Use a generic label category for motif matching
-        let category = 'verse';
-        if (label.includes('intro')) {
-            category = 'intro';
-        } else if (label.includes('chorus') || label.includes('drop')) {
-            category = 'chorus';
-        } else if (label.includes('outro') || label.includes('end')) {
-            category = 'outro';
-        } else if (style === 'jazz' || style === 'bird' || style === 'bossa') {
-            category = 'jazz';
+
+        let contourGroup = 'A'; // Default contour
+        if (label.match(/b|chorus|bridge|drop/i)) {
+            contourGroup = 'B';
+        } else if (label.match(/a|verse|main/i)) {
+            contourGroup = 'A';
+        } else if (label.match(/c|solo|outro|end/i)) {
+            contourGroup = 'C';
         }
 
         const sectionSteps = sectionRange.end - sectionRange.start;
-        const sectionMeasures = Math.floor(sectionSteps / stepsPerMeasure);
+        const _sectionMeasures = Math.floor(sectionSteps / stepsPerMeasure);
 
-        if (!labelMotifs.has(category)) {
-            const pool =
-                TEMPLATES[/** @type {keyof typeof TEMPLATES} */ (category)] || TEMPLATES.verse;
-            const template = pool[Math.floor(prng() * pool.length)];
-            const motif = [];
-            let lastInterval = 0;
+        if (generatedContours.has(contourGroup)) {
+            // Clone and shift
+            const templateSection = generatedContours.get(contourGroup);
+            const templateNotes = templateSection.notes;
+            const stepShift = sectionRange.start - templateSection.start;
 
-            for (let i = 0; i < template.length; i++) {
-                if (template[i] === 1) {
-                    let intervalChange = 0;
-                    if (motif.length > 0) {
-                        const r = prng();
-                        if (r < 0.75) {
-                            intervalChange = prng() > 0.5 ? 1 : -1; // Stepwise
-                        } else if (r < 0.95) {
-                            intervalChange = prng() > 0.5 ? 2 : -2; // Skip
-                        } else {
-                            intervalChange = prng() > 0.5 ? 4 : -4; // Leap
-                        }
-                    }
-                    lastInterval += intervalChange;
+            /** @type {SeedNote[]} */
+            const clonedNotes = [];
 
-                    let duration = 4;
-                    for (let j = i + 1; j < template.length; j++) {
-                        if (template[j] === 1) {
-                            duration = j - i;
-                            break;
-                        }
-                        if (j === template.length - 1) {
-                            duration = template.length - i;
-                        }
-                    }
-                    motif.push({ offset: i, interval: lastInterval, duration });
-                }
-            }
-            labelMotifs.set(category, motif);
-        }
-
-        const motif = labelMotifs.get(category) || [];
-
-        for (let m = 0; m < sectionMeasures; m += 2) {
-            const measureStartStep = sectionRange.start + m * stepsPerMeasure;
-
-            motif.forEach((motifNote) => {
-                const globalStep = measureStartStep + motifNote.offset;
-                if (globalStep >= sectionRange.end || globalStep >= totalSteps) {
+            templateNotes.forEach((/** @type {SeedNote} */ tn) => {
+                const newStep = tn.step + stepShift;
+                if (newStep >= sectionRange.end || newStep >= totalSteps) {
                     return;
                 }
 
-                const entry = arranger.stepMap[globalStep];
-                if (!entry) {
-                    return;
-                }
+                // Turnaround divergence check (last 2 measures)
+                const isTurnaround = newStep >= sectionRange.end - stepsPerMeasure * 2;
+                let midi = tn.midi;
 
-                /** @type {any} */
-                const chord = entry.chord;
-                const scale = getScaleForChord(state, chord, null, style);
+                const currentEntry = arranger.stepMap[newStep];
+                const currentChord = /** @type {any} */ (currentEntry?.chord);
+                const templateEntry = arranger.stepMap[tn.step];
+                const templateChord = /** @type {any} */ (templateEntry?.chord);
 
-                // Strategy Register: Intro is lower, Chorus is higher
-                let registerOffset = 12; // Adjusted to be relative so we don't force massive octave jumps
-                if (category === 'intro') {
-                    registerOffset = 0;
-                } else if (category === 'chorus') {
-                    registerOffset = 24;
-                }
-
-                const scaleIdx =
-                    ((motifNote.interval % scale.length) + scale.length) % scale.length;
-
-                // Use a normalized base (like 60) plus the interval, rather than adding the chord root
-                // directly, which can cause wild octave leaps when the chords change.
-                const baseMidi = 60 + registerOffset; // e.g. 60 (C4) or 72 (C5)
-                const pitchClass = (chord.rootMidi + scale[scaleIdx]) % 12;
-
-                let midi =
-                    baseMidi + pitchClass + Math.floor(motifNote.interval / scale.length) * 12;
-
-                // Smooth out chord transitions by forcing the new note to be as close
-                // as possible to the last generated note in the sequence, UNLESS
-                // we've crossed into a new structural section (which defines its own register)
-                if (notes.length > 0 && motifNote.offset > 0) {
-                    const lastNote = notes[notes.length - 1];
-                    let bestMidi = midi;
-                    let minDistance = Math.abs(midi - lastNote.midi);
-
-                    // Try moving it up or down an octave to see if it's closer
-                    for (const offset of [-12, 12, -24, 24]) {
-                        const testMidi = midi + offset;
-                        const dist = Math.abs(testMidi - lastNote.midi);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            bestMidi = testMidi;
-                        }
+                if (
+                    isTurnaround &&
+                    currentChord &&
+                    templateChord &&
+                    currentChord.value !== templateChord.value
+                ) {
+                    // Divergence: snap to new chord tone
+                    const measureStep = newStep % stepsPerMeasure;
+                    const isStrongBeat = measureStep % stepsPerBeat === 0;
+                    if (isStrongBeat) {
+                        const beatIndex = Math.floor(measureStep / stepsPerBeat);
+                        // Use base octave of original note, but force to primary chord tone
+                        const octave = Math.floor(midi / 12) * 12;
+                        const root = currentChord.rootMidi % 12;
+                        midi = getPrimaryChordTone(currentChord, octave + root, beatIndex);
                     }
-                    midi = bestMidi;
                 }
 
-                notes.push({
-                    step: globalStep,
-                    midi,
-                    isAnchor: motifNote.offset % 8 === 0,
-                    durationSteps: motifNote.duration,
+                clonedNotes.push({
+                    step: newStep,
+                    midi: midi,
+                    isAnchor: tn.isAnchor,
+                    durationSteps: tn.durationSteps,
                 });
             });
+            notes.push(...clonedNotes);
+        } else {
+            // Generate new thematic contour block
+            /** @type {SeedNote[]} */
+            const blockNotes = [];
+            let currentStep = sectionRange.start;
+
+            // Register Offset based on contour
+            const registerOffset = contourGroup === 'B' ? 12 : 0;
+            const baseOctave = 60 + registerOffset;
+
+            // Generate phrases in 4-measure blocks (Antecedent & Consequent)
+            while (currentStep < sectionRange.end) {
+                const blockEnd = Math.min(currentStep + stepsPerMeasure * 4, sectionRange.end);
+
+                // Antecedent (first 2 measures)
+                for (
+                    let step = currentStep;
+                    step < currentStep + stepsPerMeasure * 2 && step < blockEnd;
+                    step += stepsPerBeat
+                ) {
+                    const entry = arranger.stepMap[step];
+                    const entryChord = /** @type {any} */ (entry?.chord);
+                    if (!entryChord) {
+                        continue;
+                    }
+
+                    const measureStep = step % stepsPerMeasure;
+                    const beatIndex = Math.floor(measureStep / stepsPerBeat);
+
+                    // Simple rhythmic motif: Strong beats 1 & 3
+                    if (beatIndex === 0 || beatIndex === 2) {
+                        const root = entryChord.rootMidi % 12;
+                        const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                        blockNotes.push({
+                            step,
+                            midi,
+                            isAnchor: beatIndex === 0,
+                            durationSteps: stepsPerBeat,
+                        });
+                    }
+                }
+
+                // Consequent (last 2 measures)
+                for (
+                    let step = currentStep + stepsPerMeasure * 2;
+                    step < currentStep + stepsPerMeasure * 4 && step < blockEnd;
+                    step += stepsPerBeat
+                ) {
+                    const entry = arranger.stepMap[step];
+                    const entryChord = /** @type {any} */ (entry?.chord);
+                    if (!entryChord) {
+                        continue;
+                    }
+
+                    const measureStep = step % stepsPerMeasure;
+                    const beatIndex = Math.floor(measureStep / stepsPerBeat);
+
+                    // Consequent Motif: Strong beat 1, syncopated beat 2.5
+                    if (beatIndex === 0) {
+                        const root = entryChord.rootMidi % 12;
+                        const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                        blockNotes.push({
+                            step,
+                            midi,
+                            isAnchor: true,
+                            durationSteps: stepsPerBeat * 1.5,
+                        });
+                    } else if (measureStep === stepsPerBeat * 2.5) {
+                        // e.g. beat 3 "and"
+                        const root = entryChord.rootMidi % 12;
+                        const midi = getPrimaryChordTone(entryChord, baseOctave + root, beatIndex);
+                        blockNotes.push({
+                            step,
+                            midi,
+                            isAnchor: false,
+                            durationSteps: stepsPerBeat * 1.5,
+                        });
+                    }
+                }
+
+                currentStep = blockEnd;
+            }
+
+            generatedContours.set(contourGroup, { start: sectionRange.start, notes: blockNotes });
+            notes.push(...blockNotes);
         }
     });
 
