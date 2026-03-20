@@ -448,7 +448,7 @@ export function selectPitchAndDevices(
     let deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const sessionSeed = soloistState.sessionSeed;
     if ((playback.currentLoopCount || 0) === 0 && sessionSeed && sessionSeed.notes.length > 0) {
-        deviceBaseProb *= 0.2; // Clean head
+        deviceBaseProb = 0; // Clean head: disable ALL devices
     }
     const isPolyphonic =
         soloistState.mode !== 'monophonic' &&
@@ -460,7 +460,8 @@ export function selectPitchAndDevices(
     if (
         activeStyle === 'blues' &&
         /** @type {any} */ (coordination).isTurnaround &&
-        Math.random() < 0.6
+        Math.random() < 0.6 &&
+        !((playback.currentLoopCount || 0) === 0 && sessionSeed && sessionSeed.notes.length > 0)
     ) {
         const deviceBuffer = generateMelodicDevice('bluesTurnaround', {
             state,
@@ -565,11 +566,13 @@ export function selectPitchAndDevices(
         vibrato: vibrato,
         isSustained: rhythmNode.isSustained,
         bendStartInterval:
-            soloistState.mode === 'guitar' && durationSteps >= 4 && Math.random() < 0.3
-                ? Math.random() < 0.5
-                    ? -1
-                    : 1
-                : 0,
+            (playback.currentLoopCount || 0) === 0 && sessionSeed && sessionSeed.notes.length > 0
+                ? 0
+                : soloistState.mode === 'guitar' && durationSteps >= 4 && Math.random() < 0.3
+                  ? Math.random() < 0.5
+                      ? -1
+                      : 1
+                  : 0,
         ccEvents: [],
         timingOffset: 0,
         style: activeStyle,

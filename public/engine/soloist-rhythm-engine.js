@@ -1,3 +1,4 @@
+import { getState } from '../state.js';
 import { STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
 
 /**
@@ -30,6 +31,34 @@ export function generateRhythmPlan(
     const emphasisMap = /** @type {any} */ (STYLE_EMPHASIS)[style] || STYLE_EMPHASIS.scalar;
 
     let notesInPhrase = 0;
+    const globalState = getState();
+    const playback = globalState.playback;
+
+    // --- LOOP 0 OVERRIDE: Strict deterministic playback of the Head ---
+    if (
+        playback.currentLoopCount === 0 &&
+        soloistState.sessionSeed &&
+        soloistState.sessionSeed.notes &&
+        soloistState.sessionSeed.notes.length > 0
+    ) {
+        const { notes, loopLengthSteps } = soloistState.sessionSeed;
+        for (let step = startStep; step < startStep + activeSteps; step++) {
+            const stepInLoop = step % loopLengthSteps;
+            const seedNote = notes.find((/** @type {any} */ n) => n.step === stepInLoop);
+
+            if (seedNote) {
+                plan.push({
+                    stepTarget: step,
+                    velocity: 0.8 + intensity * 0.2, // Clean, consistent velocity
+                    isStrongBeat: true,
+                    durationSteps: seedNote.durationSteps,
+                    isSustained: false,
+                    vibrato: false,
+                });
+            }
+        }
+        return plan;
+    }
 
     // --- Call & Response: Rhythmic Mirroring ---
     if (

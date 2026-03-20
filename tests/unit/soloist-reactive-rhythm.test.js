@@ -199,4 +199,37 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         expect(hitsDownbeat).toBeGreaterThan(0); // Downbeat survives!
         randomSpy.mockRestore();
     });
+
+    it('should force exact seed performance during Loop 0', () => {
+        const localState = createMockState();
+        localState.playback.currentLoopCount = 0;
+        vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
+        localState.soloist.sessionSeed = {
+            notes: [
+                { step: 0, durationSteps: 4 },
+                { step: 4, durationSteps: 2 },
+            ],
+            loopLengthSteps: 16,
+        };
+
+        // This should bypass all probability and return exact seed notes
+        const plan = generateRhythmPlan(
+            0,
+            16,
+            'funk',
+            0.5,
+            16,
+            4,
+            {},
+            64,
+            localState.soloist,
+            null,
+        );
+
+        expect(plan.length).toBe(2);
+        expect(plan[0].stepTarget).toBe(0);
+        expect(plan[0].durationSteps).toBe(4);
+        expect(plan[1].stepTarget).toBe(4);
+        expect(plan[1].durationSteps).toBe(2);
+    });
 });

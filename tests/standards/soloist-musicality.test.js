@@ -51,6 +51,8 @@ describe('Soloist Musicality & Thematic Integrity', () => {
 
         // Simulate a conclusion phase by using a high iteration count
         // and checking for chord tone bias
+        // We mock loopCount to 1 so that deterministic loop 0 doesn't affect the statistical test
+        testState.playback.currentLoopCount = 1;
         let chordToneHits = 0;
         let totalNotes = 0;
         const iterations = 200;
@@ -73,6 +75,7 @@ describe('Soloist Musicality & Thematic Integrity', () => {
 
     it('should generate notes within a consistent range', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 };
+        testState.playback.currentLoopCount = 1;
         const iterations = 100;
 
         for (let i = 0; i < iterations; i++) {

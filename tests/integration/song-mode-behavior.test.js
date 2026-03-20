@@ -59,6 +59,7 @@ describe('Song Mode Behavior', () => {
 
         playback.isPlaying = true;
         playback.songMode = true;
+        playback.currentLoopCount = 1; // Not Loop 0
         playback.sessionTimer = 1; // 1 minute
         playback.sessionStartTime = performance.now() - 70000; // Already expired
         playback.step = 0;

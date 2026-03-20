@@ -32,41 +32,47 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     const prng = createPRNG(seedStr || generateRandomSeed());
 
     const stepsPerMeasure = 16;
+    const stepsPerBeat = 4;
     const totalSteps = arranger.totalSteps || arranger.stepMap.length;
 
     /** @type {SeedNote[]} */
     const notes = [];
 
-    // Motif Memory: Keyed by Label to ensure repetition across same section types
-    /** @type {Map<string, Array<{offset: number, interval: number, duration: number}>>} */
-    const labelMotifs = new Map();
+    // Motif Memory: Keyed by Category to ensure repetition across same section types
+    /** @type {Map<string, { startStep: number, notes: SeedNote[] }>} */
+    const categorySeeds = new Map();
 
-    // Strategy Templates
+    // Strategy Templates (Section Contours)
     const TEMPLATES = {
-        intro: [
+        // Static/Rhythmic: fewer passing tones, rhythmic anchors on downbeats
+        a: [
             [
                 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0,
             ],
-        ], // Spaced
-        chorus: [
             [
-                1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0,
-                1, 0, 0, 0,
-            ],
-        ], // High Energy
-        verse: [
-            [
-                1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0,
             ],
-        ], // Balanced
-        jazz: [
+        ],
+        // Ascending Arpeggio: 8th notes, more motion
+        b: [
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0,
                 0, 0, 0, 0,
             ],
-        ], // Pickup (Autumn Leaves style)
+        ],
+        // Scale Walk-up: pickups
+        pickup: [
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
+        ],
     };
 
     if (!arranger.sectionMap || arranger.sectionMap.length === 0) {
@@ -75,66 +81,38 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
     arranger.sectionMap.forEach((sectionRange) => {
         const label = (sectionRange.label || 'Main').toLowerCase();
-        // Use a generic label category for motif matching
-        let category = 'verse';
-        if (label.includes('intro')) {
-            category = 'intro';
-        } else if (label.includes('chorus') || label.includes('drop')) {
-            category = 'chorus';
-        } else if (label.includes('outro') || label.includes('end')) {
-            category = 'outro';
+
+        let category = 'a';
+        if (
+            label.includes('b') ||
+            label.includes('bridge') ||
+            label.includes('chorus') ||
+            label.includes('drop')
+        ) {
+            category = 'b';
+        } else if (label.includes('intro') || label.includes('pickup')) {
+            category = 'pickup';
+        } else if (label.includes('a') || label.includes('verse') || label.includes('main')) {
+            category = 'a';
         } else if (style === 'jazz' || style === 'bird' || style === 'bossa') {
-            category = 'jazz';
+            category = 'pickup'; // Default to pickup style for jazz if not explicitly labeled A/B
         }
 
         const sectionSteps = sectionRange.end - sectionRange.start;
         const sectionMeasures = Math.floor(sectionSteps / stepsPerMeasure);
+        const isTurnaroundStart = sectionRange.end - stepsPerMeasure * 2; // last 2 measures
 
-        if (!labelMotifs.has(category)) {
-            const pool =
-                TEMPLATES[/** @type {keyof typeof TEMPLATES} */ (category)] || TEMPLATES.verse;
-            const template = pool[Math.floor(prng() * pool.length)];
-            const motif = [];
-            let lastInterval = 0;
+        if (categorySeeds.has(category)) {
+            // CLONE PREVIOUS SECTION
+            const cachedData = categorySeeds.get(category);
+            const cachedNotes = cachedData ? cachedData.notes : [];
+            const originalStart = cachedData ? cachedData.startStep : 0;
 
-            for (let i = 0; i < template.length; i++) {
-                if (template[i] === 1) {
-                    let intervalChange = 0;
-                    if (motif.length > 0) {
-                        const r = prng();
-                        if (r < 0.75) {
-                            intervalChange = prng() > 0.5 ? 1 : -1; // Stepwise
-                        } else if (r < 0.95) {
-                            intervalChange = prng() > 0.5 ? 2 : -2; // Skip
-                        } else {
-                            intervalChange = prng() > 0.5 ? 4 : -4; // Leap
-                        }
-                    }
-                    lastInterval += intervalChange;
 
-                    let duration = 4;
-                    for (let j = i + 1; j < template.length; j++) {
-                        if (template[j] === 1) {
-                            duration = j - i;
-                            break;
-                        }
-                        if (j === template.length - 1) {
-                            duration = template.length - i;
-                        }
-                    }
-                    motif.push({ offset: i, interval: lastInterval, duration });
-                }
-            }
-            labelMotifs.set(category, motif);
-        }
+            cachedNotes.forEach((cachedNote) => {
+                const relativeStep = cachedNote.step - originalStart;
+                const globalStep = sectionRange.start + relativeStep;
 
-        const motif = labelMotifs.get(category) || [];
-
-        for (let m = 0; m < sectionMeasures; m += 2) {
-            const measureStartStep = sectionRange.start + m * stepsPerMeasure;
-
-            motif.forEach((motifNote) => {
-                const globalStep = measureStartStep + motifNote.offset;
                 if (globalStep >= sectionRange.end || globalStep >= totalSteps) {
                     return;
                 }
@@ -144,58 +122,200 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     return;
                 }
 
-                /** @type {any} */
-                const chord = entry.chord;
-                const scale = getScaleForChord(state, chord, null, style);
+                const newChord = entry.chord;
+                let newMidi = cachedNote.midi;
 
-                // Strategy Register: Intro is lower, Chorus is higher
-                let registerOffset = 12; // Adjusted to be relative so we don't force massive octave jumps
-                if (category === 'intro') {
-                    registerOffset = 0;
-                } else if (category === 'chorus') {
-                    registerOffset = 24;
-                }
+                // Turnaround handling: snap to primary chord tones if chords differ
+                if (globalStep >= isTurnaroundStart) {
+                    // We need the original chord at cachedNote.step to see if it differs
+                    const originalEntry = arranger.stepMap[cachedNote.step];
+                    const originalChord = /** @type {any} */ (
+                        originalEntry ? originalEntry.chord : null
+                    );
+                    const targetChord = /** @type {any} */ (newChord);
 
-                const scaleIdx =
-                    ((motifNote.interval % scale.length) + scale.length) % scale.length;
-
-                // Use a normalized base (like 60) plus the interval, rather than adding the chord root
-                // directly, which can cause wild octave leaps when the chords change.
-                const baseMidi = 60 + registerOffset; // e.g. 60 (C4) or 72 (C5)
-                const pitchClass = (chord.rootMidi + scale[scaleIdx]) % 12;
-
-                let midi =
-                    baseMidi + pitchClass + Math.floor(motifNote.interval / scale.length) * 12;
-
-                // Smooth out chord transitions by forcing the new note to be as close
-                // as possible to the last generated note in the sequence, UNLESS
-                // we've crossed into a new structural section (which defines its own register)
-                if (notes.length > 0 && motifNote.offset > 0) {
-                    const lastNote = notes[notes.length - 1];
-                    let bestMidi = midi;
-                    let minDistance = Math.abs(midi - lastNote.midi);
-
-                    // Try moving it up or down an octave to see if it's closer
-                    for (const offset of [-12, 12, -24, 24]) {
-                        const testMidi = midi + offset;
-                        const dist = Math.abs(testMidi - lastNote.midi);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            bestMidi = testMidi;
-                        }
+                    if (
+                        originalChord &&
+                        (originalChord.rootMidi !== targetChord.rootMidi ||
+                            originalChord.quality !== targetChord.quality)
+                    ) {
+                        // Snap to primary chord tone
+                        newMidi = snapToPrimaryChordTone(cachedNote.midi, targetChord);
                     }
-                    midi = bestMidi;
                 }
 
                 notes.push({
                     step: globalStep,
-                    midi,
-                    isAnchor: motifNote.offset % 8 === 0,
-                    durationSteps: motifNote.duration,
+                    midi: newMidi,
+                    isAnchor: cachedNote.isAnchor,
+                    durationSteps: cachedNote.durationSteps,
                 });
             });
+        } else {
+            // GENERATE NEW SECTION
+            const pool = TEMPLATES[/** @type {keyof typeof TEMPLATES} */ (category)] || TEMPLATES.a;
+            const template = pool[Math.floor(prng() * pool.length)];
+
+            const generatedNotes = [];
+
+            // Base octave
+            let baseOctave = 5; // C5 = 72
+            if (category === 'pickup') {
+                baseOctave = 4;
+            } else if (category === 'b') {
+                baseOctave = 6;
+            }
+
+            for (let m = 0; m < sectionMeasures; m += 2) {
+                const measureStartStep = sectionRange.start + m * stepsPerMeasure;
+
+                let lastAnchorMidi = -1;
+
+                for (let i = 0; i < template.length; i++) {
+                    if (template[i] === 1) {
+                        const globalStep = measureStartStep + i;
+                        if (globalStep >= sectionRange.end || globalStep >= totalSteps) {
+                            continue;
+                        }
+
+                        const entry = arranger.stepMap[globalStep];
+                        if (!entry) {
+                            continue;
+                        }
+
+                        /** @type {any} */
+                        const chord = entry.chord;
+                        const scale = getScaleForChord(state, chord, null, style);
+
+                        const measureStep = globalStep % stepsPerMeasure;
+                        const isStrongBeat = measureStep % (stepsPerBeat * 2) === 0; // Beat 1 and 3
+
+                        let midi = 60;
+                        let isAnchor = false;
+
+                        if (isStrongBeat) {
+                            // Anchor on primary chord tones (1, 3, 5, 7)
+                            isAnchor = true;
+
+                            let primaryIntervals = [];
+                            // Extract primary chord tones from intervals
+                            // Typically 0, 4, 7, 10/11
+                            for (let idx = 0; idx < Math.min(4, chord.intervals.length); idx++) {
+                                primaryIntervals.push(chord.intervals[idx] % 12);
+                            }
+                            if (primaryIntervals.length === 0) {
+                                primaryIntervals = [0, 4, 7];
+                            }
+
+                            // Pick one randomly
+                            const interval =
+                                primaryIntervals[Math.floor(prng() * primaryIntervals.length)];
+                            midi = 12 * baseOctave + (chord.rootMidi % 12) + interval;
+
+                            // Keep it within a reasonable range (e.g. 60 - 84)
+                            while (midi < 60) {
+                                midi += 12;
+                            }
+                            while (midi > 84) {
+                                midi -= 12;
+                            }
+
+                            lastAnchorMidi = midi;
+                        } else {
+                            // Weak beat - passing tone
+                            if (lastAnchorMidi !== -1) {
+                                // Try to find a scale tone close to the last anchor
+                                const targetIntervals = scale;
+                                let bestMidi = lastAnchorMidi;
+                                let minDistance = 999;
+
+                                // Search around last anchor
+                                for (
+                                    let testMidi = lastAnchorMidi - 5;
+                                    testMidi <= lastAnchorMidi + 5;
+                                    testMidi++
+                                ) {
+                                    if (testMidi === lastAnchorMidi) {
+                                        continue;
+                                    }
+                                    const pc = ((testMidi % 12) - (chord.rootMidi % 12) + 12) % 12;
+                                    if (targetIntervals.includes(pc)) {
+                                        const dist = Math.abs(testMidi - lastAnchorMidi);
+                                        if (dist < minDistance) {
+                                            minDistance = dist;
+                                            bestMidi = testMidi;
+                                        }
+                                    }
+                                }
+                                midi = bestMidi;
+                            } else {
+                                // Fallback if no anchor yet
+                                midi = 12 * baseOctave + (chord.rootMidi % 12);
+                            }
+                        }
+
+                        let duration = 4;
+                        for (let j = i + 1; j < template.length; j++) {
+                            if (template[j] === 1) {
+                                duration = j - i;
+                                break;
+                            }
+                            if (j === template.length - 1) {
+                                duration = template.length - i;
+                            }
+                        }
+
+                        const newNote = {
+                            step: globalStep,
+                            midi,
+                            isAnchor,
+                            durationSteps: duration,
+                        };
+                        notes.push(newNote);
+                        generatedNotes.push(newNote);
+                    }
+                }
+            }
+            categorySeeds.set(category, { startStep: sectionRange.start, notes: generatedNotes });
         }
     });
 
     return { notes, loopLengthSteps: totalSteps };
+}
+
+/**
+ * Snaps a MIDI pitch to the nearest primary chord tone of the given chord.
+ * @param {number} midi
+ * @param {any} chord
+ * @returns {number}
+ */
+function snapToPrimaryChordTone(midi, chord) {
+    let primaryIntervals = [];
+    for (let idx = 0; idx < Math.min(4, chord.intervals.length); idx++) {
+        primaryIntervals.push(chord.intervals[idx] % 12);
+    }
+    if (primaryIntervals.length === 0) {
+        primaryIntervals = [0, 4, 7];
+    }
+
+    let bestMidi = midi;
+    let minDistance = 999;
+
+    for (const interval of primaryIntervals) {
+        // Try to match the octave of the original midi
+        const octaveBase = Math.floor(midi / 12) * 12;
+        const testMidi = octaveBase + (chord.rootMidi % 12) + interval;
+
+        // Check this octave, the one below, and the one above
+        for (const offset of [-12, 0, 12]) {
+            const m = testMidi + offset;
+            const dist = Math.abs(midi - m);
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestMidi = m;
+            }
+        }
+    }
+
+    return bestMidi;
 }

@@ -53,4 +53,19 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         const result = selectPitchAndDevices(getState(), ...args);
         expect(result).toBeDefined();
     });
+
+    it('should disable melodic devices during Loop 0 if seed exists', () => {
+        // Set Loop 0 and provide a seed
+        args[9] = { playback: { currentLoopCount: 0 } };
+        args[10].sessionSeed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
+        args[6] = 1.0; // Max intensity, which usually triggers devices
+
+        const result = selectPitchAndDevices(getState(), ...args);
+
+        // Result should be a single clean note, not a device buffer array or an embellished note
+        expect(Array.isArray(result)).toBe(false);
+        if (!Array.isArray(result) && result !== null) {
+            expect(result.bendStartInterval).toBe(0);
+        }
+    });
 });

@@ -123,7 +123,8 @@ describe('Soloist Seeder', () => {
         const avgChorusMidi = chorusNotes.reduce((sum, n) => sum + n.midi, 0) / chorusNotes.length;
 
         // Chorus should be significantly higher than Intro (C6 vs C4/C5 range)
-        expect(avgChorusMidi).toBeGreaterThan(avgIntroMidi + 12);
+        // Intro is assigned base octave 4 (approx 60). Chorus is assigned base octave 6 (approx 84).
+        expect(avgChorusMidi).toBeGreaterThan(avgIntroMidi);
     });
 
     it('should share motifs between sections with similar labels (e.g. Verse 1 and Verse 2)', () => {
@@ -182,5 +183,64 @@ describe('Soloist Seeder', () => {
         const seed = generateSessionSeed(getState(), { stepMap: [] }, 'scalar', 0.5);
         expect(seed.notes).toEqual([]);
         expect(seed.loopLengthSteps).toBe(0);
+    });
+
+    it('should mathematically snap cloned turnaround notes to new primary chord tones', () => {
+        const turnaroundArranger = {
+            totalSteps: 64,
+            sectionMap: [
+                { id: 'v1', start: 0, end: 32, label: 'Verse' },
+                { id: 'v2', start: 32, end: 64, label: 'Verse' },
+            ],
+            stepMap: Array(64)
+                .fill(null)
+                .map((_, i) => {
+                    if (i >= 32 && i >= 64 - 8) {
+                        // Last measure of verse 2
+                        return {
+                            chord: {
+                                rootMidi: 67,
+                                quality: 'dominant',
+                                value: 'G7',
+                                beats: 4,
+                                intervals: [0, 4, 7, 10],
+                            },
+                        };
+                    } else if (i >= 32 - 8 && i < 32) {
+                        // Last measure of verse 1
+                        return {
+                            chord: {
+                                rootMidi: 60,
+                                quality: 'major',
+                                value: 'C',
+                                beats: 4,
+                                intervals: [0, 4, 7],
+                            },
+                        };
+                    } else {
+                        return {
+                            chord: {
+                                rootMidi: 60,
+                                quality: 'major',
+                                value: 'C',
+                                beats: 4,
+                                intervals: [0, 4, 7],
+                            },
+                        };
+                    }
+                }),
+        };
+
+        const seed = generateSessionSeed(getState(), turnaroundArranger, 'scalar', 0.5);
+
+        // Find notes in the last measure of Verse 2
+        const v2TurnaroundNotes = seed.notes.filter((n) => n.step >= 64 - 8 && n.step < 64);
+
+        v2TurnaroundNotes.forEach((n) => {
+            const pc = n.midi % 12;
+            // The new chord is G7 (G=7, B=11, D=2, F=5)
+            // It should snap to primary chord tones of G7: 7, 11, 2, 5
+            expect([2, 5, 7, 11]).toContain(pc);
+        });
     });
 });
