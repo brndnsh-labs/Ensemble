@@ -52,15 +52,44 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // To ensure repetition across identical sections (e.g. AABA form),
     // we'll memorize the target note sequence for each section label.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
-    /** @type {Map<string, Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>>} */
+    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, metrics: { density: number, syncopationRatio: number } }>} */
     const sectionMotifs = new Map();
+
+    /** @type {Map<string, number>} */
+    const sectionIterationCount = new Map();
+
+    // Find macro turnaround index
+    let turnaroundIndex = arranger.sectionMap.length - 1;
+    if (arranger.sectionMap.length > 2) {
+        // e.g., A A B A -> the final A is the turnaround
+        // Check if the last section matches a primary section
+        const lastSectionLabel = (
+            arranger.sectionMap[arranger.sectionMap.length - 1].label || ''
+        ).toLowerCase();
+        const primaryMatch = arranger.sectionMap.find(
+            (s) => (s.label || '').toLowerCase() === lastSectionLabel,
+        );
+        if (primaryMatch && primaryMatch !== arranger.sectionMap[arranger.sectionMap.length - 1]) {
+            // It repeats! The last one is indeed the turnaround.
+            turnaroundIndex = arranger.sectionMap.length - 1;
+        } else {
+            // If the last section is something like "Outro", maybe the one before it is the turnaround
+            for (let i = arranger.sectionMap.length - 1; i >= 0; i--) {
+                const label = (arranger.sectionMap[i].label || '').toLowerCase();
+                if (!label.includes('outro') && !label.includes('end')) {
+                    turnaroundIndex = i;
+                    break;
+                }
+            }
+        }
+    }
 
     // Walk through each section
     console.log(
         `[Seeder Debug] Starting seed generation. Total steps: ${totalSteps}, time signature: ${arranger.timeSignature}`,
     );
 
-    arranger.sectionMap.forEach((sectionRange) => {
+    arranger.sectionMap.forEach((sectionRange, index) => {
         const label = (sectionRange.label || 'Main').toLowerCase();
 
         // Generalize labels
@@ -88,6 +117,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             `[Seeder Debug] Section ${label}: start measure ${sectionStartMeasure}, end measure ${sectionEndMeasure}. Applying motif.`,
         );
 
+        const isDeparture =
+            category === 'chorus' ||
+            category === 'bridge' ||
+            category === 'b' ||
+            category === 'prechorus';
+
+        // Track iterations to apply restatement mutations
+        const iteration = sectionIterationCount.get(category) || 0;
+        sectionIterationCount.set(category, iteration + 1);
+
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
         if (!sectionMotifs.has(category)) {
@@ -97,28 +136,62 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const totalBeats = tsConfig.beats * 2;
             let currentDegreeOffset = 0; // Relative to a target chord tone
 
+            // Check for contrast needs
+            let forceSparse = false;
+            let forceDense = false;
+            if (isDeparture) {
+                // Find primary motif metrics to create contrast
+                const primaryMetrics =
+                    sectionMotifs.get('verse')?.metrics ||
+                    sectionMotifs.get('main')?.metrics ||
+                    sectionMotifs.get('a')?.metrics;
+                if (primaryMetrics) {
+                    if (primaryMetrics.density > 4 && primaryMetrics.syncopationRatio > 0.4) {
+                        forceSparse = true;
+                    } else if (primaryMetrics.density < 3) {
+                        forceDense = true;
+                    }
+                }
+            }
+
             // Allow for pickups at the very start of the motif (before beat 0)
-            if (prng() > 0.5) {
+            if (!forceSparse && prng() > 0.5) {
                 // Pickup 1 beat before
                 motif.push({
                     beatOffset: -1,
                     isPickup: true,
                     scaleDegreeOffset: -1,
-                    duration: stepsPerBeat,
+                    duration: forceDense ? stepsPerBeat / 2 : stepsPerBeat,
                     isRest: false,
                 });
                 currentBeat = 0;
             }
 
             while (currentBeat < totalBeats) {
-                const isRest = prng() > 0.8;
+                let isRest = false;
+                if (forceSparse) {
+                    isRest = prng() > 0.4;
+                } else if (forceDense) {
+                    isRest = prng() > 0.9;
+                } else {
+                    isRest = prng() > 0.8;
+                }
+
                 let durationBeats = 1;
 
-                if (currentBeat % tsConfig.beats === 0) {
-                    // Downbeat
-                    durationBeats = prng() > 0.5 ? 2 : 1;
+                if (forceSparse) {
+                    // Sustained notes on downbeats
+                    durationBeats = prng() > 0.5 ? 4 : 2;
+                } else if (forceDense) {
+                    // Aggressive 8th/16th notes
+                    durationBeats = prng() > 0.6 ? 0.5 : 0.25;
                 } else {
-                    durationBeats = prng() > 0.7 ? 0.5 : 1; // Sometimes play eighth notes
+                    if (currentBeat % tsConfig.beats === 0) {
+                        // Downbeat
+                        durationBeats = prng() > 0.5 ? 2 : 1;
+                    } else {
+                        durationBeats = prng() > 0.7 ? 0.5 : 1; // Sometimes play eighth notes
+                    }
                 }
 
                 // Ensure we don't overflow the 2-measure motif
@@ -171,12 +244,73 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 }
             }
 
-            sectionMotifs.set(category, motif);
+            // Calculate metrics for this new motif
+            let attacks = 0;
+            let syncopatedAttacks = 0;
+            motif.forEach((n) => {
+                if (!n.isRest) {
+                    attacks++;
+                    // An off-beat is any offset that is not a whole number or downbeat
+                    const isDownbeat = n.beatOffset % tsConfig.beats === 0;
+                    const isWholeBeat = n.beatOffset % 1 === 0;
+                    if (!isWholeBeat || !isDownbeat) {
+                        syncopatedAttacks++;
+                    }
+                }
+            });
+            const density = attacks / 2; // attacks per measure (2 measure motif)
+            const syncopationRatio = attacks > 0 ? syncopatedAttacks / attacks : 0;
+
+            sectionMotifs.set(category, { motif, metrics: { density, syncopationRatio } });
         }
 
-        const motif = sectionMotifs.get(category) || [];
+        let motif = sectionMotifs.get(category)?.motif || [];
 
-        // Apply motif to the section, 2 measures at a time
+        // Motivic Mutation (Restatement)
+        if (iteration > 0) {
+            // Create a deep copy to mutate
+            motif = motif.map((n) => ({ ...n }));
+
+            const r = prng();
+            if (r < 0.2) {
+                // Rhythmic Displacement: Shift entire motif later by one 8th note
+                motif.forEach((n) => {
+                    n.beatOffset += 0.5;
+                });
+            } else if (r < 0.5) {
+                // Subdivision: Split one quarter note into two 8ths
+                const quarterNotes = motif.filter((n) => n.duration === stepsPerBeat && !n.isRest);
+                if (quarterNotes.length > 0) {
+                    const target = quarterNotes[Math.floor(prng() * quarterNotes.length)];
+                    target.duration = stepsPerBeat / 2;
+                    // Insert the second 8th note
+                    const newNote = {
+                        ...target,
+                        beatOffset: target.beatOffset + 0.5,
+                        scaleDegreeOffset: target.scaleDegreeOffset + (prng() > 0.5 ? 1 : -1),
+                    };
+                    const idx = motif.indexOf(target);
+                    motif.splice(idx + 1, 0, newNote);
+                }
+            } else if (r < 0.75) {
+                // Interval Expansion: Push the highest pitch up a diatonic third
+                let maxDegree = -999;
+                /** @type {any} */
+                let targetNote = null;
+                motif.forEach((n) => {
+                    if (!n.isRest && n.scaleDegreeOffset > maxDegree) {
+                        maxDegree = n.scaleDegreeOffset;
+                        targetNote = n;
+                    }
+                });
+                if (targetNote) {
+                    targetNote.scaleDegreeOffset += 2; // Diatonic third
+                }
+            }
+        }
+
+        // Apply motif to the section, typically repeating in 2-measure blocks
+        // within a larger 4 or 8 measure block with a forced rest at the end.
         let registerBase = 60; // Middle C
         if (category === 'chorus') {
             registerBase += 12;
@@ -187,8 +321,87 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         let lastMidi = registerBase;
 
+        // Find if this is the last section before a structural reset (macro form turnaround)
+        // Usually the last section in the arranger.sectionMap, or right before a loop
+        const isLastSectionOfForm = index === turnaroundIndex;
+
+        // Group into 8-measure or 4-measure blocks
+        const totalSectionMeasures = sectionEndMeasure - sectionStartMeasure;
+        const blockMeasures = totalSectionMeasures >= 8 ? 8 : 4;
+
         for (let m = sectionStartMeasure; m < sectionEndMeasure; m += 2) {
             const baseStep = m * stepsPerMeasure;
+
+            // Check form resolution at the macro cycle turnaround
+            const measuresFromEnd = sectionEndMeasure - m;
+            const isResolutionZone = isLastSectionOfForm && measuresFromEnd <= 2;
+
+            // In a 4 or 8 measure block, leave the final 4 measures (for 8-block) or 2 measures (for 4-block)
+            // explicitly empty to force a rest state.
+            const measureInBlock = (m - sectionStartMeasure) % blockMeasures;
+
+            // The user explicitly requested: "generate a 2-measure motif, repeat or mutate it in measures 3 and 4,
+            // and then explicitly force a rest state for the remainder of the 8-measure block."
+            if (measureInBlock >= 4 && blockMeasures >= 8) {
+                // We are in measures 5-8 of an 8 measure block. Force rest!
+                // However, check if we are in the absolute final resolution zone
+                if (isResolutionZone && m === sectionEndMeasure - 2) {
+                    const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
+                    if (stepEntry?.chord) {
+                        const chord = /** @type {any} */ (stepEntry.chord);
+                        // Using Root and 5th to avoid major/minor 3rd dissonance on unknown chords
+                        const stableIntervals = [0, 7];
+                        const pitchClass =
+                            (chord.rootMidi +
+                                stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
+                            12;
+                        const midi = registerBase + pitchClass;
+                        notes.push({
+                            step: baseStep,
+                            midi: midi,
+                            isAnchor: true,
+                            durationSteps: stepsPerMeasure * 2, // Let it ring out
+                            velocity: 0.9,
+                        });
+                        lastMidi = midi;
+                    }
+                }
+                continue; // Always rest for remainder of 8-block
+            }
+
+            // For a 4 measure block, leave the last 2 measures relatively empty,
+            // but strongly encourage rests unless it's a dense style
+            if (measureInBlock >= 2 && blockMeasures === 4) {
+                if (isResolutionZone) {
+                    if (m === sectionEndMeasure - 2) {
+                        const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
+                        if (stepEntry?.chord) {
+                            const chord = /** @type {any} */ (stepEntry.chord);
+                            // Using Root and 5th to avoid major/minor 3rd dissonance on unknown chords
+                            const stableIntervals = [0, 7];
+                            const pitchClass =
+                                (chord.rootMidi +
+                                    stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
+                                12;
+                            const midi = registerBase + pitchClass;
+                            notes.push({
+                                step: baseStep,
+                                midi: midi,
+                                isAnchor: true,
+                                durationSteps: stepsPerMeasure * 2, // Let it ring out
+                                velocity: 0.9,
+                            });
+                            lastMidi = midi;
+                        }
+                    }
+                    continue; // Force rest for turnaround resolution
+                } else {
+                    // For regular 4 measure blocks, force a rest state frequently to breathe
+                    if (prng() > 0.3) {
+                        continue;
+                    }
+                }
+            }
 
             // Pick a target chord tone for the downbeat of these 2 measures
             const stepToSearch = Math.min(baseStep, totalSteps - 1);
