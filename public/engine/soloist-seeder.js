@@ -268,13 +268,28 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     duration = totalSteps - exactStep;
                 }
 
-                notes.push({
-                    step: exactStep,
-                    midi: midi,
-                    isAnchor: motifNote.beatOffset === 0,
-                    durationSteps: duration,
-                    velocity: motifNote.beatOffset === 0 ? 0.9 : 0.75,
-                });
+                // Prevent multiple notes from stacking exactly on the same step (causes polyphony/choking bugs)
+                const existingIdx = notes.findIndex((n) => n.step === exactStep);
+                if (existingIdx !== -1) {
+                    // Override the existing note if it's not an anchor, or just skip
+                    if (motifNote.beatOffset === 0) {
+                        notes[existingIdx] = {
+                            step: exactStep,
+                            midi: midi,
+                            isAnchor: true,
+                            durationSteps: duration,
+                            velocity: 0.9,
+                        };
+                    }
+                } else {
+                    notes.push({
+                        step: exactStep,
+                        midi: midi,
+                        isAnchor: motifNote.beatOffset === 0,
+                        durationSteps: duration,
+                        velocity: motifNote.beatOffset === 0 ? 0.9 : 0.75,
+                    });
+                }
             });
         }
     });

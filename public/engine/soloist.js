@@ -235,6 +235,12 @@ export function getSoloistNote(
         loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
 
     if (isStrictHeadPlayback && soloist.sessionSeed) {
+        // While playing the strict head, the soloist is technically actively phrasing,
+        // so we must force isResting = false to prevent the global orchestrator from giving
+        // the solo away to comping instruments due to assumed inactivity.
+        soloist.isResting = false; // @worker-mutation
+        soloist.phrasingState = 'active'; // @worker-mutation
+
         const stepInLoop =
             ((step % soloist.sessionSeed.loopLengthSteps) + soloist.sessionSeed.loopLengthSteps) %
             soloist.sessionSeed.loopLengthSteps;
