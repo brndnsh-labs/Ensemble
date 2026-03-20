@@ -160,14 +160,16 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 id={`${module === 'chords' ? 'chord' : module}-tab-smart`}
                 class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
             >
-                <div
-                    class="smart-status"
-                    style={`padding: 0.5rem; background: rgba(var(--${module}-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--${module}-color-rgb), 0.2); text-align: center;`}
-                >
-                    <p style="font-size: 0.8rem; margin: 0;">
-                        ✨ <strong>Smart Follow</strong> Active
-                    </p>
-                </div>
+                {module !== 'soloist' && (
+                    <div
+                        class="smart-status"
+                        style={`padding: 0.5rem; background: rgba(var(--${module}-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--${module}-color-rgb), 0.2); text-align: center;`}
+                    >
+                        <p style="font-size: 0.8rem; margin: 0;">
+                            ✨ <strong>Smart Follow</strong> Active
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );
