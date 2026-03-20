@@ -56,6 +56,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     const sectionMotifs = new Map();
 
     // Walk through each section
+    console.log(
+        `[Seeder Debug] Starting seed generation. Total steps: ${totalSteps}, time signature: ${arranger.timeSignature}`,
+    );
+
     arranger.sectionMap.forEach((sectionRange) => {
         const label = (sectionRange.label || 'Main').toLowerCase();
 
@@ -79,6 +83,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         const sectionStartMeasure = Math.floor(sectionRange.start / stepsPerMeasure);
         const sectionEndMeasure = Math.floor(sectionRange.end / stepsPerMeasure);
+
+        console.log(
+            `[Seeder Debug] Section ${label}: start measure ${sectionStartMeasure}, end measure ${sectionEndMeasure}. Applying motif.`,
+        );
 
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
@@ -294,5 +302,6 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         }
     });
 
+    console.log(`[Seeder Debug] Finished generation. Total seed notes: ${notes.length}.`);
     return { notes, loopLengthSteps: totalSteps };
 }
