@@ -1,6 +1,6 @@
 # Ensemble: The Intelligent Virtual Band
 
-**Ensemble** is an ultra-lightweight (under 500KB), high-performance Virtual Band in your browser. It’s an intelligent "beyond-the-metronome" toolkit for musicians that generates real-time, reactive backing tracks—drums, bass, and chords—that adapt to your style, intensity, and genre.
+**Ensemble** is an ultra-lightweight, high-performance Virtual Band in your browser. It’s an intelligent "beyond-the-metronome" toolkit for musicians that generates real-time, reactive backing tracks—drums, bass, and chords—that adapt to your style, intensity, and genre.
 
 Whether you're practicing a `ii-V-I` progression, sketching a new song idea, or exporting MIDI for a DAW, Ensemble provides a "pro-level" rhythm section that understands the pocket.
 
