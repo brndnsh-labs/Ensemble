@@ -354,6 +354,17 @@ export function selectPitchAndDevices(
         if (dist > 7) {
             weight *= 0.4;
         }
+        // Gently encourage stepwise motion and penalize large leaps
+        if (dist <= 2) {
+            weight *= 1.5;
+        } else if (dist <= 4) {
+            weight *= 1.2;
+        } else if (dist > 7 && dist !== 12) {
+            weight *= 0.1; // Moderate penalty for large leaps (not octaves)
+        } else if (dist > 5 && dist !== 12) {
+            weight *= 0.5; // Slight penalty for medium leaps
+        }
+
         const distFromCenter = Math.abs(m - dynamicCenter);
         if (distFromCenter <= 7) {
             weight += 100;

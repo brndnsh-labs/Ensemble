@@ -145,6 +145,7 @@ function runSimulation(bpm, steps = 256) {
                 // But we need to update lastFreq for the next call if the function relies on it being passed back in.
                 // The function signature is `getSoloistNote(getState(), ..., prevFreq, ...)`
                 soloistState.lastFreq = 440 * 2 ** ((note.midi - 69) / 12);
+                soloistState.lastMidiPlayed = note.midi;
             }
         }
     }
@@ -174,9 +175,9 @@ describe('Bird Soloist Density Analysis', () => {
         // Assertions for high BPM density reduction and interval control
         // Baseline 120 BPM is around 0.60 density.
         // At 200 BPM, we want it significantly lower to avoid chaos, or at least similar but controlled.
-        // With current fixes, we aim for < 0.55 density and < 3.5 semitone avg interval.
+        // With current fixes, we aim for < 0.55 density and controlled avg interval around 8 or 9.
 
         expect(stats200.density).toBeLessThan(0.95);
-        expect(stats200.avgInterval).toBeLessThan(11.0);
+        expect(stats200.avgInterval).toBeLessThan(10.5); // Accommodates bebop chromaticism safely
     });
 });
