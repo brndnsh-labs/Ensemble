@@ -148,7 +148,8 @@
         "IMPROV",
         "honky",
         "tonk",
-        "prechorus"
+        "prechorus",
+        "Comper"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

@@ -578,6 +578,9 @@ export function getSoloistNote(
         ) {
             soloist.isResting = true; // @worker-mutation
             soloist.phrasingState = 'rest'; // @worker-mutation
+            if (coordination) {
+                coordination.soloistPhraseEnd = true;
+            }
             const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
             const fatigueMultiplier = 1.0;
             const nextRestSteps = Math.floor(
