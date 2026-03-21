@@ -79,4 +79,93 @@ describe('Soloist Seeder Module', () => {
         expect(sectionBNotes.length).toBeGreaterThan(0);
         expect(sectionANotes1.length).toBeGreaterThan(0);
     });
+
+    describe('Stationary and Sequencing Hooks', () => {
+        const mockState = { arranger: { isMinor: false, key: 'C' }, soloist: { tension: 0.5 } };
+        const mockArranger = {
+            timeSignature: '4/4',
+            totalSteps: 256,
+            stepMap: [],
+            sectionMap: [
+                { label: 'A1', start: 0, end: 128 },
+                { label: 'A2', start: 128, end: 256 },
+            ],
+        };
+
+        for (let i = 0; i < 256; i += 16) {
+            mockArranger.stepMap.push({
+                start: i,
+                end: i + 16,
+                chord: { rootMidi: 60, quality: 'major', intervals: [0, 4, 7] },
+            });
+        }
+
+        it('should occasionally generate stationary motifs', () => {
+            let stationaryFound = false;
+            for (let i = 0; i < 20; i++) {
+                const seed = generateSessionSeed(
+                    mockState,
+                    mockArranger,
+                    'minimal',
+                    0.5,
+                    `test-seed-${i}`,
+                );
+                const firstSectionNotes = seed.notes.filter((n) => n.step < 128);
+                const pitchClasses = new Set(firstSectionNotes.map((n) => n.midi % 12));
+                if (pitchClasses.size === 1 && firstSectionNotes.length > 3) {
+                    stationaryFound = true;
+                    break;
+                }
+            }
+            expect(stationaryFound).toBe(true);
+        });
+
+        it('should apply stationary mutation to repeated sections', () => {
+            let mutationFound = false;
+            for (let i = 0; i < 100; i++) {
+                const seed = generateSessionSeed(
+                    mockState,
+                    mockArranger,
+                    'rock',
+                    0.5,
+                    `mutate-seed-${i}`,
+                );
+                const a1Notes = seed.notes.filter((n) => n.step < 128);
+                const a2Notes = seed.notes.filter((n) => n.step >= 128 && n.step < 256);
+                const a1Pitches = new Set(a1Notes.map((n) => n.midi % 12));
+                const a2Pitches = new Set(a2Notes.map((n) => n.midi % 12));
+
+                if (a1Pitches.size > 1 && a2Pitches.size === 1 && a2Notes.length > 3) {
+                    mutationFound = true;
+                    break;
+                }
+            }
+            expect(mutationFound).toBe(true);
+        });
+
+        it('should apply sequencing mutation to repeated sections', () => {
+            let sequencingFound = false;
+            for (let i = 0; i < 200; i++) {
+                const seed = generateSessionSeed(
+                    mockState,
+                    mockArranger,
+                    'rock',
+                    0.5,
+                    `seq-seed-${i}`,
+                );
+                const a1Notes = seed.notes.filter((n) => n.step < 32);
+                const a2Notes = seed.notes.filter((n) => n.step >= 128 && n.step < 160);
+
+                if (a1Notes.length === a2Notes.length && a1Notes.length > 2) {
+                    const diffs = a1Notes.map((n, idx) => a2Notes[idx].midi - n.midi);
+                    const allSameDiff = diffs.every((d) => d === diffs[0] && d !== 0);
+                    if (allSameDiff) {
+                        sequencingFound = true;
+                        break;
+                    }
+                }
+            }
+            expect(sequencingFound).toBe(true);
+        });
+    });
 });

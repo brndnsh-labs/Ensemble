@@ -180,7 +180,7 @@ export function selectPitchAndDevices(
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
         isGreatsProfileEnabled && soloistState.phraseContext?.role === 'response';
-    const isFunkOrSka = activeStyle === 'funk' || activeStyle === 'ska';
+    const _isFunkOrSka = activeStyle === 'funk' || activeStyle === 'ska';
 
     // Optimization: Pre-compute chord tones into a bitmask to avoid O(N) .some() checks and closure creation in hot loop
     let chordMask = 0;
@@ -201,6 +201,30 @@ export function selectPitchAndDevices(
         }
         if (!isScaleTone && !isBlueNote) {
             continue;
+        }
+
+        const dist = Math.abs(m - lastMidi);
+        let repetitionPenalty = 1.0;
+
+        // --- Common Tone Repetition Logic (Additive phase) ---
+        if (dist === 0) {
+            const isStableTone = (chordMask >> interval) & 1 || interval === 7 || interval === 2;
+            const stationaryScale = intent?.stationaryScale ?? 0.5;
+
+            if (stationaryScale > 0) {
+                // Dissonance Protection check
+                if (
+                    (interval === 1 || interval === 6) &&
+                    !['jazz', 'bird', 'blues'].includes(activeStyle)
+                ) {
+                    repetitionPenalty = 0.01;
+                }
+
+                // Reward common tones with a stronger base
+                const boost =
+                    (config.commonToneWeight || 200) * stationaryScale * (isStableTone ? 2.0 : 0.5);
+                weight += boost;
+            }
         }
 
         // --- Greats Stylistic Profiles ---
@@ -307,15 +331,6 @@ export function selectPitchAndDevices(
             }
         }
 
-        const dist = Math.abs(m - lastMidi);
-        if (dist === 0) {
-            if (isFunkOrSka) {
-                weight *= 0.5;
-            } else {
-                continue;
-            }
-        }
-
         if (dist <= 2) {
             weight += 100;
         }
@@ -374,6 +389,16 @@ export function selectPitchAndDevices(
             weight *= 0.1; // Moderate penalty for large leaps (not octaves)
         } else if (dist > 5 && dist !== 12) {
             weight *= 0.5; // Slight penalty for medium leaps
+        }
+
+        // FINAL REPETITION ADJUSTMENTS
+        if (dist === 0) {
+            weight *= repetitionPenalty;
+            const stationaryScale = intent?.stationaryScale ?? 0.5;
+            // If intent is stationary AND it's not a penalized note, apply multiplier
+            if (stationaryScale > 0.7 && repetitionPenalty >= 1.0) {
+                weight *= 1.5 + stationaryScale;
+            }
         }
 
         const distFromCenter = Math.abs(m - dynamicCenter);

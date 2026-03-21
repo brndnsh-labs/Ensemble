@@ -1,5 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { binarySearchMap, createPRNG, generateRandomSeed } from '../utils.js';
+import { STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -130,6 +131,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
         if (!sectionMotifs.has(category)) {
+            const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+            const stationaryProb = config.stationaryProb || 0.05;
+            const isStationaryMotif = prng() < stationaryProb;
+
             const motif = [];
             // Generate a 2-measure template
             let currentBeat = 0;
@@ -202,7 +207,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 if (!isRest) {
                     // Decide melodic motion
                     let motion = 0; // 0 = same, 1 = step up, -1 = step down, 2 = leap up, etc.
-                    if (motif.length > 0) {
+                    if (motif.length > 0 && !isStationaryMotif) {
                         const r = prng();
                         if (r < 0.6) {
                             motion = prng() > 0.5 ? 1 : -1; // Step
@@ -264,12 +269,12 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             motif = motif.map((n) => ({ ...n }));
 
             const r = prng();
-            if (r < 0.2) {
+            if (r < 0.15) {
                 // Rhythmic Displacement: Shift entire motif later by one 8th note
                 motif.forEach((n) => {
                     n.beatOffset += 0.5;
                 });
-            } else if (r < 0.5) {
+            } else if (r < 0.35) {
                 // Subdivision: Split one quarter note into two 8ths
                 const quarterNotes = motif.filter((n) => n.duration === stepsPerBeat && !n.isRest);
                 if (quarterNotes.length > 0) {
@@ -284,7 +289,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     const idx = motif.indexOf(target);
                     motif.splice(idx + 1, 0, newNote);
                 }
-            } else if (r < 0.75) {
+            } else if (r < 0.55) {
                 // Interval Expansion: Push the highest pitch up a diatonic third
                 let maxDegree = -999;
                 /** @type {any} */
@@ -298,6 +303,20 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 if (targetNote) {
                     targetNote.scaleDegreeOffset += 2; // Diatonic third
                 }
+            } else if (r < 0.8) {
+                // Stationary Transformation: Collapse all pitches to a single anchor tone (Root/5th)
+                // This creates "tension hooks" during restatements
+                motif.forEach((n) => {
+                    n.scaleDegreeOffset = 0;
+                });
+            } else {
+                // Sequencing: Transpose the entire motif by a diatonic step or third
+                const shift = prng() > 0.5 ? 1 : 2;
+                motif.forEach((n) => {
+                    if (!n.isRest) {
+                        n.scaleDegreeOffset += shift;
+                    }
+                });
             }
         }
 

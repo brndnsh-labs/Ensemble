@@ -14,6 +14,8 @@ export const STYLE_CONFIG = {
         sustainProb: 0.15,
         maxSustainSteps: 8,
         vibratoIntensity: 0.8,
+        commonToneWeight: 200,
+        stationaryProb: 0.05,
 
         rhythmicDensity: 0.5,
         syncopationLikelihood: 0.2,
@@ -52,6 +54,8 @@ export const STYLE_CONFIG = {
         sustainProb: 0.2,
         maxSustainSteps: 8,
         vibratoIntensity: 1.0,
+        commonToneWeight: 300,
+        stationaryProb: 0.15,
 
         rhythmicDensity: 0.5,
         syncopationLikelihood: 0.3,
@@ -82,6 +86,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2],
         deviceProb: 0.4,
         allowedDevices: ['run', 'guitarDouble'],
+        commonToneWeight: 100,
+        stationaryProb: 0.02,
 
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.4,
@@ -123,6 +129,8 @@ export const STYLE_CONFIG = {
         sustainProb: 0.4,
         maxSustainSteps: 12,
         vibratoIntensity: 1.2,
+        commonToneWeight: 500,
+        stationaryProb: 0.1,
 
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.8,
@@ -161,6 +169,8 @@ export const STYLE_CONFIG = {
         sustainProb: 0.25,
         maxSustainSteps: 10,
         vibratoIntensity: 0.9,
+        commonToneWeight: 350,
+        stationaryProb: 0.2,
 
         rhythmicDensity: 0.5,
         syncopationLikelihood: 0.9,
@@ -196,6 +206,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [9, 13],
         deviceProb: 0.2,
         allowedDevices: ['slide', 'run'],
+        commonToneWeight: 300,
+        stationaryProb: 0.1,
 
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.9,
@@ -231,6 +243,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9, 11],
         deviceProb: 0.3,
         allowedDevices: ['bluesLick', 'slide', 'quartal'],
+        commonToneWeight: 300,
+        stationaryProb: 0.15,
 
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.7,
@@ -265,6 +279,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9, 11],
         deviceProb: 0.15,
         allowedDevices: ['slide', 'enclosure'],
+        commonToneWeight: 600,
+        stationaryProb: 0.4,
 
         rhythmicDensity: 0.3,
         syncopationLikelihood: 0.3,
@@ -302,6 +318,8 @@ export const STYLE_CONFIG = {
             'quartalStack',
             'sheetsOfSound',
         ],
+        commonToneWeight: 400,
+        stationaryProb: 0.08,
 
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.85,
@@ -333,6 +351,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 5, 6, 9],
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
+        commonToneWeight: 150,
+        stationaryProb: 0.05,
 
         rhythmicDensity: 0.95,
         syncopationLikelihood: 0.7,
@@ -371,6 +391,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9],
         deviceProb: 0.1,
         allowedDevices: ['run'],
+        commonToneWeight: 200,
+        stationaryProb: 0.1,
 
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.6,
@@ -406,6 +428,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 6, 9],
         deviceProb: 0.2,
         allowedDevices: ['enclosure', 'slide', 'guitarDouble'],
+        commonToneWeight: 300,
+        stationaryProb: 0.1,
 
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.8,
@@ -448,6 +472,8 @@ export const STYLE_CONFIG = {
             'banjoRoll',
             'graceSlide',
         ],
+        commonToneWeight: 200,
+        stationaryProb: 0.05,
 
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.4,
@@ -483,6 +509,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 7],
         deviceProb: 0.5,
         allowedDevices: ['run'],
+        commonToneWeight: 100,
+        stationaryProb: 0.02,
 
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.3,
@@ -520,6 +548,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 6, 9],
         deviceProb: 0.15,
         allowedDevices: ['guitarDouble'],
+        commonToneWeight: 400,
+        stationaryProb: 0.25,
 
         rhythmicDensity: 0.5,
         syncopationLikelihood: 0.9,
@@ -555,6 +585,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 9],
         deviceProb: 0.1,
         allowedDevices: ['slide', 'run'],
+        commonToneWeight: 200,
+        stationaryProb: 0.1,
 
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.4,
@@ -588,6 +620,8 @@ export const STYLE_CONFIG = {
         targetExtensions: [2, 4, 9],
         deviceProb: 0.35,
         allowedDevices: ['run', 'slide', 'guitarDouble', 'enclosure', 'chromaticFall'],
+        commonToneWeight: 250,
+        stationaryProb: 0.12,
 
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.8,
@@ -677,6 +711,7 @@ export const SOLOIST_INTENTS = {
         phrasingBridgeProb: 0.0, // Always respect structural breaths
         syncopationBias: 0.0, // Prefer downbeats (style-adjusted)
         embellishmentProb: 0.2, // Minimal turns/slides
+        stationaryScale: 1.0, // Strong focus on repeating hooks
     },
     CONVERSATIONAL: {
         maxIntensity: 0.75,
@@ -684,6 +719,7 @@ export const SOLOIST_INTENTS = {
         phrasingBridgeProb: 0.5, // Sometimes push through 8-measure gaps
         syncopationBias: 0.6, // Moderate syncopation
         embellishmentProb: 0.5, // Active phrasing
+        stationaryScale: 0.5, // Occasional repetition
     },
     EXPLORATORY: {
         maxIntensity: 1.0,
@@ -691,5 +727,6 @@ export const SOLOIST_INTENTS = {
         phrasingBridgeProb: 0.9, // Usually push through boundaries
         syncopationBias: 1.0, // Aggressive off-beats
         embellishmentProb: 0.9, // High-energy runs/flurries
+        stationaryScale: 0.1, // Minimal repetition, favor motion
     },
 };
