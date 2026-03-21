@@ -160,13 +160,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             }
 
             // Allow for pickups at the very start of the motif (before beat 0)
-            if (!forceSparse && prng() > 0.5) {
-                // Pickup 1 beat before
+            if (!forceSparse && prng() > 0.4) {
+                const isShortPickup = prng() > 0.5;
                 motif.push({
-                    beatOffset: -1,
+                    beatOffset: isShortPickup ? -0.5 : -1,
                     isPickup: true,
-                    scaleDegreeOffset: -1,
-                    duration: forceDense ? stepsPerBeat / 2 : stepsPerBeat,
+                    scaleDegreeOffset: prng() > 0.5 ? -1 : 1, // Start slightly below or above target
+                    duration: isShortPickup ? stepsPerBeat / 2 : stepsPerBeat,
                     isRest: false,
                 });
                 currentBeat = 0;
@@ -380,9 +380,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                 const exactStep = baseStep + Math.round(motifNote.beatOffset * stepsPerBeat);
 
-                // Skip if out of bounds (e.g., negative step at start of song, or past end)
-                if (exactStep < 0 || exactStep >= totalSteps) {
-                    return;
+                // Wrap the step for the chord lookup so pick-ups to measure 0 look at the end of the song
+                let lookupStep = exactStep;
+                if (lookupStep < 0) {
+                    lookupStep = totalSteps + lookupStep;
+                }
+                if (lookupStep >= totalSteps) {
+                    lookupStep = lookupStep % totalSteps;
                 }
 
                 // Don't bleed into next section unless it's a pickup
@@ -390,7 +394,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     return;
                 }
 
-                const stepEntry = binarySearchMap(arranger.stepMap, exactStep);
+                const stepEntry = binarySearchMap(arranger.stepMap, lookupStep);
                 if (!stepEntry || !stepEntry.chord) {
                     return;
                 }

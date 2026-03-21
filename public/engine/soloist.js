@@ -290,12 +290,21 @@ export function getSoloistNote(
         soloist.isResting = false; // @worker-mutation
         soloist.phrasingState = 'active'; // @worker-mutation
 
+        const sessionSeed = soloist.sessionSeed;
         const stepInLoop =
-            ((step % soloist.sessionSeed.loopLengthSteps) + soloist.sessionSeed.loopLengthSteps) %
-            soloist.sessionSeed.loopLengthSteps;
-        const headNotes = soloist.sessionSeed.notes.filter(
-            (/** @type {any} */ n) => n.step === stepInLoop,
-        );
+            ((step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
+            sessionSeed.loopLengthSteps;
+        const headNotes = sessionSeed.notes.filter((/** @type {any} */ n) => {
+            // If we are in the count-in (step < 0), check for the explicit negative step
+            if (step < 0 && n.step === step) {
+                return true;
+            }
+            // Otherwise, wrap the stored note's step to find its position in the loop
+            const wrappedNoteStep =
+                ((n.step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
+                sessionSeed.loopLengthSteps;
+            return wrappedNoteStep === stepInLoop;
+        });
 
         if (headNotes.length > 0) {
             const headNote = headNotes[0];
