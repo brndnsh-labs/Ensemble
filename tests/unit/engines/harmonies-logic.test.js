@@ -348,7 +348,7 @@ describe('Harmony Engine Logic', () => {
             expect(requested).not.toContain(0);
         });
 
-        it('should NOT reserve space when practiceMode is OFF and bass is disabled', () => {
+        it('should ALWAYS reserve bass register (stay above 52) given new safety rules', () => {
             _playback.practiceMode = false;
             _bass.enabled = false;
             _groove.genreFeel = 'Rock';
@@ -357,9 +357,10 @@ describe('Harmony Engine Logic', () => {
             // Use anchor of 40 so it stays low
             const notes = getHarmonyNotes(getState(), chord, null, 0, 40, 'smart', 0);
 
-            // Should be allowed to drop below 52 to fill the gap
-            const hasLowNotes = notes.some((n) => n.midi < 52);
-            expect(hasLowNotes).toBe(true);
+            // In new logic, 52 is the absolute minimum safetyFloor
+            notes.forEach((n) => {
+                expect(n.midi).toBeGreaterThanOrEqual(52);
+            });
         });
     });
 

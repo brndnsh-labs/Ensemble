@@ -382,7 +382,8 @@ function finalizeHarmonyNotes(
         }
     }
 
-    const safetyFloor = feel === 'Metal' || feel === 'Rock' ? 30 : 40;
+    // Safety Floor: Always stay above 52 (E3) to reserve space for the bass.
+    const safetyFloor = 52;
 
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;

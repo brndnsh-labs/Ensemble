@@ -308,6 +308,9 @@ export function fillBuffers(state, currentStep, requestTimestamp = null, process
                 );
                 for (let i = 0; i < harmonyNotes.length; i++) {
                     const n = harmonyNotes[i];
+                    // Enforce Contract: Register Slotting
+                    n.midi = enforceRegisterSlotting('harmony', n.midi, coordination);
+
                     if (!n.freq) {
                         n.freq = getFrequency(n.midi);
                     }

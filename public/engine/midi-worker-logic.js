@@ -672,6 +672,9 @@ export class ExportProcessor {
                 const polyphonyComp = 1 / Math.sqrt(Math.max(1, harmonyNotes.length));
 
                 harmonyNotes.forEach((/** @type {any} */ n) => {
+                    // Enforce Contract: Register Slotting
+                    n.midi = enforceRegisterSlotting('harmony', n.midi, coordination);
+
                     const noteTimeS = stepTimeS + (n.timingOffset || 0);
                     const notePulse = Math.max(0, this.toPulses(noteTimeS));
                     const midiVel = Math.max(

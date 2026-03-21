@@ -124,13 +124,14 @@ export function enforceRegisterSlotting(module, midi, _context, targetMidi = nul
             return smoothOctaveClamp(midi, 28, 51, targetMidi);
 
         case 'chords':
-            // Chords: 52 to 84 (when Bass is present/active)
+        case 'harmony':
+            // Chords/Harmony: 52 to 84 (when Bass is present/active)
             return smoothOctaveClamp(midi, 52, 84, targetMidi);
 
         case 'soloist':
             // Soloist: Priority 60 to 90, but has free range.
-            // We only clamp if it's hitting extremely low bass frequencies.
-            if (midi < 40) {
+            // We clamp if it's hitting bass frequencies (now raised to 52).
+            if (midi < 52) {
                 return smoothOctaveClamp(midi, 60, 90, targetMidi);
             }
             return midi;

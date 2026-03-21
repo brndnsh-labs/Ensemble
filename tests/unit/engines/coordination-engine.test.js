@@ -155,14 +155,14 @@ describe('Coordination Engine', () => {
             });
         });
 
-        describe('Soloist Slotting (< 40 clamps to 60-90)', () => {
-            it('leaves midi unchanged if >= 40 (free range)', () => {
-                expect(enforceRegisterSlotting('soloist', 40, null)).toBe(40);
-                expect(enforceRegisterSlotting('soloist', 50, null)).toBe(50);
+        describe('Soloist Slotting (< 52 clamps to 60-90)', () => {
+            it('leaves midi unchanged if >= 52 (free range)', () => {
+                expect(enforceRegisterSlotting('soloist', 52, null)).toBe(52);
+                expect(enforceRegisterSlotting('soloist', 60, null)).toBe(60);
                 expect(enforceRegisterSlotting('soloist', 100, null)).toBe(100);
             });
 
-            it('snaps up by octaves if < 40 to fit into 60-90, preserving pitch class', () => {
+            it('snaps up by octaves if < 52 to fit into 60-90, preserving pitch class', () => {
                 const originalMidi = 36; // C
                 const result = enforceRegisterSlotting('soloist', originalMidi, null);
                 expect(result).toBeGreaterThanOrEqual(60);
