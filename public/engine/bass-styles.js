@@ -302,8 +302,8 @@ export function getBassNoteStyle(
             if (note > baseRoot) {
                 note -= 12; // Force below
             }
-            // Absolute floor check
-            if (note < 28) {
+            // Dynamic floor check
+            if (note < absMin) {
                 note += 12;
             }
         }
@@ -467,7 +467,7 @@ export function getBassNoteStyle(
         // High Intensity: Add variation (5ths or Octaves)
         let note = baseRoot;
         let vel = 0.95 + intensity * 0.15;
-        if (intensity > 0.65 && Math.random() < 0.3 + intensity * 0.2) {
+        if (intensity > 0.65 && Math.random() < 0.3 + intensity * 0.2 && !isSoloistBusy) {
             const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
             const fifthOffset = hasFlat5 ? 6 : 7;
             note = Math.random() < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
@@ -549,7 +549,7 @@ export function getBassNoteStyle(
                 !isSoloistBusy
             ) {
                 const note = baseRoot + 12;
-                const finalNote = note > 51 ? baseRoot : note;
+                const finalNote = note > absMax ? baseRoot : note;
                 return result(getFrequency(finalNote), 0.2, 1.15);
             }
 
@@ -667,12 +667,12 @@ export function getBassNoteStyle(
             const octaveProb = 0.4 + intensity * 0.6;
             if (Math.random() < octaveProb) {
                 let note = baseRoot + 12;
-                // Smart Octave Flipping: stay within bass slot (28-51)
-                if (note > 51) {
+                // Smart Octave Flipping: stay within bass slot
+                if (note > absMax) {
                     note = baseRoot - 12;
                 }
                 // Final safety
-                if (note < 28) {
+                if (note < absMin) {
                     note = baseRoot;
                 }
 
@@ -689,7 +689,7 @@ export function getBassNoteStyle(
             if (Math.random() < gallopProb - 0.1) {
                 // Usually repeat the root or octave ghosted
                 const note = Math.random() < 0.7 ? baseRoot : baseRoot + 12;
-                const finalNote = note > 51 ? baseRoot : note;
+                const finalNote = note > absMax ? baseRoot : note;
                 return result(getFrequency(finalNote), 0.5, 0.6, true);
             }
         }
@@ -708,12 +708,12 @@ export function getBassNoteStyle(
         }
 
         const deepRoot = clampAndNormalize(baseRoot - 12);
-        // Force deep register for Dub (Strictly 28-38)
+        // Force deep register for Dub (Stay within safe sub-bass range)
         let finalDeepRoot = deepRoot;
         while (finalDeepRoot > 38) {
             finalDeepRoot -= 12;
         }
-        while (finalDeepRoot < 28) {
+        while (finalDeepRoot < absMin) {
             finalDeepRoot += 12;
         }
 
@@ -794,28 +794,58 @@ export function getBassNoteStyle(
         return res;
     }
 
+    const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5);
+
     // --- QUARTER NOTE (WALKING) STYLE ---
-    if (style === 'quarter' && groove.genreFeel === 'Jazz' && intensity < 0.3) {
-        if (!isBeatStart || intBeat % 2 !== 0) {
+    if (style === 'quarter') {
+        const isJazz = groove.genreFeel === 'Jazz' || groove.lastDrumPreset === 'Jazz';
+        if (isJazz && intensity < 0.3) {
+            if (!isBeatStart || intBeat % 2 !== 0) {
+                return null;
+            }
+            if (isDownbeat) {
+                return result(getFrequency(withOctaveJump(baseRoot)), 2, 1.05);
+            }
+            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
+            const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
+            return result(
+                getFrequency(
+                    clampAndNormalize(
+                        withOctaveJump(baseRoot + (hasFlat5 ? 6 : hasSharp5 ? 8 : 7)),
+                    ),
+                ),
+                2,
+                1.05,
+            );
+        }
+
+        if (!isBeatStart && !isEighthSkip) {
             return null;
         }
-        if (isDownbeat) {
-            return result(getFrequency(withOctaveJump(baseRoot)), 2, 1.05);
-        }
-        const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-        const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
-        return result(
-            getFrequency(
-                clampAndNormalize(withOctaveJump(baseRoot + (hasFlat5 ? 6 : hasSharp5 ? 8 : 7))),
-            ),
-            2,
-            1.05,
-        );
-    }
 
-    const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5);
-    if (!isBeatStart && !(style === 'quarter' && isEighthSkip)) {
-        return null;
+        if (isDownbeat) {
+            return result(
+                getFrequency(clampAndNormalize(baseRoot)),
+                isEighthSkip ? 0.4 : ts.stepsPerBeat * 0.45,
+                velocity,
+            );
+        }
+
+        if (intBeat === 2 && isBeatStart && !isSoloistBusy) {
+            // Beat 3: High preference for 5th or Octave
+            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
+            const fifthOffset = hasFlat5 ? 6 : 7;
+            const targetInterval = Math.random() < 0.7 ? fifthOffset : 0;
+            return result(
+                getFrequency(clampAndNormalize(baseRoot + targetInterval)),
+                isEighthSkip ? 0.4 : ts.stepsPerBeat * 0.45,
+                velocity,
+            );
+        }
+
+        // For intermediate beats, return undefined to let the Generic Fallback and Approach Logic
+        // handle scale tone picking with proper voice-leading and soloist awareness.
+        return undefined;
     }
 
     // Walking Bass Approach Logic (Jazz/Blues)

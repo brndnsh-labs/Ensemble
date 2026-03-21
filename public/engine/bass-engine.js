@@ -150,124 +150,148 @@ export function getBassNote(
     const stepInMeasure = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
     const intBeat = Math.floor(stepInMeasure / ts.stepsPerBeat);
     const isDownbeat = stepInfo ? stepInfo.isMeasureStart : stepInMeasure === 0;
-    const grouping = ts.grouping || [ts.beats];
-    const isGroupStart = stepInfo
-        ? stepInfo.isGroupStart
-        : stepInMeasure % (grouping[0] * ts.stepsPerBeat) === 0;
-    const isBeatStart = stepInfo ? stepInfo.isBeatStart : stepInMeasure % ts.stepsPerBeat === 0;
-    const backbeatArray = ts.backbeat || [1, 3];
-    const _isBackbeat = stepInfo
-        ? stepInfo.isBackbeat
-        : isBeatStart && backbeatArray.includes(intBeat);
 
     // --- Intensity Mapping ---
     const globalIntensity = playback.bandIntensity || 0.5;
-    const loopStep = step % (arranger.totalSteps || 1);
-
-    let _sectionProgress = 0;
-
-    if (context.sectionStart !== undefined && context.sectionEnd !== undefined) {
-        // O(1) Optimization: Use provided context
-        const sectionLength = context.sectionEnd - context.sectionStart;
-        _sectionProgress =
-            sectionLength > 0 ? (loopStep - context.sectionStart) / sectionLength : 0;
-    } else if (arranger.stepMap && arranger.stepMap.length > 0) {
-        // Fallback: O(log N) Lookup for entry, O(log N) for section
-        const entry = binarySearchMap(arranger.stepMap, loopStep);
-        if (entry) {
-            let sectionStart = 0;
-            let sectionEnd = arranger.totalSteps;
-            if (arranger.sectionMap && arranger.sectionMap.length > 0) {
-                const sectionEntry = binarySearchMap(arranger.sectionMap, loopStep);
-                if (sectionEntry) {
-                    sectionStart = sectionEntry.start;
-                    sectionEnd = sectionEntry.end;
-                }
-            } else {
-                // Slower fallback if sectionMap is missing (should not happen in normal flow)
-                const currentSectionId = /** @type {any} */ (entry.chord).sectionId;
-                const sectionEntries = arranger.stepMap.filter(
-                    (/** @type {any} */ e) =>
-                        /** @type {any} */ (e.chord).sectionId === currentSectionId,
-                );
-                if (sectionEntries.length > 0) {
-                    sectionStart = sectionEntries[0].start;
-                    sectionEnd = sectionEntries[sectionEntries.length - 1].end;
-                }
-            }
-            const sectionLength = sectionEnd - sectionStart;
-            _sectionProgress = sectionLength > 0 ? (loopStep - sectionStart) / sectionLength : 0;
-        }
-    }
-
     const intensity = globalIntensity;
-    let safeCenterMidi = centerMidi || 48; // Standard bass register anchor
+
+    let safeCenterMidi = centerMidi || 38; // Standard bass register anchor (Meat of the neck)
 
     // --- Genre-Specific Register Offsets ---
     if (style === 'dub' || (groove.genreFeel || '') === 'Reggae') {
         safeCenterMidi = 32;
     } else if (style === 'disco' || (groove.genreFeel || '') === 'Disco') {
-        safeCenterMidi = 36; // Lowered to allow octaves
+        safeCenterMidi = 36;
     } else if (style === 'rocco') {
-        safeCenterMidi = 38; // Rocco lives on the low E/A strings
+        safeCenterMidi = 45; // Prefer A/D strings area
     } else if (style === 'neo' || (groove.genreFeel || '') === 'Neo-Soul') {
-        safeCenterMidi = 36; // Keep it deep
+        safeCenterMidi = 24; // Deep Neo-Soul register
     }
 
-    // Shift center up as intensity builds (max +7 semitones)
-    // REGGAE EXCEPTION: Keep it deep even at high intensity
-    const registerShift =
-        style === 'dub' || (groove.genreFeel || '') === 'Reggae'
-            ? Math.min(2, Math.floor(intensity * 7))
-            : Math.floor(intensity * 7);
+    // Shift center up as intensity builds
+    // Rules of Taste: Cap intensity drift for grounding-heavy genres
+    const isGroundingGenre = ['Reggae', 'Neo-Soul', 'Dub'].includes(groove.genreFeel || style);
+    const registerShift = isGroundingGenre
+        ? 0 // Neo-Soul/Reggae stay deep regardless of intensity
+        : Math.floor(intensity * 7);
     safeCenterMidi += registerShift;
 
     // --- ENSEMBLE COORDINATION: Proactive Register Clamping ---
-    // Ensure the anchor itself doesn't drift into Chord territory (52+)
-    while (safeCenterMidi > 51) {
+    const isExtendedRangeGenre = ['Reggae', 'Neo-Soul', 'Metal'].includes(groove.genreFeel);
+    const softMax = isExtendedRangeGenre ? 57 : 51;
+    const softMin = isExtendedRangeGenre ? 23 : 28;
+
+    while (safeCenterMidi > softMax) {
         safeCenterMidi -= 12;
     }
-    while (safeCenterMidi < 28) {
+    while (safeCenterMidi < softMin) {
         safeCenterMidi += 12;
     }
 
     const prevMidi = prevFreq ? getMidi(prevFreq) : null;
 
-    const absMin = 28,
-        absMax = 51; // Bass claims 28-51 as per Coordination Contract
+    // Register Definitions (Rules of Taste)
+    const absMin = 23; // Low B on 5-string
+    const absMax = 57; // High A fill
+    const comfortMin = 28; // Low E
+    const comfortMax = 51; // Standard ceiling
 
-    /** @param {number} midi */
-    const clampAndNormalize = (midi) => {
+    const isSectionStart = context && step === context.sectionStart;
+    const allowSubRange = isDownbeat || isSectionStart;
+
+    /**
+     * @param {number} midi
+     * @param {number|null} [referenceMidi]
+     * @returns {{midi: number, weight: number}}
+     */
+    const clampAndNormalize = (midi, referenceMidi = null) => {
         if (!Number.isFinite(midi)) {
-            return safeCenterMidi;
+            return { midi: safeCenterMidi, weight: 1.0 };
         }
         const pc = ((midi % 12) + 12) % 12;
-        const octave = Math.floor(safeCenterMidi / 12) * 12;
-        let best = -1;
-        let minDiff = 999999;
+        const targetRef = referenceMidi !== null ? referenceMidi : safeCenterMidi;
+        const octaveBase = Math.floor(targetRef / 12) * 12;
+        const currentRootPC = chord.rootMidi % 12;
 
-        /** @param {number} off */
-        const check = (off) => {
-            const c = octave + off + pc;
-            if (
-                c >= Math.max(absMin, safeCenterMidi - 12) &&
-                c <= Math.min(absMax, safeCenterMidi + 12)
-            ) {
-                const diff = Math.abs(c - safeCenterMidi);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    best = c;
+        const candidates = [];
+        for (let o = -24; o <= 24; o += 12) {
+            const c = octaveBase + o + pc;
+            if (c >= absMin && c <= absMax) {
+                let weight = 1.0;
+
+                // 1. Distance from Anchor
+                const distFromCenter = Math.abs(c - safeCenterMidi);
+                weight *= 1.0 - distFromCenter / 48;
+
+                // 2. Hand Position Bonus
+                if (referenceMidi !== null) {
+                    const stepDist = Math.abs(c - referenceMidi);
+                    // Single Position Bonus (±5 semitones)
+                    if (stepDist <= 5) {
+                        weight *= 1.5;
+                    }
+                    // Stepwise Bonus (±2 semitones)
+                    if (stepDist <= 2 && stepDist > 0) {
+                        weight *= 2.0; // Stronger stepwise bonus for voice leading
+                    }
+                    // Jump Penalty
+                    if (stepDist > 12) {
+                        weight *= 0.4;
+                    }
+                }
+
+                // 3. Comfort Zone vs Extended Range
+                const inComfortZone = c >= comfortMin && c <= comfortMax;
+                const isGroundingStyleInside =
+                    ['Reggae', 'Neo-Soul', 'Dub'].includes(groove.genreFeel) ||
+                    style === 'neo' ||
+                    style === 'dub';
+
+                if (isGroundingStyleInside && c < comfortMin) {
+                    weight *= 5.0; // Extremely strong basement bonus
+                } else if (!inComfortZone) {
+                    if (c < comfortMin) {
+                        const subPenalty = allowSubRange ? 0.2 : 0.8;
+                        weight *= 1.0 - subPenalty;
+                    } else {
+                        // More aggressive Attic Penalty for MIDI > 51
+                        const highPenalty = intensity > 0.85 ? 0.2 : 0.9;
+                        weight *= 1.0 - highPenalty;
+                    }
+                }
+
+                // 4. Interval Stability Bonus (Target Root/5th)
+                if (pc === currentRootPC || pc === (currentRootPC + 7) % 12) {
+                    const isGrounding = ['neo', 'dub'].includes(style);
+                    weight *= isGrounding ? 1.1 : 1.5;
+                }
+
+                // 5. Style Priority Boost
+                if (c === midi) {
+                    weight *= 5.0;
+                }
+
+                if (weight > 0) {
+                    candidates.push({ midi: c, weight });
                 }
             }
-        };
-        check(-12);
-        check(0);
-        check(12);
-
-        if (best !== -1) {
-            return best;
         }
-        return Math.max(absMin, Math.min(absMax, octave + pc));
+
+        if (candidates.length > 0) {
+            candidates.sort((a, b) => b.weight - a.weight);
+            return candidates[0];
+        }
+
+        return { midi: Math.max(absMin, Math.min(absMax, octaveBase + pc)), weight: 0.1 };
+    };
+
+    /**
+     * @param {number} midi
+     * @param {number|null} [referenceMidi]
+     * @returns {number}
+     */
+    const clampAndNormalizeMidi = (midi, referenceMidi = null) => {
+        return clampAndNormalize(midi, referenceMidi).midi;
     };
 
     /** @param {number} midi */
@@ -275,15 +299,14 @@ export function getBassNote(
         if (!Number.isFinite(midi)) {
             return safeCenterMidi;
         }
-        const useCommitment = (style === 'quarter' || style === 'funk') && prevMidi !== null;
-        // If prevMidi is null, use centerMidi directly instead of an interpolated safeCenterMidi
-        // to pass the Rocco Step 0 test which expects exact C2 (36) for center 38.
+
+        // Neck Drift Prevention: Balance previous position with intended center
+        const isGrounding = ['Reggae', 'Neo-Soul', 'Dub'].includes(groove.genreFeel || style);
+        const centerWeight = isGrounding ? 0.8 : 0.4;
         const targetRef =
             prevMidi !== null
-                ? useCommitment
-                    ? prevMidi * 0.7 + safeCenterMidi * 0.3
-                    : prevMidi
-                : centerMidi || safeCenterMidi;
+                ? prevMidi * (1.0 - centerWeight) + safeCenterMidi * centerWeight
+                : safeCenterMidi;
 
         const pc = ((midi % 12) + 12) % 12;
         const octaves = [
@@ -299,24 +322,26 @@ export function getBassNote(
 
         for (let i = 1; i < octaves.length; i++) {
             const cand = octaves[i] + pc;
-            const diff = Math.abs(cand - targetRef);
+            let diff = Math.abs(cand - targetRef);
+
+            // Grounding Bias: heavily favor the lower candidate if it's in the basement (<= 35)
+            if (isGrounding && cand <= 35 && cand >= absMin && bestCandidate > 35) {
+                diff -= 12;
+            }
+
             if (diff < minDiff) {
                 minDiff = diff;
                 bestCandidate = cand;
             }
         }
 
-        return clampAndNormalize(bestCandidate);
+        return clampAndNormalizeMidi(bestCandidate, prevMidi);
     };
 
-    // Use slash chord bass note if it exists, otherwise use chord root
     const rootToNormalize =
         chord.bassMidi !== null && chord.bassMidi !== undefined ? chord.bassMidi : chord.rootMidi;
     const baseRoot = normalizeToRange(rootToNormalize);
-
-    // --- SCALE RETRIEVAL (Refactored) ---
     const scale = getScaleForChord(state, chord, nextChord, style);
-
     const beatsInChord = Math.round(chord.beats);
     const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;
 
@@ -328,21 +353,20 @@ export function getBassNote(
      * @param {number} [bendStartInterval]
      */
     const result = (
-        freq,
+        /** @type {number} */ freq,
         durationMultiplier = null,
         velocityParam = 1.0,
         muted = false,
         bendStartInterval = 0,
     ) => {
         let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
-
-        // Neo-Soul "Dilla" Lag: Layered on top of holistic pocket
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
             timingOffset += 0.01 + intensity * 0.015;
         }
 
+        /** @type {number} */
         let durationSteps = 1;
-        if (durationMultiplier) {
+        if (durationMultiplier !== null) {
             durationSteps = durationMultiplier;
         } else {
             if (style === 'whole') {
@@ -356,7 +380,7 @@ export function getBassNote(
             } else if (style === 'funk') {
                 durationSteps = 0.8;
             } else if (
-                style === 'disco' ||
+                /** @type {any} */ (style) === 'disco' ||
                 style === 'rocco' ||
                 style === 'metal' ||
                 style === 'neo' ||
@@ -378,7 +402,7 @@ export function getBassNote(
             if (style === 'rock') {
                 durationSteps = ts.stepsPerBeat * 0.4;
             } else if (style === 'funk') {
-                durationSteps = 0.7; // Ensure Funk doesn't overlap at low intensity
+                durationSteps = 0.7;
             } else if (style === 'bossa') {
                 durationSteps = durationMultiplier
                     ? durationMultiplier * (ts.stepsPerBeat / 4)
@@ -386,12 +410,8 @@ export function getBassNote(
             }
         }
 
-        // Wider dynamic range: 0.6 + intensity * 0.7 (Range: 0.6 to 1.3)
         const intensityFactor = 0.6 + intensity * 0.7;
         const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
-
-        // Universal Overlap Protection: Force gaps for legato-heavy styles
-        // Acoustic and long styles (whole/half) are allowed to sustain longer
         const isLongStyle = ['acoustic', 'whole', 'half'].includes(style);
         const maxSafeDuration =
             style === 'quarter'
@@ -412,24 +432,15 @@ export function getBassNote(
         };
     };
 
-    // --- Ensemble Awareness (Soloist Space) ---
-    // If the soloist is shredding, reduce bass complexity to avoid mud.
     const isSoloistBusy = (soloist.busySteps || 0) > 0;
 
-    /** @param {number} note */
-    const withOctaveJump = (note) => {
-        // Skip octave jumps if soloist is busy or intensity is too low
+    const withOctaveJump = (/** @type {number} */ note) => {
         if (isSoloistBusy || intensity < 0.4) {
             return note;
         }
-
-        // Reduced probability further to pass the 40% leapRatio test
         if (Math.random() < 0.02 + intensity * 0.08) {
-            // More jumps at high intensity
             const direction = note > 48 ? -1 : Math.random() < 0.5 ? 1 : -1;
             const shifted = note + 12 * direction;
-
-            // Restrict jumps to stay below MIDI 55 (General) or 42 (Neo-Soul)
             const ceiling = style === 'neo' || groove.genreFeel === 'Neo-Soul' ? 42 : 55;
             if (shifted >= 36 && shifted <= ceiling) {
                 return shifted;
@@ -438,49 +449,33 @@ export function getBassNote(
         return note;
     };
 
-    // --- NEO-SOUL POCKET (The Dilla Foundation) ---
     if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
         const isUpbeat = step % ts.stepsPerBeat !== 0;
-        const isSecondaryAnchor = isBeatStart && intBeat === 2; // Beat 3
-
-        // 1. Fundamental Anchor (Beat 1 & 3)
+        const isSecondaryAnchor = stepInMeasure / ts.stepsPerBeat === 2;
         if (isDownbeat || isSecondaryAnchor) {
-            // Strong foundational slap
             return result(getFrequency(baseRoot), 0.9, 1.15 + intensity * 0.1);
         }
-
-        // 2. Syncopated "Lazy" Hits
         if (isUpbeat) {
-            const isSoloistBusy = soloist.enabled && (soloist.busySteps || 0) > 0;
-            const complexityFactor = playback.complexity || 0.5;
-
-            // Higher probability for syncopated hits at high complexity
-            const hitProb = 0.2 + intensity * 0.4 + complexityFactor * 0.3;
-
+            const hitProb = 0.2 + intensity * 0.4 + (playback.complexity || 0.5) * 0.3;
             if (Math.random() < hitProb && !isSoloistBusy) {
-                // Choice: Repeat root, 5th, or hammer-on (2nd)
                 const rand = Math.random();
                 let note = baseRoot;
                 let isGhost = false;
                 let dur = 0.4;
-
                 if (rand > 0.7) {
-                    note = baseRoot + 7; // The 5th
-                } else if (rand > 0.4 && complexityFactor > 0.6) {
-                    // Hammer-on/Slur: Step 2nd or b7
+                    note = baseRoot + 7;
+                } else if (rand > 0.4 && (playback.complexity || 0.5) > 0.6) {
                     note = scale.includes(2) ? baseRoot + 2 : baseRoot + 10;
                     dur = 0.2;
                 } else {
                     isGhost = true;
                 }
-
                 const res = result(
-                    getFrequency(clampAndNormalize(note)),
+                    getFrequency(clampAndNormalizeMidi(note, prevMidi)),
                     dur,
                     velocity * (isGhost ? 0.6 : 0.9),
                     isGhost,
                 );
-                // Extra lazy lag for the upbeat
                 res.timingOffset += 0.01 + intensity * 0.01;
                 return res;
             }
@@ -488,15 +483,7 @@ export function getBassNote(
         return null;
     }
 
-    /** @param {number|null} midi */
-    const isSameAsPrev = (midi) => {
-        if (!prevMidi) {
-            return false;
-        }
-        return midi === prevMidi;
-    };
-
-    // --- Ensemble Awareness (Kick Drum Mirroring) ---
+    const isSameAsPrev = (/** @type {number|null} */ midi) => prevMidi && midi === prevMidi;
     const kickInst = (groove.instruments || []).find((i) => i.name === 'Kick');
     const hasKickTrigger = !!(
         kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
@@ -505,7 +492,6 @@ export function getBassNote(
     if ((style === 'rock' || style === 'funk') && hasKickTrigger) {
         const kickVel =
             kickInst.steps[step % (groove.measures * stepsPerMeasure)] === 2 ? 1.25 : 1.15;
-        // Scale kick velocity by intensity
         const dynamicKickVel = Math.max(0.8, kickVel * (0.7 + intensity * 0.3));
         return result(getFrequency(withOctaveJump(baseRoot)), null, dynamicKickVel);
     } else if (
@@ -514,10 +500,7 @@ export function getBassNote(
         intensity < 0.4 &&
         !isDownbeat
     ) {
-        if (isSoloistBusy) {
-            return null;
-        }
-        if (Math.random() < 0.6) {
+        if (isSoloistBusy || Math.random() < 0.6) {
             return null;
         }
         if (Math.random() < 0.3) {
@@ -525,60 +508,48 @@ export function getBassNote(
         }
     }
 
-    // --- BLUES STYLE (Box Pattern / Shuffle) ---
     if (style === 'blues') {
         const isUpbeat = stepInfo?.isOffbeat;
-
-        // 1. Interaction: Lock to Kick Drum if available
         if (hasKickTrigger) {
             const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
             const kickVel = kickStepVal === 2 ? 1.25 : 1.15;
-            const dynamicKickVel = Math.max(0.8, kickVel * (0.7 + intensity * 0.3));
-            return result(getFrequency(baseRoot), null, dynamicKickVel);
+            return result(
+                getFrequency(baseRoot),
+                null,
+                Math.max(0.8, kickVel * (0.7 + intensity * 0.3)),
+            );
         }
-
-        // 2. The Box Pattern (Root, 5th, 6th, b7th)
-        // Usually played as quarter notes on stable chords.
-        if (isBeatStart && !isUpbeat) {
+        if (stepInMeasure % ts.stepsPerBeat === 0 && !isUpbeat) {
             const beatInPattern = intBeat % 4;
-            let targetInterval = 0; // Default Root
-
-            // Classic Blues Box: 1, 5, 6, b7
+            let targetInterval = 0;
             if (beatInPattern === 1) {
-                targetInterval = scale.includes(7) ? 7 : scale.includes(6) ? 6 : 7;
+                targetInterval = scale.includes(7) ? 7 : 6;
             } else if (beatInPattern === 2) {
                 targetInterval = scale.includes(9) ? 9 : 7;
             } else if (beatInPattern === 3) {
                 targetInterval = scale.includes(10) ? 10 : 9;
             }
-
-            // High intensity: Add more melodic walking variation to the box
             if (intensity > 0.7 && Math.random() < 0.4) {
-                const randomScaleNote = scale[Math.floor(Math.random() * scale.length)];
-                targetInterval = randomScaleNote;
+                targetInterval = scale[Math.floor(Math.random() * scale.length)];
             }
-
-            // Standard duration, global swing will push the next note back so we don't need to artificially lengthen this
             return result(
-                getFrequency(clampAndNormalize(baseRoot + targetInterval)),
+                getFrequency(clampAndNormalizeMidi(baseRoot + targetInterval, prevMidi)),
                 ts.stepsPerBeat * 0.45,
                 velocity,
             );
         }
-
-        // 3. The Shuffle Lope (The swung offbeat)
         if (isUpbeat) {
-            // Strictly repeat the previous note for an authentic 'long-short' identity
-            const note = prevMidi || baseRoot;
-            // Short, punchy duration for the upbeat
-            const res = result(getFrequency(clampAndNormalize(note)), 0.8, velocity * 0.8, true);
-            // Add a subtle 'lay-back' offset for the shuffle lope
+            const res = result(
+                getFrequency(clampAndNormalizeMidi(prevMidi || baseRoot, prevMidi)),
+                0.8,
+                velocity * 0.8,
+                true,
+            );
             res.timingOffset += 0.005;
             return res;
         }
     }
 
-    // --- HARMONIC RESET ---
     const isStraightStyle = ['rock', 'half', 'whole', 'arp', 'quarter', 'disco', 'neo'].includes(
         style,
     );
@@ -587,15 +558,12 @@ export function getBassNote(
         (isStraightStyle || style === 'funk') &&
         groove.genreFeel !== 'Reggae'
     ) {
-        const resetVel = style === 'funk' ? 1.25 : 1.0 + intensity * 0.25;
-        return result(getFrequency(withOctaveJump(baseRoot)), null, resetVel);
+        return result(
+            getFrequency(withOctaveJump(baseRoot)),
+            null,
+            style === 'funk' ? 1.25 : 1.0 + intensity * 0.25,
+        );
     }
-
-    // --- WHOLE NOTE STYLE ---
-
-    const isQuarter = stepInfo ? stepInfo.isBeatStart : step % ts.stepsPerBeat === 0;
-    const is8th = step % (ts.stepsPerBeat / 2) === 0;
-    const stepInBeat = stepInfo ? stepInfo.stepInBeat || 0 : step % ts.stepsPerBeat;
 
     const styleResult = getBassNoteStyle(
         style,
@@ -604,19 +572,24 @@ export function getBassNote(
         step,
         stepInChord,
         stepInfo || null,
-        { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange },
+        {
+            withOctaveJump,
+            isSameAsPrev,
+            clampAndNormalize: clampAndNormalizeMidi,
+            normalizeToRange,
+        },
         ts,
         stepsPerMeasure,
         intBeat,
-        isQuarter,
-        is8th,
-        isBeatStart,
+        step % ts.stepsPerBeat === 0,
+        step % (ts.stepsPerBeat / 2) === 0,
+        stepInMeasure % ts.stepsPerBeat === 0,
         isDownbeat,
         stepInMeasure,
-        /** @type {number} */ (stepInBeat),
+        step % ts.stepsPerBeat,
         baseRoot,
         prevFreq || 0,
-        /** @type {number} */ (prevMidi || baseRoot),
+        prevMidi || baseRoot,
         centerMidi,
         absMin,
         absMax,
@@ -629,52 +602,73 @@ export function getBassNote(
         isSoloistBusy,
         beatsInChord,
         result,
-        isGroupStart,
+        stepInMeasure % ((ts.grouping?.[0] || ts.beats) * ts.stepsPerBeat) === 0,
         hasKickTrigger,
         kickInst,
     );
     if (styleResult !== undefined) {
         return styleResult;
     }
-    if (intBeat > 0) {
-        let candidates = scale
-            .map((/** @type {number} */ pc) => {
-                const note = baseRoot + pc;
-                const octaves = [0, 12, -12];
-                let best = note,
-                    minDiff = Math.abs(note - baseRoot);
-                for (const o of octaves) {
-                    if (Math.abs(note + o - baseRoot) < minDiff) {
-                        minDiff = Math.abs(note + o - baseRoot);
-                        best = note + o;
-                    }
-                }
-                return best;
-            })
-            .filter((/** @type {number} */ n) => n >= absMin && n <= absMax && !isSameAsPrev(n));
 
-        if (isSoloistBusy) {
-            candidates = candidates.filter((/** @type {number} */ n) => {
-                const pc = n % 12;
-                const rootPC = baseRoot % 12;
-                return pc === rootPC || pc === (rootPC + 7) % 12;
-            });
-            if (candidates.length === 0) {
-                candidates = [baseRoot, baseRoot + 7, baseRoot - 5].map((/** @type {number} */ n) =>
-                    clampAndNormalize(n),
-                );
-            }
+    const isLastBeatOfMeasure = intBeat === ts.beats - 1;
+    const isEndOfChord = intBeat === beatsInChord - 1;
+    const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5);
+    const isApproachPoint =
+        (stepInMeasure % ts.stepsPerBeat === 0 && (isLastBeatOfMeasure || isEndOfChord)) ||
+        isEighthSkip ||
+        step % 16 === 14;
+
+    if (isApproachPoint && nextChord) {
+        const nextTarget = nextChord.bassMidi ?? nextChord.rootMidi;
+        const targetRoot = normalizeToRange(nextTarget);
+        let chromaticProb =
+            (isSoloistBusy ? 0.4 : 0.6) +
+            ((soloist.tension || 0) + intensity * 0.3 + (playback.complexity || 0.5) * 0.2) * 0.3;
+        if (intensity > 0.75 && ['Jazz', 'Blues'].includes(groove.genreFeel)) {
+            chromaticProb = 0.95;
         }
 
-        if (candidates.length > 0) {
-            candidates.sort(
-                (/** @type {number} */ a, /** @type {number} */ b) =>
-                    Math.abs(a - (prevMidi || baseRoot)) - Math.abs(b - (prevMidi || baseRoot)),
+        if (
+            Math.random() < chromaticProb &&
+            (['Jazz', 'Blues'].includes(groove.genreFeel) ||
+                (soloist.tension || 0) + intensity * 0.3 > 0.7)
+        ) {
+            const choices = [
+                { midi: targetRoot - 5, weight: 0.5 },
+                { midi: targetRoot - 1, weight: 1.0 },
+                { midi: targetRoot + 1, weight: 1.0 },
+            ];
+            let tw = 0;
+            for (let i = 0; i < choices.length; i++) {
+                tw += choices[i].weight;
+            }
+            let r = Math.random() * tw;
+            let approach = targetRoot - 1;
+            for (const c of choices) {
+                r -= c.weight;
+                if (r <= 0) {
+                    approach = c.midi;
+                    break;
+                }
+            }
+            approach = clampAndNormalizeMidi(withOctaveJump(approach), prevMidi);
+            return result(
+                getFrequency(approach),
+                1,
+                velocity,
+                false,
+                Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0,
+            );
+        } else {
+            const valid = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7].filter(
+                (n) => n >= absMin && n <= absMax && !isSameAsPrev(n) && n % 12 !== baseRoot % 12,
             );
             return result(
                 getFrequency(
                     withOctaveJump(
-                        candidates[Math.floor(Math.random() * Math.min(2, candidates.length))],
+                        valid.length > 0
+                            ? valid[Math.floor(Math.random() * valid.length)]
+                            : targetRoot - 5,
                     ),
                 ),
                 null,
@@ -683,5 +677,37 @@ export function getBassNote(
         }
     }
 
+    if (intBeat > 0) {
+        /** @type {{midi: number, weight: number}[]} */
+        let candidates = scale
+            .map((pc) => clampAndNormalize(baseRoot + pc, prevMidi))
+            .filter((n) => !isSameAsPrev(n.midi));
+        if (isSoloistBusy) {
+            candidates = candidates.filter((n) => {
+                const pc = n.midi % 12,
+                    rpc = baseRoot % 12;
+                return pc === rpc || pc === (rpc + 7) % 12;
+            });
+            if (candidates.length === 0) {
+                candidates = [baseRoot, baseRoot + 7, baseRoot - 5].map((n) =>
+                    clampAndNormalize(n, prevMidi),
+                );
+            }
+        }
+        if (candidates.length > 0) {
+            // Priority 1: Hand position (Weight already includes stepwise bonus)
+            // Priority 2: Proximity to Center
+            candidates.sort((a, b) => b.weight - a.weight);
+            return result(
+                getFrequency(
+                    withOctaveJump(
+                        candidates[Math.floor(Math.random() * Math.min(2, candidates.length))].midi,
+                    ),
+                ),
+                null,
+                velocity,
+            );
+        }
+    }
     return result(getFrequency(withOctaveJump(baseRoot)), null, velocity);
 }

@@ -120,8 +120,8 @@ export function enforceRegisterSlotting(module, midi, _context, targetMidi = nul
 
     switch (module) {
         case 'bass':
-            // Bass: MIDI 28 to 51
-            return smoothOctaveClamp(midi, 28, 51, targetMidi);
+            // Bass: MIDI 23 to 57 (Supports 5-string Low B and melodic fills)
+            return smoothOctaveClamp(midi, 23, 57, targetMidi);
 
         case 'chords':
         case 'harmony':

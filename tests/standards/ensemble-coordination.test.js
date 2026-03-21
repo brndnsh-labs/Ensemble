@@ -209,8 +209,8 @@ describe('Ensemble Coordination Contract', () => {
                 const randomMidi = 1 + Math.floor(Math.random() * 126);
 
                 const bassMidi = enforceRegisterSlotting('bass', randomMidi, {});
-                expect(bassMidi).toBeGreaterThanOrEqual(28);
-                expect(bassMidi).toBeLessThanOrEqual(51);
+                expect(bassMidi).toBeGreaterThanOrEqual(23);
+                expect(bassMidi).toBeLessThanOrEqual(57);
 
                 const chordMidi = enforceRegisterSlotting('chords', randomMidi, {});
                 expect(chordMidi).toBeGreaterThanOrEqual(52);

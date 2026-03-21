@@ -58,6 +58,9 @@ describe('Neo-Soul Bassist Critique', () => {
                 if (note) {
                     performance.push({ step: globalStep, loopStep: globalStep % 16, info, note });
                     prevFreq = note.freq;
+                    if (globalStep < 32) {
+                        console.log(`Step ${globalStep}: MIDI ${note.midi}`);
+                    }
                 }
             }
         }
@@ -77,7 +80,8 @@ describe('Neo-Soul Bassist Critique', () => {
     it('should stay grounded in the deep register', () => {
         const performance = simulatePerformance(32, { playback: { bandIntensity: 0.5 } });
 
-        const deepNotes = performance.filter((p) => p.note.midi <= 40);
+        // Deep register for 5-string player includes B and E strings, and the A string root (up to MIDI 38)
+        const deepNotes = performance.filter((p) => p.note.midi <= 38);
         const ratio = deepNotes.length / performance.length;
 
         console.log(`[Neo-Soul Critique] Deep Register Ratio: ${(ratio * 100).toFixed(1)}%`);
