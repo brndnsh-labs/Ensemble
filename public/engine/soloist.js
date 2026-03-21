@@ -307,17 +307,21 @@ export function getSoloistNote(
             const isMacroRestZone = measureInBlock8 >= 6; // Last 2 measures of 8-measure block
 
             // 2. Micro-Phrasing (Probability Gate)
-            const styleConfig =
-                /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
-            const densityBase = styleConfig.rhythmicDensity || 0.5;
-
             // Survival Probability:
-            // - Anchors (Themes): 95-100% chance (protected)
-            // - Non-anchors: Scale with intensity and genre density
-            // If in Themed Improv mode (Loop > 0), reduce probability slightly to leave more room for "thought"
-            const improvFactor = isThemedImprov ? 0.8 : 1.0;
-            let survivalProb =
-                (headNote.isAnchor ? 0.95 : (0.1 + intensity * 0.9) * densityBase) * improvFactor;
+            // The seeder has already spaced the notes. We don't apply densityBase here to avoid double-penalizing the melody.
+            let survivalProb = 1.0;
+
+            if (headNote.isAnchor) {
+                survivalProb = 1.0; // Anchors always play unless macro-rest overrules
+            } else {
+                if (isStrictHeadPlayback) {
+                    // Loop 0: Play almost exactly as composed
+                    survivalProb = 0.85 + intensity * 0.15;
+                } else {
+                    // Loop 1+: Themed Improv. Lower density to make room for generative fills/space
+                    survivalProb = 0.5 + intensity * 0.4;
+                }
+            }
 
             // Macro-rest overrides:
             // High intensity soloists "push through" structural boundaries to build tension,
