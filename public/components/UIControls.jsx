@@ -239,6 +239,7 @@ export function ButtonGroup({ options, value, onChange, className = '', style = 
                 <button
                     key={opt.value}
                     class={`chip-btn ${value === opt.value ? 'active' : ''}`}
+                    aria-pressed={value === opt.value}
                     onClick={() => onChange(opt.value)}
                     style={{
                         padding: '0.25rem 0.6rem',
