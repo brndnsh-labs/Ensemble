@@ -122,6 +122,18 @@ export function getFrequency(midi) {
     return 440 * 2 ** ((midi - 69) / 12);
 }
 
+const NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+// Pre-calculate note names and octaves for standard MIDI range (0-127) to avoid object allocation
+/** @type {Array<{name: string, octave: number}>} */
+const MIDI_NOTE_CACHE = new Array(128);
+for (let i = 0; i < 128; i++) {
+    MIDI_NOTE_CACHE[i] = {
+        name: NOTE_NAMES[i % 12],
+        octave: Math.floor(i / 12) - 1,
+    };
+}
+
 /**
  * Converts a MIDI note number to an object containing its note name and octave.
  * @param {number} midi - The MIDI note number.
@@ -131,10 +143,17 @@ export function midiToNote(midi) {
     if (typeof midi !== 'number' || !Number.isFinite(midi)) {
         return { name: '---', octave: 0 };
     }
-    const notes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    // Fast path: lookup from cache if within 0-127 and integer
+    const cached = MIDI_NOTE_CACHE[midi];
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    // Slow path: calculate for extended range or microtonal values
     const idx = Math.floor(midi) % 12;
     return {
-        name: notes[idx < 0 ? idx + 12 : idx],
+        name: NOTE_NAMES[idx < 0 ? idx + 12 : idx],
         octave: Math.floor(midi / 12) - 1,
     };
 }
