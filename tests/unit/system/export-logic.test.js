@@ -14,6 +14,7 @@ vi.mock('../../../public/engine/midi-utils.js', async (importOriginal) => {
         ...actual,
         MidiTrack: class extends actual.MidiTrack {
             noteOn(time, chan, midi, vel) {
+                // If the channel is the configured drums channel (9 by default, but it's 0-indexed so 8 if it was 9 previously. In tests state.midi.drumsChannel is usually 10, so chan is 9)
                 if (chan === 9) {
                     noteOnEvents.push({ time, midi, vel });
                 }
@@ -89,7 +90,13 @@ vi.mock('../../../public/state.js', () => {
             sectionSeedMap: {},
         },
         vizState: {},
-        midi: {},
+        midi: {
+            chordsChannel: 1,
+            bassChannel: 2,
+            soloistChannel: 3,
+            harmonyChannel: 4,
+            drumsChannel: 10,
+        },
         storage: {},
         dispatch: vi.fn(),
     };
