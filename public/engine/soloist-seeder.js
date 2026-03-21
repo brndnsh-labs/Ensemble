@@ -53,7 +53,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // To ensure repetition across identical sections (e.g. AABA form),
     // we'll memorize the target note sequence for each section label.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
-    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, metrics: { density: number, syncopationRatio: number } }>} */
+    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, metrics: { density: number, syncopationRatio: number }, isStationaryMotif: boolean }>} */
     const sectionMotifs = new Map();
 
     /** @type {Map<string, number>} */
@@ -135,11 +135,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const stationaryProb = config.stationaryProb || 0.05;
             const isStationaryMotif = prng() < stationaryProb;
 
-            const motif = [];
             // Generate a 2-measure template
-            let currentBeat = 0;
-            const totalBeats = tsConfig.beats * 2;
-            let currentDegreeOffset = 0; // Relative to a target chord tone
+            const motif = [];
+            let _currentBeat = 0;
+            let currentDegreeOffset = 0;
 
             // Check for contrast needs
             let forceSparse = false;
@@ -169,76 +168,112 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     duration: isShortPickup ? stepsPerBeat / 2 : stepsPerBeat,
                     isRest: false,
                 });
-                currentBeat = 0;
+                _currentBeat = 0;
             }
 
-            while (currentBeat < totalBeats) {
+            // 1. Generate a 1-measure rhythmic cell template
+            const rhythmicCell = [];
+            let cellBeat = 0;
+            const beatsPerCell = tsConfig.beats;
+
+            while (cellBeat < beatsPerCell) {
                 let isRest = false;
                 if (forceSparse) {
                     isRest = prng() > 0.4;
                 } else if (forceDense) {
                     isRest = prng() > 0.9;
                 } else {
-                    isRest = prng() > 0.85; // 15% chance of rest (thick melody)
+                    isRest = prng() > 0.85; // 15% chance of rest
                 }
 
                 let durationBeats = 1;
-
                 if (forceSparse) {
-                    // Sustained notes on downbeats
                     durationBeats = prng() > 0.5 ? 4 : 2;
                 } else if (forceDense) {
-                    // Aggressive 8th/16th notes
                     durationBeats = prng() > 0.6 ? 0.5 : 0.25;
                 } else {
-                    if (currentBeat % tsConfig.beats === 0) {
-                        // Downbeat
+                    if (cellBeat % tsConfig.beats === 0) {
                         durationBeats = prng() > 0.5 ? 2 : 1;
                     } else {
-                        durationBeats = prng() > 0.7 ? 0.5 : 1; // Sometimes play eighth notes
+                        durationBeats = prng() > 0.7 ? 0.5 : 1;
                     }
                 }
 
-                // Ensure we don't overflow the 2-measure motif
-                if (currentBeat + durationBeats > totalBeats) {
-                    durationBeats = totalBeats - currentBeat;
+                if (cellBeat + durationBeats > beatsPerCell) {
+                    durationBeats = beatsPerCell - cellBeat;
                 }
 
-                if (!isRest) {
-                    // Decide melodic motion
-                    let motion = 0; // 0 = same, 1 = step up, -1 = step down, 2 = leap up, etc.
-                    if (motif.length > 0 && !isStationaryMotif) {
+                rhythmicCell.push({
+                    beatOffset: cellBeat,
+                    duration: durationBeats * stepsPerBeat,
+                    isRest,
+                });
+                cellBeat += durationBeats;
+            }
+
+            // 2. Clone the cell twice to create a 2-measure motif (Rhythmic Mirroring)
+            // and apply melodic motion with Leap-and-Fill logic
+            currentDegreeOffset = 0;
+            let lastMotion = 0;
+
+            for (let measure = 0; measure < 2; measure++) {
+                rhythmicCell.forEach((cellNote) => {
+                    let isRest = cellNote.isRest;
+                    let duration = cellNote.duration;
+
+                    // Imperfect Symmetry: Measure 2 has a chance to drift
+                    if (measure === 1 && prng() < 0.3) {
                         const r = prng();
-                        if (r < 0.6) {
-                            motion = prng() > 0.5 ? 1 : -1; // Step
-                        } else if (r < 0.8) {
-                            motion = prng() > 0.5 ? 2 : -2; // Skip
-                        } else if (r < 0.9) {
-                            motion = 0; // Repeat
-                        } else {
-                            motion = prng() > 0.5 ? 3 : -3; // Leap
+                        if (r < 0.4) {
+                            isRest = !isRest; // Flip rest status
+                        } else if (r < 0.7) {
+                            duration = Math.max(
+                                stepsPerBeat / 2,
+                                duration + (prng() > 0.5 ? 2 : -2),
+                            ); // Change duration
                         }
                     }
-                    currentDegreeOffset += motion;
+
+                    let motion = 0;
+                    if (!isRest) {
+                        if (!isStationaryMotif) {
+                            const r = prng();
+                            // Leap-and-Fill Logic: If we just jumped, must step back
+                            if (Math.abs(lastMotion) >= 3) {
+                                motion = lastMotion > 0 ? -1 : 1; // Step in opposite direction
+                            } else {
+                                // Normal motion logic
+                                if (r < 0.6) {
+                                    motion = prng() > 0.5 ? 1 : -1; // Step
+                                } else if (r < 0.8) {
+                                    motion = prng() > 0.5 ? 2 : -2; // Skip
+                                } else if (r < 0.9) {
+                                    motion = 0; // Repeat
+                                } else {
+                                    motion = prng() > 0.5 ? 3 : -3; // Leap
+                                }
+                            }
+
+                            // Magnetic Center: Pull back towards 0 if we drift too far
+                            if (currentDegreeOffset > 4 && motion > 0) {
+                                motion = -1;
+                            }
+                            if (currentDegreeOffset < -4 && motion < 0) {
+                                motion = 1;
+                            }
+                        }
+                        currentDegreeOffset += motion;
+                        lastMotion = motion;
+                    }
 
                     motif.push({
-                        beatOffset: currentBeat,
+                        beatOffset: cellNote.beatOffset + measure * tsConfig.beats,
                         isPickup: false,
                         scaleDegreeOffset: currentDegreeOffset,
-                        duration: durationBeats * stepsPerBeat,
-                        isRest: false,
+                        duration: duration,
+                        isRest: isRest,
                     });
-                } else {
-                    motif.push({
-                        beatOffset: currentBeat,
-                        isPickup: false,
-                        scaleDegreeOffset: 0,
-                        duration: durationBeats * stepsPerBeat,
-                        isRest: true,
-                    });
-                }
-
-                currentBeat += durationBeats;
+                });
             }
 
             // SAFETY: If motif is empty (all rests), force a note on the first downbeat
@@ -268,10 +303,17 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const density = attacks / 2; // attacks per measure (2 measure motif)
             const syncopationRatio = attacks > 0 ? syncopatedAttacks / attacks : 0;
 
-            sectionMotifs.set(category, { motif, metrics: { density, syncopationRatio } });
+            sectionMotifs.set(category, {
+                motif,
+                metrics: { density, syncopationRatio },
+                isStationaryMotif,
+            });
         }
 
-        let motif = sectionMotifs.get(category)?.motif || [];
+        let { motif, isStationaryMotif } = sectionMotifs.get(category) || {
+            motif: [],
+            isStationaryMotif: false,
+        };
 
         // Motivic Mutation (Restatement)
         if (iteration > 0) {
@@ -333,11 +375,18 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // Apply motif to the section, typically repeating in 2-measure blocks
         // within a larger 4 or 8 measure block with a forced rest at the end.
         let registerBase = 60; // Middle C
+        const intensityVal = _intensity || 0.5;
+
         if (category === 'chorus') {
-            registerBase += 12;
-        } // Octave higher for chorus
-        if (category === 'intro') {
-            registerBase -= 12;
+            // Chorus boost is now tied to intensity: 0 or 12 semitones
+            // We use an octave jump (>= 0.5 intensity) to keep notes in the same scale context
+            registerBase += intensityVal >= 0.5 ? 12 : 0;
+        } else if (category === 'intro' || index === 0) {
+            // Force lower start for Intros or the very first section
+            registerBase = 48;
+        } else {
+            // Verse/Standard: slight climb based on intensity (still multiples of 12)
+            registerBase = intensityVal > 0.7 ? 60 : 48;
         }
 
         let lastMidi = registerBase;
@@ -349,6 +398,38 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // Apply motifs in 2-measure blocks across the entire section range
         for (let m = sectionStartMeasure; m < sectionEndMeasure; m += 2) {
             const baseStep = m * stepsPerMeasure;
+
+            // --- Sectional Turnaround Logic (A-A-A-B) ---
+            // If this is the last 2 measures of a >= 8 measure section,
+            // trigger a unique turnaround motif to break predictability.
+            const isTurnaroundMeasures =
+                !isStationaryMotif &&
+                m >= sectionEndMeasure - 2 &&
+                sectionEndMeasure - sectionStartMeasure >= 8;
+            /** @type {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} */
+            let activeMotif = motif;
+
+            if (isTurnaroundMeasures) {
+                // Generate a one-off "Departure" motif for the turnaround
+                activeMotif = [];
+                let turnaroundBeat = 0;
+                let tDegree = 0;
+                while (turnaroundBeat < tsConfig.beats * 2) {
+                    const isRest = prng() > 0.7; // Busier turnaround
+                    const duration = prng() > 0.5 ? 1 : 0.5;
+                    if (!isRest) {
+                        tDegree += prng() > 0.5 ? 1 : -1;
+                        activeMotif.push({
+                            beatOffset: turnaroundBeat,
+                            isPickup: false,
+                            scaleDegreeOffset: tDegree,
+                            duration: duration * stepsPerBeat,
+                            isRest: false,
+                        });
+                    }
+                    turnaroundBeat += duration;
+                }
+            }
 
             // Pick a target chord tone for the downbeat of these 2 measures
             const stepToSearch = Math.min(baseStep, totalSteps - 1);
@@ -364,8 +445,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const targetPitchClass = (targetChord.rootMidi + targetInterval) % 12;
 
             let anchorMidi = registerBase + targetPitchClass;
-            // Octave anchoring to keep it reasonable
-            if (Math.abs(anchorMidi - lastMidi) > 9) {
+            // Octave anchoring: Keep Head melody centered within a tighter +/- 6 semitone range
+            // to avoid shrill jumps at low intensity.
+            if (Math.abs(anchorMidi - lastMidi) > 6) {
                 if (anchorMidi > lastMidi) {
                     anchorMidi -= 12;
                 } else {
@@ -373,7 +455,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 }
             }
 
-            motif.forEach((motifNote) => {
+            // Find the last active note in the motif to apply resolution biases
+            const lastActiveMotifNote = activeMotif.filter((n) => !n.isRest).pop();
+            const isLastMeasureOfSection = m >= sectionEndMeasure - 2;
+
+            activeMotif.forEach((motifNote) => {
                 if (motifNote.isRest) {
                     return;
                 }
@@ -405,7 +491,27 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                 // Map scale degree offset to an actual interval
                 const scaleLen = scale.length;
-                const degree = motifNote.scaleDegreeOffset;
+                let degree = motifNote.scaleDegreeOffset;
+
+                // --- Catchy Harmonic Resolution Bias ---
+                const isFinalNoteOfSection =
+                    motifNote === lastActiveMotifNote && isLastMeasureOfSection;
+                const isConclusion =
+                    category === 'outro' || (_isLastSectionOfForm && isLastMeasureOfSection);
+
+                if (isFinalNoteOfSection) {
+                    if (isConclusion) {
+                        // Conclusion: Resolve to Root (0) or 3rd (2)
+                        degree = prng() > 0.3 ? 0 : 2;
+                    } else if (!isDeparture) {
+                        // Statement: Chance to end on "Tense" degrees (2nd, 5th, 7th) to ask a question
+                        if (prng() > 0.5) {
+                            const tenseDegrees = [1, 4, 6]; // 2nd, 5th, 7th
+                            degree = tenseDegrees[Math.floor(prng() * tenseDegrees.length)];
+                        }
+                    }
+                }
+
                 const octaveShift = Math.floor(degree / scaleLen) * 12;
                 const modDegree = ((degree % scaleLen) + scaleLen) % scaleLen;
 
