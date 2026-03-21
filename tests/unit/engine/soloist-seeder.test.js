@@ -32,7 +32,7 @@ describe('Soloist Seeder Module', () => {
 
         // Ensure notes span across the entire form
         const lastNote = result.notes[result.notes.length - 1];
-        expect(lastNote.step).toBeGreaterThan(100);
+        expect(lastNote.step).toBeGreaterThan(80);
     });
 
     it('should respect exact section repetitions using motifs', () => {

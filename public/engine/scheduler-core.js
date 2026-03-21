@@ -120,6 +120,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
                 clearTimeout(playback.suspendTimeout);
             }
             playback.suspendTimeout = /** @type {any} */ (
+                // @direct-mutation
                 setTimeout(() => {
                     if (
                         !playback.isPlaying &&
@@ -226,7 +227,7 @@ function scheduleResolution(state, time, dispatch = undefined) {
         scheduleBass(state, dummyChordData, playback.step, time);
     }
     if (soloist.enabled) {
-        scheduleSoloist(state, dummyChordData, playback.step, time, time);
+        scheduleSoloist(state, dummyChordData, playback.step, time);
     }
     if (chords.enabled) {
         scheduleChords(state, dummyChordData, playback.step, time);
@@ -850,10 +851,9 @@ function scheduleBass(state, chordData, step, time) {
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {any} chordData - The current chord context.
  * @param {number} step - The global step index.
- * @param {number} _time - The AudioContext time (swung).
- * @param {number} unswungTime - The AudioContext time (linear/unswung) for strict quantization.
+ * @param {number} playTime - The AudioContext time to play.
  */
-function scheduleSoloist(state, chordData, step, _time, unswungTime) {
+function scheduleSoloist(state, chordData, step, playTime) {
     const { soloist, playback, vizState } = state;
     const notes = soloist.buffer.get(step);
     soloist.buffer.delete(step);
@@ -899,12 +899,12 @@ function scheduleSoloist(state, chordData, step, _time, unswungTime) {
                 const duration = (durationSteps || 4) * 0.25 * spb;
                 const baseVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
                 const vel = baseVel * polyphonyComp;
-                const playTime = unswungTime + offsetS;
+                const finalTime = playTime + offsetS;
 
                 playSoloNote(
                     state,
                     freq,
-                    playTime,
+                    finalTime,
                     duration,
                     vel,
                     bendStartInterval || 0,
@@ -920,7 +920,7 @@ function scheduleSoloist(state, chordData, step, _time, unswungTime) {
                     state,
                     midiNum,
                     vel,
-                    playTime,
+                    finalTime,
                     duration,
                     bendStartInterval || 0,
                     isMono,
@@ -938,13 +938,13 @@ function scheduleSoloist(state, chordData, step, _time, unswungTime) {
                         name,
                         octave,
                         midi: midiNum,
-                        time: playTime,
+                        time: finalTime,
                         chordNotes,
                         duration,
                         noteType,
                     });
                 }
-                soloist.lastNoteEnd = playTime + duration; // @direct-mutation
+                soloist.lastNoteEnd = finalTime + duration; // @direct-mutation
             }
         });
     }
@@ -1218,9 +1218,7 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
                   ? 0.75
                   : 0.65;
     const soloistTime =
-        playback.unswungNextNoteTime * straightness +
-        swungTime * (1.0 - straightness) +
-        (Math.random() - 0.5) * (groove.humanize / 100) * 0.025;
+        playback.unswungNextNoteTime * straightness + swungTime * (1.0 - straightness);
 
     if (groove.enabled) {
         if (stepInfo.isBeatStart && playback.visualFlash) {
@@ -1289,7 +1287,7 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
             scheduleBass(state, chordData, step, t);
         }
         if (soloist.enabled) {
-            scheduleSoloist(state, chordData, step, t, soloistTime);
+            scheduleSoloist(state, chordData, step, soloistTime);
         }
         if (chords.enabled) {
             scheduleChords(state, chordData, step, t);

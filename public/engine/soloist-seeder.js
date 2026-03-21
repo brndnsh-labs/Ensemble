@@ -179,7 +179,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 } else if (forceDense) {
                     isRest = prng() > 0.9;
                 } else {
-                    isRest = prng() > 0.6;
+                    isRest = prng() > 0.4; // Thicker head: was 0.6
                 }
 
                 let durationBeats = 1;
@@ -239,6 +239,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 }
 
                 currentBeat += durationBeats;
+            }
+
+            // SAFETY: If motif is empty (all rests), force a note on the first downbeat
+            const activeNotes = motif.filter((n) => !n.isRest);
+            if (activeNotes.length === 0 && motif.length > 0) {
+                const firstDownbeat = motif.find((n) => n.beatOffset === 0);
+                if (firstDownbeat) {
+                    firstDownbeat.isRest = false;
+                    firstDownbeat.scaleDegreeOffset = 0;
+                }
             }
 
             // Calculate metrics for this new motif
@@ -336,10 +346,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // Usually the last section in the arranger.sectionMap, or right before a loop
         const _isLastSectionOfForm = index === turnaroundIndex;
 
-        // Group into 8-measure or 4-measure blocks
-        const totalSectionMeasures = sectionEndMeasure - sectionStartMeasure;
-        const _blockMeasures = totalSectionMeasures >= 8 ? 8 : 4;
-
+        // Apply motifs in 2-measure blocks across the entire section range
         for (let m = sectionStartMeasure; m < sectionEndMeasure; m += 2) {
             const baseStep = m * stepsPerMeasure;
 
