@@ -48,61 +48,71 @@ function deepDiveSession(genre = 'Rock', bpm = 102, measures = 32, intensity = 0
     let lastMidi = null;
     const intervals = [];
 
-    for (let s = -stepsPerMeasure; s < arranger.totalSteps; s++) {
-        const stepInfo = getStepInfo(s, ts, null, TIME_SIGNATURES);
-        const res = getSoloistNote(
-            getState(),
-            chord,
-            chord,
-            s,
-            440,
-            0,
-            'smart',
-            s % 16,
-            { sectionStart: 0, sectionEnd: 64, bypassRhythm: false },
-            stepInfo,
-        );
+    const loopsToSimulate = 3;
+    const stepsPerLoop = arranger.totalSteps;
 
-        if (res) {
-            const notes = Array.isArray(res) ? res : [res];
-            notes.forEach((n) => {
-                const m_b =
-                    `${Math.floor(s / stepsPerMeasure) + 1}:${Math.floor(stepInfo.mStep / ts.stepsPerBeat) + 1}`.padEnd(
-                        5,
+    for (let loop = 0; loop < loopsToSimulate; loop++) {
+        getState().playback.currentLoopCount = loop;
+        console.log(`\n>>> STARTING LOOP ${loop} <<<`);
+
+        const startOffset = loop === 0 ? -stepsPerMeasure : 0;
+
+        for (let loopStep = startOffset; loopStep < stepsPerLoop; loopStep++) {
+            const absoluteStep = loop * stepsPerLoop + loopStep;
+            const stepInfo = getStepInfo(absoluteStep, ts, null, TIME_SIGNATURES);
+            const res = getSoloistNote(
+                getState(),
+                chord,
+                chord,
+                absoluteStep,
+                440,
+                0,
+                'smart',
+                absoluteStep % 16,
+                { sectionStart: 0, sectionEnd: stepsPerLoop, bypassRhythm: false },
+                stepInfo,
+            );
+
+            if (res) {
+                const notes = Array.isArray(res) ? res : [res];
+                notes.forEach((n) => {
+                    const measureInLoop = Math.floor(loopStep / stepsPerMeasure) + 1;
+                    const beatInMeasure = Math.floor(stepInfo.mStep / ts.stepsPerBeat) + 1;
+                    const m_b = `${measureInLoop}:${beatInMeasure}`.padEnd(5);
+                    const noteInfo = midiToNote(n.midi);
+                    const noteName = `${noteInfo.name}${noteInfo.octave}`.padEnd(4);
+                    const midi = `${n.midi}`.padStart(4);
+                    const dur = `${n.durationSteps || 1}`.padStart(3);
+                    const vel = n.velocity.toFixed(2);
+                    const role = (soloist.phraseContext.role || '-').padEnd(4);
+                    const profile = (soloist.phraseContext.profile || '-').padEnd(8);
+
+                    const flags = [];
+                    if (n.isSustained) {
+                        flags.push('HOLD');
+                    }
+                    if (n.vibrato) {
+                        flags.push('VIB');
+                    }
+                    if (n.isDoubleStop) {
+                        flags.push('DBL');
+                    }
+                    if (n.device) {
+                        flags.push(n.device.toUpperCase());
+                    }
+
+                    const flagStr = flags.join('|');
+
+                    console.log(
+                        `${String(absoluteStep).padStart(4)} | ${m_b} | ${noteName} | ${midi} | ${dur} | ${vel} | ${role} | ${profile} | ${flagStr}`,
                     );
-                const noteInfo = midiToNote(n.midi);
-                const noteName = `${noteInfo.name}${noteInfo.octave}`.padEnd(4);
-                const midi = `${n.midi}`.padStart(4);
-                const dur = `${n.durationSteps || 1}`.padStart(3);
-                const vel = n.velocity.toFixed(2);
-                const role = (soloist.phraseContext.role || '-').padEnd(4);
-                const profile = (soloist.phraseContext.profile || '-').padEnd(8);
 
-                const flags = [];
-                if (n.isSustained) {
-                    flags.push('HOLD');
-                }
-                if (n.vibrato) {
-                    flags.push('VIB');
-                }
-                if (n.isDoubleStop) {
-                    flags.push('DBL');
-                }
-                if (n.device) {
-                    flags.push(n.device.toUpperCase());
-                }
-
-                const flagStr = flags.join('|');
-
-                console.log(
-                    `${String(s).padStart(4)} | ${m_b} | ${noteName} | ${midi} | ${dur} | ${vel} | ${role} | ${profile} | ${flagStr}`,
-                );
-
-                if (lastMidi !== null && !n.isDoubleStop) {
-                    intervals.push(Math.abs(n.midi - lastMidi));
-                }
-                lastMidi = n.midi;
-            });
+                    if (lastMidi !== null && !n.isDoubleStop) {
+                        intervals.push(Math.abs(n.midi - lastMidi));
+                    }
+                    lastMidi = n.midi;
+                });
+            }
         }
     }
 

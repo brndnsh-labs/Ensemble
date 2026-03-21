@@ -483,7 +483,12 @@ export function selectPitchAndDevices(
     // --- Melodic Devices ---
     let deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const sessionSeed = soloistState.sessionSeed;
-    if ((playback.currentLoopCount || 0) === 0 && sessionSeed && sessionSeed.notes.length > 0) {
+    const loopCount = playback.currentLoopCount || 0;
+
+    // Progressive Ornamentation: Increase device probability by 20% per loop
+    deviceBaseProb *= 1.0 + loopCount * 0.2;
+
+    if (loopCount === 0 && sessionSeed && sessionSeed.notes.length > 0) {
         deviceBaseProb *= 0.2; // Clean head
     }
     const isPolyphonic =

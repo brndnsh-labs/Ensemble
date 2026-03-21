@@ -408,9 +408,41 @@ export function getSoloistNote(
 
         if ((soloist.busySteps || 0) > 0) {
             soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
+            return null;
         }
 
-        return null;
+        // --- Gap-Fill Improvisation ---
+        // If we are in themed improv, have no seeded note here, and aren't busy,
+        // see if the gap to the next note is large enough to warrant a generative fill.
+        let shouldFallThrough = false;
+        if (isThemedImprov && headNotes.length === 0 && (soloist.activeSteps || 0) <= 0) {
+            let minGap = sessionSeed.loopLengthSteps;
+            for (let i = 0; i < sessionSeed.notes.length; i++) {
+                let nStep = sessionSeed.notes[i].step;
+                if (nStep < 0) {
+                    nStep += sessionSeed.loopLengthSteps;
+                }
+                let diff = nStep - stepInLoop;
+                if (diff <= 0) {
+                    diff += sessionSeed.loopLengthSteps;
+                }
+                if (diff < minGap) {
+                    minGap = diff;
+                }
+            }
+
+            // Allow fills if the gap is at least a beat (usually 4 steps) and based on intensity
+            if (minGap >= stepsPerBeat && Math.random() < effectiveIntensity * 0.8) {
+                shouldFallThrough = true;
+                soloist.activeSteps = minGap - 1; /* @worker-mutation */
+                soloist.isResting = false; // @worker-mutation
+                logDebug(`[Gap-Fill] Found gap of ${minGap} steps. Waking generative engine.`);
+            }
+        }
+
+        if (!shouldFallThrough) {
+            return null;
+        }
     }
 
     // --- Form Awareness & Phrasing States ---
