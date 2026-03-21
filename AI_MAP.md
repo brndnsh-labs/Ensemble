@@ -76,6 +76,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/audio-recovery.js` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
 | `public/engine/midi-utils.js` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
+| `public/engine/midi-constants.js` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
 
 ## Synthesis Engine (WebAudio)
 
