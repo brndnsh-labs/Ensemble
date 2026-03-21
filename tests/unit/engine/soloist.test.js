@@ -82,6 +82,8 @@ describe('Soloist Engine', () => {
         mockState.soloist.isResting = false; // Force it to generate a plan
         mockState.soloist.activeSteps = 16;
 
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+
         getSoloistNote(mockState, mockChord, null, 0, null, 4, 'scalar', 0, {});
 
         // Pitch engine should be called, but WITHOUT the head bypass flag
@@ -90,6 +92,8 @@ describe('Soloist Engine', () => {
         const rhythmNode = callArgs[2];
 
         expect(rhythmNode.isHeadBypass).toBeUndefined();
+
+        randomSpy.mockRestore();
     });
 
     it('should use themed improvisation on Loop 1 at medium intensity', () => {

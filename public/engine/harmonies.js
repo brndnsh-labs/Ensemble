@@ -440,7 +440,7 @@ export function getHarmonyNotes(
     let isBloom = false;
 
     // Latching Logic (Soloist Hook Reinforcement)
-    if (soloist.enabled && playback.bandIntensity > 0.6) {
+    if (soloist.enabled && playback.bandIntensity > 0.3) {
         let reinforce = false;
         let seedMidi = -1;
         const loopCount = playback.currentLoopCount || 0;
@@ -462,10 +462,22 @@ export function getHarmonyNotes(
             const stepInLoop = step % loopLengthSteps;
             const seedNote = notes.find((/** @type {any} */ n) => n.step === stepInLoop);
 
-            // Reinforce anchor points, or any seed note at very high intensity
-            if (seedNote && (seedNote.isAnchor || playback.bandIntensity > 0.85)) {
+            // Reinforce anchor points, or any seed note at higher intensity
+            if (seedNote) {
+                // Dynamic reinforcement probabilities based on intensity
+                let reinforceProb = 0;
+                if (seedNote.isAnchor) {
+                    // Always try to reinforce anchors, probability scales from 40% to 95%
+                    reinforceProb = 0.4 + playback.bandIntensity * 0.55;
+                } else if (playback.bandIntensity > 0.4) {
+                    // Non-anchors only reinforce at medium+ intensity
+                    reinforceProb = (playback.bandIntensity - 0.4) * 0.8;
+                }
+
                 // Higher probability of reinforcement during Chorus 1 (The Head)
-                const reinforceProb = loopCount === 0 ? 0.95 : 0.4;
+                if (loopCount === 0) {
+                    reinforceProb = Math.max(reinforceProb, 0.7);
+                }
 
                 if (Math.random() < reinforceProb) {
                     reinforce = true;
@@ -477,7 +489,7 @@ export function getHarmonyNotes(
             }
 
             // --- Hype Man: Anticipation ---
-            if (!reinforce && playback.bandIntensity > 0.7) {
+            if (!reinforce && playback.bandIntensity > 0.4) {
                 // Lookahead 2 steps (8th note anticipation)
                 const nextStepInLoop = (step + 2) % loopLengthSteps;
                 const nextSeedNote = notes.find(
@@ -517,10 +529,14 @@ export function getHarmonyNotes(
     }
 
     if (!isLatched) {
-        // --- Chorus 1: Strict Adherence ---
-        // During the Head, the harmony section ONLY plays reinforcement stabs to establish the theme.
+        // --- Chorus 1: Controlled Adherence ---
+        // During the Head, the harmony section primarily plays reinforcement stabs.
+        // We allow standard comping but with a 50% reduction to keep the theme clean.
         const seed = soloist.sessionSeed;
-        if ((playback.currentLoopCount || 0) === 0 && seed && seed.notes && seed.notes.length > 0) {
+        const isHead =
+            (playback.currentLoopCount || 0) === 0 && seed && seed.notes && seed.notes.length > 0;
+
+        if (isHead && Math.random() < 0.5) {
             return [];
         }
 

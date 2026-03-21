@@ -46,7 +46,9 @@ export function selectPitchAndDevices(
         return null;
     }
 
-    const config = { .../** @type {any} */ (STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar) };
+    /** @type {any} */
+    const styleConfigAny = STYLE_CONFIG;
+    const config = { ...(styleConfigAny[activeStyle] || STYLE_CONFIG.scalar) };
 
     // Musical Intent Scaling:
     // Scale stylistic flourishes based on the performance intent (Conservative vs. Exploratory)
