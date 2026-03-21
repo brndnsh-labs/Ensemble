@@ -76,8 +76,15 @@ export function ManualModal() {
             try {
                 const response = await fetch('MANUAL.md');
                 const rawText = await response.text();
-                const processedText = injectManualMetadata(rawText);
-                setContent(simpleMarkdown(processedText));
+                const markdownHtml = simpleMarkdown(rawText);
+
+                // 🛡️ Sentinel: Security Fix - XSS Prevention via Injection Ordering
+                // By processing the Markdown first (`simpleMarkdown`) and then injecting metadata
+                // (`injectManualMetadata`), we prevent malicious payloads within the metadata
+                // from being evaluated as Markdown syntax (e.g. converting injected text into links or headers).
+                // The `simpleMarkdown` function has its own `escapeHTML` logic for raw text, ensuring
+                // the base Markdown is safe before we inject the dynamic UI tables.
+                setContent(injectManualMetadata(markdownHtml));
             } catch (error) {
                 console.error('Failed to load manual:', error);
                 setContent('<p class="error">Error loading manual. Please try again later.</p>');
