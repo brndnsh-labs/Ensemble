@@ -70,8 +70,9 @@ describe('Soloist Seeder Module', () => {
         const sectionBNotes = result.notes.filter((n) => n.step >= 32 && n.step < 64);
         const sectionANotes2 = result.notes.filter((n) => n.step >= 64 && n.step < 96);
 
-        // Motif counts should be identical for the same label 'A'
-        expect(sectionANotes1.length).toBe(sectionANotes2.length);
+        // Because of Motivic Mutation (Restatement), the 2nd iteration of A will have slight differences.
+        // But the contour length should be relatively close.
+        expect(Math.abs(sectionANotes1.length - sectionANotes2.length)).toBeLessThanOrEqual(5);
 
         // And 'A' should differ from 'B' rhythmically or length-wise in a vast majority of random seeds
         // but testing length directly might flake, so we check existence

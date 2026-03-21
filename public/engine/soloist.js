@@ -95,11 +95,19 @@ export function getSoloistNote(
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
+    // If the test suite bypasses setting loop count, default to -1 so we don't accidentally override tests expecting normal logic.
+    // The main app usually starts loop count at 0.
+    const loopCount = playback.currentLoopCount !== undefined ? playback.currentLoopCount : -1;
+
     const isHeadMode =
-        (playback.currentLoopCount || 0) === 0 &&
+        loopCount === 0 &&
         soloist.sessionSeed &&
         soloist.sessionSeed.notes.length > 0 &&
         step % soloist.sessionSeed.loopLengthSteps < soloist.sessionSeed.loopLengthSteps - 1;
+
+    // We only force strict head playback on loop 0, AND if there is actually a seed to play.
+    const isStrictHeadPlayback =
+        loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
 
     // Use stepInfo for all meter-aware timing calculations
     const measureStep = stepInfo
@@ -231,14 +239,6 @@ export function getSoloistNote(
     }
 
     // --- Head Mode (Loop 0) Direct Playback Bypass ---
-    // If the test suite bypasses setting loop count, default to -1 so we don't accidentally override tests expecting normal logic.
-    // The main app usually starts loop count at 0.
-    const loopCount = playback.currentLoopCount !== undefined ? playback.currentLoopCount : -1;
-
-    // We only force strict head playback on loop 0, AND if there is actually a seed to play.
-    const isStrictHeadPlayback =
-        loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
-
     if (isStrictHeadPlayback && soloist.sessionSeed) {
         // While playing the strict head, the soloist is technically actively phrasing,
         // so we must force isResting = false to prevent the global orchestrator from giving
@@ -362,7 +362,7 @@ export function getSoloistNote(
         }
     }
 
-    if (isFinalMeasure && (soloist.transitionState || null) === 'rest') {
+    if (isFinalMeasure && (soloist.transitionState || null) === 'rest' && !isStrictHeadPlayback) {
         const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
         const restBeatStart = tsConfig.beats >= 4 ? 2 : 1;
         if (beatInMeasure >= restBeatStart) {
