@@ -663,3 +663,33 @@ export const INFLUENCE_POOLS = {
     neo: ['miles', 'srv'], // Cross-genre influences
     funk: ['srv', 'slash'],
 };
+
+/**
+ * Soloist Intent Behaviors
+ * Maps intensity ranges to specific performance "intentions".
+ * These allow the soloist to "dissolve" the melody or bridge gaps
+ * based on musical intent rather than rigid intensity cliffs.
+ */
+export const SOLOIST_INTENTS = {
+    CONSERVATIVE: {
+        maxIntensity: 0.35,
+        thematicAnchorScale: 1.0, // Stick strictly to theme
+        phrasingBridgeProb: 0.0, // Always respect structural breaths
+        syncopationBias: 0.0, // Prefer downbeats (style-adjusted)
+        embellishmentProb: 0.2, // Minimal turns/slides
+    },
+    CONVERSATIONAL: {
+        maxIntensity: 0.75,
+        thematicAnchorScale: 0.7, // Start introducing variations
+        phrasingBridgeProb: 0.5, // Sometimes push through 8-measure gaps
+        syncopationBias: 0.6, // Moderate syncopation
+        embellishmentProb: 0.5, // Active phrasing
+    },
+    EXPLORATORY: {
+        maxIntensity: 1.0,
+        thematicAnchorScale: 0.3, // Theme is a secondary anchor
+        phrasingBridgeProb: 0.9, // Usually push through boundaries
+        syncopationBias: 1.0, // Aggressive off-beats
+        embellishmentProb: 0.9, // High-energy runs/flurries
+    },
+};

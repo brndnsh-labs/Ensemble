@@ -22,6 +22,7 @@ const CANDIDATE_WEIGHTS = new Float32Array(128);
  * @param {import('../state/arranger.js').ArrangerState} _arranger
  * @param {number} stepsPerMeasure
  * @param {number} stepsPerBeat
+ * @param {any} [intent]
  */
 export function selectPitchAndDevices(
     state,
@@ -39,12 +40,20 @@ export function selectPitchAndDevices(
     _arranger,
     stepsPerMeasure,
     stepsPerBeat,
+    intent = null,
 ) {
     if (!currentChord) {
         return null;
     }
 
-    const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
+    const config = { .../** @type {any} */ (STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar) };
+
+    // Musical Intent Scaling:
+    // Scale stylistic flourishes based on the performance intent (Conservative vs. Exploratory)
+    if (intent) {
+        config.deviceProb = (config.deviceProb || 0.1) * intent.embellishmentProb;
+        config.doubleStopProb = (config.doubleStopProb || 0.1) * (0.5 + intensity * 0.5);
+    }
 
     // Derived from the Rhythm Engine node
     const { velocity, durationSteps, isStrongBeat, vibrato } = rhythmNode;

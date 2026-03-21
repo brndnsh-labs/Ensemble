@@ -1,6 +1,11 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { calculateTimingOffset, getFrequency } from '../utils.js';
-import { GENRE_STYLE_MAPPING, INFLUENCE_POOLS, STYLE_CONFIG } from './soloist-config.js';
+import {
+    GENRE_STYLE_MAPPING,
+    INFLUENCE_POOLS,
+    SOLOIST_INTENTS,
+    STYLE_CONFIG,
+} from './soloist-config.js';
 import { selectPitchAndDevices } from './soloist-pitch-engine.js';
 import { generateRhythmPlan } from './soloist-rhythm-engine.js';
 
@@ -89,6 +94,30 @@ export function getSoloistNote(
         }
     };
 
+    /**
+     * Evaluates the performance intent (Conservative, Conversational, Exploratory)
+     * based on intensity and genre.
+     * @param {number} i Intensity (0.0 - 1.0)
+     * @param {string} s Active Style
+     */
+    const calculateSoloistIntent = (i, s) => {
+        let profile = SOLOIST_INTENTS.CONSERVATIVE;
+        if (i > 0.75) {
+            profile = SOLOIST_INTENTS.EXPLORATORY;
+        } else if (i > 0.35) {
+            profile = SOLOIST_INTENTS.CONVERSATIONAL;
+        }
+
+        const res = { ...profile };
+        // Musical Style Overrides: Jazz/Bossa are inherently syncopated
+        if (s === 'jazz' || s === 'bossa' || s === 'bird') {
+            res.syncopationBias = Math.max(res.syncopationBias, 0.7);
+        }
+        return res;
+    };
+
+    const intentBehavior = calculateSoloistIntent(intensity, activeStyle);
+
     const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
     const tsConfig =
         /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -110,11 +139,12 @@ export function getSoloistNote(
         loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
 
     // Themed Improvisation: If loop > 0, we can still use the head as a base but with more variation.
+    // As intensity rises, the "Thematic Anchor" dissolves into more generative playing.
     const isThemedImprov =
         loopCount > 0 &&
         soloist.sessionSeed &&
         soloist.sessionSeed.notes.length > 0 &&
-        intensity < 0.8; // At very high intensity, we might want to go fully generative/wild.
+        Math.random() < intentBehavior.thematicAnchorScale;
 
     const isHeadPerformanceMode = isStrictHeadPlayback || isThemedImprov;
 
@@ -290,8 +320,14 @@ export function getSoloistNote(
                 (headNote.isAnchor ? 0.95 : (0.1 + intensity * 0.9) * densityBase) * improvFactor;
 
             // Macro-rest overrides:
-            if (isMacroRestZone && intensity < 0.7 && !headNote.isAnchor) {
-                survivalProb = 0; // Force "Breath" for non-anchors at low intensity
+            // High intensity soloists "push through" structural boundaries to build tension,
+            // while low intensity soloists respect the "Breath Zone" to leave space.
+            if (
+                isMacroRestZone &&
+                !headNote.isAnchor &&
+                Math.random() > intentBehavior.phrasingBridgeProb
+            ) {
+                survivalProb = 0; // Force "Breath"
             }
 
             if (Math.random() < survivalProb) {
@@ -340,6 +376,7 @@ export function getSoloistNote(
                     arranger,
                     stepsPerMeasure,
                     stepsPerBeat,
+                    intentBehavior,
                 );
             } else {
                 logDebug(
@@ -442,7 +479,9 @@ export function getSoloistNote(
 
         if ((soloist.restSteps || 0) <= 0 || coordination.bypassRhythm || isHeadMode) {
             const isGoodEntry =
-                isBeatStart || (measureStep % (stepsPerBeat / 2) === 0 && intensity > 0.6);
+                isBeatStart ||
+                (measureStep % (stepsPerBeat / 2) === 0 &&
+                    Math.random() < intentBehavior.syncopationBias);
             const preventBreakout =
                 isFinalMeasure &&
                 (soloist.transitionState || null) === 'rest' &&
@@ -614,6 +653,7 @@ export function getSoloistNote(
                 arranger,
                 stepsPerMeasure,
                 stepsPerBeat,
+                intentBehavior,
             );
         }
     }
