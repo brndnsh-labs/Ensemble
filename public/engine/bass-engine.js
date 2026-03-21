@@ -238,6 +238,11 @@ export function getBassNote(
                     if (stepDist > 12) {
                         weight *= 0.4;
                     }
+
+                    // Asymmetric Gravity: Penalize upward leaps specifically if above center
+                    if (c > safeCenterMidi && c > referenceMidi) {
+                        weight *= 0.7; // Downward gravity to pull back to the "Meat"
+                    }
                 }
 
                 // 3. Comfort Zone vs Extended Range
@@ -319,10 +324,19 @@ export function getBassNote(
 
         let bestCandidate = octaves[0] + pc;
         let minDiff = Math.abs(bestCandidate - targetRef);
+        // Initial gravity check for the first candidate
+        if (bestCandidate > targetRef) {
+            minDiff += 3.0; // Asymmetrical gravity penalty for going up
+        }
 
         for (let i = 1; i < octaves.length; i++) {
             const cand = octaves[i] + pc;
             let diff = Math.abs(cand - targetRef);
+
+            // Asymmetrical Gravity: Penalize jumping up to break "staircase" progressions
+            if (cand > targetRef) {
+                diff += 3.0;
+            }
 
             // Grounding Bias: heavily favor the lower candidate if it's in the basement (<= 35)
             if (isGrounding && cand <= 35 && cand >= absMin && bestCandidate > 35) {
