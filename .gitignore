@@ -11,3 +11,5 @@ test-dist/
 /test-results/
 /playwright/.cache/
 coverage
+
+gha-creds-*.json
