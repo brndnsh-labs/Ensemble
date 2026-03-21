@@ -56,10 +56,10 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ### B. Deterministic Phrasing & Dynamic Head
 *   **Dynamic Head (Soloist):** The soloist generates a session-wide "seed melody" (`soloist.sessionSeed`) at the start of playback. This melody uses **SRDC** (Statement, Restatement, Departure, Conclusion) structure.
-*   **Chorus Evolution:** Generative engines (especially Soloist) should look at `playback.currentLoopCount` to evolve their performance:
-    *   `Loop 0`: Adhere strictly to the "Head" (seed melody/simple rhythm).
-    *   `Loop 1`: Add "Ornamentation" (grace notes, slides, fills).
-    *   `Loop 2+`: Transition to "Exploration" while maintaining a slight magnetic pull to the original seed.
+*   **Chorus Evolution (Hybrid Phrasing)**: Generative engines (especially Soloist) should look at `playback.currentLoopCount` and `SOLOIST_INTENTS` to evolve their performance:
+    *   `Loop 0 (The Head)`: Adhere strictly to the "Head" (`sessionSeed`). Use `survivalProb = 1.0` to ensure no notes are skipped. Phrasing is driven by the seeder's SRDC structure and stationary "hook" motifs.
+    *   `Loop 1 (Conversational)`: Shift to "Themed Improv." Start introducing pitch variation (jitter) and "Sequencing" (transposing seeded motifs). The "Effective Intensity" nudges up (+0.05) to naturally lift energy.
+    *   `Loop 2+ (Exploratory)`: Transition to full generative performance. "Fatigue Decay" shortens breaths (rests), and "Common Tone Reward" logic allows the soloist to intelligently "stick" to stable notes during chord changes for professional "pedal point" effects.
 *   **Motifs:** Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js`.
 
 ### C. Coordination & Register Slotting
