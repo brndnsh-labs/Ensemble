@@ -33,7 +33,9 @@ export function StyleSelector({ module, styles }) {
     const onSelect = (/** @type {string} */ styleId) => {
         dispatch(ACTIONS.SET_STYLE, { module, style: styleId });
 
-        if (styleId !== 'smart') {
+        if (styleId === 'smart') {
+            dispatch(ACTIONS.SET_ACTIVE_TAB, { module, tab: 'smart' });
+        } else {
             dispatch(ACTIONS.SET_ACTIVE_TAB, { module, tab: 'classic' });
         }
 
