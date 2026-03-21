@@ -10,5 +10,6 @@
     ],
     "project": ["public/**/*.{js,jsx}", "scripts/*.js", "tests/**/*.js"],
     "ignoreDependencies": ["esbuild"],
-    "ignoreExportsUsedInFile": true
+    "ignoreExportsUsedInFile": true,
+    "ignore": ["public/engine/grooves/*.js"]
 }
