@@ -19,4 +19,4 @@ Instruments must yield to each other rhythmically to maintain a clear arrangemen
 *   **Priority:** Top priority goes to the Groove (Drums) and the Soloist.
 *   **Bass:** Yields melodic complexity to the Soloist but strictly locks its rhythm to the Kick drum.
 *   **Chords:** Yield density to the Soloist (playing sparser voicings or comping less frequently when the soloist is busy).
-*   **Harmony:** Yields to all other instruments, filling in only when space allows.
+*   **Harmony:** Yields to all other instruments, filling in only when space allows. **As of v2.36**, the Harmony section also performs **Thematic Reinforcement**: during the song's Head (Loop 0), it proactively "shadows" the soloist's seeded melody by providing reinforcement stabs on anchor points, strengthening the thematic hook.
