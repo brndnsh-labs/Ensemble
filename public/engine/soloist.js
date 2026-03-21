@@ -87,6 +87,10 @@ export function getSoloistNote(
         intensity *= 0.6; // Miles uses much more space
     }
 
+    // Loop-Aware Intensity Nudge: Subtle boost per loop (+0.05) to build energy
+    const loopCount = playback.currentLoopCount !== undefined ? playback.currentLoopCount : -1;
+    const effectiveIntensity = Math.min(1.0, intensity + Math.max(0, loopCount) * 0.05);
+
     /** @param {string} msg */
     const logDebug = (msg) => {
         if (playback.debugSoloist) {
@@ -116,17 +120,13 @@ export function getSoloistNote(
         return res;
     };
 
-    const intentBehavior = calculateSoloistIntent(intensity, activeStyle);
+    const intentBehavior = calculateSoloistIntent(effectiveIntensity, activeStyle);
 
     const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
     const tsConfig =
         /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
-
-    // If the test suite bypasses setting loop count, default to -1 so we don't accidentally override tests expecting normal logic.
-    // The main app usually starts loop count at 0.
-    const loopCount = playback.currentLoopCount !== undefined ? playback.currentLoopCount : -1;
 
     const isHeadMode =
         loopCount === 0 &&
@@ -315,11 +315,11 @@ export function getSoloistNote(
                 survivalProb = 1.0; // Anchors always play unless macro-rest overrules
             } else {
                 if (isStrictHeadPlayback) {
-                    // Loop 0: Play almost exactly as composed
-                    survivalProb = 0.85 + intensity * 0.15;
+                    // Loop 0: Play exactly as composed. Guaranteed density for the head.
+                    survivalProb = 1.0;
                 } else {
                     // Loop 1+: Themed Improv. Lower density to make room for generative fills/space
-                    survivalProb = 0.5 + intensity * 0.4;
+                    survivalProb = 0.5 + effectiveIntensity * 0.4;
                 }
             }
 
@@ -329,6 +329,7 @@ export function getSoloistNote(
             if (
                 isMacroRestZone &&
                 !headNote.isAnchor &&
+                !isStrictHeadPlayback && // Never force macro-rests during the Head or very low intensity strict mode
                 Math.random() > intentBehavior.phrasingBridgeProb
             ) {
                 survivalProb = 0; // Force "Breath"
@@ -345,7 +346,7 @@ export function getSoloistNote(
                 let targetMidi = headNote.midi;
                 if (isThemedImprov && !headNote.isAnchor) {
                     // Apply ±1-2 semitone "jitter" to seeded pitches based on intensity
-                    const jitterRange = intensity > 0.6 ? 2 : 1;
+                    const jitterRange = effectiveIntensity > 0.6 ? 2 : 1;
                     if (Math.random() < 0.4) {
                         targetMidi +=
                             Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
@@ -371,7 +372,7 @@ export function getSoloistNote(
                     currentChord,
                     nextChord,
                     activeStyle,
-                    intensity,
+                    effectiveIntensity,
                     stepInChord,
                     coordination,
                     playback,
@@ -424,7 +425,7 @@ export function getSoloistNote(
         }
 
         // PRE-HEAT: Force a lead-in transition at the start of the song to ensure count-in pick-ups
-        if (step < 0 && intensity > 0.3) {
+        if (step < 0 && effectiveIntensity > 0.3) {
             soloist.transitionState = 'lead_in'; // @worker-mutation
             logDebug(`Forcing START-OF-SONG lead-in`);
         }
@@ -435,13 +436,14 @@ export function getSoloistNote(
         // PRE-HEAT: If we are at the start of the song, preserve the forced lead_in
         const isStartOfSong = step < 0 && step === -stepsPerMeasure;
         if (!isStartOfSong || soloist.transitionState === null) {
-            soloist.transitionState = Math.random() < 0.6 - intensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
+            soloist.transitionState =
+                Math.random() < 0.6 - effectiveIntensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
             logDebug(`Selected transition state: ${soloist.transitionState}`);
         }
 
         // Mutate rhythmic entropy at section boundaries based on intensity
         // This locks the variation for the next section, preserving micro-level predictability
-        const shiftScale = 0.2 + intensity * 0.4; // Max 0.6 shift at high intensity
+        const shiftScale = 0.2 + effectiveIntensity * 0.4; // Max 0.6 shift at high intensity
         soloist.rhythmicEntropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
     } else if (!isFinalMeasure && stepInForm !== coordination.sectionStart) {
         soloist.transitionState = null; // @worker-mutation
@@ -502,7 +504,7 @@ export function getSoloistNote(
                 soloist.phrasingState = 'active'; // @worker-mutation
                 soloist.phraseCount = (soloist.phraseCount || 0) + 1; // @worker-mutation
 
-                const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
+                const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
                 let _nextActiveSteps = Math.floor(
                     baseLength * stepsPerBeat * (0.3 + Math.random() * 1.2),
                 );
@@ -540,7 +542,7 @@ export function getSoloistNote(
                     step,
                     soloist.activeSteps || 0,
                     activeStyle,
-                    intensity,
+                    effectiveIntensity,
                     stepsPerMeasure,
                     stepsPerBeat,
                     coordination,
@@ -568,7 +570,7 @@ export function getSoloistNote(
         soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
 
         const isStrongResolution =
-            measureStep === stepsPerMeasure - 1 || (isBackbeat && intensity > 0.5);
+            measureStep === stepsPerMeasure - 1 || (isBackbeat && effectiveIntensity > 0.5);
 
         if (
             (soloist.activeSteps || 0) <= 0 &&
@@ -581,8 +583,9 @@ export function getSoloistNote(
             if (coordination) {
                 coordination.soloistPhraseEnd = true;
             }
-            const restMultiplier = config.restBase * (2.0 - intensity * 1.5);
-            const fatigueMultiplier = 1.0;
+            const restMultiplier = config.restBase * (2.0 - effectiveIntensity * 1.5);
+            // Fatigue Decay: Shorten breaths as song progresses (0.9x per loop)
+            const fatigueMultiplier = Math.max(0.5, 1.0 - Math.max(0, loopCount) * 0.1);
             const nextRestSteps = Math.floor(
                 stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
             );
@@ -592,7 +595,7 @@ export function getSoloistNote(
                 soloist.restSteps = 4; // @worker-mutation
             }
             logDebug(
-                `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.restSteps} steps.`,
+                `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.restSteps} steps. (Fatigue: ${fatigueMultiplier.toFixed(2)})`,
             );
             // Clear rhythm plan just in case
             soloist.rhythmPlan = []; // @worker-mutation
@@ -609,7 +612,7 @@ export function getSoloistNote(
     ) {
         // If plan is uninitialized or exhausted but test forces active state, generate it
         if (!soloist.isResting) {
-            const baseLength = config.maxNotesPerPhrase * (0.3 + intensity * 0.7);
+            const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
             const planSteps =
                 soloist.activeSteps && soloist.activeSteps > 0
                     ? soloist.activeSteps
@@ -618,7 +621,7 @@ export function getSoloistNote(
                 step,
                 planSteps,
                 activeStyle,
-                intensity,
+                effectiveIntensity,
                 stepsPerMeasure,
                 stepsPerBeat,
                 coordination,
@@ -651,7 +654,7 @@ export function getSoloistNote(
                 currentChord,
                 nextChord,
                 activeStyle,
-                intensity,
+                effectiveIntensity,
                 stepInChord,
                 coordination,
                 playback,

@@ -179,7 +179,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 } else if (forceDense) {
                     isRest = prng() > 0.9;
                 } else {
-                    isRest = prng() > 0.8;
+                    isRest = prng() > 0.6;
                 }
 
                 let durationBeats = 1;
