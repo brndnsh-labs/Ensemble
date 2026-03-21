@@ -10,7 +10,7 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Use Node.js
         uses: actions/setup-node@v5
@@ -29,7 +29,7 @@ jobs:
     # Needs unit tests to pass first for efficiency, but could be run in parallel
     needs: unit-tests
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Use Node.js
         uses: actions/setup-node@v5
