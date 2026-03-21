@@ -88,6 +88,7 @@ export function StyleSelector({ module, styles }) {
                                 key={item.id}
                                 type="button"
                                 class={`preset-chip ${module}-style-chip ${currentStyle === item.id ? 'active' : ''}`}
+                                aria-pressed={currentStyle === item.id}
                                 onClick={() => onSelect(item.id)}
                             >
                                 {formatUnicodeSymbols(item.name)}
