@@ -1,22 +1,14 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { analyzeForm } from '../form-analysis.js';
-import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
+import { binarySearchMap, getMidi, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
-import { compingState, getAccompanimentNotes } from './accompaniment.js';
-import { getBassNote, isBassActive } from './bass-engine.js';
-import {
-    createCoordinationContext,
-    enforceRegisterSlotting,
-    updateCoordinationContext,
-} from './coordination-engine.js';
-import { generateProceduralFill } from './fills.js';
-import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
-import { getHarmonyNotes } from './harmonies.js';
+import { compingState } from './accompaniment.js';
+import { enforceRegisterSlotting, updateCoordinationContext } from './coordination-engine.js';
+import { calculatePocketOffset } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
-import { MidiTrack, writeInt16, writeInt32, writeString, writeVarInt } from './midi-utils.js';
+import { MidiTrack, writeInt16, writeInt32, writeString } from './midi-utils.js';
 import { generateResolutionNotes } from './resolution.js';
-import { getSoloistNote } from './soloist.js';
+import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep } from './worker-utils.js';
 
 export const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
@@ -152,6 +144,8 @@ export class ExportProcessor {
             targetIntensity: playback.bandIntensity,
             stepSize: 0,
             form: analyzeForm(),
+            loopMode: this.loopMode,
+            totalLoops: this.loopCount,
         };
 
         this.globalStep = 0;
@@ -258,88 +252,6 @@ export class ExportProcessor {
         updateCoordinationContext(coordination, moduleName, notes);
     }
 
-    /**
-     * @param {number} step
-     */
-    checkWorkerTransition(step) {
-        const { groove, playback, arranger, harmony } = this.state;
-        const _currentLoopCount = playback.currentLoopCount || 0;
-        if (!groove.enabled) {
-            return;
-        }
-        const modStep = step % this.totalStepsOneLoop;
-
-        if (modStep === 0 && step > 0) {
-            this.exportConductor.loopCount++;
-            this.exportConductor.formIteration++;
-            playback.currentLoopCount = this.exportConductor.loopCount; // @worker-mutation
-        }
-
-        const entry = binarySearchMap(arranger.stepMap || [], modStep);
-        if (!entry) {
-            return;
-        }
-
-        const sectionEnd = entry.end;
-        const fillStart = sectionEnd - this.stepsPerMeasure;
-
-        if (modStep === fillStart) {
-            const currentIndex = arranger.stepMap.indexOf(entry);
-            let nextEntry = arranger.stepMap[currentIndex + 1];
-            let isLoopEnd = false;
-            if (!nextEntry) {
-                nextEntry = arranger.stepMap[0];
-                isLoopEnd = true;
-            }
-
-            if (
-                /** @type {any} */ (nextEntry.chord).sectionId !==
-                    /** @type {any} */ (entry.chord).sectionId ||
-                isLoopEnd
-            ) {
-                let shouldFill = groove.creativity;
-                if (shouldFill && isLoopEnd && this.totalStepsOneLoop <= 64) {
-                    const freq =
-                        playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
-                    shouldFill = this.exportConductor.loopCount % freq === 0;
-                }
-                if (shouldFill) {
-                    const fill = generateProceduralFill(
-                        groove.genreFeel,
-                        playback.bandIntensity,
-                        this.stepsPerMeasure,
-                    );
-                    groove.fillSteps = fill; // @worker-mutation
-                    groove.fillActive = true; // @worker-mutation
-                    groove.fillStartStep = step; // @worker-mutation
-                    groove.fillLength = this.stepsPerMeasure; // @worker-mutation
-                    groove.pendingCrash = true; // @worker-mutation
-                }
-            }
-        }
-
-        if (playback.autoIntensity && modStep === 0 && this.exportConductor.formIteration > 0) {
-            const grandCycle = this.exportConductor.formIteration % 8;
-            let target = 0.5;
-            if (grandCycle < 3) {
-                target = 0.6;
-            } else if (grandCycle < 5) {
-                target = 0.9;
-            } else {
-                target = 0.4;
-            }
-            playback.bandIntensity =
-                playback.bandIntensity + (target - playback.bandIntensity) * 0.5; // @worker-mutation
-        }
-
-        harmony.complexity = Math.max(0, (playback.bandIntensity - 0.2) * 1.25); // @worker-mutation
-
-        const isLastLoop = this.exportConductor.loopCount >= this.loopCount - 1;
-        if (isLastLoop && this.loopCount > 1) {
-            harmony.complexity = Math.max(harmony.complexity, 0.85); // @worker-mutation
-        }
-    }
-
     processChunk() {
         try {
             const chunkStart = performance.now();
@@ -372,399 +284,190 @@ export class ExportProcessor {
      * @param {number} globalStep
      */
     processStep(globalStep) {
-        this.checkWorkerTransition(globalStep);
-        const { arranger, groove, playback, soloist, bass, harmony } = this.state;
+        applyWorkerTransition(this.state, globalStep, this.exportConductor);
 
+        const { arranger, groove, playback } = this.state;
         const stepTimeS = this.stepTimes[globalStep];
-        const measureStep = globalStep % this.stepsPerMeasure;
-        const stepInfo = getStepInfo(globalStep, this.ts, arranger.measureMap, TIME_SIGNATURES);
+
+        const tickResult = generateNotesForStep(
+            this.state,
+            globalStep,
+            {
+                mainCursor: this.exportCursor,
+                lookaheadCursor: this.exportLookaheadCursor,
+            },
+            {
+                includeSoloist: this.includedTracks.includes('soloist'),
+                includeBass: this.includedTracks.includes('bass'),
+                includeChords: this.includedTracks.includes('chords'),
+                includeHarmony: this.includedTracks.includes('harmonies'),
+                includeDrums: this.includedTracks.includes('drums'),
+            },
+        );
+
+        const notes = tickResult.notes;
+        const drumHits = tickResult.drumHits;
+
         const chordData = getChordAtStep(globalStep, arranger, this.exportCursor);
+        if (chordData && chordData.stepInChord === 0) {
+            const { chord } = chordData;
+            const pulse = this.toPulses(stepTimeS);
+            const modStep = globalStep % this.totalStepsOneLoop;
+            const section = binarySearchMap(arranger.sectionMap || [], modStep);
 
-        // --- Calculate Turnaround State (Match main engine) ---
-        const stepsPerBar = this.stepsPerMeasure;
-        const sectionEntry = binarySearchMap(arranger.sectionMap || [], globalStep);
-        let measuresInSection = 4;
-        let startStep = 0;
-        if (sectionEntry) {
-            measuresInSection = Math.max(1, (sectionEntry.end - sectionEntry.start) / stepsPerBar);
-            startStep = sectionEntry.start;
-        }
-        const barInSection = Math.floor((globalStep - startStep) / stepsPerBar);
-        const isTurnaround =
-            groove.creativity &&
-            measuresInSection > 1 &&
-            barInSection % measuresInSection === measuresInSection - 1;
-
-        // 1. Context Assembly (Anchor: Groove)
-        const coordination = createCoordinationContext(globalStep, /** @type {any} */ (stepInfo));
-        coordination.pocketOffset = calculatePocketOffset(playback, groove);
-
-        if (chordData) {
-            const sectionEnd = chordData.sectionEnd || 0;
-            const sectionStart = chordData.sectionStart || 0;
-            const remainingSteps = sectionEnd - globalStep;
-            const stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
-
-            // --- Structural Awareness: Turnaround Detection ---
-            const sectionSteps = sectionEnd - sectionStart;
-            const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
-            /** @type {any} */ (coordination).isTurnaround =
-                isLongEnough && remainingSteps <= stepsPerMeasure * 2;
-
-            if (remainingSteps <= stepsPerMeasure) {
-                const nextSectionChordData = getChordAtStep(
-                    sectionEnd,
-                    arranger,
-                    this.exportLookaheadCursor,
-                );
-                if (nextSectionChordData?.chord) {
-                    /** @type {any} */ (coordination).upcomingSectionFirstChord =
-                        nextSectionChordData.chord;
-                }
+            if (section && section.start === modStep) {
+                this.metaTrack.marker(pulse, `--- ${section.label} ---`);
             }
-        }
-
-        // Pre-calculate Drum Hits for Coordination
-        if (this.includedTracks.includes('drums')) {
-            const drumStep = globalStep % (groove.measures * this.stepsPerMeasure);
-            const sectionId = /** @type {any} */ (chordData?.chord)?.sectionId || null;
-            const seedIdx =
-                groove.sectionSeedMap && sectionId
-                    ? /** @type {any} */ (groove).sectionSeedMap[sectionId] || 0
-                    : 0;
-            const preset = /** @type {any} */ (DRUM_PRESETS)[groove.lastDrumPreset || 'Standard'];
-
-            /**
-             * @param {string} instName
-             */
-            const checkHit = (instName) => {
-                const inst = groove.instruments.find((i) => i.name === instName);
-                if (!inst || inst.muted) {
-                    return false;
-                }
-                let stepVal = inst.steps[drumStep];
-                if (groove.creativity && /** @type {any} */ (preset)?.variations?.[seedIdx]) {
-                    const varInst = /** @type {any} */ (preset).variations[seedIdx][
-                        /** @type {any} */ (instName)
-                    ];
-                    if (varInst) {
-                        stepVal = varInst[drumStep];
-                    }
-                }
-
-                const result = applyGrooveOverrides(this.state, {
-                    step: globalStep,
-                    inst,
-                    stepVal,
-                    playback,
-                    groove,
-                    isDownbeat: stepInfo.isMeasureStart,
-                    isBeatStart: stepInfo.isBeatStart,
-                    isBackbeat: stepInfo.isBackbeat,
-                    isGroupStart: stepInfo.isGroupStart,
-                    sectionId,
-                    beatIndex: stepInfo.beatIndex,
-                    isOffbeat: stepInfo.isOffbeat,
-                    isEOfBeat: stepInfo.isEOfBeat,
-                    isAOfBeat: stepInfo.isAOfBeat,
-                    tsConfig: stepInfo.tsConfig,
-                    isTurnaround,
-                    stepsPerBar: this.stepsPerMeasure,
-                    loopStep: drumStep,
-                });
-                return result.shouldPlay;
-            };
-
-            coordination.kickHit = checkHit('Kick');
-            coordination.snareHit = checkHit('Snare');
-        }
-
-        if (chordData) {
-            const { chord, stepInChord } = chordData;
-            const nextChordData = getChordAtStep(
-                globalStep + 4,
-                arranger,
-                this.exportLookaheadCursor,
+            this.metaTrack.marker(
+                pulse,
+                /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
             );
 
-            // Emit Metadata on Chord/Section Change
-            if (stepInChord === 0) {
-                const pulse = this.toPulses(stepTimeS);
-                const modStep = globalStep % this.totalStepsOneLoop;
-                const section = binarySearchMap(arranger.sectionMap || [], modStep);
-
-                if (section && section.start === modStep) {
-                    this.metaTrack.marker(pulse, `--- ${section.label} ---`);
-                }
-                this.metaTrack.marker(
+            if (this.includedTracks.includes('chords')) {
+                this.chordTrack.text(
                     pulse,
                     /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
                 );
-
-                if (this.includedTracks.includes('chords')) {
-                    this.chordTrack.text(
-                        pulse,
-                        /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
-                    );
-                }
             }
+        }
 
-            // 2. Soloist Generation (High Priority)
-            let soloResult = null;
-            if (this.includedTracks.includes('soloist')) {
-                const { sectionStart, sectionEnd } = chordData;
-                soloResult = getSoloistNote(
-                    this.state,
-                    /** @type {any} */ (chord),
-                    nextChordData?.chord,
-                    globalStep,
-                    soloist.lastFreq,
-                    soloist.octave,
-                    /** @type {string} */ (soloist.style),
-                    stepInChord,
-                    { sectionStart, sectionEnd, stepCoordination: coordination },
-                    stepInfo,
-                );
-                if (soloResult) {
-                    const results = Array.isArray(soloResult) ? soloResult : [soloResult];
-                    this._writeNotesToTrack(
-                        this.soloistTrack,
-                        this.state.midi.soloistChannel - 1,
-                        results,
-                        stepTimeS,
-                        'soloist',
-                        coordination,
-                        globalStep,
-                    );
-                }
-            }
+        const soloistNotes = notes.filter((n) => n.module === 'soloist');
+        if (soloistNotes.length > 0) {
+            this._writeNotesToTrack(
+                this.soloistTrack,
+                this.state.midi.soloistChannel - 1,
+                soloistNotes,
+                stepTimeS,
+                'soloist',
+                tickResult.coordination,
+                globalStep,
+            );
+        }
 
-            // 3. Bass Generation (Yields to Soloist, Locks to Kick)
-            if (
-                this.includedTracks.includes('bass') &&
-                isBassActive(
-                    this.state,
-                    /** @type {string} */ (bass.style),
-                    globalStep,
-                    stepInChord,
-                    stepInfo,
-                    coordination,
-                )
-            ) {
-                const { sectionStart, sectionEnd } = chordData;
-                const res = getBassNote(
-                    this.state,
-                    /** @type {any} */ (chord),
-                    nextChordData?.chord,
-                    stepInChord / this.ts.stepsPerBeat,
-                    bass.lastFreq,
-                    bass.octave,
-                    /** @type {string} */ (bass.style),
-                    chordData.chordIndex,
-                    globalStep,
-                    stepInChord,
-                    { sectionStart, sectionEnd, stepCoordination: coordination },
-                    stepInfo,
-                );
-                if (res) {
-                    this._writeNotesToTrack(
-                        this.bassTrack,
-                        this.state.midi.bassChannel - 1,
-                        [res],
-                        stepTimeS,
-                        'bass',
-                        coordination,
-                        globalStep,
-                    );
-                }
-            }
+        const bassNotes = notes.filter((n) => n.module === 'bass');
+        if (bassNotes.length > 0) {
+            this._writeNotesToTrack(
+                this.bassTrack,
+                this.state.midi.bassChannel - 1,
+                bassNotes,
+                stepTimeS,
+                'bass',
+                tickResult.coordination,
+                globalStep,
+            );
+        }
 
-            // 4. Chords Generation (Yields Density to Soloist)
-            if (this.includedTracks.includes('chords')) {
-                const notes = getAccompanimentNotes(
-                    this.state,
-                    chord,
-                    globalStep,
-                    stepInChord,
-                    measureStep,
-                    stepInfo,
-                    coordination,
-                );
-                this._writeNotesToTrack(
-                    this.chordTrack,
-                    this.state.midi.chordsChannel - 1,
-                    notes,
-                    stepTimeS,
-                    'chords',
-                    coordination,
-                    globalStep,
-                );
-            }
+        const chordsNotes = notes.filter((n) => n.module === 'chords');
+        if (chordsNotes.length > 0) {
+            this._writeNotesToTrack(
+                this.chordTrack,
+                this.state.midi.chordsChannel - 1,
+                chordsNotes,
+                stepTimeS,
+                'chords',
+                tickResult.coordination,
+                globalStep,
+            );
+        }
 
-            // 4. Harmonies
-            if (this.includedTracks.includes('harmonies')) {
-                const harmonyNotes = getHarmonyNotes(
-                    this.state,
-                    /** @type {any} */ (chord),
-                    nextChordData?.chord,
-                    globalStep,
-                    harmony.octave,
-                    /** @type {string} */ (harmony.style),
-                    stepInChord,
-                    soloResult,
-                    coordination,
-                    stepInfo,
-                );
-                this._writeNotesToTrack(
-                    this.harmonyTrack,
-                    this.state.midi.harmonyChannel - 1,
-                    harmonyNotes,
-                    stepTimeS,
-                    'harmony',
-                    coordination,
-                    globalStep,
-                );
-            }
+        const harmonyNotes = notes.filter((n) => n.module === 'harmony');
+        if (harmonyNotes.length > 0) {
+            this._writeNotesToTrack(
+                this.harmonyTrack,
+                this.state.midi.harmonyChannel - 1,
+                harmonyNotes,
+                stepTimeS,
+                'harmony',
+                tickResult.coordination,
+                globalStep,
+            );
+        }
 
-            if (this.includedTracks.includes('drums')) {
-                const drumTimeS = stepTimeS + calculatePocketOffset(playback, groove);
-                const drumPulse = Math.max(0, this.toPulses(drumTimeS));
+        if (this.includedTracks.includes('drums')) {
+            const drumTimeS = stepTimeS + calculatePocketOffset(playback, groove);
+            const drumPulse = Math.max(0, this.toPulses(drumTimeS));
 
-                const nextStepTimeS =
-                    this.stepTimes[globalStep + 1] || stepTimeS + this.sixteenthSec;
-                const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;
+            const nextStepTimeS = this.stepTimes[globalStep + 1] || stepTimeS + this.sixteenthSec;
+            const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;
 
-                let fillPlayed = false;
+            let fillPlayed = false;
 
-                if (groove.fillActive) {
-                    const fillStep = globalStep - groove.fillStartStep;
+            if (groove.fillActive) {
+                const fillStep = globalStep - groove.fillStartStep;
 
-                    if (fillStep >= 0 && fillStep < groove.fillLength) {
-                        if (playback.bandIntensity >= 0.5 || fillStep >= groove.fillLength / 2) {
-                            const fillNotes = /** @type {any} */ (groove.fillSteps)[fillStep];
-                            if (fillNotes && fillNotes.length > 0) {
-                                fillNotes.forEach((/** @type {any} */ n) => {
-                                    const midi = DRUM_MAP[/** @type {any} */ (n).name];
-                                    if (midi) {
-                                        const durS =
-                                            n.name === 'Crash'
-                                                ? this.secondsPerBeat
-                                                : tightDurationS;
-                                        const midiVel = Math.max(
-                                            1,
-                                            Math.min(127, Math.round(n.vel * 127)),
-                                        );
-                                        this.drumTrack.noteOn(
-                                            drumPulse,
-                                            this.state.midi.drumsChannel - 1,
-                                            midi,
-                                            midiVel,
-                                        );
-                                        this.drumTrack.noteOff(
-                                            this.toPulses(drumTimeS + durS),
-                                            this.state.midi.drumsChannel - 1,
-                                            midi,
-                                        );
-                                    }
-                                });
-                                fillPlayed = true;
-                            }
-                        }
-                    } else if (fillStep === groove.fillLength) {
-                        groove.fillActive = false; // @worker-mutation
-                        if (groove.pendingCrash) {
-                            this.drumTrack.noteOn(
-                                drumPulse,
-                                this.state.midi.drumsChannel - 1,
-                                DRUM_MAP.Crash,
-                                110,
-                            );
-                            this.drumTrack.noteOff(
-                                this.toPulses(drumTimeS + this.secondsPerBeat),
-                                this.state.midi.drumsChannel - 1,
-                                DRUM_MAP.Crash,
-                            );
-                            groove.pendingCrash = false; // @worker-mutation
+                if (fillStep >= 0 && fillStep < groove.fillLength) {
+                    if (playback.bandIntensity >= 0.5 || fillStep >= groove.fillLength / 2) {
+                        const fillNotes = /** @type {any} */ (groove.fillSteps)[fillStep];
+                        if (fillNotes && fillNotes.length > 0) {
+                            fillNotes.forEach((/** @type {any} */ n) => {
+                                const midi = DRUM_MAP[/** @type {any} */ (n).name];
+                                if (midi) {
+                                    const durS =
+                                        n.name === 'Crash' ? this.secondsPerBeat : tightDurationS;
+                                    const midiVel = Math.max(
+                                        1,
+                                        Math.min(127, Math.round(n.vel * 127)),
+                                    );
+                                    this.drumTrack.noteOn(
+                                        drumPulse,
+                                        this.state.midi.drumsChannel - 1,
+                                        midi,
+                                        midiVel,
+                                    );
+                                    this.drumTrack.noteOff(
+                                        this.toPulses(drumTimeS + durS),
+                                        this.state.midi.drumsChannel - 1,
+                                        midi,
+                                    );
+                                }
+                            });
+                            fillPlayed = true;
                         }
                     }
+                } else if (fillStep === groove.fillLength) {
+                    groove.fillActive = false; // @worker-mutation
+                    if (groove.pendingCrash) {
+                        this.drumTrack.noteOn(
+                            drumPulse,
+                            this.state.midi.drumsChannel - 1,
+                            DRUM_MAP.Crash,
+                            110,
+                        );
+                        this.drumTrack.noteOff(
+                            this.toPulses(drumTimeS + this.secondsPerBeat),
+                            this.state.midi.drumsChannel - 1,
+                            DRUM_MAP.Crash,
+                        );
+                        groove.pendingCrash = false; // @worker-mutation
+                    }
                 }
+            }
 
-                if (!fillPlayed) {
-                    const drumStep = globalStep % (groove.measures * this.stepsPerMeasure);
-                    const sectionId = /** @type {any} */ (chordData?.chord)?.sectionId || null;
-                    const seedIdx =
-                        groove.sectionSeedMap && sectionId
-                            ? /** @type {any} */ (groove).sectionSeedMap[sectionId] || 0
-                            : 0;
-                    const preset = /** @type {any} */ (DRUM_PRESETS)[
-                        groove.lastDrumPreset || 'Standard'
-                    ];
-
-                    groove.instruments.forEach((inst) => {
-                        let stepVal = inst.steps[drumStep];
-                        if (
-                            groove.creativity &&
-                            /** @type {any} */ (preset)?.variations?.[seedIdx]
-                        ) {
-                            const varInst = /** @type {any} */ (preset).variations[seedIdx][
-                                /** @type {any} */ (inst).name
-                            ];
-                            if (varInst) {
-                                stepVal = varInst[drumStep];
-                            }
-                        }
-
-                        const { shouldPlay, velocity, soundName, instTimeOffset } =
-                            applyGrooveOverrides(this.state, {
-                                step: globalStep,
-                                inst,
-                                stepVal,
-                                playback,
-                                groove,
-                                isDownbeat: stepInfo.isMeasureStart,
-                                isBeatStart: stepInfo.isBeatStart,
-                                isBackbeat: stepInfo.isBackbeat,
-                                isGroupStart: stepInfo.isGroupStart,
-                                sectionId,
-                                beatIndex: stepInfo.beatIndex,
-                                isOffbeat: stepInfo.isOffbeat,
-                                isEOfBeat: stepInfo.isEOfBeat,
-                                isAOfBeat: stepInfo.isAOfBeat,
-                                tsConfig: stepInfo.tsConfig,
-                                isTurnaround,
-                                stepsPerBar: this.stepsPerMeasure,
-                                loopStep: drumStep,
-                            });
-
-                        if (shouldPlay && !inst.muted) {
-                            const midi =
-                                DRUM_MAP[/** @type {any} */ (soundName)] ||
-                                DRUM_MAP[/** @type {any} */ (inst).name];
-                            if (midi) {
-                                const durS =
-                                    soundName === 'Open' || soundName === 'Crash'
-                                        ? this.secondsPerBeat
-                                        : tightDurationS;
-                                const finalTimeS = drumTimeS + instTimeOffset;
-                                const midiVel = Math.max(
-                                    1,
-                                    Math.min(127, Math.round(velocity * 127)),
-                                );
-                                this.drumTrack.noteOn(
-                                    this.toPulses(finalTimeS),
-                                    this.state.midi.drumsChannel - 1,
-                                    midi,
-                                    midiVel,
-                                );
-                                this.drumTrack.noteOff(
-                                    this.toPulses(finalTimeS + durS),
-                                    this.state.midi.drumsChannel - 1,
-                                    midi,
-                                );
-                            }
-                        }
-                    });
-                }
+            if (!fillPlayed) {
+                drumHits.forEach((hit) => {
+                    const midi =
+                        DRUM_MAP[/** @type {any} */ (hit.soundName)] ||
+                        DRUM_MAP[/** @type {any} */ (hit.inst).name];
+                    if (midi) {
+                        const durS =
+                            hit.soundName === 'Open' || hit.soundName === 'Crash'
+                                ? this.secondsPerBeat
+                                : tightDurationS;
+                        const finalTimeS = drumTimeS + hit.instTimeOffset;
+                        const midiVel = Math.max(1, Math.min(127, Math.round(hit.velocity * 127)));
+                        this.drumTrack.noteOn(
+                            this.toPulses(finalTimeS),
+                            this.state.midi.drumsChannel - 1,
+                            midi,
+                            midiVel,
+                        );
+                        this.drumTrack.noteOff(
+                            this.toPulses(finalTimeS + durS),
+                            this.state.midi.drumsChannel - 1,
+                            midi,
+                        );
+                    }
+                });
             }
         }
     }
