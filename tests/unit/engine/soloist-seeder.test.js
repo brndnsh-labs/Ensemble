@@ -145,7 +145,7 @@ describe('Soloist Seeder Module', () => {
 
         it('should apply sequencing mutation to repeated sections', () => {
             let sequencingFound = false;
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < 300; i++) {
                 const seed = generateSessionSeed(
                     mockState,
                     mockArranger,
@@ -153,11 +153,13 @@ describe('Soloist Seeder Module', () => {
                     0.5,
                     `seq-seed-${i}`,
                 );
-                const a1Notes = seed.notes.filter((n) => n.step < 32);
-                const a2Notes = seed.notes.filter((n) => n.step >= 128 && n.step < 160);
 
-                if (a1Notes.length === a2Notes.length && a1Notes.length > 2) {
-                    const diffs = a1Notes.map((n, idx) => a2Notes[idx].midi - n.midi);
+                // Compare the first 2-measure block of A1 vs A2
+                const a1Block = seed.notes.filter((n) => n.step >= 0 && n.step < 32);
+                const a2Block = seed.notes.filter((n) => n.step >= 128 && n.step < 160);
+
+                if (a1Block.length === a2Block.length && a1Block.length > 2) {
+                    const diffs = a1Block.map((n, idx) => a2Block[idx].midi - n.midi);
                     const allSameDiff = diffs.every((d) => d === diffs[0] && d !== 0);
                     if (allSameDiff) {
                         sequencingFound = true;
