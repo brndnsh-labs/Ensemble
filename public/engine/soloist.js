@@ -109,6 +109,15 @@ export function getSoloistNote(
     const isStrictHeadPlayback =
         loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
 
+    // Themed Improvisation: If loop > 0, we can still use the head as a base but with more variation.
+    const isThemedImprov =
+        loopCount > 0 &&
+        soloist.sessionSeed &&
+        soloist.sessionSeed.notes.length > 0 &&
+        intensity < 0.8; // At very high intensity, we might want to go fully generative/wild.
+
+    const isHeadPerformanceMode = isStrictHeadPlayback || isThemedImprov;
+
     // Use stepInfo for all meter-aware timing calculations
     const measureStep = stepInfo
         ? stepInfo.mStep
@@ -159,6 +168,11 @@ export function getSoloistNote(
             const jitterScale = 1.0 - tightness;
             const jitterMs = config.timingJitter * jitterScale;
             timingOffset += (Math.random() - 0.5) * (jitterMs / 1000);
+        }
+
+        // Apply rhythmic entropy for themed improvisation
+        if (isThemedImprov) {
+            timingOffset += (soloist.rhythmicEntropy || 0) * 0.02;
         }
 
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
@@ -238,9 +252,9 @@ export function getSoloistNote(
         }
     }
 
-    // --- Head Mode (Loop 0) Direct Playback Bypass ---
-    if (isStrictHeadPlayback && soloist.sessionSeed) {
-        // While playing the strict head, the soloist is technically actively phrasing,
+    // --- Head Mode / Themed Improv Direct Playback Bypass ---
+    if (isHeadPerformanceMode && soloist.sessionSeed) {
+        // While playing the head/themed improv, the soloist is technically actively phrasing,
         // so we must force isResting = false to prevent the global orchestrator from giving
         // the solo away to comping instruments due to assumed inactivity.
         soloist.isResting = false; // @worker-mutation
@@ -255,52 +269,93 @@ export function getSoloistNote(
 
         if (headNotes.length > 0) {
             const headNote = headNotes[0];
-            soloist.busySteps = Math.max(0, (headNote.durationSteps || 1) - 1); // @worker-mutation
 
-            logDebug(
-                `[Head Bypass] Playing exact head note: MIDI ${headNote.midi}, duration: ${headNote.durationSteps}. Triggering selectPitchAndDevices bypass.`,
-            );
+            // HYBRID PHRASING PERFORMANCE ENGINE (v2)
+            // 1. Macro-Phrasing (Duty Cycle)
+            // Determine if we are in a "Breath Zone" (e.g., end of 8-measure block)
+            const measureInBlock8 = Math.floor(step / stepsPerMeasure) % 8;
+            const isMacroRestZone = measureInBlock8 >= 6; // Last 2 measures of 8-measure block
 
-            const pseudoRhythmNode = {
-                velocity: headNote.velocity || 0.8,
-                durationSteps: headNote.durationSteps,
-                isStrongBeat: isBeatStart,
-                vibrato: headNote.durationSteps > 4,
-                isSustained: headNote.durationSteps > 4,
-                isHeadBypass: true,
-                targetMidi: headNote.midi,
-            };
+            // 2. Micro-Phrasing (Probability Gate)
+            const styleConfig =
+                /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
+            const densityBase = styleConfig.rhythmicDensity || 0.5;
 
-            soloist.lastAttackStep = step; // @worker-mutation
+            // Survival Probability:
+            // - Anchors (Themes): 95-100% chance (protected)
+            // - Non-anchors: Scale with intensity and genre density
+            // If in Themed Improv mode (Loop > 0), reduce probability slightly to leave more room for "thought"
+            const improvFactor = isThemedImprov ? 0.8 : 1.0;
+            let survivalProb =
+                (headNote.isAnchor ? 0.95 : (0.1 + intensity * 0.9) * densityBase) * improvFactor;
 
-            return selectPitchAndDevices(
-                state,
-                step,
-                pseudoRhythmNode,
-                currentChord,
-                nextChord,
-                activeStyle,
-                intensity,
-                stepInChord,
-                coordination,
-                playback,
-                soloist,
-                groove,
-                arranger,
-                stepsPerMeasure,
-                stepsPerBeat,
-            );
+            // Macro-rest overrides:
+            if (isMacroRestZone && intensity < 0.7 && !headNote.isAnchor) {
+                survivalProb = 0; // Force "Breath" for non-anchors at low intensity
+            }
+
+            if (Math.random() < survivalProb) {
+                soloist.busySteps = Math.max(0, (headNote.durationSteps || 1) - 1); // @worker-mutation
+
+                logDebug(
+                    `[Head/Themed Performance] Playing seeded note: MIDI ${headNote.midi}. (Prob: ${survivalProb.toFixed(2)}, isAnchor: ${headNote.isAnchor})`,
+                );
+
+                // --- Improvisation Layer (Phase 3) ---
+                let targetMidi = headNote.midi;
+                if (isThemedImprov && !headNote.isAnchor) {
+                    // Apply ±1-2 semitone "jitter" to seeded pitches based on intensity
+                    const jitterRange = intensity > 0.6 ? 2 : 1;
+                    if (Math.random() < 0.4) {
+                        targetMidi +=
+                            Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
+                    }
+                }
+
+                const pseudoRhythmNode = {
+                    velocity: headNote.velocity || 0.8,
+                    durationSteps: headNote.durationSteps,
+                    isStrongBeat: isBeatStart,
+                    vibrato: headNote.durationSteps > 4,
+                    isSustained: headNote.durationSteps > 4,
+                    isHeadBypass: true,
+                    targetMidi: targetMidi,
+                };
+
+                soloist.lastAttackStep = step; // @worker-mutation
+
+                return selectPitchAndDevices(
+                    state,
+                    step,
+                    pseudoRhythmNode,
+                    currentChord,
+                    nextChord,
+                    activeStyle,
+                    intensity,
+                    stepInChord,
+                    coordination,
+                    playback,
+                    soloist,
+                    groove,
+                    arranger,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                );
+            } else {
+                logDebug(
+                    `[Head/Themed Performance] Gated/Skipped seeded note for phrasing. (Prob: ${survivalProb.toFixed(2)})`,
+                );
+                // Signal to coordination so band can fill
+                if (coordination) {
+                    coordination.soloistYield = true;
+                }
+            }
         }
 
         if ((soloist.busySteps || 0) > 0) {
             soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
         }
 
-        // When strictly playing the head, if there's no note right now, we simply yield/rest.
-        // We do not evaluate the standard probability/state machine logic underneath.
-        logDebug(
-            `[Head Bypass] No head note on this step. Yielding silence until next composed note.`,
-        );
         return null;
     }
 

@@ -236,14 +236,6 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 currentBeat += durationBeats;
             }
 
-            // Adjust the end of the motif to resolve (rest) more often to leave space
-            if (motif.length > 0) {
-                const lastIdx = motif.length - 1;
-                if (!motif[lastIdx].isRest && prng() > 0.3) {
-                    motif[lastIdx].isRest = true;
-                }
-            }
-
             // Calculate metrics for this new motif
             let attacks = 0;
             let syncopatedAttacks = 0;
@@ -323,63 +315,14 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         // Find if this is the last section before a structural reset (macro form turnaround)
         // Usually the last section in the arranger.sectionMap, or right before a loop
-        const isLastSectionOfForm = index === turnaroundIndex;
+        const _isLastSectionOfForm = index === turnaroundIndex;
 
         // Group into 8-measure or 4-measure blocks
         const totalSectionMeasures = sectionEndMeasure - sectionStartMeasure;
-        const blockMeasures = totalSectionMeasures >= 8 ? 8 : 4;
+        const _blockMeasures = totalSectionMeasures >= 8 ? 8 : 4;
 
         for (let m = sectionStartMeasure; m < sectionEndMeasure; m += 2) {
             const baseStep = m * stepsPerMeasure;
-
-            // Check form resolution at the macro cycle turnaround
-            const measuresFromEnd = sectionEndMeasure - m;
-            const isResolutionZone = isLastSectionOfForm && measuresFromEnd <= 2;
-
-            // Determine macro-phrasing (4 or 8 measure arcs)
-            const measureInBlock = (m - sectionStartMeasure) % blockMeasures;
-
-            // For 8 measure blocks, the user requested "generate a 2-measure motif, repeat or mutate it in measures 3 and 4,
-            // and then explicitly force a rest state for the remainder of the 8-measure block."
-            // However, 4 whole measures of rest is too much and sounds broken ("second four don't play").
-            // We will interpret "remainder" as the final 2 measures of the block to let it breathe,
-            // OR only explicitly force rest if we are in the macro-cycle turnaround resolution zone.
-            if (measureInBlock >= blockMeasures - 2) {
-                // We are in the final 2 measures of the 4 or 8 measure block.
-
-                // If this block is the macro-cycle turnaround, force a strong resolution and full rest.
-                if (isResolutionZone) {
-                    if (m === sectionEndMeasure - 2) {
-                        const stepEntry = binarySearchMap(arranger.stepMap, baseStep);
-                        if (stepEntry?.chord) {
-                            const chord = /** @type {any} */ (stepEntry.chord);
-                            const stableIntervals = [0, 7];
-                            const pitchClass =
-                                (chord.rootMidi +
-                                    stableIntervals[Math.floor(prng() * stableIntervals.length)]) %
-                                12;
-                            const midi = registerBase + pitchClass;
-                            notes.push({
-                                step: baseStep,
-                                midi: midi,
-                                isAnchor: true,
-                                durationSteps: stepsPerMeasure * 2, // Let it ring out
-                                velocity: 0.9,
-                            });
-                            lastMidi = midi;
-                        }
-                    }
-                    continue; // Force rest for turnaround resolution
-                }
-            }
-
-            // If it's NOT the macro-cycle turnaround, but we are in the final 2 measures of an 8-measure block,
-            // encourage a rest state to breathe (50% chance), but don't force a permanent 4-measure gap.
-            if (measureInBlock >= blockMeasures - 2 && blockMeasures >= 8) {
-                if (prng() > 0.5) {
-                    continue;
-                }
-            }
 
             // Pick a target chord tone for the downbeat of these 2 measures
             const stepToSearch = Math.min(baseStep, totalSteps - 1);

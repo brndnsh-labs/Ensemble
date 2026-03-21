@@ -36,8 +36,8 @@ describe('Soloist Engine', () => {
                 sessionSeed: {
                     loopLengthSteps: 16,
                     notes: [
-                        { step: 0, midi: 72, durationSteps: 4, velocity: 0.8 },
-                        { step: 8, midi: 74, durationSteps: 2, velocity: 0.9 },
+                        { step: 0, midi: 72, durationSteps: 4, velocity: 0.8, isAnchor: true },
+                        { step: 8, midi: 74, durationSteps: 2, velocity: 0.9, isAnchor: true },
                     ],
                 },
             },
@@ -49,6 +49,8 @@ describe('Soloist Engine', () => {
     it('should bypass rhythm engine on Loop 0 and yield seed notes directly', () => {
         const mockChord = { rootMidi: 60, intervals: [0, 4, 7] };
 
+        const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
+
         // Check step 0 (should match seed)
         getSoloistNote(mockState, mockChord, null, 0, null, 4, 'scalar', 0, {});
 
@@ -59,6 +61,8 @@ describe('Soloist Engine', () => {
         expect(pseudoRhythmNode.isHeadBypass).toBe(true);
         expect(pseudoRhythmNode.targetMidi).toBe(72);
         expect(pseudoRhythmNode.durationSteps).toBe(4);
+
+        randomMock.mockRestore();
     });
 
     it('should rest if no seed note exists at current step in Loop 0', () => {
@@ -71,9 +75,10 @@ describe('Soloist Engine', () => {
         expect(pitchEngine.selectPitchAndDevices).not.toHaveBeenCalled();
     });
 
-    it('should fallback to normal generative engine on Loop 1+', () => {
+    it('should fallback to normal generative engine on Loop 1+ at high intensity', () => {
         const mockChord = { rootMidi: 60, intervals: [0, 4, 7] };
         mockState.playback.currentLoopCount = 1;
+        mockState.playback.bandIntensity = 1.0; // High intensity triggers wild mode
         mockState.soloist.isResting = false; // Force it to generate a plan
         mockState.soloist.activeSteps = 16;
 
@@ -85,5 +90,26 @@ describe('Soloist Engine', () => {
         const rhythmNode = callArgs[2];
 
         expect(rhythmNode.isHeadBypass).toBeUndefined();
+    });
+
+    it('should use themed improvisation on Loop 1 at medium intensity', () => {
+        const mockChord = { rootMidi: 60, intervals: [0, 4, 7] };
+        mockState.playback.currentLoopCount = 1;
+        mockState.playback.bandIntensity = 0.5; // Trigger themed improv
+        mockState.soloist.isResting = false;
+
+        const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
+
+        // Step 0 matches a seed note
+        getSoloistNote(mockState, mockChord, null, 0, null, 4, 'scalar', 0, {});
+
+        expect(pitchEngine.selectPitchAndDevices).toHaveBeenCalled();
+        const callArgs = pitchEngine.selectPitchAndDevices.mock.calls[0];
+        const pseudoRhythmNode = callArgs[2];
+
+        expect(pseudoRhythmNode.isHeadBypass).toBe(true);
+        expect(pseudoRhythmNode.targetMidi).toBe(72);
+
+        randomMock.mockRestore();
     });
 });

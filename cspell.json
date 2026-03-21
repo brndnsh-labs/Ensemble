@@ -147,7 +147,8 @@
         "partwise",
         "IMPROV",
         "honky",
-        "tonk"
+        "tonk",
+        "prechorus"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
