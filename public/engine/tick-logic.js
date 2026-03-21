@@ -476,7 +476,80 @@ export function applyWorkerTransition(state, step, conductorState) {
         }
     }
 
-    if (playback.autoIntensity && modStep === 0 && conductorState.formIteration > 0) {
+    // --- Auto Intensity Simulation for Offline Export ---
+    if (playback.autoIntensity && conductorState.totalLoops !== undefined) {
+        const totalExportSteps = arranger.totalSteps * conductorState.totalLoops;
+        const progress = totalExportSteps > 0 ? step / totalExportSteps : 0;
+
+        // Match the macro-arc logic from conductor.js (session timer arc)
+        let macroFloor = 0.2;
+        let macroCeiling = 0.6;
+
+        if (progress < 0.15) {
+            macroFloor = 0.2;
+            macroCeiling = 0.45;
+        } else if (progress < 0.4) {
+            macroFloor = 0.4;
+            macroCeiling = 0.7;
+        } else if (progress < 0.65) {
+            macroFloor = 0.5;
+            macroCeiling = 0.8;
+        } else if (progress < 0.85) {
+            macroFloor = 0.7;
+            macroCeiling = 1.0;
+        } else {
+            macroFloor = 0.2;
+            macroCeiling = 0.5;
+        }
+
+        // Incorporate Section Energy
+        let targetEnergy = 0.5;
+        if (conductorState.form?.sections && entry?.chord) {
+            const currentSectionId = /** @type {any} */ (entry.chord).sectionId;
+            const currentSection = conductorState.form.sections.find(
+                (/** @type {any} */ s) => s.id === currentSectionId,
+            );
+            if (currentSection) {
+                const role = currentSection.role;
+                switch (role) {
+                    case 'Exposition':
+                        targetEnergy = macroFloor + 0.1;
+                        break;
+                    case 'Development':
+                        targetEnergy = (macroFloor + macroCeiling) / 2 + 0.1;
+                        break;
+                    case 'Contrast':
+                        targetEnergy = macroFloor;
+                        break;
+                    case 'Build':
+                        targetEnergy = macroCeiling;
+                        break;
+                    case 'Climax':
+                        targetEnergy = macroCeiling + 0.1;
+                        break;
+                    case 'Recapitulation':
+                        targetEnergy = macroFloor + 0.2;
+                        break;
+                    case 'Resolution':
+                        targetEnergy = macroFloor - 0.1;
+                        break;
+                    default:
+                        targetEnergy = 0.5;
+                }
+            }
+        }
+
+        targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
+
+        // Smoothly interpolate towards target energy over the section
+        if (entry && entry.end > entry.start) {
+            const stepSize = (targetEnergy - playback.bandIntensity) / (entry.end - entry.start);
+            playback.bandIntensity = Math.max(
+                0.1,
+                Math.min(1.0, playback.bandIntensity + stepSize),
+            ); // @worker-mutation
+        }
+    } else if (playback.autoIntensity && modStep === 0 && conductorState.formIteration > 0) {
         const grandCycle = conductorState.formIteration % 8;
         let target = 0.5;
         if (grandCycle < 3) {

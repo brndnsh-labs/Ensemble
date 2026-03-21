@@ -197,8 +197,20 @@ export class ExportProcessor {
                 const notePulse = Math.max(0, this.toPulses(noteTimeS));
 
                 let finalVel = res.velocity * polyphonyComp;
+
+                // Match live engine dynamic scaling
+                if (moduleName === 'bass') {
+                    // Match synth-bass square-root compression curve
+                    finalVel = Math.sqrt(res.velocity);
+                } else if (moduleName === 'soloist') {
+                    // Match synth-soloist band intensity swell
+                    const intensity = this.state.playback.bandIntensity ?? 0.5;
+                    const intensityGain = 0.5 + intensity * 0.9;
+                    finalVel = res.velocity * intensityGain;
+                }
+
                 if (res.muted) {
-                    finalVel *= moduleName === 'bass' ? 0.25 : 0.3;
+                    finalVel *= moduleName === 'bass' ? 0.15 : 0.3;
                 }
                 const midiVel = normalizeMidiVelocity(finalVel);
 
@@ -396,16 +408,82 @@ export class ExportProcessor {
             }
 
             drumHits.forEach((hit) => {
-                const midi =
-                    DRUM_MAP[/** @type {any} */ (hit.soundName)] ||
-                    DRUM_MAP[/** @type {any} */ (hit.inst).name];
+                const soundName = /** @type {any} */ (hit.soundName);
+                const instName = /** @type {any} */ (hit.inst).name;
+                const name = soundName || instName;
+                let midi = DRUM_MAP[soundName] || DRUM_MAP[instName];
+
+                // Fuzzy matching for unmapped dynamic names
+                if (!midi) {
+                    if (name.includes('Tom')) {
+                        if (name.includes('High')) {
+                            midi = DRUM_MAP['High Tom'];
+                        } else if (name.includes('Low')) {
+                            midi = DRUM_MAP['Low Tom'];
+                        } else {
+                            midi = DRUM_MAP['Mid Tom'];
+                        }
+                    } else if (name.includes('Agogo')) {
+                        if (name.includes('Low')) {
+                            midi = DRUM_MAP['Low Agogo'];
+                        } else {
+                            midi = DRUM_MAP['High Agogo'];
+                        }
+                    } else if (name.includes('Bongo')) {
+                        if (name.includes('Low')) {
+                            midi = DRUM_MAP['Low Bongo'];
+                        } else {
+                            midi = DRUM_MAP['High Bongo'];
+                        }
+                    } else if (name.includes('Conga')) {
+                        if (name.includes('Low')) {
+                            midi = DRUM_MAP['Low Conga'];
+                        } else if (name.includes('Open')) {
+                            midi = DRUM_MAP['Open Conga'];
+                        } else if (name.includes('Mute')) {
+                            midi = DRUM_MAP['Mute Conga'];
+                        } else if (name.includes('Slap')) {
+                            midi = DRUM_MAP['Slap Conga'];
+                        } else {
+                            midi = DRUM_MAP['High Conga'];
+                        }
+                    }
+                }
+
                 if (midi) {
                     const durS =
-                        hit.soundName === 'Open' || hit.soundName === 'Crash'
-                            ? this.secondsPerBeat
-                            : tightDurationS;
+                        name === 'Open' || name === 'Crash' ? this.secondsPerBeat : tightDurationS;
                     const finalTimeS = drumTimeS + hit.instTimeOffset;
-                    const midiVel = normalizeMidiVelocity(hit.velocity);
+
+                    // Match live engine velocity scaling multipliers
+                    let volMultiplier = 1.0;
+                    if (name === 'Kick' || name === 'Snare' || name === 'Sidestick') {
+                        volMultiplier = 1.3;
+                    } else if (name === 'HiHat') {
+                        volMultiplier = 0.85;
+                    } else if (name === 'Open') {
+                        volMultiplier = 0.75;
+                    } else if (name === 'Ride') {
+                        volMultiplier = 0.8;
+                    } else if (name === 'Crash') {
+                        volMultiplier = 0.85;
+                    } else if (name.includes('Tom')) {
+                        volMultiplier = 0.8;
+                    } else if (name === 'Clave') {
+                        volMultiplier = 0.7;
+                    } else if (name.startsWith('Conga') || name.startsWith('Bongo')) {
+                        volMultiplier = name.includes('Slap') ? 0.85 : 0.7;
+                    } else if (name.startsWith('Agogo') || name === 'Perc') {
+                        volMultiplier = 0.35;
+                    } else if (name === 'Guiro') {
+                        volMultiplier = 0.5;
+                    } else if (name === 'Shaker') {
+                        volMultiplier = 0.45;
+                    }
+
+                    const scaledVelocity = hit.velocity * volMultiplier;
+                    const midiVel = normalizeMidiVelocity(scaledVelocity);
+
                     this.drumTrack.noteOn(
                         this.toPulses(finalTimeS),
                         this.state.midi.drumsChannel - 1,
