@@ -179,7 +179,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 } else if (forceDense) {
                     isRest = prng() > 0.9;
                 } else {
-                    isRest = prng() > 0.4; // Thicker head: was 0.6
+                    isRest = prng() > 0.85; // 15% chance of rest (thick melody)
                 }
 
                 let durationBeats = 1;

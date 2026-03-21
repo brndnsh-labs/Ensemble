@@ -336,9 +336,9 @@ export function getSoloistNote(
             }
 
             if (Math.random() < survivalProb) {
-                // Duration protection: Mark soloist as busy for the duration of the note.
-                // We use Math.ceil to ensure we cover the full duration in steps.
-                soloist.busySteps = Math.max(1, Math.ceil(headNote.durationSteps || 1)); // @worker-mutation
+                // Duration protection: Mark soloist as busy for the duration of the note minus 1.
+                // This ensures we hold the note but don't block the immediately adjacent step.
+                soloist.busySteps = Math.max(0, Math.ceil(headNote.durationSteps || 1) - 1); // @worker-mutation
 
                 logDebug(
                     `[Head/Themed Performance] Playing seeded note: MIDI ${headNote.midi}. (Prob: ${survivalProb.toFixed(2)}, isAnchor: ${headNote.isAnchor})`,

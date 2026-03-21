@@ -5,18 +5,19 @@
 
 import { TIME_SIGNATURES } from '../public/config.js';
 import { getSoloistNote } from '../public/engine/soloist.js';
+import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
 import { getStepInfo, midiToNote } from '../public/utils.js';
 
 function deepDiveSession(genre = 'Rock', bpm = 102, measures = 32, intensity = 0.6) {
     console.log(`\n=== Soloist Deep Dive: ${genre} @ ${bpm} BPM (Intensity: ${intensity}) ===`);
-    console.log(`Simulating ${measures} measures\n`);
+    console.log(`Simulating ${measures} measures with seed "TEST"\n`);
 
     dispatch(ACTIONS.RESET_STATE);
     dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: genre, enabled: true });
     dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart' });
-    dispatch(ACTIONS.UPDATE_PLAYBACK, { bandIntensity: intensity, bpm: bpm });
+    dispatch(ACTIONS.UPDATE_PLAYBACK, { bandIntensity: intensity, bpm: bpm, currentLoopCount: 0 });
 
     const { arranger, soloist } = getState();
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -29,6 +30,17 @@ function deepDiveSession(genre = 'Rock', bpm = 102, measures = 32, intensity = 0
         intervals: [0, 4, 7],
         quality: 'major',
     };
+
+    arranger.stepMap = [{ start: 0, end: arranger.totalSteps, chord: chord }];
+    arranger.sectionMap = [{ start: 0, end: arranger.totalSteps, label: 'main' }];
+
+    soloist.sessionSeed = generateSessionSeed(
+        getState(),
+        arranger,
+        genre.toLowerCase(),
+        intensity,
+        'TEST',
+    );
 
     console.log(`Step | M:B  | Note | MIDI | Dur | Vel  | Role | Profile | Flags`);
     console.log(`-------------------------------------------------------------------`);
