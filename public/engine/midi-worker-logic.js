@@ -408,9 +408,10 @@ export class ExportProcessor {
             }
 
             drumHits.forEach((hit) => {
-                const name =
-                    /** @type {any} */ (hit.soundName) || /** @type {any} */ (hit.inst).name;
-                let midi = DRUM_MAP[name];
+                const soundName = /** @type {any} */ (hit.soundName);
+                const instName = /** @type {any} */ (hit.inst).name;
+                const name = soundName || instName;
+                let midi = DRUM_MAP[soundName] || DRUM_MAP[instName];
 
                 // Fuzzy matching for unmapped dynamic names
                 if (!midi) {
