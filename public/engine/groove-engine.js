@@ -271,9 +271,44 @@ export function applyGrooveOverrides(
 }
 
 /**
- * @param {any} playback
+ * @param {number} step
+ * @param {number} bpm
+ * @param {any} ts
  * @param {any} groove
  */
+export function calculateStepDuration(step, bpm, ts, groove) {
+    const sixteenthSec = 0.25 * (60.0 / bpm);
+    let duration = sixteenthSec;
+
+    if (groove.swing > 0) {
+        if (ts.stepsPerBeat === 4) {
+            const shift = (sixteenthSec / 3) * (groove.swing / 100);
+            if (groove.swingSub === '16th') {
+                duration += step % 2 === 0 ? shift : -shift;
+            } else {
+                // 8th note swing logic: Weighted 'Loping' distribution across 4 subdivisions
+                const subIndex = step % ts.stepsPerBeat;
+                const weights = [1.5, 0.5, -0.5, -1.5];
+                duration += shift * weights[subIndex];
+            }
+        } else if (ts.stepsPerBeat === 3) {
+            const shift = (sixteenthSec / 3) * (groove.swing / 100);
+            duration +=
+                groove.swingSub === '16th'
+                    ? step % 2 === 0
+                        ? shift
+                        : -shift // 16th note swing over compound meters doesn't map exactly to '8th note' logic the same way
+                    : step % ts.stepsPerBeat === 0
+                      ? shift // on macro beat
+                      : step % ts.stepsPerBeat === 2
+                        ? -shift // 3rd triplet part
+                        : 0; // middle triplet stays same or slightly nudged based on deeper logic, simple offset for now
+        }
+    }
+
+    return duration;
+}
+
 /**
  * @param {any} playback
  * @param {any} groove

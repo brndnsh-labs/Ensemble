@@ -1,4 +1,5 @@
 import { DRUM_MAP } from './engine/midi-constants.js';
+import { normalizeMidiVelocity } from './engine/midi-utils.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
 
@@ -166,31 +167,6 @@ export function sendMIDICC(channel, controller, value, time) {
         (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
     const status = 0xb0 | (channel - 1);
     output.send([status, controller, value], midiTime);
-}
-
-/**
- * Maps an internal velocity (0.0 to ~1.5) to a MIDI velocity (0-127).
- * Uses a compression curve to ensure high-intensity accents don't just slam into 127.
- * @param {number} internalVel
- * @returns {number} 0-127
- */
-export function normalizeMidiVelocity(internalVel) {
-    const { midi } = getState();
-    if (internalVel <= 0.01) {
-        return 1; // Minimum audibility for non-zero internal
-    }
-
-    // We treat 1.5 as the "theoretical maximum" for internal accents.
-    // We apply a slight curve (0.8) to boost the "meat" of the signal (0.5-1.0 range)
-    // so it sits comfortably in the MIDI 60-100 range.
-    const sensitivity = midi.velocitySensitivity || 1.0;
-    const curve = 0.8 / sensitivity;
-
-    const normalized = (Math.min(1.5, internalVel) / 1.5) ** curve;
-
-    // DAWs often treat < 20 as "ghost notes" or barely audible.
-    // We lift the floor to 20 for better translation.
-    return Math.max(20, Math.min(127, Math.floor(normalized * 127)));
 }
 
 /**
@@ -370,7 +346,7 @@ export function sendMIDIDrum(instrumentName, time, velocity, octaveOffset = 0) {
     /** @type {any} */
     const drumMap = DRUM_MAP;
     const note = (drumMap[instrumentName] || 36) + octaveOffset * 12;
-    const vel = normalizeMidiVelocity(velocity);
+    const vel = normalizeMidiVelocity(velocity, midi.velocitySensitivity);
     // Drums are usually short triggers, so we'll send a note off shortly after
     sendMIDINote(midi.drumsChannel, note, vel, time, 0.05);
 }

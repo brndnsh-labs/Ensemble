@@ -48,6 +48,30 @@ export function writeInt16(val) {
 }
 
 /**
+ * Maps an internal velocity (0.0 to ~1.5) to a MIDI velocity (0-127).
+ * Uses a compression curve to ensure high-intensity accents don't just slam into 127.
+ * @param {number} internalVel
+ * @param {number} [sensitivity=1.0]
+ * @returns {number} 0-127
+ */
+export function normalizeMidiVelocity(internalVel, sensitivity = 1.0) {
+    if (internalVel <= 0.01) {
+        return 1; // Minimum audibility for non-zero internal
+    }
+
+    // We treat 1.5 as the "theoretical maximum" for internal accents.
+    // We apply a slight curve (0.8) to boost the "meat" of the signal (0.5-1.0 range)
+    // so it sits comfortably in the MIDI 60-100 range.
+    const curve = 0.8 / sensitivity;
+
+    const normalized = (Math.min(1.5, internalVel) / 1.5) ** curve;
+
+    // DAWs often treat < 20 as "ghost notes" or barely audible.
+    // We lift the floor to 20 for better translation.
+    return Math.max(20, Math.min(127, Math.floor(normalized * 127)));
+}
+
+/**
  * Simple MIDI Track representation for binary export.
  */
 export class MidiTrack {

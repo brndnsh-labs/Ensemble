@@ -130,64 +130,113 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
         measuresInSection > 1 &&
         barInSection % measuresInSection === measuresInSection - 1;
 
-    /**
-     * @param {string} instName
-     * @param {boolean} evaluateOnly
-     */
-    const checkHit = (instName, evaluateOnly = true) => {
-        const inst = groove.instruments.find((i) => i.name === instName);
-        if (!inst || inst.muted) {
-            return false;
-        }
-        let stepVal = inst.steps[drumStep];
-        if (groove.creativity && preset?.variations?.[seedIdx]) {
-            const varInst = /** @type {any} */ (preset).variations[seedIdx][instName];
-            if (varInst) {
-                stepVal = varInst[drumStep];
+    let fillPlayed = false;
+
+    if (groove.fillActive) {
+        const fillStep = step - (groove.fillStartStep || 0);
+
+        if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
+            if (playback.bandIntensity >= 0.5 || fillStep >= (groove.fillLength || 0) / 2) {
+                const fillNotes = /** @type {any} */ (groove.fillSteps)?.[fillStep];
+                if (fillNotes && fillNotes.length > 0) {
+                    fillNotes.forEach((/** @type {any} */ n) => {
+                        const inst = groove.instruments.find((i) => i.name === n.name) || {
+                            name: n.name,
+                            muted: false,
+                        };
+                        if (!inst.muted) {
+                            drumHits.push({
+                                shouldPlay: true,
+                                velocity: n.vel,
+                                soundName: n.name,
+                                instTimeOffset: 0,
+                                inst,
+                            });
+                        }
+                    });
+                    fillPlayed = true;
+                }
+            }
+        } else if (fillStep === groove.fillLength) {
+            // @worker-mutation (handled in tick-logic transition usually, but just in case for stateless generation)
+            if (groove.pendingCrash) {
+                const inst = groove.instruments.find((i) => i.name === 'Crash') || {
+                    name: 'Crash',
+                    muted: false,
+                };
+                if (!inst.muted) {
+                    drumHits.push({
+                        shouldPlay: true,
+                        velocity: 1.1,
+                        soundName: 'Crash',
+                        instTimeOffset: 0,
+                        inst,
+                    });
+                }
             }
         }
+    }
 
-        const result = applyGrooveOverrides(state, {
-            step,
-            inst,
-            stepVal,
-            playback,
-            groove,
-            isDownbeat: stepInfo.isMeasureStart,
-            isBeatStart: stepInfo.isBeatStart,
-            isBackbeat: stepInfo.isBackbeat,
-            isGroupStart: stepInfo.isGroupStart,
-            sectionId,
-            beatIndex: stepInfo.beatIndex,
-            isOffbeat: stepInfo.isOffbeat,
-            isEOfBeat: stepInfo.isEOfBeat,
-            isAOfBeat: stepInfo.isAOfBeat,
-            tsConfig: stepInfo.tsConfig,
-            isTurnaround,
-            stepsPerBar,
-            loopStep: drumStep,
-        });
+    if (!fillPlayed) {
+        /**
+         * @param {string} instName
+         * @param {boolean} evaluateOnly
+         */
+        const checkHit = (instName, evaluateOnly = true) => {
+            const inst = groove.instruments.find((i) => i.name === instName);
+            if (!inst || inst.muted) {
+                return false;
+            }
+            let stepVal = inst.steps[drumStep];
+            if (groove.creativity && preset?.variations?.[seedIdx]) {
+                const varInst = /** @type {any} */ (preset).variations[seedIdx][instName];
+                if (varInst) {
+                    stepVal = varInst[drumStep];
+                }
+            }
 
-        if (!evaluateOnly && result.shouldPlay) {
-            drumHits.push({
-                shouldPlay: result.shouldPlay,
-                velocity: result.velocity,
-                soundName: result.soundName,
-                instTimeOffset: result.instTimeOffset,
+            const result = applyGrooveOverrides(state, {
+                step,
                 inst,
+                stepVal,
+                playback,
+                groove,
+                isDownbeat: stepInfo.isMeasureStart,
+                isBeatStart: stepInfo.isBeatStart,
+                isBackbeat: stepInfo.isBackbeat,
+                isGroupStart: stepInfo.isGroupStart,
+                sectionId,
+                beatIndex: stepInfo.beatIndex,
+                isOffbeat: stepInfo.isOffbeat,
+                isEOfBeat: stepInfo.isEOfBeat,
+                isAOfBeat: stepInfo.isAOfBeat,
+                tsConfig: stepInfo.tsConfig,
+                isTurnaround,
+                stepsPerBar,
+                loopStep: drumStep,
+            });
+
+            if (!evaluateOnly && result.shouldPlay) {
+                drumHits.push({
+                    shouldPlay: result.shouldPlay,
+                    velocity: result.velocity,
+                    soundName: result.soundName,
+                    instTimeOffset: result.instTimeOffset,
+                    inst,
+                });
+            }
+            return result.shouldPlay;
+        };
+
+        coordination.kickHit = checkHit('Kick', true);
+        coordination.snareHit = checkHit('Snare', true);
+
+        // If including drums, process all instruments for actual playback
+        if (includeDrums) {
+            groove.instruments.forEach((inst) => {
+                checkHit(inst.name, false);
             });
         }
-        return result.shouldPlay;
-    };
-
-    coordination.kickHit = checkHit('Kick', true);
-    coordination.snareHit = checkHit('Snare', true);
-
-    // If including drums, process all instruments for actual playback
-    if (includeDrums) {
-        groove.instruments.forEach((inst) => {
-            checkHit(inst.name, false);
-        });
     }
 
     // 2. Soloist Generation (High Priority)

@@ -1,5 +1,4 @@
 import {
-    normalizeMidiVelocity,
     panic,
     sendMIDICC,
     sendMIDIDrum,
@@ -7,6 +6,7 @@ import {
     sendMIDITransport,
 } from '../midi-controller.js';
 import { getMidi } from '../utils.js';
+import { normalizeMidiVelocity } from './midi-utils.js';
 
 /**
  * Stops MIDI transport and sends panic.
@@ -67,7 +67,7 @@ export function dispatchMidiBass(state, midiNum, finalVel, adjustedTime, duratio
     sendMIDINote(
         midi.bassChannel,
         midiNum + midi.bassOctave * 12,
-        normalizeMidiVelocity(finalVel),
+        normalizeMidiVelocity(finalVel, midi.velocitySensitivity),
         adjustedTime,
         duration,
         true, // isMono
@@ -105,7 +105,7 @@ export function dispatchMidiSoloist(
     sendMIDINote(
         midi.soloistChannel,
         midiNum + midi.soloistOctave * 12,
-        normalizeMidiVelocity(vel),
+        normalizeMidiVelocity(vel, midi.velocitySensitivity),
         playTime,
         duration,
         { isMono, bend },
@@ -143,7 +143,7 @@ export function dispatchMidiChordNote(state, freq, velocity, playTime, duration)
     sendMIDINote(
         state.midi.chordsChannel,
         midiNote + state.midi.chordsOctave * 12,
-        normalizeMidiVelocity(velocity),
+        normalizeMidiVelocity(velocity, state.midi.velocitySensitivity),
         playTime,
         duration,
     );
@@ -165,7 +165,7 @@ export function dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration) 
     sendMIDINote(
         midi.harmonyChannel,
         m + midi.harmonyOctave * 12,
-        normalizeMidiVelocity(finalVel),
+        normalizeMidiVelocity(finalVel, midi.velocitySensitivity),
         playTime,
         duration,
     );

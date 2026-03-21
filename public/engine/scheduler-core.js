@@ -32,7 +32,11 @@ import {
     restoreGains,
     updateSustain,
 } from './engine.js';
-import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
+import {
+    applyGrooveOverrides,
+    calculatePocketOffset,
+    calculateStepDuration,
+} from './groove-engine.js';
 import {
     dispatchMidiAutomation,
     dispatchMidiBass,
@@ -51,6 +55,7 @@ import {
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
 import { getSoloistNote } from './soloist.js';
+import { generateNotesForStep } from './tick-logic.js';
 
 const DRUM_VIS_PITCHES = {
     Kick: 36,
@@ -527,42 +532,19 @@ function advanceGlobalStep(state, dispatch = undefined) {
     }
     const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
     const sixteenth = 0.25 * (60.0 / effectiveBpm);
-    let duration = sixteenth;
-    if (groove.swing > 0) {
-        // Find current time signature for swing logic
-        /** @type {any} */
-        const signatures = TIME_SIGNATURES;
-        const sInfo = getStepInfo(
-            playback.step,
-            signatures[arranger.timeSignature] || signatures['4/4'],
-            arranger.measureMap,
-            signatures,
-        );
-        const ts = signatures[sInfo.tsName || '4/4'] || signatures['4/4'];
-        if (ts.stepsPerBeat === 4) {
-            const shift = (sixteenth / 3) * (groove.swing / 100);
-            if (groove.swingSub === '16th') {
-                duration += playback.step % 2 === 0 ? shift : -shift;
-            } else {
-                // 8th note swing logic: Weighted 'Loping' distribution across 4 subdivisions
-                const subIndex = playback.step % ts.stepsPerBeat;
-                const weights = [1.5, 0.5, -0.5, -1.5];
-                duration += shift * weights[subIndex];
-            }
-        } else if (ts.stepsPerBeat === 3) {
-            const shift = (sixteenth / 3) * (groove.swing / 100);
-            duration +=
-                groove.swingSub === '16th'
-                    ? playback.step % 2 === 0
-                        ? shift
-                        : -shift // 16th note swing over compound meters doesn't map exactly to '8th note' logic the same way
-                    : playback.step % ts.stepsPerBeat === 0
-                      ? shift // on macro beat
-                      : playback.step % ts.stepsPerBeat === 2
-                        ? -shift // 3rd triplet part
-                        : 0; // middle triplet stays same or slightly nudged based on deeper logic, simple offset for now
-        }
-    }
+
+    /** @type {any} */
+    const signatures = TIME_SIGNATURES;
+    const sInfo = getStepInfo(
+        playback.step,
+        signatures[arranger.timeSignature] || signatures['4/4'],
+        arranger.measureMap,
+        signatures,
+    );
+    const ts = signatures[sInfo.tsName || '4/4'] || signatures['4/4'];
+
+    const duration = calculateStepDuration(playback.step, effectiveBpm, ts, groove);
+
     playback.nextNoteTime += duration;
     playback.unswungNextNoteTime += sixteenth;
     playback.step++; // @direct-mutation
@@ -606,22 +588,7 @@ function getChordAtStep(state, step) {
  * @param {Function} [dispatch] - State dispatch function.
  */
 function scheduleDrums(state, params, dispatch = undefined) {
-    const {
-        step,
-        time,
-        isDownbeat,
-        isBeatStart,
-        isBackbeat,
-        absoluteStep,
-        isGroupStart,
-        sectionId,
-        beatIndex,
-        isOffbeat,
-        isEOfBeat,
-        isAOfBeat,
-        tsConfig,
-        isTurnaround,
-    } = params;
+    const { time, absoluteStep } = params;
 
     const { playback, groove, vizState, arranger } = state;
 
@@ -632,9 +599,30 @@ function scheduleDrums(state, params, dispatch = undefined) {
 
     const conductorVel = playback.conductorVelocity || 1.0;
     const finalTime = time + calculatePocketOffset(playback, groove);
-    const stepsPerBar = getStepsPerMeasure(arranger.timeSignature);
 
-    // ... (fill logic) ...
+    // Evaluate fills and standard groove patterns via our unified tick logic
+    // This maintains 1:1 playback/export parity.
+    const sectionIndex =
+        arranger.sectionMap?.findIndex(
+            (/** @type {any} */ s) => absoluteStep >= s.start && absoluteStep < s.end,
+        ) || 0;
+    const tickResult = generateNotesForStep(
+        state,
+        absoluteStep,
+        {
+            mainCursor: { index: 0, sectionIndex: Math.max(0, sectionIndex) },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        },
+        {
+            includeDrums: true,
+            includeBass: false,
+            includeChords: false,
+            includeHarmony: false,
+            includeSoloist: false,
+        },
+    );
+
+    // Handle fill state cleanup
     if (groove.fillActive) {
         const fillStep = absoluteStep - (groove.fillStartStep || 0);
         if (fillStep >= (groove.fillLength || 0)) {
@@ -648,43 +636,17 @@ function scheduleDrums(state, params, dispatch = undefined) {
                 groove.fillActive = false; // @direct-mutation
             }
             if (groove.pendingCrash) {
-                playDrumSound(state, 'Crash', finalTime, 1.1 * conductorVel);
                 groove.pendingCrash = false; // @direct-mutation
             }
         }
-    }
 
-    if (groove.fillActive) {
-        const fillStep = absoluteStep - (groove.fillStartStep || 0);
         if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
-            if (playback.bandIntensity >= 0.5 || fillStep >= (groove.fillLength || 0) / 2) {
-                const notes = /** @type {any} */ (groove).fillSteps
-                    ? /** @type {any} */ (groove).fillSteps[fillStep]
-                    : [];
-                if (notes && notes.length > 0) {
-                    if (vizState.enabled) {
-                        playback.drawQueue.push({
-                            type: 'fill_active',
-                            time: finalTime,
-                            active: true,
-                        });
-                    }
-                    notes.forEach((/** @type {any} */ note) => {
-                        playDrumSound(state, note.name, finalTime, note.vel * conductorVel);
-
-                        if (vizState.enabled) {
-                            const midiNum = /** @type {any} */ (DRUM_VIS_PITCHES)[note.name] || 36;
-                            playback.drawQueue.push({
-                                type: 'drums_vis',
-                                midi: midiNum,
-                                time: finalTime,
-                                velocity: note.vel * conductorVel,
-                                duration: 0.1,
-                            });
-                        }
-                    });
-                    return;
-                }
+            if (vizState.enabled) {
+                playback.drawQueue.push({
+                    type: 'fill_active',
+                    time: finalTime,
+                    active: true,
+                });
             }
         }
     } else if (vizState.enabled) {
@@ -692,60 +654,22 @@ function scheduleDrums(state, params, dispatch = undefined) {
         playback.drawQueue.push({ type: 'fill_active', time: finalTime, active: false });
     }
 
-    // --- MULTI-SEED LIVE LOGIC ---
-    const seedIdx =
-        /** @type {any} */ (groove).sectionSeedMap && sectionId
-            ? /** @type {any} */ (groove).sectionSeedMap[sectionId] || 0
-            : 0;
-    const preset = /** @type {any} */ (DRUM_PRESETS)[groove.lastDrumPreset];
+    tickResult.drumHits.forEach((hit) => {
+        const playTime = finalTime + hit.instTimeOffset;
+        playDrumSound(state, hit.soundName, playTime, hit.velocity * conductorVel);
 
-    groove.instruments.forEach((/** @type {any} */ inst) => {
-        let stepVal = /** @type {any} */ (inst.steps)[step];
-
-        // If creativity is on and we have a valid preset variation, override the step value
-        if (groove.creativity && preset?.variations?.[seedIdx]) {
-            const varInst = preset.variations[seedIdx][inst.name];
-            if (varInst) {
-                stepVal = varInst[step];
-            }
+        if (vizState.enabled) {
+            const midiNum = /** @type {any} */ (DRUM_VIS_PITCHES)[hit.soundName] || 36;
+            playback.drawQueue.push({
+                type: 'drums_vis',
+                midi: midiNum,
+                time: playTime,
+                velocity: hit.velocity * conductorVel,
+                duration: 0.1,
+            });
         }
-        const { shouldPlay, velocity, soundName, instTimeOffset } = applyGrooveOverrides(state, {
-            step: absoluteStep,
-            inst,
-            stepVal,
-            playback,
-            groove,
-            isDownbeat,
-            isBeatStart,
-            isGroupStart,
-            isBackbeat,
-            isOffbeat,
-            isEOfBeat,
-            isAOfBeat,
-            beatIndex,
-            tsConfig,
-            isTurnaround,
-            stepsPerBar,
-            loopStep: step, // scheduleDrums 'step' is the local drum loop step
-        });
 
-        if (shouldPlay && !inst.muted) {
-            const playTime = finalTime + instTimeOffset;
-            playDrumSound(state, soundName, playTime, velocity * conductorVel);
-
-            if (vizState.enabled) {
-                const midiNum = /** @type {any} */ (DRUM_VIS_PITCHES)[soundName] || 36;
-                playback.drawQueue.push({
-                    type: 'drums_vis',
-                    midi: midiNum,
-                    time: playTime,
-                    velocity: velocity * conductorVel,
-                    duration: 0.1,
-                });
-            }
-
-            dispatchMidiDrum(state, soundName, playTime, velocity * conductorVel);
-        }
+        dispatchMidiDrum(state, hit.soundName, playTime, hit.velocity * conductorVel);
     });
 }
 
