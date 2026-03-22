@@ -140,6 +140,23 @@ export class MidiTrack {
     }
 
     /**
+     * Sets the pitch bend range using RPN 0.
+     * @param {number} time
+     * @param {number} ch
+     * @param {number} semitones
+     */
+    setPitchBendRange(time, ch, semitones) {
+        // RPN 0: Pitch Bend Sensitivity
+        this.cc(time, ch, 101, 0); // RPN MSB
+        this.cc(time, ch, 100, 0); // RPN LSB
+        this.cc(time, ch, 6, semitones); // Data Entry MSB (semitones)
+        this.cc(time, ch, 38, 0); // Data Entry LSB (cents)
+        // Close RPN
+        this.cc(time, ch, 101, 127);
+        this.cc(time, ch, 100, 127);
+    }
+
+    /**
      * @param {number} time
      * @param {string} name
      */

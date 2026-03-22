@@ -114,12 +114,22 @@ export class ExportProcessor {
 
         this.chordTrack.setName(0, 'Chords');
         this.chordTrack.programChange(0, this.state.midi.chordsChannel - 1, 4);
+        this.chordTrack.pitchBend(0, this.state.midi.chordsChannel - 1, 0);
+
         this.bassTrack.setName(0, 'Bass');
         this.bassTrack.programChange(0, this.state.midi.bassChannel - 1, 34);
+        this.bassTrack.setPitchBendRange(0, this.state.midi.bassChannel - 1, 2);
+        this.bassTrack.pitchBend(0, this.state.midi.bassChannel - 1, 0);
+
         this.soloistTrack.setName(0, 'Soloist');
         this.soloistTrack.programChange(0, this.state.midi.soloistChannel - 1, 80);
+        this.soloistTrack.setPitchBendRange(0, this.state.midi.soloistChannel - 1, 2);
+        this.soloistTrack.pitchBend(0, this.state.midi.soloistChannel - 1, 0);
+
         this.harmonyTrack.setName(0, 'Harmonies');
         this.harmonyTrack.programChange(0, this.state.midi.harmonyChannel - 1, 61);
+        this.harmonyTrack.pitchBend(0, this.state.midi.harmonyChannel - 1, 0);
+
         this.drumTrack.setName(0, 'Drums');
 
         // Snapshot and Apply Overrides
@@ -248,7 +258,6 @@ export class ExportProcessor {
                         Math.round(-(res.bendStartInterval / 2) * 8192),
                     );
                     track.noteOn(notePulse, channel, finalMidi, midiVel);
-                    track.pitchBend(this.toPulses(stepTimeS + this.sixteenthSec), channel, 0);
                 } else {
                     track.noteOn(notePulse, channel, finalMidi, midiVel);
                 }
@@ -265,6 +274,12 @@ export class ExportProcessor {
                 if (endTimeS - noteTimeS < 0.05) {
                     endTimeS = noteTimeS + 0.05;
                 }
+
+                if (res.bendStartInterval) {
+                    const resetTimeS = Math.min(endTimeS, noteTimeS + 0.05);
+                    track.pitchBend(this.toPulses(resetTimeS), channel, 0);
+                }
+
                 if (moduleName === 'soloist') {
                     endTimeS += 0.015;
                 } else if (moduleName === 'bass') {
@@ -612,12 +627,15 @@ export class ExportProcessor {
 
                 track.noteOn(notePulse, channel, finalMidi, n.midiVelocity || 90);
 
+                const durationS = (n.durationSteps || 1) * this.sixteenthSec;
+                const endTimeS = resTimeS + offsetS + durationS;
+
                 if (n.module === 'soloist' && n.bendStartInterval) {
-                    track.pitchBend(this.toPulses(resTimeS + this.sixteenthSec), channel, 0);
+                    const resetTimeS = Math.min(endTimeS, resTimeS + offsetS + 0.05);
+                    track.pitchBend(this.toPulses(resetTimeS), channel, 0);
                 }
 
-                const durationS = (n.durationSteps || 1) * this.sixteenthSec;
-                track.noteOff(this.toPulses(resTimeS + offsetS + durationS), channel, finalMidi);
+                track.noteOff(this.toPulses(endTimeS), channel, finalMidi);
             } else if (n.module === 'groove' && n.name) {
                 let midi = DRUM_MAP[/** @type {any} */ (n).name];
                 if (midi) {
