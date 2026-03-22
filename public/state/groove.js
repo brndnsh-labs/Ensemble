@@ -125,7 +125,7 @@ export const groove = deepSignal({
 /**
  * @param {string} action
  * @param {any} payload
- * @param {any} playback
+ * @param {import('./playback.js').GlobalContext} playback
  */
 export function grooveReducer(action, payload, playback) {
     switch (action) {

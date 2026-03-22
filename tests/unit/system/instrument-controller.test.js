@@ -42,8 +42,7 @@ vi.mock('../../../public/ui.js', () => ({
     showToast: vi.fn(),
 }));
 
-vi.mock('../../../public/state.js', async (importOriginal) => {
-    const actual = await importOriginal();
+vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { step: 10, bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
         groove: {
@@ -65,56 +64,60 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             progression: [],
             stepMap: [],
             sectionMap: [],
-            totalSteps: 16,
+            totalSteps: 128,
             key: 'C',
             isMinor: false,
         },
         chords: {
-            style: 'smart',
-            octave: 65,
-            density: 'standard',
+            style: 'rhythmic',
+            octave: 4,
+            density: 1,
             enabled: true,
             volume: 0.5,
             buffer: new Map(),
         },
         bass: {
-            style: 'smart',
-            octave: 38,
+            style: 'simple',
+            octave: 2,
             enabled: true,
-            volume: 0.5,
             lastFreq: null,
-            lastPlayedFreq: 40,
+            lastPlayedFreq: 55,
+            volume: 0.5,
             buffer: new Map(),
         },
         soloist: {
-            style: 'smart',
-            octave: 72,
+            style: 'scalar',
+            octave: 4,
             enabled: true,
-            volume: 0.5,
             lastFreq: null,
-            lastPlayedFreq: null,
-            mode: 'monophonic',
+            lastPlayedFreq: 440,
+            volume: 0.5,
+            mode: 'auto',
             sessionSteps: 0,
-            tradeMode: 'manual',
             buffer: new Map(),
         },
         harmony: {
             style: 'smart',
-            octave: 60,
+            octave: 4,
             enabled: true,
-            volume: 0.4,
+            volume: 0.5,
             complexity: 0.5,
             buffer: new Map(),
         },
         vizState: { enabled: true },
     };
+
     return {
-        ...actual,
-        stateMap: mockState,
         getState: () => mockState,
-        dispatch: vi.fn((action, _payload) => {
-            if (action === 'SET_PARAM' || action === 'SET_ACTIVE_MEASURE') {
-                // simple local mock logic if needed, but mostly we assert on dispatch
+        stateMap: mockState,
+        dispatch: vi.fn((action, payload) => {
+            if (action === 'SET_PARAM') {
+                const { module, param, value } = payload;
+                if (mockState[module]) {
+                    mockState[module][param] = value;
+                }
+            } else if (action === 'SET_ACTIVE_MEASURE') {
+                mockState.groove.currentMeasure = payload;
             }
         }),
     };

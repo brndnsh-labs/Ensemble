@@ -8,9 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
+const mockDispatch = vi.fn();
 
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
+    useDispatch: () => mockDispatch,
 }));
 
 vi.mock('../../../public/state.js', () => {

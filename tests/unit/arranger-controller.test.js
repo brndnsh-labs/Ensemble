@@ -26,10 +26,20 @@ import { getState, stateMap } from '../../public/state.js';
 import { showToast } from '../../public/ui.js';
 import { syncWorker } from '../../public/worker-client.js';
 
-vi.mock('../../public/state.js', () => ({
-    getState: vi.fn(),
-    stateMap: { mockState: true },
-}));
+vi.mock('../../public/state.js', () => {
+    const mockState = {};
+    return {
+        getState: () => mockState,
+        stateMap: { mockState: true },
+        dispatch: vi.fn((action, payload) => {
+            if (action === 'SET_PARAM') {
+                if (mockState[payload.module]) {
+                    mockState[payload.module][payload.param] = payload.value;
+                }
+            }
+        }),
+    };
+});
 
 vi.mock('../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn((_state, _, cb) => {
@@ -109,6 +119,17 @@ describe('Arranger Controller', () => {
 
         state = {
             arranger: {
+                sections: [],
+                key: 'C',
+                isMinor: false,
+                progression: [],
+                lastChordPreset: null,
+                isDirty: false,
+            },
+        };
+
+        state = {
+            arranger: {
                 lastChordPreset: 'Test Preset',
                 sections: [
                     { id: 's1', label: 'Verse', value: 'C G', repeat: 2, key: 'C' },
@@ -119,7 +140,7 @@ describe('Arranger Controller', () => {
                 isDirty: false,
             },
         };
-        getState.mockReturnValue(state);
+        Object.assign(getState(), state);
     });
 
     afterEach(() => {

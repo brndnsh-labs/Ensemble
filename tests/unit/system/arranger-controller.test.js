@@ -37,7 +37,23 @@ vi.mock('../../../public/state.js', () => {
         },
         vizState: {},
         midi: {},
-        dispatch: vi.fn(),
+
+        dispatch: vi.fn((action, payload) => {
+            if (action === 'SET_PARAM' || action === 'SET_ACTIVE_MEASURE') {
+                if (action === 'SET_ACTIVE_MEASURE') {
+                    mockState.groove.currentMeasure = payload;
+                    return;
+                }
+                const { module, param, value } = payload;
+                if (mockState[module]) {
+                    mockState[module][param] = value;
+                }
+            } else if (action === 'DRUM_PRESET_LOADED' || action === 'DRUM_MEASURE_CLONED') {
+                // these do nothing to mockState
+            } else {
+                // handle other actions if needed
+            }
+        }),
     };
     return { ...mockState, stateMap: mockState, getState: () => mockState };
 });

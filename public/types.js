@@ -66,6 +66,251 @@
  * @property {string} [tsName] - Name of the time signature (e.g., "4/4").
  */
 
+/**
+ * @typedef {Object} ActionPayloadSetParam
+ * @property {string} module
+ * @property {string} param
+ * @property {any} value
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetStyle
+ * @property {string} module
+ * @property {string} style
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetVolume
+ * @property {string} module
+ * @property {number} value
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetReverb
+ * @property {string} module
+ * @property {number} value
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetOctave
+ * @property {string} module
+ * @property {number} value
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetActiveTab
+ * @property {string} module
+ * @property {string} tab
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetModalOpen
+ * @property {keyof ModalsState} modal
+ * @property {boolean} open
+ */
+
+/**
+ * @typedef {Object} ActionPayloadImportMusicXML
+ * @property {boolean} hasChords
+ * @property {Array<import('./state/arranger.js').Section>} [sections]
+ * @property {string} [xmlKey]
+ * @property {Array<any>} [leadSheetMelody]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadLoadTemplate
+ * @property {Array<import('./state/arranger.js').Section>} sections
+ * @property {boolean} [isMinor]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetGenreFeel
+ * @property {string} [genreName]
+ * @property {string} [feel]
+ * @property {number} [swing]
+ * @property {string} [sub]
+ * @property {string} [chord]
+ * @property {string} [bass]
+ * @property {string} [soloist]
+ * @property {string} [harmony]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadUpdateConductorDecision
+ * @property {number} [velocity]
+ * @property {number} [lyricalBias]
+ * @property {Partial<PlaybackIntent>} [intent]
+ * @property {string} [density]
+ * @property {number} [hookProb]
+ * @property {string} [feel]
+ * @property {string} [genreName]
+ * @property {number} [swing]
+ * @property {string} [sub]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadTriggerFill
+ * @property {Record<number, any>} steps
+ * @property {number} startStep
+ * @property {number} length
+ * @property {boolean} [crash]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetGrooveSteps
+ * @property {string} instrument
+ * @property {Array<number>} steps
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetGrooveSeed
+ * @property {string} sectionId
+ * @property {number|string} seed
+ */
+
+/**
+ * @typedef {Object} ActionPayloadShowToast
+ * @property {string} [id]
+ * @property {string} [message]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetPocketConfig
+ * @property {number} [globalDrive]
+ * @property {number} [tightness]
+ * @property {number} [bassGravity]
+ * @property {number} [chordGravity]
+ * @property {number} [soloistGravity]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadSetMidiConfig
+ * @property {boolean} [enabled]
+ * @property {Array<{id: string, name: string}>} [outputs]
+ * @property {string|null} [selectedOutputId]
+ * @property {number} [chordsChannel]
+ * @property {number} [bassChannel]
+ * @property {number} [soloistChannel]
+ * @property {number} [harmonyChannel]
+ * @property {number} [drumsChannel]
+ * @property {number} [latency]
+ * @property {boolean} [muteLocal]
+ * @property {number} [chordsOctave]
+ * @property {number} [bassOctave]
+ * @property {number} [soloistOctave]
+ * @property {number} [harmonyOctave]
+ * @property {number} [drumsOctave]
+ * @property {number} [velocitySensitivity]
+ */
+
+/**
+ * @typedef {Object} ActionPayloadUpdateConductorState
+ * @property {number} [targetIntensity]
+ * @property {number} [stepSize]
+ * @property {number} [larsBpmOffset]
+ * @property {Object|null} [form]
+ * @property {number} [loopCount]
+ * @property {number} [formIteration]
+ */
+
+/**
+ * @typedef {Partial<import('./state/instruments.js').HarmonyState>} ActionPayloadUpdateHB
+ */
+
+/**
+ * @typedef {Partial<import('./state/instruments.js').SoloistState>} ActionPayloadUpdateSB
+ */
+
+/**
+ * @typedef {Partial<import('./state/groove.js').GrooveState>} ActionPayloadUpdateGB
+ */
+
+/**
+ * @typedef {Object} ActionPayloadMap
+ * @property {ActionPayloadImportMusicXML} IMPORT_MUSICXML
+ * @property {undefined} CLEAR_LEAD_SHEET
+ * @property {undefined} GENERATE_SEED
+ * @property {ActionPayloadSetParam} SET_PARAM
+ * @property {number} SET_BAND_INTENSITY
+ * @property {number} SET_COMPLEXITY
+ * @property {boolean} SET_AUTO_INTENSITY
+ * @property {ActionPayloadUpdateConductorDecision} UPDATE_CONDUCTOR_DECISION
+ * @property {ActionPayloadUpdateConductorState} UPDATE_CONDUCTOR_STATE
+ * @property {undefined} TRIGGER_EMERGENCY_LOOKAHEAD
+ * @property {undefined} RESET_SESSION
+ * @property {number} SET_SESSION_STEPS
+ * @property {ActionPayloadShowToast | string} SHOW_TOAST
+ * @property {number} [TRIGGER_FLASH]
+ * @property {boolean} SET_UPDATE_AVAILABLE
+ * @property {ActionPayloadSetModalOpen} SET_MODAL_OPEN
+ * @property {boolean} SET_VIZ_ENABLED
+ * @property {boolean} [TOGGLE_MAXIMIZED_CHORDS]
+ * @property {undefined} TOGGLE_PLAY
+ * @property {number | string} SET_BPM
+ * @property {ActionPayloadSetStyle} SET_STYLE
+ * @property {string} SET_DENSITY
+ * @property {ActionPayloadSetVolume} SET_VOLUME
+ * @property {ActionPayloadSetReverb} SET_REVERB
+ * @property {ActionPayloadSetOctave} SET_OCTAVE
+ * @property {string} SET_SOLOIST_MODE
+ * @property {string} SET_SOLOIST_SEED
+ * @property {ActionPayloadSetActiveTab} SET_ACTIVE_TAB
+ * @property {string} SET_SOLOIST_PRESET
+ * @property {ActionPayloadUpdateSB} UPDATE_SB
+ * @property {number} SET_SWING
+ * @property {string} SET_SWING_SUB
+ * @property {number} SET_HUMANIZE
+ * @property {boolean} SET_FOLLOW_PLAYBACK
+ * @property {boolean} SET_LARS_MODE
+ * @property {number} SET_LARS_INTENSITY
+ * @property {boolean} SET_CREATIVITY
+ * @property {ActionPayloadSetGenreFeel} SET_GENRE_FEEL
+ * @property {number | null} SET_GENRE_COUNTDOWN
+ * @property {ActionPayloadSetPocketConfig} SET_POCKET_CONFIG
+ * @property {ActionPayloadSetGrooveSteps} SET_GROOVE_STEPS
+ * @property {number | string} SET_ACTIVE_MEASURE
+ * @property {ActionPayloadSetGrooveSeed} SET_GROOVE_SEED
+ * @property {undefined} STEP_TOGGLE
+ * @property {ActionPayloadTriggerFill} TRIGGER_FILL
+ * @property {ActionPayloadUpdateHB} UPDATE_HB
+ * @property {ActionPayloadUpdateGB} UPDATE_GB
+ * @property {Array<import('./state/arranger.js').Section>} SET_ARRANGEMENT
+ * @property {Array<import('./state/arranger.js').Section>} SET_SECTIONS
+ * @property {import('./state/arranger.js').Section} ADD_SECTION
+ * @property {string} REMOVE_SECTION
+ * @property {import('./state/arranger.js').Section} UPDATE_SECTION
+ * @property {string} SET_KEY
+ * @property {string} SET_TIME_SIGNATURE
+ * @property {boolean} SET_IS_MINOR
+ * @property {ActionPayloadLoadTemplate} LOAD_TEMPLATE
+ * @property {boolean} SET_METRONOME
+ * @property {boolean} SET_PRESET_SETTINGS_MODE
+ * @property {boolean} SET_PIANO_ROOTS
+ * @property {string} SET_NOTATION
+ * @property {number} SET_SESSION_TIMER
+ * @property {boolean} SET_SONG_MODE
+ * @property {boolean} SET_STOP_AT_END
+ * @property {boolean} SET_ENDING_PENDING
+ * @property {undefined} RESET_STATE
+ * @property {ActionPayloadSetMidiConfig} SET_MIDI_CONFIG
+ * @property {undefined} RESTORE_GAINS
+ * @property {undefined} INIT_AUDIO
+ * @property {undefined} [HYDRATE]
+ * @property {string} [TOAST_EXPIRED]
+ * @property {undefined} [FLASH_EXPIRED]
+ * @property {undefined} [KEY_CHANGE]
+ * @property {undefined} [TIME_SIG_CHANGE]
+ * @property {undefined} [GROUPING_CHANGE]
+ * @property {undefined} [REL_KEY_TOGGLE]
+ * @property {undefined} [TRANSPOSE]
+ * @property {undefined} [VIS_RESET]
+ * @property {any} [VIS_UPDATE]
+ * @property {undefined} [PROG_VALIDATED]
+ * @property {undefined} [DRUM_PRESET_LOADED]
+ * @property {undefined} [DRUM_MEASURE_CLONED]
+ * @property {undefined} [MOBILE_TAB_SWITCH]
+ */
+
 export const ACTIONS = {
     IMPORT_MUSICXML: 'IMPORT_MUSICXML',
     CLEAR_LEAD_SHEET: 'CLEAR_LEAD_SHEET',

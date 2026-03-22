@@ -4,11 +4,10 @@ import { useEffect, useImperativeHandle, useRef, useState } from 'preact/hooks';
 import { onSectionDelete, onSectionDuplicate, onSectionUpdate } from '../arranger-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import { getState } from '../state.js';
-import { useEnsembleState } from '../ui-bridge.js';
+import { ACTIONS } from '../types.js';
+import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { SymbolMenu } from './SymbolMenu.jsx';
-
-const { arranger } = getState();
 
 /**
  * @typedef {import('preact').ComponentChildren} ComponentChildren
@@ -27,6 +26,7 @@ const { arranger } = getState();
  */
 export const SectionCard = forwardRef(
     (/** @type {SectionCardProps} */ { section, index, totalSections }, ref) => {
+        const dispatch = useDispatch();
         const [isMenuOpen, setIsMenuOpen] = useState(false);
         /** @type {import('preact/hooks').MutableRef<HTMLTextAreaElement|null>} */
         const textareaRef = useRef(null);
@@ -354,7 +354,11 @@ export const SectionCard = forwardRef(
                     }
                     onFocus={() => {
                         // Update legacy state for mutation logic
-                        arranger.lastInteractedSectionId = section.id;
+                        dispatch(ACTIONS.SET_PARAM, {
+                            module: 'arranger',
+                            param: 'lastInteractedSectionId',
+                            value: section.id,
+                        });
                     }}
                 />
             </div>

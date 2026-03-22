@@ -113,8 +113,9 @@ const listeners = new Set();
 
 /**
  * Dispatch a state change action.
- * @param {string} action - The action type (e.g., ACTIONS.SET_INTENSITY).
- * @param {any} [payload] - The data associated with the action.
+ * @template {keyof import('./types.js').ActionPayloadMap | string} T
+ * @param {T} action - The action type (e.g., ACTIONS.SET_BAND_INTENSITY).
+ * @param {T extends keyof import('./types.js').ActionPayloadMap ? import('./types.js').ActionPayloadMap[T] : any} [payload] - The data associated with the action.
  */
 export function dispatch(action, payload) {
     // Accessing deepSignal property directly works like a getter

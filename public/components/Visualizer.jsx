@@ -187,7 +187,11 @@ export function Visualizer({ enabled, getVisualTime }) {
 
             if (!playback.audio || !playback.audio.currentTime) {
                 if (!playback.isPlaying) {
-                    playback.isDrawing = false; // @direct-mutation
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'playback',
+                        param: 'isDrawing',
+                        value: false,
+                    });
                 }
                 loopRef.current = requestAnimationFrame(loop);
                 return;
@@ -203,9 +207,17 @@ export function Visualizer({ enabled, getVisualTime }) {
             }
 
             if (!playback.isPlaying && playback.drawQueue.length === 0) {
-                playback.isDrawing = false; // @direct-mutation
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'playback',
+                    param: 'isDrawing',
+                    value: false,
+                });
                 if (chords.lastActiveChordIndex !== null) {
-                    chords.lastActiveChordIndex = null; // @direct-mutation
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'chords',
+                        param: 'lastActiveChordIndex',
+                        value: null,
+                    });
                     dispatch('VIS_RESET');
                 }
                 if (enabled && vizRef.current) {
@@ -219,10 +231,18 @@ export function Visualizer({ enabled, getVisualTime }) {
                 playback.drawQueue.length > 0 &&
                 /** @type {any} */ (playback.drawQueue[0]).time < now - 2.0
             ) {
-                playback.drawQueue.shift(); // @direct-mutation
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'playback',
+                    param: 'drawQueue',
+                    value: playback.drawQueue.slice(1),
+                });
             }
             if (playback.drawQueue.length > 300) {
-                playback.drawQueue = playback.drawQueue.slice(playback.drawQueue.length - 200); // @direct-mutation
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'playback',
+                    param: 'drawQueue',
+                    value: playback.drawQueue.slice(playback.drawQueue.length - 200),
+                });
             }
             const spm = getStepsPerMeasure(arranger.timeSignature);
 
@@ -231,7 +251,12 @@ export function Visualizer({ enabled, getVisualTime }) {
                 /** @type {any} */ (playback.drawQueue[0]).time <= now
             ) {
                 /** @type {any} */
-                const ev = playback.drawQueue.shift(); // @direct-mutation
+                const ev = playback.drawQueue[0];
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'playback',
+                    param: 'drawQueue',
+                    value: playback.drawQueue.slice(1),
+                });
                 if (!ev) {
                     continue;
                 }
@@ -246,10 +271,18 @@ export function Visualizer({ enabled, getVisualTime }) {
                         // @ts-expect-error second arg isn't actually typed in instrument-controller
                         switchMeasure(stepMeasure, true);
                     }
-                    playback.lastPlayingStep = ev.step; // @direct-mutation
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'playback',
+                        param: 'lastPlayingStep',
+                        value: ev.step,
+                    });
                 } else if (ev.type === 'chord_vis') {
                     if (chords.lastActiveChordIndex !== ev.index) {
-                        chords.lastActiveChordIndex = ev.index; // @direct-mutation
+                        dispatch(ACTIONS.SET_PARAM, {
+                            module: 'chords',
+                            param: 'lastActiveChordIndex',
+                            value: ev.index,
+                        });
                         dispatch('VIS_UPDATE', { type: 'chord', index: ev.index });
                     }
                     if (enabled && playback.isDrawing && vizRef.current) {
@@ -303,7 +336,7 @@ export function Visualizer({ enabled, getVisualTime }) {
         if (isPlaying) {
             /** @type {import('../state.js').StateMap} */
             const typedStateMap2 = stateMap;
-            typedStateMap2.playback.isDrawing = true; // @direct-mutation
+            dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'isDrawing', value: true });
             if (enabled) {
                 const { playback, arranger } = typedStateMap2;
                 const secondsPerBeat = 60.0 / playback.bpm;

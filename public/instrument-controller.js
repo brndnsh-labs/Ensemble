@@ -62,13 +62,23 @@ export function loadDrumPreset(name) {
         return { ...inst, steps: newSteps };
     });
 
-    Object.assign(groove, {
-        lastDrumPreset: name,
-        measures: p.measures || 1,
-        currentMeasure: 0,
-        instruments: [...newInstruments], // Force new array reference
-        swing: p.swing !== undefined ? p.swing : groove.swing,
-        swingSub: p.sub || groove.swingSub,
+    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'lastDrumPreset', value: name });
+    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: p.measures || 1 });
+    dispatch(ACTIONS.SET_ACTIVE_MEASURE, 0);
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'groove',
+        param: 'instruments',
+        value: [...newInstruments],
+    });
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'groove',
+        param: 'swing',
+        value: p.swing !== undefined ? p.swing : groove.swing,
+    });
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'groove',
+        param: 'swingSub',
+        value: p.sub || groove.swingSub,
     });
 
     dispatch('DRUM_PRESET_LOADED');
@@ -126,7 +136,7 @@ export function cloneMeasure() {
         }
         return { ...inst, steps: newSteps };
     });
-    Object.assign(groove, { instruments: newInstruments });
+    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'instruments', value: newInstruments });
     showToast(`Measure ${groove.currentMeasure + 1} copied to all`);
     dispatch('DRUM_MEASURE_CLONED');
 }

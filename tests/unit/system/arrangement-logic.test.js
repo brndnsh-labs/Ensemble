@@ -28,7 +28,15 @@ vi.mock('../../../public/state.js', () => {
         bass: { enabled: false },
         soloist: { enabled: false },
         playback: { isPlaying: false, bandIntensity: 0.5, complexity: 0.3 },
-        dispatch: vi.fn(),
+
+        dispatch: vi.fn((action, payload) => {
+            if (action === 'SET_PARAM') {
+                if (mockState[payload.module]) {
+                    mockState[payload.module][payload.param] = payload.value;
+                }
+            }
+        }),
+
         midi: {},
         vizState: {},
     };

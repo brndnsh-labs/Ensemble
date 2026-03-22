@@ -183,15 +183,23 @@ export function GenerateSongModal() {
             if (newSections.length > 0) {
                 const first = newSections[0];
                 if (first.key && first.key !== 'Random') {
-                    arranger.key = first.key; // @direct-mutation
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'arranger',
+                        param: 'key',
+                        value: first.key,
+                    });
                 }
                 if (first.timeSignature && first.timeSignature !== 'Random') {
-                    arranger.timeSignature = first.timeSignature; // @direct-mutation
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'arranger',
+                        param: 'timeSignature',
+                        value: first.timeSignature,
+                    });
                 }
             }
 
-            arranger.isMinor = isMinor; // @direct-mutation
-            arranger.isDirty = true; // @direct-mutation
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isMinor', value: isMinor });
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
 
             clearChordPresetHighlight();
             refreshArrangerUI();

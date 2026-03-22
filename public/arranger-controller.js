@@ -15,7 +15,8 @@ import { getSectionEnergy } from './form-analysis.js';
 import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
-import { getState, stateMap } from './state.js';
+import { dispatch, getState, stateMap } from './state.js';
+import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
 import { syncWorker } from './worker-client.js';
@@ -92,7 +93,11 @@ export function onSectionUpdate(id, field, value) {
 
         if (hasChanged) {
             pushHistory();
-            arranger.sections = newSections;
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'arranger',
+                param: 'sections',
+                value: newSections,
+            });
         } else {
             return;
         }
@@ -110,17 +115,25 @@ export function onSectionUpdate(id, field, value) {
                 const temp = newSections[index];
                 newSections[index] = newSections[newIndex];
                 newSections[newIndex] = temp;
-                arranger.sections = newSections;
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'arranger',
+                    param: 'sections',
+                    value: newSections,
+                });
             } else {
                 return;
             }
         } else {
             const newSections = [...arranger.sections];
             newSections[index] = { ...section, [field]: value };
-            arranger.sections = newSections;
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'arranger',
+                param: 'sections',
+                value: newSections,
+            });
         }
     }
-    arranger.isDirty = true;
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     if (field === 'reorder' || field === 'move' || field === 'value') {
         clearChordPresetHighlight();
     }
@@ -144,8 +157,12 @@ export function onSectionDelete(id) {
         }
     }
 
-    arranger.sections = arranger.sections.filter((/** @type {any} */ s) => s.id !== id);
-    arranger.isDirty = true;
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'arranger',
+        param: 'sections',
+        value: arranger.sections.filter((/** @type {any} */ s) => s.id !== id),
+    });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
     refreshArrangerUI();
 }
@@ -162,24 +179,28 @@ export function onSectionDuplicate(id) {
     const index = arranger.sections.findIndex((s) => s.id === id);
     const newSections = [...arranger.sections];
     newSections.splice(index + 1, 0, newSection);
-    arranger.sections = newSections;
-    arranger.isDirty = true;
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
     refreshArrangerUI();
 }
 
 export function addSection() {
     const { arranger } = getState();
-    arranger.sections = [
-        ...arranger.sections,
-        {
-            id: generateId(),
-            label: `Section ${arranger.sections.length + 1}`,
-            value: 'I',
-            repeat: 1,
-        },
-    ];
-    arranger.isDirty = true;
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'arranger',
+        param: 'sections',
+        value: [
+            ...arranger.sections,
+            {
+                id: generateId(),
+                label: `Section ${arranger.sections.length + 1}`,
+                value: 'I',
+                repeat: 1,
+            },
+        ],
+    });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
     refreshArrangerUI();
 }
@@ -192,7 +213,7 @@ export function transposeKey(delta) {
     const currentIndex = KEY_ORDER.indexOf(normalizeKey(currentKeyName));
     const newKey = KEY_ORDER[(currentIndex + delta + 12) % 12];
 
-    arranger.key = newKey;
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: newKey });
 
     /** @param {string} part */
     const isMusicalNotation = (part) => {
@@ -234,7 +255,14 @@ export function transposeKey(delta) {
         }
     });
 
-    arranger.isDirty = true;
+    // We mutated the `sections` objects directly in the loop, so we should dispatch the updated array reference
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'arranger',
+        param: 'sections',
+        value: [...arranger.sections],
+    });
+
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
     refreshArrangerUI();
 }
@@ -246,8 +274,8 @@ export function switchToRelativeKey() {
     const shift = wasMinor ? 3 : -3;
     const newKey = KEY_ORDER[(currentIndex + shift + 12) % 12];
 
-    arranger.key = newKey;
-    arranger.isMinor = !wasMinor;
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: newKey });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isMinor', value: !wasMinor });
 
     pushHistory();
     arranger.sections.forEach((section) => {
@@ -262,7 +290,14 @@ export function switchToRelativeKey() {
         }
     });
 
-    arranger.isDirty = true;
+    // We mutated the `sections` objects directly in the loop, so we should dispatch the updated array reference
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'arranger',
+        param: 'sections',
+        value: [...arranger.sections],
+    });
+
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     refreshArrangerUI();
     showToast(
         `Switched to Relative ${arranger.isMinor ? 'Minor' : 'Major'}: ${newKey}${arranger.isMinor ? 'm' : ''}`,
