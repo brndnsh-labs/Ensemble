@@ -152,8 +152,8 @@ describe('Soloist Presets', () => {
 
         // 2 Oscs + 1 Vibrato = 3 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
-        // 1 Lowpass + 1 Peaking = 2 filters
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(2);
+        // 1 Lowpass + 1 Peaking + 1 Highshelf = 3 filters
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
         expect(soloist.activeVoices.length).toBe(1);
     });
 

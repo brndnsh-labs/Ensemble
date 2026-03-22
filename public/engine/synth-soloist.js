@@ -225,11 +225,13 @@ function manageVoices(playTime, soloist) {
         soloist.activeVoices = []; // @direct-mutation
     }
 
-    // Clean up finished voices
-    soloist.activeVoices = soloist.activeVoices.filter(
-        // @direct-mutation
-        /** @param {any} v */ (v) => v.time + v.duration + 1.0 > playTime,
-    );
+    // Clean up finished voices (in-place mutation to satisfy state checks)
+    for (let i = soloist.activeVoices.length - 1; i >= 0; i--) {
+        const v = soloist.activeVoices[i];
+        if (v.time + v.duration + 1.0 <= playTime) {
+            soloist.activeVoices.splice(i, 1);
+        }
+    }
 
     const VOICE_LIMIT = soloist.mode === 'piano' ? 4 : soloist.mode === 'guitar' ? 2 : 1;
 
@@ -327,23 +329,39 @@ function playTrumpet(
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(clampFreq(freq * 1.2), playTime);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 4.0), playTime + 0.08);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2.5), playTime + 0.15);
+
+    // Non-linear cutoff ceiling: Cap the filter to prevent "ice-pick" high frequencies
+    const baseCutoff = clampFreq(freq * 1.2);
+    const maxCutoff = Math.min(clampFreq(freq * 4.0), 5500 + freq * 1.5);
+    const sustainCutoff = Math.min(clampFreq(freq * 2.5), 4500 + freq * 1.2);
+
+    filter.frequency.setValueAtTime(baseCutoff, playTime);
+    filter.frequency.exponentialRampToValueAtTime(maxCutoff, playTime + 0.08);
+    filter.frequency.exponentialRampToValueAtTime(sustainCutoff, playTime + 0.15);
     filter.Q.value = 0.8;
 
     const bellFilter = ctx.createBiquadFilter();
     bellFilter.type = 'peaking';
     bellFilter.frequency.value = 1200;
     bellFilter.Q.value = 1.5;
-    bellFilter.gain.value = 4;
 
-    voiceObj.nodes.push(filter, bellFilter);
+    // Register-aware bell gain: Reduce boost in high register to prevent nasality
+    const bellBoost = freq > 800 ? Math.max(1.5, 4 - (freq - 800) * 0.005) : 4;
+    bellFilter.gain.value = bellBoost;
+
+    // High-shelf smoothing: Roll off extreme high-end "fizz"
+    const smoother = ctx.createBiquadFilter();
+    smoother.type = 'highshelf';
+    smoother.frequency.value = 6000;
+    smoother.gain.setValueAtTime(freq > 1000 ? -4 : -2, playTime);
+
+    voiceObj.nodes.push(filter, bellFilter, smoother);
 
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(bellFilter);
-    bellFilter.connect(outputGain);
+    bellFilter.connect(smoother);
+    smoother.connect(outputGain);
 
     const attack = isLegato ? 0.005 : 0.02;
 

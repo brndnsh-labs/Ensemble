@@ -10,7 +10,7 @@ import { getBestInversion, getIntervals } from './chords-engine.js';
  */
 
 const RESOLUTION_NORMALIZER = 0.85; // Global tamer to prevent limiter crushing
-const RESOLUTION_STAGGER = 0.012; // Max jitter in seconds for sample-accurate peak reduction
+const RESOLUTION_STAGGER = 0.015; // Max jitter in seconds for sample-accurate peak reduction
 
 const CADENCE_PROFILES = {
     // Sharp hit on the Tonic
