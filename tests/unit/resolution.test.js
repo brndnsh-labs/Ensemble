@@ -31,7 +31,6 @@ describe('Resolution Logic', () => {
         const step = 64;
 
         const state = { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } };
-        // Rock is the default, which uses BUTTON (1 step)
         const notes = generateResolutionNotes(state, step, arranger, enabled, bpm);
 
         expect(notes.length).toBeGreaterThan(0);
@@ -48,7 +47,7 @@ describe('Resolution Logic', () => {
     it('handles minor key resolution correctly', () => {
         const arranger = { key: 'C', isMinor: true };
         const enabled = { chords: true, bass: true };
-        const groove = { genreFeel: 'Rock' }; // Use explicit genre to check mapping
+        const groove = { genreFeel: 'Rock' };
         const notes = generateResolutionNotes(
             { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } },
             0,
@@ -65,7 +64,7 @@ describe('Resolution Logic', () => {
         expect(chordNotes.length).toBeGreaterThan(0);
     });
 
-    it('generates Jazz ending with extensions', () => {
+    it('generates Jazz ending with extensions and staggered timing', () => {
         const arranger = { key: 'F', isMinor: false };
         const enabled = { chords: true };
         const groove = { genreFeel: 'Jazz' };
@@ -79,8 +78,52 @@ describe('Resolution Logic', () => {
             groove,
         );
 
-        // Jazz Major should be JAZZ_V_I (2 steps)
-        const uniqueTimes = [...new Set(notes.map((n) => n.timingOffset))];
-        expect(uniqueTimes.length).toBe(2);
+        // Jazz Major should be JAZZ_V_I (2 cadence steps)
+        // Since we have staggering, unique times will be many, but they should fall into two clusters
+        const times = notes.map((n) => n.timingOffset);
+        const uniqueClusters = [...new Set(times.map((t) => Math.round(t * 10) / 10))];
+        expect(uniqueClusters.length).toBe(2);
+    });
+
+    it('scales velocity based on band intensity', () => {
+        const arranger = { key: 'C', isMinor: false };
+        const enabled = { bass: true };
+        const bpm = 120;
+
+        const stateLow = { playback: { bandIntensity: 0.0 }, groove: { genreFeel: 'Rock' } };
+        const stateHigh = { playback: { bandIntensity: 1.0 }, groove: { genreFeel: 'Rock' } };
+
+        const notesLow = generateResolutionNotes(stateLow, 0, arranger, enabled, bpm);
+        const notesHigh = generateResolutionNotes(stateHigh, 0, arranger, enabled, bpm);
+
+        expect(notesHigh[0].velocity).toBeGreaterThan(notesLow[0].velocity);
+    });
+
+    it('applies micro-staggering to final hit notes', () => {
+        const arranger = { key: 'C', isMinor: false };
+        const enabled = { chords: true };
+        const bpm = 120;
+
+        const state = { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } };
+        const notes = generateResolutionNotes(state, 0, arranger, enabled, bpm);
+
+        // Chords usually have multiple notes. Check if they are exactly aligned.
+        const chordNotes = notes.filter((n) => n.module === 'chords');
+        if (chordNotes.length > 1) {
+            const allSame = chordNotes.every((n) => n.timingOffset === chordNotes[0].timingOffset);
+            expect(allSame).toBe(false);
+        }
+    });
+
+    it('applies global resolution normalization tamer', () => {
+        const arranger = { key: 'C', isMinor: false };
+        const enabled = { bass: true };
+        const bpm = 120;
+
+        const state = { playback: { bandIntensity: 1.0 }, groove: { genreFeel: 'Rock' } };
+        const notes = generateResolutionNotes(state, 0, arranger, enabled, bpm);
+
+        // Even at 1.0 intensity, velocity should not be 1.0 because of the tamer (0.85)
+        expect(notes[0].velocity).toBeLessThan(0.9);
     });
 });

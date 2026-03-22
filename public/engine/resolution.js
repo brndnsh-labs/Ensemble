@@ -9,20 +9,23 @@ import { getBestInversion, getIntervals } from './chords-engine.js';
  * Optimized for clean "Final Button" landings on the Tonic.
  */
 
+const RESOLUTION_NORMALIZER = 0.85; // Global tamer to prevent limiter crushing
+const RESOLUTION_STAGGER = 0.012; // Max jitter in seconds for sample-accurate peak reduction
+
 const CADENCE_PROFILES = {
     // Sharp hit on the Tonic
-    BUTTON: [{ label: 'I', degree: 0, quality: 'major', beats: 4, velocity: 1.0 }],
+    BUTTON: [{ label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 1.0 }],
 
     // Standard V -> I resolution
     STANDARD_V_I: [
-        { label: 'V', degree: 7, quality: 'major', beats: 2, velocity: 0.7 },
-        { label: 'I', degree: 0, quality: 'major', beats: 4, velocity: 1.0 },
+        { label: 'V', degree: 7, quality: 'major', beats: 2, baseVelocity: 0.75 },
+        { label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 1.0 },
     ],
 
     // Jazz ii -> V -> I (Condensed)
     JAZZ_V_I: [
-        { label: 'V7', degree: 7, quality: '13', beats: 2, velocity: 0.7 },
-        { label: 'I6/9', degree: 0, quality: '6', beats: 4, velocity: 1.0 },
+        { label: 'V7', degree: 7, quality: '13', beats: 2, baseVelocity: 0.7 },
+        { label: 'I6/9', degree: 0, quality: '6', beats: 4, baseVelocity: 1.0 },
     ],
 };
 
@@ -41,6 +44,7 @@ const GENRE_MAP = {
 };
 
 /**
+ * Generates intensity-aware resolution notes with cross-instrument normalization.
  * @param {import('../types.js').EnsembleState} state
  * @param {number} step
  * @param {import('../state/arranger.js').ArrangerState} arranger
@@ -60,8 +64,25 @@ export function generateResolutionNotes(
 ) {
     /** @type {any[]} */
     const notes = [];
+    const { playback } = state;
     const genre = groove.genreFeel || 'Rock';
     const config = /** @type {any} */ (GENRE_MAP)[genre] || GENRE_MAP.Rock;
+
+    // --- Intensity Awareness ---
+    // Scale the raw energy of the ending based on the current band intensity.
+    // This ensures a chill track doesn't end with a jarring peak-velocity hit.
+    const intensity = playback?.bandIntensity ?? 0.5;
+    const intensityScale = 0.6 + intensity * 0.4; // 0.6 (min) to 1.0 (max)
+
+    /**
+     * @param {number} baseVel
+     */
+    const getFinalVel = (baseVel) => baseVel * intensityScale * RESOLUTION_NORMALIZER;
+
+    /**
+     * @param {number} maxMs
+     */
+    const getStagger = (maxMs = RESOLUTION_STAGGER) => (Math.random() - 0.5) * maxMs;
 
     // Use current song key as tonic
     const resolutionKey = arranger.key || 'C';
@@ -142,8 +163,9 @@ export function generateResolutionNotes(
                 });
             }
             voicings.forEach((/** @type {number} */ m, /** @type {number} */ vIdx) => {
-                const vel = cadenceStep.velocity || 0.8;
-                const offset = genre === 'Acoustic' ? vIdx * 0.03 : 0;
+                const vel = getFinalVel(cadenceStep.baseVelocity || 0.85);
+                // Acoustic strum + global stagger
+                const offset = (genre === 'Acoustic' ? vIdx * 0.035 : 0) + getStagger();
                 notes.push({
                     midi: m,
                     freq: getFrequency(m),
@@ -152,7 +174,7 @@ export function generateResolutionNotes(
                     durationSteps: 16,
                     module: 'chords',
                     step,
-                    timingOffset: time + offset,
+                    timingOffset: time + Math.max(0, offset),
                 });
             });
         }
@@ -163,7 +185,9 @@ export function generateResolutionNotes(
             if (bassMidi < 33) {
                 bassMidi += 12;
             }
-            const vel = isLast ? 1.0 : 0.8;
+            const baseVel = isLast ? 1.0 : 0.8;
+            const vel = getFinalVel(baseVel);
+            const offset = getStagger(0.005); // Tighter stagger for bass/kick lock
             notes.push({
                 midi: bassMidi,
                 freq: getFrequency(bassMidi),
@@ -172,39 +196,42 @@ export function generateResolutionNotes(
                 durationSteps: 16,
                 module: 'bass',
                 step,
-                timingOffset: time,
+                timingOffset: time + offset,
             });
         }
 
         // --- DRUMS ---
         if (enabled.groove) {
+            const kickVel = getFinalVel(1.0);
             // Kick on every change
             notes.push({
                 module: 'groove',
                 name: 'Kick',
-                velocity: 1.0,
-                midiVelocity: 127,
+                velocity: kickVel,
+                midiVelocity: Math.round(kickVel * 127),
                 step,
                 timingOffset: time,
             });
             if (isLast) {
                 // Final Crash
+                const crashVel = getFinalVel(1.0);
                 notes.push({
                     module: 'groove',
                     name: 'Crash',
-                    velocity: 1.0,
-                    midiVelocity: 127,
+                    velocity: crashVel,
+                    midiVelocity: Math.round(crashVel * 127),
                     step,
-                    timingOffset: time,
+                    timingOffset: time + getStagger(0.008),
                 });
             } else {
+                const snareVel = getFinalVel(0.7);
                 notes.push({
                     module: 'groove',
                     name: 'Snare',
-                    velocity: 0.7,
-                    midiVelocity: 90,
+                    velocity: snareVel,
+                    midiVelocity: Math.round(snareVel * 127),
                     step,
-                    timingOffset: time,
+                    timingOffset: time + getStagger(0.005),
                 });
             }
         }
@@ -215,14 +242,17 @@ export function generateResolutionNotes(
             // Force resolution to Tonic (0) or 5th (7) relative to resolutionKey
             const soloPC = (isLast ? 0 : 7) + keyIndex;
             const soloMidi = soloOctave + (soloPC % 12);
+            const baseVel = isLast ? 0.9 : 0.7;
+            const vel = getFinalVel(baseVel);
             notes.push({
                 midi: soloMidi,
                 freq: getFrequency(soloMidi),
-                velocity: isLast ? 0.9 : 0.7,
+                velocity: vel,
+                midiVelocity: Math.round(vel * 127),
                 durationSteps: 16,
                 module: 'soloist',
                 step,
-                timingOffset: time,
+                timingOffset: time + getStagger(),
                 vibrato: isLast ? { delay: 0.2, depth: 0.4 } : null,
             });
         }
@@ -231,14 +261,16 @@ export function generateResolutionNotes(
         if (enabled.harmony) {
             // Pads follow the top notes of the voicing
             voicings.slice(-3).forEach((/** @type {any} */ m) => {
+                const vel = getFinalVel(0.5);
                 notes.push({
                     midi: m,
                     freq: getFrequency(m),
-                    velocity: 0.5,
+                    velocity: vel,
+                    midiVelocity: Math.round(vel * 127),
                     durationSteps: 16,
                     module: 'harmony',
                     step,
-                    timingOffset: time,
+                    timingOffset: time + getStagger(),
                     style: 'pads',
                 });
             });
