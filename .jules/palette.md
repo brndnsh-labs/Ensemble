@@ -1,0 +1,3 @@
+## 2026-03-22 - Improved screen reader context for Toggle component
+**Learning:** Custom UI toggle switches built on top of `<input type="checkbox">` elements often lack semantic meaning, causing screen readers to announce them as simple checkboxes.
+**Action:** Always add `role="switch"` and `aria-checked={checked}` to the underlying input of custom toggle components so that assistive technologies announce them correctly as switches (on/off) instead of checkboxes (checked/unchecked).
