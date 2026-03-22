@@ -208,6 +208,7 @@ export class ExportProcessor {
     _writeNotesToTrack(track, channel, notes, stepTimeS, moduleName, coordination, globalStep) {
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, notes.length));
         const midiState = this.state.midi;
+        const humanizeFactor = (this.state.groove.humanize || 0) / 100;
 
         notes.forEach((res) => {
             if (res.midi && res.midi > 0) {
@@ -243,6 +244,13 @@ export class ExportProcessor {
                 if (res.muted) {
                     finalVel *= moduleName === 'bass' ? 0.15 : 0.3;
                 }
+
+                // Apply global humanization to velocity
+                if (humanizeFactor > 0) {
+                    const velJitter = 1.0 + (Math.random() - 0.5) * (humanizeFactor * 0.2);
+                    finalVel *= velJitter;
+                }
+
                 const midiVel = normalizeMidiVelocity(finalVel);
 
                 if (res.ccEvents && res.ccEvents.length > 0) {
@@ -263,14 +271,22 @@ export class ExportProcessor {
                 }
 
                 let endTimeS;
-                if (res.durationSteps < 1) {
-                    endTimeS = noteTimeS + res.durationSteps * this.sixteenthSec;
+                let actualDurationSteps = res.durationSteps;
+
+                // Handle Staccato "Dry" notes (e.g. Reggae Skanks, Funk Chucks)
+                if (res.dry) {
+                    actualDurationSteps *= 0.3;
+                }
+
+                if (actualDurationSteps < 1) {
+                    endTimeS = noteTimeS + actualDurationSteps * this.sixteenthSec;
                 } else {
-                    const targetStepIdx = globalStep + Math.round(res.durationSteps);
+                    const targetStepIdx = globalStep + Math.round(actualDurationSteps);
                     endTimeS =
                         this.stepTimes[targetStepIdx] ||
-                        noteTimeS + res.durationSteps * this.sixteenthSec;
+                        noteTimeS + actualDurationSteps * this.sixteenthSec;
                 }
+
                 if (endTimeS - noteTimeS < 0.05) {
                     endTimeS = noteTimeS + 0.05;
                 }
@@ -281,7 +297,8 @@ export class ExportProcessor {
                 }
 
                 if (moduleName === 'soloist') {
-                    endTimeS += 0.015;
+                    // Extend overlap for Legato slides to trigger DAW glide
+                    endTimeS += res.isLegato ? 0.05 : 0.015;
                 } else if (moduleName === 'bass') {
                     endTimeS += 0.02;
                 }

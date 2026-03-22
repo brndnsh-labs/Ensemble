@@ -31,6 +31,8 @@ import { getChordAtStep } from './worker-utils.js';
  * @property {number} [timingOffset]
  * @property {number} [bendStartInterval]
  * @property {boolean} [isDoubleStop]
+ * @property {boolean} [isLegato]
+ * @property {boolean} [dry]
  * @property {any} [ccEvents]
  * @property {boolean} [muted]
  */
@@ -544,11 +546,8 @@ export function applyWorkerTransition(state, step, conductorState) {
         // Smoothly interpolate towards target energy over the section
         if (entry && entry.end > entry.start) {
             const stepSize = (targetEnergy - playback.bandIntensity) / (entry.end - entry.start);
-            playback.bandIntensity = Math.max(
-                // @worker-mutation
-                0.1,
-                Math.min(1.0, playback.bandIntensity + stepSize),
-            );
+            const newIntensity = Math.max(0.1, Math.min(1.0, playback.bandIntensity + stepSize));
+            playback.bandIntensity = newIntensity; // @worker-mutation
         }
     } else if (playback.autoIntensity && modStep === 0 && conductorState.formIteration > 0) {
         const grandCycle = conductorState.formIteration % 8;
