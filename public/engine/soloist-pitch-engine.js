@@ -5,6 +5,13 @@ import { getScaleForChord } from './theory-scales.js';
 
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 
+// Stylistic interval arrays (hoisted to module scope to avoid re-allocation on every function call)
+const srvIntervals = [0, 3, 5, 6, 7, 10];
+const gilmourIntervals = [0, 7];
+const slashIntervals = [4, 9];
+const milesIntervals = [2, 5, 9];
+const evansIntervals = [2, 5, 6, 9];
+
 /**
  * Primary entry point for pitch selection.
  * @param {import('../types.js').EnsembleState} state
@@ -174,9 +181,11 @@ export function selectPitchAndDevices(
     const searchMin = Math.max(minMidi, lastMidi - 14);
     const searchMax = Math.min(maxMidi, lastMidi + 14);
 
-    // Optimization: Pre-compute stylistic boolean checks to avoid allocating arrays and calling .includes() inside the hot loop
+    // Optimization: Pre-compute stylistic boolean checks and common tone arrays to avoid allocating inside the hot loop
     const isBluesOrJazz = activeStyle === 'blues' || activeStyle === 'jazz';
     const isGreatsProfileEnabled = ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle);
+    const isDissonantStyle = ['jazz', 'bird', 'blues'].includes(activeStyle);
+
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
         isGreatsProfileEnabled && soloistState.phraseContext?.role === 'response';
@@ -213,10 +222,7 @@ export function selectPitchAndDevices(
 
             if (stationaryScale > 0) {
                 // Dissonance Protection check
-                if (
-                    (interval === 1 || interval === 6) &&
-                    !['jazz', 'bird', 'blues'].includes(activeStyle)
-                ) {
+                if ((interval === 1 || interval === 6) && !isDissonantStyle) {
                     repetitionPenalty = 0.01;
                 }
 
@@ -233,19 +239,19 @@ export function selectPitchAndDevices(
             switch (profile) {
                 case 'srv':
                     // SRV: High energy, favors pentatonic/blues notes
-                    if ([0, 3, 5, 6, 7, 10].includes(interval)) {
+                    if (srvIntervals.includes(interval)) {
                         weight *= 1.2;
                     }
                     break;
                 case 'gilmour':
                     // Gilmour: Melodic, Root and 5th stability for singsong leads
-                    if ([0, 7].includes(interval)) {
+                    if (gilmourIntervals.includes(interval)) {
                         weight *= 1.4;
                     }
                     break;
                 case 'slash':
                     // Slash: Classic rock, targets 3rds and 6ths
-                    if ([4, 9].includes(interval)) {
+                    if (slashIntervals.includes(interval)) {
                         weight *= 1.3;
                     }
                     break;
@@ -289,7 +295,7 @@ export function selectPitchAndDevices(
                     break;
                 case 'miles':
                     // Miles: Modal, targets extensions (9, 11, 13)
-                    if ([2, 5, 9].includes(interval)) {
+                    if (milesIntervals.includes(interval)) {
                         weight *= 1.3;
                     }
                     break;
@@ -301,7 +307,7 @@ export function selectPitchAndDevices(
                     break;
                 case 'evans':
                     // Bill Evans: Upper Extensions (9, 11, #11, 13)
-                    if ([2, 5, 6, 9].includes(interval)) {
+                    if (evansIntervals.includes(interval)) {
                         weight += 500; // Final boost to reliably exceed 40% target
                         weight *= 10.0;
                     }
