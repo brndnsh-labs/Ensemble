@@ -185,7 +185,7 @@ export function syncWorker(action, payload) {
     if (!timerWorker) {
         return;
     }
-    const { arranger, chords, bass, soloist, harmony, groove, playback } = getState();
+    const { arranger, chords, bass, soloist, harmony, groove, playback, midi } = getState();
 
     /** @type {Partial<Record<keyof import('./types.js').EnsembleState, any>>} */
     const data = {};
@@ -202,6 +202,21 @@ export function syncWorker(action, payload) {
                 isMinor: arranger.isMinor,
                 timeSignature: arranger.timeSignature,
                 grouping: arranger.grouping,
+                sections: arranger.sections,
+                measureMap: arranger.measureMap,
+            },
+            midi: {
+                chordsChannel: midi.chordsChannel,
+                bassChannel: midi.bassChannel,
+                soloistChannel: midi.soloistChannel,
+                harmonyChannel: midi.harmonyChannel,
+                drumsChannel: midi.drumsChannel,
+                chordsOctave: midi.chordsOctave,
+                bassOctave: midi.bassOctave,
+                soloistOctave: midi.soloistOctave,
+                harmonyOctave: midi.harmonyOctave,
+                drumsOctave: midi.drumsOctave,
+                velocitySensitivity: midi.velocitySensitivity,
             },
             chords: {
                 style: chords.style,
@@ -209,6 +224,8 @@ export function syncWorker(action, payload) {
                 density: chords.density,
                 enabled: chords.enabled,
                 volume: chords.volume,
+                pianoRoots: chords.pianoRoots,
+                rhythmicMask: chords.rhythmicMask,
             },
             bass: {
                 style: bass.style,
@@ -226,6 +243,11 @@ export function syncWorker(action, payload) {
                 mode: soloist.mode,
                 sessionSteps: soloist.sessionSteps,
                 leadSheetMelody: soloist.leadSheetMelody,
+                seed: soloist.seed,
+                sessionSeed: soloist.sessionSeed,
+                phrasingIntensity: soloist.phrasingIntensity,
+                tradeMode: soloist.tradeMode,
+                hookRetentionProb: soloist.hookRetentionProb,
             },
             harmony: {
                 style: harmony.style,
@@ -243,6 +265,10 @@ export function syncWorker(action, payload) {
                 measures: groove.measures,
                 swing: groove.swing,
                 swingSub: groove.swingSub,
+                creativity: groove.creativity,
+                sectionSeedMap: groove.sectionSeedMap,
+                pocket: groove.pocket,
+                humanize: groove.humanize,
                 instruments: groove.instruments.map((/** @type {any} */ i) => ({
                     name: i.name,
                     steps: [...i.steps],
@@ -258,6 +284,10 @@ export function syncWorker(action, payload) {
                 sessionTimer: playback.sessionTimer,
                 sessionStartTime: playback.sessionStartTime,
                 modals: { performance: playback.modals?.performance || false },
+                intent: playback.intent,
+                conductorVelocity: playback.conductorVelocity,
+                lyricalBias: playback.lyricalBias,
+                songMode: playback.songMode,
             },
         });
     } else {
@@ -312,11 +342,16 @@ export function syncWorker(action, payload) {
                     /** @type {any} */ (data)[payload.module] = { octave: payload.value };
                 }
                 break;
+            case 'SET_MIDI_CONFIG':
+                data.midi = payload;
+                break;
             case 'SET_GENRE_FEEL':
                 data.groove = {
                     genreFeel: groove.genreFeel,
                     swing: groove.swing,
                     swingSub: groove.swingSub,
+                    creativity: groove.creativity,
+                    sectionSeedMap: groove.sectionSeedMap,
                 };
                 break;
             case 'SET_SWING':

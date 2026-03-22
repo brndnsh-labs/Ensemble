@@ -29,7 +29,7 @@ function processMessage(type, data, startTime) {
     if (!workerContext.state) {
         workerContext.state = state;
     }
-    const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
+    const { arranger, chords, bass, soloist, harmony, groove, playback, midi } = state;
     try {
         switch (type) {
             case WORKER_MSG.START:
@@ -57,6 +57,7 @@ function processMessage(type, data, startTime) {
                 recursiveSafeSync(soloist, data.soloist, 'soloist');
                 recursiveSafeSync(harmony, data.harmony, 'harmony');
                 recursiveSafeSync(groove, data.groove, 'groove');
+                recursiveSafeSync(midi, data.midi, 'midi');
                 if (data.playback) {
                     Object.assign(playback, data.playback);
                 }

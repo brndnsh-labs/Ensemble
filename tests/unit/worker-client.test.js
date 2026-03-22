@@ -71,6 +71,19 @@ vi.mock('../../public/state.js', () => {
             instruments: [{ name: 'Kick', steps: [], muted: false }],
         },
         playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
+        midi: {
+            chordsChannel: 1,
+            bassChannel: 2,
+            soloistChannel: 3,
+            harmonyChannel: 4,
+            drumsChannel: 10,
+            chordsOctave: 0,
+            bassOctave: 0,
+            soloistOctave: 0,
+            harmonyOctave: 0,
+            drumsOctave: 0,
+            velocitySensitivity: 1.0,
+        },
     };
     return {
         stateMap: mockState,
@@ -217,6 +230,7 @@ describe('Worker Client', () => {
                         harmony: expect.any(Object),
                         groove: expect.any(Object),
                         playback: expect.any(Object),
+                        midi: expect.any(Object),
                     }),
                 }),
             );

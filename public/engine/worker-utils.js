@@ -23,15 +23,7 @@ export const WORKER_MANAGED_KEYS = {
     ],
     bass: ['lastFreq', 'busySteps', 'lastMidiPlayed'],
     harmony: ['motifBuffer', 'lastMidis'],
-    groove: [
-        'fillSteps',
-        'fillActive',
-        'fillStartStep',
-        'fillLength',
-        'pendingCrash',
-        'snareMask',
-        'sectionSeedMap',
-    ],
+    groove: ['fillSteps', 'fillActive', 'fillStartStep', 'fillLength', 'pendingCrash', 'snareMask'],
 };
 
 // --- LOGIC CURSORS ---

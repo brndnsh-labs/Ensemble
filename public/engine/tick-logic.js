@@ -136,7 +136,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
         const fillStep = step - (groove.fillStartStep || 0);
 
         if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
-            if (playback.bandIntensity >= 0.5 || fillStep >= (groove.fillLength || 0) / 2) {
+            if (playback.bandIntensity >= 0.1 || fillStep >= (groove.fillLength || 0) / 2) {
                 const fillNotes = /** @type {any} */ (groove.fillSteps)?.[fillStep];
                 if (fillNotes && fillNotes.length > 0) {
                     fillNotes.forEach((/** @type {any} */ n) => {
@@ -545,9 +545,10 @@ export function applyWorkerTransition(state, step, conductorState) {
         if (entry && entry.end > entry.start) {
             const stepSize = (targetEnergy - playback.bandIntensity) / (entry.end - entry.start);
             playback.bandIntensity = Math.max(
+                // @worker-mutation
                 0.1,
                 Math.min(1.0, playback.bandIntensity + stepSize),
-            ); // @worker-mutation
+            );
         }
     } else if (playback.autoIntensity && modStep === 0 && conductorState.formIteration > 0) {
         const grandCycle = conductorState.formIteration % 8;

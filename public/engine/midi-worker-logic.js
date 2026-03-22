@@ -3,6 +3,7 @@ import { analyzeForm } from '../form-analysis.js';
 import { binarySearchMap, getMidi, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState } from './accompaniment.js';
+import { resetBassState } from './bass-engine.js';
 import { enforceRegisterSlotting, updateCoordinationContext } from './coordination-engine.js';
 import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
@@ -14,6 +15,7 @@ import {
     writeString,
 } from './midi-utils.js';
 import { generateResolutionNotes } from './resolution.js';
+import { resetSoloistState } from './soloist.js';
 import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep } from './worker-utils.js';
 
@@ -130,6 +132,7 @@ export class ExportProcessor {
             intensity: playback.bandIntensity,
             mode: soloist.mode,
             sessionSteps: soloist.sessionSteps,
+            currentLoopCount: playback.currentLoopCount,
         };
 
         chords.enabled = true; // @worker-mutation
@@ -137,13 +140,17 @@ export class ExportProcessor {
         soloist.enabled = true; // @worker-mutation
         harmony.enabled = true; // @worker-mutation
         groove.enabled = true; // @worker-mutation
-        soloist.sessionSteps = 1000; // @worker-mutation
+        playback.currentLoopCount = 0; // @worker-mutation
+
+        resetSoloistState(this.state);
+        resetBassState(this.state);
+        harmony.lastMidis = []; // @worker-mutation
+        groove.fillActive = false; // @worker-mutation
+        groove.pendingCrash = false; // @worker-mutation
+
         compingState.lockedUntil = 0; // @worker-mutation
         compingState.lastChordIndex = -1; // @worker-mutation
-        soloist.busySteps = 0; // @worker-mutation
-        soloist.isResting = true; // @worker-mutation
-        soloist.restSteps = 0; // @worker-mutation
-        soloist.activeSteps = 0; // @worker-mutation
+        compingState.grooveRetentionCount = 0; // @worker-mutation
 
         // Conductor State
         this.exportConductor = {
@@ -190,11 +197,25 @@ export class ExportProcessor {
      */
     _writeNotesToTrack(track, channel, notes, stepTimeS, moduleName, coordination, globalStep) {
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, notes.length));
+        const midiState = this.state.midi;
 
         notes.forEach((res) => {
             if (res.midi && res.midi > 0) {
                 const noteTimeS = stepTimeS + (res.timingOffset || 0);
                 const notePulse = Math.max(0, this.toPulses(noteTimeS));
+
+                let octaveShift = 0;
+                if (moduleName === 'bass') {
+                    octaveShift = midiState.bassOctave || 0;
+                } else if (moduleName === 'chords') {
+                    octaveShift = midiState.chordsOctave || 0;
+                } else if (moduleName === 'soloist') {
+                    octaveShift = midiState.soloistOctave || 0;
+                } else if (moduleName === 'harmony') {
+                    octaveShift = midiState.harmonyOctave || 0;
+                }
+
+                const finalMidi = Math.max(0, Math.min(127, res.midi + octaveShift * 12));
 
                 let finalVel = res.velocity * polyphonyComp;
 
@@ -226,10 +247,10 @@ export class ExportProcessor {
                         channel,
                         Math.round(-(res.bendStartInterval / 2) * 8192),
                     );
-                    track.noteOn(notePulse, channel, res.midi, midiVel);
+                    track.noteOn(notePulse, channel, finalMidi, midiVel);
                     track.pitchBend(this.toPulses(stepTimeS + this.sixteenthSec), channel, 0);
                 } else {
-                    track.noteOn(notePulse, channel, res.midi, midiVel);
+                    track.noteOn(notePulse, channel, finalMidi, midiVel);
                 }
 
                 let endTimeS;
@@ -250,7 +271,7 @@ export class ExportProcessor {
                     endTimeS += 0.02;
                 }
 
-                track.noteOff(this.toPulses(endTimeS), channel, res.midi);
+                track.noteOff(this.toPulses(endTimeS), channel, finalMidi);
             } else if (res.ccEvents && res.ccEvents.length > 0) {
                 const noteTimeS = stepTimeS + (res.timingOffset || 0);
                 const notePulse = Math.max(0, this.toPulses(noteTimeS));
@@ -413,6 +434,11 @@ export class ExportProcessor {
                 const name = soundName || instName;
                 let midi = DRUM_MAP[soundName] || DRUM_MAP[instName];
 
+                if (midi) {
+                    midi += (this.state.midi.drumsOctave || 0) * 12;
+                    midi = Math.max(0, Math.min(127, midi));
+                }
+
                 // Fuzzy matching for unmapped dynamic names
                 if (!midi) {
                     if (name.includes('Tom')) {
@@ -563,6 +589,19 @@ export class ExportProcessor {
             }
 
             if (n.midi && n.midi > 0) {
+                let octaveShift = 0;
+                if (n.module === 'bass') {
+                    octaveShift = this.state.midi.bassOctave || 0;
+                } else if (n.module === 'chords') {
+                    octaveShift = this.state.midi.chordsOctave || 0;
+                } else if (n.module === 'soloist') {
+                    octaveShift = this.state.midi.soloistOctave || 0;
+                } else if (n.module === 'harmony') {
+                    octaveShift = this.state.midi.harmonyOctave || 0;
+                }
+
+                const finalMidi = Math.max(0, Math.min(127, n.midi + octaveShift * 12));
+
                 if (n.module === 'soloist' && n.bendStartInterval) {
                     track.pitchBend(
                         notePulse,
@@ -571,17 +610,20 @@ export class ExportProcessor {
                     );
                 }
 
-                track.noteOn(notePulse, channel, n.midi, n.midiVelocity || 90);
+                track.noteOn(notePulse, channel, finalMidi, n.midiVelocity || 90);
 
                 if (n.module === 'soloist' && n.bendStartInterval) {
                     track.pitchBend(this.toPulses(resTimeS + this.sixteenthSec), channel, 0);
                 }
 
                 const durationS = (n.durationSteps || 1) * this.sixteenthSec;
-                track.noteOff(this.toPulses(resTimeS + offsetS + durationS), channel, n.midi);
+                track.noteOff(this.toPulses(resTimeS + offsetS + durationS), channel, finalMidi);
             } else if (n.module === 'groove' && n.name) {
-                const midi = DRUM_MAP[/** @type {any} */ (n).name];
+                let midi = DRUM_MAP[/** @type {any} */ (n).name];
                 if (midi) {
+                    midi += (this.state.midi.drumsOctave || 0) * 12;
+                    midi = Math.max(0, Math.min(127, midi));
+
                     track.noteOn(notePulse, channel, midi, n.midiVelocity || 110);
                     const durS = n.name === 'Crash' ? 3.0 : 0.1;
                     track.noteOff(this.toPulses(resTimeS + offsetS + durS), channel, midi);
@@ -665,6 +707,7 @@ export class ExportProcessor {
             playback.bandIntensity = this.prevStates.intensity; // @worker-mutation
             soloist.mode = this.prevStates.mode; // @worker-mutation
             soloist.sessionSteps = this.prevStates.sessionSteps; // @worker-mutation
+            playback.currentLoopCount = this.prevStates.currentLoopCount; // @worker-mutation
         }
 
         _isExporting = false;
