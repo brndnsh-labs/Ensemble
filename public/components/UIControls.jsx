@@ -75,6 +75,8 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }) {
             <input
                 type="checkbox"
                 id={id}
+                role="switch"
+                aria-checked={checked}
                 checked={checked}
                 onChange={(e) => onChange(/** @type {HTMLInputElement} */ (e.target).checked)}
                 aria-label={ariaLabel || label || id}
