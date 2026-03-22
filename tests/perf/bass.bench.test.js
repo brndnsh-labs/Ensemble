@@ -99,8 +99,15 @@ describe('Bass Logic Performance', () => {
         for (let i = 0; i < ITERATIONS; i++) {
             // Cycle through steps 0-15 (one measure of 16th notes)
             const step = i % 16;
+            // mock stepInfo for Bossa style correctly
+            const isMeasureStart = step === 0;
+            const isBeatStart = step % 4 === 0;
+            const mStep = step;
+            const beatIndex = Math.floor(step / 4);
+            const stepInfo = { isMeasureStart, isBeatStart, mStep, beatIndex };
+
             // stepInChord is effectively same as step for this micro-benchmark
-            if (isBassActive(getState(), style, step, step)) {
+            if (isBassActive(getState(), style, step, step, stepInfo)) {
                 activeCount++;
             }
         }

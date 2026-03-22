@@ -312,8 +312,17 @@ export function getSoloistNote(
             // HYBRID PHRASING PERFORMANCE ENGINE (v2)
             // 1. Macro-Phrasing (Duty Cycle)
             // Determine if we are in a "Breath Zone" (e.g., end of 8-measure block)
-            const measureInBlock8 = Math.floor(step / stepsPerMeasure) % 8;
-            const isMacroRestZone = measureInBlock8 >= 6; // Last 2 measures of 8-measure block
+            const sectionMap = arranger?.sectionMap || [
+                { start: 0, end: stepsPerMeasure * 8, label: 'Default' },
+            ];
+            const currentSection =
+                sectionMap.find((s) => step >= s.start && step < s.end) || sectionMap[0];
+            const measuresInSection = Math.floor((step - currentSection.start) / stepsPerMeasure);
+            const sectionTotalMeasures = Math.floor(
+                (currentSection.end - currentSection.start) / stepsPerMeasure,
+            );
+            const isMacroRestZone =
+                sectionTotalMeasures > 4 && measuresInSection >= sectionTotalMeasures - 2;
 
             // 2. Micro-Phrasing (Probability Gate)
             // Survival Probability:

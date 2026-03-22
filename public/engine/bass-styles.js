@@ -1,8 +1,6 @@
 import { REGGAE_RIDDIMS } from '../config.js';
 import { getFrequency } from '../utils.js';
 
-const BOSSA_STEPS = [0, 6, 8, 14];
-
 /**
  * @param {string} style
  * @param {number} step
@@ -51,7 +49,7 @@ export function checkBassActiveStyle(
                 (isOffbeatAnd && (intBeat === 1 || intBeat === 3)) // Steps 6, 14
             );
         }
-        return BOSSA_STEPS.includes(step % 16);
+        return false;
     }
     if (style === 'quarter' || groove.genreFeel === 'Jazz') {
         if (isQuarter) {
@@ -75,10 +73,7 @@ export function checkBassActiveStyle(
     }
     if (style === 'funk') {
         // Semantic: On beats or specific syncopations
-        // For 4/4, step 2 is a foundational 'pop' target.
-        const isPopTarget = stepInfo
-            ? stepInfo.isBackbeat
-            : step % 16 === 2 || step % 16 === 6 || step % 16 === 10 || step % 16 === 14;
+        const isPopTarget = stepInfo ? stepInfo.isBackbeat : isQuarter && intBeat % 2 !== 0;
         const isFoundational = isQuarter || isPopTarget;
         let ghostProb = 0.5 + playback.bandIntensity * 0.3;
 
@@ -126,7 +121,7 @@ export function checkBassActiveStyle(
                 stepInfo.mStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2)
             );
         }
-        return [0, 6, 8, 14].includes(step % 16);
+        return false;
     }
     if (style === 'country') {
         return step % (ts.stepsPerBeat * 2) === 0; // Alternating beats (1 and 3 in 4/4)
@@ -773,7 +768,9 @@ export function getBassNoteStyle(
         }
 
         // Chromatic approach to next chord on the last eighth note
-        const isLastEighth = step % 16 === 14;
+        const isLastEighth =
+            _stepInfo?.mStep ===
+            (_stepInfo?.tsConfig?.beats || 4) * (_stepInfo?.tsConfig?.stepsPerBeat || 4) - 2;
         if (isLastEighth && nextChord && nextChord.rootMidi !== chord.rootMidi && intensity > 0.5) {
             const nextTarget = normalizeToRange(nextChord.rootMidi);
             const approach = Math.random() < 0.5 ? nextTarget - 1 : nextTarget + 1;
@@ -894,8 +891,9 @@ export function getBassNoteStyle(
     // Walking Bass Approach Logic (Jazz/Blues)
     const isLastBeatOfMeasure = intBeat === ts.beats - 1;
     const isEndOfChord = intBeat === beatsInChord - 1;
+    const isLastEighth = _stepInfo?.mStep === ts.beats * ts.stepsPerBeat - 2;
     const isApproachPoint =
-        (isBeatStart && (isLastBeatOfMeasure || isEndOfChord)) || isEighthSkip || step % 16 === 14;
+        (isBeatStart && (isLastBeatOfMeasure || isEndOfChord)) || isEighthSkip || isLastEighth;
 
     // Use a slightly more aggressive chromatic probability for the critique to ensure it triggers
     if (isApproachPoint && nextChord) {

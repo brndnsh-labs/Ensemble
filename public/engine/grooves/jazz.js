@@ -64,6 +64,11 @@ export function applyOverrides(context, state) {
         isSoloistBusy,
         stepsPerBar,
         loopStep,
+        mStep,
+        tsConfig,
+        isCompound,
+        stepInGroup,
+        groupIndex,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
@@ -75,12 +80,24 @@ export function applyOverrides(context, state) {
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
     const halfBarStep = Math.floor(stepsPerBar / 2);
     const lastBeatIndex = Math.max(1, Math.round(stepsPerBar / 4) - 1);
+    const isPulse = tsConfig?.pulse?.includes(mStep);
+
+    // In compound meters, the "skip" beat is typically the last beat of a grouping (e.g., step 4 in a 6/8 where grouping is [3,3] and stepsPerBeat=2, so mStep 4 is the third 8th note)
+    let isSkipBeat = false;
+    let isRideStep = false;
+
+    if (isCompound) {
+        const groupSteps = (tsConfig?.grouping?.[groupIndex] || 3) * (tsConfig?.stepsPerBeat || 2);
+        isSkipBeat = stepInGroup === groupSteps - 1; // Last step of the group
+        isRideStep = isPulse || isSkipBeat;
+    } else {
+        isSkipBeat = isOffbeat && beatIndex % 2 !== 0;
+        isRideStep = isBeatStart || isSkipBeat;
+    }
 
     if (inst.name === 'Open') {
         shouldPlay = false;
         soundName = 'Ride';
-        const isSkipBeat = isOffbeat && beatIndex % 2 !== 0;
-        const isRideStep = isBeatStart || isSkipBeat;
 
         if (isTurnaround && loopStep >= halfBarStep) {
             // Drop ride for fill
@@ -91,7 +108,10 @@ export function applyOverrides(context, state) {
                 shouldPlay = true;
                 if (isBackbeat) {
                     velocity = scaleVelocity(0.9, intensity, 0.2);
-                } else if (isBeatStart && beatIndex % 2 === 0) {
+                } else if (
+                    (isCompound && isPulse && groupIndex % 2 === 0) ||
+                    (!isCompound && isBeatStart && beatIndex % 2 === 0)
+                ) {
                     velocity = scaleVelocity(0.8, intensity, 0.15);
                 } else {
                     velocity = 0.6 + drumComplexity * 0.1;
@@ -99,12 +119,14 @@ export function applyOverrides(context, state) {
             }
         }
 
-        if (
-            (activeMotif === 1 && isOffbeat && beatIndex === 1) ||
-            (activeMotif === 2 && isBeatStart && beatIndex === 2) ||
-            (activeMotif === 3 && isOffbeat && beatIndex === lastBeatIndex)
-        ) {
-            velocity *= 1.2;
+        if (!isCompound) {
+            if (
+                (activeMotif === 1 && isOffbeat && beatIndex === 1) ||
+                (activeMotif === 2 && isBeatStart && beatIndex === 2) ||
+                (activeMotif === 3 && isOffbeat && beatIndex === lastBeatIndex)
+            ) {
+                velocity *= 1.2;
+            }
         }
 
         if (playback.bpm > 180 && isSkipBeat && roll(0.4)) {
@@ -120,32 +142,49 @@ export function applyOverrides(context, state) {
         }
     } else if (inst.name === 'Kick') {
         shouldPlay = false;
-        if (isBeatStart) {
+        const isFeatherStep = isCompound ? isPulse : isBeatStart;
+        if (isFeatherStep) {
             shouldPlay = true;
             // Kick feathering: almost inaudible but felt
             velocity = scaleVelocity(0.12, intensity, 0.08);
         }
 
-        if (isTurnaround && isBeatStart && beatIndex === lastBeatIndex) {
+        if (
+            isTurnaround &&
+            ((isCompound && isPulse && groupIndex === (tsConfig?.grouping?.length || 2) - 1) ||
+                (!isCompound && isBeatStart && beatIndex === lastBeatIndex))
+        ) {
             shouldPlay = true;
             velocity = 0.95;
-        } else if (activeMotif === 1 && isOffbeat && beatIndex === 1 && sectionSeed > 0.5) {
-            shouldPlay = true;
-            velocity = scaleVelocity(0.75, intensity, 0.2);
-        } else if (activeMotif === 4 && isOffbeat && beatIndex >= 2) {
-            shouldPlay = true;
-            velocity = scaleVelocity(0.85, Math.random(), 0.2);
+        } else if (!isCompound) {
+            if (activeMotif === 1 && isOffbeat && beatIndex === 1 && sectionSeed > 0.5) {
+                shouldPlay = true;
+                velocity = scaleVelocity(0.75, intensity, 0.2);
+            } else if (activeMotif === 4 && isOffbeat && beatIndex >= 2) {
+                shouldPlay = true;
+                velocity = scaleVelocity(0.85, Math.random(), 0.2);
+            } else {
+                // General Kick Bombs
+                let bombProb = intensity * 0.12;
+                if (isSoloistBusy) {
+                    bombProb *= 1.4;
+                }
+                if (playback.bpm > 175) {
+                    bombProb *= 0.3;
+                }
+
+                if (roll(bombProb) && isOffbeat && beatIndex % 2 !== 0) {
+                    shouldPlay = true;
+                    velocity = scaleVelocity(0.85, Math.random(), 0.25);
+                }
+            }
         } else {
-            // General Kick Bombs
+            // Compound meter general kick bombs
             let bombProb = intensity * 0.12;
             if (isSoloistBusy) {
                 bombProb *= 1.4;
             }
-            if (playback.bpm > 175) {
-                bombProb *= 0.3;
-            }
-
-            if (roll(bombProb) && isOffbeat && beatIndex % 2 !== 0) {
+            if (roll(bombProb) && isSkipBeat) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.85, Math.random(), 0.25);
             }

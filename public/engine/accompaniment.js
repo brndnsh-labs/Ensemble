@@ -489,7 +489,7 @@ export function getAccompanimentNotes(
         coordination?.soloistBusy || (soloist.enabled && (soloist.busySteps || 0) > 0);
     updateRhythmicIntent(state, step, isSoloistBusy, spm, chord.sectionId);
 
-    if (isSoloistBusy && step % 16 !== 0 && Math.random() < 0.7) {
+    if (isSoloistBusy && !stepInfo.isMeasureStart && Math.random() < 0.7) {
         // Yield density to busy soloist: Skip offbeats and less-foundational hits
         if (ccEvents.length > 0) {
             return [
@@ -887,7 +887,9 @@ export function getAccompanimentNotes(
     // --- NEW: Harmony Interlocking ---
     // If backgrounds are busy, the main accompanist should find gaps.
     if (isHit && harmony.enabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {
-        const hasHarmonyHit = (harmony.rhythmicMask >> (step % 16)) & 1;
+        // Assume rhythmic mask maps up to 16 steps, gracefully wrap for different meters
+        const stepInMask = stepInfo.mStep % 16;
+        const hasHarmonyHit = (harmony.rhythmicMask >> stepInMask) & 1;
         if (hasHarmonyHit && Math.random() < 0.4 + playback.bandIntensity * 0.3) {
             // Background stab present, suppress piano hit to let it pop
             isHit = false;

@@ -205,7 +205,10 @@ function playShadowMode(context) {
             const nextSeedNote = seed.notes.find(
                 (/** @type {any} */ n) => n.step === nextStepInLoop,
             );
-            if (nextSeedNote?.isAnchor && nextSeedNote.step % 8 === 0) {
+            // Assuming 8 steps means half-measure in 4/4. Let's make it robust.
+            const spm = seed.loopLengthSteps; // Actually this is loop length. If loop is 1 measure, spm=loopLength.
+            // A strong downbeat or half-bar downbeat
+            if (nextSeedNote?.isAnchor && nextSeedNote.step % Math.floor(spm / 2) === 0) {
                 const pushProb = loopCount === 0 ? 0.8 : 0.3;
                 if (Math.random() < pushProb) {
                     return { type: 'reinforce', isLatched: true, isBloom: true, duration: 1 };

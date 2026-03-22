@@ -88,6 +88,10 @@ export function applyGrooveOverrides(
         isAOfBeat,
         beatIndex,
         tsConfig,
+        mStep,
+        isCompound,
+        stepInGroup,
+        groupIndex,
     },
 ) {
     const { soloist, arranger } = state;
@@ -211,6 +215,10 @@ export function applyGrooveOverrides(
         isAOfBeat,
         beatIndex,
         tsConfig,
+        mStep,
+        isCompound,
+        stepInGroup,
+        groupIndex,
         stepsPerBar,
         loopStep,
         drumComplexity: effectiveComplexity,
