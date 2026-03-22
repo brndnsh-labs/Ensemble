@@ -378,9 +378,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         const intensityVal = _intensity || 0.5;
 
         if (category === 'chorus') {
-            // Chorus boost is now tied to intensity: 0 or 12 semitones
-            // We use an octave jump (>= 0.5 intensity) to keep notes in the same scale context
-            registerBase += intensityVal >= 0.5 ? 12 : 0;
+            // Chorus boost: 0 or 12. For Jazz/Bossa Head, we stay grounded to keep it singable.
+            const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
+            const boost = isJazzStyle ? 0 : 12;
+            registerBase += intensityVal >= 0.5 ? boost : 0;
         } else if (category === 'intro' || index === 0) {
             // Force lower start for Intros or the very first section
             registerBase = 48;
@@ -565,8 +566,17 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         const isFreshNote = isPivotStep && !prevScalePitches.includes(testPC);
                         const pivotBonus = isFreshNote ? -3 : 0;
 
+                        // Singable Register Penalty: Penalize notes above MIDI 76 (E5)
+                        // to avoid "neck creep" or shrillness in the Head.
+                        const ceilingPenalty = testMidi > 76 ? (testMidi - 76) * 2.0 : 0;
+
                         const totalScore =
-                            jumpPenalty + anchorPenalty + motifPenalty + guideBonus + pivotBonus;
+                            jumpPenalty +
+                            anchorPenalty +
+                            motifPenalty +
+                            guideBonus +
+                            pivotBonus +
+                            ceilingPenalty;
 
                         if (totalScore < minScore) {
                             minScore = totalScore;
