@@ -118,6 +118,7 @@ export const ACTIONS = {
     STEP_TOGGLE: 'STEP_TOGGLE',
     TRIGGER_FILL: 'TRIGGER_FILL',
     UPDATE_HB: 'UPDATE_HB',
+    UPDATE_GB: 'UPDATE_GB',
 
     // --- Options / Arranger ---
     SET_ARRANGEMENT: 'SET_ARRANGEMENT',

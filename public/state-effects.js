@@ -1,6 +1,11 @@
 import { applyTheme, setBpm } from './app-controller.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { applyConductor } from './engine/conductor.js';
+import {
+    generateDrumFills,
+    generateDrumOrchestration,
+    generateSoloistAccents,
+} from './engine/drum-seeder.js';
 import { initAudio, restoreGains } from './engine/engine.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { generateSessionSeed } from './engine/soloist-seeder.js';
@@ -20,28 +25,65 @@ export function handleEffects(action, payload, stateMap, context = {}) {
     const { dispatch } = context;
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
-            const { playback, arranger, soloist } = stateMap;
+            const { playback, arranger, soloist, groove } = stateMap;
             if (playback.isPlaying) {
-                // If user didn't provide a seed, generate one and save it so they can see/share it
-                let currentSeed = soloist.seed;
-                if (!currentSeed) {
-                    currentSeed = Math.floor(Math.random() * 0xffffff)
+                // --- Soloist Seeder ---
+                let currentSoloistSeed = soloist.seed;
+                if (!currentSoloistSeed) {
+                    currentSoloistSeed = Math.floor(Math.random() * 0xffffff)
                         .toString(16)
                         .padStart(6, '0')
                         .toUpperCase();
-                    dispatch(ACTIONS.SET_SOLOIST_SEED, currentSeed);
+                    dispatch(ACTIONS.SET_SOLOIST_SEED, currentSoloistSeed);
                 }
 
-                const generated = generateSessionSeed(
+                const soloGenerated = generateSessionSeed(
                     stateMap,
                     arranger,
                     soloist.style || 'smart',
                     playback.bandIntensity,
-                    currentSeed,
+                    currentSoloistSeed,
                 );
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: generated });
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
+
+                // --- Drum Seeder ---
+                if (groove.enabled) {
+                    const currentDrumSeed = soloist.seed || currentSoloistSeed;
+                    const drumOrchGenerated = generateDrumOrchestration(
+                        stateMap,
+                        arranger,
+                        groove.genreFeel || 'Rock',
+                        playback.bandIntensity,
+                        currentDrumSeed,
+                    );
+                    const drumFillsGenerated = generateDrumFills(
+                        stateMap,
+                        arranger,
+                        groove.genreFeel || 'Rock',
+                        playback.bandIntensity,
+                        currentDrumSeed,
+                    );
+                    const drumAccentsGenerated = generateSoloistAccents(
+                        stateMap,
+                        arranger,
+                        soloGenerated,
+                        groove.genreFeel || 'Rock',
+                        playback.bandIntensity,
+                        currentDrumSeed,
+                    );
+                    dispatch(ACTIONS.UPDATE_GB, {
+                        orchestrationMap: drumOrchGenerated,
+                        fillMap: drumFillsGenerated,
+                        accentMap: drumAccentsGenerated,
+                    });
+                }
             } else {
                 dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null });
+                dispatch(ACTIONS.UPDATE_GB, {
+                    orchestrationMap: null,
+                    fillMap: null,
+                    accentMap: null,
+                });
             }
             togglePlay(stateMap, true, dispatch);
             break;
@@ -54,17 +96,46 @@ export function handleEffects(action, payload, stateMap, context = {}) {
         case ACTIONS.SET_TIME_SIGNATURE:
         case ACTIONS.SET_IS_MINOR: {
             validateProgression(stateMap, dispatch);
-            // If arrangement changes during playback, we must regenerate the seed
-            // to ensure MIDI notes land on valid chord/scale tones for the new structure.
+            // If arrangement changes during playback, we must regenerate seeds
             if (stateMap.playback.isPlaying) {
-                const generated = generateSessionSeed(
+                const soloGenerated = generateSessionSeed(
                     stateMap,
                     stateMap.arranger,
                     stateMap.soloist.style || 'smart',
                     stateMap.playback.bandIntensity,
                     stateMap.soloist.seed,
                 );
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: generated });
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
+
+                if (stateMap.groove.enabled) {
+                    const drumOrchGenerated = generateDrumOrchestration(
+                        stateMap,
+                        stateMap.arranger,
+                        stateMap.groove.genreFeel || 'Rock',
+                        stateMap.playback.bandIntensity,
+                        stateMap.soloist.seed,
+                    );
+                    const drumFillsGenerated = generateDrumFills(
+                        stateMap,
+                        stateMap.arranger,
+                        stateMap.groove.genreFeel || 'Rock',
+                        stateMap.playback.bandIntensity,
+                        stateMap.soloist.seed,
+                    );
+                    const drumAccentsGenerated = generateSoloistAccents(
+                        stateMap,
+                        stateMap.arranger,
+                        soloGenerated,
+                        stateMap.groove.genreFeel || 'Rock',
+                        stateMap.playback.bandIntensity,
+                        stateMap.soloist.seed,
+                    );
+                    dispatch(ACTIONS.UPDATE_GB, {
+                        orchestrationMap: drumOrchGenerated,
+                        fillMap: drumFillsGenerated,
+                        accentMap: drumAccentsGenerated,
+                    });
+                }
             }
             break;
         }

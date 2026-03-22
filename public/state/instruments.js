@@ -2,6 +2,7 @@ import { deepSignal } from 'deepsignal';
 import { KEY_ORDER } from '../config.js';
 import { ACTIONS } from '../types.js';
 import { arranger } from './arranger.js';
+import { groove } from './groove.js';
 
 /**
  * @typedef {Object} ChordState
@@ -231,6 +232,8 @@ const instrumentStateMap = {
     soloist,
     hb: harmony,
     harmony,
+    gb: groove,
+    groove,
 };
 
 /**

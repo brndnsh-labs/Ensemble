@@ -31,6 +31,7 @@ import { ACTIONS } from '../types.js';
  * @property {number} swing - Swing percentage (0-100).
  * @property {string} swingSub - Swing subdivision ('8th' or '16th').
  * @property {string} lastDrumPreset - Name of the last loaded drum preset.
+ * @property {string} seed - Thematic seed for deterministic generation.
  * @property {any} audioBuffers - Cache for decoded drum samples.
  * @property {string} genreFeel - Active genre for procedural nuances ('Rock', 'Jazz', 'Funk').
  * @property {boolean} larsMode - Whether "Lars Mode" (tempo drift) is active.
@@ -52,6 +53,9 @@ import { ACTIONS } from '../types.js';
  * @property {string} lastSmartGenre - Last selected smart genre.
  * @property {{genreName?: string, feel?: string}|null} pendingGenreFeel - Genre queued for the next measure.
  * @property {number|null} genreSwitchCountdown - Beats until genre switch.
+ * @property {Array<any>|null} orchestrationMap - Pre-calculated section orchestration map.
+ * @property {Record<number, any>|null} fillMap - Pre-calculated song-wide fill map.
+ * @property {Record<number, any>|null} accentMap - Pre-calculated soloist accent catching map.
  * @property {Map<number, any>} buffer - Map of scheduled drum events.
  */
 /**
@@ -83,6 +87,7 @@ export const groove = deepSignal({
     swing: 0,
     swingSub: '8th',
     lastDrumPreset: 'Basic Rock',
+    seed: '',
     audioBuffers: {},
     genreFeel: 'Rock',
     larsMode: false,
@@ -90,6 +95,9 @@ export const groove = deepSignal({
     lastSmartGenre: 'Rock',
     pendingGenreFeel: null,
     genreSwitchCountdown: null,
+    orchestrationMap: null,
+    fillMap: null,
+    accentMap: null,
     fillActive: false,
     fillSteps: {},
     buffer: new Map(),
@@ -121,6 +129,13 @@ export const groove = deepSignal({
  */
 export function grooveReducer(action, payload, playback) {
     switch (action) {
+        case ACTIONS.UPDATE_GB:
+            for (const key in payload) {
+                if (Object.hasOwn(groove, key)) {
+                    /** @type {any} */ (groove)[key] = payload[key];
+                }
+            }
+            return true;
         case ACTIONS.SET_PARAM:
             if (
                 payload.module === 'groove' ||
@@ -142,6 +157,9 @@ export function grooveReducer(action, payload, playback) {
             groove.lastSmartGenre = 'Rock';
             groove.measures = 1;
             groove.currentMeasure = 0;
+            groove.orchestrationMap = null;
+            groove.fillMap = null;
+            groove.accentMap = null;
 
             groove.pocket.globalDrive = 0;
             groove.pocket.tightness = 0.5;
