@@ -171,58 +171,102 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 _currentBeat = 0;
             }
 
-            // 1. Generate a 1-measure rhythmic cell template
-            const rhythmicCell = [];
-            let cellBeat = 0;
-            const beatsPerCell = tsConfig.beats;
+            /**
+             * Helper to generate a 1-measure rhythmic cell
+             * @param {boolean} sparse
+             * @param {boolean} dense
+             */
+            const generateCell = (sparse, dense) => {
+                const cell = [];
+                let cellBeat = 0;
+                const beatsPerCell = tsConfig.beats;
 
-            while (cellBeat < beatsPerCell) {
-                let isRest = false;
-                if (forceSparse) {
-                    isRest = prng() > 0.4;
-                } else if (forceDense) {
-                    isRest = prng() > 0.9;
-                } else {
-                    isRest = prng() > 0.85; // 15% chance of rest
-                }
-
-                let durationBeats = 1;
-                if (forceSparse) {
-                    durationBeats = prng() > 0.5 ? 4 : 2;
-                } else if (forceDense) {
-                    durationBeats = prng() > 0.6 ? 0.5 : 0.25;
-                } else {
-                    if (cellBeat % tsConfig.beats === 0) {
-                        durationBeats = prng() > 0.5 ? 2 : 1;
+                while (cellBeat < beatsPerCell) {
+                    let isRest = false;
+                    if (sparse) {
+                        isRest = prng() > 0.4;
+                    } else if (dense) {
+                        isRest = prng() > 0.9;
                     } else {
-                        durationBeats = prng() > 0.7 ? 0.5 : 1;
+                        isRest = prng() > 0.85; // 15% chance of rest
                     }
-                }
 
-                if (cellBeat + durationBeats > beatsPerCell) {
-                    durationBeats = beatsPerCell - cellBeat;
-                }
+                    let durationBeats = 1;
+                    if (sparse) {
+                        durationBeats = prng() > 0.5 ? 4 : 2;
+                    } else if (dense) {
+                        durationBeats = prng() > 0.6 ? 0.5 : 0.25;
+                    } else {
+                        if (cellBeat % tsConfig.beats === 0) {
+                            durationBeats = prng() > 0.5 ? 2 : 1;
+                        } else {
+                            durationBeats = prng() > 0.7 ? 0.5 : 1;
+                        }
+                    }
 
-                rhythmicCell.push({
-                    beatOffset: cellBeat,
-                    duration: durationBeats * stepsPerBeat,
-                    isRest,
-                });
-                cellBeat += durationBeats;
+                    if (cellBeat + durationBeats > beatsPerCell) {
+                        durationBeats = beatsPerCell - cellBeat;
+                    }
+
+                    cell.push({
+                        beatOffset: cellBeat,
+                        duration: durationBeats * stepsPerBeat,
+                        isRest,
+                    });
+                    cellBeat += durationBeats;
+                }
+                return cell;
+            };
+
+            // 1. Generate the initial A cell
+            const cellA = generateCell(forceSparse, forceDense);
+
+            // Determine motif structure for the 2-measure block
+            const structureRoll = prng();
+            let structureType = 'A-A';
+            if (structureRoll < 0.4) {
+                structureType = 'A-B';
+            } else if (structureRoll < 0.6 && ['jazz', 'bird', 'bossa'].includes(style)) {
+                structureType = 'A-Rest';
             }
 
-            // 2. Clone the cell twice to create a 2-measure motif (Rhythmic Mirroring)
-            // and apply melodic motion with Leap-and-Fill logic
+            // 2. Build the 2-measure motif based on the chosen structure
             currentDegreeOffset = 0;
             let lastMotion = 0;
 
             for (let measure = 0; measure < 2; measure++) {
-                rhythmicCell.forEach((cellNote) => {
+                let currentCell = cellA;
+
+                if (measure === 1) {
+                    if (structureType === 'A-B') {
+                        currentCell = generateCell(forceSparse, forceDense);
+                    } else if (structureType === 'A-Rest') {
+                        // Create a mostly empty cell for measure 2
+                        currentCell = [
+                            {
+                                beatOffset: 0,
+                                duration: tsConfig.beats * stepsPerBeat,
+                                isRest: true,
+                            },
+                        ];
+                        // 30% chance for a small closing hit on beat 4
+                        if (prng() < 0.3) {
+                            currentCell[0].duration = (tsConfig.beats - 1) * stepsPerBeat;
+                            currentCell.push({
+                                beatOffset: tsConfig.beats - 1,
+                                duration: stepsPerBeat,
+                                isRest: false,
+                            });
+                        }
+                    }
+                }
+
+                currentCell.forEach((cellNote) => {
                     let isRest = cellNote.isRest;
                     let duration = cellNote.duration;
 
-                    // Imperfect Symmetry: Measure 2 has a chance to drift
-                    if (measure === 1 && prng() < 0.3) {
+                    // Imperfect Symmetry: Even if A-A, let measure 2 drift slightly
+                    if (measure === 1 && structureType === 'A-A' && prng() < 0.3) {
                         const r = prng();
                         if (r < 0.4) {
                             isRest = !isRest; // Flip rest status
@@ -321,27 +365,38 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             motif = motif.map((n) => ({ ...n }));
 
             const r = prng();
-            if (r < 0.15) {
-                // Rhythmic Displacement: Shift entire motif later by one 8th note
+            if (r < 0.2) {
+                // Enhanced Rhythmic Displacement: Shift motif by 16th, 8th, or anticipate
+                const shiftAmount = prng() > 0.5 ? 0.5 : prng() > 0.5 ? 0.25 : -0.5;
                 motif.forEach((n) => {
-                    n.beatOffset += 0.5;
+                    n.beatOffset += shiftAmount;
                 });
-            } else if (r < 0.35) {
-                // Subdivision: Split one quarter note into two 8ths
-                const quarterNotes = motif.filter((n) => n.duration === stepsPerBeat && !n.isRest);
-                if (quarterNotes.length > 0) {
-                    const target = quarterNotes[Math.floor(prng() * quarterNotes.length)];
-                    target.duration = stepsPerBeat / 2;
-                    // Insert the second 8th note
+            } else if (r < 0.4) {
+                // Rhythmic Compression / Subdivision
+                const longNotes = motif.filter((n) => n.duration >= stepsPerBeat && !n.isRest);
+                if (longNotes.length > 0) {
+                    const target = longNotes[Math.floor(prng() * longNotes.length)];
+                    const halfDur = target.duration / 2;
+                    target.duration = halfDur;
+                    // Insert the second note
                     const newNote = {
                         ...target,
-                        beatOffset: target.beatOffset + 0.5,
+                        beatOffset: target.beatOffset + halfDur / stepsPerBeat,
                         scaleDegreeOffset: target.scaleDegreeOffset + (prng() > 0.5 ? 1 : -1),
                     };
                     const idx = motif.indexOf(target);
                     motif.splice(idx + 1, 0, newNote);
                 }
             } else if (r < 0.55) {
+                // Note Drop (Less is More)
+                const optionalNotes = motif.filter(
+                    (n) => !n.isRest && n.beatOffset % tsConfig.beats !== 0,
+                );
+                if (optionalNotes.length > 0) {
+                    const target = optionalNotes[Math.floor(prng() * optionalNotes.length)];
+                    target.isRest = true;
+                }
+            } else if (r < 0.7) {
                 // Interval Expansion: Push the highest pitch up a diatonic third
                 let maxDegree = -999;
                 /** @type {any} */
@@ -355,7 +410,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 if (targetNote) {
                     targetNote.scaleDegreeOffset += 2; // Diatonic third
                 }
-            } else if (r < 0.8) {
+            } else if (r < 0.85) {
                 // Stationary Transformation: Collapse all pitches to a single anchor tone (Root/5th)
                 // This creates "tension hooks" during restatements
                 motif.forEach((n) => {
