@@ -9,7 +9,7 @@ import { getSoloistNote } from '../../public/engine/soloist.js';
 import { parseMusicXML } from '../../public/musicxml-parser.js';
 import { getState } from '../../public/state.js';
 
-const fixturesDir = path.join(__dirname, '../fixtures/musicxml');
+const fixturesDir = path.join(__dirname, '../unit/fixtures/musicxml');
 
 function analyzeMelody(melody, totalSteps, timeSignature = '4/4') {
     if (!melody || melody.length === 0) {

@@ -1,14 +1,18 @@
-// tests/scripts/analyze-blues-feel.test.js
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../public/config.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
+import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
 
 describe('Blues Soloist Authenticity Benchmark', () => {
     beforeEach(() => {
         dispatch(ACTIONS.RESET_STATE);
-        dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Blues', enabled: true });
-        dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'blues' });
-        dispatch(ACTIONS.UPDATE_PLAYBACK, { debugSoloist: true });
+        dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'genreFeel', value: 'Blues' });
+        dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'enabled', value: true });
+        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'enabled', value: true });
+        dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'style', value: 'blues' });
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'debugSoloist', value: true });
     });
 
     it('should alternate between Call and Response roles', () => {
@@ -37,9 +41,9 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 { mStep: 0 },
             );
 
-            if (soloist.phraseContext.role === 'call') {
+            if (soloist.phraseContext && soloist.phraseContext.role === 'call') {
                 callCount++;
-            } else {
+            } else if (soloist.phraseContext) {
                 responseCount++;
             }
 
@@ -63,8 +67,12 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         let callTotal = 0;
         let respTotal = 0;
 
+        const ts = TIME_SIGNATURES['4/4'];
+
         for (let i = 0; i < 50000; i++) {
             const step = i;
+            const info = getStepInfo(step, ts, [], TIME_SIGNATURES);
+
             const note = getSoloistNote(
                 getState(),
                 chord,
@@ -73,9 +81,9 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 440,
                 0,
                 'blues',
-                step % 16,
+                info.mStep,
                 { sectionStart: 0, sectionEnd: 50000 },
-                { mStep: step % 16 },
+                info,
             );
 
             if (note) {
@@ -84,12 +92,12 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 const rel = ((lastNote.midi % 12) - (chord.rootMidi % 12) + 12) % 12;
                 const isRes = [0, 4, 7].includes(rel);
 
-                if (soloist.phraseContext.role === 'call') {
+                if (soloist.phraseContext && soloist.phraseContext.role === 'call') {
                     if (isRes) {
                         callResScore++;
                     }
                     callTotal++;
-                } else {
+                } else if (soloist.phraseContext) {
                     if (isRes) {
                         respResScore++;
                     }
@@ -131,7 +139,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
             'blues',
             4,
             { sectionStart: 0, sectionEnd: 128, isTurnaround: true, bypassRhythm: false },
-            { mStep: 4 },
+            { mStep: 4, tsConfig: TIME_SIGNATURES['4/4'] },
         );
 
         console.log(

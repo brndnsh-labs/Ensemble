@@ -156,7 +156,13 @@
         "iiim",
         "Vmaj",
         "bviim",
-        "bIII"
+        "bIII",
+        "Cdim",
+        "Cabasa",
+        "Vibraslap",
+        "Edim",
+        "tril",
+        "bvii"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

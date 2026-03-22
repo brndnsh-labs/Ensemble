@@ -5,9 +5,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../public/config.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { parseMusicXML } from '../../public/musicxml-parser.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 
 // Mock state.js
 vi.mock('../../public/state.js', () => ({
@@ -15,17 +17,8 @@ vi.mock('../../public/state.js', () => ({
     dispatch: vi.fn(),
 }));
 
-// Mock config.js
-vi.mock('../../public/config.js', () => ({
-    TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4 },
-        '6/8': { beats: 2, stepsPerBeat: 6 },
-    },
-    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-}));
-
 describe('MusicXML Integration Critique', () => {
-    const fixturesDir = path.join(__dirname, '../fixtures/musicxml');
+    const fixturesDir = path.join(__dirname, '../unit/fixtures/musicxml');
 
     beforeEach(() => {
         vi.restoreAllMocks();
@@ -77,8 +70,10 @@ describe('MusicXML Integration Critique', () => {
         getState.mockReturnValue(state);
 
         const totalSteps = state.arranger.totalSteps * numLoops;
+        const tsConfig = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
 
         for (let step = 0; step < totalSteps; step++) {
+            const info = getStepInfo(step, tsConfig, [], TIME_SIGNATURES);
             const note = getSoloistNote(
                 getState(),
                 { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] }, // Dummy C Major chord
@@ -87,7 +82,9 @@ describe('MusicXML Integration Critique', () => {
                 0,
                 64,
                 'lead_sheet',
-                step % 16,
+                info.mStep,
+                {},
+                info,
             );
 
             if (note) {
@@ -179,7 +176,8 @@ describe('MusicXML Integration Critique', () => {
         };
         getState.mockReturnValue(state);
 
-        const note = getSoloistNote(getState(), {}, {}, 0, 0, 64, 'lead_sheet', 0, false);
+        const info = getStepInfo(0, TIME_SIGNATURES['6/8'], [], TIME_SIGNATURES);
+        const note = getSoloistNote(getState(), {}, {}, 0, 0, 64, 'lead_sheet', 0, {}, info);
 
         // First note in AllBlues.xml measure 1 is G3 (MIDI 55).
         // Expected transposed: A3 (MIDI 57)

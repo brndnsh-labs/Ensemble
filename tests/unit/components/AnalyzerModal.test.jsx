@@ -54,7 +54,7 @@ vi.mock('../../../public/melody-harmonizer.js', () => ({
     }),
 }));
 
-vi.mock('../../utils/form-extractor.js', () => ({
+vi.mock('../../../../public/form-analysis.js', () => ({
     extractForm: vi.fn().mockReturnValue([]),
 }));
 

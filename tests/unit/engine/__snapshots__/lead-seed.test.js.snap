@@ -1,0 +1,1646 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Lead Seed - MusicXML Fixtures > should correctly parse AllBlues.xml fixture 1`] = `
+{
+  "hasChords": true,
+  "leadSheetMelody": [
+    {
+      "durationSteps": 3,
+      "globalStep": 0,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 3,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 4,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 5,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 6,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 9,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 10,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 11,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 12,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 15,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 16,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 17,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 18,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 21,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 22,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 23,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 24,
+      "midi": 79,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 28,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 32,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 34,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 36,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 40,
+      "midi": 86,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 44,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 46,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 36,
+      "midi": 79,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 40,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 44,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 46,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 48,
+      "midi": 83,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 52,
+      "midi": 86,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 56,
+      "midi": 81,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 58,
+      "midi": 84,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 48,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 54,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 58,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 59,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 60,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 61,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 62,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 66,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 70,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 71,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 72,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 73,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 74,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 78,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 82,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 83,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 84,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 90,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 96,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 100,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 102,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 106,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 108,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 112,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 114,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 118,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 119,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 12,
+      "globalStep": 120,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 132,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 138,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 142,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 1,
+      "globalStep": 143,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 12,
+      "globalStep": 144,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 12,
+      "globalStep": 156,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 168,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 174,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 180,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 186,
+      "midi": 67,
+    },
+  ],
+  "sections": [
+    {
+      "color": "#3b82f6",
+      "id": "s1772280000000",
+      "label": "A",
+      "repeat": 1,
+      "value": "G7 | % | % | % | G7 | G7 | G7 | %",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s17722800000007",
+      "label": "B",
+      "repeat": 1,
+      "value": "C7 | C7 | G7 | G7 | D7 | Eb7 D7 | G7 | G7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000015",
+      "label": "C",
+      "repeat": 1,
+      "value": "G7 | % | % | % | %",
+    },
+  ],
+  "xmlKey": "G",
+}
+`;
+
+exports[`Lead Seed - MusicXML Fixtures > should correctly parse Night And DAy.xml fixture 1`] = `
+{
+  "hasChords": true,
+  "leadSheetMelody": [
+    {
+      "durationSteps": 4,
+      "globalStep": -8,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": -4,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": -2,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 0,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 16,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 24,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 27,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 30,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 32,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 48,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 56,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 60,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 62,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 64,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 68,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 72,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 76,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 80,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 84,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 88,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 91,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 94,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 96,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 112,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 120,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 126,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 128,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 132,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 136,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 140,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 144,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 152,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 154,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 158,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 160,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 164,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 168,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 172,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 176,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 180,
+      "midi": 61,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 182,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 184,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 188,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 192,
+      "midi": 57,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 196,
+      "midi": 56,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 198,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 200,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 208,
+      "midi": 55,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 216,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 220,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 222,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 224,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 240,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 248,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 252,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 254,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 256,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 264,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 268,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 272,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 288,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 296,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 299,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 302,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 304,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 308,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 310,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 312,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 320,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 328,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 334,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 336,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 338,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 342,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 344,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 348,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 350,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 352,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 354,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 358,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 360,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 363,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 3,
+      "globalStep": 366,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 368,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 372,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 374,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 376,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 384,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 392,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 398,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 400,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 404,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 408,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 412,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 416,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 424,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 426,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 430,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 432,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 436,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 440,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 444,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 448,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 450,
+      "midi": 61,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 452,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 454,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 456,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 458,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 460,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 464,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 468,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 470,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 472,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 8,
+      "globalStep": 480,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 488,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 492,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 494,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 16,
+      "globalStep": 496,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 520,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 524,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 526,
+      "midi": 67,
+    },
+  ],
+  "sections": [
+    {
+      "color": "#3b82f6",
+      "id": "s1772280000000",
+      "label": "A",
+      "repeat": 1,
+      "value": "Dm7 | G7 | Cmaj7 | Cmaj7 | Dm7 | G7 | Cmaj7 | Cmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s17722800000008",
+      "label": "B",
+      "repeat": 1,
+      "value": "F#m7 | Fm7 | Em7 | Ebdim7 | Dm7 | G7 | Cmaj7 | Cmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000016",
+      "label": "C",
+      "repeat": 1,
+      "value": "Bb7 | Ebmaj7 | Ebmaj7 | Cmaj7 | Cmaj7 | Ebmaj7 | Ebmaj7 | Cmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000024",
+      "label": "D",
+      "repeat": 1,
+      "value": "Cmaj7 | F#m7 | Fm7 | Em7 | Ebdim7 | Dm7 | G7 Dm7 | Cmaj7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000032",
+      "label": "E",
+      "repeat": 1,
+      "value": "D7 G7",
+    },
+  ],
+  "xmlKey": "C",
+}
+`;
+
+exports[`Lead Seed - MusicXML Fixtures > should correctly parse Ornithology.xml fixture 1`] = `
+{
+  "hasChords": true,
+  "leadSheetMelody": [
+    {
+      "durationSteps": 2,
+      "globalStep": -2,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 0,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 2,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 4,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 6,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 8,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 10,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 12,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 14,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 16,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 18,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 30,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 32,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 34,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 36,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 38,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 40,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 42,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 46,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 48,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 50,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 52,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 54,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 6,
+      "globalStep": 56,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 62,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 64,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 66,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 70,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 72,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 74,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 76,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 78,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 94,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 96,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 100,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 102,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 104,
+      "midi": 64,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 106,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 108,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 110,
+      "midi": 60,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 112,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 116,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 118,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 126,
+      "midi": 73,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 128,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 132,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 134,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 136,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 138,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 140,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 142,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 144,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 148,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 150,
+      "midi": 66,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 158,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 160,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 162,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 164,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 166,
+      "midi": 58,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 168,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 170,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 172,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 174,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 186,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 188,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 190,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 192,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 198,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 200,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 202,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 206,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 208,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 210,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 212,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 214,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 216,
+      "midi": 77,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 220,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 222,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 224,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 230,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 232,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 234,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 238,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 240,
+      "midi": 66,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 242,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 244,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 246,
+      "midi": 75,
+    },
+    {
+      "durationSteps": 4,
+      "globalStep": 248,
+      "midi": 75,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 252,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 254,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 256,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 258,
+      "midi": 67,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 260,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 262,
+      "midi": 59,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 264,
+      "midi": 65,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 266,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 268,
+      "midi": 63,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 270,
+      "midi": 62,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 286,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 288,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 290,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 292,
+      "midi": 78,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 294,
+      "midi": 74,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 296,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 298,
+      "midi": 73,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 300,
+      "midi": 70,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 302,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 304,
+      "midi": 69,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 306,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 308,
+      "midi": 76,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 310,
+      "midi": 72,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 312,
+      "midi": 75,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 314,
+      "midi": 71,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 316,
+      "midi": 68,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 318,
+      "midi": 66,
+    },
+    {
+      "durationSteps": 2,
+      "globalStep": 320,
+      "midi": 67,
+    },
+  ],
+  "sections": [
+    {
+      "color": "#3b82f6",
+      "id": "s1772280000000",
+      "label": "A",
+      "repeat": 1,
+      "value": "Gmaj7 | Gmaj7 | Gm7 C7 | Gm7 C7 | Fmaj7 | Fmaj | Fm7 | Bb7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s17722800000008",
+      "label": "B",
+      "repeat": 1,
+      "value": "Eb7 | Am7 D7 | Gm7 | D7 | Bm7 | E7 | Am7 | D7",
+    },
+    {
+      "color": "#3b82f6",
+      "id": "s177228000000016",
+      "label": "C",
+      "repeat": 1,
+      "value": "G7 | D7 | Bm7 Bbm7 | Am7 Abm7 | G | Am7 D7",
+    },
+  ],
+  "xmlKey": "G",
+}
+`;

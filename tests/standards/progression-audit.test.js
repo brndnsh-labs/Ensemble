@@ -82,10 +82,12 @@ vi.mock('../../public/config.js', async (importOriginal) => {
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 
+import { TIME_SIGNATURES } from '../../public/config.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
 
 const { arranger, groove, soloist } = getState();
 
@@ -143,13 +145,9 @@ describe('Progression Audit: Verifying All Library Presets', () => {
                 accompanistIntervals.forEach((interval) => {
                     const pc = interval % 12;
                     // Every note the accompanist plays SHOULD be in the soloist's scale
-                    // (Allowing for small deviations in dominant altered contexts if needed)
                     const isInScale = soloistScale.includes(pc);
 
                     // EXCEPTION: 7#9 "Hendrix Chord"
-                    // Accompanist plays Major 3rd (4) and #9 (3).
-                    // Blues Scale plays minor 3rd (3) but rarely Major 3rd (4).
-                    // This clash is stylistically correct for Funk/Blues.
                     const isHendrixClash = chord.quality.includes('7#9');
 
                     if (!isInScale && !isHendrixClash) {
@@ -169,15 +167,19 @@ describe('Progression Audit: Verifying All Library Presets', () => {
             soloist.currentPhraseSteps = 0;
             soloist.notesInPhrase = 0;
 
+            const ts = TIME_SIGNATURES['4/4'];
+            const spm = getStepsPerMeasure(ts);
+
             // "Play" the first 32 steps (2 bars)
             for (let step = 0; step < 32; step++) {
+                const info = getStepInfo(step, ts, [], TIME_SIGNATURES);
                 const chordEntry = arranger.stepMap.find((m) => step >= m.start && step < m.end);
                 if (!chordEntry) {
                     continue;
                 }
 
                 const currentChord = chordEntry.chord;
-                const nextStep = step + 16;
+                const nextStep = step + spm;
                 const nextChord = arranger.stepMap.find(
                     (m) => nextStep >= m.start && nextStep < m.end,
                 )?.chord;
@@ -196,7 +198,9 @@ describe('Progression Audit: Verifying All Library Presets', () => {
                     440,
                     72,
                     'smart',
-                    step % 16,
+                    info.mStep,
+                    {},
+                    info,
                 );
 
                 if (result) {

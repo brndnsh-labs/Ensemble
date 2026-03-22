@@ -17,6 +17,7 @@
         "test:verbose": "npm run check-mutations && npm run lint && npx vitest run",
         "test:e2e": "npm run build:quiet && npx playwright test",
         "test:coverage": "npx vitest run --coverage",
+        "test:bench": "npx vitest run tests/bench",
         "size": "size-limit",
         "build:size": "npm run build && size-limit",
         "validate": "npm run typecheck && npm run format && npm test",
