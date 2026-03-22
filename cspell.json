@@ -151,7 +151,12 @@
         "prechorus",
         "Comper",
         "cooldown",
-        "Unroller"
+        "Unroller",
+        "attya",
+        "iiim",
+        "Vmaj",
+        "bviim",
+        "bIII"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
