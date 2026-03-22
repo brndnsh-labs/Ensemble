@@ -209,7 +209,7 @@ export function initAudio(state) {
                 scoop.type = 'peaking';
                 scoop.frequency.setValueAtTime(450, playback.audio.currentTime);
                 scoop.Q.setValueAtTime(1.2, playback.audio.currentTime);
-                scoop.gain.setValueAtTime(-6, playback.audio.currentTime);
+                scoop.gain.setValueAtTime(-3, playback.audio.currentTime);
 
                 const definition = playback.audio.createBiquadFilter();
                 definition.type = 'peaking';
