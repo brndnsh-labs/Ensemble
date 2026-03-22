@@ -42,10 +42,12 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/soloist-config.js` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
 | `public/engine/soloist-devices.js` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
-| `public/engine/fills.js` | Procedural drum fill algorithms. | `generateProceduralFill` |
+| `public/engine/drum-seeder.js` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
+| `public/engine/fills.js` | Procedural drum fill generation. | `generateProceduralFill` |
 | `public/engine/conductor.js` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
 | `public/engine/theory-scales.js` | Scale degrees and mode definitions. | `getScaleForChord` |
 | `public/engine/resolution.js` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
+| `public/engine/arranger-utils.js` | Arrangement unrolling and form utilities. | `unrollArrangement` |
 
 ## Engine Styles (Genre Logic)
 
