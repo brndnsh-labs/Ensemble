@@ -55,6 +55,7 @@ export function applyOverrides(context, state) {
         isAOfBeat,
         beatIndex,
         drumComplexity,
+        orchestration,
         sectionSeed,
         isTurnaround,
     } = context;
@@ -78,10 +79,21 @@ export function applyOverrides(context, state) {
     if (inst.name === 'HiHat' || inst.name === 'Open') {
         shouldPlay = false;
 
+        const useOrchestration = orchestration?.rideVoice !== undefined;
+        const voice = orchestration?.rideVoice;
+
         // 16th note shimmer (Texture)
-        if (intensity > 0.5) {
+        if (intensity > 0.5 || (useOrchestration && voice !== 'None')) {
             shouldPlay = true;
             soundName = 'HiHat';
+
+            if (voice === 'Ride') {
+                soundName = 'Ride';
+            }
+            if (voice === 'Open') {
+                soundName = 'Open';
+            }
+
             // Tiered velocity for the shimmer
             if (isBeatStart) {
                 velocity = scaleVelocity(0.85, intensity, 0.15);
@@ -98,7 +110,7 @@ export function applyOverrides(context, state) {
 
         // Barks (Open Hat syncopation)
         const barkProb = (activeMotif === 2 ? 0.6 : 0.2) * intensity;
-        if (isOffbeat && roll(barkProb)) {
+        if (isOffbeat && roll(barkProb) && voice !== 'HiHat-Closed') {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.1;
@@ -132,8 +144,15 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
-            velocity = scaleVelocity(1.2, intensity, 0.1);
+            if (orchestration?.snareVoice === 'Sidestick') {
+                soundName = 'Sidestick';
+                velocity = 0.8;
+            } else if (orchestration?.snareVoice === 'None') {
+                shouldPlay = false;
+            } else {
+                soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+                velocity = scaleVelocity(1.2, intensity, 0.1);
+            }
         }
 
         // Motif 1: The Funky Drummer (Dense Ghosting)

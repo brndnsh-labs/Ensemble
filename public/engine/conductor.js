@@ -528,6 +528,12 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
 
                 targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
                 targetEnergy += Math.random() * 0.15 - 0.075;
+
+                // Genre-specific floors for auto-intensity
+                if (groove.genreFeel === 'Rock' || groove.genreFeel === 'Metal') {
+                    targetEnergy = Math.max(0.35, targetEnergy);
+                }
+
                 targetEnergy = Math.max(0.1, Math.min(1.0, targetEnergy));
 
                 if (isLoopEnd && playback.autoIntensity) {

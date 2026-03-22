@@ -428,54 +428,14 @@ export function applyWorkerTransition(state, step, conductorState) {
         return;
     }
 
-    const ts =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-    const sectionEnd = entry.end;
-    const fillStart = sectionEnd - stepsPerMeasure;
-
-    if (modStep === fillStart) {
-        const currentIndex = arranger.stepMap.indexOf(entry);
-        let nextEntry = arranger.stepMap[currentIndex + 1];
-        let isLoopEnd = false;
-        if (!nextEntry) {
-            nextEntry = arranger.stepMap[0];
-            isLoopEnd = true;
-        }
-
-        if (
-            /** @type {any} */ (nextEntry.chord).sectionId !==
-                /** @type {any} */ (entry.chord).sectionId ||
-            isLoopEnd
-        ) {
-            let shouldFill = groove.creativity;
-            // CHECK FOR SEAMLESS TRANSITION
-            const nextSectionId = /** @type {any} */ (nextEntry.chord).sectionId;
-            const nextSection = (arranger.sections || []).find(
-                (/** @type {any} */ s) => s.id === nextSectionId,
-            );
-            if (nextSection?.seamless) {
-                shouldFill = false;
-            }
-
-            if (shouldFill && isLoopEnd && arranger.totalSteps <= 64) {
-                const freq =
-                    playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
-                shouldFill = conductorState.loopCount % freq === 0;
-            }
-            if (shouldFill) {
-                const fill = generateProceduralFill(
-                    groove.genreFeel,
-                    playback.bandIntensity,
-                    stepsPerMeasure,
-                );
-                groove.fillSteps = fill; // @worker-mutation
-                groove.fillActive = true; // @worker-mutation
-                groove.fillStartStep = step; // @worker-mutation
-                groove.fillLength = stepsPerMeasure; // @worker-mutation
-                groove.pendingCrash = true; // @worker-mutation
-            }
-        }
+    // --- Phase 2: Thematic Fill Memory ---
+    if (groove.fillMap?.[modStep]) {
+        const fillData = groove.fillMap[modStep];
+        groove.fillSteps = fillData.steps; // @worker-mutation
+        groove.fillActive = true; // @worker-mutation
+        groove.fillStartStep = step; // @worker-mutation
+        groove.fillLength = fillData.length; // @worker-mutation
+        groove.pendingCrash = fillData.crash; // @worker-mutation
     }
 
     // --- Auto Intensity Simulation for Offline Export ---

@@ -69,6 +69,7 @@ export function applyOverrides(context, state) {
         isOffbeat,
         beatIndex,
         drumComplexity,
+        orchestration,
         sectionSeed,
         isTurnaround,
         stepsPerBar,
@@ -95,16 +96,28 @@ export function applyOverrides(context, state) {
         } else if (isEighthNote) {
             shouldPlay = true;
 
-            // Choose voicing: Open hats or Ride for Anthem/Stadium feel
-            if (activeMotif === 3 || intensity > 0.8) {
-                soundName = sectionSeed < 0.5 ? 'Ride' : 'Open';
-                velocity = isBeatStart ? 1.15 : 0.95;
-            } else if (intensity > 0.6) {
-                soundName = roll(0.7, intensity) ? 'HiHat' : 'Open';
+            // Orchestration Override
+            if (orchestration?.rideVoice === 'Ride') {
+                soundName = 'Ride';
+                velocity = isBeatStart ? 1.1 : 0.9;
+            } else if (orchestration?.rideVoice === 'Open') {
+                soundName = 'Open';
                 velocity = isBeatStart ? 1.05 : 0.85;
-            } else {
+            } else if (orchestration?.rideVoice === 'HiHat-Closed') {
                 soundName = 'HiHat';
                 velocity = isBeatStart ? 0.95 : 0.75;
+            } else {
+                // Legacy logic fallback
+                if (activeMotif === 3 || intensity > 0.8) {
+                    soundName = sectionSeed < 0.5 ? 'Ride' : 'Open';
+                    velocity = isBeatStart ? 1.15 : 0.95;
+                } else if (intensity > 0.6) {
+                    soundName = roll(0.7, intensity) ? 'HiHat' : 'Open';
+                    velocity = isBeatStart ? 1.05 : 0.85;
+                } else {
+                    soundName = 'HiHat';
+                    velocity = isBeatStart ? 0.95 : 0.75;
+                }
             }
 
             velocity = scaleVelocity(velocity, intensity, 0.1);
@@ -170,8 +183,17 @@ export function applyOverrides(context, state) {
         }
 
         if (shouldPlay) {
-            soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
-            velocity = scaleVelocity(1.2, intensity, 0.1);
+            // Orchestration Override
+            if (orchestration?.snareVoice === 'Sidestick') {
+                soundName = 'Sidestick';
+                velocity = 0.8;
+            } else if (orchestration?.snareVoice === 'None') {
+                shouldPlay = false;
+            } else {
+                soundName = 'Snare';
+                // Higher floor for rock snare to ensure it "cracks"
+                velocity = scaleVelocity(1.15, intensity, 0.15);
+            }
         }
 
         // Ghost notes (Modern/Driving)

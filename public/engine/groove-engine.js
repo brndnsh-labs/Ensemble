@@ -121,6 +121,14 @@ export function applyGrooveOverrides(
     const prevBarIndex = Math.floor((step - 1) / stepsPerBar);
     const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
 
+    const orchestration = groove.orchestrationMap
+        ? binarySearchMap(groove.orchestrationMap, step)
+        : null;
+    const effectiveComplexity =
+        orchestration?.motifComplexity !== undefined
+            ? orchestration.motifComplexity / 3
+            : drumComplexity;
+
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
     const sectionEntry = binarySearchMap(arrangerState.sectionMap || [], step);
     let measuresInSection = 4; // default
@@ -205,7 +213,8 @@ export function applyGrooveOverrides(
         tsConfig,
         stepsPerBar,
         loopStep,
-        drumComplexity,
+        drumComplexity: effectiveComplexity,
+        orchestration,
         barIndex,
         isFirstStepOfNewBar,
         sectionSeed,
@@ -217,12 +226,47 @@ export function applyGrooveOverrides(
         currentState = strategy.applyOverrides(context, currentState);
     }
 
+    // --- Phase 3: Soloist Accent Catching ---
+    const accent = groove.accentMap?.[step];
+    if (accent) {
+        if (accent.type === 'crash-catch') {
+            if (inst.name === 'Kick') {
+                currentState.shouldPlay = true;
+                currentState.velocity = 1.3;
+            } else if (inst.name === 'HiHat' || inst.name === 'Open') {
+                currentState.shouldPlay = true;
+                currentState.soundName = 'Open';
+                currentState.velocity = 1.25;
+            }
+        } else if (accent.type === 'snare-stab') {
+            if (inst.name === 'Snare') {
+                currentState.shouldPlay = true;
+                currentState.soundName = 'Snare';
+                currentState.velocity = 1.2;
+            } else if (inst.name === 'Kick') {
+                currentState.shouldPlay = true;
+                currentState.velocity = 1.1;
+            }
+        } else if (accent.type === 'hat-bark') {
+            if (inst.name === 'HiHat' || inst.name === 'Open') {
+                currentState.shouldPlay = true;
+                currentState.soundName = 'Open';
+                currentState.velocity = 1.1;
+            }
+        }
+    }
+
+    // --- Entropy Phase (Random Expressivity) ---
+    // Suppress entropy during the first iteration to establish a solid 'Pocket'
+    const firstIterationSuppression = step < (arrangerState.totalSteps || 0) ? 0.3 : 1.0;
+
     if (
         groove.creativity &&
         !currentState.shouldPlay &&
         Math.random() <
             playback.bandIntensity *
                 config.entropyMultiplier *
+                firstIterationSuppression *
                 (config.blockAdjacentSnare && groove.genreFeel !== 'Rock' ? 0.7 : 1.0)
     ) {
         const isSyncopated = loopStep % 2 === 1;
