@@ -150,7 +150,8 @@
         "tonk",
         "prechorus",
         "Comper",
-        "cooldown"
+        "cooldown",
+        "Unroller"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

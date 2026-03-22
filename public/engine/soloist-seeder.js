@@ -1,5 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { binarySearchMap, createPRNG, generateRandomSeed } from '../utils.js';
+import { unrollArrangement } from './arranger-utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -29,7 +30,11 @@ import { getScaleForChord } from './theory-scales.js';
  * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
  */
 export function generateSessionSeed(state, arranger, style, _intensity, seedStr) {
-    if (!arranger.stepMap || arranger.stepMap.length === 0) {
+    // Unroll the arrangement for virtual macro-form (max 128 bars for performance)
+    const unrolled = unrollArrangement(arranger, 128);
+    const { stepMap, sectionMap, totalSteps } = unrolled;
+
+    if (!stepMap || stepMap.length === 0) {
         return { notes: [], loopLengthSteps: 0 };
     }
 
@@ -40,13 +45,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
-    // We use the last step map entry to dynamically get total steps
-    const totalSteps = arranger.totalSteps || arranger.stepMap.at(-1)?.end || 0;
-
     /** @type {SeedNote[]} */
     const notes = [];
 
-    if (!arranger.sectionMap || arranger.sectionMap.length === 0) {
+    if (!sectionMap || sectionMap.length === 0) {
         return { notes: [], loopLengthSteps: totalSteps };
     }
 
@@ -60,23 +62,21 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     const sectionIterationCount = new Map();
 
     // Find macro turnaround index
-    let turnaroundIndex = arranger.sectionMap.length - 1;
-    if (arranger.sectionMap.length > 2) {
+    let turnaroundIndex = sectionMap.length - 1;
+    if (sectionMap.length > 2) {
         // e.g., A A B A -> the final A is the turnaround
         // Check if the last section matches a primary section
-        const lastSectionLabel = (
-            arranger.sectionMap[arranger.sectionMap.length - 1].label || ''
-        ).toLowerCase();
-        const primaryMatch = arranger.sectionMap.find(
+        const lastSectionLabel = (sectionMap[sectionMap.length - 1].label || '').toLowerCase();
+        const primaryMatch = sectionMap.find(
             (s) => (s.label || '').toLowerCase() === lastSectionLabel,
         );
-        if (primaryMatch && primaryMatch !== arranger.sectionMap[arranger.sectionMap.length - 1]) {
+        if (primaryMatch && primaryMatch !== sectionMap[sectionMap.length - 1]) {
             // It repeats! The last one is indeed the turnaround.
-            turnaroundIndex = arranger.sectionMap.length - 1;
+            turnaroundIndex = sectionMap.length - 1;
         } else {
             // If the last section is something like "Outro", maybe the one before it is the turnaround
-            for (let i = arranger.sectionMap.length - 1; i >= 0; i--) {
-                const label = (arranger.sectionMap[i].label || '').toLowerCase();
+            for (let i = sectionMap.length - 1; i >= 0; i--) {
+                const label = (sectionMap[i].label || '').toLowerCase();
                 if (!label.includes('outro') && !label.includes('end')) {
                     turnaroundIndex = i;
                     break;
@@ -90,7 +90,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         `[Seeder Debug] Starting seed generation. Total steps: ${totalSteps}, time signature: ${arranger.timeSignature}`,
     );
 
-    arranger.sectionMap.forEach((sectionRange, index) => {
+    sectionMap.forEach((sectionRange, index) => {
         const label = (sectionRange.label || 'Main').toLowerCase();
 
         // Generalize labels
@@ -433,7 +433,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
             // Pick a target chord tone for the downbeat of these 2 measures
             const stepToSearch = Math.min(baseStep, totalSteps - 1);
-            const entryForMeasure = binarySearchMap(arranger.stepMap, stepToSearch);
+            const entryForMeasure = binarySearchMap(stepMap, stepToSearch);
 
             if (!entryForMeasure || !entryForMeasure.chord) {
                 continue;
@@ -480,7 +480,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     return;
                 }
 
-                const stepEntry = binarySearchMap(arranger.stepMap, lookupStep);
+                const stepEntry = binarySearchMap(stepMap, lookupStep);
                 if (!stepEntry || !stepEntry.chord) {
                     return;
                 }
