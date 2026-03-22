@@ -98,6 +98,12 @@ export function arrangerReducer(action, payload) {
         case ACTIONS.SET_NOTATION:
             arranger.notation = payload;
             return true;
+        case ACTIONS.SET_TIME_SIGNATURE:
+            arranger.timeSignature = payload;
+            return true;
+        case ACTIONS.SET_KEY:
+            arranger.key = payload;
+            return true;
         case ACTIONS.LOAD_TEMPLATE:
             arranger.sections = payload.sections;
             if (payload.isMinor !== undefined) {

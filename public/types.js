@@ -55,6 +55,8 @@
  * @property {boolean} isEOfBeat - True if the step is on the "e" of a 16th-note beat.
  * @property {boolean} isAOfBeat - True if the step is on the "a" of a 16th-note beat.
  * @property {boolean} [isCompound] - True if the time signature is compound (e.g., 6/8).
+ * @property {boolean} [isPulse] - True if the step is on a primary pulse boundary.
+ * @property {boolean} [isPulseStart] - True if the step is the start of a pulse.
  * @property {boolean} [isDownbeat] - Alias for isMeasureStart.
  * @property {boolean} [isTurnaround] - True if this is the final bar of a section.
  * @property {number} beatIndex - 0-indexed beat number within the measure.

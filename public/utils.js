@@ -502,10 +502,16 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
     const isEOfBeat = stepsPerBeat === 4 && stepInBeat === 1;
     const isAOfBeat = stepsPerBeat === 4 && stepInBeat === 3;
 
+    const isPulse = currentTS.pulse ? currentTS.pulse.includes(mStep) : isBeatStart;
+    const isPulseStart = isGroupStart;
+
     return {
         isMeasureStart,
+        isDownbeat: isMeasureStart,
         isGroupStart,
         isBeatStart,
+        isPulse,
+        isPulseStart,
         isBackbeat,
         isOffbeat,
         isEOfBeat,

@@ -77,12 +77,13 @@ export function generateRhythmPlan(
             // Evaluate everything as if we are on 'step'
             const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
             const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
-            const isBeatStart = stepInBeat === 0;
-            const isDownbeat = measureStep === 0;
 
-            // This simulates a backbeat on beats 2 and 4 (if 4/4)
-            const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
-            const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+            // Use stepInfo if available for high-precision meter logic
+            const currentStepInfo = _stepInfo && _stepInfo.mStep === measureStep ? _stepInfo : null;
+
+            const isBeatStart = currentStepInfo ? currentStepInfo.isBeatStart : stepInBeat === 0;
+            const isDownbeat = currentStepInfo ? currentStepInfo.isMeasureStart : measureStep === 0;
+            const isBackbeat = currentStepInfo ? currentStepInfo.isBackbeat : false;
 
             const remainingSteps = coordination.sectionEnd - step;
             const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
@@ -90,9 +91,24 @@ export function generateRhythmPlan(
             const isSectionDownbeat =
                 step === coordination.sectionStart && soloistState.transitionState === 'lead_in';
 
-            // Map to 16-step emphasis map to handle any meter
+            // Meter-Aware Emphasis
             const emphasisIdx = Math.floor((measureStep / stepsPerMeasure) * 16) % 16;
-            let baseAttackProb = emphasisMap[emphasisIdx];
+            let baseAttackProb = 0.1;
+
+            if (isDownbeat) {
+                baseAttackProb = 0.8;
+            } else if (isBackbeat) {
+                baseAttackProb = 0.6;
+            } else if (isBeatStart) {
+                baseAttackProb = 0.4;
+            } else if (currentStepInfo?.isPulse) {
+                baseAttackProb = 0.5;
+            }
+
+            // Fallback to legacy emphasis map for 4/4 or if no specific pulse
+            if (!currentStepInfo?.isPulse && !isBeatStart) {
+                baseAttackProb = Math.max(baseAttackProb, emphasisMap[emphasisIdx] || 0.1);
+            }
 
             // --- Emphasis Mutation: Prevent Stagnant Rhythms ---
             if (['rock', 'scalar', 'blues'].includes(style)) {
