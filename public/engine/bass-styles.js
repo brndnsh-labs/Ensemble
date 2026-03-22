@@ -843,6 +843,49 @@ export function getBassNoteStyle(
             );
         }
 
+        // --- NEW: Jazz Path-Note Logic (Beat 2) ---
+        if (isJazz && isBeatStart && intBeat === 1) {
+            const nextTarget = nextChord ? nextChord.rootMidi : baseRoot;
+            const targetRoot = normalizeToRange(nextTarget);
+
+            // Find a scale note that moves towards the target
+            const candidates = scale
+                .map((ivl) => normalizeToRange(baseRoot + ivl))
+                .filter((midi) => {
+                    const diff = Math.abs(midi - (prevMidi || baseRoot));
+                    return diff > 0 && diff <= 5; // Within a reasonable distance
+                });
+
+            if (candidates.length > 0) {
+                // Score candidates by distance to targetRoot AND proximity to prevMidi
+                candidates.sort((a, b) => {
+                    const ivlA = (a - chord.rootMidi + 120) % 12;
+                    const ivlB = (b - chord.rootMidi + 120) % 12;
+
+                    // Bonus for 3rd or 7th (Defining tones)
+                    const bonusA =
+                        ivlA === 3 || ivlA === 4 || ivlA === 10 || ivlA === 11 ? -1.5 : 0;
+                    const bonusB =
+                        ivlB === 3 || ivlB === 4 || ivlB === 10 || ivlB === 11 ? -1.5 : 0;
+
+                    const scoreA =
+                        Math.abs(a - targetRoot) +
+                        Math.abs(a - (prevMidi || baseRoot)) * 0.5 +
+                        bonusA;
+                    const scoreB =
+                        Math.abs(b - targetRoot) +
+                        Math.abs(b - (prevMidi || baseRoot)) * 0.5 +
+                        bonusB;
+                    return scoreA - scoreB;
+                });
+                return result(
+                    getFrequency(clampAndNormalize(candidates[0])),
+                    ts.stepsPerBeat * 0.45,
+                    velocity * 0.9,
+                );
+            }
+        }
+
         // For intermediate beats, return undefined to let the Generic Fallback and Approach Logic
         // handle scale tone picking with proper voice-leading and soloist awareness.
         return undefined;

@@ -459,6 +459,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const lastActiveMotifNote = activeMotif.filter((n) => !n.isRest).pop();
             const isLastMeasureOfSection = m >= sectionEndMeasure - 2;
 
+            /** @type {any} */
+            let prevNoteChord = null;
+            /** @type {number[]} */
+            let prevScalePitches = [];
+
             activeMotif.forEach((motifNote) => {
                 if (motifNote.isRest) {
                     return;
@@ -488,6 +493,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 /** @type {any} */
                 const currentChord = stepEntry.chord;
                 const scale = getScaleForChord(state, currentChord, null, style);
+                const currentScalePitches = scale.map((ivl) => (currentChord.rootMidi + ivl) % 12);
 
                 // Map scale degree offset to an actual interval
                 const scaleLen = scale.length;
@@ -518,29 +524,61 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 const intervalFromRoot = scale[modDegree];
                 const pitchClass = (currentChord.rootMidi + intervalFromRoot) % 12;
 
-                // We want to center the melody around the anchorMidi
-                // Calculate the difference between anchor and this note's pitch class
-                let midi = registerBase + pitchClass + octaveShift;
+                // Pivot Check: Is this chord different from the one we played the last note over?
+                const isPivotStep = prevNoteChord && currentChord !== prevNoteChord;
 
-                // Octave adjustment to stay near lastMidi for stepwise motion
-                let bestMidi = midi;
-                let minDistance = Math.abs(midi - lastMidi);
-                for (const offset of [-24, -12, 0, 12, 24]) {
-                    const testMidi = midi + offset;
-                    // Encourage staying near the anchor
-                    const distToAnchor = Math.abs(testMidi - anchorMidi);
-                    const distToLast = Math.abs(testMidi - lastMidi);
-                    // Score = distance to last note + small penalty for distance from anchor
-                    const score = distToLast + distToAnchor * 0.2;
+                // --- NEW: Voice-Leading Scoring Logic ---
+                // If the chord has just changed, or we're in Loop 0, try to find a note in the scale
+                // that is a "Common Tone" or "Guide Tone" and is close to lastMidi.
+                let bestMidi = registerBase + pitchClass + octaveShift;
+                let minScore = 999;
 
-                    if (score < minDistance) {
-                        minDistance = score;
-                        bestMidi = testMidi;
+                // Search all scale degrees for the "best" melodic path
+                for (let d = 0; d < scaleLen; d++) {
+                    const testInterval = scale[d];
+                    const testPC = (currentChord.rootMidi + testInterval) % 12;
+
+                    // Possible Octaves
+                    for (const oShift of [-12, 0, 12]) {
+                        const testMidi = registerBase + testPC + oShift;
+                        const distToLast = Math.abs(testMidi - lastMidi);
+                        const distToAnchor = Math.abs(testMidi - anchorMidi);
+
+                        // Scoring components
+                        const jumpPenalty = distToLast * 1.5; // High penalty for large jumps
+                        const anchorPenalty = distToAnchor * 0.3; // Slight pull to anchor
+
+                        // Motif adherence: How far is this degree from the intended motif degree?
+                        const degreeDist = Math.abs(d - modDegree);
+                        const motifPenalty = degreeDist * 2.0;
+
+                        // Guide Tone Bonus (3rd or 7th)
+                        const isGuideTone =
+                            testInterval === 3 ||
+                            testInterval === 4 ||
+                            testInterval === 10 ||
+                            testInterval === 11;
+                        const guideBonus = isGuideTone ? -2 : 0;
+
+                        // Pivot Bonus: Favor "Fresh" notes that weren't in the previous scale
+                        // This helps highlight key changes (modulations).
+                        const isFreshNote = isPivotStep && !prevScalePitches.includes(testPC);
+                        const pivotBonus = isFreshNote ? -3 : 0;
+
+                        const totalScore =
+                            jumpPenalty + anchorPenalty + motifPenalty + guideBonus + pivotBonus;
+
+                        if (totalScore < minScore) {
+                            minScore = totalScore;
+                            bestMidi = testMidi;
+                        }
                     }
                 }
 
-                midi = bestMidi;
+                const midi = bestMidi;
                 lastMidi = midi;
+                prevNoteChord = currentChord;
+                prevScalePitches = currentScalePitches;
 
                 // Adjust duration if it overlaps with the next section or end of song
                 let duration = Math.round(motifNote.duration);

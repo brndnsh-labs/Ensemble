@@ -86,7 +86,10 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
 
         // Alt Dominants
         if (quality === '7alt') {
-            return isRich ? [4, 10, 13, 15, 18, 20] : [4, 10, 15, 20]; // 3, b7, #9, b13
+            // Must have: 3, b7 AND at least one altered extension (b9/13 or #9/20)
+            const base = [4, 10];
+            const altExtensions = intensity > 0.6 ? [13, 15, 20] : [15, 20];
+            return isRich ? [4, 10, 13, 15, 18, 20] : [...base, ...altExtensions.slice(0, 2)];
         }
         if (quality === '7b9') {
             return isRich ? [4, 10, 13, 16, 20] : [4, 10, 13, 16]; // 3, b7, b9, (5 or b13)
@@ -116,10 +119,12 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
     }
 
     if (quality === 'dim') {
-        return [3, 6, 9, 14]; // b3, b5, bb7, 9
+        // b3, b5, bb7 (9) are essential. Add 9 (14) for richness.
+        return isRich ? [3, 6, 9, 14, 18] : [3, 6, 9];
     }
     if (quality === 'halfdim') {
-        return [3, 5, 6, 10]; // b3, 11, b5, b7
+        // b3, 11, b5, b7 + (9 in rich)
+        return isRich ? [3, 6, 10, 14, 17] : [3, 6, 10];
     }
 
     return null; // Fallback to standard triads
