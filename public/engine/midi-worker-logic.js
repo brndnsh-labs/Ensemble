@@ -205,6 +205,41 @@ export class ExportProcessor {
      * @param {any} coordination
      * @param {number} globalStep
      */
+    /**
+     * Writes global MIDI CC automation (Expression and Tension) to tracks.
+     * @param {number} _globalStep
+     * @param {number} stepTimeS
+     * @param {import('../types.js').StepInfo} stepInfo
+     */
+    _writeAutomationToTracks(_globalStep, stepTimeS, stepInfo) {
+        if (!stepInfo.isBeatStart) {
+            return;
+        }
+
+        const { playback, soloist, midi } = this.state;
+        const pulse = this.toPulses(stepTimeS);
+
+        const intensityCC = Math.floor((playback.bandIntensity || 0.5) * 127);
+        const soloistTensionCC = Math.floor((soloist.tension || 0) * 127);
+
+        // Expression (CC 11) for all pitched instruments
+        this.soloistTrack.cc(pulse, midi.soloistChannel - 1, 11, intensityCC);
+        this.chordTrack.cc(pulse, midi.chordsChannel - 1, 11, intensityCC);
+        this.bassTrack.cc(pulse, midi.bassChannel - 1, 11, intensityCC);
+
+        // Modulation/Tension (CC 1) for Soloist
+        this.soloistTrack.cc(pulse, midi.soloistChannel - 1, 1, soloistTensionCC);
+    }
+
+    /**
+     * @param {MidiTrack} track
+     * @param {number} channel 0-indexed channel
+     * @param {Array<any>} notes
+     * @param {number} stepTimeS
+     * @param {string} moduleName
+     * @param {any} coordination
+     * @param {number} globalStep
+     */
     _writeNotesToTrack(track, channel, notes, stepTimeS, moduleName, coordination, globalStep) {
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, notes.length));
         const midiState = this.state.midi;
@@ -367,6 +402,16 @@ export class ExportProcessor {
                 includeDrums: this.includedTracks.includes('drums'),
             },
         );
+
+        const stepInfo = getStepInfo(
+            globalStep,
+            /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'],
+            arranger.measureMap,
+            TIME_SIGNATURES,
+        );
+
+        // Write CC Automation (Expression/Intensity and Tension)
+        this._writeAutomationToTracks(globalStep, stepTimeS, stepInfo);
 
         const notes = tickResult.notes;
         const drumHits = tickResult.drumHits;
