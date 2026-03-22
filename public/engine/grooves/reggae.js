@@ -53,11 +53,12 @@ export function applyOverrides(context, state) {
         sectionSeed,
         isTurnaround,
         isDownbeat,
+        isPulseStart,
         isBeatStart,
+        isBackbeat,
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
-        beatIndex,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
@@ -76,23 +77,27 @@ export function applyOverrides(context, state) {
         shouldPlay = false;
 
         if (activeMotif === 0) {
-            // One Drop: Kick only on Beat 3
-            if (isBeatStart && beatIndex === 2) {
+            // One Drop: Kick only on the backbeat
+            if (isBackbeat && isBeatStart) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 1) {
-            // Steppers: Kick on every beat
-            if (isBeatStart) {
+            // Steppers: Kick on every beat (or pulse)
+            if (isPulseStart) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 2) {
             // Rockers: Syncopated
-            if (isBeatStart || (isOffbeat && beatIndex === 1) || (isAOfBeat && beatIndex === 3)) {
+            if (
+                isPulseStart ||
+                (isOffbeat && !isBackbeat && !isDownbeat) ||
+                (isAOfBeat && isBackbeat)
+            ) {
                 shouldPlay = true;
             }
         } else {
             // Dub: Heavy syncopation
-            if (isDownbeat || (isAOfBeat && beatIndex % 2 === 0)) {
+            if (isDownbeat || (isAOfBeat && !isBackbeat)) {
                 shouldPlay = true;
             }
         }
@@ -103,8 +108,8 @@ export function applyOverrides(context, state) {
     } else if (inst.name === 'Snare') {
         shouldPlay = false;
 
-        // Universal Reggae Backbeat on 3
-        if (isBeatStart && beatIndex === 2) {
+        // Universal Reggae Backbeat
+        if (isBackbeat && isBeatStart) {
             shouldPlay = true;
             soundName = intensity > 0.7 ? 'Snare' : 'Sidestick';
             velocity = scaleVelocity(1.2, intensity, 0.1);
@@ -121,7 +126,7 @@ export function applyOverrides(context, state) {
 
         // Turnaround Fills (Rimshot rolls)
         if (isTurnaround && intensity > 0.6 && !shouldPlay) {
-            if (isAOfBeat && beatIndex >= 2 && roll(0.6)) {
+            if (isAOfBeat && roll(0.6)) {
                 shouldPlay = true;
                 soundName = 'Sidestick';
                 velocity = 0.85;
@@ -144,7 +149,7 @@ export function applyOverrides(context, state) {
         }
 
         // Offbeat Open Barks
-        if (isOffbeat && beatIndex === 3 && intensity > 0.65 && roll(0.4)) {
+        if (isOffbeat && isBackbeat && intensity > 0.65 && roll(0.4)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.1;

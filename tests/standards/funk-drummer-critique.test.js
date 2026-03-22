@@ -31,14 +31,23 @@ describe('Funk Drummer Critique', () => {
         for (let bar = 0; bar < numBars; bar++) {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
-                const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
+                const info = getStepInfo(
+                    bar * 16 + step,
+                    TIME_SIGNATURES['4/4'],
+                    [],
+                    TIME_SIGNATURES,
+                );
+                const stepData = {
+                    step: bar * 16 + step,
+                    loopStep: step,
+                    instruments: {},
+                    isDownbeat: info.isMeasureStart,
+                    isPulse: info.isPulse,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    isOffbeat: info.isOffbeat,
+                };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
-                    const info = getStepInfo(
-                        bar * 16 + step,
-                        TIME_SIGNATURES['4/4'],
-                        [],
-                        TIME_SIGNATURES,
-                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
@@ -46,10 +55,10 @@ describe('Funk Drummer Critique', () => {
                         playback: mockState.playback,
                         groove: mockState.groove,
                         isDownbeat: info.isMeasureStart,
+                        isPulse: info.isPulse,
                         isBeatStart: info.isBeatStart,
                         isBackbeat: info.isBackbeat,
                         isGroupStart: info.isGroupStart,
-                        beatIndex: info.beatIndex,
                         isOffbeat: info.isOffbeat,
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
@@ -103,18 +112,19 @@ describe('Funk Drummer Critique', () => {
         performance.forEach((bar) => {
             let barHasStrongBackbeat = false;
             bar.forEach((stepData) => {
-                const s = stepData.loopStep;
+                const _s = stepData.loopStep;
 
                 // --- CRITIQUE: "The One" (Kick on 0) ---
-                if (s === 0 && stepData.instruments.Kick) {
+                if (stepData.isDownbeat && stepData.instruments.Kick) {
                     kickOnTheOne++;
                 }
 
-                // --- CRITIQUE: Backbeat Consistency (Snare 4, 12 or 14 for Cold Sweat) ---
+                // --- CRITIQUE: Backbeat Consistency ---
                 if (stepData.instruments.Snare) {
                     const vel = stepData.instruments.Snare.velocity;
-                    if (s === 4 || s === 12 || s === 14) {
-                        if (vel > 1.0) {
+                    // A strong hit on a backbeat, or a strong displaced hit on an offbeat
+                    if (stepData.isBackbeat || (stepData.isOffbeat && vel > 0.8)) {
+                        if (vel > 0.8) {
                             barHasStrongBackbeat = true;
                             totalSnareVelocity += vel;
                         } else {
@@ -128,7 +138,7 @@ describe('Funk Drummer Critique', () => {
                 }
 
                 // --- CRITIQUE: Syncopated Kick ---
-                if (stepData.instruments.Kick && s !== 0 && s !== 8) {
+                if (stepData.instruments.Kick && !stepData.isPulseStart) {
                     totalSyncopatedKickHits++;
                 }
             });

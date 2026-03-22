@@ -31,14 +31,21 @@ describe('Rock Drummer Critique', () => {
         for (let bar = 0; bar < numBars; bar++) {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
-                const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
+                const info = getStepInfo(
+                    bar * 16 + step,
+                    TIME_SIGNATURES['4/4'],
+                    [],
+                    TIME_SIGNATURES,
+                );
+                const stepData = {
+                    step: bar * 16 + step,
+                    loopStep: step,
+                    instruments: {},
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
-                    const info = getStepInfo(
-                        bar * 16 + step,
-                        TIME_SIGNATURES['4/4'],
-                        [],
-                        TIME_SIGNATURES,
-                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
@@ -107,8 +114,8 @@ describe('Rock Drummer Critique', () => {
                     }
                 }
 
-                // --- CRITIQUE: Kick Solid (1 and 3) ---
-                if ((s === 0 || s === 8) && stepData.instruments.Kick) {
+                // --- CRITIQUE: Kick Solid (on non-backbeat pulses) ---
+                if (stepData.isBeatStart && !stepData.isBackbeat && stepData.instruments.Kick) {
                     kickSolidHits++;
                 }
 

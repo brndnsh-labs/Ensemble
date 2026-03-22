@@ -67,7 +67,6 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
-        beatIndex,
         drumComplexity,
         orchestration,
         sectionSeed,
@@ -127,33 +126,33 @@ export function applyOverrides(context, state) {
     else if (inst.name === 'Kick') {
         shouldPlay = false;
 
-        // Foundation: Always on 1 and 3 (except half-time maybe)
+        // Foundation: Always on non-backbeat pulses
         if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
             velocity = isDownbeat ? 1.25 : 1.15;
         }
 
-        // Motif 1: Double Kicks (1&, 3&)
-        if (activeMotif === 1 && isOffbeat && (beatIndex === 0 || beatIndex === 2)) {
+        // Motif 1: Double Kicks (offbeats after non-backbeat pulses)
+        if (activeMotif === 1 && isOffbeat && !isBackbeat) {
             shouldPlay = true;
             velocity = scaleVelocity(0.9, intensity, 0.15);
         }
 
-        // Motif 2: Half-time (Heavier kick on 1, optional 3)
+        // Motif 2: Half-time (Heavier kick on downbeat, optional next non-backbeat pulse)
         if (activeMotif === 2) {
             if (isDownbeat) {
                 shouldPlay = true;
                 velocity = 1.4;
-            } else if (isBeatStart && beatIndex === 2 && roll(0.6, intensity)) {
+            } else if (isBeatStart && !isBackbeat && !isDownbeat && roll(0.6, intensity)) {
                 shouldPlay = true;
                 velocity = 1.1;
-            } else if (isOffbeat && beatIndex === 3 && roll(0.4, intensity)) {
+            } else if (isOffbeat && isBackbeat && roll(0.4, intensity)) {
                 shouldPlay = true; // Anticipation
                 velocity = 0.85;
             }
         }
 
-        // Motif 3: Anthem (Feathered 4-on-the-floor)
+        // Motif 3: Anthem (Feathered on backbeats)
         if (activeMotif === 3 && isBeatStart && isBackbeat) {
             shouldPlay = true;
             velocity = scaleVelocity(0.65, intensity, 0.1); // Feathered to anchor
@@ -169,15 +168,12 @@ export function applyOverrides(context, state) {
     else if (inst.name === 'Snare') {
         shouldPlay = false;
 
-        const isHalfTimeBackbeat = beatIndex === 2;
-        const isStandardBackbeat = isBackbeat;
-
         if (activeMotif === 2) {
-            if (isBeatStart && isHalfTimeBackbeat) {
+            if (isBackbeat) {
                 shouldPlay = true;
             }
         } else {
-            if (isStandardBackbeat) {
+            if (isBackbeat) {
                 shouldPlay = true;
             }
         }

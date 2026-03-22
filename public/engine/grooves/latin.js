@@ -50,10 +50,12 @@ export function applyOverrides(context, state) {
         drumComplexity,
         sectionSeed,
         isTurnaround,
+        isDownbeat,
+        isPulseStart,
         isBeatStart,
+        isBackbeat,
         isOffbeat,
         isAOfBeat,
-        beatIndex,
         stepsPerBar,
     } = context;
     let { shouldPlay, velocity, soundName, instTimeOffset } = state;
@@ -71,21 +73,21 @@ export function applyOverrides(context, state) {
     // --- 1. KICK PATTERNS (Surdo Feel) ---
     if (inst.name === 'Kick') {
         shouldPlay = false;
-        // Foundation: 1 and 3 (Surdo heart)
-        if (isBeatStart && (beatIndex === 0 || beatIndex === 2)) {
+        // Foundation: 1 and 3 in 4/4 (Surdo heart), generalizing to non-backbeat pulses
+        if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
-            // The hit on 3 is often heavier or more "open" in feel
-            const accent = beatIndex === 2 ? 1.15 : 1.0;
+            // The secondary hit (non-downbeat pulse) is often heavier or more "open" in feel
+            const accent = !isDownbeat ? 1.15 : 1.0;
             velocity = scaleVelocity(1.1 * accent, intensity, 0.1);
-            // Extra "weight" (lag) on the second surdo hit
-            if (beatIndex === 2) {
+            // Extra "weight" (lag) on the non-downbeat surdo hit
+            if (!isDownbeat) {
                 instTimeOffset += 0.005;
             }
         }
 
         // Samba variation: Add 16th note pushes
         if (activeMotif >= 2 && !shouldPlay) {
-            if (isAOfBeat && (beatIndex === 0 || beatIndex === 2)) {
+            if (isAOfBeat && !isBackbeat) {
                 if (roll(0.6, intensity)) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.7, intensity, 0.1);
@@ -101,18 +103,21 @@ export function applyOverrides(context, state) {
         // 2-Bar Clave Logic
         const barIndex = Math.floor(step / stepsPerBar);
         const isBar1 = barIndex % 2 === 0;
-        const stepInBar = step % stepsPerBar;
 
         if (activeMotif === 0 || activeMotif === 1) {
             // Authentic 3-2 Bossa Clave
-            // Bar 1 (3-side): 1, & of 2, 4
-            // Bar 2 (2-side): & of 1, 3
+            // Downbeat, Offbeat of second pulse, 4th pulse start
             if (isBar1) {
-                if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
+                if (
+                    isDownbeat ||
+                    (isOffbeat && !isBackbeat && !isDownbeat) ||
+                    (isBeatStart && isBackbeat)
+                ) {
                     shouldPlay = true;
                 }
             } else {
-                if (stepInBar === 2 || stepInBar === 8) {
+                // Downbeat offbeat, 3rd pulse start
+                if ((isOffbeat && isDownbeat) || (isBeatStart && !isBackbeat && !isDownbeat)) {
                     shouldPlay = true;
                 }
             }
@@ -133,15 +138,19 @@ export function applyOverrides(context, state) {
             }
         } else {
             // Partido Alto
-            // Typical syncopation: &1, 2, &3, 4 | 1, &2, 3, &4
-            const partidoPattern = isBar1 ? [2, 4, 10, 12] : [0, 6, 8, 14];
-            if (partidoPattern.includes(stepInBar)) {
-                shouldPlay = true;
+            if (isBar1) {
+                if ((isOffbeat && !isBackbeat) || (isPulseStart && isBackbeat)) {
+                    shouldPlay = true;
+                }
+            } else {
+                if ((isPulseStart && !isBackbeat) || (isOffbeat && isBackbeat)) {
+                    shouldPlay = true;
+                }
             }
         }
 
         if (isTurnaround && intensity > 0.8) {
-            if (beatIndex === 3) {
+            if (isPulseStart && isBackbeat) {
                 shouldPlay = true;
                 velocity = 1.1;
                 soundName = 'Snare';

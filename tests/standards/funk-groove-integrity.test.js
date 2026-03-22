@@ -53,14 +53,13 @@ describe('Funk Groove Integrity', () => {
                 groove: mockState.groove,
                 isDownbeat: info.isMeasureStart,
                 isBeatStart: info.isBeatStart,
+                isPulse: info.isPulse,
                 isBackbeat: info.isBackbeat,
                 isGroupStart: info.isGroupStart,
-                beatIndex: info.beatIndex,
                 isOffbeat: info.isOffbeat,
                 isEOfBeat: info.isEOfBeat,
                 isAOfBeat: info.isAOfBeat,
                 tsConfig: info.tsConfig,
-                stepsPerBar: 16,
             };
         };
 
@@ -89,23 +88,65 @@ describe('Funk Groove Integrity', () => {
             // Force a seed that maps to Motif 2
             mockState.groove.sectionSeedMap['1'] = 0.5;
 
-            // Motif 2 often moves the snare backbeat to the "and" of 4
-            const normalBackbeat = 12; // beat 4
-            const displacedBackbeat = 14; // "and" of 4
+            // Motif 2 often moves the later snare backbeat to an offbeat
+            // Early backbeat (e.g. beat 2 in 4/4) should play normally
+            // Late backbeat (e.g. beat 4 in 4/4) should be silent
+            // The following offbeat (e.g. "and" of 4) should play strong
 
-            const resultNormal = applyGrooveOverrides(
-                getState(),
-                createParams(normalBackbeat, 'Snare'),
-            );
-            const resultDisplaced = applyGrooveOverrides(
-                getState(),
-                createParams(displacedBackbeat, 'Snare'),
-            );
+            const ts44 = TIME_SIGNATURES['4/4'];
+            let earlyBackbeatPlayed = false;
+            let lateBackbeatPlayed = false;
+            let offbeatDisplacedPlayed = false;
 
-            // In a displaced motif, the normal backbeat is often silent, and the "and" is strong
-            expect(resultNormal.shouldPlay).toBe(false);
-            expect(resultDisplaced.shouldPlay).toBe(true);
-            expect(resultDisplaced.velocity).toBeGreaterThan(0.85);
+            let callCount = 0;
+            const mockMath = vi.spyOn(Math, 'random').mockImplementation(() => {
+                callCount++;
+                // Return 0.1 for the first roll() call to pass the first backbeat.
+                // For any subsequent calls, return 0.9 to fail the roll() check.
+                if (callCount === 1) {
+                    return 0.1;
+                }
+                return 0.9;
+            });
+
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+
+                if (info.isBackbeat || (info.isOffbeat && step >= 8)) {
+                    const params = createParams(step, 'Snare');
+                    const result = applyGrooveOverrides(getState(), params);
+
+                    if (info.isBackbeat) {
+                        if (step < 8 && result.shouldPlay && result.velocity > 0.8) {
+                            earlyBackbeatPlayed = true;
+                        } else if (step >= 8 && result.shouldPlay && result.velocity > 0.8) {
+                            lateBackbeatPlayed = true;
+                        }
+                    }
+                }
+            }
+
+            // We run a second loop resetting Math.random just for the offbeat displacement,
+            // otherwise multiple `roll()` calls per step evaluation drain our mock unexpectedly.
+            mockMath.mockRestore();
+            const _mockMath2 = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+
+            for (let step = 8; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                if (info.isOffbeat && !info.isBackbeat) {
+                    const params = createParams(step, 'Snare');
+                    const result = applyGrooveOverrides(getState(), params);
+                    if (result.shouldPlay && result.velocity > 0.85) {
+                        offbeatDisplacedPlayed = true;
+                    }
+                }
+            }
+
+            mockMath.mockRestore();
+
+            expect(earlyBackbeatPlayed).toBe(true);
+            expect(lateBackbeatPlayed).toBe(false);
+            expect(offbeatDisplacedPlayed).toBe(true);
         });
 
         it('should trigger anticipatory hi-hat barks on phrase turnarounds', () => {

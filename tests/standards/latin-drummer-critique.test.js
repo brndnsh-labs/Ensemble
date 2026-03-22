@@ -32,14 +32,22 @@ describe('Latin Drummer Critique', () => {
         for (let bar = 0; bar < numBars; bar++) {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
-                const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
+                const info = getStepInfo(
+                    bar * 16 + step,
+                    TIME_SIGNATURES['4/4'],
+                    [],
+                    TIME_SIGNATURES,
+                );
+                const stepData = {
+                    step: bar * 16 + step,
+                    loopStep: step,
+                    instruments: {},
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    beatIndex: info.beatIndex,
+                };
                 for (const instName of latinInstruments) {
-                    const info = getStepInfo(
-                        bar * 16 + step,
-                        TIME_SIGNATURES['4/4'],
-                        [],
-                        TIME_SIGNATURES,
-                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
@@ -83,9 +91,25 @@ describe('Latin Drummer Critique', () => {
         let shakerHits = 0;
         const totalBars = performance.length;
 
-        // 2-Bar Clave 3-2 Pattern
-        const CLAVE_3_2_BAR1 = [0, 6, 12]; // 3-side
-        const CLAVE_3_2_BAR2 = [2, 8]; // 2-side
+        const ts44 = TIME_SIGNATURES['4/4'];
+        const CLAVE_3_2_BAR1 = [];
+        const CLAVE_3_2_BAR2 = [];
+        for (let step = 0; step < 16; step++) {
+            const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+            if (
+                info.isMeasureStart ||
+                (info.isOffbeat && !info.isBackbeat && !info.isMeasureStart) ||
+                (info.isBeatStart && info.isBackbeat)
+            ) {
+                CLAVE_3_2_BAR1.push(step);
+            }
+            if (
+                (info.isMeasureStart && info.isOffbeat) ||
+                (info.isBeatStart && !info.isBackbeat && !info.isMeasureStart)
+            ) {
+                CLAVE_3_2_BAR2.push(step);
+            }
+        }
 
         performance.forEach((bar, bIdx) => {
             const snareSteps = bar.filter((s) => s.instruments.Snare).map((s) => s.loopStep);
@@ -99,10 +123,8 @@ describe('Latin Drummer Critique', () => {
             }
 
             bar.forEach((stepData) => {
-                const s = stepData.loopStep;
-
-                // --- CRITIQUE: Surdo Kick (0, 8) with accents on 8 ---
-                if ([0, 8].includes(s)) {
+                // --- CRITIQUE: Surdo Kick should hit on pulses that are not backbeats
+                if (stepData.isBeatStart && !stepData.isBackbeat) {
                     if (stepData.instruments.Kick) {
                         steadyKickHits++;
                     }

@@ -56,14 +56,18 @@ describe('Latin Groove Integrity', () => {
             };
         };
 
-        it('should play the Surdo pulse on Kick (0, 8)', () => {
+        it('should play the Surdo pulse on Kick for non-backbeat pulses', () => {
             getState.mockReturnValue(mockState);
 
-            // Surdo Kick: 0, 8
-            const heartbeatSteps = [0, 8];
-            for (const step of heartbeatSteps) {
+            // Surdo Kick: Non-backbeat pulses (e.g., 0, 8 in 4/4)
+            const ts44 = TIME_SIGNATURES['4/4'];
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
                 const result = applyGrooveOverrides(getState(), createParams(step, 'Kick'));
-                expect(result.shouldPlay).toBe(true);
+
+                if (info.isBeatStart && !info.isBackbeat) {
+                    expect(result.shouldPlay).toBe(true);
+                }
             }
 
             // Offbeat check
@@ -90,17 +94,40 @@ describe('Latin Groove Integrity', () => {
                 return;
             }
 
-            // Bar 1 (3-side): 0, 6, 12
-            const bar1Steps = [0, 6, 12].map((s) => barIndexMotif0 * 16 + s);
-            for (const step of bar1Steps) {
+            const ts44 = TIME_SIGNATURES['4/4'];
+
+            // Bar 1 (3-side): In 4/4, the 3 clave hits occur on Downbeat, Beat 2 offbeat, Beat 4 start
+            const bar1ExpectedSteps = [];
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                if (
+                    info.isMeasureStart ||
+                    (info.beatIndex === 1 && info.isOffbeat) ||
+                    (info.beatIndex === 3 && info.isBeatStart)
+                ) {
+                    bar1ExpectedSteps.push(barIndexMotif0 * 16 + step);
+                }
+            }
+
+            for (const step of bar1ExpectedSteps) {
                 const result = applyGrooveOverrides(getState(), createParams(step, 'Snare'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Sidestick');
             }
 
-            // Bar 2 (2-side): 2, 8
-            const bar2Steps = [2, 8].map((s) => (barIndexMotif0 + 1) * 16 + s);
-            for (const step of bar2Steps) {
+            // Bar 2 (2-side): In 4/4, the 2 clave hits occur on Downbeat offbeat, Beat 3 start
+            const bar2ExpectedSteps = [];
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                if (
+                    (info.isMeasureStart && info.isOffbeat) ||
+                    (info.beatIndex === 2 && info.isBeatStart)
+                ) {
+                    bar2ExpectedSteps.push((barIndexMotif0 + 1) * 16 + step);
+                }
+            }
+
+            for (const step of bar2ExpectedSteps) {
                 const result = applyGrooveOverrides(getState(), createParams(step, 'Snare'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Sidestick');

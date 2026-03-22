@@ -31,14 +31,23 @@ describe('Reggae Drummer Critique', () => {
         for (let bar = 0; bar < numBars; bar++) {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
-                const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
+                const info = getStepInfo(
+                    bar * 16 + step,
+                    TIME_SIGNATURES['4/4'],
+                    [],
+                    TIME_SIGNATURES,
+                );
+                const stepData = {
+                    step: bar * 16 + step,
+                    loopStep: step,
+                    instruments: {},
+                    isDownbeat: info.isMeasureStart,
+                    isPulseStart: info.isPulseStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    beatIndex: info.beatIndex,
+                };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
-                    const info = getStepInfo(
-                        bar * 16 + step,
-                        TIME_SIGNATURES['4/4'],
-                        [],
-                        TIME_SIGNATURES,
-                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
@@ -46,6 +55,7 @@ describe('Reggae Drummer Critique', () => {
                         playback: mockState.playback,
                         groove: mockState.groove,
                         isDownbeat: info.isMeasureStart,
+                        isPulseStart: info.isPulseStart,
                         isBeatStart: info.isBeatStart,
                         isBackbeat: info.isBackbeat,
                         isGroupStart: info.isGroupStart,
@@ -77,47 +87,56 @@ describe('Reggae Drummer Critique', () => {
     it('should implement "One Drop" feel at low intensity', () => {
         const performance = simulatePerformance(16, { playback: { bandIntensity: 0.3 } });
 
-        let kickOnOne = 0;
-        let kickOnThree = 0;
-        let snareOnThree = 0;
+        let kickOnDownbeat = 0;
+        let kickOnBackbeat = 0;
+        let snareOnBackbeat = 0;
+        let backbeatCount = 0;
 
         performance.forEach((bar) => {
-            if (bar[0].instruments.Kick) {
-                kickOnOne++;
-            }
-            if (bar[8].instruments.Kick) {
-                kickOnThree++;
-            }
-            if (bar[8].instruments.Snare) {
-                snareOnThree++;
-            }
+            bar.forEach((stepData) => {
+                if (stepData.isBackbeat && stepData.isBeatStart) {
+                    backbeatCount++;
+                    if (stepData.instruments.Kick) {
+                        kickOnBackbeat++;
+                    }
+                    if (stepData.instruments.Snare) {
+                        snareOnBackbeat++;
+                    }
+                } else if (stepData.isDownbeat) {
+                    if (stepData.instruments.Kick) {
+                        kickOnDownbeat++;
+                    }
+                }
+            });
         });
 
-        const totalBars = performance.length;
         console.log(
-            `[Reggae Critique] Kick on 1: ${kickOnOne}, Kick/Snare on 3: ${kickOnThree}/${snareOnThree}`,
+            `[Reggae Critique] Kick on Downbeat: ${kickOnDownbeat}, Kick/Snare on Backbeat: ${kickOnBackbeat}/${snareOnBackbeat}`,
         );
 
-        // One Drop: No kick on 1, Kick and Snare TOGETHER on 3
-        expect(kickOnOne).toBe(0);
-        expect(kickOnThree).toBe(totalBars);
-        expect(snareOnThree).toBe(totalBars);
+        // One Drop: No kick on 1, Kick and Snare TOGETHER on backbeat
+        expect(kickOnDownbeat).toBe(0);
+        expect(kickOnBackbeat).toBe(backbeatCount);
+        expect(snareOnBackbeat).toBe(backbeatCount);
     });
 
     it('should implement "Steppers" feel at high intensity', () => {
         const performance = simulatePerformance(16, { playback: { bandIntensity: 0.9 } });
 
         let kickHits = 0;
+        let pulseCount = 0;
         performance.forEach((bar) => {
-            [0, 4, 8, 12].forEach((s) => {
-                if (bar[s].instruments.Kick) {
-                    kickHits++;
+            bar.forEach((stepData) => {
+                if (stepData.isPulseStart) {
+                    pulseCount++;
+                    if (stepData.instruments.Kick) {
+                        kickHits++;
+                    }
                 }
             });
         });
 
-        const totalBars = performance.length;
-        const kickScore = kickHits / (totalBars * 4);
+        const kickScore = kickHits / pulseCount;
         console.log(
             `[Reggae Critique] Steppers Kick Consistency: ${(kickScore * 100).toFixed(1)}%`,
         );

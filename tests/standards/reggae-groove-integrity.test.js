@@ -44,6 +44,8 @@ describe('Reggae Groove Integrity', () => {
                 playback: mockState.playback,
                 groove: mockState.groove,
                 isDownbeat: info.isMeasureStart,
+                isPulse: info.isPulse,
+                isPulseStart: info.isPulseStart,
                 isBeatStart: info.isBeatStart,
                 isBackbeat: info.isBackbeat,
                 isGroupStart: info.isGroupStart,
@@ -55,7 +57,7 @@ describe('Reggae Groove Integrity', () => {
             };
         };
 
-        it('should play One Drop: Kick only on beat 3 for Motif 0', () => {
+        it('should play One Drop: Kick only on backbeat for Motif 0', () => {
             getState.mockReturnValue(mockState);
             let barIndexMotif0 = -1;
             for (let i = 0; i < 100; i++) {
@@ -71,17 +73,21 @@ describe('Reggae Groove Integrity', () => {
                 return;
             }
 
-            const beat1 = barIndexMotif0 * 16 + 0;
-            const beat3 = barIndexMotif0 * 16 + 8;
+            const ts44 = TIME_SIGNATURES['4/4'];
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                const absStep = barIndexMotif0 * 16 + step;
+                const result = applyGrooveOverrides(getState(), createParams(absStep, 'Kick'));
 
-            const result1 = applyGrooveOverrides(getState(), createParams(beat1, 'Kick'));
-            const result3 = applyGrooveOverrides(getState(), createParams(beat3, 'Kick'));
-
-            expect(result1.shouldPlay).toBe(false);
-            expect(result3.shouldPlay).toBe(true);
+                if (info.isBeatStart && info.isBackbeat) {
+                    expect(result.shouldPlay).toBe(true);
+                } else {
+                    expect(result.shouldPlay).toBe(false);
+                }
+            }
         });
 
-        it('should play Steppers: Kick on every beat for Motif 1', () => {
+        it('should play Steppers: Kick on every pulse start for Motif 1', () => {
             getState.mockReturnValue(mockState);
             let barIndexMotif1 = -1;
             for (let i = 0; i < 100; i++) {
@@ -97,10 +103,15 @@ describe('Reggae Groove Integrity', () => {
                 return;
             }
 
-            const kickSteps = [0, 4, 8, 12].map((s) => barIndexMotif1 * 16 + s);
-            for (const step of kickSteps) {
-                const result = applyGrooveOverrides(getState(), createParams(step, 'Kick'));
-                expect(result.shouldPlay).toBe(true);
+            const ts44 = TIME_SIGNATURES['4/4'];
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                const absStep = barIndexMotif1 * 16 + step;
+                const result = applyGrooveOverrides(getState(), createParams(absStep, 'Kick'));
+
+                if (info.isPulseStart) {
+                    expect(result.shouldPlay).toBe(true);
+                }
             }
         });
     });

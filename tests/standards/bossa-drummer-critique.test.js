@@ -31,14 +31,21 @@ describe('Bossa Nova Drummer Critique', () => {
         for (let bar = 0; bar < numBars; bar++) {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
-                const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
+                const info = getStepInfo(
+                    bar * 16 + step,
+                    TIME_SIGNATURES['4/4'],
+                    [],
+                    TIME_SIGNATURES,
+                );
+                const stepData = {
+                    step: bar * 16 + step,
+                    loopStep: step,
+                    instruments: {},
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
-                    const info = getStepInfo(
-                        bar * 16 + step,
-                        TIME_SIGNATURES['4/4'],
-                        [],
-                        TIME_SIGNATURES,
-                    );
                     const params = {
                         step: bar * 16 + step,
                         inst: { name: instName, muted: false, steps: [] },
@@ -93,33 +100,36 @@ describe('Bossa Nova Drummer Critique', () => {
         expect(patternA).not.toBe(patternB);
     });
 
-    it('should emphasize beat 3 in the Kick pattern (Surdo feel)', () => {
+    it('should emphasize non-downbeat pulses in the Kick pattern (Surdo feel)', () => {
         const performance = simulatePerformance(32);
 
-        let vel1 = 0,
-            count1 = 0;
-        let vel3 = 0,
-            count3 = 0;
+        let totalKickDownbeat = 0;
+        let countKickDownbeat = 0;
+        let totalKickOther = 0;
+        let countKickOther = 0;
 
         performance.forEach((bar) => {
-            if (bar[0].instruments.Kick) {
-                vel1 += bar[0].instruments.Kick.velocity;
-                count1++;
-            }
-            if (bar[8].instruments.Kick) {
-                vel3 += bar[8].instruments.Kick.velocity;
-                count3++;
-            }
+            bar.forEach((stepData) => {
+                if (stepData.instruments.Kick) {
+                    if (stepData.isDownbeat) {
+                        totalKickDownbeat += stepData.instruments.Kick.velocity;
+                        countKickDownbeat++;
+                    } else if (stepData.isBeatStart && !stepData.isBackbeat) {
+                        totalKickOther += stepData.instruments.Kick.velocity;
+                        countKickOther++;
+                    }
+                }
+            });
         });
 
-        const avg1 = vel1 / count1;
-        const avg3 = vel3 / count3;
+        const avgDownbeat = totalKickDownbeat / countKickDownbeat;
+        const avgOther = totalKickOther / countKickOther;
 
         console.log(
-            `[Bossa Critique] Avg Kick 1: ${avg1.toFixed(2)}, Avg Kick 3: ${avg3.toFixed(2)}`,
+            `[Bossa Critique] Avg Kick Downbeat: ${avgDownbeat.toFixed(2)}, Avg Kick Other: ${avgOther.toFixed(2)}`,
         );
 
         // In many Latin styles, the second half of the bar carries more weight
-        expect(avg3).toBeGreaterThan(avg1 * 0.95);
+        expect(avgOther).toBeGreaterThan(avgDownbeat * 0.95);
     });
 });
