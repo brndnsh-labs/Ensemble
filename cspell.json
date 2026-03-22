@@ -149,7 +149,8 @@
         "honky",
         "tonk",
         "prechorus",
-        "Comper"
+        "Comper",
+        "cooldown"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

@@ -245,6 +245,18 @@ export const FILL_TEMPLATES = {
  * @returns {Object} Map of step -> array of {name, vel}
  */
 export function generateProceduralFill(genre, intensity, stepsPerMeasure) {
+    return generateDeterministicFill(genre, intensity, stepsPerMeasure, Math.random);
+}
+
+/**
+ * Deterministic version of fill generation.
+ * @param {string} genre
+ * @param {number} intensity
+ * @param {number} stepsPerMeasure
+ * @param {Function} prng - PRNG function returning 0-1
+ * @returns {Record<number, {name: string, vel: number}[]>}
+ */
+export function generateDeterministicFill(genre, intensity, stepsPerMeasure, prng) {
     /** @type {Record<number, {name: string, vel: number}[]>} */
     const fill = {};
     const templates = FILL_TEMPLATES[genre] || FILL_TEMPLATES.Rock;
@@ -263,8 +275,8 @@ export function generateProceduralFill(genre, intensity, stepsPerMeasure) {
         return fill;
     }
 
-    // Pick a random template
-    const template = options[Math.floor(Math.random() * options.length)];
+    // Pick a deterministic template
+    const template = options[Math.floor(prng() * options.length)];
 
     // Apply template to the LAST beat(s) of the measure
     // Templates use steps relative to a standard 16-step measure (ending at 15).
