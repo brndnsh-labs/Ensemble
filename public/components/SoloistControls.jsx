@@ -44,6 +44,7 @@ export function SoloistControls() {
                         value={seed || ''}
                         placeholder="Random"
                         class="seed-input"
+                        aria-label="Seed"
                         style={{
                             width: '80px',
                             fontFamily: 'monospace',
@@ -60,6 +61,7 @@ export function SoloistControls() {
                     <button
                         class="icon-btn"
                         title="Generate Random Seed"
+                        aria-label="Generate Random Seed"
                         onClick={rollSeed}
                         style={{ fontSize: '0.9rem', padding: '2px 4px' }}
                     >
