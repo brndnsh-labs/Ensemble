@@ -88,6 +88,27 @@ function syncMIDIOutputs() {
 }
 
 /**
+ * Internal helper to get active MIDI output and calculated timestamp.
+ * @param {number} time - AudioContext time.
+ * @returns {{output: any, midiTime: number, midiState: import('./state/midi.js').MidiState}|null}
+ */
+function getMIDIOutputAndTimestamp(time) {
+    const { playback, midi } = getState();
+    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+        return null;
+    }
+    const output = midiAccess.outputs.get(midi.selectedOutputId);
+    if (!output) {
+        return null;
+    }
+
+    const midiTime =
+        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
+
+    return { output, midiTime, midiState: midi };
+}
+
+/**
  * Sends a MIDI Note On message.
  * @param {number} channel - 1-16
  * @param {number} note - MIDI note number 0-127
@@ -95,18 +116,11 @@ function syncMIDIOutputs() {
  * @param {number} time - AudioContext time
  */
 function sendMIDINoteOn(channel, note, velocity, time) {
-    const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+    const res = getMIDIOutputAndTimestamp(time);
+    if (!res) {
         return;
     }
-    /** @type {any} */
-    const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) {
-        return;
-    }
-
-    const midiTime =
-        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
+    const { output, midiTime } = res;
     const status = 0x90 | (channel - 1);
     output.send([status, note, velocity], midiTime);
 
@@ -120,18 +134,11 @@ function sendMIDINoteOn(channel, note, velocity, time) {
  * @param {number} time - AudioContext time
  */
 function sendMIDINoteOff(channel, note, time) {
-    const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+    const res = getMIDIOutputAndTimestamp(time);
+    if (!res) {
         return;
     }
-    /** @type {any} */
-    const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) {
-        return;
-    }
-
-    const midiTime =
-        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
+    const { output, midiTime } = res;
     const status = 0x80 | (channel - 1);
     output.send([status, note, 0], midiTime);
 
@@ -146,15 +153,11 @@ function sendMIDINoteOff(channel, note, time) {
  * @param {number} time - AudioContext time
  */
 export function sendMIDICC(channel, controller, value, time) {
-    const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+    const res = getMIDIOutputAndTimestamp(time);
+    if (!res) {
         return;
     }
-    /** @type {any} */
-    const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) {
-        return;
-    }
+    const { output, midiTime } = res;
 
     // Deduplication: Don't resend if value hasn't changed
     const key = `${channel}_${controller}`;
@@ -163,8 +166,6 @@ export function sendMIDICC(channel, controller, value, time) {
     }
     sentCCValues.set(key, value);
 
-    const midiTime =
-        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
     const status = 0xb0 | (channel - 1);
     output.send([status, controller, value], midiTime);
 }
@@ -176,15 +177,11 @@ export function sendMIDICC(channel, controller, value, time) {
  * @param {number} time - AudioContext time
  */
 export function sendMIDIPitchBend(channel, value, time) {
-    const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+    const res = getMIDIOutputAndTimestamp(time);
+    if (!res) {
         return;
     }
-    /** @type {any} */
-    const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) {
-        return;
-    }
+    const { output, midiTime } = res;
 
     // Deduplication
     if (sentBendValues.get(channel) === value) {
@@ -192,8 +189,6 @@ export function sendMIDIPitchBend(channel, value, time) {
     }
     sentBendValues.set(channel, value);
 
-    const midiTime =
-        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
     const status = 0xe0 | (channel - 1);
 
     const normalized = Math.max(0, Math.min(16383, value + 8192));
@@ -215,7 +210,7 @@ export function sendMIDIPitchBend(channel, value, time) {
  * @param {boolean|Object} [options] - If true, enforces monophony. Or pass object { isMono, bend }
  */
 export function sendMIDINote(channel, note, velocity, time, duration, options = false) {
-    const { playback, midi } = getState();
+    const { playback } = getState();
     const isMono = typeof options === 'boolean' ? options : !!(/** @type {any} */ (options).isMono);
     const bend = typeof options === 'object' ? /** @type {any} */ (options).bend : 0;
 
@@ -230,9 +225,9 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
             const activeNote = parseInt(nStr, 10);
 
             if (activeCh === channel && activeNote !== note) {
-                /** @type {any} */
-                const output = midiAccess?.outputs.get(midi.selectedOutputId);
-                if (output) {
+                const res = getMIDIOutputAndTimestamp(time);
+                if (res) {
+                    const { output, midiState } = res;
                     const status = 0x80 | (channel - 1);
                     if (activeNoteOffs.has(activeKey)) {
                         /** @type {any} */
@@ -241,15 +236,14 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
                             clearTimeout(prev.id);
                             const cutoffTime = Math.max(now, time - 0.005);
                             const delayToCutoff = Math.max(0, (cutoffTime - now) * 1000);
-                            const out = output;
                             const ak = activeKey;
                             setTimeout(() => {
                                 if (activeNotes.has(ak)) {
-                                    out.send(
+                                    output.send(
                                         [status, activeNote, 0],
                                         (cutoffTime - (playback.audio?.currentTime || 0)) * 1000 +
                                             performance.now() +
-                                            midi.latency,
+                                            midiState.latency,
                                     );
                                     activeNotes.delete(ak);
                                 }
@@ -283,21 +277,12 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
 
             // We manually send the Off here instead of using setTimeout
             // This ensures the driver receives Off -> On sequence
-            if (midiAccess && midi.selectedOutputId) {
-                /** @type {any} */
-                const output = midiAccess.outputs.get(midi.selectedOutputId);
-                if (output) {
-                    // Calculate MIDI timestamp for cutoff
-                    // time param is AudioContext time.
-
-                    const midiTime =
-                        (cutoffTime - (playback.audio?.currentTime || 0)) * 1000 +
-                        performance.now() +
-                        midi.latency;
-                    const status = 0x80 | (channel - 1);
-                    output.send([status, note, 0], midiTime);
-                    activeNotes.delete(key);
-                }
+            const res = getMIDIOutputAndTimestamp(cutoffTime);
+            if (res) {
+                const { output, midiTime } = res;
+                const status = 0x80 | (channel - 1);
+                output.send([status, note, 0], midiTime);
+                activeNotes.delete(key);
             }
         }
         activeNoteOffs.delete(key);
@@ -357,18 +342,11 @@ export function sendMIDIDrum(instrumentName, time, velocity, octaveOffset = 0) {
  * @param {number} time - AudioContext time
  */
 export function sendMIDITransport(type, time) {
-    const { playback, midi } = getState();
-    if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
+    const res = getMIDIOutputAndTimestamp(time);
+    if (!res) {
         return;
     }
-    /** @type {any} */
-    const output = midiAccess.outputs.get(midi.selectedOutputId);
-    if (!output) {
-        return;
-    }
-
-    const midiTime =
-        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
+    const { output, midiTime } = res;
     const msg = type === 'start' ? 0xfa : 0xfc;
     output.send([msg], midiTime);
 }
