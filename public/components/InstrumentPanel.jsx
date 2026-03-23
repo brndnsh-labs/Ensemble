@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
 import { flushBuffers, togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { syncWorker } from '../worker-client.js';
+import { useClickOutside } from './hooks.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
 import { StyleSelector } from './StyleSelector.jsx';
@@ -33,26 +33,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
         },
     );
 
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const menuRef = useRef(null);
-
-    useEffect(() => {
-        if (!isMenuOpen) {
-            return;
-        }
-
-        const handleClickOutside = (/** @type {any} */ event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
-                setIsMenuOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isMenuOpen]);
+    const [isMenuOpen, setIsMenuOpen, menuRef] = useClickOutside();
 
     const switchTab = (/** @type {any} */ tab) => {
         if (tab === 'smart') {

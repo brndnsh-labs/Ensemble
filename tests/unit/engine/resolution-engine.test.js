@@ -18,6 +18,7 @@ vi.mock('../../../public/utils.js', async (importOriginal) => {
         ...actual,
         getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
         getFrequency: (midi) => 440 * 2 ** ((midi - 69) / 12),
+        applyBluesBends: vi.fn(),
         calculateTimingOffset: vi.fn(() => 0),
         midiToNote: () => ({ name: 'C', octave: 4 }),
     };

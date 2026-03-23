@@ -401,27 +401,17 @@ export function DrumPadModal() {
                                     </div>{' '}
                                 </div>
                                 <div style="display: flex; gap: 2rem; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 2rem;">
-                                    <div>
-                                        <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
-                                            Swing
-                                        </div>
-                                        <div style="font-size: 1.1rem; font-weight: bold; color: var(--soloist-color);">
-                                            {swing}%
-                                        </div>
+                                    <div class="drum-pad-stat">
+                                        <div class="drum-pad-stat-label">Swing</div>
+                                        <div class="drum-pad-stat-value">{swing}%</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
-                                            BPM
-                                        </div>
-                                        <div style="font-size: 1.1rem; font-weight: bold; color: var(--soloist-color);">
-                                            {bpm}
-                                        </div>
+                                    <div class="drum-pad-stat">
+                                        <div class="drum-pad-stat-label">BPM</div>
+                                        <div class="drum-pad-stat-value">{bpm}</div>
                                     </div>
-                                    <div>
-                                        <div style="font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
-                                            Genre
-                                        </div>
-                                        <div style="font-size: 1.1rem; font-weight: bold; color: var(--soloist-color);">
+                                    <div class="drum-pad-stat">
+                                        <div class="drum-pad-stat-label">Genre</div>
+                                        <div class="drum-pad-stat-value">
                                             {lastSmartGenre || 'Standard'}
                                         </div>
                                     </div>

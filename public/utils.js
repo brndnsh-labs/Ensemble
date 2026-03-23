@@ -715,3 +715,19 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
 
     return finalOffset;
 }
+
+/**
+ * Applies blues bend styling to a note.
+ * @param {any} primary
+ * @param {string} activeStyle
+ * @param {any} currentChord
+ */
+export function applyBluesBends(primary, activeStyle, currentChord) {
+    if (activeStyle === 'blues') {
+        const relativeInterval =
+            ((primary.midi % 12) - ((currentChord.rootMidi || 0) % 12) + 12) % 12;
+        if ((relativeInterval === 3 || relativeInterval === 6) && primary.bendStartInterval === 0) {
+            primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
+        }
+    }
+}

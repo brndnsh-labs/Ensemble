@@ -1,7 +1,25 @@
-import { calculateTimingOffset, getFrequency } from '../utils.js';
+import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
 import { getScaleForChord } from './theory-scales.js';
+
+/**
+ * Utility to generate a device buffer and compute busy steps.
+ * @param {string} deviceType
+ * @param {any} contextOptions
+ * @returns {{ buffer: any[], first: any, busySteps: number }|null}
+ */
+function applyDeviceBuffer(deviceType, contextOptions) {
+    const deviceBuffer = generateMelodicDevice(deviceType, contextOptions);
+    if (deviceBuffer && deviceBuffer.length > 0) {
+        /** @type {any} */
+        const first = deviceBuffer[0];
+        const busySteps =
+            (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1;
+        return { buffer: deviceBuffer.slice(1), first, busySteps };
+    }
+    return null;
+}
 
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 
@@ -143,15 +161,7 @@ export function selectPitchAndDevices(
             soloistState.lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
-        if (activeStyle === 'blues') {
-            const relativeInterval = ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12;
-            if (
-                (relativeInterval === 3 || relativeInterval === 6) &&
-                primary.bendStartInterval === 0
-            ) {
-                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
-            }
-        }
+        applyBluesBends(primary, activeStyle, currentChord);
 
         return res;
     };
@@ -503,37 +513,34 @@ export function selectPitchAndDevices(
         config.doubleStopProb > 0 &&
         ((playback.currentLoopCount || 0) > 0 || !sessionSeed || sessionSeed.notes.length === 0); // No double stops in the Head ONLY if seed exists
 
+    const deviceContextOptions = {
+        state,
+        selectedMidi,
+        targetChord,
+        activeStyle,
+        effectiveIntensity: intensity,
+        minMidi,
+        maxMidi,
+        lastMidi,
+        playback,
+        soloist: soloistState,
+        isPolyphonic,
+        isPiano: soloistState.mode === 'piano',
+        dynamicCenter: 72,
+        scaleMask,
+    };
+
     // --- Structural Awareness: Turnaround Handling ---
     if (
         activeStyle === 'blues' &&
         /** @type {any} */ (coordination).isTurnaround &&
         Math.random() < 0.6
     ) {
-        const deviceBuffer = generateMelodicDevice('bluesTurnaround', {
-            state,
-            selectedMidi,
-            targetChord,
-            activeStyle,
-            effectiveIntensity: intensity,
-            minMidi,
-            maxMidi,
-            lastMidi,
-            playback,
-            soloist: soloistState,
-            isPolyphonic,
-            isPiano: soloistState.mode === 'piano',
-            dynamicCenter: 72,
-            scaleMask,
-        });
-
-        if (deviceBuffer && deviceBuffer.length > 0) {
-            soloistState.embellishmentBuffer = deviceBuffer.slice(1); // @worker-mutation
-            const first = deviceBuffer[0];
-            soloistState.busySteps =
-                (Array.isArray(first)
-                    ? /** @type {any} */ (first[0]).durationSteps
-                    : /** @type {any} */ (first).durationSteps || 1) - 1; // @worker-mutation
-            return finalizeNote(first);
+        const res = applyDeviceBuffer('bluesTurnaround', deviceContextOptions);
+        if (res) {
+            soloistState.embellishmentBuffer = res.buffer; // @worker-mutation
+            soloistState.busySteps = res.busySteps; // @worker-mutation
+            return finalizeNote(res.first);
         }
     }
 
@@ -573,33 +580,11 @@ export function selectPitchAndDevices(
         const deviceType =
             allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         if (deviceType) {
-            const deviceBuffer = generateMelodicDevice(deviceType, {
-                state,
-                selectedMidi,
-                targetChord,
-                activeStyle,
-                effectiveIntensity: intensity,
-                minMidi,
-                maxMidi,
-                lastMidi,
-                playback,
-                soloist: soloistState,
-                isPolyphonic,
-                isPiano: soloistState.mode === 'piano',
-                dynamicCenter: 72,
-                scaleMask,
-            });
-
-            if (deviceBuffer && deviceBuffer.length > 0) {
-                // If a device generates multiple notes, those will bypass rhythm logic by setting busySteps
-                soloistState.deviceBuffer = deviceBuffer.slice(1); // @worker-mutation
-                const first = deviceBuffer[0];
-                soloistState.busySteps =
-                    (Array.isArray(first)
-                        ? /** @type {any} */ (first[0]).durationSteps
-                        : /** @type {any} */ (first).durationSteps || 1) - 1; // @worker-mutation
-                // Note: The device handles its own durations, but we ensure the first note gets returned
-                return finalizeNote(first);
+            const res = applyDeviceBuffer(deviceType, deviceContextOptions);
+            if (res) {
+                soloistState.deviceBuffer = res.buffer; // @worker-mutation
+                soloistState.busySteps = res.busySteps; // @worker-mutation
+                return finalizeNote(res.first);
             }
         }
     }

@@ -38,6 +38,7 @@ vi.mock('../../public/config.js', () => ({
 }));
 vi.mock('../../public/utils.js', () => ({
     getFrequency: () => 440,
+    applyBluesBends: vi.fn(),
     getMidi: () => 60,
     calculateTimingOffset: vi.fn(() => 0),
 }));

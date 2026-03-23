@@ -105,6 +105,7 @@ vi.mock('../../public/utils.js', () => ({
         return map[norm] || norm;
     },
     getFrequency: (m) => 440 * 2 ** ((m - 69) / 12),
+    applyBluesBends: vi.fn(),
     getMidi: (f) => Math.round(12 * Math.log2(f / 440) + 69),
     calculateTimingOffset: vi.fn(() => 0),
 }));

@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { calculateTimingOffset, getFrequency } from '../utils.js';
+import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import {
     GENRE_STYLE_MAPPING,
     INFLUENCE_POOLS,
@@ -211,16 +211,7 @@ export function getSoloistNote(
             soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
-        if (activeStyle === 'blues') {
-            const relativeInterval =
-                ((primary.midi % 12) - ((currentChord.rootMidi || 0) % 12) + 12) % 12;
-            if (
-                (relativeInterval === 3 || relativeInterval === 6) &&
-                primary.bendStartInterval === 0
-            ) {
-                primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
-            }
-        }
+        applyBluesBends(primary, activeStyle, currentChord);
         return res;
     };
 

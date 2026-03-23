@@ -30,6 +30,7 @@ vi.mock('../../../public/engine/theory-scales.js', () => ({
 vi.mock('../../../public/utils.js', () => ({
     calculateTimingOffset: vi.fn(() => 0),
     getFrequency: vi.fn(() => 440),
+    applyBluesBends: vi.fn(),
 }));
 
 describe('Soloist Phrasing Refinements v2.7.1', () => {

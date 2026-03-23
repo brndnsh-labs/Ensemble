@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
 import {
     cloneMeasure,
     saveDrumPreset,
@@ -10,6 +9,7 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { syncWorker } from '../worker-client.js';
+import { useClickOutside } from './hooks.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { SequencerGrid } from './SequencerGrid.jsx';
@@ -32,30 +32,7 @@ export function GroovePanel({ isActiveMobile }) {
         }),
     );
 
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const menuRef = useRef(null);
-
-    useEffect(() => {
-        if (!isMenuOpen) {
-            return;
-        }
-
-        const handleClickOutside = (/** @type {MouseEvent} */ event) => {
-            if (
-                menuRef.current &&
-                event.target instanceof Node &&
-                !menuRef.current.contains(event.target)
-            ) {
-                setIsMenuOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isMenuOpen]);
+    const [isMenuOpen, setIsMenuOpen, menuRef] = useClickOutside();
 
     /** @param {string} tab */
     const switchTab = (/** @type {any} */ tab) => {

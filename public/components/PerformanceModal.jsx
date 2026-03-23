@@ -514,17 +514,14 @@ export function PerformanceModal() {
                 {/* Floating Buttons */}
                 <div style="position: absolute; top: 1rem; right: 1rem; z-index: 100; display: flex; gap: 0.75rem;">
                     <button
-                        style="width: 40px; height: 40px; background: rgba(15, 23, 42, 0.8); border: 1.5px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; cursor: pointer; backdrop-filter: blur(4px);"
+                        class="performance-floating-btn"
+                        style="font-weight: bold;"
                         onClick={() => setShowLegend(!showLegend)}
                         aria-label="Toggle Legend"
                     >
                         ?
                     </button>
-                    <button
-                        style="width: 40px; height: 40px; background: rgba(15, 23, 42, 0.8); border: 1.5px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(4px);"
-                        onClick={close}
-                        aria-label="Close"
-                    >
+                    <button class="performance-floating-btn" onClick={close} aria-label="Close">
                         ✖
                     </button>
                 </div>
@@ -539,39 +536,33 @@ export function PerformanceModal() {
                         </h3>
 
                         <div style="display: flex; flex-direction: column; gap: 1.5rem; align-items: flex-start; width: 100%; max-width: 300px;">
-                            <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--yellow);" />
-                                <div style="text-align: left;">
-                                    <div style="font-weight: bold; color: var(--yellow);">
+                            <div class="performance-legend-item">
+                                <div class="legend-color-box" style="background: var(--yellow);" />
+                                <div class="legend-text-container">
+                                    <div class="legend-title" style="color: var(--yellow);">
                                         Safe Arpeggios
                                     </div>
-                                    <div style="font-size: 0.85rem; opacity: 0.7;">
-                                        Stable chord tones
-                                    </div>
+                                    <div class="legend-desc">Stable chord tones</div>
                                 </div>
                             </div>
 
-                            <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--cyan);" />
-                                <div style="text-align: left;">
-                                    <div style="font-weight: bold; color: var(--cyan);">
+                            <div class="performance-legend-item">
+                                <div class="legend-color-box" style="background: var(--cyan);" />
+                                <div class="legend-text-container">
+                                    <div class="legend-title" style="color: var(--cyan);">
                                         Color Extensions
                                     </div>
-                                    <div style="font-size: 0.85rem; opacity: 0.7;">
-                                        Flavorful scale tensions
-                                    </div>
+                                    <div class="legend-desc">Flavorful scale tensions</div>
                                 </div>
                             </div>
 
-                            <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 28px; height: 28px; border-radius: 6px; background: var(--magenta);" />
-                                <div style="text-align: left;">
-                                    <div style="font-weight: bold; color: var(--magenta);">
+                            <div class="performance-legend-item">
+                                <div class="legend-color-box" style="background: var(--magenta);" />
+                                <div class="legend-text-container">
+                                    <div class="legend-title" style="color: var(--magenta);">
                                         Bridge Tones
                                     </div>
-                                    <div style="font-size: 0.85rem; opacity: 0.7;">
-                                        Common to both chords
-                                    </div>
+                                    <div class="legend-desc">Common to both chords</div>
                                 </div>
                             </div>
 

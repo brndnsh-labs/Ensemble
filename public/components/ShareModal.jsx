@@ -176,56 +176,35 @@ export function ShareModal(_props) {
                     {/* --- SECTION 1: CONFIGURE CONTENT --- */}
                     <SettingGroup title="1. Configure Content">
                         <div class="instrument-selection-grid">
-                            <div
-                                class="flex-row"
-                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
-                            >
-                                <div style="flex-shrink: 0; display: flex;">
+                            <div class="instrument-toggle-row">
+                                <div class="instrument-toggle-container">
                                     <Toggle checked={includeSolo} onChange={setIncludeSolo} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">
-                                    🎺 Soloist
-                                </span>
+                                <span class="instrument-toggle-label">🎺 Soloist</span>
                             </div>
-                            <div
-                                class="flex-row"
-                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
-                            >
-                                <div style="flex-shrink: 0; display: flex;">
+                            <div class="instrument-toggle-row">
+                                <div class="instrument-toggle-container">
                                     <Toggle checked={includeBass} onChange={setIncludeBass} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">🎸 Bass</span>
+                                <span class="instrument-toggle-label">🎸 Bass</span>
                             </div>
-                            <div
-                                class="flex-row"
-                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
-                            >
-                                <div style="flex-shrink: 0; display: flex;">
+                            <div class="instrument-toggle-row">
+                                <div class="instrument-toggle-container">
                                     <Toggle checked={includeChords} onChange={setIncludeChords} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">
-                                    🎹 Chords
-                                </span>
+                                <span class="instrument-toggle-label">🎹 Chords</span>
                             </div>
-                            <div
-                                class="flex-row"
-                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
-                            >
-                                <div style="flex-shrink: 0; display: flex;">
+                            <div class="instrument-toggle-row">
+                                <div class="instrument-toggle-container">
                                     <Toggle checked={includeHarmony} onChange={setIncludeHarmony} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">
-                                    🎻 Harmony
-                                </span>
+                                <span class="instrument-toggle-label">🎻 Harmony</span>
                             </div>
-                            <div
-                                class="flex-row"
-                                style="gap: 0.75rem; cursor: pointer; align-items: center;"
-                            >
-                                <div style="flex-shrink: 0; display: flex;">
+                            <div class="instrument-toggle-row">
+                                <div class="instrument-toggle-container">
                                     <Toggle checked={includeDrums} onChange={setIncludeDrums} />
                                 </div>
-                                <span style="font-weight: 500; white-space: nowrap;">🥁 Drums</span>
+                                <span class="instrument-toggle-label">🥁 Drums</span>
                             </div>
                         </div>
 

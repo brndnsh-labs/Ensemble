@@ -6,10 +6,26 @@ import { getScaleForChord } from './theory-scales.js';
  */
 
 /**
+ * Computes a bitmask of intervals present in the current chord.
+ * @param {any} currentChord
+ * @returns {number}
+ */
+export function getChordMask(currentChord) {
+    let mask = 0;
+    if (currentChord?.intervals) {
+        for (let i = 0; i < currentChord.intervals.length; i++) {
+            const intv = ((currentChord.intervals[i] % 12) + 12) % 12;
+            mask |= 1 << intv;
+        }
+    }
+    return mask;
+}
+
+/**
  * Generates a sequence of notes for a specific melodic device.
  * @param {string} deviceType - The ID of the device to generate (e.g., 'bluesLick', 'run').
  * @param {any} ctx - Context object containing necessary state for generation.
- * @returns {Object[]|null} An array of note objects for the device buffer, or null if none generated.
+ * @returns {any[]|null} An array of note objects for the device buffer, or null if none generated.
  */
 export function generateMelodicDevice(deviceType, ctx) {
     const {
@@ -404,12 +420,7 @@ export function generateExtraNotes(ctx) {
     if (soloist.mode === 'piano') {
         const currentRoot = currentChord.rootMidi;
 
-        // ⚡ Bolt Optimization: Pre-compute bitmask for chord intervals to eliminate O(N) linear scanning inside loop
-        let chordMask = 0;
-        for (let i = 0; i < currentChord.intervals.length; i++) {
-            const intv = ((currentChord.intervals[i] % 12) + 12) % 12;
-            chordMask |= 1 << intv;
-        }
+        const chordMask = getChordMask(currentChord);
 
         if ((activeStyle === 'neo' || activeStyle === 'bird') && Math.random() < 0.6) {
             extraNotes.push({
@@ -458,12 +469,7 @@ export function generateExtraNotes(ctx) {
     } else if (soloist.mode === 'guitar') {
         const currentRoot = currentChord.rootMidi;
 
-        // ⚡ Bolt Optimization: Pre-compute bitmask for chord intervals to eliminate O(N) linear scanning inside loop
-        let chordMask = 0;
-        for (let i = 0; i < currentChord.intervals.length; i++) {
-            const intv = ((currentChord.intervals[i] % 12) + 12) % 12;
-            chordMask |= 1 << intv;
-        }
+        const chordMask = getChordMask(currentChord);
 
         const validIntervalsDown = [3, 4, 5, 7, 8, 9]; // minor 3rd to major 6th down
         let foundMidi = null;

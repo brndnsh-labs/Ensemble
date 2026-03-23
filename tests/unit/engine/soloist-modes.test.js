@@ -94,6 +94,7 @@ vi.mock('../../../public/engine/theory-scales.js', () => ({
 // Mock Utils
 vi.mock('../../../public/utils.js', () => ({
     getFrequency: (midi) => 440 * 2 ** ((midi - 69) / 12),
+    applyBluesBends: vi.fn(),
     getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
     calculateTimingOffset: vi.fn(() => 0),
 }));
