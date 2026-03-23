@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -48,9 +54,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         drumComplexity,
         sectionSeed,
         isTurnaround,
@@ -62,22 +71,17 @@ export function applyOverrides(context, state) {
         isEOfBeat,
         beatIndex,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const _isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. ENERGETIC PUSH (Micro-timing) ---
     // Rushing the beat drives the Ska-Punk energy.
     instTimeOffset -= 0.006 + intensity * 0.008;
 
     // --- 2. HI-HAT / OPEN DYNAMICS ---
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         // The Skank: Mandatory offbeat focus
@@ -102,7 +106,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 3. KICK DRUM ---
-    else if (inst.name === 'Kick') {
+    else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         if (activeMotif === 0) {
@@ -132,7 +136,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 4. SNARE POCKET ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         if (activeMotif === 2) {

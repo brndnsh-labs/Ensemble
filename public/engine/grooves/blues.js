@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -50,9 +56,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -60,21 +69,16 @@ export function applyOverrides(context, state) {
         beatIndex,
         drumComplexity,
         sectionSeed,
-        stepsPerBar,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const beatsPerMeasure = stepsPerBar / 4;
+    const beatsPerMeasure = context.stepsPerBar / 4;
     const lastBeatIndex = beatsPerMeasure - 1;
 
     // --- Crashes ---
-    if (inst.name === 'Open' && isDownbeat && intensity > 0.75 && roll(0.25)) {
+    if (context.inst.name === 'Open' && isDownbeat && intensity > 0.75 && roll(0.25)) {
         shouldPlay = true;
         velocity = 1.25;
         soundName = 'Crash';
@@ -82,7 +86,7 @@ export function applyOverrides(context, state) {
     }
 
     // --- HiHat / Ride (The Shuffle Engine) ---
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         // The core shuffle pattern: downbeats and the swung offbeat
@@ -121,7 +125,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- Kick Drum (Simplified Anchor) ---
-    else if (inst.name === 'Kick') {
+    else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         // Foundation Beats (1 and 3)
@@ -144,7 +148,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- Snare (The Pocket) ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         // Solid backbeat on 2 and 4
@@ -181,7 +185,7 @@ export function applyOverrides(context, state) {
     }
 
     // Use Sidestick for low intensity backbeats
-    if (shouldPlay && inst.name === 'Snare' && isBackbeat && intensity < 0.3) {
+    if (shouldPlay && context.inst.name === 'Snare' && isBackbeat && intensity < 0.3) {
         soundName = 'Sidestick';
         velocity = scaleVelocity(0.95, intensity, 0.05);
     }

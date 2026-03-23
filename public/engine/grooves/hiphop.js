@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -47,9 +53,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -61,16 +70,12 @@ export function applyOverrides(context, state) {
         sectionSeed,
     } = context;
 
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- 1. KICK (808 vs Boom Bap) ---
-    if (inst.name === 'Kick') {
+    if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         if (activeMotif === 0) {
@@ -101,7 +106,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 2. SNARE / CLAP ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
         soundName = intensity < 0.4 ? 'Sidestick' : 'Snare';
 
@@ -118,7 +123,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 3. HI-HATS (The Engine) ---
-    else if (inst.name === 'HiHat' || inst.name === 'Open') {
+    else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         // Foundation: 8ths or 16ths

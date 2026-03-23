@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -43,10 +49,13 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
         step,
-        inst,
-        playback,
         drumComplexity,
         sectionSeed,
         isTurnaround,
@@ -56,22 +65,17 @@ export function applyOverrides(context, state) {
         isBackbeat,
         isOffbeat,
         isAOfBeat,
-        stepsPerBar,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- Lay-back: Bossa is relaxed ---
     instTimeOffset += 0.005 + intensity * 0.005;
 
     // --- 1. KICK PATTERNS (Surdo Feel) ---
-    if (inst.name === 'Kick') {
+    if (context.inst.name === 'Kick') {
         shouldPlay = false;
         // Foundation: 1 and 3 in 4/4 (Surdo heart), generalizing to non-backbeat pulses
         if (isBeatStart && !isBackbeat) {
@@ -96,12 +100,12 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 2. CLAVE (Sidestick) ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
         soundName = 'Sidestick';
 
         // 2-Bar Clave Logic
-        const barIndex = Math.floor(step / stepsPerBar);
+        const barIndex = Math.floor(step / context.stepsPerBar);
         const isBar1 = barIndex % 2 === 0;
 
         if (activeMotif === 0 || activeMotif === 1) {
@@ -162,7 +166,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 3. HI-HAT (Steady 8ths) ---
-    else if (inst.name === 'HiHat' || inst.name === 'Open') {
+    else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
         if (isBeatStart || isOffbeat) {
             shouldPlay = true;
@@ -171,7 +175,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 4. PERCUSSION (Ganza/Shaker) ---
-    else if (inst.name === 'Shaker' || inst.name === 'Perc') {
+    else if (context.inst.name === 'Shaker' || context.inst.name === 'Perc') {
         shouldPlay = true;
         // Consistent 16th note shimmer with tiered pulse
         if (isBeatStart) {
@@ -182,13 +186,13 @@ export function applyOverrides(context, state) {
             velocity = scaleVelocity(0.45, intensity, 0.1);
         }
 
-        if (inst.name === 'Perc') {
+        if (context.inst.name === 'Perc') {
             shouldPlay = activeMotif >= 2 && roll(0.4, intensity);
             soundName = 'AgogoHigh';
         }
     }
 
-    if (shouldPlay && inst.name === 'Snare' && intensity < 0.4) {
+    if (shouldPlay && context.inst.name === 'Snare' && intensity < 0.4) {
         soundName = 'Sidestick';
     }
 

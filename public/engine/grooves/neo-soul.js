@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -7,7 +13,10 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Neo-Soul / Hip Hop.
-...
+ * 0: Classic Boom Bap (Solid & Grounded)
+ * 1: Ghost Note Heavy (Busy ghosting)
+ * 2: Dilla Skips (Heavy syncopation / drunken swing)
+ * 3: Modern Hybrid (Percussive & Expressive)
  * @param {number} seed
  * @param {number} complexity
  * @param {number} [intensity=1.0]
@@ -44,9 +53,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -57,9 +69,9 @@ export function applyOverrides(context, state) {
         sectionSeed,
         isTurnaround,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    const intensity = playback.bandIntensity;
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
+
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- 1. THE EXPRESSIVE DRAG (Dilla Micro-timing) ---
@@ -67,16 +79,12 @@ export function applyOverrides(context, state) {
     const snareDrag = 0.006 + intensity * 0.012; // Up to +0.018s delay
     const hiHatPush = -0.008 - intensity * 0.012; // Up to -0.020s rush
 
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         instTimeOffset += hiHatPush;
-    } else if (inst.name === 'Snare') {
+    } else if (context.inst.name === 'Snare') {
         instTimeOffset += snareDrag;
-    } else if (inst.name === 'Kick') {
+    } else if (context.inst.name === 'Kick') {
         instTimeOffset += 0.008; // Heavy kick weight
-    }
-
-    if (inst.muted) {
-        return state;
     }
 
     // --- 2. DRUNKEN JITTER ---
@@ -90,7 +98,7 @@ export function applyOverrides(context, state) {
     }
 
     // --- 3. HI-HAT DYNAMICS ---
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         // High intensity: 16th note shimmer becomes "lazy" and tiered
         if (intensity > 0.6) {
             shouldPlay = true;
@@ -112,7 +120,7 @@ export function applyOverrides(context, state) {
             soundName = 'Open';
             velocity = 1.1;
         }
-    } else if (inst.name === 'Snare') {
+    } else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         // --- Snare Motif Logic ---
@@ -145,7 +153,7 @@ export function applyOverrides(context, state) {
         if (shouldPlay && intensity < 0.35) {
             soundName = 'Sidestick';
         }
-    } else if (inst.name === 'Kick') {
+    } else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         // --- Kick Motif Logic ---
@@ -182,7 +190,7 @@ export function applyOverrides(context, state) {
         const dampening = 0.65 + intensity * 0.15;
         velocity *= dampening;
 
-        if (inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
+        if (context.inst.name === 'Snare' && intensity < INTENSITY_BANDS.LOW) {
             soundName = 'Sidestick';
         }
     }

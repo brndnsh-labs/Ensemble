@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -46,9 +52,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         drumComplexity,
         sectionSeed,
         isTurnaround,
@@ -60,20 +69,16 @@ export function applyOverrides(context, state) {
         isEOfBeat,
         isAOfBeat,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- Lay-back: Reggae is consistently behind the beat ---
     instTimeOffset += 0.008 + intensity * 0.005;
 
     // --- 1. KICK & SNARE ---
-    if (inst.name === 'Kick') {
+    if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         if (activeMotif === 0) {
@@ -105,7 +110,7 @@ export function applyOverrides(context, state) {
         if (shouldPlay) {
             velocity = scaleVelocity(1.15, intensity, 0.1);
         }
-    } else if (inst.name === 'Snare') {
+    } else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         // Universal Reggae Backbeat
@@ -132,7 +137,7 @@ export function applyOverrides(context, state) {
                 velocity = 0.85;
             }
         }
-    } else if (inst.name === 'HiHat' || inst.name === 'Open') {
+    } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         // Standard 8th note hats
@@ -156,7 +161,7 @@ export function applyOverrides(context, state) {
         }
     }
 
-    if (shouldPlay && inst.name === 'Snare' && intensity < 0.4) {
+    if (shouldPlay && context.inst.name === 'Snare' && intensity < 0.4) {
         soundName = 'Sidestick';
     }
 

@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -39,9 +45,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -53,15 +62,11 @@ export function applyOverrides(context, state) {
         sectionSeed,
     } = context;
 
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
-    if (inst.name === 'Snare') {
+    if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         // Train Beat snare is consistent 16ths
@@ -103,7 +108,7 @@ export function applyOverrides(context, state) {
                 velocity = scaleVelocity(0.9, intensity, 0.1);
             }
         }
-    } else if (inst.name === 'Kick') {
+    } else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         // Foundation: 1 and 3
@@ -116,7 +121,7 @@ export function applyOverrides(context, state) {
             shouldPlay = true;
             velocity = scaleVelocity(0.6, intensity, 0.1); // Feathered
         }
-    } else if (inst.name === 'HiHat' || inst.name === 'Open') {
+    } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         // Hats are secondary in a train beat

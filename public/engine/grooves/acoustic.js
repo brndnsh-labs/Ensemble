@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -48,32 +54,22 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
-    const {
-        inst,
-        playback,
-        drumComplexity,
-        sectionSeed,
-        isDownbeat,
-        isBeatStart,
-        isOffbeat,
-        beatIndex,
-    } = context;
-
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
-
-    if (inst.muted) {
-        return state;
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
     }
 
-    const intensity = playback.bandIntensity;
+    const { drumComplexity, sectionSeed, isDownbeat, isBeatStart, isOffbeat, beatIndex } = context;
+
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
+
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const _isEighthNote = isBeatStart || isOffbeat;
 
     // --- Lay-back: Acoustic is relaxed ---
     instTimeOffset += 0.004 + intensity * 0.004;
 
     // --- 1. SNARE / SIDESTICK (Cajon Feel) ---
-    if (inst.name === 'Snare') {
+    if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         // Transition from Sidestick to full Snare as intensity rises
@@ -103,7 +99,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 2. KICK (Deep & Grounded) ---
-    else if (inst.name === 'Kick') {
+    else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         // Foundation: Beat 1
@@ -127,7 +123,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 3. HI-HAT (Pulse Shaker) ---
-    else if (inst.name === 'HiHat' || inst.name === 'Open') {
+    else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         // Acoustic HiHats often act as a constant shaker-like pulse
         shouldPlay = true;
 
@@ -155,7 +151,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 4. PERCUSSION (Tambourine/Shaker) ---
-    else if (inst.name === 'Shaker' || inst.name === 'Tambourine') {
+    else if (context.inst.name === 'Shaker' || context.inst.name === 'Tambourine') {
         // High intensity shimmers
         shouldPlay = intensity > 0.6;
         if (shouldPlay) {
