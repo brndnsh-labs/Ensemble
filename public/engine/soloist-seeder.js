@@ -893,6 +893,160 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         }
     });
 
-    console.log(`[Seeder Debug] Finished generation. Total seed notes: ${notes.length}.`);
-    return { notes, loopLengthSteps: actualTotalSteps };
+    // --- Improvisational Pass (Post-Processing) ---
+    // Apply musical flair to the generated head to break up monotony
+    // and make the melody sound more intentional and vocal.
+    /** @type {SeedNote[]} */
+    const processedNotes = [];
+
+    for (let i = 0; i < notes.length; i++) {
+        const currentNote = notes[i];
+        const nextNote = notes[i + 1];
+
+        // We only apply flair probabilistically
+        if (prng() < 0.35) {
+            let mutationApplied = false;
+            const r = prng();
+
+            // Device 1: Syllable Splits (Repeated Notes)
+            // Break up long sustained notes into two notes of the same pitch
+            if (!mutationApplied && currentNote.durationSteps >= stepsPerBeat * 2) {
+                if (r < 0.4) {
+                    // Split a long note into a dotted-quarter and an eighth (or similar based on meter)
+                    const splitPoint = stepsPerBeat * 1.5;
+                    const firstDuration = splitPoint;
+                    const secondDuration = currentNote.durationSteps - splitPoint;
+
+                    if (secondDuration >= stepsPerBeat * 0.5) {
+                        processedNotes.push({
+                            ...currentNote,
+                            durationSteps: firstDuration,
+                        });
+                        processedNotes.push({
+                            ...currentNote,
+                            step: currentNote.step + firstDuration,
+                            durationSteps: secondDuration,
+                            isAnchor: false,
+                        });
+                        mutationApplied = true;
+                    }
+                } else if (r < 0.7) {
+                    // Split equally
+                    const halfDuration = Math.floor(currentNote.durationSteps / 2);
+                    if (halfDuration >= stepsPerBeat * 0.5) {
+                        processedNotes.push({
+                            ...currentNote,
+                            durationSteps: halfDuration,
+                        });
+                        processedNotes.push({
+                            ...currentNote,
+                            step: currentNote.step + halfDuration,
+                            durationSteps: currentNote.durationSteps - halfDuration,
+                            isAnchor: false,
+                        });
+                        mutationApplied = true;
+                    }
+                }
+            }
+
+            // Device 2: Syncopated Anticipations (Pushes)
+            // If the note lands squarely on a beat, push it early by half a beat and tie it
+            if (!mutationApplied && currentNote.step % stepsPerBeat === 0) {
+                // Only push if there's room before this note (i.e. it doesn't overlap the previous note)
+                const prevNote = processedNotes[processedNotes.length - 1];
+                const shiftAmount = stepsPerBeat * 0.5; // eighth note push
+
+                const canPush =
+                    !prevNote ||
+                    prevNote.step + prevNote.durationSteps <= currentNote.step - shiftAmount;
+
+                if (canPush && currentNote.durationSteps >= stepsPerBeat) {
+                    processedNotes.push({
+                        ...currentNote,
+                        step: currentNote.step - shiftAmount,
+                        durationSteps: currentNote.durationSteps + shiftAmount,
+                    });
+                    mutationApplied = true;
+                }
+            }
+
+            // Device 3: Neighbor/Passing Tones (Motion)
+            // If this pitch is the same as the next pitch, move this one to create motion
+            if (!mutationApplied && nextNote && currentNote.midi === nextNote.midi) {
+                // Find scale for the current step to select a diatonic neighbor
+                let lookupStep = currentNote.step;
+                if (lookupStep < 0) {
+                    lookupStep = actualTotalSteps + lookupStep;
+                }
+                if (lookupStep >= actualTotalSteps) {
+                    lookupStep = lookupStep % actualTotalSteps;
+                }
+
+                const stepEntry = binarySearchMap(stepMap, lookupStep);
+                if (stepEntry?.chord) {
+                    const scale = getScaleForChord(state, stepEntry.chord, null, style);
+                    const scaleLen = scale.length;
+
+                    // Find the current note's scale degree
+                    let currentDegreeIndex = -1;
+                    const targetPC = currentNote.midi % 12;
+                    for (let d = 0; d < scaleLen; d++) {
+                        const testPC = (stepEntry.chord.rootMidi + scale[d]) % 12;
+                        if (testPC === targetPC) {
+                            currentDegreeIndex = d;
+                            break;
+                        }
+                    }
+
+                    if (currentDegreeIndex !== -1) {
+                        // Move up or down one scale step
+                        const shiftDir = prng() > 0.5 ? 1 : -1;
+                        const newDegreeIndex =
+                            (((currentDegreeIndex + shiftDir) % scaleLen) + scaleLen) % scaleLen;
+
+                        // Calculate octave adjustment
+                        let octaveShift = 0;
+                        if (currentDegreeIndex + shiftDir >= scaleLen) {
+                            octaveShift = 12;
+                        }
+                        if (currentDegreeIndex + shiftDir < 0) {
+                            octaveShift = -12;
+                        }
+
+                        const newPC = (stepEntry.chord.rootMidi + scale[newDegreeIndex]) % 12;
+                        const baseOctave = Math.floor(currentNote.midi / 12) * 12;
+
+                        let newMidi = baseOctave + newPC + octaveShift;
+
+                        // Ensure we don't jump too far
+                        if (Math.abs(newMidi - currentNote.midi) > 6) {
+                            if (newMidi > currentNote.midi) {
+                                newMidi -= 12;
+                            } else {
+                                newMidi += 12;
+                            }
+                        }
+
+                        processedNotes.push({
+                            ...currentNote,
+                            midi: newMidi,
+                        });
+                        mutationApplied = true;
+                    }
+                }
+            }
+
+            if (!mutationApplied) {
+                processedNotes.push(currentNote);
+            }
+        } else {
+            processedNotes.push(currentNote);
+        }
+    }
+
+    // Sort the processed notes by step just in case our pushes messed up the order
+    processedNotes.sort((a, b) => a.step - b.step);
+
+    console.log(`[Seeder Debug] Finished generation. Total seed notes: ${processedNotes.length}.`);
+    return { notes: processedNotes, loopLengthSteps: actualTotalSteps };
 }
