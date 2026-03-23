@@ -6,11 +6,11 @@ import { getScaleForChord } from './theory-scales.js';
 const CANDIDATE_WEIGHTS = new Float32Array(128);
 
 // Stylistic interval arrays (hoisted to module scope to avoid re-allocation on every function call)
-const srvIntervals = [0, 3, 5, 6, 7, 10];
-const gilmourIntervals = [0, 7];
-const slashIntervals = [4, 9];
-const milesIntervals = [2, 5, 9];
-const evansIntervals = [2, 5, 6, 9];
+const srvIntervals = new Set([0, 3, 5, 6, 7, 10]);
+const gilmourIntervals = new Set([0, 7]);
+const slashIntervals = new Set([4, 9]);
+const milesIntervals = new Set([2, 5, 9]);
+const evansIntervals = new Set([2, 5, 6, 9]);
 
 /**
  * Primary entry point for pitch selection.
@@ -239,19 +239,19 @@ export function selectPitchAndDevices(
             switch (profile) {
                 case 'srv':
                     // SRV: High energy, favors pentatonic/blues notes
-                    if (srvIntervals.includes(interval)) {
+                    if (srvIntervals.has(interval)) {
                         weight *= 1.2;
                     }
                     break;
                 case 'gilmour':
                     // Gilmour: Melodic, Root and 5th stability for singsong leads
-                    if (gilmourIntervals.includes(interval)) {
+                    if (gilmourIntervals.has(interval)) {
                         weight *= 1.4;
                     }
                     break;
                 case 'slash':
                     // Slash: Classic rock, targets 3rds and 6ths
-                    if (slashIntervals.includes(interval)) {
+                    if (slashIntervals.has(interval)) {
                         weight *= 1.3;
                     }
                     break;
@@ -295,7 +295,7 @@ export function selectPitchAndDevices(
                     break;
                 case 'miles':
                     // Miles: Modal, targets extensions (9, 11, 13)
-                    if (milesIntervals.includes(interval)) {
+                    if (milesIntervals.has(interval)) {
                         weight *= 1.3;
                     }
                     break;
@@ -307,7 +307,7 @@ export function selectPitchAndDevices(
                     break;
                 case 'evans':
                     // Bill Evans: Upper Extensions (9, 11, #11, 13)
-                    if (evansIntervals.includes(interval)) {
+                    if (evansIntervals.has(interval)) {
                         weight += 500; // Final boost to reliably exceed 40% target
                         weight *= 10.0;
                     }
