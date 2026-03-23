@@ -40,3 +40,34 @@ export const DEFAULT_CONFIG = {
     backbeatCrack: false,
     isLatin: false,
 };
+
+/**
+ * Standard base logic for groove overrides.
+ * Extracts context and handles early returns for muted instruments.
+ *
+ * @param {any} context
+ * @param {any} state
+ * @returns {{base: any, muted: boolean}}
+ */
+export function applyStandardBase(context, state) {
+    const { inst, playback, stepsPerBar } = context;
+
+    if (inst.muted) {
+        return { base: state, muted: true };
+    }
+
+    const intensity = playback.bandIntensity;
+    // Common helpers derived from context
+    const isEighthNote = context.isBeatStart || context.isOffbeat;
+    const halfBarStep = Math.floor(stepsPerBar / 2);
+
+    return {
+        base: {
+            ...state,
+            intensity,
+            isEighthNote,
+            halfBarStep,
+        },
+        muted: false,
+    };
+}

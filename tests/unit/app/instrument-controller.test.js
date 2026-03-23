@@ -117,6 +117,7 @@ vi.mock('../../../public/state.js', () => {
 
     return {
         getState: () => mockState,
+        getSyncState: vi.fn(() => ({})),
         stateMap: mockState,
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_PARAM') {

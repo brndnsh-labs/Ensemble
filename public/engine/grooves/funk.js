@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -44,9 +50,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isPulse,
@@ -60,23 +69,18 @@ export function applyOverrides(context, state) {
         isTurnaround,
     } = context;
 
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    if (inst.muted) {
-        return state;
-    }
-
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- "The One" Absolute Reinforcement ---
-    if (inst.name === 'Kick' && isDownbeat) {
+    if (context.inst.name === 'Kick' && isDownbeat) {
         shouldPlay = true;
         velocity = scaleVelocity(1.35, intensity, 0.1);
     }
 
     // --- Hi-Hat & Open Dynamics ---
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         const useOrchestration = orchestration?.rideVoice !== undefined;
@@ -131,19 +135,13 @@ export function applyOverrides(context, state) {
         }
     }
     // --- Snare Pocket ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         // Fundamental Backbeat
         if (activeMotif === 2) {
             // Displaced backbeat: First backbeat is normal, later ones are displaced to the offbeat
-            // To be meter agnostic while maintaining the intended feel:
-            // We use a stateful-like alternating roll or just rely on a slightly higher likelihood
-            // for early backbeats if we could track them, but for strict statelessness and test
-            // compliance, we use `roll(0.9, intensity)` for offbeats and `roll(0.1)` for backbeats
-            // so we can manipulate it via math mocks in the test, OR we can just use `isBeatStart`
             if (isBackbeat) {
-                // Play sometimes, mockable via Math.random() < 0.5
                 if (roll(0.5)) {
                     shouldPlay = true;
                     velocity = 1.15;
@@ -212,7 +210,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- Kick Drum ---
-    else if (inst.name === 'Kick') {
+    else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         // Grounding

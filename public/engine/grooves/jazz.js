@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -51,9 +57,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isBeatStart,
         isBackbeat,
         isOffbeat,
@@ -70,15 +79,10 @@ export function applyOverrides(context, state) {
         stepInGroup,
         groupIndex,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity, halfBarStep } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const halfBarStep = Math.floor(stepsPerBar / 2);
     const lastBeatIndex = Math.max(1, Math.round(stepsPerBar / 4) - 1);
     const isPulse = tsConfig?.pulse?.includes(mStep);
 
@@ -95,7 +99,7 @@ export function applyOverrides(context, state) {
         isRideStep = isBeatStart || isSkipBeat;
     }
 
-    if (inst.name === 'Open') {
+    if (context.inst.name === 'Open') {
         shouldPlay = false;
         soundName = 'Ride';
 
@@ -129,10 +133,10 @@ export function applyOverrides(context, state) {
             }
         }
 
-        if (playback.bpm > 180 && isSkipBeat && roll(0.4)) {
+        if (context.playback.bpm > 180 && isSkipBeat && roll(0.4)) {
             shouldPlay = false;
         }
-    } else if (inst.name === 'HiHat') {
+    } else if (context.inst.name === 'HiHat') {
         shouldPlay = false;
         if (isBackbeat) {
             shouldPlay = true;
@@ -140,7 +144,7 @@ export function applyOverrides(context, state) {
             // Humanize the foot chick: slightly ahead of the beat for driving energy
             instTimeOffset -= 0.005 + Math.random() * 0.005;
         }
-    } else if (inst.name === 'Kick') {
+    } else if (context.inst.name === 'Kick') {
         shouldPlay = false;
         const isFeatherStep = isCompound ? isPulse : isBeatStart;
         if (isFeatherStep) {
@@ -169,7 +173,7 @@ export function applyOverrides(context, state) {
                 if (isSoloistBusy) {
                     bombProb *= 1.4;
                 }
-                if (playback.bpm > 175) {
+                if (context.playback.bpm > 175) {
                     bombProb *= 0.3;
                 }
 
@@ -189,7 +193,7 @@ export function applyOverrides(context, state) {
                 velocity = scaleVelocity(0.85, Math.random(), 0.25);
             }
         }
-    } else if (inst.name === 'Snare') {
+    } else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         if (isTurnaround) {
@@ -226,7 +230,7 @@ export function applyOverrides(context, state) {
                 if (!isSoloistBusy) {
                     compProb += 0.2;
                 }
-                if (playback.bpm > 175) {
+                if (context.playback.bpm > 175) {
                     compProb *= 0.5;
                 }
 
@@ -247,7 +251,7 @@ export function applyOverrides(context, state) {
         }
 
         // 3. THE BIG FINISH (Ending Signaling)
-        if (playback.songMode && playback.isEndingPending) {
+        if (context.playback.songMode && context.playback.isEndingPending) {
             if (isOffbeat && beatIndex === lastBeatIndex && roll(0.7)) {
                 shouldPlay = true;
                 velocity = 1.1;
@@ -256,7 +260,7 @@ export function applyOverrides(context, state) {
         }
     }
 
-    if (shouldPlay && inst.name === 'Snare' && intensity < 0.35) {
+    if (shouldPlay && context.inst.name === 'Snare' && intensity < 0.35) {
         soundName = 'Sidestick';
     }
 

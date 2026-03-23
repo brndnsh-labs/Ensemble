@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -43,9 +49,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isBeatStart,
         isBackbeat,
         isOffbeat,
@@ -58,18 +67,13 @@ export function applyOverrides(context, state) {
         stepsPerBar,
         loopStep,
     } = context;
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
 
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity, isEighthNote } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. KICK (Strict 4-on-the-floor) ---
-    if (inst.name === 'Kick') {
+    if (context.inst.name === 'Kick') {
         shouldPlay = isBeatStart;
         if (shouldPlay) {
             // Scale velocity to drive the energy
@@ -78,7 +82,7 @@ export function applyOverrides(context, state) {
                     ? scaleVelocity(1.2, intensity, 0.15)
                     : scaleVelocity(1.1, intensity, 0.1);
         }
-    } else if (inst.name === 'Snare') {
+    } else if (context.inst.name === 'Snare') {
         shouldPlay = false;
         // Standard Disco backbeat
         if (isBackbeat) {
@@ -107,7 +111,7 @@ export function applyOverrides(context, state) {
         if (shouldPlay && intensity < INTENSITY_BANDS.LOW) {
             soundName = 'Sidestick';
         }
-    } else if (inst.name === 'HiHat' || inst.name === 'Open') {
+    } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         // Core Offbeat Open Hat (The Disco "And")
@@ -141,7 +145,7 @@ export function applyOverrides(context, state) {
                 velocity = 1.25;
             }
         }
-    } else if (inst.name === 'Perc' || inst.name.includes('Cowbell')) {
+    } else if (context.inst.name === 'Perc' || context.inst.name.includes('Cowbell')) {
         // Motif 3: Octave Cowbells
         if (activeMotif === 3) {
             if (isEighthNote) {
@@ -164,10 +168,10 @@ export function applyOverrides(context, state) {
 
     // --- FINAL POLISH ---
     if (shouldPlay) {
-        if (inst.name === 'Snare' && intensity < 0.35) {
+        if (context.inst.name === 'Snare' && intensity < 0.35) {
             soundName = 'Sidestick';
         }
-        if (inst.name === 'Open') {
+        if (context.inst.name === 'Open') {
             // Ensure the open hat has that "shimmer"
             velocity *= 1.15;
         }

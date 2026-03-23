@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -57,9 +63,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -69,23 +78,17 @@ export function applyOverrides(context, state) {
         beatIndex,
         drumComplexity,
         sectionSeed,
-        stepsPerBar,
         loopStep,
         isTurnaround,
     } = context;
 
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity, isEighthNote, halfBarStep } =
+        base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const halfBarStep = Math.floor(stepsPerBar / 2);
-    const isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. KICK DRUM (The Engine) ---
-    if (inst.name === 'Kick') {
+    if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         if (activeMotif === 0) {
@@ -103,17 +106,8 @@ export function applyOverrides(context, state) {
             }
         } else if (activeMotif === 2) {
             // The Gallop (16-16-8)
-            // Kick on Beat Start and the 'a' of previous beat?
-            // Actually usually: 1, (skip e), and, a | 2, (skip e), and, a
-            // Or simpler: e, a, beat | e, a, beat
-            if (isBeatStart || isEOfBeat || isAOfBeat) {
-                // To create 16-16-8, we skip one 16th.
-                // Traditional Gallop: 1 (long), e (silent), and (short), a (short) -> No
-                // Traditional: Beat (eighth), e (silent), and (16th), a (16th) -> 8-16-16
-                // Reversed: 16-16-8 (e, a, BeatStart)
-                if (isBeatStart || isOffbeat || isAOfBeat) {
-                    shouldPlay = true;
-                }
+            if (isBeatStart || isOffbeat || isAOfBeat) {
+                shouldPlay = true;
             }
         } else if (activeMotif === 3 || activeMotif === 4) {
             // Continuous 16ths
@@ -129,13 +123,12 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 2. SNARE (The Anchor) ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
         soundName = 'Snare';
 
         if (activeMotif === 4 && intensity > 0.85) {
             // Blast Beat: Snare on every 8th or 16th
-            // For now, let's do every 8th note for "traditional" blast
             if (isEighthNote) {
                 shouldPlay = true;
             }
@@ -164,10 +157,13 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 3. CYMBALS / HATS ---
-    else if (inst.name === 'HiHat' || inst.name === 'Open' || inst.name === 'Crash') {
+    else if (
+        context.inst.name === 'HiHat' ||
+        context.inst.name === 'Open' ||
+        context.inst.name === 'Crash'
+    ) {
         shouldPlay = false;
 
-        // Bossa/Rockers style offbeat emphasis but with heavy metal energy
         if (isEighthNote) {
             shouldPlay = true;
             // Use China/Open sounds at high intensity

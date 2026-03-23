@@ -51,6 +51,123 @@ export function getState() {
     return stateMap;
 }
 
+/**
+ * Creates a worker-safe, raw snapshot of the global state.
+ * Strips deepSignal proxies and filter for necessary worker properties.
+ * @returns {Object}
+ */
+export function getSyncState() {
+    const { playback, arranger, chords, bass, soloist, harmony, groove, midi } = stateMap;
+
+    return {
+        playback: {
+            isPlaying: playback.isPlaying,
+            step: playback.step,
+            bpm: playback.bpm,
+            bandIntensity: playback.bandIntensity,
+            complexity: playback.complexity,
+            autoIntensity: playback.autoIntensity,
+            practiceMode: playback.practiceMode,
+            sessionTimer: playback.sessionTimer,
+            sessionStartTime: playback.sessionStartTime,
+            modals: { performance: playback.modals?.performance || false },
+            intent: playback.intent,
+            conductorVelocity: playback.conductorVelocity,
+            lyricalBias: playback.lyricalBias,
+            songMode: playback.songMode,
+            isEndingPending: playback.isEndingPending,
+        },
+        arranger: {
+            progression: arranger.progression,
+            stepMap: arranger.stepMap,
+            sectionMap: arranger.sectionMap,
+            totalSteps: arranger.totalSteps,
+            key: arranger.key,
+            isMinor: arranger.isMinor,
+            timeSignature: arranger.timeSignature,
+            grouping: arranger.grouping,
+            sections: arranger.sections,
+            measureMap: arranger.measureMap,
+        },
+        chords: {
+            style: chords.style,
+            octave: chords.octave,
+            density: chords.density,
+            enabled: chords.enabled,
+            volume: chords.volume,
+            pianoRoots: chords.pianoRoots,
+            rhythmicMask: chords.rhythmicMask,
+        },
+        bass: {
+            style: bass.style,
+            octave: bass.octave,
+            enabled: bass.enabled,
+            lastFreq: bass.lastFreq,
+            volume: bass.volume,
+        },
+        soloist: {
+            style: soloist.style,
+            octave: soloist.octave,
+            enabled: soloist.enabled,
+            lastFreq: soloist.lastFreq,
+            volume: soloist.volume,
+            mode: soloist.mode,
+            sessionSteps: soloist.sessionSteps,
+            leadSheetMelody: soloist.leadSheetMelody,
+            seed: soloist.seed,
+            sessionSeed: soloist.sessionSeed,
+            phrasingIntensity: soloist.phrasingIntensity,
+            tradeMode: soloist.tradeMode,
+            hookRetentionProb: soloist.hookRetentionProb,
+        },
+        harmony: {
+            style: harmony.style,
+            octave: harmony.octave,
+            enabled: harmony.enabled,
+            volume: harmony.volume,
+            reverb: harmony.reverb,
+            complexity: harmony.complexity,
+            pocketOffset: harmony.pocketOffset,
+        },
+        groove: {
+            enabled: groove.enabled,
+            genreFeel: groove.genreFeel,
+            swing: groove.swing,
+            swingSub: groove.swingSub,
+            humanize: groove.humanize,
+            pocket: groove.pocket,
+            creativity: groove.creativity,
+            sectionSeedMap: groove.sectionSeedMap,
+            lastDrumPreset: groove.lastDrumPreset,
+            fillActive: groove.fillActive,
+            variations: groove.variations,
+            measures: groove.measures,
+            orchestrationMap: groove.orchestrationMap,
+            accentMap: groove.accentMap,
+            instruments: groove.instruments.map((/** @type {any} */ i) => ({
+                name: i.name,
+                steps: [...i.steps],
+                muted: i.muted,
+            })),
+        },
+        midi: {
+            enabled: midi.enabled,
+            chordsChannel: midi.chordsChannel,
+            bassChannel: midi.bassChannel,
+            soloistChannel: midi.soloistChannel,
+            harmonyChannel: midi.harmonyChannel,
+            drumsChannel: midi.drumsChannel,
+            latency: midi.latency,
+            chordsOctave: midi.chordsOctave,
+            bassOctave: midi.bassOctave,
+            soloistOctave: midi.soloistOctave,
+            harmonyOctave: midi.harmonyOctave,
+            drumsOctave: midi.drumsOctave,
+            velocitySensitivity: midi.velocitySensitivity,
+        },
+    };
+}
+
 // Export individual state slices for dynamic imports
 export {
     arranger,

@@ -1,21 +1,19 @@
-import { DEFAULT_CONFIG, scaleVelocity } from './utils.js';
+import { applyStandardBase, DEFAULT_CONFIG } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
-    entropyMultiplier: 0.02,
-    blockAdjacentSnare: true,
-    backbeatCrack: false,
+    entropyMultiplier: 0.05,
 };
 
 /**
- * @param {number} _seed
- * @param {number} _complexity
- * @param {number} [intensity=1.0]
+ * @param {number} _sectionSeed
+ * @param {number} drumComplexity
+ * @param {number} intensity
  * @returns {number}
  */
-export function getMotif(_seed, _complexity, intensity = 1.0) {
-    if (intensity < 0.4) {
-        return 0; // Extremely sparse
+export function getMotif(_sectionSeed, drumComplexity, intensity) {
+    if (drumComplexity <= 0.2 || intensity < 0.3) {
+        return 0; // Ultralight
     }
     if (intensity < 0.7) {
         return 1; // Sparse
@@ -25,13 +23,16 @@ export function getMotif(_seed, _complexity, intensity = 1.0) {
 
 /**
  * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
+ * @param {any} state
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -43,60 +44,47 @@ export function applyOverrides(context, state) {
         loopStep,
     } = context;
 
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
-    if (inst.muted) {
-        return state;
-    }
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
     const safeIsOffbeat = isOffbeat !== undefined ? isOffbeat : loopStep % (stepsPerBar / 8) === 2;
 
-    if (inst.name === 'Kick') {
+    if (context.inst.name === 'Kick') {
         shouldPlay = false;
         if (isDownbeat) {
             shouldPlay = true;
-        } else if (activeMotif >= 1 && isBeatStart && beatIndex === 2) {
+        } else if (activeMotif === 1 && isBeatStart && beatIndex === 2) {
             shouldPlay = true; // Beat 3
-        } else if (activeMotif === 2 && safeIsOffbeat && beatIndex === 1) {
-            shouldPlay = true; // "And" of 2
-        }
-
-        if (shouldPlay) {
-            velocity = scaleVelocity(0.8, intensity, 0.1);
-        }
-    } else if (inst.name === 'Snare') {
-        shouldPlay = false;
-        soundName = intensity < 0.8 ? 'Sidestick' : 'Snare';
-
-        if (isBackbeat && (activeMotif > 0 || beatIndex === 1)) {
-            // At motif 0, only play on beat 2. At motif 1+, play 2 and 4.
-            shouldPlay = true;
-        }
-
-        if (shouldPlay) {
-            velocity = scaleVelocity(0.7, intensity, 0.2);
-        }
-    } else if (inst.name === 'HiHat' || inst.name === 'Open') {
-        shouldPlay = false;
-        soundName = 'HiHat'; // Rarely open in minimal
-
-        if (activeMotif === 0) {
-            if (isDownbeat) {
-                shouldPlay = true;
-            }
-        } else if (activeMotif === 1) {
-            if (isBeatStart) {
-                shouldPlay = true;
-            }
         } else if (activeMotif === 2) {
-            if (isBeatStart || safeIsOffbeat) {
+            if (isBeatStart && beatIndex === 2) {
                 shouldPlay = true;
+            } else if (isOffbeat && beatIndex === 1) {
+                shouldPlay = true; // Syncopation
             }
         }
-
-        if (shouldPlay) {
-            velocity = scaleVelocity(0.4, intensity, 0.2);
+    } else if (context.inst.name === 'Snare') {
+        shouldPlay = false;
+        // Metronomic backbeat
+        if (isBackbeat) {
+            shouldPlay = true;
+            velocity = 0.8;
+            if (intensity < 0.8) {
+                soundName = 'Sidestick';
+            } else {
+                soundName = 'Snare';
+            }
+        }
+    } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
+        shouldPlay = false;
+        if (isDownbeat) {
+            shouldPlay = true;
+            velocity = 0.7;
+        } else if (activeMotif === 1 && isBeatStart) {
+            shouldPlay = true;
+            velocity = 0.6;
+        } else if (activeMotif === 2 && (isBeatStart || safeIsOffbeat)) {
+            shouldPlay = true;
+            velocity = 0.4;
         }
     }
 

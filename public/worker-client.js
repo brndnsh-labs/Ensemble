@@ -1,4 +1,4 @@
-import { getState } from './state.js';
+import { getState, getSyncState } from './state.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
 const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
@@ -185,15 +185,97 @@ export function syncWorker(action, payload) {
     if (!timerWorker) {
         return;
     }
-    const { arranger, chords, bass, soloist, harmony, groove, playback, midi } = getState();
+    const { arranger, chords, soloist, harmony, groove, playback } = getState();
 
     /** @type {Partial<Record<keyof import('./types.js').EnsembleState, any>>} */
     const data = {};
 
     if (!action) {
         // Full Sync
-        Object.assign(data, {
-            arranger: {
+        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data: toRaw(getSyncState()) });
+        return;
+    }
+
+    // Delta Sync
+    switch (action) {
+        case 'SET_MODAL_OPEN':
+            if (payload.modal === 'performance') {
+                data.playback = { modals: { performance: !!payload.open } };
+            }
+            break;
+        case 'SET_BAND_INTENSITY':
+            data.playback = { bandIntensity: playback.bandIntensity };
+            break;
+        case 'SET_COMPLEXITY':
+            data.playback = { complexity: playback.complexity };
+            data.harmony = { complexity: harmony.complexity };
+            break;
+        case 'SET_AUTO_INTENSITY':
+            data.playback = { autoIntensity: playback.autoIntensity };
+            break;
+        case 'UPDATE_HB':
+            data.harmony = payload;
+            break;
+        case 'UPDATE_SB':
+            data.soloist = payload;
+            break;
+        case 'SET_PARAM':
+            if (payload.module) {
+                /** @type {any} */ (data)[payload.module] = { [payload.param]: payload.value };
+            }
+            break;
+        case 'UPDATE_CONDUCTOR_DECISION':
+            data.chords = { density: chords.density };
+            data.soloist = { hookRetentionProb: soloist.hookRetentionProb };
+            data.playback = {
+                conductorVelocity: playback.conductorVelocity,
+                intent: playback.intent,
+            };
+            break;
+        case 'SET_STYLE':
+            if (payload.module) {
+                /** @type {any} */ (data)[payload.module] = { style: payload.style };
+            }
+            break;
+        case 'SET_VOLUME':
+            if (payload.module) {
+                /** @type {any} */ (data)[payload.module] = { volume: payload.value };
+            }
+            break;
+        case 'SET_OCTAVE':
+            if (payload.module) {
+                /** @type {any} */ (data)[payload.module] = { octave: payload.value };
+            }
+            break;
+        case 'SET_MIDI_CONFIG':
+            data.midi = payload;
+            break;
+        case 'SET_GENRE_FEEL':
+            data.groove = {
+                genreFeel: groove.genreFeel,
+                swing: groove.swing,
+                swingSub: groove.swingSub,
+                creativity: groove.creativity,
+                sectionSeedMap: groove.sectionSeedMap,
+            };
+            break;
+        case 'SET_SWING':
+            data.groove = { swing: payload };
+            break;
+        case 'SET_SWING_SUB':
+            data.groove = { swingSub: payload };
+            break;
+        case 'SET_SESSION_STEPS':
+            data.soloist = { sessionSteps: payload };
+            break;
+        case 'SET_SOLOIST_MODE':
+            data.soloist = { mode: payload };
+            break;
+        case 'SET_BPM':
+            data.playback = { bpm: playback.bpm };
+            break;
+        case 'IMPORT_MUSICXML':
+            data.arranger = {
                 progression: arranger.progression,
                 stepMap: arranger.stepMap,
                 sectionMap: arranger.sectionMap,
@@ -201,204 +283,34 @@ export function syncWorker(action, payload) {
                 key: arranger.key,
                 isMinor: arranger.isMinor,
                 timeSignature: arranger.timeSignature,
-                grouping: arranger.grouping,
-                sections: arranger.sections,
-                measureMap: arranger.measureMap,
-            },
-            midi: {
-                chordsChannel: midi.chordsChannel,
-                bassChannel: midi.bassChannel,
-                soloistChannel: midi.soloistChannel,
-                harmonyChannel: midi.harmonyChannel,
-                drumsChannel: midi.drumsChannel,
-                chordsOctave: midi.chordsOctave,
-                bassOctave: midi.bassOctave,
-                soloistOctave: midi.soloistOctave,
-                harmonyOctave: midi.harmonyOctave,
-                drumsOctave: midi.drumsOctave,
-                velocitySensitivity: midi.velocitySensitivity,
-            },
-            chords: {
-                style: chords.style,
-                octave: chords.octave,
-                density: chords.density,
-                enabled: chords.enabled,
-                volume: chords.volume,
-                pianoRoots: chords.pianoRoots,
-                rhythmicMask: chords.rhythmicMask,
-            },
-            bass: {
-                style: bass.style,
-                octave: bass.octave,
-                enabled: bass.enabled,
-                lastFreq: bass.lastFreq,
-                volume: bass.volume,
-            },
-            soloist: {
-                style: soloist.style,
-                octave: soloist.octave,
-                enabled: soloist.enabled,
-                lastFreq: soloist.lastFreq,
-                volume: soloist.volume,
-                mode: soloist.mode,
-                sessionSteps: soloist.sessionSteps,
+            };
+            data.soloist = {
                 leadSheetMelody: soloist.leadSheetMelody,
-                seed: soloist.seed,
-                sessionSeed: soloist.sessionSeed,
-                phrasingIntensity: soloist.phrasingIntensity,
-                tradeMode: soloist.tradeMode,
-                hookRetentionProb: soloist.hookRetentionProb,
-            },
-            harmony: {
-                style: harmony.style,
-                octave: harmony.octave,
-                enabled: harmony.enabled,
-                volume: harmony.volume,
-                complexity: harmony.complexity,
-                pocketOffset: harmony.pocketOffset,
-            },
-            groove: {
-                genreFeel: groove.genreFeel,
-                lastDrumPreset: groove.lastDrumPreset,
-                enabled: groove.enabled,
-                volume: groove.volume,
-                measures: groove.measures,
-                swing: groove.swing,
-                swingSub: groove.swingSub,
-                creativity: groove.creativity,
-                sectionSeedMap: groove.sectionSeedMap,
-                pocket: groove.pocket,
-                humanize: groove.humanize,
-                instruments: groove.instruments.map((/** @type {any} */ i) => ({
-                    name: i.name,
-                    steps: [...i.steps],
-                    muted: i.muted,
-                })),
-            },
-            playback: {
-                bpm: playback.bpm,
-                bandIntensity: playback.bandIntensity,
-                complexity: playback.complexity,
-                autoIntensity: playback.autoIntensity,
-                practiceMode: playback.practiceMode,
-                sessionTimer: playback.sessionTimer,
+                style: soloist.style,
+                enabled: soloist.enabled,
+            };
+            break;
+        case 'SET_SESSION_TIMER':
+            data.playback = { sessionTimer: payload };
+            break;
+        case 'TOGGLE_PLAY':
+            // Ensure session start time is synced when play starts
+            data.playback = {
+                isPlaying: playback.isPlaying,
                 sessionStartTime: playback.sessionStartTime,
-                modals: { performance: playback.modals?.performance || false },
-                intent: playback.intent,
-                conductorVelocity: playback.conductorVelocity,
-                lyricalBias: playback.lyricalBias,
-                songMode: playback.songMode,
-            },
-        });
-    } else {
-        // Delta Sync
-        switch (action) {
-            case 'SET_MODAL_OPEN':
-                if (payload.modal === 'performance') {
-                    data.playback = { modals: { performance: !!payload.open } };
-                }
-                break;
-            case 'SET_BAND_INTENSITY':
-                data.playback = { bandIntensity: playback.bandIntensity };
-                break;
-            case 'SET_COMPLEXITY':
-                data.playback = { complexity: playback.complexity };
-                data.harmony = { complexity: harmony.complexity };
-                break;
-            case 'SET_AUTO_INTENSITY':
-                data.playback = { autoIntensity: playback.autoIntensity };
-                break;
-            case 'UPDATE_HB':
-                data.harmony = payload;
-                break;
-            case 'UPDATE_SB':
-                data.soloist = payload;
-                break;
-            case 'SET_PARAM':
-                if (payload.module) {
-                    /** @type {any} */ (data)[payload.module] = { [payload.param]: payload.value };
-                }
-                break;
-            case 'UPDATE_CONDUCTOR_DECISION':
-                data.chords = { density: chords.density };
-                data.soloist = { hookRetentionProb: soloist.hookRetentionProb };
-                data.playback = {
-                    conductorVelocity: playback.conductorVelocity,
-                    intent: playback.intent,
-                };
-                break;
-            case 'SET_STYLE':
-                if (payload.module) {
-                    /** @type {any} */ (data)[payload.module] = { style: payload.style };
-                }
-                break;
-            case 'SET_VOLUME':
-                if (payload.module) {
-                    /** @type {any} */ (data)[payload.module] = { volume: payload.value };
-                }
-                break;
-            case 'SET_MIDI_CONFIG':
-                data.midi = payload;
-                break;
-            case 'SET_GENRE_FEEL':
-                data.groove = {
-                    genreFeel: groove.genreFeel,
-                    swing: groove.swing,
-                    swingSub: groove.swingSub,
-                    creativity: groove.creativity,
-                    sectionSeedMap: groove.sectionSeedMap,
-                };
-                break;
-            case 'SET_SWING':
-                data.groove = { swing: payload };
-                break;
-            case 'SET_SWING_SUB':
-                data.groove = { swingSub: payload };
-                break;
-            case 'SET_SOLOIST_MODE':
-                data.soloist = { mode: payload };
-                break;
-            case 'SET_BPM':
-                data.playback = { bpm: playback.bpm };
-                break;
-            case 'IMPORT_MUSICXML':
-                data.arranger = {
-                    progression: arranger.progression,
-                    stepMap: arranger.stepMap,
-                    sectionMap: arranger.sectionMap,
-                    totalSteps: arranger.totalSteps,
-                    key: arranger.key,
-                    isMinor: arranger.isMinor,
-                    timeSignature: arranger.timeSignature,
-                };
-                data.soloist = {
-                    leadSheetMelody: soloist.leadSheetMelody,
-                    style: soloist.style,
-                    enabled: soloist.enabled,
-                };
-                break;
-            case 'SET_SESSION_TIMER':
-                data.playback = { sessionTimer: payload };
-                break;
-            case 'TOGGLE_PLAY':
-                // Ensure session start time is synced when play starts
-                data.playback = {
-                    isPlaying: playback.isPlaying,
-                    sessionStartTime: playback.sessionStartTime,
-                };
-                break;
-            case 'ARRANGER_UPDATE': // Custom action for large structural changes
-                data.arranger = {
-                    progression: arranger.progression,
-                    stepMap: arranger.stepMap,
-                    sectionMap: arranger.sectionMap,
-                    totalSteps: arranger.totalSteps,
-                    key: arranger.key,
-                    isMinor: arranger.isMinor,
-                    timeSignature: arranger.timeSignature,
-                };
-                break;
-        }
+            };
+            break;
+        case 'ARRANGER_UPDATE': // Custom action for large structural changes
+            data.arranger = {
+                progression: arranger.progression,
+                stepMap: arranger.stepMap,
+                sectionMap: arranger.sectionMap,
+                totalSteps: arranger.totalSteps,
+                key: arranger.key,
+                isMinor: arranger.isMinor,
+                timeSignature: arranger.timeSignature,
+            };
+            break;
     }
 
     if (Object.keys(data).length > 0) {

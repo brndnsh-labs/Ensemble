@@ -1,4 +1,10 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    INTENSITY_BANDS,
+    roll,
+    scaleVelocity,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
@@ -60,9 +66,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
  * @returns {any}
  */
 export function applyOverrides(context, state) {
+    const { base, muted } = applyStandardBase(context, state);
+    if (muted) {
+        return base;
+    }
+
     const {
-        inst,
-        playback,
         isDownbeat,
         isBeatStart,
         isBackbeat,
@@ -71,23 +80,16 @@ export function applyOverrides(context, state) {
         orchestration,
         sectionSeed,
         isTurnaround,
-        stepsPerBar,
         loopStep,
     } = context;
 
-    let { shouldPlay, velocity, soundName, instTimeOffset } = state;
+    let { shouldPlay, velocity, soundName, instTimeOffset, intensity, isEighthNote, halfBarStep } =
+        base;
 
-    if (inst.muted) {
-        return state;
-    }
-
-    const intensity = playback.bandIntensity;
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
-    const halfBarStep = Math.floor(stepsPerBar / 2);
-    const isEighthNote = isBeatStart || isOffbeat;
 
     // --- 1. HI-HAT / RIDE ---
-    if (inst.name === 'HiHat' || inst.name === 'Open') {
+    if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
 
         if (isTurnaround && loopStep >= halfBarStep) {
@@ -123,7 +125,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 2. KICK DRUM ---
-    else if (inst.name === 'Kick') {
+    else if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
         // Foundation: Always on non-backbeat pulses
@@ -165,7 +167,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 3. SNARE ---
-    else if (inst.name === 'Snare') {
+    else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
         if (activeMotif === 2) {
@@ -209,7 +211,7 @@ export function applyOverrides(context, state) {
         }
     }
     // --- 4. TOMS ---
-    else if (inst.name.includes('Tom')) {
+    else if (context.inst.name.includes('Tom')) {
         if (isTurnaround && loopStep >= halfBarStep) {
             // Distribute across toms for energy
             if (isEighthNote && roll(0.6, intensity)) {

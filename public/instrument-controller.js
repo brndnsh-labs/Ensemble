@@ -1,3 +1,4 @@
+import { DRUM_PRESETS } from './data/drum-presets.js';
 import {
     killAllPianoNotes,
     killBassBus,
@@ -12,7 +13,7 @@ import {
     restoreGains,
 } from './engine/engine.js';
 import { saveCurrentState } from './persistence.js';
-import { dispatch, getState, stateMap } from './state.js';
+import { dispatch, getState, getSyncState, stateMap } from './state.js';
 import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 import { getStepsPerMeasure } from './utils.js';
@@ -43,9 +44,8 @@ export function updateMeasures(val) {
 }
 
 /** @param {string} name */
-export async function loadDrumPreset(name) {
+export function loadDrumPreset(name) {
     const { groove, arranger } = getState();
-    const { DRUM_PRESETS } = await import('./data/drum-presets.js');
     let p = /** @type {any} */ (DRUM_PRESETS)[name];
     if (/** @type {any} */ (p)[arranger.timeSignature]) {
         p = { ...p, .../** @type {any} */ (p)[arranger.timeSignature] };
@@ -80,20 +80,6 @@ export async function loadDrumPreset(name) {
         param: 'swingSub',
         value: p.sub || groove.swingSub,
     });
-
-    if (p.variations) {
-        dispatch(ACTIONS.SET_PARAM, {
-            module: 'groove',
-            param: 'variations',
-            value: p.variations,
-        });
-    } else {
-        dispatch(ACTIONS.SET_PARAM, {
-            module: 'groove',
-            param: 'variations',
-            value: null,
-        });
-    }
 
     dispatch('DRUM_PRESET_LOADED');
 }
@@ -191,7 +177,7 @@ export function handleTap(setBpmRef) {
  * Flushes all local buffers and kills current sounds.
  */
 export function flushBuffers() {
-    const { groove, arranger, playback, chords, bass, soloist, harmony } = getState();
+    const { playback, bass, soloist, chords, harmony } = getState();
     // 1. Clear local buffers
     bass.buffer.clear();
     soloist.buffer.clear();
@@ -212,67 +198,7 @@ export function flushBuffers() {
     killHarmonyBus(stateMap);
 
     // 3. Prepare sync data for atomicity
-    const syncData = {
-        arranger: {
-            progression: arranger.progression,
-            stepMap: arranger.stepMap,
-            sectionMap: arranger.sectionMap,
-            totalSteps: arranger.totalSteps,
-            key: arranger.key,
-            isMinor: arranger.isMinor,
-            timeSignature: arranger.timeSignature,
-        },
-        chords: {
-            style: chords.style,
-            octave: chords.octave,
-            density: chords.density,
-            enabled: chords.enabled,
-            volume: chords.volume,
-        },
-        bass: {
-            style: bass.style,
-            octave: bass.octave,
-            enabled: bass.enabled,
-            lastFreq: bass.lastFreq,
-            volume: bass.volume,
-        },
-        soloist: {
-            style: soloist.style,
-            octave: soloist.octave,
-            enabled: soloist.enabled,
-            lastFreq: soloist.lastFreq,
-            volume: soloist.volume,
-            mode: soloist.mode,
-            sessionSteps: soloist.sessionSteps,
-        },
-        harmony: {
-            style: harmony.style,
-            octave: harmony.octave,
-            enabled: harmony.enabled,
-            volume: harmony.volume,
-            complexity: harmony.complexity,
-        },
-        groove: {
-            genreFeel: groove.genreFeel,
-            enabled: groove.enabled,
-            volume: groove.volume,
-            measures: groove.measures,
-            swing: groove.swing,
-            swingSub: groove.swingSub,
-            instruments: groove.instruments.map((/** @type {any} */ i) => ({
-                name: i.name,
-                steps: [...i.steps],
-                muted: i.muted,
-            })),
-        },
-        playback: {
-            bpm: playback.bpm,
-            bandIntensity: playback.bandIntensity,
-            complexity: playback.complexity,
-            autoIntensity: playback.autoIntensity,
-            practiceMode: playback.practiceMode,
-        },
-    };
+    const syncData = getSyncState();
 
     // 4. Trigger a BUNDLED worker flush
     flushWorker(playback.step, syncData);
