@@ -165,7 +165,8 @@
         "bvii",
         "biim",
         "viim",
-        "jscpd"
+        "jscpd",
+        "BARLINE"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

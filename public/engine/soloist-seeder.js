@@ -353,6 +353,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             /** @type {Map<string, number[]>} */
             const cellMemory = new Map();
 
+            let tiedDurationBeats = 0;
+
             for (let measure = 0; measure < phraseLength; measure++) {
                 let currentCell = cellA;
                 const cellType = structureArray[measure % structureArray.length];
@@ -390,6 +392,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 currentCell.forEach((cellNote, noteIdx) => {
                     let isRest = cellNote.isRest;
                     let duration = cellNote.duration;
+
+                    // BARLINE TIE: If the previous measure tied over, silence notes at the entrance
+                    if (tiedDurationBeats > 0 && cellNote.beatOffset < tiedDurationBeats) {
+                        isRest = true;
+                    }
 
                     // Imperfect Symmetry: Even if A-A, let repeated measures drift slightly
                     if (measure > 0 && cellType === 'A' && prng() < 0.3) {
@@ -471,6 +478,24 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // Store the offsets for future sequencing
                 if (!cellMemory.has(cellType)) {
                     cellMemory.set(cellType, currentCellOffsets);
+                }
+
+                // BARLINE TIE: At the end of the measure, decide if we should tie the last note over
+                tiedDurationBeats = 0; // Reset for next measure
+                if (measure < phraseLength - 1) {
+                    const lastActiveNote = motif.filter((n) => !n.isRest).pop();
+                    // If the last note ends late in the measure (beat 3 or later)
+                    if (
+                        lastActiveNote &&
+                        lastActiveNote.beatOffset >= measure * tsConfig.beats + (tsConfig.beats - 1)
+                    ) {
+                        const tieProb = ['bossa', 'jazz', 'bird'].includes(style) ? 0.5 : 0.25;
+                        if (prng() < tieProb) {
+                            const tieLengthBeats = prng() > 0.5 ? 1 : 0.5;
+                            lastActiveNote.duration += tieLengthBeats * stepsPerBeat;
+                            tiedDurationBeats = tieLengthBeats;
+                        }
+                    }
                 }
             }
 
