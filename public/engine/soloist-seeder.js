@@ -5,6 +5,36 @@ import { STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
+ * Rhythmic Cell Dictionary
+ * Common musical motifs used to build the "Head".
+ * Expressed in beats relative to the start of the cell.
+ */
+const RH_CELLS = {
+    // 4/4 Basic Cells
+    BASIC: [
+        [0, 1, 2, 3], // Straight Quarters
+        [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], // Straight 8ths
+        [0, 1.5, 2, 3.5], // Syncopated (And of 1, And of 4)
+        [0, 1, 2], // The "Missing 4"
+        [1, 2, 3], // The "Late Start"
+    ],
+    // 4/4 Stylistic/Complex
+    SYNC: [
+        [0, 0.75, 1.5, 2.25, 3], // Dotted 8th (Bossa-ish)
+        [0, 0.5, 1.25, 1.5, 2, 2.5, 3.25, 3.5], // 16th pushes
+        [0.5, 1, 1.5, 2, 2.5, 3, 3.5], // Off-beat start
+        [0, 1, 2, 2.75, 3, 3.75], // Gallop finish
+    ],
+    // 3/4 Cells
+    WALTZ: [
+        [0, 1, 2], // Straight
+        [0, 0.5, 1, 1.5, 2, 2.5], // 8ths
+        [0, 1.5, 2], // Syncopated 2
+        [0, 0.75, 1.5, 2.25], // Dotted
+    ],
+};
+
+/**
  * Soloist Seeder Module (v4)
  * Generates a "Dynamic Head" (Seed Melody) for the entire arrangement.
  * Implements a continuous, musically connected line utilizing target notes,
@@ -114,16 +144,116 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         const iteration = sectionIterationCount.get(category) || 0;
         sectionIterationCount.set(category, iteration + 1);
 
+        const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+        const rhythmicDensity = config.rhythmicDensity || 0.5;
+
+        /**
+         * Helper to generate a 1-measure rhythmic cell
+         * @param {boolean} sparse
+         * @param {boolean} dense
+         * @param {number} density
+         * @returns {any[]}
+         */
+        const generateCell = (sparse, dense, density) => {
+            /** @type {any[]} */
+            const cell = [];
+            const beatsPerCell = tsConfig.beats;
+            const isCompound = tsConfig.pulse && tsConfig.pulse.length > 0;
+
+            if (isCompound) {
+                // Compound Meter Pulse-Aware Generation (e.g. 6/8)
+                const grouping = tsConfig.grouping || [beatsPerCell];
+                let currentGroupStep = 0;
+
+                grouping.forEach((/** @type {number} */ groupSize) => {
+                    const groupSteps = groupSize * stepsPerBeat;
+                    let stepInGroup = 0;
+
+                    while (stepInGroup < groupSteps) {
+                        const isPulseStart = stepInGroup === 0;
+                        let isRest = false;
+
+                        if (sparse) {
+                            isRest = prng() > (isPulseStart ? density * 0.6 : density * 0.4);
+                        } else if (dense) {
+                            isRest = prng() > Math.min(0.98, density * 1.5);
+                        } else {
+                            isRest = prng() > (isPulseStart ? density * 1.1 : density * 0.9);
+                        }
+
+                        // Calculate duration
+                        let durationSteps = stepsPerBeat;
+                        if (dense) {
+                            durationSteps = prng() > 0.5 ? stepsPerBeat / 2 : stepsPerBeat;
+                        } else if (sparse) {
+                            durationSteps = groupSteps - stepInGroup;
+                        } else {
+                            if (stepInGroup + stepsPerBeat > groupSteps) {
+                                durationSteps = groupSteps - stepInGroup;
+                            }
+                        }
+
+                        if (!isRest) {
+                            cell.push({
+                                beatOffset: (currentGroupStep + stepInGroup) / stepsPerBeat,
+                                duration: durationSteps,
+                                isRest: false,
+                            });
+                        }
+
+                        stepInGroup += durationSteps;
+                    }
+                    currentGroupStep += groupSteps;
+                });
+            } else {
+                // Standard Meter: Use Rhythm Dictionary
+                let pool = RH_CELLS.BASIC;
+                if (beatsPerCell === 3) {
+                    pool = RH_CELLS.WALTZ;
+                } else if (density > 0.7 || dense || prng() < 0.3) {
+                    pool = [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
+                }
+
+                const selectedPattern = pool[Math.floor(prng() * pool.length)];
+                const restProb = 1.0 - density;
+
+                selectedPattern.forEach((beatOffset, idx) => {
+                    // Sparse mode drops non-anchors
+                    if (sparse && idx % 2 !== 0 && prng() < 0.6) {
+                        return;
+                    }
+
+                    // General rest probability
+                    if (!dense && prng() < restProb * 0.5) {
+                        return;
+                    }
+
+                    const nextOffset = selectedPattern[idx + 1] || beatsPerCell;
+                    let dur = (nextOffset - beatOffset) * stepsPerBeat;
+
+                    // Add some length variety to basic patterns
+                    if (!dense && dur === stepsPerBeat && prng() < 0.2) {
+                        dur *= 2;
+                    }
+
+                    cell.push({
+                        beatOffset,
+                        duration: dur,
+                        isRest: false,
+                    });
+                });
+            }
+            return cell;
+        };
+
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
         if (!sectionMotifs.has(category)) {
-            const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
             const stationaryProb = config.stationaryProb || 0.05;
             const isStationaryMotif = prng() < stationaryProb;
 
             // Generate a 2-measure template
             const motif = [];
-            let _currentBeat = 0;
             let currentDegreeOffset = 0;
 
             // Check for contrast needs
@@ -154,110 +284,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     duration: isShortPickup ? stepsPerBeat / 2 : stepsPerBeat,
                     isRest: false,
                 });
-                _currentBeat = 0;
             }
 
-            /**
-             * Helper to generate a 1-measure rhythmic cell
-             * @param {boolean} sparse
-             * @param {boolean} dense
-             */
-            const generateCell = (sparse, dense) => {
-                const cell = [];
-                let cellBeat = 0;
-                const beatsPerCell = tsConfig.beats;
-                const isCompound = tsConfig.pulse && tsConfig.pulse.length > 0;
-
-                if (isCompound) {
-                    // Compound Meter Pulse-Aware Generation (e.g. 6/8)
-                    const grouping = tsConfig.grouping || [beatsPerCell];
-                    let currentGroupStep = 0;
-
-                    grouping.forEach(
-                        (/** @type {number} */ groupSize, /** @type {number} */ _gIdx) => {
-                            const groupSteps = groupSize * stepsPerBeat;
-                            let stepInGroup = 0;
-
-                            while (stepInGroup < groupSteps) {
-                                const isPulseStart = stepInGroup === 0;
-                                let isRest = false;
-
-                                if (sparse) {
-                                    isRest = prng() > (isPulseStart ? 0.3 : 0.6);
-                                } else if (dense) {
-                                    isRest = prng() > 0.95;
-                                } else {
-                                    isRest = prng() > (isPulseStart ? 0.9 : 0.7);
-                                }
-
-                                // Calculate duration in beats relative to the grouping
-                                let durationSteps = stepsPerBeat;
-                                if (dense) {
-                                    durationSteps = prng() > 0.5 ? stepsPerBeat / 2 : stepsPerBeat;
-                                } else if (sparse) {
-                                    durationSteps = groupSteps - stepInGroup;
-                                } else {
-                                    // Standard: mostly 8th notes (stepsPerBeat)
-                                    if (stepInGroup + stepsPerBeat > groupSteps) {
-                                        durationSteps = groupSteps - stepInGroup;
-                                    }
-                                }
-
-                                if (!isRest) {
-                                    cell.push({
-                                        beatOffset: (currentGroupStep + stepInGroup) / stepsPerBeat,
-                                        duration: durationSteps,
-                                        isRest: false,
-                                    });
-                                }
-
-                                stepInGroup += durationSteps;
-                            }
-                            currentGroupStep += groupSteps;
-                        },
-                    );
-                } else {
-                    // Standard Meter (4/4, 3/4)
-                    while (cellBeat < beatsPerCell) {
-                        let isRest = false;
-                        if (sparse) {
-                            isRest = prng() > 0.4;
-                        } else if (dense) {
-                            isRest = prng() > 0.9;
-                        } else {
-                            isRest = prng() > 0.85; // 15% chance of rest
-                        }
-
-                        let durationBeats = 1;
-                        if (sparse) {
-                            durationBeats = prng() > 0.5 ? 4 : 2;
-                        } else if (dense) {
-                            durationBeats = prng() > 0.6 ? 0.5 : 0.25;
-                        } else {
-                            if (cellBeat % tsConfig.beats === 0) {
-                                durationBeats = prng() > 0.5 ? 2 : 1;
-                            } else {
-                                durationBeats = prng() > 0.7 ? 0.5 : 1;
-                            }
-                        }
-
-                        if (cellBeat + durationBeats > beatsPerCell) {
-                            durationBeats = beatsPerCell - cellBeat;
-                        }
-
-                        cell.push({
-                            beatOffset: cellBeat,
-                            duration: durationBeats * stepsPerBeat,
-                            isRest,
-                        });
-                        cellBeat += durationBeats;
-                    }
-                }
-                return cell;
-            };
-
             // 1. Generate the initial A cell
-            const cellA = generateCell(forceSparse, forceDense);
+            const cellA = generateCell(forceSparse, forceDense, rhythmicDensity);
 
             // Determine motif structure for the 2-measure block
             const structureRoll = prng();
@@ -277,7 +307,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                 if (measure === 1) {
                     if (structureType === 'A-B') {
-                        currentCell = generateCell(forceSparse, forceDense);
+                        currentCell = generateCell(forceSparse, forceDense, rhythmicDensity);
                     } else if (structureType === 'A-Rest') {
                         // Create a mostly empty cell for measure 2
                         currentCell = [
@@ -505,24 +535,25 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
             if (isTurnaroundMeasures) {
                 // Generate a one-off "Departure" motif for the turnaround
+                // Busier turnaround (+0.2 density boost) but still respects genre
+                const tDensity = Math.min(1.0, rhythmicDensity + 0.2);
+                const tCellA = generateCell(false, true, tDensity);
+                const tCellB = generateCell(false, true, tDensity);
+
                 activeMotif = [];
-                let turnaroundBeat = 0;
                 let tDegree = 0;
-                while (turnaroundBeat < tsConfig.beats * 2) {
-                    const isRest = prng() > 0.7; // Busier turnaround
-                    const duration = prng() > 0.5 ? 1 : 0.5;
-                    if (!isRest) {
+                [tCellA, tCellB].forEach((cell, cellIdx) => {
+                    cell.forEach((cNote) => {
                         tDegree += prng() > 0.5 ? 1 : -1;
                         activeMotif.push({
-                            beatOffset: turnaroundBeat,
+                            beatOffset: cNote.beatOffset + cellIdx * tsConfig.beats,
                             isPickup: false,
                             scaleDegreeOffset: tDegree,
-                            duration: duration * stepsPerBeat,
+                            duration: cNote.duration,
                             isRest: false,
                         });
-                    }
-                    turnaroundBeat += duration;
-                }
+                    });
+                });
             }
 
             // Pick a target chord tone for the downbeat of these 2 measures

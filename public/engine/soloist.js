@@ -382,6 +382,7 @@ export function getSoloistNote(
                     isSustained: headNote.durationSteps > 4,
                     isHeadBypass: true,
                     targetMidi: targetMidi,
+                    seedNote: headNote, // Pass the original seed note for context
                 };
 
                 soloist.lastAttackStep = step; // @worker-mutation
@@ -441,11 +442,15 @@ export function getSoloistNote(
             }
 
             // Allow fills if the gap is at least a beat (usually 4 steps) and based on intensity
-            if (minGap >= stepsPerBeat && Math.random() < effectiveIntensity * 0.8) {
+            // Motivic Gap Fill: Instead of random fills, we bias towards the current genre's density.
+            if (minGap >= stepsPerBeat && Math.random() < effectiveIntensity * 0.7) {
                 shouldFallThrough = true;
-                soloist.activeSteps = minGap - 1; /* @worker-mutation */
+                // Allow the generative engine to play for half the gap to prevent "over-playing" into the next seed note
+                soloist.activeSteps = Math.floor(minGap / 2); /* @worker-mutation */
                 soloist.isResting = false; // @worker-mutation
-                logDebug(`[Gap-Fill] Found gap of ${minGap} steps. Waking generative engine.`);
+                logDebug(
+                    `[Gap-Fill] Found gap of ${minGap} steps. Waking generative engine for ${soloist.activeSteps} steps.`,
+                );
             }
         }
 

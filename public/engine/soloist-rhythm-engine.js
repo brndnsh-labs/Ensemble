@@ -124,7 +124,14 @@ export function generateRhythmPlan(
             }
 
             const warmUpScale = Math.min(1.0, 0.5 + ((sessionSteps || 0) / 64) * 0.5);
-            const intensityScale = 0.5 + intensity * 2.0;
+
+            // --- Genre-Anchored Intensity Scaling ---
+            // Use the config's rhythmicDensity as the 'medium' point (0.5 intensity).
+            // Scale between 50% and 150% of the baseline density based on intensity.
+            const rhythmicDensity = _config.rhythmicDensity || 0.5;
+            const densityScale = 0.5 + intensity * 1.0; // 0.5 to 1.5 multiplier
+            const intensityScale = rhythmicDensity * densityScale * 2.0; // Normalized to ~1.0 at medium
+
             let attackProb = baseAttackProb * intensityScale * warmUpScale;
 
             // --- Rock Profile Bursts (EVH / Beck) ---
