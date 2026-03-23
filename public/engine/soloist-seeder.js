@@ -223,8 +223,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         return;
                     }
 
-                    // General rest probability
-                    if (!dense && prng() < restProb * 0.5) {
+                    // General rest probability (significantly reduced since dictionary cells are already musical)
+                    if (!dense && prng() < restProb * 0.15) {
                         return;
                     }
 
@@ -311,19 +311,21 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             let structureType = 'A-B'; // fallback
 
             if (phraseLength === 4) {
-                if (structureRoll < 0.3) {
+                if (structureRoll < 0.25) {
                     structureType = 'A-A-A-B';
-                } else if (structureRoll < 0.6) {
+                } else if (structureRoll < 0.5) {
                     structureType = 'A-B-A-C';
-                } else if (structureRoll < 0.8) {
+                } else if (structureRoll < 0.75) {
                     structureType = 'A-A-B-A';
+                } else if (structureRoll < 0.9) {
+                    structureType = 'A-B-A-B';
                 } else {
-                    structureType = 'A-Rest-B-Rest';
+                    structureType = 'A-B-A-Rest'; // More tasteful than A-Rest-B-Rest
                 }
             } else {
-                if (structureRoll < 0.4) {
+                if (structureRoll < 0.5) {
                     structureType = 'A-A';
-                } else if (structureRoll < 0.6 && ['jazz', 'bird', 'bossa'].includes(style)) {
+                } else if (structureRoll < 0.7 && ['jazz', 'bird', 'bossa'].includes(style)) {
                     structureType = 'A-Rest';
                 }
             }
