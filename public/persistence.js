@@ -51,8 +51,7 @@ export function saveCurrentState() {
         soloist: {
             enabled: soloist.enabled,
             style: soloist.style,
-            timbreX: soloist.timbreX,
-            timbreY: soloist.timbreY,
+            preset: soloist.preset,
             octave: soloist.octave,
             volume: soloist.volume,
             reverb: soloist.reverb,

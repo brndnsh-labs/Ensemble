@@ -77,9 +77,11 @@ describe('Instrument Reducer', () => {
         expect(chords.pianoRoots).toBe(true);
     });
 
-    it('should set soloist mode', () => {
+    it('should set soloist mode and preset', () => {
         instrumentReducer(ACTIONS.SET_SOLOIST_MODE, 'guitar');
         expect(soloist.mode).toBe('guitar');
+        instrumentReducer(ACTIONS.SET_SOLOIST_PRESET, 'neo');
+        expect(soloist.preset).toBe('neo');
     });
 
     it('should handle session resets', () => {

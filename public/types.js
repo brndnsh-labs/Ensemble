@@ -253,7 +253,7 @@
  * @property {string} SET_SOLOIST_MODE
  * @property {string} SET_SOLOIST_SEED
  * @property {ActionPayloadSetActiveTab} SET_ACTIVE_TAB
- * @property {string} SET_SOLOIST_TIMBRE
+ * @property {string} SET_SOLOIST_PRESET
  * @property {ActionPayloadUpdateSB} UPDATE_SB
  * @property {number} SET_SWING
  * @property {string} SET_SWING_SUB
@@ -335,7 +335,7 @@ export const ACTIONS = {
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SOLOIST_SEED: 'SET_SOLOIST_SEED',
     SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
-    SET_SOLOIST_TIMBRE: 'SET_SOLOIST_TIMBRE',
+    SET_SOLOIST_PRESET: 'SET_SOLOIST_PRESET',
     UPDATE_SB: 'UPDATE_SB',
 
     // --- Groove / Drums ---

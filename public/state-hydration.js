@@ -1,12 +1,3 @@
-const legacyPresetMap = {
-    trumpet: { x: 0, y: 0 },
-    saxophone: { x: 1, y: 0 },
-    neo: { x: 0, y: 1 },
-    shred: { x: 1, y: 1 },
-    vowel: { x: 0.5, y: 0.5 },
-    classic: { x: 0, y: 0 },
-};
-
 import { KEY_ORDER, TIME_SIGNATURES } from './config.js';
 import {
     BASS_STYLES,
@@ -201,18 +192,7 @@ export function hydrateState() {
                 enabled:
                     savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
                 style: savedState.soloist.style || 'smart',
-                timbreX:
-                    savedState.soloist.timbreX !== undefined
-                        ? savedState.soloist.timbreX
-                        : savedState.soloist.preset
-                          ? /** @type {any} */ (legacyPresetMap)[savedState.soloist.preset]?.x || 0
-                          : 0,
-                timbreY:
-                    savedState.soloist.timbreY !== undefined
-                        ? savedState.soloist.timbreY
-                        : savedState.soloist.preset
-                          ? /** @type {any} */ (legacyPresetMap)[savedState.soloist.preset]?.y || 0
-                          : 0,
+                preset: savedState.soloist.preset || 'trumpet',
                 octave:
                     savedState.soloist.octave === 77 ||
                     savedState.soloist.octave === 67 ||
@@ -428,18 +408,7 @@ export function loadFromUrl() {
                 Object.assign(soloist, {
                     enabled: !!band.s.e,
                     style: SOLOIST_STYLES.some((s) => s.id === band.s.s) ? band.s.s : soloist.style,
-                    timbreX:
-                        band.s.tx !== undefined
-                            ? band.s.tx
-                            : band.s.p
-                              ? /** @type {any} */ (legacyPresetMap)[band.s.p]?.x || 0
-                              : soloist.timbreX,
-                    timbreY:
-                        band.s.ty !== undefined
-                            ? band.s.ty
-                            : band.s.p
-                              ? /** @type {any} */ (legacyPresetMap)[band.s.p]?.y || 0
-                              : soloist.timbreY,
+                    preset: band.s.p || soloist.preset,
                     octave: clamp(band.s.o, 0, 127, 72),
                     volume: clamp(band.s.v, 0, 1, 0.5),
                     reverb: clamp(band.s.r, 0, 1, 0.6),

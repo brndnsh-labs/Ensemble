@@ -37,7 +37,6 @@ vi.mock('../../../public/state.js', () => {
                 value: 1000,
                 setValueAtTime: vi.fn(),
                 exponentialRampToValueAtTime: vi.fn(),
-                cancelScheduledValues: vi.fn(),
             },
             Q: { value: 1 },
             connect: vi.fn(),
@@ -137,6 +136,6 @@ describe('Soloist Legato Articulation', () => {
         const gain = voice.gain;
 
         // Expect setTargetAtTime with timeConstant 0.02
-        expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(expect.any(Number), 100, 0.01);
+        expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(expect.any(Number), 100, 0.02);
     });
 });

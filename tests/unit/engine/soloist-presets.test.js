@@ -34,12 +34,7 @@ vi.mock('../../../public/state.js', () => {
         })),
         createBiquadFilter: vi.fn(() => ({
             type: '',
-            frequency: {
-                value: 0,
-                setValueAtTime: vi.fn(),
-                exponentialRampToValueAtTime: vi.fn(),
-                cancelScheduledValues: vi.fn(),
-            },
+            frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
             Q: { value: 0 },
             gain: { value: 0, setValueAtTime: vi.fn() },
             connect: vi.fn(),
@@ -83,8 +78,7 @@ vi.mock('../../../public/state.js', () => {
     const mockSoloist = {
         activeVoices: [],
         mode: 'monophonic',
-        timbreX: 0,
-        timbreY: 0,
+        preset: 'classic',
     };
 
     const mockStateMap = {
@@ -109,35 +103,89 @@ vi.mock('../../../public/utils.js', () => ({
 import { killSoloistNote, playSoloNote } from '../../../public/engine/synth-soloist.js';
 import { getState } from '../../../public/state.js';
 
-describe('Soloist Morphing Engine', () => {
+describe('Soloist Presets', () => {
     const { playback, soloist } = getState();
 
     beforeEach(() => {
         vi.clearAllMocks();
         soloist.activeVoices = [];
-        soloist.timbreX = 0;
-        soloist.timbreY = 0;
+        soloist.preset = 'classic';
         soloist.mode = 'monophonic';
         playback.audio.currentTime = 10;
     });
 
-    it('should connect generated sound to the output gain', () => {
+    it('should play Classic preset (Osc + Filter)', () => {
+        soloist.preset = 'classic';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        // Ensure at least one gain node connected to the soloist output
-        const _gainNodes = playback.audio.createGain.mock.results.map((r) => r.value);
-        const mainGain = soloist.activeVoices[0].gain;
-        expect(mainGain).toBeDefined();
+        // Classic uses 2 oscs (saw + tri) + 1 osc (vibrato) = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
+        expect(soloist.activeVoices.length).toBe(1);
+    });
 
+    it('should play Neo-Juno (Dual Saw + 2 LFOs)', () => {
+        soloist.preset = 'neo';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 2 LFOs + 1 Vibrato = 5 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(5);
+        expect(soloist.activeVoices.length).toBe(1);
+    });
+
+    it('should play Vowel Lead (Parallel Filters + LFO)', () => {
+        soloist.preset = 'vowel';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Vibrato = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 1 Bandpass filter (in current implementation)
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
+
+        const filters = playback.audio.createBiquadFilter.mock.results.map((r) => r.value);
+        expect(filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(800, 10);
+    });
+
+    it('should play Trumpet preset (Saw + Peaking Filter)', () => {
+        soloist.preset = 'trumpet';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Vibrato = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 1 Lowpass + 1 Peaking + 1 Highshelf = 3 filters
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
+        expect(soloist.activeVoices.length).toBe(1);
+    });
+
+    it('should play Saxophone preset (Saw/Tri + Breath LFO)', () => {
+        soloist.preset = 'saxophone';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Breath LFO + 1 Vibrato = 4 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
+        // 2 Bandpass filters
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(2);
+        expect(soloist.activeVoices.length).toBe(1);
+    });
+
+    it('should play Shred preset (High-gain Saw + Noise)', () => {
+        soloist.preset = 'shred';
+        playSoloNote(getState(), 440, 10, 1.0);
+
+        // 2 Oscs + 1 Vibrato = 3 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 1 Resonant filter
+        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
         expect(soloist.activeVoices.length).toBe(1);
     });
 
     it('should kill active voices properly', () => {
+        soloist.preset = 'neo';
         playSoloNote(getState(), 440, 10, 1.0);
 
         const voice = soloist.activeVoices[0];
         const gainNode = voice.gain;
-        const oscillators = voice.nodes.filter((n) => n.frequency && n.stop); // Filter for things with frequency params and stop method
+        const oscillators = voice.nodes.filter((n) => n.frequency); // Filter for things with frequency params
 
         killSoloistNote(getState());
 
@@ -151,7 +199,8 @@ describe('Soloist Morphing Engine', () => {
         expect(soloist.activeVoices.length).toBe(0);
     });
 
-    it('should manage voice stealing correctly', () => {
+    it('should manage voice stealing with complex nodes', () => {
+        soloist.preset = 'neo';
         playSoloNote(getState(), 440, 10, 1.0);
 
         const firstVoice = soloist.activeVoices[0];

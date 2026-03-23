@@ -23,8 +23,7 @@ function compressBandSettings(options = {}) {
         s: {
             e: (options.includeSolo !== undefined ? options.includeSolo : soloist.enabled) ? 1 : 0,
             s: soloist.style,
-            tx: soloist.timbreX,
-            ty: soloist.timbreY,
+            p: soloist.preset,
             o: soloist.octave,
             v: parseFloat(soloist.volume.toFixed(2)),
             r: parseFloat(soloist.reverb.toFixed(2)),
