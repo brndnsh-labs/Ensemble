@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../public/engine/conductor.js';
-import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
+import { getDrumMotif } from '../../public/engine/groove-engine.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 

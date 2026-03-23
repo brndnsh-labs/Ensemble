@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
+import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 

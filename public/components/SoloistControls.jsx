@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';

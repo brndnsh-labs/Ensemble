@@ -1,0 +1,16 @@
+{
+    "threshold": 5,
+    "reporters": ["console", "html"],
+    "ignore": [
+        "node_modules",
+        "dist",
+        "tests",
+        "scripts",
+        "public/data/drum-presets.js",
+        "public/data/chord-presets.js",
+        "public/data/smart-genres.js",
+        "public/engine/soloist-config.js"
+    ],
+    "absolute": true,
+    "gitignore": true
+}

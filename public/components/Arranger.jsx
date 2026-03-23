@@ -1,4 +1,4 @@
-import { Fragment, h } from 'preact';
+import { Fragment } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
 import { onSectionUpdate } from '../arranger-controller.js';

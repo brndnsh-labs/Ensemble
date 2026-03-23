@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getState } from '../../../public/state.js';

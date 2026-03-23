@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { midi, midiReducer } from '../../../public/state/midi.js';
 import { ACTIONS } from '../../../public/types.js';
 

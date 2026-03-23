@@ -1,10 +1,10 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm } from '../form-analysis.js';
-import { binarySearchMap, getMidi, getStepInfo } from '../utils.js';
+import { binarySearchMap, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
-import { enforceRegisterSlotting, updateCoordinationContext } from './coordination-engine.js';
+import { updateCoordinationContext } from './coordination-engine.js';
 import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {

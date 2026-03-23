@@ -142,8 +142,8 @@ describe('Motown P-Bass Synthesis', () => {
         playBassNote(getState(), 41.2, 10, 1.0, 1.0);
 
         const mockGains = playback.audio.createGain.mock.results;
-        // Gains: bodyMix (0), growlGain (1), impactGain (2), mainGain (3)
-        const mainGain = mockGains[3].value;
+        // Gains: mainGain (0), bodyMix (1), growlGain (2), impactGain (3 - inside playPercussiveStrike)
+        const mainGain = mockGains[0].value;
 
         // Stage 1: Pluck Settle (50%)
         expect(mainGain.gain.setTargetAtTime).toHaveBeenCalledWith(
@@ -161,7 +161,7 @@ describe('Motown P-Bass Synthesis', () => {
         const lp1 = playback.audio.createBiquadFilter.mock.results[0].value;
         expect(lp1.frequency.setValueAtTime).toHaveBeenCalledWith(300, 10);
 
-        const mainGain = playback.audio.createGain.mock.results[3].value;
+        const mainGain = playback.audio.createGain.mock.results[0].value;
         // Muted notes have short release (15ms)
         expect(mainGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 10.015, 0.01);
     });

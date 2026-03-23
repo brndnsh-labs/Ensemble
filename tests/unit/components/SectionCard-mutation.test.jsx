@@ -1,10 +1,10 @@
 /**
  * @vitest-environment happy-dom
  */
-import { h, render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from 'preact';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SectionCard } from '../../../public/components/SectionCard.jsx';
-import { dispatch, getState } from '../../../public/state.js';
+import { dispatch } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
 vi.mock('../../../public/arranger-controller.js', () => ({

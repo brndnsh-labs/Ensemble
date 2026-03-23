@@ -1,4 +1,3 @@
-import { DRUM_PRESETS } from './data/drum-presets.js';
 import {
     killAllPianoNotes,
     killBassBus,
@@ -44,8 +43,9 @@ export function updateMeasures(val) {
 }
 
 /** @param {string} name */
-export function loadDrumPreset(name) {
+export async function loadDrumPreset(name) {
     const { groove, arranger } = getState();
+    const { DRUM_PRESETS } = await import('./data/drum-presets.js');
     let p = /** @type {any} */ (DRUM_PRESETS)[name];
     if (/** @type {any} */ (p)[arranger.timeSignature]) {
         p = { ...p, .../** @type {any} */ (p)[arranger.timeSignature] };
@@ -80,6 +80,20 @@ export function loadDrumPreset(name) {
         param: 'swingSub',
         value: p.sub || groove.swingSub,
     });
+
+    if (p.variations) {
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'variations',
+            value: p.variations,
+        });
+    } else {
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'variations',
+            value: null,
+        });
+    }
 
     dispatch('DRUM_PRESET_LOADED');
 }

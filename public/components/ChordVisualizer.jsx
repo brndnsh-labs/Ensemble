@@ -1,4 +1,4 @@
-import { Fragment, h } from 'preact';
+import { Fragment } from 'preact';
 import React, { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';

@@ -248,10 +248,8 @@ describe('Worker Client', () => {
                 'UPDATE_CONDUCTOR_DECISION',
                 'SET_STYLE',
                 'SET_VOLUME',
-                'SET_OCTAVE',
                 'SET_SWING',
                 'SET_SWING_SUB',
-                'SET_SESSION_STEPS',
                 'SET_SOLOIST_MODE',
                 'SET_BPM',
                 'IMPORT_MUSICXML',
@@ -267,7 +265,7 @@ describe('Worker Client', () => {
                 if (action === 'SET_MODAL_OPEN') {
                     payload = { modal: 'performance', open: true };
                 }
-                if (['SET_STYLE', 'SET_VOLUME', 'SET_OCTAVE'].includes(action)) {
+                if (['SET_STYLE', 'SET_VOLUME'].includes(action)) {
                     payload = { module: 'soloist', style: 'rock', value: 1 };
                 }
 

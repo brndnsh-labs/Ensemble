@@ -1,6 +1,6 @@
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
-import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
+import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
 /**
  * @typedef {Object} SoloistVoice

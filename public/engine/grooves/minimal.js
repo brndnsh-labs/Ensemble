@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, INTENSITY_BANDS, roll, scaleVelocity } from './utils.js';
+import { DEFAULT_CONFIG, scaleVelocity } from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,

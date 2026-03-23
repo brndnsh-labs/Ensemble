@@ -1,9 +1,7 @@
-import { Fragment, h } from 'preact';
+import { Fragment } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { validateAndAnalyze } from '../arranger-controller.js';
-import { CHORD_PRESETS } from '../data/chord-presets.js';
-import { DRUM_PRESETS } from '../data/drum-presets.js';
-import { flushBuffers, loadDrumPreset, switchMeasure } from '../instrument-controller.js';
+import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -31,6 +29,21 @@ export function PresetLibrary({ type }) {
     const [userPresets, setUserPresets] = useState(/** @type {any[]} */ ([]));
     const [confirmSelect, setConfirmSelect] = useState(/** @type {string|number|null} */ (null)); // stores id of preset to confirm
     const [confirmDelete, setConfirmDelete] = useState(/** @type {string|number|null} */ (null)); // stores id of preset to delete
+    const [systemPresets, setSystemPresets] = useState(/** @type {any[]} */ ([]));
+
+    useEffect(() => {
+        if (type === 'chord') {
+            import('../data/chord-presets.js').then((m) => setSystemPresets(m.CHORD_PRESETS));
+        } else {
+            import('../data/drum-presets.js').then((m) => {
+                const mapped = Object.keys(m.DRUM_PRESETS).map((name) => ({
+                    name,
+                    .../** @type {any} */ (m.DRUM_PRESETS)[name],
+                }));
+                setSystemPresets(mapped);
+            });
+        }
+    }, [type]);
 
     useEffect(() => {
         const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
@@ -53,13 +66,7 @@ export function PresetLibrary({ type }) {
         return () => window.removeEventListener('storage_sync', load);
     }, [type]);
 
-    const presets =
-        type === 'chord'
-            ? CHORD_PRESETS
-            : Object.keys(DRUM_PRESETS).map((name) => ({
-                  name,
-                  .../** @type {any} */ (DRUM_PRESETS)[name],
-              }));
+    const presets = systemPresets;
 
     // Optimization: Check isDirty state instead of manual DOM manipulation in arranger-controller
     const activeId = type === 'chord' ? (isDirty ? null : lastChordPreset) : lastDrumPreset;

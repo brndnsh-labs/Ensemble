@@ -1,21 +1,16 @@
-import { Fragment, h } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
-import { Arranger } from './components/Arranger.jsx';
+import { Fragment } from 'preact';
+import { useEffect } from 'preact/hooks';
 import { ChordVisualizer } from './components/ChordVisualizer.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { GroovePanel } from './components/GroovePanel.jsx';
 import { InstrumentPanel } from './components/InstrumentPanel.jsx';
-import { InstrumentSettings } from './components/InstrumentSettings.jsx';
 import { KeySignatureControls } from './components/KeySignatureControls.jsx';
 import { Modals } from './components/Modals.jsx';
 import { NotificationLayer } from './components/NotificationLayer.jsx';
 import { PresetLibrary } from './components/PresetLibrary.jsx';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner.jsx';
-import { SequencerGrid } from './components/SequencerGrid.jsx';
-import { StyleSelector } from './components/StyleSelector.jsx';
 import { Transport } from './components/Transport.jsx';
 import { Visualizer } from './components/Visualizer.jsx';
-import { APP_VERSION } from './config.js';
 import {
     BASS_STYLES,
     CHORD_STYLES,
@@ -24,8 +19,7 @@ import {
 } from './data/instrument-styles.js';
 import { togglePower } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
-import { triggerInstall } from './pwa.js';
-import { dispatch, getState } from './state.js';
+import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 import { useEnsembleState } from './ui-bridge.js';
 import { syncWorker } from './worker-client.js';

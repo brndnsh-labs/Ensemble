@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockDispatch } = vi.hoisted(() => ({

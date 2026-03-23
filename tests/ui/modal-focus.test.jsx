@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import React from 'preact/compat';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorModal } from '../../public/components/EditorModal.jsx';

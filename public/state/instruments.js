@@ -358,11 +358,6 @@ export function instrumentReducer(action, payload) {
                 instrumentStateMap[payload.module].reverb = payload.value;
             }
             return true;
-        case ACTIONS.SET_OCTAVE:
-            if (instrumentStateMap[payload.module]) {
-                instrumentStateMap[payload.module].octave = payload.value;
-            }
-            return true;
         case ACTIONS.SET_PIANO_ROOTS:
             chords.pianoRoots = payload;
             return true;
@@ -377,9 +372,6 @@ export function instrumentReducer(action, payload) {
             return true;
         case ACTIONS.RESET_SESSION:
             soloist.sessionSteps = 0;
-            return true;
-        case ACTIONS.SET_SESSION_STEPS:
-            soloist.sessionSteps = payload;
             return true;
         case ACTIONS.SET_GENRE_FEEL:
             // When a smart genre is selected, update all instrument styles and switch to smart mode

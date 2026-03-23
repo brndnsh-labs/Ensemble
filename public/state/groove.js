@@ -56,6 +56,7 @@ import { ACTIONS } from '../types.js';
  * @property {Array<any>|null} orchestrationMap - Pre-calculated section orchestration map.
  * @property {Record<number, any>|null} fillMap - Pre-calculated song-wide fill map.
  * @property {Record<number, any>|null} accentMap - Pre-calculated soloist accent catching map.
+ * @property {Array<any>|null} variations - Pre-calculated pattern variations for the current preset.
  * @property {Map<number, any>} buffer - Map of scheduled drum events.
  */
 /**
@@ -112,6 +113,7 @@ export const groove = deepSignal({
     creativity: false,
     sectionSeedMap: {},
     gridVersion: 0,
+    variations: null,
     // --- Unified Rhythmic Pocket System ---
     pocket: {
         globalDrive: 0, // -1.0 (behind) to 1.0 (ahead)
@@ -172,23 +174,6 @@ export function grooveReducer(action, payload, playback) {
                 inst.muted = false;
             });
             return true;
-        case ACTIONS.SET_POCKET_CONFIG:
-            if (payload.globalDrive !== undefined) {
-                groove.pocket.globalDrive = payload.globalDrive;
-            }
-            if (payload.tightness !== undefined) {
-                groove.pocket.tightness = payload.tightness;
-            }
-            if (payload.bassGravity !== undefined) {
-                groove.pocket.bassGravity = payload.bassGravity;
-            }
-            if (payload.chordGravity !== undefined) {
-                groove.pocket.chordGravity = payload.chordGravity;
-            }
-            if (payload.soloistGravity !== undefined) {
-                groove.pocket.soloistGravity = payload.soloistGravity;
-            }
-            return true;
         case ACTIONS.SET_GROOVE_STEPS: {
             const inst = groove.instruments.find((i) => i.name === payload.instrument);
             if (inst) {
@@ -234,9 +219,6 @@ export function grooveReducer(action, payload, playback) {
                 return true;
             }
             return false;
-        case ACTIONS.SET_FOLLOW_PLAYBACK:
-            groove.followPlayback = payload;
-            return true;
         case ACTIONS.SET_LARS_MODE:
             groove.larsMode = !!payload;
             return true;

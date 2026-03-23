@@ -1,5 +1,5 @@
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
-import { rampGain, updateDensityDucking } from './synth-utils.js';
+import { playPercussiveStrike, rampGain, updateDensityDucking } from './synth-utils.js';
 
 /**
  * Stop any currently playing bass note.
@@ -58,6 +58,10 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
 
         const tonalVol = muted ? vol * 0.15 : vol;
 
+        // --- 5. Global Envelope (The "Foam Mute" Feel) ---
+        const mainGain = playback.audio.createGain();
+        mainGain.gain.setValueAtTime(0, startTime);
+
         // --- 1. The Thump (Fundamental + Passive Saturation) ---
         const oscSine = playback.audio.createOscillator();
         oscSine.type = 'sine';
@@ -100,17 +104,15 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         growlGain.gain.setTargetAtTime(tonalVol * 0.35, startTime, 0.005);
 
         // --- 3. The Impact (Finger Thud) ---
-        const impact = playback.audio.createBufferSource();
-        impact.buffer = groove.audioBuffers.noise;
-        const impactFilter = playback.audio.createBiquadFilter();
-        impactFilter.type = 'bandpass';
-        impactFilter.frequency.setValueAtTime(600, startTime);
-        impactFilter.Q.setValueAtTime(2.0, startTime);
-
-        const impactGain = playback.audio.createGain();
-        impactGain.gain.setValueAtTime(0, startTime);
-        impactGain.gain.setTargetAtTime(vol * 0.4, startTime, 0.001);
-        impactGain.gain.setTargetAtTime(0, startTime + 0.015, 0.02);
+        playPercussiveStrike(playback.audio, groove.audioBuffers.noise, mainGain, startTime, {
+            volume: vol * 0.4,
+            filterType: 'bandpass',
+            freq: 600,
+            Q: 2.0,
+            attack: 0.001,
+            decay: 0.02,
+            duration: 0.1,
+        });
 
         // --- 4. Articulation (Body Resonance) ---
         const bodyEQ = playback.audio.createBiquadFilter();
@@ -119,9 +121,6 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         bodyEQ.Q.setValueAtTime(0.8, startTime);
         bodyEQ.gain.setValueAtTime(4, startTime);
 
-        // --- 5. Global Envelope (The "Foam Mute" Feel) ---
-        const mainGain = playback.audio.createGain();
-        mainGain.gain.setValueAtTime(0, startTime);
         mainGain.gain.setTargetAtTime(tonalVol, startTime, 0.008);
 
         const releaseTime = muted ? 0.015 : duration;
@@ -143,10 +142,6 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         lp2.connect(growlGain);
         growlGain.connect(mainGain);
 
-        impact.connect(impactFilter);
-        impactFilter.connect(impactGain);
-        impactGain.connect(mainGain);
-
         mainGain.connect(bodyEQ);
         if (playback.bassGain) {
             bodyEQ.connect(playback.bassGain);
@@ -161,13 +156,11 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         oscSine.start(startTime);
         oscTri.start(startTime);
         oscGrowl.start(startTime);
-        impact.start(startTime);
 
         const stopTime = startTime + releaseTime + 1.0;
         oscSine.stop(stopTime);
         oscTri.stop(stopTime);
         oscGrowl.stop(stopTime);
-        impact.stop(startTime + 0.1);
 
         oscSine.onended = () =>
             safeDisconnect([
@@ -179,9 +172,6 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
                 lp1,
                 lp2,
                 growlGain,
-                impact,
-                impactFilter,
-                impactGain,
                 mainGain,
                 bodyEQ,
             ]);

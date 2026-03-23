@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { groove, grooveReducer } from '../../../public/state/groove.js';
 import { ACTIONS } from '../../../public/types.js';
 
@@ -54,9 +54,7 @@ describe('Groove Reducer', () => {
         expect(result).toBe(false);
     });
 
-    it('should set follow playback and Lars mode', () => {
-        grooveReducer(ACTIONS.SET_FOLLOW_PLAYBACK, false);
-        expect(groove.followPlayback).toBe(false);
+    it('should set Lars mode', () => {
         grooveReducer(ACTIONS.SET_LARS_MODE, true);
         expect(groove.larsMode).toBe(true);
         grooveReducer(ACTIONS.SET_LARS_INTENSITY, 0.9);

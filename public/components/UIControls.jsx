@@ -1,5 +1,3 @@
-import { Fragment, h } from 'preact';
-
 /**
  * @typedef {import('../ui-types.js').ComponentChildren} ComponentChildren
  * @typedef {import('../ui-types.js').StyleObject} StyleObject

@@ -162,7 +162,10 @@
         "Vibraslap",
         "Edim",
         "tril",
-        "bvii"
+        "bvii",
+        "biim",
+        "viim",
+        "jscpd"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

@@ -11,7 +11,6 @@ export { mutateProgression, transformRelativeProgression, validateProgression };
 
 import { analyzeFormUI } from './engine/conductor.js';
 import { restoreGains } from './engine/engine.js';
-import { getSectionEnergy } from './form-analysis.js';
 import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';

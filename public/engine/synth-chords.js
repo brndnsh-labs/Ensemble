@@ -1,5 +1,5 @@
 import { safeDisconnect } from '../utils.js';
-import { createSimplePanner, rampGain } from './synth-utils.js';
+import { createSimplePanner, playPercussiveStrike, rampGain } from './synth-utils.js';
 
 /**
  * Instrument definitions for the chord engine.
@@ -149,28 +149,22 @@ export function playNote(
         );
 
         // --- Component A: The Hammer Strike ---
-        if (isPiano && !muted) {
-            const strike = playback.audio.createBufferSource();
-            strike.buffer = groove.audioBuffers.noise;
-            const strikeFilter = playback.audio.createBiquadFilter();
-            const strikeGain = playback.audio.createGain();
-
-            strikeFilter.type = 'bandpass';
-            strikeFilter.frequency.setValueAtTime(1200 + finalVol * 800, startTime);
-            strikeFilter.Q.setValueAtTime(1.5, startTime);
-
-            strikeGain.gain.setValueAtTime(0, startTime);
-            strikeGain.gain.setTargetAtTime(finalVol * 0.15, startTime, 0.001);
-            strikeGain.gain.setTargetAtTime(0, startTime + 0.01, 0.01);
-
-            strike.connect(strikeFilter);
-            strikeFilter.connect(strikeGain);
-            if (playback.chordsGain) {
-                strikeGain.connect(playback.chordsGain);
-            }
-            strike.start(startTime);
-            strike.stop(startTime + 0.1);
-            strike.onended = () => safeDisconnect([strike, strikeFilter, strikeGain]);
+        if (isPiano && !muted && playback.chordsGain) {
+            playPercussiveStrike(
+                playback.audio,
+                groove.audioBuffers.noise,
+                playback.chordsGain,
+                startTime,
+                {
+                    volume: finalVol * 0.15,
+                    filterType: 'bandpass',
+                    freq: 1200 + finalVol * 800,
+                    Q: 1.5,
+                    attack: 0.001,
+                    decay: 0.01,
+                    duration: 0.1,
+                },
+            );
         }
 
         // --- Component B: The Harmonic Body ---
@@ -284,38 +278,17 @@ export function playNote(
  */
 export function playChordScratch(state, time, vol = 0.1) {
     const { playback, groove } = state;
-    if (!playback.audio) {
+    if (!playback.audio || !playback.chordsGain) {
         return;
     }
-    try {
-        const randomizedVol = vol * (0.8 + Math.random() * 0.4);
-        const gain = playback.audio.createGain();
-        const filter = playback.audio.createBiquadFilter();
-        const noise = playback.audio.createBufferSource();
-
-        noise.buffer = groove.audioBuffers.noise;
-        filter.type = 'bandpass';
-        const scratchFreq = 1200 + Math.random() * 400;
-        filter.frequency.value = scratchFreq;
-        filter.frequency.setValueAtTime(scratchFreq, time);
-        filter.Q.value = 1.5;
-        filter.Q.setValueAtTime(1.5, time);
-
-        gain.gain.setValueAtTime(0, time);
-        gain.gain.setTargetAtTime(randomizedVol, time, 0.005);
-        gain.gain.setTargetAtTime(0, time + 0.02, 0.02);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        if (playback.chordsGain) {
-            gain.connect(playback.chordsGain);
-        }
-
-        noise.start(time);
-        noise.stop(time + 0.2);
-
-        noise.onended = () => safeDisconnect([gain, filter, noise]);
-    } catch (e) {
-        console.error('playChordScratch error:', e);
-    }
+    const randomizedVol = vol * (0.8 + Math.random() * 0.4);
+    playPercussiveStrike(playback.audio, groove.audioBuffers.noise, playback.chordsGain, time, {
+        volume: randomizedVol,
+        filterType: 'bandpass',
+        freq: 1200 + Math.random() * 400,
+        Q: 1.5,
+        attack: 0.005,
+        decay: 0.02,
+        duration: 0.2,
+    });
 }

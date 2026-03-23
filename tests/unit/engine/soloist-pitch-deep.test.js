@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { SOLOIST_INTENTS } from '../../../public/engine/soloist-config.js';
 import { selectPitchAndDevices } from '../../../public/engine/soloist-pitch-engine.js';
 import { getState } from '../../../public/state.js';

@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { dispatch, getState } from '../state.js';

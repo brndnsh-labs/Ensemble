@@ -1,4 +1,3 @@
-import { Fragment, h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
     cloneMeasure,

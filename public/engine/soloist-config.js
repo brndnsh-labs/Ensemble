@@ -1,81 +1,112 @@
-export const STYLE_CONFIG = {
-    scalar: {
-        genreGravityOffset: 0,
-        restBase: 0.1,
-        tensionScale: 0.6,
-        timingJitter: 8,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
-        doubleStopProb: 0.25,
-        anticipationProb: 0.1,
-        targetExtensions: [2, 9],
-        deviceProb: 0.12,
-        allowedDevices: ['run', 'slide', 'guitarDouble'],
-        sustainProb: 0.15,
-        maxSustainSteps: 8,
-        vibratoIntensity: 0.8,
-        commonToneWeight: 200,
-        stationaryProb: 0.05,
-
-        rhythmicDensity: 0.5,
-        syncopationLikelihood: 0.2,
-        targetAnchoring: 0.8,
-        chromaticism: 0.1,
-        contourSkeletons: [
-            [
-                { interval: 1, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
-            ],
-            [
-                { interval: 2, durationSteps: 4 },
-                { interval: -1, durationSteps: 2 },
-                { interval: 1, durationSteps: 2 },
-            ],
-            [
-                { interval: -1, durationSteps: 2 },
-                { interval: -2, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
-            ],
+const DEFAULT_STYLE_CONFIG = {
+    genreGravityOffset: 0,
+    restBase: 0.1,
+    tensionScale: 0.6,
+    timingJitter: 8,
+    maxNotesPerPhrase: 24,
+    minNotesPerPhrase: 2,
+    doubleStopProb: 0.25,
+    anticipationProb: 0.1,
+    targetExtensions: [2, 9],
+    deviceProb: 0.12,
+    allowedDevices: ['run', 'slide', 'guitarDouble'],
+    sustainProb: 0.15,
+    maxSustainSteps: 8,
+    vibratoIntensity: 0.8,
+    commonToneWeight: 200,
+    stationaryProb: 0.05,
+    rhythmicDensity: 0.5,
+    syncopationLikelihood: 0.2,
+    targetAnchoring: 0.8,
+    chromaticism: 0.1,
+    contourSkeletons: [
+        [
+            {
+                interval: 1,
+                durationSteps: 2,
+            },
+            {
+                interval: 2,
+                durationSteps: 2,
+            },
+            {
+                interval: 0,
+                durationSteps: 4,
+            },
         ],
-    },
+        [
+            {
+                interval: 2,
+                durationSteps: 4,
+            },
+            {
+                interval: -1,
+                durationSteps: 2,
+            },
+            {
+                interval: 1,
+                durationSteps: 2,
+            },
+        ],
+        [
+            {
+                interval: -1,
+                durationSteps: 2,
+            },
+            {
+                interval: -2,
+                durationSteps: 2,
+            },
+            {
+                interval: 0,
+                durationSteps: 4,
+            },
+        ],
+    ],
+};
+
+const STYLE_OVERRIDES = {
+    scalar: {},
     rock: {
-        genreGravityOffset: 0,
-        restBase: 0.1,
-        tensionScale: 0.6,
-        timingJitter: 8,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
-        anticipationProb: 0.1,
-        targetExtensions: [2, 9],
-        deviceProb: 0.12,
         allowedDevices: ['run', 'slide', 'guitarDouble', 'bluesCurl'],
         sustainProb: 0.2,
-        maxSustainSteps: 8,
-        vibratoIntensity: 1.0,
+        vibratoIntensity: 1,
         commonToneWeight: 300,
         stationaryProb: 0.15,
-
-        rhythmicDensity: 0.5,
         syncopationLikelihood: 0.3,
-        targetAnchoring: 0.8,
-        chromaticism: 0.1,
         contourSkeletons: [
             [
-                { interval: 1, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 2, durationSteps: 4 },
-                { interval: -1, durationSteps: 2 },
-                { interval: 1, durationSteps: 2 },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     shred: {
-        genreGravityOffset: 0,
         restBase: 0.05,
         tensionScale: 0.3,
         timingJitter: 4,
@@ -88,38 +119,71 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run', 'guitarDouble'],
         commonToneWeight: 100,
         stationaryProb: 0.02,
-
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.4,
         targetAnchoring: 0.4,
         chromaticism: 0.5,
         contourSkeletons: [
             [
-                { interval: 1, durationSteps: 1 },
-                { interval: 2, durationSteps: 1 },
-                { interval: 3, durationSteps: 1 },
-                { interval: 4, durationSteps: 1 },
+                {
+                    interval: 1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 1,
+                },
             ],
             [
-                { interval: -1, durationSteps: 1 },
-                { interval: 1, durationSteps: 1 },
-                { interval: -2, durationSteps: 1 },
-                { interval: 0, durationSteps: 1 },
+                {
+                    interval: -1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: -2,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
             ],
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
-                { interval: 6, durationSteps: 2 },
-                { interval: 7, durationSteps: 2 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 6,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 7,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     blues: {
-        genreGravityOffset: 0,
         restBase: 0.15,
         tensionScale: 0.8,
         timingJitter: 25,
-        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
@@ -131,26 +195,52 @@ export const STYLE_CONFIG = {
         vibratoIntensity: 1.2,
         commonToneWeight: 500,
         stationaryProb: 0.1,
-
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.9,
         chromaticism: 0.6,
         contourSkeletons: [
             [
-                { interval: 3, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 3,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 0, durationSteps: 2 },
-                { interval: -2, durationSteps: 2 },
-                { interval: -3, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -3,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 5, durationSteps: 2 },
-                { interval: 6, durationSteps: 1 },
-                { interval: 7, durationSteps: 5 },
+                {
+                    interval: 5,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 6,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 7,
+                    durationSteps: 5,
+                },
             ],
         ],
     },
@@ -159,8 +249,6 @@ export const STYLE_CONFIG = {
         restBase: 0.12,
         tensionScale: 0.7,
         timingJitter: 25,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
         doubleStopProb: 0.15,
         anticipationProb: 0.45,
         targetExtensions: [2, 6, 9, 11],
@@ -171,32 +259,56 @@ export const STYLE_CONFIG = {
         vibratoIntensity: 0.9,
         commonToneWeight: 350,
         stationaryProb: 0.2,
-
-        rhythmicDensity: 0.5,
         syncopationLikelihood: 0.9,
         targetAnchoring: 0.6,
         chromaticism: 0.4,
         contourSkeletons: [
             [
-                { interval: 2, durationSteps: 3 },
-                { interval: 4, durationSteps: 1 },
-                { interval: 6, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 3,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 6,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 1, durationSteps: 2 },
-                { interval: 3, durationSteps: 4 },
-                { interval: 0, durationSteps: 2 },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 4, durationSteps: 4 },
-                { interval: 2, durationSteps: 2 },
-                { interval: -1, durationSteps: 2 },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     funk: {
         genreGravityOffset: -0.005,
-        restBase: 0.1,
         tensionScale: 0.4,
         timingJitter: 5,
         maxNotesPerPhrase: 32,
@@ -208,36 +320,60 @@ export const STYLE_CONFIG = {
         allowedDevices: ['slide', 'run'],
         commonToneWeight: 300,
         stationaryProb: 0.1,
-
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.9,
         targetAnchoring: 0.7,
         chromaticism: 0.3,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 1 },
-                { interval: 0, durationSteps: 1 },
-                { interval: 2, durationSteps: 2 },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 3, durationSteps: 1 },
-                { interval: 0, durationSteps: 1 },
-                { interval: -2, durationSteps: 2 },
+                {
+                    interval: 3,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
+                {
+                    interval: -2,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: 1, durationSteps: 1 },
-                { interval: 0, durationSteps: 1 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
             ],
         ],
     },
     hiphop: {
         genreGravityOffset: 0.015,
         restBase: 0.15,
-        tensionScale: 0.6,
         timingJitter: 20,
         maxNotesPerPhrase: 16,
-        minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.3,
         targetExtensions: [2, 9, 11],
@@ -245,61 +381,96 @@ export const STYLE_CONFIG = {
         allowedDevices: ['bluesLick', 'slide', 'quartal'],
         commonToneWeight: 300,
         stationaryProb: 0.15,
-
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.7,
-        targetAnchoring: 0.8,
         chromaticism: 0.2,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 2, durationSteps: 4 },
-                { interval: 1, durationSteps: 2 },
-                { interval: 0, durationSteps: 2 },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: -1, durationSteps: 2 },
-                { interval: 0, durationSteps: 6 },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 6,
+                },
             ],
         ],
     },
     minimal: {
-        genreGravityOffset: 0,
         restBase: 0.3,
         tensionScale: 0.95,
         timingJitter: 35,
         maxNotesPerPhrase: 8,
         minNotesPerPhrase: 1,
-        doubleStopProb: 0.0,
+        doubleStopProb: 0,
         anticipationProb: 0.25,
         targetExtensions: [2, 9, 11],
         deviceProb: 0.15,
         allowedDevices: ['slide', 'enclosure'],
         commonToneWeight: 600,
         stationaryProb: 0.4,
-
         rhythmicDensity: 0.3,
         syncopationLikelihood: 0.3,
         targetAnchoring: 0.95,
-        chromaticism: 0.1,
         contourSkeletons: [
-            [{ interval: 0, durationSteps: 8 }],
             [
-                { interval: 2, durationSteps: 4 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 8,
+                },
             ],
             [
-                { interval: -1, durationSteps: 4 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
+            ],
+            [
+                {
+                    interval: -1,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
         ],
     },
     jazz: {
-        genreGravityOffset: 0,
         restBase: 0.08,
         tensionScale: 0.85,
         timingJitter: 15,
@@ -320,27 +491,46 @@ export const STYLE_CONFIG = {
         ],
         commonToneWeight: 400,
         stationaryProb: 0.08,
-
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.85,
         targetAnchoring: 0.5,
         chromaticism: 0.7,
         contourSkeletons: [
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 1, durationSteps: 1 },
-                { interval: 2, durationSteps: 1 },
-                { interval: 3, durationSteps: 1 },
-                { interval: 0, durationSteps: 1 },
+                {
+                    interval: 1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
             ],
         ],
     },
     bird: {
-        genreGravityOffset: 0,
         restBase: 0.05,
         tensionScale: 0.9,
         timingJitter: 12,
@@ -352,77 +542,127 @@ export const STYLE_CONFIG = {
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
         commonToneWeight: 150,
-        stationaryProb: 0.05,
-
         rhythmicDensity: 0.95,
         syncopationLikelihood: 0.7,
         targetAnchoring: 0.3,
         chromaticism: 0.9,
         contourSkeletons: [
             [
-                { interval: 1, durationSteps: 2 },
-                { interval: 3, durationSteps: 2 },
-                { interval: 5, durationSteps: 2 },
-                { interval: 7, durationSteps: 2 },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 5,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 7,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 2, durationSteps: 1 },
-                { interval: 1, durationSteps: 1 },
-                { interval: 0, durationSteps: 1 },
-                { interval: -1, durationSteps: 1 },
+                {
+                    interval: 2,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 1,
+                },
             ],
             [
-                { interval: -2, durationSteps: 2 },
-                { interval: 0, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
+                {
+                    interval: -2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     disco: {
-        genreGravityOffset: 0,
-        restBase: 0.1,
         tensionScale: 0.5,
-        timingJitter: 8,
-        maxNotesPerPhrase: 24,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.05,
         anticipationProb: 0.2,
-        targetExtensions: [2, 9],
         deviceProb: 0.1,
         allowedDevices: ['run'],
-        commonToneWeight: 200,
         stationaryProb: 0.1,
-
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.6,
-        targetAnchoring: 0.8,
         chromaticism: 0.2,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
-                { interval: 2, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 4, durationSteps: 4 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 2 },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     bossa: {
-        genreGravityOffset: 0,
         restBase: 0.12,
         tensionScale: 0.7,
         timingJitter: 15,
-        maxNotesPerPhrase: 24,
-        minNotesPerPhrase: 2,
         doubleStopProb: 0.08,
         anticipationProb: 0.35,
         targetExtensions: [2, 6, 9],
@@ -430,31 +670,56 @@ export const STYLE_CONFIG = {
         allowedDevices: ['enclosure', 'slide', 'guitarDouble'],
         commonToneWeight: 300,
         stationaryProb: 0.1,
-
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.7,
         chromaticism: 0.5,
         contourSkeletons: [
             [
-                { interval: 2, durationSteps: 3 },
-                { interval: 0, durationSteps: 3 },
-                { interval: -1, durationSteps: 2 },
+                {
+                    interval: 2,
+                    durationSteps: 3,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 3,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 1, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 4 },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 4, durationSteps: 4 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 1, durationSteps: 2 },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     country: {
-        genreGravityOffset: 0,
         restBase: 0.08,
         tensionScale: 0.5,
         timingJitter: 4,
@@ -472,34 +737,56 @@ export const STYLE_CONFIG = {
             'banjoRoll',
             'graceSlide',
         ],
-        commonToneWeight: 200,
-        stationaryProb: 0.05,
-
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.4,
         targetAnchoring: 0.9,
         chromaticism: 0.3,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 2 },
-                { interval: 1, durationSteps: 2 },
-                { interval: 2, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: -1, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: -2, durationSteps: 2 },
-                { interval: -1, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: -2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
         ],
     },
     metal: {
-        genreGravityOffset: 0,
-        restBase: 0.1,
         tensionScale: 0.4,
         timingJitter: 2,
         maxNotesPerPhrase: 32,
@@ -511,106 +798,172 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run'],
         commonToneWeight: 100,
         stationaryProb: 0.02,
-
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.3,
         targetAnchoring: 0.5,
         chromaticism: 0.6,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 1 },
-                { interval: 1, durationSteps: 1 },
-                { interval: 2, durationSteps: 1 },
-                { interval: 3, durationSteps: 1 },
+                {
+                    interval: 0,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 1,
+                },
             ],
             [
-                { interval: 4, durationSteps: 2 },
-                { interval: 3, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 2 },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 0, durationSteps: 2 },
-                { interval: -1, durationSteps: 2 },
-                { interval: -2, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: -2,
+                    durationSteps: 4,
+                },
             ],
         ],
     },
     reggae: {
-        genreGravityOffset: 0,
         restBase: 0.12,
-        tensionScale: 0.6,
         timingJitter: 20,
         maxNotesPerPhrase: 16,
-        minNotesPerPhrase: 2,
         doubleStopProb: 0.2,
-        anticipationProb: 0.1,
         targetExtensions: [2, 6, 9],
         deviceProb: 0.15,
         allowedDevices: ['guitarDouble'],
         commonToneWeight: 400,
         stationaryProb: 0.25,
-
-        rhythmicDensity: 0.5,
         syncopationLikelihood: 0.9,
-        targetAnchoring: 0.8,
         chromaticism: 0.2,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 3 },
-                { interval: 2, durationSteps: 1 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 0,
+                    durationSteps: 3,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 1,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
-                { interval: 2, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 4, durationSteps: 4 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 2 },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
             ],
         ],
     },
     acoustic: {
-        genreGravityOffset: 0,
         restBase: 0.15,
         tensionScale: 0.4,
         timingJitter: 15,
         maxNotesPerPhrase: 12,
-        minNotesPerPhrase: 2,
         doubleStopProb: 0.1,
         anticipationProb: 0.15,
-        targetExtensions: [2, 9],
         deviceProb: 0.1,
         allowedDevices: ['slide', 'run'],
-        commonToneWeight: 200,
         stationaryProb: 0.1,
-
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.4,
-        targetAnchoring: 0.8,
         chromaticism: 0.2,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 4 },
-                { interval: 1, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 2, durationSteps: 4 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 4,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: -1, durationSteps: 2 },
-                { interval: 0, durationSteps: 6 },
+                {
+                    interval: -1,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 6,
+                },
             ],
         ],
     },
     ska: {
         genreGravityOffset: -0.005,
-        restBase: 0.1,
         tensionScale: 0.5,
         timingJitter: 5,
         maxNotesPerPhrase: 32,
@@ -622,31 +975,70 @@ export const STYLE_CONFIG = {
         allowedDevices: ['run', 'slide', 'guitarDouble', 'enclosure', 'chromaticFall'],
         commonToneWeight: 250,
         stationaryProb: 0.12,
-
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.7,
         chromaticism: 0.4,
         contourSkeletons: [
             [
-                { interval: 0, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 4, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
+                {
+                    interval: 0,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
             ],
             [
-                { interval: 4, durationSteps: 2 },
-                { interval: 2, durationSteps: 2 },
-                { interval: 0, durationSteps: 4 },
+                {
+                    interval: 4,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 0,
+                    durationSteps: 4,
+                },
             ],
             [
-                { interval: 2, durationSteps: 2 },
-                { interval: 3, durationSteps: 2 },
-                { interval: 4, durationSteps: 4 },
+                {
+                    interval: 2,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 3,
+                    durationSteps: 2,
+                },
+                {
+                    interval: 4,
+                    durationSteps: 4,
+                },
             ],
         ],
     },
 };
+
+export const STYLE_CONFIG = /** @type {any} */ (
+    Object.keys(STYLE_OVERRIDES).reduce((acc, key) => {
+        /** @type {any} */ (acc)[key] = {
+            ...DEFAULT_STYLE_CONFIG,
+            .../** @type {any} */ (STYLE_OVERRIDES)[key],
+        };
+        return acc;
+    }, {})
+);
 
 export const STYLE_EMPHASIS = {
     jazz: [0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9],

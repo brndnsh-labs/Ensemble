@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { flushBuffers, togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';

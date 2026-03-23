@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
-import { getFrequency, getStepInfo } from '../../public/utils.js';
+import { getStepInfo } from '../../public/utils.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),

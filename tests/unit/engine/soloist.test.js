@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSoloistNote, resetSoloistState } from '../../../public/engine/soloist.js';
+import { getSoloistNote } from '../../../public/engine/soloist.js';
 import * as pitchEngine from '../../../public/engine/soloist-pitch-engine.js';
 import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
-import { getFrequency } from '../../../public/utils.js';
 
 vi.mock('../../../public/state.js', () => {
     const mockState = {

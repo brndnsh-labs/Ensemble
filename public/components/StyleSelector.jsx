@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { ACTIONS } from '../types.js';

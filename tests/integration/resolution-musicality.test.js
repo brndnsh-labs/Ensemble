@@ -2,7 +2,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { generateResolutionNotes } from '../../public/engine/resolution.js';
 import { getState } from '../../public/state.js';
 

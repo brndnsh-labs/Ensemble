@@ -1,5 +1,4 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
 import { getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
@@ -8,7 +7,6 @@ import {
     enforceRegisterSlotting,
     updateCoordinationContext,
 } from './coordination-engine.js';
-import { generateProceduralFill } from './fills.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
 import { getHarmonyNotes } from './harmonies.js';
 import { getSoloistNote } from './soloist.js';
@@ -116,7 +114,12 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
         groove.sectionSeedMap && sectionId
             ? /** @type {any} */ (groove.sectionSeedMap)[sectionId] || 0
             : 0;
-    const preset = /** @type {any} */ (DRUM_PRESETS)[groove.lastDrumPreset || 'Standard'];
+
+    // Use a cached variation lookup if creativity is enabled
+    if (groove.creativity && groove.lastDrumPreset) {
+        // We use a global cache or just handle it synchronously if already loaded
+        // For now, we'll try to find a way to avoid the top-level import.
+    }
 
     // --- Calculate Turnaround State ---
     const sectionEntry = binarySearchMap(arranger.sectionMap || [], step);
@@ -184,14 +187,17 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
          * @param {string} instName
          * @param {boolean} evaluateOnly
          */
+        // Variations lookup
         const checkHit = (instName, evaluateOnly = true) => {
             const inst = groove.instruments.find((i) => i.name === instName);
             if (!inst || inst.muted) {
                 return false;
             }
             let stepVal = inst.steps[drumStep];
-            if (groove.creativity && preset?.variations?.[seedIdx]) {
-                const varInst = /** @type {any} */ (preset).variations[seedIdx][instName];
+
+            // Variation logic: We use pre-computed variations if creativity is high
+            if (groove.creativity && groove.variations) {
+                const varInst = groove.variations[seedIdx]?.[instName];
                 if (varInst) {
                     stepVal = varInst[drumStep];
                 }

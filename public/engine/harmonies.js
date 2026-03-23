@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { calculateTimingOffset, getFrequency } from '../utils.js';
+import { getFrequency } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
 import { getWorkerState } from './worker-orchestrator.js';
 

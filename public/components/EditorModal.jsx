@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { parseMusicXML, reharmonizeMelody } from '../musicxml-parser.js';
@@ -16,12 +15,10 @@ import {
     refreshArrangerUI,
     saveProgression,
     transformRelativeProgression,
-    validateAndAnalyze,
     validateProgression,
 } from '../arranger-controller.js';
 import { KEY_ORDER } from '../config.js';
 import { pushHistory, undo } from '../history.js';
-import { shareProgression } from '../sharing.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { generateId } from '../utils.js';

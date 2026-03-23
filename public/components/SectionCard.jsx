@@ -1,9 +1,7 @@
-import { h } from 'preact';
 import React, { forwardRef } from 'preact/compat';
 import { useEffect, useImperativeHandle, useRef, useState } from 'preact/hooks';
 import { onSectionDelete, onSectionDuplicate, onSectionUpdate } from '../arranger-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
-import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';

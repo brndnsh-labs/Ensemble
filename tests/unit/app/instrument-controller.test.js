@@ -182,8 +182,8 @@ describe('Instrument Controller', () => {
     });
 
     describe('loadDrumPreset', () => {
-        it('should load a preset and update groove state', () => {
-            InstrumentController.loadDrumPreset('Basic Rock');
+        it('should load a preset and update groove state', async () => {
+            await InstrumentController.loadDrumPreset('Basic Rock');
             const state = getState();
             expect(state.groove.lastDrumPreset).toBe('Basic Rock');
             expect(dispatch).toHaveBeenCalledWith('DRUM_PRESET_LOADED');

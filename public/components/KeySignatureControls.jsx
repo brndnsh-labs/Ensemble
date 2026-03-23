@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';

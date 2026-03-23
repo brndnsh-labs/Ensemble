@@ -1,5 +1,5 @@
 import { clampFreq, safeDisconnect } from '../utils.js';
-import { createSimplePanner, killActiveVoices, rampGain } from './synth-utils.js';
+import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
 /**
  * Polyphonic Synthesizer for the Harmony Module (harmony).

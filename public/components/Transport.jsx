@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { handleTap } from '../instrument-controller.js';

@@ -3,18 +3,16 @@
  * @vitest-environment happy-dom
  */
 
-import { Fragment, h, render } from 'preact';
+import { render } from 'preact';
 import React from 'preact/compat';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatch, getState, storage } from '../../public/state.js';
-import { renderChordVisualizer, renderGrid, ui } from '../../public/ui.js';
+import { dispatch, getState } from '../../public/state.js';
 
 const { arranger, groove } = getState();
 
 import { Arranger } from '../../public/components/Arranger.jsx';
 import { ChordVisualizer } from '../../public/components/ChordVisualizer.jsx';
 import { SequencerGrid } from '../../public/components/SequencerGrid.jsx';
-import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies that we don't need for layout testing
 vi.mock('../../public/persistence.js', () => ({

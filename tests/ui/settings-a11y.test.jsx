@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Settings } from '../../public/components/Settings.jsx';
 import { dispatch } from '../../public/state.js';

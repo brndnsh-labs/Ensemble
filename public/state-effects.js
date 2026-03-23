@@ -1,6 +1,5 @@
 import { applyTheme, setBpm } from './app-controller.js';
 import { validateProgression } from './engine/chords-engine.js';
-import { applyConductor } from './engine/conductor.js';
 import {
     generateDrumFills,
     generateDrumOrchestration,

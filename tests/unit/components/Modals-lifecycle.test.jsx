@@ -1,11 +1,11 @@
 /**
  * @vitest-environment happy-dom
  */
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Modals } from '../../../public/components/Modals.jsx';
-import { dispatch, getState } from '../../../public/state.js';
+import { dispatch } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock heavy components to avoid complex sub-renders

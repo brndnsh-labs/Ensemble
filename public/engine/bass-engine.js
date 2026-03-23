@@ -1,4 +1,4 @@
-import { binarySearchMap, calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
+import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**

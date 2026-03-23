@@ -1,13 +1,10 @@
 /**
  * @vitest-environment happy-dom
  */
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { useState } from 'preact/hooks';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-// We need to mock state.js before importing ui-bridge.js
-// but we want to use the real implementation mostly.
-import * as stateModule from '../../public/state.js';
 
 // Mock side-effect modules to prevent EnvironmentTeardownErrors from dynamic imports in state.js
 vi.mock('../../public/app-controller.js', () => ({
@@ -41,7 +38,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
 
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
-import { useDispatch, useEnsembleState } from '../../public/ui-bridge.js';
+import { useEnsembleState } from '../../public/ui-bridge.js';
 
 describe('UI Bridge Integration: Preact & State Stability', () => {
     let container;

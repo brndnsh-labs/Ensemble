@@ -1,4 +1,3 @@
-import { Fragment, h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';

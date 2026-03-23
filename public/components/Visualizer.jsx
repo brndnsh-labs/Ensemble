@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
 import { switchMeasure } from '../instrument-controller.js';

@@ -2,15 +2,13 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import React from 'preact/compat';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Transport } from '../../public/components/Transport.jsx';
 import { dispatch, getState } from '../../public/state.js';
 
 const { playback } = getState();
-
-import { setBpm } from '../../public/app-controller.js';
 
 // Mock state
 vi.mock('../../public/state.js', async (importOriginal) => {

@@ -5,7 +5,7 @@ import {
     HARMONY_STYLES,
     SOLOIST_STYLES,
 } from './data/instrument-styles.js';
-import { SMART_GENRES } from './data/smart-genres.js';
+import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
 import {
@@ -240,18 +240,15 @@ export function hydrateState() {
                           : true,
                 lastDrumPreset: savedState.groove.lastDrumPreset || 'Basic Rock',
                 genreFeel:
-                    savedState.groove.genreFeel &&
-                    Object.values(SMART_GENRES).some((g) => g.feel === savedState.groove.genreFeel)
+                    savedState.groove.genreFeel && GENRE_FEELS.includes(savedState.groove.genreFeel)
                         ? savedState.groove.genreFeel
                         : 'Rock',
                 larsMode: savedState.groove.larsMode || false,
                 larsIntensity: clamp(savedState.groove.larsIntensity, 0, 1, 0.5),
                 lastSmartGenre:
                     savedState.groove.lastSmartGenre ||
-                    Object.keys(SMART_GENRES).find(
-                        (k) =>
-                            /** @type {any} */ (SMART_GENRES)[k].feel ===
-                            savedState.groove.genreFeel,
+                    GENRE_NAMES.find(
+                        (k) => GENRE_FEELS[GENRE_NAMES.indexOf(k)] === savedState.groove.genreFeel,
                     ) ||
                     'Rock',
                 activeTab: savedState.groove.activeTab || 'smart',
@@ -365,7 +362,7 @@ export function loadFromUrl() {
 
     const genreParam = params.get('genre');
     if (genreParam) {
-        if (/** @type {any} */ (SMART_GENRES)[genreParam]) {
+        if (GENRE_NAMES.includes(genreParam)) {
             groove.lastSmartGenre = genreParam; // @direct-mutation
             groove.genreFeel = genreParam; // @direct-mutation
         }

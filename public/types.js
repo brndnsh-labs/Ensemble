@@ -231,7 +231,6 @@
  * @typedef {Object} ActionPayloadMap
  * @property {ActionPayloadImportMusicXML} IMPORT_MUSICXML
  * @property {undefined} CLEAR_LEAD_SHEET
- * @property {undefined} GENERATE_SEED
  * @property {ActionPayloadSetParam} SET_PARAM
  * @property {number} SET_BAND_INTENSITY
  * @property {number} SET_COMPLEXITY
@@ -240,12 +239,10 @@
  * @property {ActionPayloadUpdateConductorState} UPDATE_CONDUCTOR_STATE
  * @property {undefined} TRIGGER_EMERGENCY_LOOKAHEAD
  * @property {undefined} RESET_SESSION
- * @property {number} SET_SESSION_STEPS
  * @property {ActionPayloadShowToast | string} SHOW_TOAST
  * @property {number} [TRIGGER_FLASH]
  * @property {boolean} SET_UPDATE_AVAILABLE
  * @property {ActionPayloadSetModalOpen} SET_MODAL_OPEN
- * @property {boolean} SET_VIZ_ENABLED
  * @property {boolean} [TOGGLE_MAXIMIZED_CHORDS]
  * @property {undefined} TOGGLE_PLAY
  * @property {number | string} SET_BPM
@@ -253,7 +250,6 @@
  * @property {string} SET_DENSITY
  * @property {ActionPayloadSetVolume} SET_VOLUME
  * @property {ActionPayloadSetReverb} SET_REVERB
- * @property {ActionPayloadSetOctave} SET_OCTAVE
  * @property {string} SET_SOLOIST_MODE
  * @property {string} SET_SOLOIST_SEED
  * @property {ActionPayloadSetActiveTab} SET_ACTIVE_TAB
@@ -262,13 +258,11 @@
  * @property {number} SET_SWING
  * @property {string} SET_SWING_SUB
  * @property {number} SET_HUMANIZE
- * @property {boolean} SET_FOLLOW_PLAYBACK
  * @property {boolean} SET_LARS_MODE
  * @property {number} SET_LARS_INTENSITY
  * @property {boolean} SET_CREATIVITY
  * @property {ActionPayloadSetGenreFeel} SET_GENRE_FEEL
  * @property {number | null} SET_GENRE_COUNTDOWN
- * @property {ActionPayloadSetPocketConfig} SET_POCKET_CONFIG
  * @property {ActionPayloadSetGrooveSteps} SET_GROOVE_STEPS
  * @property {number | string} SET_ACTIVE_MEASURE
  * @property {ActionPayloadSetGrooveSeed} SET_GROOVE_SEED
@@ -316,7 +310,6 @@
 export const ACTIONS = {
     IMPORT_MUSICXML: 'IMPORT_MUSICXML',
     CLEAR_LEAD_SHEET: 'CLEAR_LEAD_SHEET',
-    GENERATE_SEED: 'GENERATE_SEED',
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
@@ -326,12 +319,10 @@ export const ACTIONS = {
     UPDATE_CONDUCTOR_STATE: 'UPDATE_CONDUCTOR_STATE',
     TRIGGER_EMERGENCY_LOOKAHEAD: 'TRIGGER_EMERGENCY_LOOKAHEAD',
     RESET_SESSION: 'RESET_SESSION',
-    SET_SESSION_STEPS: 'SET_SESSION_STEPS',
     SHOW_TOAST: 'SHOW_TOAST',
     TRIGGER_FLASH: 'TRIGGER_FLASH',
     SET_UPDATE_AVAILABLE: 'SET_UPDATE_AVAILABLE',
     SET_MODAL_OPEN: 'SET_MODAL_OPEN',
-    SET_VIZ_ENABLED: 'SET_VIZ_ENABLED',
     TOGGLE_MAXIMIZED_CHORDS: 'TOGGLE_MAXIMIZED_CHORDS',
     TOGGLE_PLAY: 'TOGGLE_PLAY',
     SET_BPM: 'SET_BPM',
@@ -341,7 +332,6 @@ export const ACTIONS = {
     SET_DENSITY: 'SET_DENSITY',
     SET_VOLUME: 'SET_VOLUME',
     SET_REVERB: 'SET_REVERB',
-    SET_OCTAVE: 'SET_OCTAVE',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SOLOIST_SEED: 'SET_SOLOIST_SEED',
     SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
@@ -352,13 +342,11 @@ export const ACTIONS = {
     SET_SWING: 'SET_SWING',
     SET_SWING_SUB: 'SET_SWING_SUB',
     SET_HUMANIZE: 'SET_HUMANIZE',
-    SET_FOLLOW_PLAYBACK: 'SET_FOLLOW_PLAYBACK',
     SET_LARS_MODE: 'SET_LARS_MODE',
     SET_LARS_INTENSITY: 'SET_LARS_INTENSITY',
     SET_CREATIVITY: 'SET_CREATIVITY',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
     SET_GENRE_COUNTDOWN: 'SET_GENRE_COUNTDOWN',
-    SET_POCKET_CONFIG: 'SET_POCKET_CONFIG',
     SET_GROOVE_STEPS: 'SET_GROOVE_STEPS',
     SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',
     SET_GROOVE_SEED: 'SET_GROOVE_SEED',

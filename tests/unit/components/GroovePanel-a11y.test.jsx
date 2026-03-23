@@ -1,4 +1,4 @@
-import { h, render } from 'preact';
+import { render } from 'preact';
 import React from 'preact/compat';
 /**
  * @vitest-environment happy-dom

@@ -337,11 +337,6 @@ export function syncWorker(action, payload) {
                     /** @type {any} */ (data)[payload.module] = { volume: payload.value };
                 }
                 break;
-            case 'SET_OCTAVE':
-                if (payload.module) {
-                    /** @type {any} */ (data)[payload.module] = { octave: payload.value };
-                }
-                break;
             case 'SET_MIDI_CONFIG':
                 data.midi = payload;
                 break;
@@ -359,9 +354,6 @@ export function syncWorker(action, payload) {
                 break;
             case 'SET_SWING_SUB':
                 data.groove = { swingSub: payload };
-                break;
-            case 'SET_SESSION_STEPS':
-                data.soloist = { sessionSteps: payload };
                 break;
             case 'SET_SOLOIST_MODE':
                 data.soloist = { mode: payload };

@@ -65,8 +65,8 @@
         "rules": {
             "recommended": true,
             "correctness": {
-                "noUnusedVariables": "warn",
-                "noUnusedImports": "off",
+                "noUnusedVariables": "error",
+                "noUnusedImports": "error",
                 "noUnreachable": "error",
                 "noUndeclaredVariables": "error",
                 "useParseIntRadix": "error",

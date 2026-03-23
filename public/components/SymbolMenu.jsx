@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import React from 'preact/compat';
 
 /** @param {any} props */

@@ -3,14 +3,13 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatch, getState, storage } from '../../public/state.js';
+import { getState } from '../../public/state.js';
 
 const { arranger, playback, chords, bass, soloist, groove } = getState();
 
 import { audioWatchdog } from '../../public/engine/audio-recovery.js';
 import { initAudio } from '../../public/engine/engine.js';
 import { scheduleGlobalEvent } from '../../public/engine/scheduler-core.js';
-import { getTimerWorker, initWorker } from '../../public/worker-client.js';
 
 // Mock Worker to bypass async complexity and control the clock
 vi.mock('../../public/worker-client.js', () => ({

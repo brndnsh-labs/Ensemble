@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,11 +24,14 @@ vi.mock('../../../public/state.js', () => ({
 }));
 
 // Mock Presets
-vi.mock('../../../public/presets.js', () => ({
+vi.mock('../../../public/data/chord-presets.js', () => ({
     CHORD_PRESETS: [
         { name: 'Pop (Standard)', category: 'Pop/Rock', sections: [] },
         { name: 'Another Preset', category: 'Other', sections: [] },
     ],
+}));
+
+vi.mock('../../../public/data/drum-presets.js', () => ({
     DRUM_PRESETS: {
         'Basic Rock': { category: 'Pop/Rock', swing: 0, sub: '8th' },
         Jazz: { category: 'Jazz', swing: 60, sub: '8th' },
@@ -99,7 +102,7 @@ describe('PresetLibrary Component', () => {
         vi.unstubAllGlobals();
     });
 
-    it('should show chord preset as active when isDirty is false', () => {
+    it('should show chord preset as active when isDirty is false', async () => {
         // Setup state: dirty=false, lastChordPreset='Pop (Standard)'
         mockUseEnsembleState.mockImplementation((selector) => {
             const state = {
@@ -113,12 +116,17 @@ describe('PresetLibrary Component', () => {
             render(<PresetLibrary type="chord" />, container);
         });
 
+        // Wait for dynamic import
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 0));
+        });
+
         const activeChip = container.querySelector('.chord-preset-chip.active');
         expect(activeChip).not.toBeNull();
         expect(activeChip.textContent).toBe('Pop (Standard)');
     });
 
-    it('should NOT show chord preset as active when isDirty is true', () => {
+    it('should NOT show chord preset as active when isDirty is true', async () => {
         // Setup state: dirty=true, lastChordPreset='Pop (Standard)'
         mockUseEnsembleState.mockImplementation((selector) => {
             const state = {
@@ -132,13 +140,18 @@ describe('PresetLibrary Component', () => {
             render(<PresetLibrary type="chord" />, container);
         });
 
+        // Wait for dynamic import
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 0));
+        });
+
         const activeChip = container.querySelector('.chord-preset-chip.active');
         // This expectation validates the FIX.
         // Currently (before fix), this test is expected to FAIL because the component ignores isDirty.
         expect(activeChip).toBeNull();
     });
 
-    it('should show drum preset as active regardless of isDirty', () => {
+    it('should show drum preset as active regardless of isDirty', async () => {
         // Setup state: dirty=true (arranger dirty), lastDrumPreset='Basic Rock'
         mockUseEnsembleState.mockImplementation((selector) => {
             const state = {
@@ -150,6 +163,11 @@ describe('PresetLibrary Component', () => {
 
         act(() => {
             render(<PresetLibrary type="drum" />, container);
+        });
+
+        // Wait for dynamic import
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 0));
         });
 
         // Drums should stay active even if arranger is dirty

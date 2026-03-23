@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatch, getState, playback, storage, subscribe } from '../../../public/state.js';
+import { dispatch, getState, storage, subscribe } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Manual localStorage mock

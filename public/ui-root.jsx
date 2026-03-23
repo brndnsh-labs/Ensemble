@@ -1,4 +1,4 @@
-import { Component, h, render } from 'preact';
+import { Component, render } from 'preact';
 import { App } from './App.jsx';
 
 class ErrorBoundary extends Component {

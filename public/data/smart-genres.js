@@ -1,13 +1,17 @@
-export const SMART_GENRES = {
+const GENRE_DEFAULTS = {
+    swing: 0,
+    sub: '16th',
+    chord: 'smart',
+    harmony: 'smart',
+};
+
+const GENRE_OVERRIDES = {
     Rock: {
-        swing: 0,
         sub: '8th',
         drum: 'Basic Rock',
         feel: 'Rock',
-        chord: 'smart',
         bass: 'rock',
         soloist: 'shred',
-        harmony: 'smart',
     },
     Jazz: {
         swing: 60,
@@ -21,7 +25,6 @@ export const SMART_GENRES = {
     },
     Funk: {
         swing: 15,
-        sub: '16th',
         drum: 'Funk',
         feel: 'Funk',
         chord: 'funk',
@@ -30,24 +33,17 @@ export const SMART_GENRES = {
         harmony: 'horns',
     },
     Disco: {
-        swing: 0,
-        sub: '16th',
         drum: 'Disco',
         feel: 'Disco',
-        chord: 'smart',
         bass: 'disco',
         soloist: 'disco',
-        harmony: 'smart',
     },
     'Hip Hop': {
         swing: 25,
-        sub: '16th',
         drum: 'Hip Hop',
         feel: 'Hip Hop',
-        chord: 'smart',
         bass: 'hiphop',
         soloist: 'neo',
-        harmony: 'smart',
     },
     Blues: {
         swing: 90,
@@ -61,23 +57,18 @@ export const SMART_GENRES = {
     },
     'Neo-Soul': {
         swing: 30,
-        sub: '16th',
         drum: 'Neo-Soul',
         feel: 'Neo-Soul',
-        chord: 'smart',
         bass: 'neo',
         soloist: 'neo',
         harmony: 'strings',
     },
     Reggae: {
         swing: 20,
-        sub: '16th',
         drum: 'Reggae',
         feel: 'Reggae',
-        chord: 'smart',
         bass: 'dub',
         soloist: 'minimal',
-        harmony: 'smart',
     },
     Acoustic: {
         swing: 15,
@@ -90,8 +81,6 @@ export const SMART_GENRES = {
         harmony: 'strings',
     },
     Bossa: {
-        swing: 0,
-        sub: '16th',
         drum: 'Bossa Nova',
         feel: 'Bossa Nova',
         chord: 'jazz',
@@ -101,26 +90,20 @@ export const SMART_GENRES = {
     },
     Country: {
         swing: 60,
-        sub: '16th',
         drum: 'Country (Two-Step)',
         feel: 'Country',
         chord: 'strum-country',
         bass: 'country',
         soloist: 'country',
-        harmony: 'smart',
     },
     Metal: {
-        swing: 0,
-        sub: '16th',
         drum: 'Metal (Speed)',
         feel: 'Metal',
         chord: 'power-metal',
         bass: 'metal',
         soloist: 'metal',
-        harmony: 'smart',
     },
     'Ska-Punk': {
-        swing: 0,
         sub: '8th',
         drum: 'Ska',
         feel: 'Ska',
@@ -130,3 +113,14 @@ export const SMART_GENRES = {
         harmony: 'horns',
     },
 };
+
+export const SMART_GENRES = Object.keys(GENRE_OVERRIDES).reduce((acc, key) => {
+    /** @type {any} */ (acc)[key] = {
+        ...GENRE_DEFAULTS,
+        .../** @type {any} */ (GENRE_OVERRIDES)[key],
+    };
+    return acc;
+}, {});
+
+export const GENRE_NAMES = Object.keys(GENRE_OVERRIDES);
+export const GENRE_FEELS = Object.values(GENRE_OVERRIDES).map((g) => g.feel);

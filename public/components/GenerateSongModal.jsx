@@ -1,11 +1,7 @@
-import { Fragment, h } from 'preact';
+import { Fragment } from 'preact';
 import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import {
-    clearChordPresetHighlight,
-    refreshArrangerUI,
-    validateAndAnalyze,
-} from '../arranger-controller.js';
+import { clearChordPresetHighlight, refreshArrangerUI } from '../arranger-controller.js';
 import { SONG_TEMPLATES } from '../data/song-templates.js';
 import { pushHistory } from '../history.js';
 import { generateSong } from '../song-generator.js';
@@ -14,7 +10,7 @@ import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { generateId } from '../utils.js';
-import { ButtonGroup, SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
+import { ButtonGroup, SettingGroup, SettingRow, Toggle } from './UIControls.jsx';
 
 export function GenerateSongModal() {
     const { arranger } = getState();

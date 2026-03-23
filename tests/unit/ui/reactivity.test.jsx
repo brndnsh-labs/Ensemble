@@ -2,8 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dispatch, getState } from '../../../public/state.js';

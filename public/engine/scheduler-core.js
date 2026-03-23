@@ -1,5 +1,4 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { DRUM_PRESETS } from '../data/drum-presets.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
@@ -32,11 +31,7 @@ import {
     restoreGains,
     updateSustain,
 } from './engine.js';
-import {
-    applyGrooveOverrides,
-    calculatePocketOffset,
-    calculateStepDuration,
-} from './groove-engine.js';
+import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
 import {
     dispatchMidiAutomation,
     dispatchMidiBass,

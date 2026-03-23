@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
 

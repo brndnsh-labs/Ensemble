@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GenerateSongModal } from '../../public/components/GenerateSongModal.jsx';
 import { getState } from '../../public/state.js';

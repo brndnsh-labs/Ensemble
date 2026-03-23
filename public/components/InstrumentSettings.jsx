@@ -1,4 +1,4 @@
-import { Fragment, h } from 'preact';
+import { Fragment } from 'preact';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -81,7 +81,7 @@ export function InstrumentSettings({ module }) {
                             id="densitySelect"
                             value={state.density || 'standard'}
                             onChange={(/** @type {any} */ val) => {
-                                dispatch(/** @type {any} */ (ACTIONS).SET_CHORD_DENSITY, val);
+                                dispatch(ACTIONS.SET_DENSITY, val);
                                 saveCurrentState();
                             }}
                             options={[

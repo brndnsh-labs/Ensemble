@@ -2,8 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Harmonizer } from '../../../public/melody-harmonizer.js';
+import { describe, expect, it, vi } from 'vitest';
 import { parseMusicXML, reharmonizeMelody } from '../../../public/musicxml-parser.js';
 
 // Mock Harmonizer

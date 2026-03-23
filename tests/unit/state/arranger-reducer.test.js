@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
 import { ACTIONS } from '../../../public/types.js';
 

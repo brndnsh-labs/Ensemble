@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { arranger } from '../../../public/state/arranger.js';
 import {
     bass,
@@ -65,13 +65,11 @@ describe('Instrument Reducer', () => {
         expect(chords.density).toBe('rich');
     });
 
-    it('should set volume, reverb and octave for modules', () => {
+    it('should set volume and reverb for modules', () => {
         instrumentReducer(ACTIONS.SET_VOLUME, { module: 'chords', value: 0.8 });
         expect(chords.volume).toBe(0.8);
         instrumentReducer(ACTIONS.SET_REVERB, { module: 'harmony', value: 0.2 });
         expect(harmony.reverb).toBe(0.2);
-        instrumentReducer(ACTIONS.SET_OCTAVE, { module: 'soloist', value: 84 });
-        expect(soloist.octave).toBe(84);
     });
 
     it('should set piano roots', () => {
@@ -86,12 +84,10 @@ describe('Instrument Reducer', () => {
         expect(soloist.preset).toBe('neo');
     });
 
-    it('should handle session resets and steps', () => {
+    it('should handle session resets', () => {
         soloist.sessionSteps = 100;
         instrumentReducer(ACTIONS.RESET_SESSION);
         expect(soloist.sessionSteps).toBe(0);
-        instrumentReducer(ACTIONS.SET_SESSION_STEPS, 50);
-        expect(soloist.sessionSteps).toBe(50);
     });
 
     it('should update conductor decisions', () => {

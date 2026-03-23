@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { generateRhythmPlan } from '../../../public/engine/soloist-rhythm-engine.js';
 import * as stateModule from '../../../public/state.js';
 

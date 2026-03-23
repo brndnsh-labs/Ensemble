@@ -1,3 +1,5 @@
+import { safeDisconnect } from '../utils.js';
+
 /**
  * Standardized WebAudio utilities for instrument synthesis.
  */
@@ -113,5 +115,135 @@ export function duckGain(param, target, time, attack = 0.01, release = 0.1) {
         param.setTargetAtTime(1.0, time + attack, release);
     } catch {
         /* ignore audio graph errors */
+    }
+}
+
+/**
+ * Plays a percussive strike using a noise buffer and filter.
+ * Consolidated from various instrument engines to reduce duplication.
+ *
+ * @param {AudioContext} audio - WebAudio context.
+ * @param {AudioBuffer} buffer - Noise buffer.
+ * @param {AudioNode} destination - Target node.
+ * @param {number} time - Start time.
+ * @param {Object} options - Synthesis options.
+ * @param {number} [options.volume=0.1] - Output volume.
+ * @param {BiquadFilterType} [options.filterType='bandpass'] - Filter type.
+ * @param {number} [options.freq=1200] - Filter frequency.
+ * @param {number} [options.Q=1.5] - Filter resonance.
+ * @param {number} [options.attack=0.001] - Attack time constant.
+ * @param {number} [options.decay=0.01] - Decay time constant.
+ * @param {number} [options.duration=0.1] - Stop duration.
+ */
+export function playPercussiveStrike(
+    audio,
+    buffer,
+    destination,
+    time,
+    {
+        volume = 0.1,
+        filterType = 'bandpass',
+        freq = 1200,
+        Q = 1.5,
+        attack = 0.001,
+        decay = 0.01,
+        duration = 0.1,
+    } = {},
+) {
+    if (!audio || !buffer || !destination) {
+        return;
+    }
+
+    try {
+        const source = audio.createBufferSource();
+        source.buffer = buffer;
+        const filter = audio.createBiquadFilter();
+        const gain = audio.createGain();
+
+        filter.type = filterType;
+        filter.frequency.setValueAtTime(freq, time);
+        filter.Q.setValueAtTime(Q, time);
+
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.setTargetAtTime(volume, time, attack);
+        gain.gain.setTargetAtTime(0, time + attack, decay);
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+
+        source.start(time);
+        source.stop(time + duration);
+
+        source.onended = () => safeDisconnect([source, filter, gain]);
+    } catch {
+        /* ignore audio errors */
+    }
+}
+
+/**
+ * Plays a resonant tone component using an oscillator and frequency ramp.
+ * Standardizes "body" sounds for drums and bass.
+ *
+ * @param {AudioContext} audio - WebAudio context.
+ * @param {AudioNode} destination - Target node.
+ * @param {number} time - Start time.
+ * @param {Object} options - Synthesis options.
+ * @param {OscillatorType} [options.type='sine'] - Oscillator type.
+ * @param {number} [options.freqStart=100] - Initial frequency.
+ * @param {number} [options.freqEnd=100] - End frequency (ramp target).
+ * @param {number} [options.rampDuration=0.02] - Duration of the frequency ramp.
+ * @param {number} [options.volume=0.1] - Output volume.
+ * @param {number} [options.attack=0.001] - Attack time constant.
+ * @param {number} [options.decay=0.05] - Decay time constant.
+ * @param {number} [options.duration=0.5] - Stop duration.
+ * @param {number} [options.detune=0] - Initial detune in cents.
+ */
+export function playResonantTone(
+    audio,
+    destination,
+    time,
+    {
+        type = 'sine',
+        freqStart = 100,
+        freqEnd = 100,
+        rampDuration = 0.02,
+        volume = 0.1,
+        attack = 0.001,
+        decay = 0.05,
+        duration = 0.5,
+        detune = 0,
+    } = {},
+) {
+    if (!audio || !destination) {
+        return;
+    }
+
+    try {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freqStart, time);
+        if (freqStart !== freqEnd) {
+            osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), time + rampDuration);
+        }
+        if (detune !== 0) {
+            osc.detune.setValueAtTime(detune, time);
+        }
+
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.setTargetAtTime(volume, time, attack);
+        gain.gain.setTargetAtTime(0, time + attack, decay);
+
+        osc.connect(gain);
+        gain.connect(destination);
+
+        osc.start(time);
+        osc.stop(time + duration);
+
+        osc.onended = () => safeDisconnect([osc, gain]);
+    } catch {
+        /* ignore audio errors */
     }
 }

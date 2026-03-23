@@ -1,5 +1,3 @@
-import { WORKER_MSG, WORKER_RESP } from '../worker-types.js';
-
 /**
  * Shared state for the worker generative engines.
  * @type {{

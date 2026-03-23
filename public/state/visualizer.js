@@ -20,9 +20,6 @@ export const vizState = deepSignal({
  */
 export function vizReducer(action, payload) {
     switch (action) {
-        case ACTIONS.SET_VIZ_ENABLED:
-            vizState.enabled = !!payload;
-            return true;
         case ACTIONS.TOGGLE_MAXIMIZED_CHORDS:
             vizState.isMaximized = payload !== undefined ? !!payload : !vizState.isMaximized;
             return true;

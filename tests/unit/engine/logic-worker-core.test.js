@@ -29,7 +29,7 @@ vi.mock('../../../public/engine/midi-worker-logic.js', () => {
     };
 });
 
-import { _setExporting, isExporting } from '../../../public/engine/midi-worker-logic.js';
+import { _setExporting } from '../../../public/engine/midi-worker-logic.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();

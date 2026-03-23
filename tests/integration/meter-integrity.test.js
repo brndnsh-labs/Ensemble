@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';

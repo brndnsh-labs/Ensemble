@@ -1,7 +1,7 @@
-import { Fragment, h } from 'preact';
+import { Fragment } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ChordAnalyzerLite } from '../audio-analyzer-lite.js';
-import { dispatch, getState } from '../state.js';
+import { getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';

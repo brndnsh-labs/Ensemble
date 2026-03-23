@@ -1,5 +1,5 @@
 import { WORKER_RESP } from '../worker-types.js';
-import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
+import { generateNotesForStep } from './tick-logic.js';
 import { workerContext } from './worker-orchestrator.js';
 
 /**

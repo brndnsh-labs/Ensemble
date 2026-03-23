@@ -1,4 +1,3 @@
-import { TIME_SIGNATURES } from '../config.js';
 import { binarySearchMap, calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
 import * as acoustic from './grooves/acoustic.js';
 import * as blues from './grooves/blues.js';

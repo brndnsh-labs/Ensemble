@@ -2,11 +2,9 @@
  * @vitest-environment happy-dom
  */
 
-import { h, render } from 'preact';
+import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GenerateSongModal } from '../../public/components/GenerateSongModal.jsx';
-import { dispatch } from '../../public/state.js';
-import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies
 vi.mock('../../public/persistence.js', () => ({

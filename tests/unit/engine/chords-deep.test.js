@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getChordDetails } from '../../../public/engine/chords-engine.js';
 
 describe('Chords Details Deep Dive', () => {

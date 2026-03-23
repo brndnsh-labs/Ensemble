@@ -1,15 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { vizReducer, vizState } from '../../../public/state/visualizer.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Visualizer State Reducer', () => {
-    it('should toggle enabled state', () => {
-        vizReducer(ACTIONS.SET_VIZ_ENABLED, true);
-        expect(vizState.enabled).toBe(true);
-        vizReducer(ACTIONS.SET_VIZ_ENABLED, false);
-        expect(vizState.enabled).toBe(false);
-    });
-
     it('should toggle maximized chords state', () => {
         vizState.isMaximized = false;
         vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS);

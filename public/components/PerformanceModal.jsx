@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../config.js';
 import { stopSoloist, triggerSoloNote } from '../performance-controller.js';

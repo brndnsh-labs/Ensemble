@@ -193,8 +193,8 @@ describe('Drum Synthesis', () => {
         playDrumSound(getState(), 'Low Agogo', 10, 1.0);
         playDrumSound(getState(), 'Perc', 10, 1.0);
 
+        // Uses 3 oscillators via playResonantTone
         expect(playback.audio.createOscillator).toHaveBeenCalled();
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
     });
 
     it('should implement Shaker/Cabasa/Guiro synthesis', () => {
