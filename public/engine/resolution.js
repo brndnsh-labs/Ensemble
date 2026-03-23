@@ -82,7 +82,7 @@ export function generateResolutionNotes(
     /**
      * @param {number} maxMs
      */
-    const getStagger = (maxMs = RESOLUTION_STAGGER) => (Math.random() - 0.5) * maxMs;
+    const getStagger = (maxMs = RESOLUTION_STAGGER) => Math.random() * maxMs;
 
     // Use current song key as tonic
     const resolutionKey = arranger.key || 'C';

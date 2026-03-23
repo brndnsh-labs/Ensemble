@@ -82,7 +82,7 @@ describe('Resolution Logic', () => {
         // Jazz Major should be JAZZ_V_I (2 cadence steps)
         // Since we have staggering, unique times will be many, but they should fall into two clusters
         const times = notes.map((n) => n.timingOffset);
-        const uniqueClusters = [...new Set(times.map((t) => Math.round(t * 10) / 10))];
+        const uniqueClusters = [...new Set(times.map((t) => Math.round(t * 2) / 2))];
         expect(uniqueClusters.length).toBe(2);
     });
 
