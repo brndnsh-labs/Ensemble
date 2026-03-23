@@ -34,6 +34,13 @@ export function hashString(str) {
  * @returns {string}
  */
 export function generateRandomSeed() {
+    // 🛡️ Sentinel: Security Enhancement - Cryptographically Secure RNG
+    // Fallback to Math.random() is maintained for environments without crypto.
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        return (array[0] % 0xffffff).toString(16).padStart(6, '0').toUpperCase();
+    }
     return Math.floor(Math.random() * 0xffffff)
         .toString(16)
         .padStart(6, '0')
@@ -174,7 +181,18 @@ export function getMidi(freq) {
  * Generates a unique ID for sections.
  */
 export function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    // 🛡️ Sentinel: Security Enhancement - Cryptographically Secure UUID
+    // Date.now() + Math.random() is susceptible to collisions and is not secure.
+    // We prefix with 'id-' to ensure the ID is a valid CSS selector and DOM id.
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return `id-${crypto.randomUUID()}`;
+    }
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const array = new Uint32Array(2);
+        crypto.getRandomValues(array);
+        return `id-${array[0].toString(36)}${array[1].toString(36)}`;
+    }
+    return `id-${Date.now().toString(36)}${Math.random().toString(36).substr(2)}`;
 }
 
 /**
