@@ -35,6 +35,19 @@ const RH_CELLS = {
 };
 
 /**
+ * Pickup Dictionary (Anacrusis)
+ * Common run-ups and pushes leading into a downbeat.
+ * Expressed in beats relative to the downbeat (negative values).
+ */
+const PICKUP_DICTIONARY = {
+    SCALE_RUN: [-0.75, -0.5, -0.25], // 16th note walk-up
+    CHORD_PUSH: [-0.5], // Syncopated 'And' of 4
+    DOUBLE_HIT: [-1.0, -0.5], // Two 8th notes (dun-dun)
+    LATE_SWEEP: [-0.375, -0.25, -0.125], // Fast 32nd note flurry
+    TRIPLET_RUN: [-0.666, -0.333], // Triplet lead-in
+};
+
+/**
  * Soloist Seeder Module (v4)
  * Generates a "Dynamic Head" (Seed Melody) for the entire arrangement.
  * Implements a continuous, musically connected line utilizing target notes,
@@ -253,6 +266,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const isStationaryMotif = prng() < stationaryProb;
 
             // Generate a 2-measure template
+            /** @type {any[]} */
             const motif = [];
             let currentDegreeOffset = 0;
 
@@ -272,18 +286,6 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         forceDense = true;
                     }
                 }
-            }
-
-            // Allow for pickups at the very start of the motif (before beat 0)
-            if (!forceSparse && prng() > 0.4) {
-                const isShortPickup = prng() > 0.5;
-                motif.push({
-                    beatOffset: isShortPickup ? -0.5 : -1,
-                    isPickup: true,
-                    scaleDegreeOffset: prng() > 0.5 ? -1 : 1, // Start slightly below or above target
-                    duration: isShortPickup ? stepsPerBeat / 2 : stepsPerBeat,
-                    isRest: false,
-                });
             }
 
             // Determine phrase length dynamically
@@ -618,7 +620,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 sectionEndMeasure - sectionStartMeasure >= 8 &&
                 isSectionTurnaround(baseStep, sectionMap, stepsPerMeasure, phraseLength);
             /** @type {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} */
-            let activeMotif = motif;
+            let activeMotif = [...motif]; // Copy so we can safely inject one-off pickups
 
             if (isTurnaroundMeasures) {
                 // Generate a one-off "Departure" motif for the turnaround
@@ -639,6 +641,40 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             isRest: false,
                         });
                     });
+                }
+            } else if (m === sectionStartMeasure) {
+                // --- Sectional Entrance (Anacrusis) ---
+                // Only trigger at the start of a structural block (and avoid sparse sections)
+                if (prng() > 0.3 && !isStationaryMotif) {
+                    const pickupValues = Object.values(PICKUP_DICTIONARY);
+                    const pickupKeys = Object.keys(PICKUP_DICTIONARY);
+                    const pIdx = Math.floor(prng() * pickupValues.length);
+                    const pPattern = pickupValues[pIdx];
+                    const pKey = pickupKeys[pIdx];
+
+                    // Find the target degree we are leading into
+                    const firstNote = activeMotif.find((n) => !n.isRest && n.beatOffset >= 0);
+                    const targetDegree = firstNote ? firstNote.scaleDegreeOffset : 0;
+
+                    // Start below the target and walk up to it
+                    let currentDegree = targetDegree - pPattern.length;
+
+                    // Inject pickup notes at the beginning of the motif
+                    const pickupNotes = pPattern.map(
+                        (/** @type {number} */ pOffset, /** @type {number} */ i) => {
+                            const nextOffset = pPattern[i + 1] || 0;
+                            return {
+                                beatOffset: pOffset,
+                                isPickup: true,
+                                scaleDegreeOffset: currentDegree++,
+                                duration: (nextOffset - pOffset) * stepsPerBeat,
+                                isRest: false,
+                            };
+                        },
+                    );
+
+                    activeMotif = [...pickupNotes, ...activeMotif];
+                    console.log(`[Composer] Injected ${pKey} pickup into section ${label}`);
                 }
             }
 
