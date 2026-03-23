@@ -91,7 +91,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // To ensure repetition across identical sections (e.g. AABA form),
     // we'll memorize the target note sequence for each section label.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
-    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, phraseLength: number, metrics: { density: number, syncopationRatio: number }, isStationaryMotif: boolean }>} */
+    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, phraseLength: number, contourType: string, metrics: { density: number, syncopationRatio: number }, isStationaryMotif: boolean }>} */
     const sectionMotifs = new Map();
 
     /** @type {Map<string, number>} */
@@ -299,6 +299,12 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 }
             }
 
+            // --- Melodic Intent Phase ---
+            const contourType = ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC'][
+                Math.floor(prng() * 5)
+            ];
+            console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
+
             // 1. Generate the initial A cell
             const cellA = generateCell(forceSparse, forceDense, rhythmicDensity);
 
@@ -332,8 +338,18 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
             // 2. Build the motif based on the chosen structure
             currentDegreeOffset = 0;
+            // Contour-based starting offset
+            if (contourType === 'ASCEND') {
+                currentDegreeOffset = -2;
+            } else if (contourType === 'DESCEND') {
+                currentDegreeOffset = 4;
+            }
+
             let lastMotion = 0;
             const structureArray = structureType.split('-');
+
+            /** @type {Map<string, number[]>} */
+            const cellMemory = new Map();
 
             for (let measure = 0; measure < phraseLength; measure++) {
                 let currentCell = cellA;
@@ -363,7 +379,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     }
                 }
 
-                currentCell.forEach((cellNote) => {
+                // --- Melodic Sequencing Logic ---
+                // If we've seen this cell type before, reuse its relative intervals (offsets)
+                const previousOffsets = cellMemory.get(cellType);
+                /** @type {number[]} */
+                const currentCellOffsets = [];
+
+                currentCell.forEach((cellNote, noteIdx) => {
                     let isRest = cellNote.isRest;
                     let duration = cellNote.duration;
 
@@ -382,34 +404,57 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                     let motion = 0;
                     if (!isRest) {
-                        if (!isStationaryMotif) {
+                        if (previousOffsets && previousOffsets[noteIdx] !== undefined) {
+                            // SEQUENCE: Reuse the motion from the first time we played this cell type
+                            motion = previousOffsets[noteIdx];
+                        } else if (!isStationaryMotif) {
                             const r = prng();
+
+                            // CONTOUR BIASING
+                            const progress = measure / phraseLength;
+                            let upProb = 0.5;
+                            if (contourType === 'ASCEND') {
+                                upProb = 0.7;
+                            } else if (contourType === 'DESCEND') {
+                                upProb = 0.3;
+                            } else if (contourType === 'ARCH') {
+                                upProb = progress < 0.5 ? 0.7 : 0.3;
+                            } else if (contourType === 'VALLEY') {
+                                upProb = progress < 0.5 ? 0.3 : 0.7;
+                            } else if (contourType === 'STATIC') {
+                                upProb = currentDegreeOffset > 0 ? 0.2 : 0.8;
+                            }
+
                             // Leap-and-Fill Logic: If we just jumped, must step back
                             if (Math.abs(lastMotion) >= 3) {
                                 motion = lastMotion > 0 ? -1 : 1; // Step in opposite direction
                             } else {
                                 // Normal motion logic
                                 if (r < 0.6) {
-                                    motion = prng() > 0.5 ? 1 : -1; // Step
+                                    motion = prng() < upProb ? 1 : -1; // Step
                                 } else if (r < 0.8) {
-                                    motion = prng() > 0.5 ? 2 : -2; // Skip
+                                    motion = prng() < upProb ? 2 : -2; // Skip
                                 } else if (r < 0.9) {
                                     motion = 0; // Repeat
                                 } else {
-                                    motion = prng() > 0.5 ? 3 : -3; // Leap
+                                    motion = prng() < upProb ? 3 : -3; // Leap
                                 }
                             }
 
                             // Magnetic Center: Pull back towards 0 if we drift too far
-                            if (currentDegreeOffset > 4 && motion > 0) {
-                                motion = -1;
+                            // This ensures contour doesn't drift too high or low
+                            if (currentDegreeOffset > 5 && motion > 0) {
+                                motion = prng() > 0.5 ? -1 : -2;
                             }
-                            if (currentDegreeOffset < -4 && motion < 0) {
-                                motion = 1;
+                            if (currentDegreeOffset < -5 && motion < 0) {
+                                motion = prng() > 0.5 ? 1 : 2;
                             }
                         }
                         currentDegreeOffset += motion;
                         lastMotion = motion;
+                        currentCellOffsets.push(motion);
+                    } else {
+                        currentCellOffsets.push(0);
                     }
 
                     motif.push({
@@ -420,6 +465,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         isRest: isRest,
                     });
                 });
+
+                // Store the offsets for future sequencing
+                if (!cellMemory.has(cellType)) {
+                    cellMemory.set(cellType, currentCellOffsets);
+                }
             }
 
             // SAFETY: If motif is empty (all rests), force a note on the first downbeat
@@ -452,6 +502,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             sectionMotifs.set(category, {
                 motif,
                 phraseLength,
+                contourType,
                 metrics: { density, syncopationRatio },
                 isStationaryMotif,
             });
