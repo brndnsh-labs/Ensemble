@@ -40,21 +40,25 @@ export function unrollArrangement(arranger, targetBars = 64) {
     const iterations = Math.ceil(targetBars / originalBars);
     /** @type {Array<any>} */
     const unrolledStepMap = [];
+    /** @type {Array<any>} */
     const unrolledSectionMap = [];
     let currentStep = 0;
 
     for (let i = 0; i < iterations; i++) {
         const iterationStart = currentStep;
+        const progress = (i * originalBars) / targetBars;
 
-        // Determine the "Musical Role" for this iteration
+        // Determine the "Musical Role" based on overall song progress (0.0 - 1.0)
         let roleLabel = 'Verse';
-        if (i === 0) {
-            roleLabel = 'Intro';
-        } else if (i === iterations - 1) {
+        if (i === iterations - 1 || progress >= 0.9) {
             roleLabel = 'Outro';
-        } else if (i === Math.floor(iterations / 2)) {
+        } else if (progress < 0.1) {
+            roleLabel = 'Intro';
+        } else if (progress < 0.4) {
+            roleLabel = 'Verse';
+        } else if (progress < 0.6) {
             roleLabel = 'Chorus';
-        } else if (i > Math.floor(iterations / 2)) {
+        } else {
             roleLabel = 'Solo';
         }
 
@@ -72,13 +76,20 @@ export function unrollArrangement(arranger, targetBars = 64) {
             currentStep += steps;
         });
 
-        // Add to virtual section map
-        unrolledSectionMap.push({
-            id: `v-loop-${i}`,
-            start: iterationStart,
-            end: currentStep,
-            label: roleLabel,
-        });
+        // Add or extend virtual section map
+        if (
+            unrolledSectionMap.length > 0 &&
+            unrolledSectionMap[unrolledSectionMap.length - 1].label === roleLabel
+        ) {
+            unrolledSectionMap[unrolledSectionMap.length - 1].end = currentStep;
+        } else {
+            unrolledSectionMap.push({
+                id: `v-loop-${i}`,
+                start: iterationStart,
+                end: currentStep,
+                label: roleLabel,
+            });
+        }
     }
 
     return {

@@ -91,7 +91,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // To ensure repetition across identical sections (e.g. AABA form),
     // we'll memorize the target note sequence for each section label.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
-    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, metrics: { density: number, syncopationRatio: number }, isStationaryMotif: boolean }>} */
+    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, phraseLength: number, metrics: { density: number, syncopationRatio: number }, isStationaryMotif: boolean }>} */
     const sectionMotifs = new Map();
 
     /** @type {Map<string, number>} */
@@ -286,46 +286,78 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 });
             }
 
+            // Determine phrase length dynamically
+            const sectionTotalMeasures = sectionEndMeasure - sectionStartMeasure;
+            let phraseLength = 2; // default
+            if (sectionTotalMeasures > 0) {
+                if (sectionTotalMeasures % 12 === 0) {
+                    phraseLength = 4; // Blues phrasing
+                } else if (sectionTotalMeasures % 8 === 0) {
+                    phraseLength = 4; // Pop/Jazz standard
+                } else if (sectionTotalMeasures % 4 === 0) {
+                    phraseLength = 4;
+                }
+            }
+
             // 1. Generate the initial A cell
             const cellA = generateCell(forceSparse, forceDense, rhythmicDensity);
 
-            // Determine motif structure for the 2-measure block
+            // Generate secondary cells for longer phrases
+            const cellB = generateCell(forceSparse, forceDense, rhythmicDensity);
+            const cellC = generateCell(forceSparse, forceDense, rhythmicDensity);
+
+            // Determine motif structure based on phrase length
             const structureRoll = prng();
-            let structureType = 'A-A';
-            if (structureRoll < 0.4) {
-                structureType = 'A-B';
-            } else if (structureRoll < 0.6 && ['jazz', 'bird', 'bossa'].includes(style)) {
-                structureType = 'A-Rest';
+            let structureType = 'A-B'; // fallback
+
+            if (phraseLength === 4) {
+                if (structureRoll < 0.3) {
+                    structureType = 'A-A-A-B';
+                } else if (structureRoll < 0.6) {
+                    structureType = 'A-B-A-C';
+                } else if (structureRoll < 0.8) {
+                    structureType = 'A-A-B-A';
+                } else {
+                    structureType = 'A-Rest-B-Rest';
+                }
+            } else {
+                if (structureRoll < 0.4) {
+                    structureType = 'A-A';
+                } else if (structureRoll < 0.6 && ['jazz', 'bird', 'bossa'].includes(style)) {
+                    structureType = 'A-Rest';
+                }
             }
 
-            // 2. Build the 2-measure motif based on the chosen structure
+            // 2. Build the motif based on the chosen structure
             currentDegreeOffset = 0;
             let lastMotion = 0;
+            const structureArray = structureType.split('-');
 
-            for (let measure = 0; measure < 2; measure++) {
+            for (let measure = 0; measure < phraseLength; measure++) {
                 let currentCell = cellA;
+                const cellType = structureArray[measure % structureArray.length];
 
-                if (measure === 1) {
-                    if (structureType === 'A-B') {
-                        currentCell = generateCell(forceSparse, forceDense, rhythmicDensity);
-                    } else if (structureType === 'A-Rest') {
-                        // Create a mostly empty cell for measure 2
-                        currentCell = [
-                            {
-                                beatOffset: 0,
-                                duration: tsConfig.beats * stepsPerBeat,
-                                isRest: true,
-                            },
-                        ];
-                        // 30% chance for a small closing hit on beat 4
-                        if (prng() < 0.3) {
-                            currentCell[0].duration = (tsConfig.beats - 1) * stepsPerBeat;
-                            currentCell.push({
-                                beatOffset: tsConfig.beats - 1,
-                                duration: stepsPerBeat,
-                                isRest: false,
-                            });
-                        }
+                if (cellType === 'B') {
+                    currentCell = cellB;
+                } else if (cellType === 'C') {
+                    currentCell = cellC;
+                } else if (cellType === 'Rest') {
+                    // Create a mostly empty cell
+                    currentCell = [
+                        {
+                            beatOffset: 0,
+                            duration: tsConfig.beats * stepsPerBeat,
+                            isRest: true,
+                        },
+                    ];
+                    // 30% chance for a small closing hit on beat 4
+                    if (prng() < 0.3) {
+                        currentCell[0].duration = (tsConfig.beats - 1) * stepsPerBeat;
+                        currentCell.push({
+                            beatOffset: tsConfig.beats - 1,
+                            duration: stepsPerBeat,
+                            isRest: false,
+                        });
                     }
                 }
 
@@ -333,8 +365,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     let isRest = cellNote.isRest;
                     let duration = cellNote.duration;
 
-                    // Imperfect Symmetry: Even if A-A, let measure 2 drift slightly
-                    if (measure === 1 && structureType === 'A-A' && prng() < 0.3) {
+                    // Imperfect Symmetry: Even if A-A, let repeated measures drift slightly
+                    if (measure > 0 && cellType === 'A' && prng() < 0.3) {
                         const r = prng();
                         if (r < 0.4) {
                             isRest = !isRest; // Flip rest status
@@ -412,18 +444,20 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     }
                 }
             });
-            const density = attacks / 2; // attacks per measure (2 measure motif)
+            const density = attacks / phraseLength; // attacks per measure
             const syncopationRatio = attacks > 0 ? syncopatedAttacks / attacks : 0;
 
             sectionMotifs.set(category, {
                 motif,
+                phraseLength,
                 metrics: { density, syncopationRatio },
                 isStationaryMotif,
             });
         }
 
-        let { motif, isStationaryMotif } = sectionMotifs.get(category) || {
+        let { motif, phraseLength, isStationaryMotif } = sectionMotifs.get(category) || {
             motif: [],
+            phraseLength: 2,
             isStationaryMotif: false,
         };
 
@@ -519,17 +553,17 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // Usually the last section in the arranger.sectionMap, or right before a loop
         const _isLastSectionOfForm = index === turnaroundIndex;
 
-        // Apply motifs in 2-measure blocks across the entire section range
-        for (let m = sectionStartMeasure; m < sectionEndMeasure; m += 2) {
+        // Apply motifs in phraseLength-measure blocks across the entire section range
+        for (let m = sectionStartMeasure; m < sectionEndMeasure; m += phraseLength) {
             const baseStep = m * stepsPerMeasure;
 
             // --- Sectional Turnaround Logic (A-A-A-B) ---
-            // If this is the last 2 measures of a >= 8 measure section,
+            // If this is the last phraseLength measures of a >= 8 measure section,
             // trigger a unique turnaround motif to break predictability.
             const isTurnaroundMeasures =
                 !isStationaryMotif &&
                 sectionEndMeasure - sectionStartMeasure >= 8 &&
-                isSectionTurnaround(baseStep, sectionMap, stepsPerMeasure, 2);
+                isSectionTurnaround(baseStep, sectionMap, stepsPerMeasure, phraseLength);
             /** @type {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} */
             let activeMotif = motif;
 
@@ -537,23 +571,22 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // Generate a one-off "Departure" motif for the turnaround
                 // Busier turnaround (+0.2 density boost) but still respects genre
                 const tDensity = Math.min(1.0, rhythmicDensity + 0.2);
-                const tCellA = generateCell(false, true, tDensity);
-                const tCellB = generateCell(false, true, tDensity);
 
                 activeMotif = [];
                 let tDegree = 0;
-                [tCellA, tCellB].forEach((cell, cellIdx) => {
-                    cell.forEach((cNote) => {
+                for (let tc = 0; tc < phraseLength; tc++) {
+                    const tCell = generateCell(false, true, tDensity);
+                    tCell.forEach((cNote) => {
                         tDegree += prng() > 0.5 ? 1 : -1;
                         activeMotif.push({
-                            beatOffset: cNote.beatOffset + cellIdx * tsConfig.beats,
+                            beatOffset: cNote.beatOffset + tc * tsConfig.beats,
                             isPickup: false,
                             scaleDegreeOffset: tDegree,
                             duration: cNote.duration,
                             isRest: false,
                         });
                     });
-                });
+                }
             }
 
             // Pick a target chord tone for the downbeat of these 2 measures

@@ -80,7 +80,16 @@ describe('Soloist Range Constraints', () => {
 
         // Generate a large sample of notes
         for (let i = 0; i < 1000; i++) {
-            const note = getSoloistNote(getState(), chordC, null, 16, lastFreq, 64, 'scalar', 0);
+            const note = getSoloistNote(
+                getState(),
+                chordC,
+                null,
+                i,
+                lastFreq,
+                64,
+                'scalar',
+                i % 16,
+            );
             if (note) {
                 const primary = Array.isArray(note) ? note[0] : note;
                 totalNotes++;
