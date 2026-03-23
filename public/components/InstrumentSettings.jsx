@@ -156,24 +156,6 @@ export function InstrumentSettings({ module }) {
                             />
                         </SettingRow>
 
-                        <SettingRow label="Lead Sound" id="soloistPresetSelect">
-                            <Select
-                                id="soloistPresetSelect"
-                                value={state.preset || 'classic'}
-                                onChange={(/** @type {any} */ val) => {
-                                    dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
-                                    saveCurrentState();
-                                }}
-                                options={[
-                                    { value: 'classic', label: 'Classic Sawtooth' },
-                                    { value: 'neo', label: 'Neo-Juno' },
-                                    { value: 'vowel', label: 'Vowel Lead' },
-                                    { value: 'trumpet', label: 'Trumpet' },
-                                    { value: 'saxophone', label: 'Saxophone' },
-                                ]}
-                            />
-                        </SettingRow>
-
                         <SettingRow label="Phrasing Mode" id="soloistModeSelect">
                             <Select
                                 id="soloistModeSelect"

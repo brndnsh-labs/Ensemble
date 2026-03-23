@@ -73,7 +73,8 @@ export const bass = deepSignal({
  * @property {boolean} enabled - Whether the soloist is active.
  * @property {number} volume - Mix volume (0.0 - 1.0).
  * @property {number} reverb - Reverb level.
- * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
+ * @property {number} timbreX
+ * @property {number} timbreY
  * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
  * @property {string} seed - Thematic seed for deterministic generation.
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
@@ -128,7 +129,8 @@ export const bass = deepSignal({
 /** @type {import('deepsignal').DeepSignal<SoloistState>} */
 export const soloist = deepSignal({
     enabled: false,
-    preset: 'trumpet',
+    timbreX: 0,
+    timbreY: 0,
     volume: 0.5,
     reverb: 0.6,
     lastPlayedFreq: null,
@@ -300,7 +302,8 @@ export function instrumentReducer(action, payload) {
             bass.activeTab = 'smart';
 
             soloist.enabled = false;
-            soloist.preset = 'trumpet';
+            soloist.timbreX = 0;
+            soloist.timbreY = 0;
             soloist.volume = 0.5;
             soloist.reverb = 0.6;
             soloist.octave = 72;
@@ -367,8 +370,16 @@ export function instrumentReducer(action, payload) {
         case ACTIONS.SET_SOLOIST_SEED:
             soloist.seed = payload;
             return true;
-        case ACTIONS.SET_SOLOIST_PRESET:
-            soloist.preset = payload;
+
+        case ACTIONS.SET_SOLOIST_TIMBRE:
+            soloist.timbreX = payload.x;
+            soloist.timbreY = payload.y;
+            // update in real-time
+            import('../engine/synth-soloist.js').then((m) => {
+                import('../state.js').then((stateModule) => {
+                    m.updateActiveSoloistTimbre(/** @type {any} */ (stateModule.getSyncState()));
+                });
+            });
             return true;
         case ACTIONS.RESET_SESSION:
             soloist.sessionSteps = 0;

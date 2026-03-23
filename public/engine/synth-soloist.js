@@ -8,6 +8,10 @@ import { createSimplePanner, killActiveVoices } from './synth-utils.js';
  * @property {number} time
  * @property {number} duration
  * @property {AudioNode[]} nodes
+ * @property {GainNode} [mixSaw]
+ * @property {GainNode} [mixSquare]
+ * @property {BiquadFilterNode} [filter]
+ * @property {number} [baseFreq]
  */
 
 /**
@@ -32,7 +36,7 @@ export function killSoloistNote(state) {
  * @param {number} [bendStartInterval=0] - Interval in semitones to bend from.
  * @param {string} [style='scalar'] - Synthesis style preset.
  * @param {boolean} [isLegato=false] - Whether to use legato articulation.
- * @param {boolean} [vibrato=false] - Whether to apply vibrato.
+ * @param {boolean} [vibratoFlag=false] - Whether to apply vibrato.
  */
 export function playSoloNote(
     state,
@@ -43,14 +47,13 @@ export function playSoloNote(
     bendStartInterval = 0,
     style = 'scalar',
     isLegato = false,
-    vibrato = false,
+    vibratoFlag = false,
 ) {
     const { playback, soloist } = state;
     if (!Number.isFinite(freq)) {
         return;
     }
 
-    const preset = soloist.preset || 'trumpet';
     const ctx = playback.audio;
     if (!ctx) {
         return;
@@ -60,16 +63,16 @@ export function playSoloNote(
 
     if (playback.debugSoloist) {
         console.log(
-            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, preset=${preset}, vibrato=${vibrato}`,
+            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, vibrato=${vibratoFlag}`,
         );
     }
 
-    // Voice Management
     manageVoices(playTime, soloist);
 
     const isPiano = soloist.mode === 'piano';
+    let localIsLegato = isLegato;
     if (isPiano) {
-        isLegato = false;
+        localIsLegato = false;
     }
 
     const gain = ctx.createGain();
@@ -78,141 +81,145 @@ export function playSoloNote(
     const panValue = (Math.random() * 2 - 1) * 0.05;
     const pan = createSimplePanner(ctx, panValue, playTime);
 
-    // Common output chain
     gain.connect(pan);
     pan.connect(/** @type {any} */ (playback).soloistGain);
 
-    // We store nodes in a single array for the utility to handle stopping/cleanup
     /** @type {SoloistVoice} */
     const voiceObj = { gain, time: playTime, duration, nodes: [gain, pan] };
 
-    // Retrieve last frequency for portamento
     const prevFreq = soloist.lastRenderedFreq || freq;
-    soloist.lastRenderedFreq = freq; // @direct-mutation
+    soloist.lastRenderedFreq = freq;
 
-    switch (preset) {
-        case 'neo':
-            playNeoJuno(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
-        case 'vowel':
-            playVowel(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
-        case 'trumpet':
-            playTrumpet(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
-        case 'saxophone':
-            playSaxophone(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
-        case 'shred':
-            playShred(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
-        case 'classic':
-            playClassic(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
-        default:
-            playNeoJuno(
-                state,
-                ctx,
-                freq,
-                playTime,
-                duration,
-                vol,
-                bendStartInterval,
-                style,
-                gain,
-                voiceObj,
-                isLegato,
-                prevFreq,
-                vibrato,
-            );
-            break;
+    // Use specific any casts for safely indexing properties that will be added to the state later
+    const timbreX = Math.max(0, Math.min(1, /** @type {any} */ (soloist).timbreX || 0));
+    const timbreY = Math.max(0, Math.min(1, /** @type {any} */ (soloist).timbreY || 0));
+
+    const oscSaw = ctx.createOscillator();
+    oscSaw.type = 'sawtooth';
+    const oscSquare = ctx.createOscillator();
+    oscSquare.type = 'square';
+    oscSquare.detune.value = 7;
+
+    const mixSaw = ctx.createGain();
+    const mixSquare = ctx.createGain();
+    mixSaw.gain.value = 1.0 - timbreX;
+    mixSquare.gain.value = timbreX;
+
+    voiceObj.nodes.push(oscSaw, oscSquare, mixSaw, mixSquare);
+    voiceObj.mixSaw = mixSaw;
+    voiceObj.mixSquare = mixSquare;
+
+    applyPitchEnvelope(
+        state,
+        oscSaw,
+        oscSquare,
+        freq,
+        playTime,
+        duration,
+        bendStartInterval,
+        style,
+        localIsLegato,
+        prevFreq,
+        isPiano,
+    );
+
+    if (!isPiano) {
+        const vibratoNodes = createVibrato(
+            state,
+            ctx,
+            freq,
+            playTime,
+            duration,
+            style,
+            vibratoFlag,
+        );
+        const vibratoOsc = vibratoNodes.vibrato;
+        const vibGain = vibratoNodes.vibGain;
+        vibratoOsc.connect(vibGain);
+        vibGain.connect(/** @type {any} */ (oscSaw.frequency));
+        vibGain.connect(/** @type {any} */ (oscSquare.frequency));
+        voiceObj.nodes.push(vibratoOsc, vibGain);
     }
 
-    soloist.activeVoices.push(voiceObj); // @direct-mutation
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+
+    const baseCutoff = clampFreq(freq * (2 + timbreY * 6));
+    filter.frequency.setValueAtTime(baseCutoff, playTime);
+
+    const filterRampTime = 0.05 + timbreY * 0.5;
+    const endCutoff = clampFreq(freq * (1.5 + timbreY * 2));
+    filter.frequency.exponentialRampToValueAtTime(endCutoff, playTime + filterRampTime);
+
+    filter.Q.value = 1.0 + timbreX * 3.0 + timbreY * 2.0;
+
+    voiceObj.nodes.push(filter);
+    voiceObj.filter = filter;
+    voiceObj.baseFreq = freq;
+
+    oscSaw.connect(mixSaw);
+    oscSquare.connect(mixSquare);
+    mixSaw.connect(filter);
+    mixSquare.connect(filter);
+    filter.connect(gain);
+
+    const attack = localIsLegato ? 0.005 : 0.01 + timbreY * 0.04;
+    let release = 0.1 + timbreY * 0.2;
+    if (isPiano) {
+        release = 0.3;
+    } else if (soloist.mode === 'guitar' && vol < 0.6) {
+        release = 0.02;
+        filter.frequency.cancelScheduledValues(playTime);
+        filter.frequency.setValueAtTime(clampFreq(freq * 3), playTime);
+        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.08);
+        filter.Q.value = 4.0;
+    }
+
+    gain.gain.setValueAtTime(0, playTime);
+    gain.gain.setTargetAtTime(vol * 1.5, playTime, attack);
+    gain.gain.setTargetAtTime(0, playTime + duration * (0.8 + timbreY * 0.1), release);
+
+    oscSaw.start(playTime);
+    oscSquare.start(playTime);
+
+    const stopTime = playTime + duration + 0.5;
+    oscSaw.stop(stopTime);
+    oscSquare.stop(stopTime);
+
+    oscSaw.onended = () => safeDisconnect(voiceObj.nodes);
+
+    soloist.activeVoices.push(voiceObj);
+}
+
+/**
+ * Updates the active voices in real-time as timbre parameters change.
+ * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ */
+export function updateActiveSoloistTimbre(state) {
+    const { playback, soloist } = state;
+    const ctx = playback.audio;
+    if (!ctx) {
+        return;
+    }
+
+    const timbreX = Math.max(0, Math.min(1, /** @type {any} */ (soloist).timbreX || 0));
+    const timbreY = Math.max(0, Math.min(1, /** @type {any} */ (soloist).timbreY || 0));
+    const now = ctx.currentTime;
+
+    for (const voice of soloist.activeVoices || []) {
+        if (!voice.mixSaw || !voice.mixSquare || !voice.filter || !voice.baseFreq) {
+            continue;
+        }
+
+        // Fast morph (0.05s) to avoid clicks but feel instantaneous
+        voice.mixSaw.gain.setTargetAtTime(1.0 - timbreX, now, 0.05);
+        voice.mixSquare.gain.setTargetAtTime(timbreX, now, 0.05);
+
+        // Adjust cutoff based on the new Y (recalculating from baseFreq)
+        const newCutoff = clampFreq(voice.baseFreq * (2 + timbreY * 6));
+        voice.filter.frequency.setTargetAtTime(newCutoff, now, 0.05);
+        voice.filter.Q.setTargetAtTime(1.0 + timbreX * 3.0 + timbreY * 2.0, now, 0.05);
+    }
 }
 
 /**
@@ -252,694 +259,6 @@ function manageVoices(playTime, soloist) {
         }
         killActiveVoices(killed, playTime, 0.01);
     }
-}
-
-// --- PRESET IMPLEMENTATIONS ---
-
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
-function playTrumpet(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
-    const { soloist } = state;
-
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth';
-
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'sawtooth';
-    osc2.detune.value = 5;
-
-    voiceObj.nodes.push(osc1, osc2);
-
-    applyPitchEnvelope(
-        state,
-        osc1,
-        osc2,
-        freq,
-        playTime,
-        duration,
-        bendStartInterval,
-        style,
-        isLegato,
-        prevFreq,
-        soloist.mode === 'piano',
-    );
-
-    if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
-    }
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-
-    // Non-linear cutoff ceiling: Cap the filter to prevent "ice-pick" high frequencies
-    const baseCutoff = clampFreq(freq * 1.2);
-    const maxCutoff = Math.min(clampFreq(freq * 4.0), 5500 + freq * 1.5);
-    const sustainCutoff = Math.min(clampFreq(freq * 2.5), 4500 + freq * 1.2);
-
-    filter.frequency.setValueAtTime(baseCutoff, playTime);
-    filter.frequency.exponentialRampToValueAtTime(maxCutoff, playTime + 0.08);
-    filter.frequency.exponentialRampToValueAtTime(sustainCutoff, playTime + 0.15);
-    filter.Q.value = 0.8;
-
-    const bellFilter = ctx.createBiquadFilter();
-    bellFilter.type = 'peaking';
-    bellFilter.frequency.value = 1200;
-    bellFilter.Q.value = 1.5;
-
-    // Register-aware bell gain: Reduce boost in high register to prevent nasality
-    const bellBoost = freq > 800 ? Math.max(1.5, 4 - (freq - 800) * 0.005) : 4;
-    bellFilter.gain.value = bellBoost;
-
-    // High-shelf smoothing: Roll off extreme high-end "fizz"
-    const smoother = ctx.createBiquadFilter();
-    smoother.type = 'highshelf';
-    smoother.frequency.value = 6000;
-    smoother.gain.setValueAtTime(freq > 1000 ? -4 : -2, playTime);
-
-    voiceObj.nodes.push(filter, bellFilter, smoother);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(bellFilter);
-    bellFilter.connect(smoother);
-    smoother.connect(outputGain);
-
-    const attack = isLegato ? 0.005 : 0.02;
-
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack);
-    outputGain.gain.setTargetAtTime(vol * 0.9, playTime + 0.1, 0.05);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
-
-    osc1.start(playTime);
-    osc2.start(playTime);
-
-    const stopTime = playTime + duration + 0.2;
-    osc1.stop(stopTime);
-    osc2.stop(stopTime);
-
-    osc1.onended = () => safeDisconnect(voiceObj.nodes);
-}
-
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
-function playSaxophone(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
-    const { soloist } = state;
-
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth';
-
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'triangle';
-    osc2.detune.value = -7;
-
-    voiceObj.nodes.push(osc1, osc2);
-
-    applyPitchEnvelope(
-        state,
-        osc1,
-        osc2,
-        freq,
-        playTime,
-        duration,
-        bendStartInterval,
-        style,
-        isLegato,
-        prevFreq,
-        soloist.mode === 'piano',
-    );
-
-    if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
-    }
-
-    const f1 = ctx.createBiquadFilter();
-    f1.type = 'bandpass';
-    f1.frequency.value = 900;
-    f1.Q.value = 3.0;
-
-    const f2 = ctx.createBiquadFilter();
-    f2.type = 'bandpass';
-    f2.frequency.value = 2400;
-    f2.Q.value = 4.0;
-
-    const breathLfo = ctx.createOscillator();
-    breathLfo.frequency.value = 3.5;
-    const breathGain = ctx.createGain();
-    breathGain.gain.value = 0.05;
-
-    const masterGainNode = ctx.createGain();
-    masterGainNode.gain.value = 1.0;
-
-    breathLfo.connect(breathGain);
-    breathGain.connect(masterGainNode.gain);
-
-    voiceObj.nodes.push(f1, f2, breathLfo, breathGain, masterGainNode);
-
-    osc1.connect(f1);
-    osc2.connect(f1);
-    osc1.connect(f2);
-    osc2.connect(f2);
-
-    f1.connect(masterGainNode);
-    f2.connect(masterGainNode);
-    masterGainNode.connect(outputGain);
-
-    const attack = isLegato ? 0.008 : 0.04;
-
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
-
-    osc1.start(playTime);
-    osc2.start(playTime);
-    breathLfo.start(playTime);
-
-    const stopTime = playTime + duration + 0.2;
-    osc1.stop(stopTime);
-    osc2.stop(stopTime);
-    breathLfo.stop(stopTime);
-
-    osc1.onended = () => safeDisconnect(voiceObj.nodes);
-}
-
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
-function playClassic(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
-    const { playback, soloist } = state;
-    const intensity = playback.bandIntensity || 0.5;
-    const intensityGain = 0.5 + intensity * 0.9;
-    const randomizedVol = vol * intensityGain * (0.95 + Math.random() * 0.1);
-
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth';
-
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'triangle';
-    osc2.detune.setValueAtTime(style === 'shred' ? 12 : 6, playTime);
-
-    voiceObj.nodes.push(osc1, osc2);
-
-    // Pitch Envelope
-    applyPitchEnvelope(
-        state,
-        osc1,
-        osc2,
-        freq,
-        playTime,
-        duration,
-        bendStartInterval,
-        style,
-        isLegato,
-        prevFreq,
-        soloist.mode === 'piano',
-    );
-
-    // Vibrato
-    if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
-    }
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    const brightnessBase = 1.0 + intensity * 1.5 + vol * 1.5;
-    const cutoffBase =
-        style === 'bird' ? freq * 3.5 * brightnessBase : Math.min(freq * 4 * brightnessBase, 12000);
-
-    const muteThreshold = intensity < 0.4 ? 0.7 : 0.55;
-    const isMuted = soloist.mode === 'guitar' && vol < muteThreshold;
-    const isPiano = soloist.mode === 'piano';
-
-    filter.frequency.setValueAtTime(clampFreq(cutoffBase), playTime);
-    if (isMuted) {
-        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.08);
-        filter.Q.value = 4;
-    } else {
-        filter.frequency.exponentialRampToValueAtTime(
-            clampFreq(cutoffBase * (style === 'bird' ? 0.7 : 0.6)),
-            playTime + duration,
-        );
-        filter.Q.value = isPiano ? 0.7 : style === 'bird' ? 1.5 : duration > 0.4 ? 2 : 1;
-    }
-
-    voiceObj.nodes.push(filter);
-
-    const baseAttack = style === 'shred' ? 0.005 : 0.015;
-    const attack = isLegato ? 0.005 : Math.min(baseAttack, duration * 0.25);
-    let releaseTime = duration * (style === 'minimal' ? 1.5 : 1.1);
-
-    if (isMuted) {
-        outputGain.gain.setValueAtTime(0, playTime);
-        outputGain.gain.setTargetAtTime(randomizedVol, playTime, 0.005);
-        outputGain.gain.setTargetAtTime(0, playTime + 0.05, 0.02);
-        releaseTime = 0.12;
-    } else if (isPiano && (vol < 0.5 || duration > 0.6)) {
-        outputGain.gain.setValueAtTime(0, playTime);
-        outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
-        const sustainDecay = Math.max(0.1, randomizedVol * 0.2);
-        outputGain.gain.setTargetAtTime(sustainDecay, playTime + 0.1, 0.1);
-        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.95, 0.3);
-        releaseTime = Math.max(0.5, duration * 1.2);
-    } else {
-        outputGain.gain.setValueAtTime(0, playTime);
-        outputGain.gain.setTargetAtTime(randomizedVol, playTime, attack);
-        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
-    }
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(outputGain);
-
-    osc1.start(playTime);
-    osc2.start(playTime);
-
-    const stopTime = playTime + releaseTime + 0.1;
-    osc1.stop(stopTime);
-    osc2.stop(stopTime);
-
-    osc1.onended = () => safeDisconnect(voiceObj.nodes);
-}
-
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
-function playNeoJuno(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
-    const { soloist } = state;
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth';
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'sawtooth';
-
-    const lfo1 = ctx.createOscillator();
-    lfo1.frequency.value = 0.3;
-    const lfo1Gain = ctx.createGain();
-    lfo1Gain.gain.value = 8;
-
-    const lfo2 = ctx.createOscillator();
-    lfo2.frequency.value = 0.5;
-    const lfo2Gain = ctx.createGain();
-    lfo2Gain.gain.value = -7;
-
-    lfo1.connect(lfo1Gain);
-    lfo1Gain.connect(/** @type {any} */ (osc1.detune));
-    lfo2.connect(lfo2Gain);
-    lfo2Gain.connect(/** @type {any} */ (osc2.detune));
-
-    voiceObj.nodes.push(osc1, osc2, lfo1, lfo1Gain, lfo2, lfo2Gain);
-
-    applyPitchEnvelope(
-        state,
-        osc1,
-        osc2,
-        freq,
-        playTime,
-        duration,
-        bendStartInterval,
-        style,
-        isLegato,
-        prevFreq,
-        soloist.mode === 'piano',
-    );
-
-    if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
-    }
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(clampFreq(freq * 3), playTime);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + duration);
-    filter.Q.value = 1.0;
-
-    voiceObj.nodes.push(filter);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(outputGain);
-
-    const attack = isLegato ? 0.005 : 0.02;
-
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.1, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
-
-    osc1.start(playTime);
-    osc2.start(playTime);
-    lfo1.start(playTime);
-    lfo2.start(playTime);
-
-    const stopTime = playTime + duration + 0.2;
-    osc1.stop(stopTime);
-    osc2.stop(stopTime);
-    lfo1.stop(stopTime);
-    lfo2.stop(stopTime);
-
-    osc1.onended = () => safeDisconnect(voiceObj.nodes);
-}
-
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
-function playVowel(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
-    const { soloist } = state;
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth';
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'square';
-    osc2.detune.value = 4;
-
-    voiceObj.nodes.push(osc1, osc2);
-
-    applyPitchEnvelope(
-        state,
-        osc1,
-        osc2,
-        freq,
-        playTime,
-        duration,
-        bendStartInterval,
-        style,
-        isLegato,
-        prevFreq,
-        soloist.mode === 'piano',
-    );
-
-    if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
-    }
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(800, playTime);
-    filter.frequency.exponentialRampToValueAtTime(1200, playTime + 0.1);
-    filter.frequency.exponentialRampToValueAtTime(800, playTime + duration);
-    filter.Q.value = 5.0;
-
-    voiceObj.nodes.push(filter);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(outputGain);
-
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, 0.02);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
-
-    osc1.start(playTime);
-    osc2.start(playTime);
-
-    const stopTime = playTime + duration + 0.2;
-    osc1.stop(stopTime);
-    osc2.stop(stopTime);
-
-    osc1.onended = () => safeDisconnect(voiceObj.nodes);
-}
-
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
-function playShred(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
-    const { soloist } = state;
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'sawtooth';
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'sawtooth';
-    osc2.detune.value = 12;
-
-    voiceObj.nodes.push(osc1, osc2);
-
-    applyPitchEnvelope(
-        state,
-        osc1,
-        osc2,
-        freq,
-        playTime,
-        duration,
-        bendStartInterval,
-        style,
-        isLegato,
-        prevFreq,
-        soloist.mode === 'piano',
-    );
-
-    if (soloist.mode !== 'piano') {
-        const { vibrato, vibGain } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
-    }
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(clampFreq(freq * 6), playTime);
-    filter.Q.value = 2.0;
-
-    voiceObj.nodes.push(filter);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    filter.connect(outputGain);
-
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.3, playTime, 0.005);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.05);
-
-    osc1.start(playTime);
-    osc2.start(playTime);
-
-    const stopTime = playTime + duration + 0.1;
-    osc1.stop(stopTime);
-    osc2.stop(stopTime);
-
-    osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
 /**
