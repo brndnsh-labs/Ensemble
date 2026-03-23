@@ -3,11 +3,11 @@ import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
-    binarySearchMap,
     getFrequency,
     getMidi,
     getStepInfo,
     getStepsPerMeasure,
+    isSectionTurnaround,
     midiToNote,
 } from '../utils.js';
 import {
@@ -119,8 +119,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
             if (playback.suspendTimeout) {
                 clearTimeout(playback.suspendTimeout);
             }
-            playback.suspendTimeout = /** @type {any} */ (
-                // @direct-mutation
+            playback.suspendTimeout /* @direct-mutation */ = /** @type {any} */ (
                 setTimeout(() => {
                     if (
                         !playback.isPlaying &&
@@ -1156,20 +1155,8 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
 
         // --- Port Turnaround Logic from Worker ---
         const stepsPerBar = spm;
-        const entry = binarySearchMap(arranger.sectionMap || [], step);
-        let isTurnaround = false;
-        if (groove.creativity) {
-            let measuresInSection = 4;
-            let startStep = 0;
-            if (entry) {
-                measuresInSection = Math.max(1, (entry.end - entry.start) / stepsPerBar);
-                startStep = entry.start;
-            }
-            const barInSection = Math.floor((step - startStep) / stepsPerBar);
-            // Use modulo for fallback (entry-less) turnaround logic, and suppress turnaround fills for 1-measure sections
-            isTurnaround =
-                measuresInSection > 1 && barInSection % measuresInSection === measuresInSection - 1;
-        }
+        const isTurnaround =
+            groove.creativity && isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
 
         scheduleDrums(
             state,

@@ -1,5 +1,11 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { binarySearchMap, getFrequency, getMidi, getStepInfo } from '../utils.js';
+import {
+    binarySearchMap,
+    getFrequency,
+    getMidi,
+    getStepInfo,
+    isSectionTurnaround,
+} from '../utils.js';
 import { getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
 import {
@@ -122,18 +128,8 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
     }
 
     // --- Calculate Turnaround State ---
-    const sectionEntry = binarySearchMap(arranger.sectionMap || [], step);
-    let measuresInSection = 4;
-    let startStep = 0;
-    if (sectionEntry) {
-        measuresInSection = Math.max(1, (sectionEntry.end - sectionEntry.start) / stepsPerBar);
-        startStep = sectionEntry.start;
-    }
-    const barInSection = Math.floor((step - startStep) / stepsPerBar);
     const isTurnaround =
-        groove.creativity &&
-        measuresInSection > 1 &&
-        barInSection % measuresInSection === measuresInSection - 1;
+        groove.creativity && isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
 
     let fillPlayed = false;
 

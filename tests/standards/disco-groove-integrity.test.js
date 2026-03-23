@@ -22,6 +22,7 @@ describe('Disco Groove Integrity', () => {
             instruments: [],
         },
         soloist: { enabled: false, busySteps: 0 },
+        arranger: { sectionMap: [{ start: 0, end: 64 }] }, // 4 measures
     };
 
     it('should assign valid Disco Motifs', () => {

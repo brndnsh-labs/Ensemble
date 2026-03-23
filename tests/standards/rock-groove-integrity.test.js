@@ -32,6 +32,7 @@ describe('Rock Groove Integrity', () => {
             playback: { bandIntensity: 0.8, bpm: 120, songMode: false },
             groove: { genreFeel: 'Rock', creativity: true, lastDrumPreset: 'Rock' },
             soloist: { enabled: false, busySteps: 0 },
+            arranger: { sectionMap: [{ start: 0, end: 64 }] }, // 4 measures
         };
 
         const createParams = (step, instName, stepVal = 0) => {

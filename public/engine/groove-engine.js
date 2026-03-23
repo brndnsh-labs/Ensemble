@@ -1,4 +1,9 @@
-import { binarySearchMap, calculateTimingOffset, getStepsPerMeasure } from '../utils.js';
+import {
+    binarySearchMap,
+    calculateTimingOffset,
+    getStepsPerMeasure,
+    isSectionTurnaround,
+} from '../utils.js';
 import * as acoustic from './grooves/acoustic.js';
 import * as blues from './grooves/blues.js';
 import * as country from './grooves/country.js';
@@ -135,43 +140,14 @@ export function applyGrooveOverrides(
             : drumComplexity;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
-    const sectionEntry = binarySearchMap(arrangerState.sectionMap || [], step);
-    let measuresInSection = 4; // default
-    let startStep = 0;
-    if (sectionEntry) {
-        measuresInSection = Math.max(1, (sectionEntry.end - sectionEntry.start) / stepsPerBar);
-        startStep = sectionEntry.start;
-    }
-    const barInSection = Math.floor((step - startStep) / stepsPerBar);
-
-    // Use modulo for fallback logic, and prevent Turnarounds on 1-measure sections to avoid clutter
     const isTurnaround =
-        groove.creativity &&
-        measuresInSection > 1 &&
-        barInSection % measuresInSection === measuresInSection - 1;
+        groove.creativity && isSectionTurnaround(step, arrangerState.sectionMap, stepsPerBar, 1);
 
     // Check if the PREVIOUS bar was a turnaround to determine if we should crash now
     const prevStep = step - stepsPerBar;
-    const prevSectionEntry = binarySearchMap(arrangerState.sectionMap || [], prevStep);
-    let prevMeasuresInSection = 4;
-    let prevStartStep = 0;
-    if (prevSectionEntry) {
-        prevMeasuresInSection = Math.max(
-            1,
-            (prevSectionEntry.end - prevSectionEntry.start) / stepsPerBar,
-        );
-        prevStartStep = prevSectionEntry.start;
-    } else {
-        // If no previous section entry, use current section length as a more localized fallback than hardcoded 4
-        prevMeasuresInSection = measuresInSection;
-        prevStartStep = startStep;
-    }
-    const prevBarInSection = Math.floor((prevStep - prevStartStep) / stepsPerBar);
     const prevWasTurnaround =
         groove.creativity &&
-        prevMeasuresInSection > 1 &&
-        barIndex > 0 &&
-        prevBarInSection % prevMeasuresInSection === prevMeasuresInSection - 1;
+        isSectionTurnaround(prevStep, arrangerState.sectionMap, stepsPerBar, 1);
 
     const justFinishedTurnaround = prevWasTurnaround && isFirstStepOfNewBar;
 

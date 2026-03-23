@@ -385,6 +385,38 @@ export function binarySearchMap(mapArray, step) {
 }
 
 /**
+ * Checks if a specific step falls within the "turnaround" (final part) of its section.
+ *
+ * @param {number} step - Current global step.
+ * @param {Array<{start: number, end: number}>} sectionMap - Map of section boundaries.
+ * @param {number} stepsPerBar - Steps per measure.
+ * @param {number} [thresholdBars=1] - Number of measures before the section end to consider as turnaround.
+ * @returns {boolean}
+ */
+export function isSectionTurnaround(step, sectionMap, stepsPerBar, thresholdBars = 1) {
+    if (!sectionMap || sectionMap.length === 0) {
+        return false;
+    }
+    const entry = binarySearchMap(sectionMap, step);
+    if (!entry) {
+        return false;
+    }
+
+    const sectionLengthSteps = entry.end - entry.start;
+    const measuresInSection = Math.max(1, sectionLengthSteps / stepsPerBar);
+
+    // Suppress turnarounds for extremely short sections (e.g., 1 measure)
+    if (measuresInSection <= thresholdBars && thresholdBars === 1) {
+        return false;
+    }
+
+    const stepInSection = step - entry.start;
+    const barInSection = Math.floor(stepInSection / stepsPerBar);
+
+    return barInSection >= measuresInSection - thresholdBars;
+}
+
+/**
  * Returns detailed structural information about a specific step in a measure.
  * @param {number} step - The global step counter.
  * @param {any} tsConfig - The global time signature configuration (fallback).

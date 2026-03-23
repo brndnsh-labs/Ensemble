@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { binarySearchMap, createPRNG, generateRandomSeed } from '../utils.js';
+import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
@@ -498,8 +498,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             // trigger a unique turnaround motif to break predictability.
             const isTurnaroundMeasures =
                 !isStationaryMotif &&
-                m >= sectionEndMeasure - 2 &&
-                sectionEndMeasure - sectionStartMeasure >= 8;
+                sectionEndMeasure - sectionStartMeasure >= 8 &&
+                isSectionTurnaround(baseStep, sectionMap, stepsPerMeasure, 2);
             /** @type {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} */
             let activeMotif = motif;
 

@@ -21,7 +21,7 @@
         "test:bench": "npx vitest run tests/bench",
         "size": "size-limit",
         "build:size": "npm run build && size-limit",
-        "validate": "npm run typecheck && npm run knip && npm run format && npm test",
+        "validate": "npm run typecheck && npm run knip && npm run jscpd && npm run format && npm test",
         "build": "./scripts/deploy-test.sh --dry-run",
         "build:quiet": "./scripts/deploy-test.sh --dry-run --quiet",
         "deploy:test": "./scripts/deploy-test.sh",
