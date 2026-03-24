@@ -182,14 +182,10 @@ export function Stepper({
     incAriaLabel,
 }) {
     return (
-        <div
-            class="stepper-control"
-            style="display: flex; align-items: center; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;"
-        >
+        <div class="stepper-control">
             <button
                 id={id ? `${id}Dec` : undefined}
                 class="stepper-btn"
-                style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
                 onClick={onDecrement}
                 disabled={value <= min}
                 aria-label={decAriaLabel || 'Decrease'}
@@ -201,13 +197,12 @@ export function Stepper({
                 type="number"
                 value={value}
                 readonly
-                style="width: 40px; text-align: center; background: transparent; border: none; font-weight: bold; color: var(--text-color); -moz-appearance: textfield; padding: 0;"
+                class="stepper-input"
                 aria-label="Current Value"
             />
             <button
                 id={id ? `${id}Inc` : undefined}
                 class="stepper-btn"
-                style="padding: 0.5rem 0.75rem; background: transparent; border: none; color: var(--text-color); cursor: pointer; font-weight: bold; font-size: 1.1rem;"
                 onClick={onIncrement}
                 disabled={value >= max}
                 aria-label={incAriaLabel || 'Increase'}
@@ -234,23 +229,14 @@ export function Stepper({
  */
 export function ButtonGroup({ options, value, onChange, className = '', style = {} }) {
     return (
-        <div class={`flex-row ${className}`} style={{ gap: '0.25rem', ...style }}>
+        <div class={`button-group ${className}`} style={style}>
             {options.map((/** @type {any} */ opt) => (
                 <button
                     key={opt.value}
-                    class={`chip-btn ${value === opt.value ? 'active' : ''}`}
+                    class={`button-group-btn ${value === opt.value ? 'active' : ''}`}
                     aria-pressed={value === opt.value}
                     onClick={() => onChange(opt.value)}
-                    style={{
-                        padding: '0.25rem 0.6rem',
-                        fontSize: '0.75rem',
-                        borderRadius: '4px',
-                        background: value === opt.value ? 'var(--accent-color)' : 'var(--input-bg)',
-                        color: value === opt.value ? 'white' : 'var(--text-color)',
-                        border: '1px solid var(--border-color)',
-                        cursor: 'pointer',
-                        ...opt.style,
-                    }}
+                    style={opt.style}
                 >
                     {opt.label}
                 </button>

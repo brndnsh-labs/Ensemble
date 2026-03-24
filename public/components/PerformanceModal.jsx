@@ -393,8 +393,12 @@ export function PerformanceModal() {
                     }
                 }}
             >
-                <span style="font-size: 1.1rem; margin-top: 4px;">{label}</span>
-                <span style={`font-size: 0.65rem; opacity: ${isNext ? '0.4' : '0.6'};`}>
+                <span class="performance-note-label">{label}</span>
+                <span
+                    class={`performance-note-octave ${
+                        isNext ? 'performance-note-octave--dim' : 'performance-note-octave--normal'
+                    }`}
+                >
                     {noteLabel}
                 </span>
             </button>
@@ -409,21 +413,20 @@ export function PerformanceModal() {
     ) => {
         const chordName = getChordName(chordObj);
         const accentColor = isNext ? '#94a3b8' : 'var(--soloist-color)';
-        const safeLabelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--yellow)'}; margin-bottom: 0.5rem;`;
-        const tenseLabelStyle = `font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; opacity: 0.6; color: ${isNext ? '#94a3b8' : 'var(--cyan)'}; margin-bottom: 0.5rem;`;
+        const safeLabelColor = isNext ? '#94a3b8' : 'var(--yellow)';
+        const tenseLabelColor = isNext ? '#94a3b8' : 'var(--cyan)';
 
         return (
-            <div
-                class={isNext ? 'upcoming-chord' : 'active-chord'}
-                style="display: flex; flex-direction: column; align-items: center; width: 100%;"
-            >
+            <div class={`performance-deck-row ${isNext ? 'upcoming-chord' : 'active-chord'}`}>
                 {/* Header Row: Chord Name + Label indicators */}
-                <div style="display: flex; width: 100%; max-width: 650px; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
-                    <div style="flex: 1; text-align: left; padding-left: 10px;">
-                        <div style={safeLabelStyle}>Chord Tones</div>
+                <div class="performance-deck-header-row">
+                    <div class="performance-deck-label-side performance-deck-label-side--left">
+                        <div class="performance-deck-subtitle" style={`color: ${safeLabelColor};`}>
+                            Chord Tones
+                        </div>
                     </div>
 
-                    <div style="text-align: center; margin-bottom: -0.5rem; position: relative;">
+                    <div class="performance-deck-title-wrap">
                         <div
                             style={`
                                 font-size: ${isNext ? '1.2rem' : '1.5rem'}; font-weight: bold; 
@@ -438,25 +441,22 @@ export function PerformanceModal() {
                         >
                             {chordName}
                         </div>
-                        <div
-                            style={`
-                                font-size: 0.6rem; margin-top: 0.4rem; font-weight: 900; 
-                                letter-spacing: 0.2em; opacity: 0.5; color: ${accentColor};
-                            `}
-                        >
+                        <div class="performance-deck-state-label" style={`color: ${accentColor};`}>
                             {isNext ? 'UPCOMING' : 'CURRENT'}
                         </div>
                     </div>
 
-                    <div style="flex: 1; text-align: right; padding-right: 10px;">
-                        <div style={tenseLabelStyle}>Scale Tensions</div>
+                    <div class="performance-deck-label-side performance-deck-label-side--right">
+                        <div class="performance-deck-subtitle" style={`color: ${tenseLabelColor};`}>
+                            Scale Tensions
+                        </div>
                     </div>
                 </div>
 
                 {/* Keys Row */}
-                <div style="display: flex; gap: 0.5rem; justify-content: center; align-items: center; position: relative;">
+                <div class="performance-deck-keys-row">
                     {/* CHORD ZONE */}
-                    <div style="display: flex; gap: 0.5rem;">
+                    <div class="performance-deck-zone">
                         {keys.slice(0, 5).map((/** @type {any} */ k, /** @type {any} */ i) => {
                             const midi = notes[i];
                             const noteInfo =
@@ -470,10 +470,10 @@ export function PerformanceModal() {
                     </div>
 
                     {/* DIVIDER */}
-                    <div style="width: 2px; height: 50px; background: rgba(255,255,255,0.1); margin: 0 0.75rem;" />
+                    <div class="performance-deck-divider" />
 
                     {/* TENSION ZONE */}
-                    <div style="display: flex; gap: 0.5rem;">
+                    <div class="performance-deck-zone">
                         {keys.slice(5).map((/** @type {any} */ k, /** @type {any} */ i) => {
                             const midi = notes[i + 5];
                             const noteInfo =
@@ -510,12 +510,11 @@ export function PerformanceModal() {
         ];
 
         return (
-            <div style="display: flex; flex-direction: column; width: 100%; height: 100%; position: relative;">
+            <div class="performance-mobile-shell">
                 {/* Floating Buttons */}
-                <div style="position: absolute; top: 1rem; right: 1rem; z-index: 100; display: flex; gap: 0.75rem;">
+                <div class="performance-floating-actions">
                     <button
-                        class="performance-floating-btn"
-                        style="font-weight: bold;"
+                        class="performance-floating-btn performance-floating-btn--strong"
                         onClick={() => setShowLegend(!showLegend)}
                         aria-label="Toggle Legend"
                     >
@@ -527,19 +526,14 @@ export function PerformanceModal() {
                 </div>
 
                 {showLegend && (
-                    <div
-                        style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); z-index: 150; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; color: #fff; text-align: center;"
-                        onClick={() => setShowLegend(false)}
-                    >
-                        <h3 style="margin-bottom: 2rem; color: var(--soloist-color); font-size: 1.5rem;">
-                            How to Play
-                        </h3>
+                    <div class="performance-legend-overlay" onClick={() => setShowLegend(false)}>
+                        <h3 class="performance-legend-title">How to Play</h3>
 
-                        <div style="display: flex; flex-direction: column; gap: 1.5rem; align-items: flex-start; width: 100%; max-width: 300px;">
+                        <div class="performance-legend-list">
                             <div class="performance-legend-item">
-                                <div class="legend-color-box" style="background: var(--yellow);" />
+                                <div class="legend-color-box legend-color-box--yellow performance-instruction-swatch" />
                                 <div class="legend-text-container">
-                                    <div class="legend-title" style="color: var(--yellow);">
+                                    <div class="legend-title legend-title--yellow">
                                         Safe Arpeggios
                                     </div>
                                     <div class="legend-desc">Stable chord tones</div>
@@ -547,9 +541,9 @@ export function PerformanceModal() {
                             </div>
 
                             <div class="performance-legend-item">
-                                <div class="legend-color-box" style="background: var(--cyan);" />
+                                <div class="legend-color-box legend-color-box--cyan" />
                                 <div class="legend-text-container">
-                                    <div class="legend-title" style="color: var(--cyan);">
+                                    <div class="legend-title legend-title--cyan">
                                         Color Extensions
                                     </div>
                                     <div class="legend-desc">Flavorful scale tensions</div>
@@ -557,24 +551,24 @@ export function PerformanceModal() {
                             </div>
 
                             <div class="performance-legend-item">
-                                <div class="legend-color-box" style="background: var(--magenta);" />
+                                <div class="legend-color-box legend-color-box--magenta" />
                                 <div class="legend-text-container">
-                                    <div class="legend-title" style="color: var(--magenta);">
+                                    <div class="legend-title legend-title--magenta">
                                         Bridge Tones
                                     </div>
                                     <div class="legend-desc">Common to both chords</div>
                                 </div>
                             </div>
 
-                            <div style="margin-top: 1rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); width: 100%;">
-                                <div style="font-size: 0.9rem; font-style: italic; opacity: 0.8; line-height: 1.4;">
+                            <div class="performance-instruction-divider">
+                                <div class="performance-mobile-legend-note">
                                     Dashed border = Same note in other octaves
                                 </div>
                             </div>
                         </div>
 
                         <button
-                            style="margin-top: 3rem; padding: 1rem 3rem; border-radius: 12px; background: var(--soloist-color); border: none; color: #fff; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(var(--soloist-color-rgb), 0.3);"
+                            class="performance-legend-button"
                             onClick={() => setShowLegend(false)}
                         >
                             Got it
@@ -595,22 +589,12 @@ export function PerformanceModal() {
     };
 
     const renderDesktopLayout = () => (
-        <div
-            class="modal-content"
-            style="flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; padding: 1rem; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;"
-        >
-            <div style="height: 4rem; display: flex; align-items: center; justify-content: center;">
-                {currentNoteName && (
-                    <div style="font-size: 4rem; font-weight: 900; color: var(--soloist-color); text-shadow: 0 0 20px rgba(var(--soloist-color-rgb), 0.5); font-family: monospace;">
-                        {currentNoteName}
-                    </div>
-                )}
+        <div class="modal-content performance-modal-shell performance-modal-shell--desktop">
+            <div class="performance-note-display">
+                {currentNoteName && <div class="performance-note-name">{currentNoteName}</div>}
             </div>
 
-            <div
-                class="keyboard-layout"
-                style="display: flex; flex-direction: column; gap: 4rem; width: 100%; align-items: center;"
-            >
+            <div class="keyboard-layout performance-keyboard-layout">
                 {/* UPCOMING CHORD - TOP ROW */}
                 {renderDeckRow(
                     ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
@@ -628,25 +612,22 @@ export function PerformanceModal() {
                 )}
             </div>
 
-            <div
-                class="keyboard-instructions"
-                style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 2rem; background: rgba(15, 23, 42, 0.4); padding: 1rem 2rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);"
-            >
-                <div style="display: flex; gap: 2rem; justify-content: center; align-items: center; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--yellow);" />
-                        <span style="color: #cbd5e1;">Safe Arpeggios</span>
+            <div class="keyboard-instructions performance-instructions">
+                <div class="performance-instructions-row">
+                    <div class="performance-instruction-item">
+                        <div class="performance-instruction-swatch legend-color-box legend-color-box--yellow" />
+                        <span class="performance-instruction-label">Safe Arpeggios</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--cyan);" />
-                        <span style="color: #cbd5e1;">Color Extensions</span>
+                    <div class="performance-instruction-item">
+                        <div class="performance-instruction-swatch legend-color-box legend-color-box--cyan" />
+                        <span class="performance-instruction-label">Color Extensions</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--magenta); opacity: 0.8;" />
-                        <span style="color: #cbd5e1;">Bridge Tones</span>
+                    <div class="performance-instruction-item">
+                        <div class="performance-instruction-swatch legend-color-box legend-color-box--magenta" />
+                        <span class="performance-instruction-label">Bridge Tones</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: 1rem; padding-left: 1rem; border-left: 1px solid rgba(255,255,255,0.1);">
-                        <span style="opacity: 0.6; font-style: italic;">
+                    <div class="performance-instruction-divider">
+                        <span class="performance-instruction-note">
                             Dashed border = Same note in other octaves
                         </span>
                     </div>
@@ -675,7 +656,11 @@ export function PerformanceModal() {
             }}
         >
             <div
-                class="modal PerformanceSurfaceModal"
+                class={`modal PerformanceSurfaceModal performance-modal-shell ${
+                    isMobile
+                        ? 'performance-modal-shell--mobile'
+                        : 'performance-modal-shell--desktop'
+                }`}
                 onPointerDown={(e) => {
                     e.stopPropagation();
                     // Use pointerdown for immediate focus response on touch devices
@@ -686,11 +671,6 @@ export function PerformanceModal() {
                 onClick={(/** @type {Event} */ e) => {
                     e.stopPropagation();
                 }}
-                style={
-                    isMobile
-                        ? 'width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius: 0; border: none; padding: 0;'
-                        : 'max-width: 1200px; height: 85vh; max-height: 700px; overflow-y: auto;'
-                }
             >
                 {!isMobile && (
                     <div class="modal-header">

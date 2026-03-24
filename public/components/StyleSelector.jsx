@@ -64,24 +64,9 @@ export function StyleSelector({ module, styles }) {
             {categories.map((cat) => (
                 <div key={cat} class="style-category">
                     {/* Only show label if there are multiple categories or it provides value */}
-                    {categories.length > 1 && (
-                        <div
-                            class="category-label"
-                            style={{
-                                fontSize: '0.75rem',
-                                color: 'var(--text-muted)',
-                                marginTop: '0.5rem',
-                                marginBottom: '0.25rem',
-                            }}
-                        >
-                            {cat}
-                        </div>
-                    )}
+                    {categories.length > 1 && <div class="category-label">{cat}</div>}
 
-                    <div
-                        class="chip-grid"
-                        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}
-                    >
+                    <div class="chip-grid">
                         {categorized[cat].map((/** @type {any} */ item) => (
                             <button
                                 key={item.id}

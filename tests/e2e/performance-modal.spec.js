@@ -38,7 +38,7 @@ test.describe('Performance Modal @ui', () => {
         await expect(instructions).toContainText('Bridge Tones');
 
         // Verify that we have the colored indicators in the legends
-        const legendDots = instructions.locator('div[style*="width: 12px"]');
+        const legendDots = instructions.locator('.performance-instruction-swatch');
         await expect(legendDots).toHaveCount(3);
 
         // Verify Sympathetic Highlights

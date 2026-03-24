@@ -100,9 +100,8 @@ export function ManualModal() {
     return (
         <div class="modal-overlay active" onClick={close}>
             <div
-                class="settings-content"
+                class="settings-content manual-modal"
                 onClick={(/** @type {any} */ e) => e.stopPropagation()}
-                style="max-width: 900px; height: 90vh;"
             >
                 <div class="modal-header-shared">
                     <h2>Ensemble Manual</h2>
@@ -113,7 +112,7 @@ export function ManualModal() {
 
                 <div class="manual-content" dangerouslySetInnerHTML={{ __html: content }} />
 
-                <div class="modal-footer" style="margin-top: 2rem;">
+                <div class="modal-footer manual-modal-footer">
                     <div class="footer-primary-actions">
                         <button class="footer-main-btn active" onClick={close}>
                             Back to Ensemble

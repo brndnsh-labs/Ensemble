@@ -283,7 +283,7 @@ export function EditorModal(_props) {
                         type="file"
                         id="xml-upload-editor"
                         accept=".xml,.mxl,.musicxml"
-                        style="display:none;"
+                        class="editor-upload-input"
                         onChange={handleFileUpload}
                     />
                     <button id="closeEditorBtn" class="primary-btn" onClick={closeEditor}>
@@ -351,15 +351,16 @@ Em  C  G  D"
                             aria-label="Arranger Actions Menu"
                             aria-haspopup="true"
                             aria-expanded={isMenuOpen}
-                            class={`action-trigger-btn ${isMenuOpen ? 'active' : ''}`}
+                            class={`action-trigger-btn editor-action-trigger ${
+                                isMenuOpen ? 'active' : ''
+                            }`}
                             title="Arranger Actions"
-                            style="justify-content: center; padding: 0.75rem 1rem;"
                             onClick={(/** @type {MouseEvent} */ e) => {
                                 e.stopPropagation();
                                 setIsMenuOpen(!isMenuOpen);
                             }}
                         >
-                            <span style="font-size: 1.2rem;">⋮</span>
+                            <span class="editor-action-trigger-icon">⋮</span>
                         </button>
                     </div>
 
@@ -389,23 +390,19 @@ Em  C  G  D"
                                 ✨ <span>Inspiration Hub</span>
                             </button>
                             {showConfirmClear ? (
-                                <div
-                                    role="alert"
-                                    aria-live="polite"
-                                    style="padding: 0.5rem; background: rgba(255, 0, 0, 0.1); border-radius: 4px; margin: 0 0.5rem;"
-                                >
-                                    <div style="font-size: 0.8rem; color: var(--text-color); margin-bottom: 0.5rem; text-align: center;">
+                                <div role="alert" aria-live="polite" class="editor-clear-confirm">
+                                    <div class="editor-clear-confirm-copy">
                                         Clear entire progression?
                                     </div>
-                                    <div style="display: flex; gap: 0.5rem;">
+                                    <div class="editor-clear-confirm-actions">
                                         <button
-                                            style="flex: 1; padding: 0.3rem; font-size: 0.8rem; background: var(--red); color: white; border: none; border-radius: 4px; cursor: pointer;"
+                                            class="editor-clear-confirm-btn editor-clear-confirm-btn--danger"
                                             onClick={confirmClear}
                                         >
                                             Yes
                                         </button>
                                         <button
-                                            style="flex: 1; padding: 0.3rem; font-size: 0.8rem; background: transparent; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;"
+                                            class="editor-clear-confirm-btn editor-clear-confirm-btn--secondary"
                                             onClick={() => setShowConfirmClear(false)}
                                         >
                                             No
