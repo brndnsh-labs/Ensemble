@@ -193,8 +193,13 @@ export function selectPitchAndDevices(
 
     // Optimization: Pre-compute stylistic boolean checks and common tone arrays to avoid allocating inside the hot loop
     const isBluesOrJazz = activeStyle === 'blues' || activeStyle === 'jazz';
-    const isGreatsProfileEnabled = ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle);
-    const isDissonantStyle = ['jazz', 'bird', 'blues'].includes(activeStyle);
+    const isGreatsProfileEnabled =
+        activeStyle === 'blues' ||
+        activeStyle === 'jazz' ||
+        activeStyle === 'rock' ||
+        activeStyle === 'scalar';
+    const isDissonantStyle =
+        activeStyle === 'jazz' || activeStyle === 'bird' || activeStyle === 'blues';
 
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
@@ -549,7 +554,10 @@ export function selectPitchAndDevices(
 
         // --- Greats Profiles: Device Priority ---
         if (
-            ['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle) &&
+            (activeStyle === 'blues' ||
+                activeStyle === 'jazz' ||
+                activeStyle === 'rock' ||
+                activeStyle === 'scalar') &&
             soloistState.phraseContext?.profile
         ) {
             const profile = soloistState.phraseContext.profile;
@@ -570,7 +578,11 @@ export function selectPitchAndDevices(
 
         if (soloistState.mode === 'piano') {
             allowed = allowed.filter(
-                (d) => !['slide', 'countryBend', 'graceSlide', 'chickenPick'].includes(d),
+                (d) =>
+                    d !== 'slide' &&
+                    d !== 'countryBend' &&
+                    d !== 'graceSlide' &&
+                    d !== 'chickenPick',
             );
             if (!allowed.includes('graceNote')) {
                 allowed.push('graceNote');
