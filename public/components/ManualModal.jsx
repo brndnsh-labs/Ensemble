@@ -31,9 +31,9 @@ function simpleMarkdown(/** @type {string} */ text) {
             // Links
             .replace(/\[(.*?)\]\((.*?)\)/g, (_match, linkText, url) => {
                 // Prevent javascript: and data: URIs in links.
-                // Since `escapeHTML` has run, entity evasion (e.g., jav&#x09;ascript:)
-                // is neutralized because the '&' became '&amp;'.
-                const cleanUrl = url.trim().toLowerCase();
+                // Strip control characters and spaces before scheme validation to prevent evasion.
+                // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional removal of control chars for XSS prevention
+                const cleanUrl = url.replace(/[\x00-\x20]+/g, '').toLowerCase();
                 if (
                     cleanUrl.startsWith('javascript:') ||
                     cleanUrl.startsWith('data:') ||
