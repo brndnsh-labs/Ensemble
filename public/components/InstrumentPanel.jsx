@@ -59,8 +59,8 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
             data-id={module}
         >
             <div class={`panel-header ${headerClass}`}>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <h2>{title}</h2>
+                <div class="panel-header-main">
+                    <h2 class="panel-title">{title}</h2>
                 </div>
                 <div class="instrument-tabs">
                     <button
@@ -78,7 +78,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                         Smart
                     </button>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;" ref={menuRef}>
+                <div class="panel-header-actions" ref={menuRef}>
                     {module === 'soloist' && (
                         <button
                             class="panel-menu-btn"
@@ -131,9 +131,7 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 id={`${module === 'chords' ? 'chord' : module}-tab-classic`}
                 class={`instrument-tab-content ${activeTab === 'classic' ? 'active' : ''}`}
             >
-                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8;">
-                    Style
-                </label>
+                <label class="section-label">Style</label>
                 <div
                     id={`${module === 'harmony' ? 'harmony' : module}StylePresets`}
                     class="presets-container"
@@ -146,11 +144,8 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 id={`${module === 'chords' ? 'chord' : module}-tab-smart`}
                 class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
             >
-                <div
-                    class="smart-status"
-                    style={`padding: 0.5rem; background: rgba(var(--${module}-color-rgb), 0.05); border-radius: 8px; border: 1px dashed rgba(var(--${module}-color-rgb), 0.2); text-align: center;`}
-                >
-                    <p style="font-size: 0.8rem; margin: 0;">
+                <div class="smart-status" style={`--module-color-rgb: var(--${module}-color-rgb);`}>
+                    <p class="smart-status-copy">
                         ✨ <strong>Smart Follow</strong> Active
                     </p>
                 </div>

@@ -106,5 +106,7 @@ Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written ta
 
 1.  **Fail Fast in Workers:** Validate payload shapes immediately when sending data to `logic-worker.js`.
 2.  **No Magic Numbers:** Use CSS variables for all spacing and colors.
-3.  **Atomic State Changes:** Perform multiple related state updates in a single `dispatch` if possible.
-4.  **Semantic Prop Names:** Name props after their domain (e.g., `isTransportVisible`) rather than visual state (`isBlue`).
+3.  **CSS Ownership:** Keep `public/styles.css` as an import manifest only. Put feature rules in the owning file under `public/css/` rather than adding ad hoc selectors to the entrypoint.
+4.  **Inline Style Rule:** Keep inline styles only for runtime-calculated values (e.g. widths, dynamic grid templates, transition names). Move static presentation into semantic CSS classes.
+5.  **Atomic State Changes:** Perform multiple related state updates in a single `dispatch` if possible.
+6.  **Semantic Prop Names:** Name props after their domain (e.g., `isTransportVisible`) rather than visual state (`isBlue`).

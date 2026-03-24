@@ -1,6 +1,11 @@
 :root {
     color-scheme: dark light;
 
+    --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono:
+        "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas,
+        monospace;
+
     /* Solarized Dark (Default) */
     --base03: #002b36;
     --base02: #073642;
@@ -22,6 +27,7 @@
     --bg-color: var(--base03);
     --panel-color: var(--base02);
     --text-color: var(--base1);
+    --text-primary: var(--text-color);
     --text-secondary: var(--base0);
     --text-muted: var(--base01);
     --accent-color: var(--blue);
@@ -45,10 +51,31 @@
     --card-bg: #0a404e; /* Slightly lighter than base02 for contrast */
     --card-bg-hover: var(--base01);
     --border-color: rgba(147, 161, 161, 0.15);
+    --border: var(--border-color);
     --input-bg: rgba(0, 43, 54, 0.4);
+    --surface-sunken: var(--input-bg);
     --select-bg: var(--base03);
     --select-text: var(--base2);
     --select-border: var(--base01);
+
+    /* Spacing */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+
+    /* Shadows */
+    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
 
     /* Sequencer Specific */
     --step-bg: rgba(147, 161, 161, 0.15);
@@ -91,6 +118,7 @@
     --bg-color: var(--base3);
     --panel-color: var(--base2);
     --text-color: var(--base02);
+    --text-primary: var(--text-color);
     --text-secondary: var(--base01);
     --text-muted: var(--base00);
     --accent-color: var(--blue);
@@ -110,7 +138,9 @@
     --card-bg: var(--base3);
     --card-bg-hover: var(--base2);
     --border-color: rgba(7, 54, 66, 0.15);
+    --border: var(--border-color);
     --input-bg: rgba(238, 232, 213, 0.5);
+    --surface-sunken: var(--input-bg);
     --select-bg: var(--base3);
     --select-text: var(--base02);
     --select-border: var(--base1);

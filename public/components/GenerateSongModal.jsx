@@ -240,8 +240,7 @@ export function GenerateSongModal() {
             }}
         >
             <div
-                class="modal-content settings-content"
-                style="min-height: 700px; display: flex; flex-direction: column;"
+                class="modal-content settings-content generate-modal-shell"
                 onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
@@ -256,57 +255,33 @@ export function GenerateSongModal() {
                     </button>
                 </div>
 
-                <div class="modal-body" style="padding: 1.5rem; flex-grow: 1;">
+                <div class="modal-body generate-modal-body">
                     {hasGenerated ? (
-                        <div
-                            class="animate-in"
-                            style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 0; text-align: center;"
-                        >
-                            <div
-                                style="font-size: 4rem; margin-bottom: 1rem; filter: drop-shadow(0 0 10px var(--accent-color));"
-                                aria-hidden="true"
-                            >
+                        <div class="animate-in generate-success">
+                            <div class="generate-success-icon" aria-hidden="true">
                                 ✨
                             </div>
-                            <h3 style="margin-bottom: 0.5rem; color: var(--accent-color);">
-                                Arrangement Ready!
-                            </h3>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem;">
+                            <h3 class="generate-success-title">Arrangement Ready!</h3>
+                            <p class="generate-success-copy">
                                 Your new arrangement is ready to play.
                             </p>
-                            <button
-                                class="primary-btn"
-                                style="width: 100%; padding: 1rem; font-size: 1rem;"
-                                onClick={close}
-                            >
+                            <button class="primary-btn generate-success-button" onClick={close}>
                                 👍 Done
                             </button>
                         </div>
                     ) : (
                         <div class="generate-form animate-in">
-                            <div style="display: flex; justify-content: center; margin-bottom: 2rem; background: var(--input-bg); padding: 0.5rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                            <div class="generate-mode-switcher">
                                 <ButtonGroup
-                                    style={{ gap: '0.5rem', width: '100%' }}
+                                    className="generate-mode-toggle-group"
                                     options={[
                                         {
                                             label: '📚 Structure Library',
                                             value: 'templates',
-                                            style: {
-                                                flex: 1,
-                                                padding: '0.75rem',
-                                                fontSize: '1rem',
-                                                borderRadius: '8px',
-                                            },
                                         },
                                         {
                                             label: '🎲 Randomize',
                                             value: 'generator',
-                                            style: {
-                                                flex: 1,
-                                                padding: '0.75rem',
-                                                fontSize: '1rem',
-                                                borderRadius: '8px',
-                                            },
                                         },
                                     ]}
                                     value={activeTab}
@@ -316,32 +291,16 @@ export function GenerateSongModal() {
 
                             {activeTab === 'templates' ? (
                                 <SettingGroup title="Song Templates">
-                                    <p class="setting-description" style="margin-bottom: 1.5rem;">
+                                    <p class="setting-description generate-copy">
                                         Select a curated song structure to replace your current
                                         arrangement.
                                     </p>
-                                    <div
-                                        class="template-grid"
-                                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding-bottom: 1rem;"
-                                    >
+                                    <div class="template-grid generate-template-grid">
                                         {SONG_TEMPLATES.map((/** @type {any} */ template) => (
                                             <button
                                                 key={template.name}
-                                                class="template-card-btn"
-                                                style="padding: 1.25rem; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-color); cursor: pointer; text-align: left; transition: all 0.2s; display: flex; flex-direction: column; gap: 0.25rem;"
+                                                class="template-card-btn generate-template-card"
                                                 onClick={() => applyTemplate(template)}
-                                                onMouseOver={(/** @type {any} */ e) => {
-                                                    e.currentTarget.style.borderColor =
-                                                        'var(--accent-color)';
-                                                    e.currentTarget.style.transform =
-                                                        'translateY(-2px)';
-                                                }}
-                                                onMouseOut={(/** @type {any} */ e) => {
-                                                    e.currentTarget.style.borderColor =
-                                                        'var(--border-color)';
-                                                    e.currentTarget.style.transform =
-                                                        'translateY(0)';
-                                                }}
                                                 aria-label={
                                                     confirmTemplate === template.name
                                                         ? 'Apply template? This replaces current arrangement.'
@@ -353,15 +312,15 @@ export function GenerateSongModal() {
                                                         : 'off'
                                                 }
                                             >
-                                                <div style="font-weight: bold; color: var(--accent-color); font-size: 1rem; display: flex; justify-content: space-between;">
+                                                <div class="generate-template-card-header">
                                                     <span>{template.name}</span>
                                                     {confirmTemplate === template.name && (
-                                                        <span style="color: var(--red); font-size: 0.8rem;">
+                                                        <span class="generate-template-card-confirm">
                                                             Click again to replace
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                                <div class="generate-template-card-meta">
                                                     {template.sections.length} Sections •{' '}
                                                     {template.sections.reduce(
                                                         (
@@ -390,7 +349,7 @@ export function GenerateSongModal() {
                                                 onChange={(/** @type {any} */ e) =>
                                                     setKey(e.target.value)
                                                 }
-                                                style="min-width: 100px;"
+                                                class="generate-select--sm"
                                             >
                                                 <option value="Random">Random</option>
                                                 <option value="C">C</option>
@@ -412,10 +371,7 @@ export function GenerateSongModal() {
                                             label="Key Quality"
                                             description="Major or Minor mode"
                                         >
-                                            <div
-                                                class="flex-row"
-                                                style="gap: 0.5rem; align-items: center;"
-                                            >
+                                            <div class="flex-row">
                                                 <span style={{ opacity: isMinor ? 0.5 : 1 }}>
                                                     Major
                                                 </span>
@@ -436,7 +392,7 @@ export function GenerateSongModal() {
                                                 onChange={(/** @type {any} */ e) =>
                                                     setTimeSignature(e.target.value)
                                                 }
-                                                style="min-width: 100px;"
+                                                class="generate-select--sm"
                                             >
                                                 <option value="Random">Random</option>
                                                 <option value="4/4">4/4</option>
@@ -451,7 +407,10 @@ export function GenerateSongModal() {
                                     </SettingGroup>
 
                                     {/* --- VIBE & STYLE --- */}
-                                    <SettingGroup title="2. Vibe & Style" style="margin-top: 1rem;">
+                                    <SettingGroup
+                                        title="2. Vibe & Style"
+                                        className="generate-section-spaced"
+                                    >
                                         <SettingRow
                                             label="Structure"
                                             description="The architectural form of the song"
@@ -462,7 +421,7 @@ export function GenerateSongModal() {
                                                 onChange={(/** @type {any} */ e) =>
                                                     setStructure(e.target.value)
                                                 }
-                                                style="min-width: 150px;"
+                                                class="generate-select--md"
                                             >
                                                 {structureOptions.map((/** @type {any} */ opt) => (
                                                     <option key={opt.id} value={opt.id}>
@@ -476,13 +435,7 @@ export function GenerateSongModal() {
                                             label="Complexity"
                                             description="Influences chord extensions (7ths, 9ths)"
                                             valueDisplay={
-                                                <span
-                                                    style={{
-                                                        color: 'var(--accent-color)',
-                                                        fontWeight: 'bold',
-                                                        marginRight: '0.5rem',
-                                                    }}
-                                                >
+                                                <span class="generate-value-highlight">
                                                     {Math.round(complexity * 100)}%
                                                 </span>
                                             }
@@ -496,7 +449,7 @@ export function GenerateSongModal() {
                                                 onInput={(/** @type {any} */ e) =>
                                                     setComplexity(parseFloat(e.target.value))
                                                 }
-                                                style="width: 100px;"
+                                                class="generate-range"
                                             />
                                         </SettingRow>
                                     </SettingGroup>
@@ -504,7 +457,7 @@ export function GenerateSongModal() {
                                     {/* --- ADVANCED --- */}
                                     <SettingGroup
                                         title="3. Seeds"
-                                        style="margin-top: 1rem; border-bottom: none;"
+                                        className="generate-section-spaced generate-section-borderless"
                                     >
                                         <SettingRow
                                             label="Seed Source"
@@ -515,7 +468,7 @@ export function GenerateSongModal() {
                                                 onChange={(/** @type {any} */ e) =>
                                                     setSeedMode(e.target.value)
                                                 }
-                                                style="min-width: 150px;"
+                                                class="generate-select--md"
                                             >
                                                 <option value="none">None</option>
                                                 <option value="existing">Existing Section</option>
@@ -524,7 +477,7 @@ export function GenerateSongModal() {
                                         </SettingRow>
 
                                         {seedMode === 'existing' && (
-                                            <div class="animate-in" style="margin-top: 0.5rem;">
+                                            <div class="animate-in generate-subsection">
                                                 <SettingRow
                                                     label="Select Section"
                                                     description="Choose a section to use as a seed"
@@ -534,7 +487,7 @@ export function GenerateSongModal() {
                                                         onChange={(/** @type {any} */ e) =>
                                                             setSelectedSectionId(e.target.value)
                                                         }
-                                                        style="min-width: 150px;"
+                                                        class="generate-select--md"
                                                     >
                                                         {sections.map((/** @type {any} */ s) => (
                                                             <option key={s.id} value={s.id}>
@@ -547,7 +500,7 @@ export function GenerateSongModal() {
                                         )}
 
                                         {seedMode === 'manual' && (
-                                            <div class="animate-in" style="margin-top: 0.5rem;">
+                                            <div class="animate-in generate-subsection">
                                                 <SettingRow
                                                     label="Chord Progression"
                                                     description="e.g. I | IV | V"
@@ -559,14 +512,14 @@ export function GenerateSongModal() {
                                                             setManualSeedValue(e.target.value)
                                                         }
                                                         placeholder="I | IV | V"
-                                                        style="width: 100%; padding: 0.5rem; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px;"
+                                                        class="generate-text-input"
                                                     />
                                                 </SettingRow>
                                             </div>
                                         )}
 
                                         {seedMode !== 'none' && (
-                                            <div class="animate-in" style="margin-top: 0.5rem;">
+                                            <div class="animate-in generate-subsection">
                                                 <SettingRow
                                                     label="Treat Seed as..."
                                                     description="Section type for the seed"
@@ -577,7 +530,7 @@ export function GenerateSongModal() {
                                                         onChange={(/** @type {any} */ e) =>
                                                             setSeedType(e.target.value)
                                                         }
-                                                        style="min-width: 100px;"
+                                                        class="generate-select--sm"
                                                     >
                                                         <option value="Verse">Verse</option>
                                                         <option value="Chorus">Chorus</option>
@@ -590,8 +543,7 @@ export function GenerateSongModal() {
                                     </SettingGroup>
 
                                     <button
-                                        class="primary-btn"
-                                        style="width: 100%; margin-top: 1rem; padding: 1rem; font-size: 1rem;"
+                                        class="primary-btn generate-submit-btn"
                                         onClick={handleConfirm}
                                         aria-label={
                                             confirmGen

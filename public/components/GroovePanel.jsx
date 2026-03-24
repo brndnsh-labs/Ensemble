@@ -48,8 +48,8 @@ export function GroovePanel({ isActiveMobile }) {
             data-id="grooves"
         >
             <div class="panel-header groove-panel-header">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <h2 style={{ color: fillActive ? 'var(--soloist-color)' : '' }}>Grooves</h2>
+                <div class="panel-header-main">
+                    <h2 class={`panel-title ${fillActive ? 'panel-title-accent' : ''}`}>Grooves</h2>
                 </div>
                 <div class="instrument-tabs">
                     <button
@@ -67,7 +67,7 @@ export function GroovePanel({ isActiveMobile }) {
                         Smart
                     </button>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;" ref={menuRef}>
+                <div class="panel-header-actions" ref={menuRef}>
                     <button
                         class="panel-menu-btn"
                         aria-label="Open Drum Pad"
@@ -116,17 +116,13 @@ export function GroovePanel({ isActiveMobile }) {
                 id="groove-tab-classic"
                 class={`instrument-tab-content ${activeTab === 'classic' ? 'active' : ''}`}
             >
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8;">
-                        Style
-                    </label>
+                <div class="smart-control-group--compact">
+                    <label class="section-label">Style</label>
                     <PresetLibrary type="drum" />
                 </div>
-                <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin-bottom: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h4 style="margin: 0; font-size: 0.9rem; color: var(--accent-color);">
-                            Step Sequencer
-                        </h4>
+                <div class="panel-surface">
+                    <div class="panel-surface-header">
+                        <h4 class="panel-surface-title">Step Sequencer</h4>
                         <select
                             id="drumBarsSelect"
                             aria-label="Number of Drum Measures"
@@ -139,23 +135,12 @@ export function GroovePanel({ isActiveMobile }) {
                             <option value="8">8</option>
                         </select>
                     </div>
-                    <div
-                        id="measurePagination"
-                        style="display: flex; gap: 0.4rem; margin-bottom: 1rem; align-items: center;"
-                    />
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                        <button
-                            id="cloneMeasureBtn"
-                            style="font-size: 0.75rem; padding: 0.3rem 0.6rem; flex: 1;"
-                            onClick={cloneMeasure}
-                        >
+                    <div id="measurePagination" class="panel-pagination-row" />
+                    <div class="panel-action-row">
+                        <button id="cloneMeasureBtn" class="button-compact" onClick={cloneMeasure}>
                             ⧉ Copy to All
                         </button>
-                        <button
-                            id="saveDrumBtn"
-                            style="font-size: 0.75rem; padding: 0.3rem 0.6rem; flex: 1;"
-                            onClick={saveDrumPreset}
-                        >
+                        <button id="saveDrumBtn" class="button-compact" onClick={saveDrumPreset}>
                             💾 Save Pattern
                         </button>
                     </div>
@@ -184,17 +169,14 @@ function IntensitySlider() {
     );
 
     return (
-        <div class="smart-control-group" style="margin-bottom: 1.5rem;">
+        <div class="smart-control-group">
             <SettingRow
                 label="Intensity (Global)"
                 id="intensitySlider"
                 valueDisplay={`${Math.round(bandIntensity * 100)}%`}
             >
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <label
-                        htmlFor="autoIntensityCheck"
-                        style="font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; cursor: pointer;"
-                    >
+                <div class="control-stack">
+                    <label htmlFor="autoIntensityCheck" class="setting-toggle-label">
                         <Toggle
                             id="autoIntensityCheck"
                             label="Auto Intensity"
@@ -230,7 +212,7 @@ function CreativityToggle() {
     );
 
     return (
-        <div class="smart-control-group" style="margin-bottom: 1rem;">
+        <div class="smart-control-group smart-control-group--compact">
             <SettingRow
                 label="Creativity"
                 description="Enables generative variations and musical risks."
@@ -298,10 +280,8 @@ function GenreSelector() {
     };
 
     return (
-        <div class="smart-control-group" style="margin-bottom: 1.5rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8;">
-                Genre
-            </label>
+        <div class="smart-control-group">
+            <label class="section-label">Genre</label>
             <div class="genre-selector">
                 {genres.map((/** @type {any} */ genre) => {
                     const isActive = genre === lastSmartGenre && !pendingGenreFeel;
