@@ -74,6 +74,15 @@ describe('EditorModal Component', () => {
                 },
                 arranger: {
                     key: 'C',
+                    sections: [
+                        {
+                            id: 'section-1',
+                            label: 'Intro',
+                            value: 'Cmaj7',
+                            repeat: 1,
+                            seamless: false,
+                        },
+                    ],
                     totalSteps: 16,
                 },
                 ...overrides,
@@ -90,6 +99,8 @@ describe('EditorModal Component', () => {
         });
 
         expect(container.textContent).toContain('Arrangement Editor');
+        expect(container.textContent).toContain('1 section');
+        expect(container.textContent).toContain('Global key C');
         expect(container.querySelector('#mockArranger')).not.toBeNull();
     });
 

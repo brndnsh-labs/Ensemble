@@ -2,6 +2,16 @@ import pkg from '@playwright/test';
 
 const { expect, test } = pkg;
 
+async function openEditorFromLibraryPreset(page) {
+    await page.click('button[aria-label="Open arranger actions"]');
+    await page.locator('.workspace-library-fab').dispatchEvent('click');
+    await page.getByRole('button', { name: 'All The Things You Are' }).click();
+    await page.click('button[aria-label="Open arranger actions"]');
+    await page.locator('#editArrangementBtn').dispatchEvent('click');
+    await page.waitForSelector('#editorOverlay', { state: 'visible' });
+    return page.locator('#editorOverlay .settings-content');
+}
+
 test.describe('Modals Responsiveness @ui', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
@@ -27,18 +37,48 @@ test.describe('Modals Responsiveness @ui', () => {
     });
 
     test('Editor Modal - Content Layout', async ({ page }) => {
-        // Open editor modal (the 'Edit Arrangement' button)
-        await page.click('button[aria-label="Open arranger actions"]');
-        await page.locator('#editArrangementBtn').dispatchEvent('click');
-
-        await page.waitForSelector('#editorOverlay', { state: 'visible' });
-        const editorModal = page.locator('#editorOverlay .settings-content');
+        const editorModal = await openEditorFromLibraryPreset(page);
         await expect(editorModal).toBeVisible();
 
-        // Verify content
         await expect(editorModal).toContainText('Arrangement Editor');
+        await expect(editorModal).toContainText('7 sections');
+        await expect(page.locator('#editorOverlay .section-card')).toHaveCount(7);
+        await expect(page.locator('#addSectionBtn')).toBeVisible();
+        await expect(page.locator('#arrangerActionTrigger')).toBeVisible();
 
-        // Close modal
+        const viewport = page.viewportSize();
+        const editorBox = await editorModal.boundingBox();
+        expect(viewport).not.toBeNull();
+        expect(editorBox).not.toBeNull();
+        expect(editorBox.width).toBeGreaterThan(viewport.width * 0.9);
+        expect(editorBox.height).toBeGreaterThan(viewport.height * 0.8);
+
+        await page.click('#closeEditorBtn');
+        await page.waitForSelector('#editorOverlay', { state: 'hidden' });
+    });
+
+    test('Editor Modal - Mobile fullscreen shell @mobile', async ({ page }) => {
+        const editorModal = await openEditorFromLibraryPreset(page);
+        await expect(editorModal).toBeVisible();
+        await expect(editorModal).toContainText('Arrangement Editor');
+        await expect(page.locator('#addSectionBtn')).toBeVisible();
+        await expect(page.locator('#closeEditorBtn')).toBeVisible();
+
+        const viewport = page.viewportSize();
+        const editorBox = await editorModal.boundingBox();
+        const computedShell = await editorModal.evaluate((el) => ({
+            width: parseFloat(getComputedStyle(el).width),
+            height: parseFloat(getComputedStyle(el).height),
+        }));
+        expect(viewport).not.toBeNull();
+        expect(editorBox).not.toBeNull();
+        expect(editorBox.x).toBeGreaterThanOrEqual(0);
+        expect(editorBox.y).toBeGreaterThanOrEqual(0);
+        expect(editorBox.x + editorBox.width).toBeLessThanOrEqual(viewport.width);
+        expect(editorBox.y + editorBox.height).toBeLessThanOrEqual(viewport.height + 1);
+        expect(computedShell.width).toBeGreaterThanOrEqual(viewport.width - 2);
+        expect(computedShell.height).toBeGreaterThanOrEqual(viewport.height - 2);
+
         await page.click('#closeEditorBtn');
         await page.waitForSelector('#editorOverlay', { state: 'hidden' });
     });

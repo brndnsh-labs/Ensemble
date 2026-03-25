@@ -187,6 +187,12 @@ export const SectionCard = forwardRef(
                                 onSectionUpdate(section.id, 'label', e.target.value)
                             }
                         />
+                        <div class="section-title-meta">
+                            {section.seamless && <span class="section-status-chip">Linked</span>}
+                            <span class="drag-handle" title="Drag to reorder" aria-hidden="true">
+                                ⋮⋮
+                            </span>
+                        </div>
                     </div>
 
                     <div class="section-controls-row">
