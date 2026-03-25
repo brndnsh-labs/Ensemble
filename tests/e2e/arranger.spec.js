@@ -66,6 +66,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('Arranger action menu stays fully visible after loading a short preset', async ({
         page,
     }) => {
+        await page.setViewportSize({ width: 700, height: 600 });
         await page.getByRole('button', { name: 'Open arranger actions' }).click();
         await page.locator('.workspace-library-fab').dispatchEvent('click');
 
@@ -76,15 +77,41 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(modal).toBeHidden();
 
         const actionMenu = page.locator('.workspace-fab-menu');
-        await page.getByRole('button', { name: 'Open arranger actions' }).click();
+        const trigger = page.getByRole('button', { name: 'Open arranger actions' });
+        const items = actionMenu.locator('.workspace-fab-items');
+        const viewport = await page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+        }));
 
-        const viewportHeight = await page.evaluate(() => window.innerHeight);
-        const seedBox = await actionMenu.locator('.workspace-fab-item--seed').boundingBox();
+        await page.mouse.click(5, 5);
+        await page.waitForTimeout(150);
+        await expect(actionMenu).not.toHaveClass(/is-open/);
 
-        expect(seedBox).not.toBeNull();
-        expect(seedBox.y).toBeGreaterThanOrEqual(0);
-        expect(seedBox.y + seedBox.height).toBeLessThanOrEqual(viewportHeight - 8);
+        await trigger.click();
+        await page.waitForTimeout(250);
 
-        await expect(actionMenu.locator('.workspace-fab-item--seed')).toBeVisible();
+        const clickBox = await items.boundingBox();
+        expect(clickBox).not.toBeNull();
+        expect(clickBox.x).toBeGreaterThanOrEqual(0);
+        expect(clickBox.y).toBeGreaterThanOrEqual(0);
+        expect(clickBox.x + clickBox.width).toBeLessThanOrEqual(viewport.width);
+        expect(clickBox.y + clickBox.height).toBeLessThanOrEqual(viewport.height);
+        await expect(items).toBeVisible();
+
+        await page.mouse.click(5, 5);
+        await page.waitForTimeout(150);
+        await expect(actionMenu).not.toHaveClass(/is-open/);
+
+        await trigger.hover();
+        await page.waitForTimeout(250);
+
+        const hoverBox = await items.boundingBox();
+        expect(hoverBox).not.toBeNull();
+        expect(hoverBox.x).toBeGreaterThanOrEqual(0);
+        expect(hoverBox.y).toBeGreaterThanOrEqual(0);
+        expect(hoverBox.x + hoverBox.width).toBeLessThanOrEqual(viewport.width);
+        expect(hoverBox.y + hoverBox.height).toBeLessThanOrEqual(viewport.height);
+        await expect(items).toBeVisible();
     });
 });

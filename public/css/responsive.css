@@ -288,35 +288,66 @@
         min-width: 0;
     }
 
-    .workspace-view--arranger #panel-arranger .workspace-fab-items {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        right: auto;
-        bottom: auto;
-        width: min(92vw, 21rem);
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.94);
-        transform-origin: center;
-        max-height: min(68dvh, 28rem);
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        z-index: var(--z-modal);
-        pointer-events: none;
-        transition:
-            opacity 160ms ease,
-            transform 180ms var(--anim-ease);
+    @media (max-width: 700px) and (pointer: coarse) {
+        .workspace-view--arranger #panel-arranger .workspace-fab-items {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            right: auto;
+            bottom: auto;
+            width: min(92vw, 21rem);
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.94);
+            transform-origin: center;
+            max-height: min(68dvh, 28rem);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            z-index: var(--z-modal);
+            pointer-events: none;
+            transition:
+                opacity 160ms ease,
+                transform 180ms var(--anim-ease);
+        }
+
+        .workspace-view--arranger #panel-arranger .workspace-fab-menu.is-open .workspace-fab-items,
+        .workspace-view--arranger #panel-arranger .workspace-fab-menu:hover .workspace-fab-items,
+        .workspace-view--arranger
+            #panel-arranger
+            .workspace-fab-menu:focus-within
+            .workspace-fab-items {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+            pointer-events: auto;
+        }
     }
 
-    .workspace-view--arranger #panel-arranger .workspace-fab-menu.is-open .workspace-fab-items,
-    .workspace-view--arranger #panel-arranger .workspace-fab-menu:hover .workspace-fab-items,
-    .workspace-view--arranger
-        #panel-arranger
-        .workspace-fab-menu:focus-within
-        .workspace-fab-items {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-        pointer-events: auto;
+    @media (max-width: 700px) and (pointer: fine) {
+        .workspace-view--arranger #panel-arranger .workspace-fab-items {
+            position: fixed;
+            right: auto;
+            bottom: auto;
+            width: min(92vw, 21rem);
+            opacity: 0;
+            max-height: min(68dvh, 28rem);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            z-index: var(--z-modal);
+            pointer-events: none;
+            transition:
+                opacity 160ms ease,
+                transform 180ms var(--anim-ease);
+        }
+
+        .workspace-view--arranger #panel-arranger .workspace-fab-menu.is-open .workspace-fab-items,
+        .workspace-view--arranger #panel-arranger .workspace-fab-menu:hover .workspace-fab-items,
+        .workspace-view--arranger
+            #panel-arranger
+            .workspace-fab-menu:focus-within
+            .workspace-fab-items {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
     }
 
     .workspace-view--arranger .workspace-arranger-controls-panel .workspace-seed-control {
@@ -504,26 +535,23 @@
 
     .workspace-view--studio .workspace-studio-mix-menu-trigger,
     .workspace-view--studio .power-btn {
-        width: 30px;
         height: 30px;
         font-size: 0.95rem;
     }
 
-    .workspace-view--studio .workspace-studio-surface {
+    .workspace-view--studio .workspace-studio-mix-menu-trigger {
+        width: auto;
+        padding: 0 0.65rem 0 0.72rem;
+    }
+
+    .workspace-view--studio .workspace-studio-surface--modal {
         left: 0.75rem;
         right: 0.75rem;
         width: auto;
         max-height: min(78dvh, 38rem);
         padding: 0.9rem;
-        transform: translateY(-48%) scale(0.98);
-    }
-
-    .workspace-view--studio .workspace-studio-surface--settings {
-        width: auto;
-    }
-
-    .workspace-view--studio .workspace-studio-surface.is-open {
-        transform: translateY(-50%) scale(1);
+        transform: translateY(-50%);
+        animation: workspaceStudioSurfaceMobileIn 180ms ease-out;
     }
 
     .workspace-view--studio .workspace-studio-genre-grid {
@@ -531,21 +559,13 @@
     }
 
     .workspace-view--studio .workspace-studio-surface--settings .grid-2-col {
-        grid-template-columns: 1fr;
         gap: 0.7rem;
     }
 
-    .workspace-view--studio .workspace-studio-surface--settings .setting-group {
-        margin-bottom: 0.75rem;
-    }
-
-    .workspace-view--studio .workspace-studio-surface--settings .setting-group:last-child {
-        margin-left: -0.9rem;
-        margin-right: -0.9rem;
-        margin-bottom: -0.9rem;
-        padding-left: 0.9rem;
-        padding-right: 0.9rem;
-        padding-bottom: 0.9rem;
+    .workspace-view--studio .workspace-studio-surface--settings .setting-group,
+    .workspace-view--studio .workspace-studio-surface-card {
+        padding: 0.8rem;
+        border-radius: 16px;
     }
 
     .workspace-view--studio .workspace-studio-surface--settings .setting-group-title {
@@ -578,5 +598,20 @@
         .setting-control
         input[type="range"] {
         width: clamp(96px, 38vw, 160px);
+    }
+
+    .workspace-view--studio .workspace-studio-mix-menu-label {
+        font-size: 0.72rem;
+    }
+}
+
+@keyframes workspaceStudioSurfaceMobileIn {
+    from {
+        opacity: 0;
+        transform: translateY(-46%) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
     }
 }

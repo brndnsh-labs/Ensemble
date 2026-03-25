@@ -27,7 +27,7 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(studio.locator('.workspace-studio-live-mix')).toBeVisible();
         await expect(studio.locator('.workspace-studio-mix-row')).toHaveCount(5);
         await expect(studio.locator('.workspace-studio-genre-button')).toBeVisible();
-        await expect(studio.locator('.workspace-studio-genre-option')).toHaveCount(13);
+        await expect(studio.locator('.workspace-studio-genre-option')).toHaveCount(0);
         await expect(studio.locator('.workspace-instrument-state')).toHaveCount(5);
         await expect(studio.locator('.workspace-columns')).toHaveCount(0);
         await expect(studio.locator('.workspace-group-header')).toHaveCount(0);
@@ -39,6 +39,7 @@ test.describe('Workspace surfaces @ui', () => {
         await genreButton.click();
         const desktopGenreSurface = page.locator('.workspace-studio-surface--genre.is-open');
         await expect(desktopGenreSurface).toBeVisible();
+        await expect(desktopGenreSurface.locator('.workspace-studio-genre-option')).toHaveCount(13);
         const desktopGenreBox = await desktopGenreSurface.boundingBox();
         expect(desktopGenreBox).not.toBeNull();
         expect(desktopGenreBox.x).toBeGreaterThanOrEqual(0);
@@ -48,13 +49,21 @@ test.describe('Workspace surfaces @ui', () => {
         await genreButton.click();
         await desktopGenreSurface.getByRole('button', { name: initialGenre || 'Rock' }).click();
 
-        await studio.locator('#panel-bass .workspace-studio-mix-menu-trigger').click();
+        const bassRow = studio.locator('#panel-bass');
+        const bassTrigger = bassRow.locator('.workspace-studio-mix-menu-trigger');
+        await expect(bassTrigger).toContainText('Controls');
+        await bassTrigger.click();
         const desktopSettingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
         await expect(desktopSettingsSurface).toBeVisible();
-        const desktopSettingsBox = await desktopSettingsSurface.boundingBox();
+        const [desktopSettingsBox, bassRowBox] = await Promise.all([
+            desktopSettingsSurface.boundingBox(),
+            bassRow.boundingBox(),
+        ]);
         expect(desktopSettingsBox).not.toBeNull();
+        expect(bassRowBox).not.toBeNull();
         expect(desktopSettingsBox.x).toBeGreaterThanOrEqual(0);
         expect(desktopSettingsBox.x + desktopSettingsBox.width).toBeLessThanOrEqual(1440);
+        expect(Math.abs(desktopSettingsBox.y - bassRowBox.y)).toBeLessThan(160);
         await desktopSettingsSurface.getByRole('button', { name: 'Close Bass settings' }).click();
 
         await page.setViewportSize({ width: 768, height: 1024 });

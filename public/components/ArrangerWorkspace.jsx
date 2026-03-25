@@ -303,7 +303,9 @@ export function ArrangerWorkspace() {
                                                 aria-expanded={isActionMenuOpen}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
-                                                    setIsActionMenuOpen((value) => !value);
+                                                    setIsActionMenuOpen((value) =>
+                                                        isTouchLike ? !value : true,
+                                                    );
                                                 }}
                                             >
                                                 ⋮

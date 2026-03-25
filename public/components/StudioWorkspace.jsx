@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
@@ -5,9 +6,10 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { syncWorker } from '../worker-client.js';
-import { useClickOutside } from './hooks.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
+
+const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
 
 const STUDIO_INSTRUMENTS = [
     {
@@ -53,6 +55,16 @@ const STUDIO_INSTRUMENTS = [
 ];
 
 /**
+ * @returns {{ kind: null | 'genre' | 'settings', module: string | null }}
+ */
+function getClosedSurface() {
+    return {
+        kind: null,
+        module: null,
+    };
+}
+
+/**
  * @param {string} genreName
  */
 function setGenre(genreName) {
@@ -84,33 +96,216 @@ function getStudioState(enabled, tradeMode, module) {
     };
 }
 
-function StudioGenreChooser() {
-    const activeGenre = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) =>
-            s.groove.lastSmartGenre || s.groove.genreFeel,
+function useIsCompactStudioViewport() {
+    const [isCompact, setIsCompact] = useState(() =>
+        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+            ? window.matchMedia(STUDIO_SURFACE_BREAKPOINT).matches
+            : false,
     );
-    const [isMenuOpen, setIsMenuOpen, menuRef] = useClickOutside();
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+            return undefined;
+        }
+
+        const mediaQuery = window.matchMedia(STUDIO_SURFACE_BREAKPOINT);
+        const update = () => setIsCompact(mediaQuery.matches);
+
+        update();
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', update);
+            return () => mediaQuery.removeEventListener('change', update);
+        }
+
+        mediaQuery.addListener(update);
+        return () => mediaQuery.removeListener(update);
+    }, []);
+
+    return isCompact;
+}
+
+/**
+ * @param {{
+ *   accent: string,
+ *   anchorElement?: HTMLElement | null,
+ *   className?: string,
+ *   closeLabel: string,
+ *   isCompactViewport: boolean,
+ *   isOpen: boolean,
+ *   kicker: string,
+ *   meta?: import('../ui-types.js').ComponentChildren,
+ *   onClose: () => void,
+ *   subtitle?: string,
+ *   title: string,
+ *   children: import('../ui-types.js').ComponentChildren
+ * }} props
+ */
+function StudioSurface({
+    accent,
+    anchorElement = null,
+    className = '',
+    closeLabel,
+    isCompactViewport,
+    isOpen,
+    kicker,
+    meta,
+    onClose,
+    subtitle,
+    title,
+    children,
+}) {
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement | null>} */
+    const surfaceRef = useRef(null);
+    const [surfaceStyle, setSurfaceStyle] = useState(
+        /** @type {import('preact').JSX.CSSProperties | undefined} */ (undefined),
+    );
+
+    useEffect(() => {
+        if (!isOpen) {
+            return undefined;
+        }
+
+        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
+    useLayoutEffect(() => {
+        if (!isOpen || isCompactViewport || typeof window === 'undefined') {
+            setSurfaceStyle(undefined);
+            return undefined;
+        }
+
+        const updatePosition = () => {
+            const surface = surfaceRef.current;
+            if (!surface) {
+                return;
+            }
+
+            const anchorRect =
+                anchorElement?.getBoundingClientRect() || document.body.getBoundingClientRect();
+            const viewportPadding = 16;
+            const minWidth = className.includes('--genre') ? 320 : 360;
+            const preferredWidth = className.includes('--genre') ? 360 : 420;
+            const maxWidth = Math.max(320, window.innerWidth - viewportPadding * 2);
+            const measuredWidth = surface.offsetWidth || preferredWidth;
+            const width = Math.min(
+                Math.max(measuredWidth, minWidth),
+                Math.min(preferredWidth, maxWidth),
+            );
+            const measuredHeight = surface.offsetHeight || 0;
+            const preferredTop = Math.max(viewportPadding, anchorRect.top - 8);
+            let top = preferredTop;
+
+            if (measuredHeight > 0) {
+                top = Math.min(
+                    preferredTop,
+                    Math.max(
+                        viewportPadding,
+                        window.innerHeight - measuredHeight - viewportPadding,
+                    ),
+                );
+            }
+
+            const maxHeight = Math.max(240, window.innerHeight - top - viewportPadding);
+            const left = Math.min(
+                Math.max(viewportPadding, anchorRect.right - width),
+                window.innerWidth - width - viewportPadding,
+            );
+
+            setSurfaceStyle({
+                position: 'fixed',
+                top: `${top}px`,
+                left: `${left}px`,
+                width: `${width}px`,
+                maxHeight: `${maxHeight}px`,
+            });
+        };
+
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [anchorElement, className, isCompactViewport, isOpen]);
+
+    if (!isOpen) {
+        return null;
+    }
+
+    const modeClass = isCompactViewport
+        ? 'workspace-studio-surface--modal'
+        : 'workspace-studio-surface--anchored';
 
     return (
-        <div
-            class={`workspace-studio-surface-root workspace-studio-genre-chooser ${isMenuOpen ? 'is-open' : ''}`}
-            ref={menuRef}
-        >
-            {isMenuOpen && (
-                <button
-                    type="button"
-                    class="workspace-studio-surface-backdrop"
-                    aria-label="Close band feel menu"
-                    onClick={() => setIsMenuOpen(false)}
-                />
-            )}
+        <div class="workspace-studio-surface-layer">
             <button
                 type="button"
-                class="workspace-studio-genre-button"
+                class="workspace-studio-surface-backdrop"
+                aria-label={closeLabel}
+                onClick={onClose}
+            />
+            <div
+                ref={surfaceRef}
+                class={`workspace-studio-surface ${modeClass} workspace-studio-surface--${accent} ${className} is-open`}
+                style={surfaceStyle}
+            >
+                <div class="workspace-studio-surface-header">
+                    <div class="workspace-studio-surface-header-copy">
+                        <p class="workspace-kicker">{kicker}</p>
+                        <h3>{title}</h3>
+                        {subtitle && <p class="workspace-studio-surface-summary">{subtitle}</p>}
+                        {meta && <div class="workspace-studio-surface-meta">{meta}</div>}
+                    </div>
+                    <button
+                        type="button"
+                        class="workspace-studio-surface-close"
+                        aria-label={closeLabel}
+                        onClick={onClose}
+                    >
+                        ×
+                    </button>
+                </div>
+                <div class="workspace-studio-surface-body">{children}</div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * @param {{
+ *   activeGenre: string,
+ *   anchorElement?: HTMLElement | null,
+ *   isCompactViewport: boolean,
+ *   isOpen: boolean,
+ *   onClose: () => void,
+ *   onToggle: () => void
+ * }} props
+ */
+function StudioGenreChooser({
+    activeGenre,
+    anchorElement = null,
+    isCompactViewport,
+    isOpen,
+    onClose,
+    onToggle,
+}) {
+    return (
+        <div class="workspace-studio-surface-root workspace-studio-genre-chooser">
+            <button
+                type="button"
+                class={`workspace-studio-genre-button ${isOpen ? 'is-open' : ''}`}
                 aria-label="Choose band feel"
                 aria-haspopup="dialog"
-                aria-expanded={isMenuOpen}
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                aria-expanded={isOpen}
+                onClick={onToggle}
             >
                 <span class="workspace-studio-genre-button-label">Band feel</span>
                 <span class="workspace-studio-genre-button-value">{activeGenre}</span>
@@ -118,24 +313,18 @@ function StudioGenreChooser() {
                     ▾
                 </span>
             </button>
-            <div
-                class={`workspace-studio-surface workspace-studio-surface--genre ${isMenuOpen ? 'is-open' : ''}`}
-                aria-hidden={!isMenuOpen}
+            <StudioSurface
+                accent="chords"
+                anchorElement={anchorElement}
+                className="workspace-studio-surface--genre"
+                closeLabel="Close band feel menu"
+                isCompactViewport={isCompactViewport}
+                isOpen={isOpen}
+                kicker="Band feel"
+                onClose={onClose}
+                subtitle="Choose the groove language for the whole band."
+                title="Choose groove language"
             >
-                <div class="workspace-studio-surface-header">
-                    <div>
-                        <p class="workspace-kicker">Band feel</p>
-                        <h3>Choose groove language</h3>
-                    </div>
-                    <button
-                        type="button"
-                        class="workspace-studio-surface-close"
-                        aria-label="Close band feel menu"
-                        onClick={() => setIsMenuOpen(false)}
-                    >
-                        ×
-                    </button>
-                </div>
                 <div class="workspace-studio-genre-grid" role="list">
                     {GENRE_NAMES.map((genreName) => {
                         const isActive = activeGenre === genreName;
@@ -147,7 +336,7 @@ function StudioGenreChooser() {
                                 aria-pressed={isActive}
                                 onClick={() => {
                                     setGenre(genreName);
-                                    setIsMenuOpen(false);
+                                    onClose();
                                 }}
                             >
                                 <span>{genreName}</span>
@@ -163,15 +352,21 @@ function StudioGenreChooser() {
                         );
                     })}
                 </div>
-            </div>
+            </StudioSurface>
         </div>
     );
 }
 
 /**
- * @param {{ instrument: typeof STUDIO_INSTRUMENTS[number] }} props
+ * @param {{
+ *   instrument: typeof STUDIO_INSTRUMENTS[number],
+ *   isOpen: boolean,
+ *   onToggleSettings: () => void,
+ *   rowRef?: (node: HTMLDivElement | null) => void,
+ *   triggerRef?: (node: HTMLButtonElement | null) => void
+ * }} props
  */
-function StudioMixRow({ instrument }) {
+function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, triggerRef }) {
     const { enabled, tradeMode } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => {
             const modState = /** @type {any} */ (s)[instrument.module];
@@ -181,25 +376,16 @@ function StudioMixRow({ instrument }) {
             };
         },
     );
-    const [isMenuOpen, setIsMenuOpen, menuRef] = useClickOutside();
     const { stateLabel, stateClass } = getStudioState(enabled, tradeMode, instrument.module);
     const powerClass = `power-btn ${enabled ? 'active' : ''}`;
 
     return (
         <div
-            class={`workspace-studio-mix-row workspace-studio-mix-row--${instrument.accent} ${enabled ? 'is-active' : ''} ${isMenuOpen ? 'is-menu-open' : ''}`}
+            class={`workspace-studio-mix-row workspace-studio-mix-row--${instrument.accent} ${enabled ? 'is-active' : ''} ${isOpen ? 'is-menu-open' : ''}`}
             id={instrument.id}
             data-id={instrument.module}
-            ref={menuRef}
+            ref={rowRef}
         >
-            {isMenuOpen && (
-                <button
-                    type="button"
-                    class="workspace-studio-surface-backdrop"
-                    aria-label={`Close ${instrument.label} settings`}
-                    onClick={() => setIsMenuOpen(false)}
-                />
-            )}
             <div class="workspace-studio-mix-row-main">
                 <span class="workspace-studio-mix-row-icon" aria-hidden="true">
                     {instrument.icon}
@@ -215,13 +401,17 @@ function StudioMixRow({ instrument }) {
             <div class="workspace-studio-mix-row-actions">
                 <button
                     type="button"
-                    class="workspace-actions-trigger workspace-studio-mix-menu-trigger"
+                    ref={triggerRef}
+                    class={`workspace-actions-trigger workspace-studio-mix-menu-trigger ${isOpen ? 'is-open' : ''}`}
                     aria-label={`${instrument.label} settings`}
                     aria-haspopup="dialog"
-                    aria-expanded={isMenuOpen}
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    aria-expanded={isOpen}
+                    onClick={onToggleSettings}
                 >
-                    ⋮
+                    <span class="workspace-studio-mix-menu-label">Controls</span>
+                    <span class="workspace-studio-mix-menu-caret" aria-hidden="true">
+                        ›
+                    </span>
                 </button>
                 <button
                     type="button"
@@ -233,47 +423,134 @@ function StudioMixRow({ instrument }) {
                     ⏻
                 </button>
             </div>
-            <div
-                class={`workspace-studio-surface workspace-studio-surface--settings ${isMenuOpen ? 'is-open' : ''}`}
-                aria-hidden={!isMenuOpen}
-            >
-                <div class="workspace-studio-surface-header">
-                    <div>
-                        <p class="workspace-kicker">Live mix</p>
-                        <h3>{instrument.label} settings</h3>
-                    </div>
-                    <button
-                        type="button"
-                        class="workspace-studio-surface-close"
-                        aria-label={`Close ${instrument.label} settings`}
-                        onClick={() => setIsMenuOpen(false)}
-                    >
-                        ×
-                    </button>
-                </div>
-                <InstrumentSettings module={instrument.module} />
-                {instrument.module === 'soloist' && (
-                    <div class="divider-top">
-                        <SoloistControls />
-                    </div>
-                )}
-            </div>
         </div>
     );
 }
 
+/**
+ * @param {{
+ *   anchorElement?: HTMLElement | null,
+ *   instrument: typeof STUDIO_INSTRUMENTS[number] | undefined,
+ *   isCompactViewport: boolean,
+ *   isOpen: boolean,
+ *   onClose: () => void
+ * }} props
+ */
+function StudioSettingsSurface({
+    anchorElement = null,
+    instrument,
+    isCompactViewport,
+    isOpen,
+    onClose,
+}) {
+    const instrumentState = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => {
+            if (!instrument) {
+                return {
+                    enabled: false,
+                    tradeMode: 'manual',
+                };
+            }
+
+            const modState = /** @type {any} */ (s)[instrument.module];
+            return {
+                enabled: modState.enabled,
+                tradeMode: modState.tradeMode,
+            };
+        },
+    );
+
+    if (!instrument) {
+        return null;
+    }
+
+    const { stateLabel, stateClass } = getStudioState(
+        instrumentState.enabled,
+        instrumentState.tradeMode,
+        instrument.module,
+    );
+
+    return (
+        <StudioSurface
+            accent={instrument.accent}
+            anchorElement={anchorElement}
+            className="workspace-studio-surface--settings"
+            closeLabel={`Close ${instrument.label} settings`}
+            isCompactViewport={isCompactViewport}
+            isOpen={isOpen}
+            kicker="Live mix"
+            meta={<span class={`workspace-instrument-state ${stateClass}`}>{stateLabel}</span>}
+            onClose={onClose}
+            subtitle={instrument.summary}
+            title={`${instrument.label} settings`}
+        >
+            <InstrumentSettings module={instrument.module} />
+            {instrument.module === 'soloist' && (
+                <div class="workspace-studio-surface-card workspace-studio-surface-card--soloist">
+                    <SoloistControls />
+                </div>
+            )}
+        </StudioSurface>
+    );
+}
+
 function StudioLiveMix() {
-    const { groove, bass, chords, harmony, soloist } = useEnsembleState(
+    const { groove, bass, chords, harmony, soloist, activeGenre } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             groove: s.groove.enabled,
             bass: s.bass.enabled,
             chords: s.chords.enabled,
             harmony: s.harmony.enabled,
             soloist: s.soloist.enabled,
+            activeGenre: s.groove.lastSmartGenre || s.groove.genreFeel,
         }),
     );
+    const [activeSurface, setActiveSurface] = useState(getClosedSurface);
+    const isCompactViewport = useIsCompactStudioViewport();
+    /** @type {import('preact/hooks').MutableRef<Record<string, HTMLDivElement | null>>} */
+    const rowElementsRef = useRef({});
+    /** @type {import('preact/hooks').MutableRef<Record<string, HTMLButtonElement | null>>} */
+    const settingsTriggerRef = useRef({});
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement | null>} */
+    const genreTriggerRef = useRef(null);
 
     const activeCount = [groove, bass, chords, harmony, soloist].filter(Boolean).length;
+    const activeInstrument =
+        activeSurface.kind === 'settings'
+            ? STUDIO_INSTRUMENTS.find((instrument) => instrument.module === activeSurface.module)
+            : undefined;
+
+    const closeSurface = () => {
+        const focusTarget =
+            activeSurface.kind === 'genre'
+                ? genreTriggerRef.current
+                : activeSurface.module
+                  ? settingsTriggerRef.current[activeSurface.module]
+                  : null;
+
+        setActiveSurface(getClosedSurface());
+
+        if (focusTarget instanceof HTMLElement) {
+            requestAnimationFrame(() => focusTarget.focus());
+        }
+    };
+
+    const toggleGenreSurface = () => {
+        setActiveSurface((current) =>
+            current.kind === 'genre' ? getClosedSurface() : { kind: 'genre', module: null },
+        );
+    };
+
+    /**
+     * @param {string} module
+     */
+    const toggleSettingsSurface = (module) => {
+        setActiveSurface((current) =>
+            current.kind === 'settings' && current.module === module
+                ? getClosedSurface()
+                : { kind: 'settings', module },
+        );
+    };
 
     return (
         <div class="panel dashboard-panel workspace-panel workspace-studio-live-mix">
@@ -284,14 +561,56 @@ function StudioLiveMix() {
                 </div>
                 <div class="workspace-studio-live-mix-tools">
                     <span class="workspace-studio-active-count">{activeCount}/5 on</span>
-                    <StudioGenreChooser />
+                    <div ref={genreTriggerRef}>
+                        <StudioGenreChooser
+                            activeGenre={activeGenre}
+                            anchorElement={genreTriggerRef.current}
+                            isCompactViewport={isCompactViewport}
+                            isOpen={activeSurface.kind === 'genre'}
+                            onClose={closeSurface}
+                            onToggle={toggleGenreSurface}
+                        />
+                    </div>
                 </div>
             </div>
             <div class="workspace-studio-live-mix-rows">
                 {STUDIO_INSTRUMENTS.map((instrument) => (
-                    <StudioMixRow key={instrument.module} instrument={instrument} />
+                    <StudioMixRow
+                        key={instrument.module}
+                        instrument={instrument}
+                        isOpen={
+                            activeSurface.kind === 'settings' &&
+                            activeSurface.module === instrument.module
+                        }
+                        onToggleSettings={() => toggleSettingsSurface(instrument.module)}
+                        rowRef={(node) => {
+                            if (node) {
+                                rowElementsRef.current[instrument.module] = node;
+                                return;
+                            }
+
+                            delete rowElementsRef.current[instrument.module];
+                        }}
+                        triggerRef={(node) => {
+                            if (node) {
+                                settingsTriggerRef.current[instrument.module] = node;
+                                return;
+                            }
+
+                            delete settingsTriggerRef.current[instrument.module];
+                        }}
+                    />
                 ))}
             </div>
+            <StudioSettingsSurface
+                anchorElement={
+                    activeSurface.module ? rowElementsRef.current[activeSurface.module] : null
+                }
+                instrument={activeInstrument}
+                isCompactViewport={isCompactViewport}
+                isOpen={activeSurface.kind === 'settings'}
+                onClose={closeSurface}
+            />
         </div>
     );
 }

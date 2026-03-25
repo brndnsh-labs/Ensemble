@@ -64,7 +64,7 @@ export function InstrumentSettings({ module }) {
     };
 
     return (
-        <div class="grid-2-col">
+        <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
             {/* Left Column: Instrument Specifics */}
             <SettingGroup
                 title={
@@ -247,7 +247,7 @@ function GrooveControls({ state }) {
     return (
         <Fragment>
             <SettingRow label="Swing" id="swingSlider" valueDisplay={`${swing || 0}%`}>
-                <div class="flex-row">
+                <div class="flex-row instrument-settings-swing-controls">
                     <Slider
                         id="swingSlider"
                         min="0"
