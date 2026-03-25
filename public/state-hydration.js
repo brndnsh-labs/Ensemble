@@ -6,6 +6,7 @@ import {
     SOLOIST_STYLES,
 } from './data/instrument-styles.js';
 import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
+import { normalizeWorkspace } from './state/ui.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
 import {
@@ -106,7 +107,7 @@ function validateSections(sections) {
 }
 
 export function hydrateState() {
-    const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
+    const { playback, chords, bass, soloist, harmony, groove, arranger, vizState, ui } = getState();
     const savedState = storage.get('currentState');
     if (savedState?.sections) {
         const validatedSections = validateSections(savedState.sections);
@@ -297,6 +298,10 @@ export function hydrateState() {
                         ? savedState.midi.velocitySensitivity
                         : 1.0,
             });
+        }
+
+        if (ui) {
+            ui.activeWorkspace = normalizeWorkspace(savedState.ui?.activeWorkspace); // @direct-mutation
         }
     } else {
         dispatch(ACTIONS.RESET_STATE);

@@ -4,7 +4,7 @@ import { getState, storage } from './state.js';
 let saveTimeout;
 
 export function saveCurrentState() {
-    const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } =
+    const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi, ui } =
         getState();
     if (saveTimeout) {
         clearTimeout(saveTimeout);
@@ -105,6 +105,9 @@ export function saveCurrentState() {
             latency: midi.latency,
             muteLocal: midi.muteLocal,
             velocitySensitivity: midi.velocitySensitivity,
+        },
+        ui: {
+            activeWorkspace: ui?.activeWorkspace || 'arranger',
         },
     };
     storage.save('currentState', data);

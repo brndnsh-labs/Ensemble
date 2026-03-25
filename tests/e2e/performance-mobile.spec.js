@@ -9,14 +9,9 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
     });
 
     test('Performance Modal renders mobile canvas pillars', async ({ page }) => {
-        // Switch to Soloist tab on mobile
-        const soloistTab = page.locator('.mobile-tabs-nav .tab-soloist');
-        await soloistTab.click();
+        await page.click('[data-workspace-nav="perform"]');
 
-        // Open performance modal
-        const performanceBtn = page.locator(
-            '[data-id="soloist"] [aria-label="Open Performance Mode"]',
-        );
+        const performanceBtn = page.locator('button[aria-label="Open Performance Mode"]');
         await expect(performanceBtn).toBeVisible();
         await performanceBtn.click();
 
@@ -46,11 +41,9 @@ test.describe('Performance Mobile Quad-Pillar @ui @mobile', () => {
     });
 
     test('Canvas interaction triggers note display', async ({ page }) => {
-        await page.click('.mobile-tabs-nav .tab-soloist');
+        await page.click('[data-workspace-nav="perform"]');
 
-        const performanceBtn = page.locator(
-            '[data-id="soloist"] [aria-label="Open Performance Mode"]',
-        );
+        const performanceBtn = page.locator('button[aria-label="Open Performance Mode"]');
         await expect(performanceBtn).toBeVisible();
         await performanceBtn.click();
 

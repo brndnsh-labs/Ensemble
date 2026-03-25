@@ -40,6 +40,127 @@
     }
 }
 
+@media (max-width: 1100px) and (pointer: coarse) {
+    .app-main-layout.workspace-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.5rem 0.5rem calc(92px + env(safe-area-inset-bottom));
+        min-height: 100dvh;
+    }
+
+    .workspace-content {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    .workspace-nav {
+        position: fixed;
+        left: 0.5rem;
+        right: 0.5rem;
+        bottom: calc(0.5rem + env(safe-area-inset-bottom));
+        top: auto;
+        z-index: var(--z-mobile-nav);
+        padding: 0.6rem;
+        border-radius: 18px;
+        box-shadow: var(--shadow-lg);
+    }
+
+    .workspace-nav-header {
+        display: none;
+    }
+
+    .workspace-nav-list {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.35rem;
+    }
+
+    .workspace-nav-btn {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 0.55rem 0.2rem;
+        min-height: 60px;
+        gap: 0.25rem;
+        text-align: center;
+    }
+
+    .workspace-nav-icon {
+        font-size: 1rem;
+    }
+
+    .workspace-nav-label {
+        font-size: 0.72rem;
+        line-height: 1.1;
+    }
+
+    .workspace-fab-menu {
+        right: 0.5rem;
+        bottom: calc(0.5rem + 92px + env(safe-area-inset-bottom));
+        margin-left: 0;
+        position: fixed;
+        align-items: stretch;
+    }
+
+    .workspace-fab-items {
+        top: auto;
+        bottom: calc(100% + 0.5rem);
+        right: 0;
+        transform: translateY(0.5rem) scale(0.98);
+        transform-origin: bottom right;
+    }
+
+    .workspace-view--arranger,
+    .workspace-arranger-layout,
+    .workspace-arranger-main,
+    .workspace-arranger-chords {
+        min-height: 0;
+    }
+
+    .workspace-arranger-layout {
+        height: calc(100dvh - 64px - 92px - 1rem);
+        overflow: hidden;
+    }
+
+    .workspace-arranger-main {
+        overflow: hidden;
+        gap: 0.6rem;
+    }
+
+    .workspace-arranger-chords {
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .workspace-arranger-chords .display-area {
+        height: 100%;
+        max-height: none;
+        overflow: hidden;
+    }
+
+    .workspace-arranger-chords .section-block {
+        width: 100%;
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        margin-bottom: 0.65rem;
+    }
+
+    .workspace-arranger-chords .section-block-content {
+        gap: 0.3rem;
+    }
+
+    .workspace-arranger-chords .measure-box {
+        min-height: 34px;
+    }
+
+    .workspace-arranger-chords .chord-card {
+        --base-size: clamp(0.9rem, 3.8vw, 1.15rem);
+        min-height: 30px;
+    }
+}
+
 /* --- Desktop / Tablet Grid Layout --- */
 @media (min-width: 900px) {
     .app-main-layout {

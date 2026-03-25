@@ -6,6 +6,7 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.click('[data-workspace-nav="studio"]');
     });
 
     test('Chords Kebab Menu - Layout & Content @desktop', async ({ page }) => {

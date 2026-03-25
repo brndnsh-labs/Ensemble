@@ -16,11 +16,21 @@ import { StyleSelector } from './StyleSelector.jsx';
  * @property {string} title
  * @property {any} styles
  * @property {boolean} isActiveMobile
+ * @property {boolean} [showPerformanceAction]
+ * @property {boolean} [compactStudio]
  */
 /**
  * @param {InstrumentPanelProps} props
  */
-export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
+export function InstrumentPanel({
+    id,
+    module,
+    title,
+    styles,
+    isActiveMobile,
+    showPerformanceAction = true,
+    compactStudio = false,
+}) {
     const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => {
             const modState = /** @type {any} */ (s)[module];
@@ -52,9 +62,33 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
     const isPerformanceMode = module === 'soloist' && performanceOpen;
     const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''} ${isPerformanceMode ? 'performance-active' : ''}`;
 
+    const classicContent = (
+        <div
+            id={`${module === 'chords' ? 'chord' : module}-tab-classic`}
+            class="instrument-tab-content active"
+        >
+            <label class="section-label">Style</label>
+            <div
+                id={`${module === 'harmony' ? 'harmony' : module}StylePresets`}
+                class="presets-container"
+            >
+                <StyleSelector module={module} styles={styles} />
+            </div>
+        </div>
+    );
+
+    const smartStatus = (
+        <div class="smart-status" style={`--module-color-rgb: var(--${module}-color-rgb);`}>
+            <p class="smart-status-copy">
+                ✨ <strong>Smart Follow</strong> Active
+            </p>
+        </div>
+    );
+    const compactSmartContent = module === 'soloist' ? <SoloistControls /> : smartStatus;
+
     return (
         <div
-            class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''}`}
+            class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} ${compactStudio ? 'studio-compact-panel' : ''}`}
             id={id}
             data-id={module}
         >
@@ -62,24 +96,26 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 <div class="panel-header-main">
                     <h2 class="panel-title">{title}</h2>
                 </div>
-                <div class="instrument-tabs">
-                    <button
-                        class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
-                        aria-pressed={activeTab === 'classic'}
-                        onClick={() => switchTab('classic')}
-                    >
-                        Classic
-                    </button>
-                    <button
-                        class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
-                        aria-pressed={activeTab === 'smart'}
-                        onClick={() => switchTab('smart')}
-                    >
-                        Smart
-                    </button>
-                </div>
+                {!compactStudio && (
+                    <div class="instrument-tabs">
+                        <button
+                            class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
+                            aria-pressed={activeTab === 'classic'}
+                            onClick={() => switchTab('classic')}
+                        >
+                            Classic
+                        </button>
+                        <button
+                            class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
+                            aria-pressed={activeTab === 'smart'}
+                            onClick={() => switchTab('smart')}
+                        >
+                            Smart
+                        </button>
+                    </div>
+                )}
                 <div class="panel-header-actions" ref={menuRef}>
-                    {module === 'soloist' && (
+                    {module === 'soloist' && showPerformanceAction && (
                         <button
                             class="panel-menu-btn"
                             aria-label="Open Performance Mode"
@@ -125,31 +161,39 @@ export function InstrumentPanel({ id, module, title, styles, isActiveMobile }) {
                 </div>
             </div>
 
-            {module === 'soloist' && <SoloistControls />}
+            {compactStudio ? (
+                <div class="studio-mode-grid">
+                    <section class="studio-mode-section studio-mode-section--smart">
+                        <div class="studio-mode-section-header">
+                            <p class="workspace-kicker">Smart first</p>
+                            <h3 class="studio-mode-title">Smart</h3>
+                        </div>
+                        {compactSmartContent}
+                    </section>
 
-            <div
-                id={`${module === 'chords' ? 'chord' : module}-tab-classic`}
-                class={`instrument-tab-content ${activeTab === 'classic' ? 'active' : ''}`}
-            >
-                <label class="section-label">Style</label>
-                <div
-                    id={`${module === 'harmony' ? 'harmony' : module}StylePresets`}
-                    class="presets-container"
-                >
-                    <StyleSelector module={module} styles={styles} />
+                    <details
+                        class="studio-mode-section studio-mode-section--legacy"
+                        open={activeTab === 'classic'}
+                    >
+                        <summary class="studio-mode-summary">
+                            <span>Classic controls</span>
+                            <span class="studio-mode-summary-hint">Legacy</span>
+                        </summary>
+                        <div class="studio-mode-section-body">{classicContent}</div>
+                    </details>
                 </div>
-            </div>
-
-            <div
-                id={`${module === 'chords' ? 'chord' : module}-tab-smart`}
-                class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
-            >
-                <div class="smart-status" style={`--module-color-rgb: var(--${module}-color-rgb);`}>
-                    <p class="smart-status-copy">
-                        ✨ <strong>Smart Follow</strong> Active
-                    </p>
-                </div>
-            </div>
+            ) : (
+                <>
+                    {module === 'soloist' && <SoloistControls />}
+                    {classicContent}
+                    <div
+                        id={`${module === 'chords' ? 'chord' : module}-tab-smart`}
+                        class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
+                    >
+                        {smartStatus}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

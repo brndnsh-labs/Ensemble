@@ -9,8 +9,8 @@ test.describe('Performance Modal @ui', () => {
     });
 
     test('Performance Modal Opens and Renders Correctly', async ({ page }) => {
-        // Open performance modal from the Soloist panel
-        await page.click('[data-id="soloist"] [aria-label="Open Performance Mode"]');
+        await page.click('[data-workspace-nav="perform"]');
+        await page.click('button[aria-label="Open Performance Mode"]');
 
         // Wait for modal to be visible
         const modal = page.locator('.PerformanceSurfaceModal');
@@ -27,7 +27,8 @@ test.describe('Performance Modal @ui', () => {
     });
 
     test('Performance Modal Desktop Palette and Legends', async ({ page }) => {
-        await page.click('[data-id="soloist"] [aria-label="Open Performance Mode"]');
+        await page.click('[data-workspace-nav="perform"]');
+        await page.click('button[aria-label="Open Performance Mode"]');
         const modal = page.locator('.PerformanceSurfaceModal');
 
         // Verify Legends
@@ -94,7 +95,8 @@ test.describe('Performance Modal @ui', () => {
             dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'step', value: 0 });
         });
 
-        await page.click('[data-id="soloist"] [aria-label="Open Performance Mode"]');
+        await page.click('[data-workspace-nav="perform"]');
+        await page.click('button[aria-label="Open Performance Mode"]');
         const modal = page.locator('.PerformanceSurfaceModal');
 
         // Verify we have bridge keys (Magenta)

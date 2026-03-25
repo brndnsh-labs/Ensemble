@@ -18,11 +18,13 @@ import { SettingRow, Slider, Toggle } from './UIControls.jsx';
 /**
  * @typedef {Object} GroovePanelProps
  * @property {boolean} isActiveMobile
+ * @property {boolean} [showLaunchAction]
+ * @property {boolean} [compactStudio]
  */
 /**
  * @param {GroovePanelProps} props
  */
-export function GroovePanel({ isActiveMobile }) {
+export function GroovePanel({ isActiveMobile, showLaunchAction = true, compactStudio = false }) {
     const { activeTab, enabled, measures, fillActive } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             activeTab: s.groove.activeTab,
@@ -43,7 +45,7 @@ export function GroovePanel({ isActiveMobile }) {
 
     return (
         <div
-            class={`panel dashboard-panel instrument-panel ${isActiveMobile ? 'active-mobile' : ''}`}
+            class={`panel dashboard-panel instrument-panel ${isActiveMobile ? 'active-mobile' : ''} ${compactStudio ? 'studio-compact-panel' : ''}`}
             id="panel-grooves"
             data-id="grooves"
         >
@@ -51,41 +53,45 @@ export function GroovePanel({ isActiveMobile }) {
                 <div class="panel-header-main">
                     <h2 class={`panel-title ${fillActive ? 'panel-title-accent' : ''}`}>Grooves</h2>
                 </div>
-                <div class="instrument-tabs">
-                    <button
-                        class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
-                        aria-pressed={activeTab === 'classic'}
-                        onClick={() => switchTab('classic')}
-                    >
-                        Classic
-                    </button>
-                    <button
-                        class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
-                        aria-pressed={activeTab === 'smart'}
-                        onClick={() => switchTab('smart')}
-                    >
-                        Smart
-                    </button>
-                </div>
+                {!compactStudio && (
+                    <div class="instrument-tabs">
+                        <button
+                            class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
+                            aria-pressed={activeTab === 'classic'}
+                            onClick={() => switchTab('classic')}
+                        >
+                            Classic
+                        </button>
+                        <button
+                            class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
+                            aria-pressed={activeTab === 'smart'}
+                            onClick={() => switchTab('smart')}
+                        >
+                            Smart
+                        </button>
+                    </div>
+                )}
                 <div class="panel-header-actions" ref={menuRef}>
-                    <button
-                        class="panel-menu-btn"
-                        aria-label="Open Drum Pad"
-                        onClick={() => {
-                            if (document.activeElement instanceof HTMLElement) {
-                                document.activeElement.blur();
-                            }
-                            dispatch(ACTIONS.INIT_AUDIO);
-                            setTimeout(() => {
-                                dispatch(ACTIONS.SET_MODAL_OPEN, {
-                                    modal: 'drumPad',
-                                    open: true,
-                                });
-                            }, 0);
-                        }}
-                    >
-                        🥁
-                    </button>
+                    {showLaunchAction && (
+                        <button
+                            class="panel-menu-btn"
+                            aria-label="Open Drum Pad"
+                            onClick={() => {
+                                if (document.activeElement instanceof HTMLElement) {
+                                    document.activeElement.blur();
+                                }
+                                dispatch(ACTIONS.INIT_AUDIO);
+                                setTimeout(() => {
+                                    dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                        modal: 'drumPad',
+                                        open: true,
+                                    });
+                                }, 0);
+                            }}
+                        >
+                            🥁
+                        </button>
+                    )}
                     <button
                         class={`panel-menu-btn ${isMenuOpen ? 'active' : ''}`}
                         aria-label="Grooves Settings"
@@ -112,50 +118,128 @@ export function GroovePanel({ isActiveMobile }) {
                 </div>
             </div>
 
-            <div
-                id="groove-tab-classic"
-                class={`instrument-tab-content ${activeTab === 'classic' ? 'active' : ''}`}
-            >
-                <div class="smart-control-group--compact">
-                    <label class="section-label">Style</label>
-                    <PresetLibrary type="drum" />
-                </div>
-                <div class="panel-surface">
-                    <div class="panel-surface-header">
-                        <h4 class="panel-surface-title">Step Sequencer</h4>
-                        <select
-                            id="drumBarsSelect"
-                            aria-label="Number of Drum Measures"
-                            value={measures}
-                            onChange={(/** @type {any} */ e) => updateMeasures(e.target.value)}
-                        >
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="4">4</option>
-                            <option value="8">8</option>
-                        </select>
-                    </div>
-                    <div id="measurePagination" class="panel-pagination-row" />
-                    <div class="panel-action-row">
-                        <button id="cloneMeasureBtn" class="button-compact" onClick={cloneMeasure}>
-                            ⧉ Copy to All
-                        </button>
-                        <button id="saveDrumBtn" class="button-compact" onClick={saveDrumPreset}>
-                            💾 Save Pattern
-                        </button>
-                    </div>
-                    <SequencerGrid />
-                </div>
-            </div>
+            {compactStudio ? (
+                <div class="studio-mode-grid">
+                    <section class="studio-mode-section studio-mode-section--smart">
+                        <div class="studio-mode-section-header">
+                            <p class="workspace-kicker">Smart first</p>
+                            <h3 class="studio-mode-title">Smart</h3>
+                        </div>
+                        <GenreSelector />
+                        <IntensitySlider />
+                        <CreativityToggle />
+                    </section>
 
-            <div
-                id="groove-tab-smart"
-                class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
-            >
-                <GenreSelector />
-                <IntensitySlider />
-                <CreativityToggle />
-            </div>
+                    <details
+                        class="studio-mode-section studio-mode-section--legacy"
+                        open={activeTab === 'classic'}
+                    >
+                        <summary class="studio-mode-summary">
+                            <span>Classic controls</span>
+                            <span class="studio-mode-summary-hint">Legacy</span>
+                        </summary>
+                        <div class="studio-mode-section-body">
+                            <div class="smart-control-group--compact">
+                                <label class="section-label">Style</label>
+                                <PresetLibrary type="drum" />
+                            </div>
+                            <div class="panel-surface">
+                                <div class="panel-surface-header">
+                                    <h4 class="panel-surface-title">Step Sequencer</h4>
+                                    <select
+                                        id="drumBarsSelect"
+                                        aria-label="Number of Drum Measures"
+                                        value={measures}
+                                        onChange={(/** @type {any} */ e) =>
+                                            updateMeasures(e.target.value)
+                                        }
+                                    >
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="4">4</option>
+                                        <option value="8">8</option>
+                                    </select>
+                                </div>
+                                <div id="measurePagination" class="panel-pagination-row" />
+                                <div class="panel-action-row">
+                                    <button
+                                        id="cloneMeasureBtn"
+                                        class="button-compact"
+                                        onClick={cloneMeasure}
+                                    >
+                                        ⧉ Copy to All
+                                    </button>
+                                    <button
+                                        id="saveDrumBtn"
+                                        class="button-compact"
+                                        onClick={saveDrumPreset}
+                                    >
+                                        💾 Save Pattern
+                                    </button>
+                                </div>
+                                <SequencerGrid />
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            ) : (
+                <>
+                    <div
+                        id="groove-tab-classic"
+                        class={`instrument-tab-content ${activeTab === 'classic' ? 'active' : ''}`}
+                    >
+                        <div class="smart-control-group--compact">
+                            <label class="section-label">Style</label>
+                            <PresetLibrary type="drum" />
+                        </div>
+                        <div class="panel-surface">
+                            <div class="panel-surface-header">
+                                <h4 class="panel-surface-title">Step Sequencer</h4>
+                                <select
+                                    id="drumBarsSelect"
+                                    aria-label="Number of Drum Measures"
+                                    value={measures}
+                                    onChange={(/** @type {any} */ e) =>
+                                        updateMeasures(e.target.value)
+                                    }
+                                >
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="4">4</option>
+                                    <option value="8">8</option>
+                                </select>
+                            </div>
+                            <div id="measurePagination" class="panel-pagination-row" />
+                            <div class="panel-action-row">
+                                <button
+                                    id="cloneMeasureBtn"
+                                    class="button-compact"
+                                    onClick={cloneMeasure}
+                                >
+                                    ⧉ Copy to All
+                                </button>
+                                <button
+                                    id="saveDrumBtn"
+                                    class="button-compact"
+                                    onClick={saveDrumPreset}
+                                >
+                                    💾 Save Pattern
+                                </button>
+                            </div>
+                            <SequencerGrid />
+                        </div>
+                    </div>
+
+                    <div
+                        id="groove-tab-smart"
+                        class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
+                    >
+                        <GenreSelector />
+                        <IntensitySlider />
+                        <CreativityToggle />
+                    </div>
+                </>
+            )}
         </div>
     );
 }

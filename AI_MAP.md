@@ -25,6 +25,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/groove.js` | Genre, intensity, and drum kit selection. | `groove` |
 | `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
+| `public/state/ui.js` | Top-level UI workspace navigation state. | `ui`, `normalizeWorkspace` |
 | `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.js` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
@@ -126,6 +127,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/instruments.js` | Bass, Chords, Soloist, and Harmony settings. |
 | `public/state/conductor.js` | Auto-intensity target, tempo drift, and form tracking. |
 | `public/state/midi.js` | MIDI device and channel configuration. |
+| `public/state/ui.js` | Top-level workspace selection for the app shell. |
 | `public/state/visualizer.js` | Visualizer rendering and flash state. |
 
 ## High-Level Controllers & Integration

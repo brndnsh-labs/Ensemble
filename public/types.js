@@ -34,6 +34,7 @@
  * @property {import('./state/conductor.js').ConductorState} conductor - Macro-arc and intensity drift state.
  * @property {import('./state/visualizer.js').VisualizerState} vizState - Visualizer rendering state.
  * @property {import('./state/midi.js').MidiState} midi - WebMIDI routing and local muting state.
+ * @property {import('./state/ui.js').UiState} ui - Top-level UI workspace state.
  */
 
 /**

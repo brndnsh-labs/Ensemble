@@ -12,11 +12,12 @@ import { syncWorker } from '../worker-client.js';
 /**
  * @typedef {Object} PresetLibraryProps
  * @property {string} type
+ * @property {(item: any) => void} [onSelect]
  */
 /**
  * @param {PresetLibraryProps} props
  */
-export function PresetLibrary({ type }) {
+export function PresetLibrary({ type, onSelect }) {
     const dispatch = useDispatch();
     const { lastChordPreset, lastDrumPreset, isDirty } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -141,6 +142,7 @@ export function PresetLibrary({ type }) {
             validateAndAnalyze();
             flushBuffers();
             saveCurrentState();
+            onSelect?.(item);
         } else {
             if (isUser) {
                 if (item.measures) {
@@ -182,6 +184,7 @@ export function PresetLibrary({ type }) {
                 });
                 syncWorker();
                 saveCurrentState();
+                onSelect?.(item);
             } else {
                 loadDrumPreset(item.name);
                 dispatch(ACTIONS.SET_PARAM, {
@@ -191,6 +194,7 @@ export function PresetLibrary({ type }) {
                 });
                 syncWorker();
                 saveCurrentState();
+                onSelect?.(item);
             }
         }
     };
