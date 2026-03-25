@@ -12,6 +12,27 @@
     box-sizing: border-box;
     overflow: visible;
     min-width: 0;
+    --panel-accent: var(--accent-color);
+}
+
+.dashboard-panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in srgb, var(--panel-accent), transparent 25%) 16%,
+        var(--panel-accent) 50%,
+        color-mix(in srgb, var(--panel-accent), transparent 25%) 84%,
+        transparent
+    );
+    pointer-events: none;
 }
 
 .dashboard-panel.settings-open {
@@ -321,27 +342,30 @@
     }
 }
 
-/* Section-specific subtle accents */
-#panel-arranger {
-    border-top: 4px solid var(--accent-color);
-}
+/* Section-specific accent colors */
+#panel-arranger,
 #panel-chords {
-    border-top: 4px solid var(--accent-color);
+    --panel-accent: var(--accent-color);
 }
+
 #panel-grooves {
-    border-top: 4px solid var(--yellow);
+    --panel-accent: var(--yellow);
 }
+
 #panel-bass {
-    border-top: 4px solid var(--success-color);
+    --panel-accent: var(--success-color);
 }
+
 #panel-soloist {
-    border-top: 4px solid var(--soloist-color);
+    --panel-accent: var(--soloist-color);
 }
+
 #panel-harmonies {
-    border-top: 4px solid var(--harmony-color);
+    --panel-accent: var(--harmony-color);
 }
+
 #panel-visualizer {
-    border-top: 4px solid var(--soloist-color);
+    --panel-accent: var(--cyan);
 }
 
 .chord-panel-header h2 {

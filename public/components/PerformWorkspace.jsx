@@ -22,6 +22,7 @@ function launchPerformanceModal(modal) {
  * @property {string} title
  * @property {string} description
  * @property {string} actionLabel
+ * @property {string} icon
  * @property {() => void} onClick
  * @property {string} accentClass
  */
@@ -29,10 +30,15 @@ function launchPerformanceModal(modal) {
 /**
  * @param {LaunchCardProps} props
  */
-function LaunchCard({ title, description, actionLabel, onClick, accentClass }) {
+function LaunchCard({ title, description, actionLabel, icon, onClick, accentClass }) {
     return (
         <div class={`workspace-launch-card ${accentClass}`}>
-            <h3 class="workspace-launch-title">{title}</h3>
+            <div class="workspace-launch-card-header">
+                <span class="workspace-launch-icon" aria-hidden="true">
+                    {icon}
+                </span>
+                <h3 class="workspace-launch-title">{title}</h3>
+            </div>
             <p class="workspace-launch-copy">{description}</p>
             <button
                 type="button"
@@ -67,6 +73,7 @@ export function PerformWorkspace() {
                             title="Soloist Performance"
                             description="Open the expressive solo ribbon surface for mobile-friendly live phrasing."
                             actionLabel="Open Performance Mode"
+                            icon="🎺"
                             accentClass="workspace-launch-card--soloist"
                             onClick={() => launchPerformanceModal('performance')}
                         />
@@ -74,6 +81,7 @@ export function PerformWorkspace() {
                             title="Groove Drum Pad"
                             description="Launch the touch drum pad for manual groove accents, fills, and performance hits."
                             actionLabel="Open Drum Pad"
+                            icon="🥁"
                             accentClass="workspace-launch-card--groove"
                             onClick={() => launchPerformanceModal('drumPad')}
                         />

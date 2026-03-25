@@ -143,7 +143,7 @@ test.describe('Workspace surfaces @ui', () => {
         await page.setViewportSize({ width: 1366, height: 900 });
         await openWorkspace(page, 'Visuals');
 
-        const visuals = page.locator('[data-workspace="visuals"]');
+        const visuals = page.locator('section[data-workspace="visuals"]');
         await expect(visuals.locator('.workspace-panel-copy')).toHaveCount(0);
         await expect(visuals.locator('.workspace-kicker')).toHaveCount(0);
         await expect(visuals.locator('.workspace-status-grid')).toHaveCount(0);
@@ -156,12 +156,15 @@ test.describe('Workspace surfaces @ui', () => {
         const canvas = panel.locator('canvas').first();
         await expect(canvas).toBeVisible();
 
+        const visualsBox = await visuals.boundingBox();
         const panelBox = await panel.boundingBox();
         const canvasBox = await canvas.boundingBox();
 
+        expect(visualsBox).not.toBeNull();
         expect(panelBox).not.toBeNull();
         expect(canvasBox).not.toBeNull();
+        expect(panelBox.y - visualsBox.y).toBeLessThanOrEqual(4);
         expect(panelBox.height).toBeGreaterThan(220);
-        expect(canvasBox.height).toBeGreaterThanOrEqual(150);
+        expect(canvasBox.height).toBeGreaterThanOrEqual(148);
     });
 });

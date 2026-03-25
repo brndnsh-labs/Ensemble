@@ -86,7 +86,14 @@ export function App({ getVisualTime }) {
                 <Header activeWorkspace={activeWorkspace} />
                 <main class="app-main-layout workspace-shell loaded" id="dashboardGrid">
                     <WorkspaceNav />
-                    <div class="workspace-content">{renderWorkspace()}</div>
+                    <div class="workspace-content">
+                        <div
+                            key={activeWorkspace}
+                            class={`workspace-stage workspace-stage--${activeWorkspace}`}
+                        >
+                            {renderWorkspace()}
+                        </div>
+                    </div>
                 </main>
             </div>
 
