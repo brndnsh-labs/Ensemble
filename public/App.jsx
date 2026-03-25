@@ -101,11 +101,14 @@ export function App({ getVisualTime }) {
  * @param {{ activeWorkspace: keyof typeof WORKSPACE_META }} props
  */
 function Header({ activeWorkspace }) {
+    const description =
+        activeWorkspace === 'visuals' ? '' : WORKSPACE_META[activeWorkspace].description;
+
     return (
         <header>
             <div class="app-title-group">
                 <h1>Ensemble</h1>
-                <p class="app-subtitle">{WORKSPACE_META[activeWorkspace].description}</p>
+                {description ? <p class="app-subtitle">{description}</p> : null}
             </div>
             <Transport />
         </header>

@@ -56,4 +56,18 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
             .toBeGreaterThan(before.scrollTop);
         await expect.poll(async () => page.evaluate(() => window.scrollY)).toBe(before.pageScroll);
     });
+
+    test('Maximized arranger view exposes a touch close control', async ({ page }) => {
+        await page.setViewportSize({ width: 360, height: 640 });
+        await page.click('[data-workspace-nav="arranger"]');
+        await page.click('#maximizeChordBtn');
+
+        await expect(page.locator('body')).toHaveClass(/chord-maximized/);
+
+        const exitButton = page.locator('.chord-maximize-exit-btn');
+        await expect(exitButton).toBeVisible();
+        await exitButton.click();
+
+        await expect(page.locator('body')).not.toHaveClass(/chord-maximized/);
+    });
 });

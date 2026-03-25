@@ -705,6 +705,53 @@ select option {
     margin-bottom: 1rem;
 }
 
+.workspace-view--visuals #panel-visualizer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    height: 100%;
+}
+
+.workspace-view--visuals,
+.workspace-view--visuals .workspace-grid--visuals {
+    min-height: 0;
+    height: 100%;
+}
+
+.workspace-view--visuals {
+    flex: 1 1 auto;
+}
+
+.workspace-view--visuals .workspace-grid--visuals {
+    flex: 1 1 auto;
+}
+
+.workspace-view--visuals #panel-visualizer .panel-header {
+    margin-bottom: 0;
+    padding-bottom: 0.5rem;
+}
+
+.workspace-view--visuals .workspace-grid--visuals,
+.workspace-view--visuals {
+    min-height: 0;
+    height: 100%;
+}
+
+.workspace-view--visuals .workspace-visualizer-area {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.workspace-view--visuals .workspace-status-grid {
+    display: none;
+}
+
+.workspace-view--visuals .viz-graph-area {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 .workspace-guidance-list {
     margin: 0;
     padding-left: 1.1rem;
@@ -718,6 +765,12 @@ select option {
 
 .workspace-visualizer-area {
     min-height: 360px;
+}
+
+@media (max-width: 900px) {
+    .workspace-view--visuals #panel-visualizer {
+        margin-bottom: 0;
+    }
 }
 
 .workspace-view--studio .studio-compact-panel {
@@ -1077,10 +1130,6 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-transpose-fab {
-    display: none;
-}
-
-.workspace-arranger-menu-backdrop {
     display: none;
 }
 

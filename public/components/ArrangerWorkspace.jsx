@@ -118,11 +118,40 @@ function LibraryModal({ isOpen, onClose }) {
 export function ArrangerWorkspace() {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
+    const menuRef = useRef(null);
+    /** @type {import('preact/hooks').MutableRef<HTMLButtonElement|null>} */
+    const triggerRef = useRef(null);
+    const isTouchLike =
+        typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
     const { isMaximized } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             isMaximized: s.vizState.isMaximized,
         }),
     );
+
+    useEffect(() => {
+        if (!isActionMenuOpen || !isTouchLike) {
+            return;
+        }
+
+        const handlePointerDown = (/** @type {PointerEvent} */ event) => {
+            const target = event.target instanceof Node ? event.target : null;
+
+            if (!target) {
+                return;
+            }
+
+            if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
+                return;
+            }
+
+            setIsActionMenuOpen(false);
+        };
+
+        window.addEventListener('pointerdown', handlePointerDown, true);
+        return () => window.removeEventListener('pointerdown', handlePointerDown, true);
+    }, [isActionMenuOpen, isTouchLike]);
 
     return (
         <section class="workspace-view workspace-view--arranger" data-workspace="arranger">
@@ -171,33 +200,57 @@ export function ArrangerWorkspace() {
                                             class={`workspace-fab-menu${
                                                 isActionMenuOpen ? ' is-open' : ''
                                             }`}
-                                            onMouseEnter={() => setIsActionMenuOpen(true)}
-                                            onMouseLeave={() => setIsActionMenuOpen(false)}
-                                            onFocusCapture={() => setIsActionMenuOpen(true)}
-                                            onBlurCapture={(event) => {
-                                                const relatedTarget =
-                                                    event.relatedTarget instanceof Node
-                                                        ? event.relatedTarget
-                                                        : null;
-                                                if (!event.currentTarget.contains(relatedTarget)) {
-                                                    setIsActionMenuOpen(false);
-                                                }
-                                            }}
+                                            onMouseEnter={
+                                                isTouchLike
+                                                    ? undefined
+                                                    : () => setIsActionMenuOpen(true)
+                                            }
+                                            onMouseLeave={
+                                                isTouchLike
+                                                    ? undefined
+                                                    : () => setIsActionMenuOpen(false)
+                                            }
+                                            onFocusCapture={
+                                                isTouchLike
+                                                    ? undefined
+                                                    : () => setIsActionMenuOpen(true)
+                                            }
+                                            onBlurCapture={
+                                                isTouchLike
+                                                    ? undefined
+                                                    : (event) => {
+                                                          const relatedTarget =
+                                                              event.relatedTarget instanceof Node
+                                                                  ? event.relatedTarget
+                                                                  : null;
+                                                          if (
+                                                              !event.currentTarget.contains(
+                                                                  relatedTarget,
+                                                              )
+                                                          ) {
+                                                              setIsActionMenuOpen(false);
+                                                          }
+                                                      }
+                                            }
                                         >
                                             <button
+                                                ref={triggerRef}
                                                 type="button"
                                                 class="header-btn workspace-actions-trigger"
                                                 aria-label="Open arranger actions"
                                                 aria-expanded={isActionMenuOpen}
-                                                onClick={() =>
-                                                    setIsActionMenuOpen((value) => !value)
-                                                }
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setIsActionMenuOpen((value) => !value);
+                                                }}
                                             >
                                                 ⋮
                                             </button>
                                             <div
+                                                ref={menuRef}
                                                 class="workspace-fab-items"
                                                 aria-label="Arranger actions"
+                                                onClick={(event) => event.stopPropagation()}
                                             >
                                                 <button
                                                     id="editArrangementBtn"
@@ -262,14 +315,6 @@ export function ArrangerWorkspace() {
                                     </div>
                                 </div>
                             </div>
-                            {isActionMenuOpen && (
-                                <button
-                                    type="button"
-                                    class="workspace-arranger-menu-backdrop"
-                                    aria-label="Dismiss arranger actions"
-                                    onClick={() => setIsActionMenuOpen(false)}
-                                />
-                            )}
                         </div>
                     </div>
 

@@ -2,6 +2,8 @@ import { Fragment } from 'preact';
 import React, { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
+import { dispatch } from '../state.js';
+import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
@@ -279,6 +281,16 @@ export function ChordVisualizer() {
             ref={containerRef}
             data-total-measures={totalMeasures}
         >
+            {isMaximized && (
+                <button
+                    type="button"
+                    className="chord-maximize-exit-btn"
+                    aria-label="Exit maximize"
+                    onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false)}
+                >
+                    ✕
+                </button>
+            )}
             {groupedSections.map((/** @type {any} */ section) => (
                 <div
                     key={section.id}

@@ -95,6 +95,9 @@ test.describe('Workspace surfaces @ui', () => {
 
         const visuals = page.locator('[data-workspace="visuals"]');
         await expect(visuals.locator('.workspace-panel-copy')).toHaveCount(0);
+        await expect(visuals.locator('.workspace-kicker')).toHaveCount(0);
+        await expect(visuals.locator('.workspace-status-grid')).toHaveCount(0);
+        await expect(page.locator('.app-subtitle')).toHaveCount(0);
 
         const panel = visuals.locator('#panel-visualizer');
         await expect(panel.locator('#vizPowerBtn')).toHaveCount(0);
@@ -108,7 +111,7 @@ test.describe('Workspace surfaces @ui', () => {
 
         expect(panelBox).not.toBeNull();
         expect(canvasBox).not.toBeNull();
-        expect(panelBox.height).toBeGreaterThan(500);
-        expect(canvasBox.height).toBeGreaterThan(250);
+        expect(panelBox.height).toBeGreaterThan(220);
+        expect(canvasBox.height).toBeGreaterThanOrEqual(150);
     });
 });

@@ -153,18 +153,6 @@
     --base-size: clamp(0.82rem, 2vw, 1rem);
 }
 
-@media (min-width: 700px) {
-    .display-area--dense .section-block-content {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-    }
-}
-
-@media (min-width: 1100px) {
-    .display-area--dense .section-block-content {
-        grid-template-columns: repeat(8, minmax(0, 1fr));
-    }
-}
-
 .chord-card.minor {
     color: var(--soloist-color);
 }
@@ -225,6 +213,29 @@
     justify-content: flex-start;
     align-items: center;
     overflow-y: auto;
+}
+
+.chord-maximize-exit-btn {
+    display: none;
+}
+
+.chord-maximized .chord-maximize-exit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--accent-color);
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    z-index: var(--z-maximized-header);
 }
 
 .chord-maximized .section-block {
@@ -305,6 +316,14 @@
         top: 64px;
         height: calc(100vh - 64px);
         padding: 1vh 0.5rem;
+    }
+
+    .chord-maximized .chord-maximize-exit-btn {
+        top: 0.5rem;
+        right: 0.5rem;
+        width: 2.25rem;
+        height: 2.25rem;
+        font-size: 1rem;
     }
 
     .chord-maximized .chord-card {

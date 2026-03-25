@@ -5,12 +5,9 @@ import { Visualizer } from './Visualizer.jsx';
  * @param {{ getVisualTime: () => number }} props
  */
 export function VisualsWorkspace({ getVisualTime }) {
-    const { enabled, isPlaying, bpm, timeSignature } = useEnsembleState(
+    const { enabled } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             enabled: s.vizState.enabled,
-            isPlaying: s.playback.isPlaying,
-            bpm: s.playback.bpm,
-            timeSignature: s.arranger.timeSignature,
         }),
     );
 
@@ -24,27 +21,7 @@ export function VisualsWorkspace({ getVisualTime }) {
                 >
                     <div class="panel-header">
                         <div>
-                            <p class="workspace-kicker">Live motion</p>
-                            <div>
-                                <h2 class="panel-title">Visuals</h2>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="workspace-status-grid workspace-status-grid--tight">
-                        <div class="workspace-status-item">
-                            <span class="workspace-stat-label">Playback</span>
-                            <strong class="workspace-stat-value">
-                                {isPlaying ? 'Playing' : 'Idle'}
-                            </strong>
-                        </div>
-                        <div class="workspace-status-item">
-                            <span class="workspace-stat-label">Tempo</span>
-                            <strong class="workspace-stat-value">{bpm} BPM</strong>
-                        </div>
-                        <div class="workspace-status-item">
-                            <span class="workspace-stat-label">Meter</span>
-                            <strong class="workspace-stat-value">{timeSignature}</strong>
+                            <h2 class="panel-title">Visuals</h2>
                         </div>
                     </div>
 

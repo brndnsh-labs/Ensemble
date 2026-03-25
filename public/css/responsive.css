@@ -44,6 +44,8 @@
 
     main.app-main-layout.workspace-shell .workspace-content {
         flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
         min-height: 0;
         width: 100%;
         max-width: none;
@@ -278,6 +280,7 @@
         right: auto;
         bottom: auto;
         align-items: stretch;
+        z-index: var(--z-modal);
     }
 
     .workspace-view--arranger .workspace-arranger-controls-actions .workspace-fab-items {
@@ -286,14 +289,34 @@
     }
 
     .workspace-view--arranger #panel-arranger .workspace-fab-items {
-        top: calc(100% + 0.4rem);
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        right: auto;
         bottom: auto;
-        right: 0;
-        transform: translateY(-0.35rem) scale(0.98);
-        transform-origin: top right;
-        max-height: min(44dvh, 18rem);
+        width: min(92vw, 21rem);
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.94);
+        transform-origin: center;
+        max-height: min(68dvh, 28rem);
         overflow-y: auto;
         overscroll-behavior: contain;
+        z-index: var(--z-modal);
+        pointer-events: none;
+        transition:
+            opacity 160ms ease,
+            transform 180ms var(--anim-ease);
+    }
+
+    .workspace-view--arranger #panel-arranger .workspace-fab-menu.is-open .workspace-fab-items,
+    .workspace-view--arranger #panel-arranger .workspace-fab-menu:hover .workspace-fab-items,
+    .workspace-view--arranger
+        #panel-arranger
+        .workspace-fab-menu:focus-within
+        .workspace-fab-items {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+        pointer-events: auto;
     }
 
     .workspace-view--arranger .workspace-arranger-controls-panel .workspace-seed-control {
@@ -337,19 +360,7 @@
     }
 
     .workspace-view--arranger .workspace-arranger-controls-actions .workspace-fab-menu {
-        z-index: calc(var(--z-panel-header) + 1);
-    }
-
-    .workspace-view--arranger .workspace-arranger-menu-backdrop {
-        display: block;
-        position: fixed;
-        inset: 0;
-        border: 0;
-        padding: 0;
-        margin: 0;
-        background: transparent;
-        cursor: default;
-        z-index: var(--z-panel-header);
+        z-index: var(--z-modal);
     }
 
     .workspace-view--arranger .workspace-arranger-controls-panel #transDownBtn,
