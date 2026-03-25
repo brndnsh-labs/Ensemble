@@ -190,14 +190,10 @@ function StudioSurface({
             const anchorRect =
                 anchorElement?.getBoundingClientRect() || document.body.getBoundingClientRect();
             const viewportPadding = 16;
-            const minWidth = className.includes('--genre') ? 320 : 360;
-            const preferredWidth = className.includes('--genre') ? 360 : 420;
-            const maxWidth = Math.max(320, window.innerWidth - viewportPadding * 2);
-            const measuredWidth = surface.offsetWidth || preferredWidth;
-            const width = Math.min(
-                Math.max(measuredWidth, minWidth),
-                Math.min(preferredWidth, maxWidth),
-            );
+            const isGenreSurface = className.includes('--genre');
+            const preferredWidth = isGenreSurface ? 360 : 560;
+            const maxWidth = window.innerWidth - viewportPadding * 2;
+            const width = Math.min(preferredWidth, maxWidth);
             const measuredHeight = surface.offsetHeight || 0;
             const preferredTop = Math.max(viewportPadding, anchorRect.top - 8);
             let top = preferredTop;

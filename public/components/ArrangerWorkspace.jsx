@@ -134,7 +134,7 @@ export function ArrangerWorkspace() {
     );
 
     useEffect(() => {
-        if (!isActionMenuOpen || !isTouchLike) {
+        if (!isActionMenuOpen) {
             return;
         }
 
@@ -152,9 +152,22 @@ export function ArrangerWorkspace() {
             setIsActionMenuOpen(false);
         };
 
+        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
+            if (event.key !== 'Escape') {
+                return;
+            }
+
+            setIsActionMenuOpen(false);
+            triggerRef.current?.focus();
+        };
+
         window.addEventListener('pointerdown', handlePointerDown, true);
-        return () => window.removeEventListener('pointerdown', handlePointerDown, true);
-    }, [isActionMenuOpen, isTouchLike]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('pointerdown', handlePointerDown, true);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isActionMenuOpen]);
 
     useLayoutEffect(() => {
         if (!isActionMenuOpen || isTouchLike || typeof window === 'undefined') {
@@ -262,50 +275,26 @@ export function ArrangerWorkspace() {
                                             class={`workspace-fab-menu${
                                                 isActionMenuOpen ? ' is-open' : ''
                                             }`}
-                                            onMouseEnter={
-                                                isTouchLike
-                                                    ? undefined
-                                                    : () => setIsActionMenuOpen(true)
-                                            }
-                                            onMouseLeave={
-                                                isTouchLike
-                                                    ? undefined
-                                                    : () => setIsActionMenuOpen(false)
-                                            }
-                                            onFocusCapture={
-                                                isTouchLike
-                                                    ? undefined
-                                                    : () => setIsActionMenuOpen(true)
-                                            }
-                                            onBlurCapture={
-                                                isTouchLike
-                                                    ? undefined
-                                                    : (event) => {
-                                                          const relatedTarget =
-                                                              event.relatedTarget instanceof Node
-                                                                  ? event.relatedTarget
-                                                                  : null;
-                                                          if (
-                                                              !event.currentTarget.contains(
-                                                                  relatedTarget,
-                                                              )
-                                                          ) {
-                                                              setIsActionMenuOpen(false);
-                                                          }
-                                                      }
-                                            }
+                                            onBlurCapture={(event) => {
+                                                const relatedTarget =
+                                                    event.relatedTarget instanceof Node
+                                                        ? event.relatedTarget
+                                                        : null;
+                                                if (!event.currentTarget.contains(relatedTarget)) {
+                                                    setIsActionMenuOpen(false);
+                                                }
+                                            }}
                                         >
                                             <button
                                                 ref={triggerRef}
                                                 type="button"
                                                 class="header-btn workspace-actions-trigger"
                                                 aria-label="Open arranger actions"
+                                                aria-haspopup="dialog"
                                                 aria-expanded={isActionMenuOpen}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
-                                                    setIsActionMenuOpen((value) =>
-                                                        isTouchLike ? !value : true,
-                                                    );
+                                                    setIsActionMenuOpen((value) => !value);
                                                 }}
                                             >
                                                 ⋮
@@ -317,6 +306,7 @@ export function ArrangerWorkspace() {
                                                         ? ' workspace-fab-items--fixed'
                                                         : ''
                                                 }`}
+                                                role="dialog"
                                                 aria-label="Arranger actions"
                                                 style={actionMenuStyle}
                                                 onClick={(event) => event.stopPropagation()}

@@ -1132,8 +1132,6 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     min-width: 13.5rem;
 }
 
-.workspace-fab-menu:hover .workspace-fab-items,
-.workspace-fab-menu:focus-within .workspace-fab-items,
 .workspace-fab-menu.is-open .workspace-fab-items {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1744,11 +1742,16 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface-body {
     min-height: 0;
+    width: 100%;
     overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-block-end: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.9rem;
     padding-right: 0.1rem;
+    scrollbar-gutter: stable;
 }
 
 .workspace-studio-surface-close {
@@ -1810,8 +1813,9 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .grid-2-col {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
     gap: 0.85rem;
+    align-items: start;
 }
 
 .workspace-studio-surface--settings .setting-group,
@@ -1847,9 +1851,10 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .setting-row {
-    margin-bottom: 0.35rem;
-    min-height: 2rem;
-    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    min-height: 0;
+    gap: 0.55rem;
+    align-items: flex-start;
 }
 
 .workspace-studio-surface--settings .setting-label {
@@ -1858,12 +1863,14 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface--settings .setting-info {
     min-width: 0;
+    width: 100%;
 }
 
 .workspace-studio-surface--settings .setting-control {
     min-width: 0;
     flex: 1 1 auto;
-    justify-content: flex-end;
+    width: 100%;
+    justify-content: flex-start;
     flex-wrap: wrap;
 }
 
@@ -1873,8 +1880,9 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings input[type="range"] {
-    width: min(100%, 180px);
-    flex: 1 1 9rem;
+    width: 100%;
+    min-width: 9rem;
+    flex: 1 1 12rem;
 }
 
 .workspace-studio-surface--settings select {
@@ -1884,9 +1892,9 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .setting-control > select {
-    width: min(100%, 220px);
+    width: 100%;
     min-width: 0;
-    flex: 1 1 11rem;
+    flex: 1 1 12rem;
 }
 
 .workspace-studio-surface--settings .divider-top {
@@ -1895,14 +1903,14 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .instrument-settings-swing-controls {
-    width: min(100%, 16rem);
-    margin-left: auto;
-    justify-content: flex-end;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
     flex-wrap: wrap;
 }
 
 .workspace-studio-surface--settings .instrument-settings-swing-controls input[type="range"] {
-    flex: 1 1 8rem;
+    flex: 1 1 10rem;
 }
 
 .workspace-studio-surface--settings .instrument-settings-swing-controls > select {
@@ -1921,13 +1929,18 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .button-group {
+    width: 100%;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
 }
 
 .workspace-studio-surface--settings .button-group-btn {
     border-radius: 999px;
     padding: 0.35rem 0.75rem;
+}
+
+.workspace-studio-surface-card--soloist {
+    width: 100%;
 }
 
 .workspace-studio-surface--settings .smart-tab-label.panel-title {

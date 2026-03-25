@@ -66,7 +66,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('Arranger action menu stays fully visible after loading a short preset', async ({
         page,
     }) => {
-        await page.setViewportSize({ width: 700, height: 600 });
+        await page.setViewportSize({ width: 1024, height: 768 });
         await page.getByRole('button', { name: 'Open arranger actions' }).click();
         await page.locator('.workspace-library-fab').dispatchEvent('click');
 
@@ -90,14 +90,30 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await trigger.click();
         await page.waitForTimeout(250);
+        await page.mouse.move(16, 16);
+        await page.waitForTimeout(250);
+
+        await expect(actionMenu).toHaveClass(/is-open/);
+        await expect(items).toBeVisible();
+        await expect(page.locator('#arrangerSoloistSeed')).toBeVisible();
 
         const clickBox = await items.boundingBox();
+        const seedBox = await page.locator('#arrangerSoloistSeed').boundingBox();
+        const seedButtonBox = await page
+            .locator('.workspace-fab-item--seed .icon-btn')
+            .boundingBox();
+
         expect(clickBox).not.toBeNull();
+        expect(seedBox).not.toBeNull();
+        expect(seedButtonBox).not.toBeNull();
         expect(clickBox.x).toBeGreaterThanOrEqual(0);
         expect(clickBox.y).toBeGreaterThanOrEqual(0);
         expect(clickBox.x + clickBox.width).toBeLessThanOrEqual(viewport.width);
         expect(clickBox.y + clickBox.height).toBeLessThanOrEqual(viewport.height);
-        await expect(items).toBeVisible();
+        expect(seedBox.y + seedBox.height).toBeLessThanOrEqual(clickBox.y + clickBox.height);
+        expect(seedButtonBox.y + seedButtonBox.height).toBeLessThanOrEqual(
+            clickBox.y + clickBox.height,
+        );
 
         await page.mouse.click(5, 5);
         await page.waitForTimeout(150);
@@ -105,13 +121,12 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await trigger.hover();
         await page.waitForTimeout(250);
-
-        const hoverBox = await items.boundingBox();
-        expect(hoverBox).not.toBeNull();
-        expect(hoverBox.x).toBeGreaterThanOrEqual(0);
-        expect(hoverBox.y).toBeGreaterThanOrEqual(0);
-        expect(hoverBox.x + hoverBox.width).toBeLessThanOrEqual(viewport.width);
-        expect(hoverBox.y + hoverBox.height).toBeLessThanOrEqual(viewport.height);
-        await expect(items).toBeVisible();
+        await expect(actionMenu).not.toHaveClass(/is-open/);
+        await expect
+            .poll(async () => items.evaluate((el) => getComputedStyle(el).opacity))
+            .toBe('0');
+        await expect
+            .poll(async () => items.evaluate((el) => getComputedStyle(el).pointerEvents))
+            .toBe('none');
     });
 });
