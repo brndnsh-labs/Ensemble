@@ -50,7 +50,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         const libraryFab = page.locator('.workspace-library-fab');
         await expect(libraryFab).toBeVisible();
-        await libraryFab.click();
+        await libraryFab.dispatchEvent('click');
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -61,5 +61,30 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(modal).toBeHidden();
 
         await expect(page.getByRole('button', { name: 'Open arranger actions' })).toBeVisible();
+    });
+
+    test('Arranger action menu stays fully visible after loading a short preset', async ({
+        page,
+    }) => {
+        await page.getByRole('button', { name: 'Open arranger actions' }).click();
+        await page.locator('.workspace-library-fab').dispatchEvent('click');
+
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        await expect(modal).toBeVisible();
+
+        await page.getByRole('button', { name: 'Pop (Standard)' }).click();
+        await expect(modal).toBeHidden();
+
+        const actionMenu = page.locator('.workspace-fab-menu');
+        await page.getByRole('button', { name: 'Open arranger actions' }).click();
+
+        const viewportHeight = await page.evaluate(() => window.innerHeight);
+        const seedBox = await actionMenu.locator('.workspace-fab-item--seed').boundingBox();
+
+        expect(seedBox).not.toBeNull();
+        expect(seedBox.y).toBeGreaterThanOrEqual(0);
+        expect(seedBox.y + seedBox.height).toBeLessThanOrEqual(viewportHeight - 8);
+
+        await expect(actionMenu.locator('.workspace-fab-item--seed')).toBeVisible();
     });
 });

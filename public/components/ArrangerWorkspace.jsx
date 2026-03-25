@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { transposeKey } from '../arranger-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -118,6 +118,9 @@ function LibraryModal({ isOpen, onClose }) {
 export function ArrangerWorkspace() {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+    const [actionMenuStyle, setActionMenuStyle] = useState(
+        /** @type {import('preact').JSX.CSSProperties | undefined} */ (undefined),
+    );
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const menuRef = useRef(null);
     /** @type {import('preact/hooks').MutableRef<HTMLButtonElement|null>} */
@@ -151,6 +154,65 @@ export function ArrangerWorkspace() {
 
         window.addEventListener('pointerdown', handlePointerDown, true);
         return () => window.removeEventListener('pointerdown', handlePointerDown, true);
+    }, [isActionMenuOpen, isTouchLike]);
+
+    useLayoutEffect(() => {
+        if (!isActionMenuOpen || isTouchLike || typeof window === 'undefined') {
+            setActionMenuStyle(undefined);
+            return;
+        }
+
+        const updateMenuPosition = () => {
+            const trigger = triggerRef.current;
+            const menu = menuRef.current;
+            if (!trigger || !menu) {
+                return;
+            }
+
+            const triggerRect = trigger.getBoundingClientRect();
+            const menuWidth = Math.min(
+                Math.max(menu.offsetWidth || 216, 216),
+                window.innerWidth - 24,
+            );
+            const menuHeight = menu.offsetHeight || 0;
+            const gap = 8;
+            const viewportPadding = 12;
+            const spaceBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding;
+            const spaceAbove = triggerRect.top - gap - viewportPadding;
+            const shouldOpenUpward = menuHeight > spaceBelow && spaceAbove > spaceBelow;
+            const maxHeight = Math.max(
+                180,
+                shouldOpenUpward ? spaceAbove : Math.max(spaceBelow, 180),
+            );
+            const left = Math.min(
+                Math.max(viewportPadding, triggerRect.right - menuWidth),
+                window.innerWidth - menuWidth - viewportPadding,
+            );
+            const top = shouldOpenUpward
+                ? Math.max(viewportPadding, triggerRect.top - Math.min(menuHeight, maxHeight) - gap)
+                : Math.min(
+                      triggerRect.bottom + gap,
+                      window.innerHeight - maxHeight - viewportPadding,
+                  );
+
+            setActionMenuStyle({
+                position: 'fixed',
+                top: `${top}px`,
+                left: `${left}px`,
+                right: 'auto',
+                bottom: 'auto',
+                width: `${menuWidth}px`,
+                maxHeight: `${maxHeight}px`,
+            });
+        };
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
     }, [isActionMenuOpen, isTouchLike]);
 
     return (
@@ -248,8 +310,13 @@ export function ArrangerWorkspace() {
                                             </button>
                                             <div
                                                 ref={menuRef}
-                                                class="workspace-fab-items"
+                                                class={`workspace-fab-items${
+                                                    !isTouchLike
+                                                        ? ' workspace-fab-items--fixed'
+                                                        : ''
+                                                }`}
                                                 aria-label="Arranger actions"
+                                                style={actionMenuStyle}
                                                 onClick={(event) => event.stopPropagation()}
                                             >
                                                 <button

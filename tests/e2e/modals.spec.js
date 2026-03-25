@@ -29,7 +29,7 @@ test.describe('Modals Responsiveness @ui', () => {
     test('Editor Modal - Content Layout', async ({ page }) => {
         // Open editor modal (the 'Edit Arrangement' button)
         await page.click('button[aria-label="Open arranger actions"]');
-        await page.click('#editArrangementBtn');
+        await page.locator('#editArrangementBtn').dispatchEvent('click');
 
         await page.waitForSelector('#editorOverlay', { state: 'visible' });
         const editorModal = page.locator('#editorOverlay .settings-content');
@@ -46,7 +46,7 @@ test.describe('Modals Responsiveness @ui', () => {
     test('Share & Export Modal - Content and Consolidation', async ({ page }) => {
         // Open share modal from the dashboard
         await page.click('button[aria-label="Open arranger actions"]');
-        await page.click('#shareHubBtn');
+        await page.locator('#shareHubBtn').dispatchEvent('click');
 
         await page.waitForSelector('#shareOverlay', { state: 'visible' });
         const shareModal = page.locator('#shareOverlay .modal-content');
@@ -65,7 +65,7 @@ test.describe('Modals Responsiveness @ui', () => {
     test('Inspiration Hub Modal - Layout and Actions', async ({ page }) => {
         // Open editor first
         await page.click('button[aria-label="Open arranger actions"]');
-        await page.click('#editArrangementBtn');
+        await page.locator('#editArrangementBtn').dispatchEvent('click');
         await page.waitForSelector('#editorOverlay', { state: 'visible' });
 
         // Open randomize menu

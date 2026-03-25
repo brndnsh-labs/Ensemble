@@ -1140,6 +1140,19 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     pointer-events: auto;
 }
 
+@media (min-width: 701px) {
+    .workspace-view--arranger #panel-arranger .workspace-fab-items--fixed {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        z-index: var(--z-modal);
+    }
+
+    .workspace-view--arranger .workspace-fab-item {
+        scroll-margin-block-start: 6rem;
+    }
+}
+
 .workspace-fab-item {
     box-shadow: var(--shadow-md);
     width: 100%;
