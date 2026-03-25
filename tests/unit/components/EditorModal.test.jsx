@@ -101,6 +101,7 @@ describe('EditorModal Component', () => {
         expect(container.textContent).toContain('Arrangement Editor');
         expect(container.textContent).toContain('1 section');
         expect(container.textContent).toContain('Global key C');
+        expect(container.querySelector('#arrangerActionTrigger')).not.toBeNull();
         expect(container.querySelector('#mockArranger')).not.toBeNull();
     });
 

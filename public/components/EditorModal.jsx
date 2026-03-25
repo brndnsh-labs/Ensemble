@@ -48,9 +48,10 @@ export function EditorModal(_props) {
         leadSheetMelody: s.soloist.leadSheetMelody,
         currentKey: s.arranger.key,
         totalSteps: s.arranger.totalSteps,
-        sectionCount: s.arranger.sections.length,
-        linkedCount: s.arranger.sections.filter((section) => section.seamless).length,
-        sectionKeyCount: s.arranger.sections.filter((section) => Boolean(section.key)).length,
+        sectionCount: (s.arranger.sections || []).length,
+        linkedCount: (s.arranger.sections || []).filter((section) => section.seamless).length,
+        sectionKeyCount: (s.arranger.sections || []).filter((section) => Boolean(section.key))
+            .length,
     }));
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImportMode, setIsImportMode] = useState(false);

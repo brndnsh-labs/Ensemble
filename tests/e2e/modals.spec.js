@@ -46,12 +46,32 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(page.locator('#addSectionBtn')).toBeVisible();
         await expect(page.locator('#arrangerActionTrigger')).toBeVisible();
 
+        await page.click('#arrangerActionTrigger');
+        const toolsMenu = page.locator('#arrangerActionMenu');
+        await expect(toolsMenu).toBeVisible();
+        await expect(toolsMenu).toContainText('Import Tab');
+        await expect(toolsMenu).toContainText('Analyze');
+        await page.locator('.menu-click-away').dispatchEvent('click');
+
         const viewport = page.viewportSize();
         const editorBox = await editorModal.boundingBox();
         expect(viewport).not.toBeNull();
         expect(editorBox).not.toBeNull();
         expect(editorBox.width).toBeGreaterThan(viewport.width * 0.9);
         expect(editorBox.height).toBeGreaterThan(viewport.height * 0.8);
+
+        const linkedGroup = page.locator('#editorOverlay .section-group').first();
+        await expect(linkedGroup).toBeVisible();
+        await expect(linkedGroup.locator('.section-card')).toHaveCount(2);
+        const [leftCard, rightCard] = await Promise.all([
+            linkedGroup.locator('.section-card').nth(0).boundingBox(),
+            linkedGroup.locator('.section-card').nth(1).boundingBox(),
+        ]);
+
+        expect(leftCard).not.toBeNull();
+        expect(rightCard).not.toBeNull();
+        expect(Math.abs(leftCard.y - rightCard.y)).toBeLessThan(16);
+        expect(rightCard.x).toBeGreaterThan(leftCard.x + leftCard.width * 0.45);
 
         await page.click('#closeEditorBtn');
         await page.waitForSelector('#editorOverlay', { state: 'hidden' });
@@ -78,6 +98,19 @@ test.describe('Modals Responsiveness @ui', () => {
         expect(editorBox.y + editorBox.height).toBeLessThanOrEqual(viewport.height + 1);
         expect(computedShell.width).toBeGreaterThanOrEqual(viewport.width - 2);
         expect(computedShell.height).toBeGreaterThanOrEqual(viewport.height - 2);
+
+        const linkedGroup = page.locator('#editorOverlay .section-group').first();
+        await expect(linkedGroup).toBeVisible();
+        await expect(linkedGroup.locator('.section-card')).toHaveCount(2);
+        const [topCard, bottomCard] = await Promise.all([
+            linkedGroup.locator('.section-card').nth(0).boundingBox(),
+            linkedGroup.locator('.section-card').nth(1).boundingBox(),
+        ]);
+
+        expect(topCard).not.toBeNull();
+        expect(bottomCard).not.toBeNull();
+        expect(Math.abs(topCard.x - bottomCard.x)).toBeLessThan(16);
+        expect(bottomCard.y).toBeGreaterThan(topCard.y + topCard.height * 0.55);
 
         await page.click('#closeEditorBtn');
         await page.waitForSelector('#editorOverlay', { state: 'hidden' });
