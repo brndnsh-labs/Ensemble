@@ -1,9 +1,9 @@
 /* --- Chord Visualizer Base --- */
 .display-area {
     background: var(--input-bg);
-    border-radius: 8px;
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-2);
+    margin-bottom: var(--space-2);
     position: relative;
     overflow-x: hidden;
     overflow-y: auto;
@@ -20,8 +20,8 @@
 .section-block {
     display: flex;
     flex-direction: column;
-    padding: 0.4rem 0.6rem;
-    border-radius: 8px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
     background: var(--step-bg);
     border: 1px solid var(--border-color);
     width: 100%;
@@ -29,22 +29,26 @@
     margin-left: auto;
     margin-right: auto;
     box-sizing: border-box;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
     min-height: 0;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+        background-color var(--anim-normal) var(--anim-ease),
+        border-color var(--anim-normal) var(--anim-ease),
+        box-shadow var(--anim-normal) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease);
 }
 
 .section-block-header {
-    font-size: 0.65rem;
+    font-size: var(--font-xs);
     font-weight: 900;
     text-transform: none;
     letter-spacing: 0.1em;
-    margin-bottom: 0.4rem;
+    margin-bottom: var(--space-2);
     opacity: 0.6;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     flex-shrink: 0;
 }
 
@@ -59,7 +63,7 @@
 .section-block-content {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
+    gap: var(--space-2);
 }
 
 @media (min-width: 600px) {
@@ -74,7 +78,7 @@
     flex-direction: row;
     gap: 0;
     background: var(--panel-color);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     padding: 0;
     border: 1px solid var(--border-color);
     min-width: 0;
@@ -90,13 +94,14 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    padding: 0.2rem;
+    padding: var(--space-1);
     border-radius: 0;
     border: none;
     transition:
-        background-color 0.2s,
-        color 0.2s,
-        transform 0.1s;
+        background-color var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
     cursor: pointer;
     min-width: 0;
     min-height: 40px;
@@ -111,7 +116,7 @@
 }
 
 .display-area--dense {
-    padding: 0.4rem;
+    padding: var(--space-2);
 }
 
 .display-area--dense .section-block {
@@ -130,7 +135,7 @@
 }
 
 .display-area--dense .measure-box {
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
 }
 
 .display-area--dense .chord-card {
@@ -238,6 +243,11 @@
     z-index: var(--z-maximized-header);
 }
 
+.chord-maximized .chord-maximize-exit-btn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+}
+
 .chord-maximized .section-block {
     max-width: 1200px;
     width: 100%;
@@ -261,7 +271,7 @@
 
 .chord-maximized .measure-box {
     border: 1.5px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     min-height: 0;
     flex-grow: 1;
 }
@@ -416,8 +426,17 @@
     height: 32px;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
+}
+
+#maximizeChordBtn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 .chord-maximized #maximizeChordBtn {
@@ -471,7 +490,7 @@
     background: var(--soloist-color);
     border-radius: 1px;
     min-width: 2px;
-    transition: height 0.2s ease;
+    transition: height var(--anim-fast) var(--anim-ease);
 }
 
 .chord-card.active .sparkline-bar {
