@@ -538,8 +538,8 @@
     }
 
     .workspace-view--studio .workspace-studio-surface-body {
-        padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-        scroll-padding-block-end: calc(1rem + env(safe-area-inset-bottom));
+        padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+        scroll-padding-block-end: calc(1.5rem + env(safe-area-inset-bottom));
     }
 
     .workspace-view--studio .workspace-studio-genre-grid {
@@ -555,6 +555,10 @@
     .workspace-view--studio .workspace-studio-surface-card {
         padding: 0.7rem;
         border-radius: 16px;
+    }
+
+    .workspace-view--studio .workspace-studio-surface-card--soloist {
+        padding-bottom: 1.75rem;
     }
 
     .workspace-view--studio .workspace-studio-surface--settings .setting-group-title {
