@@ -777,10 +777,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     flex: 1;
 }
 
-.workspace-arranger-tools {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: -0.35rem;
+.workspace-arranger-header-title {
+    margin: 0;
 }
 
 .workspace-seed-control {
@@ -830,6 +828,10 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     width: 100%;
 }
 
+.workspace-arranger-chords .section-block-content {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .workspace-fab-menu {
     position: relative;
     z-index: var(--z-floating);
@@ -840,13 +842,42 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     gap: 0.5rem;
 }
 
-.workspace-fab-trigger {
-    box-shadow: var(--shadow-lg);
-    width: auto;
-    min-width: 11rem;
-    justify-content: flex-start;
-    gap: 0.65rem;
-    padding-inline: 0.9rem;
+.workspace-fab-menu::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 0.5rem;
+}
+
+.workspace-actions-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 2.4rem;
+    height: 32px;
+    padding: 0 0.45rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1;
+    transition:
+        background-color 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.18s ease,
+        color 0.18s ease;
+}
+
+.workspace-actions-trigger:hover,
+.workspace-actions-trigger:focus-visible {
+    background: var(--card-bg-hover);
+    border-color: color-mix(in srgb, var(--accent-color), transparent 55%);
+    transform: translateY(-1px);
 }
 
 .workspace-fab-items {
@@ -864,6 +895,12 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     transition:
         opacity 160ms ease,
         transform 160ms ease;
+    padding: 0.5rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--panel-color);
+    box-shadow: var(--shadow-lg);
+    min-width: 13.5rem;
 }
 
 .workspace-fab-menu:hover .workspace-fab-items,
@@ -877,7 +914,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 .workspace-fab-item {
     box-shadow: var(--shadow-md);
     width: 100%;
-    min-width: 11rem;
+    min-width: 0;
     height: 42px;
     padding: 0.5rem 0.9rem;
     border-radius: 12px;
@@ -885,7 +922,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     align-items: center;
     justify-content: flex-start;
     gap: 0.65rem;
-    background: var(--input-bg);
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-color);
     font-weight: 700;
@@ -899,14 +936,152 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-fab-menu .workspace-fab-item:hover,
 .workspace-fab-menu .workspace-fab-item:focus-visible {
-    background: var(--card-bg-hover);
-    border-color: color-mix(in srgb, var(--accent-color), transparent 50%);
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
+.workspace-fab-item--seed:hover,
+.workspace-fab-item--seed:focus-visible {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+    transform: none;
+    box-shadow: none;
+}
+
+.workspace-arranger-controls-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    align-items: start;
+    width: 100%;
+    margin-top: 0.6rem;
+    margin-bottom: 0.15rem;
+    padding: 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--panel-color), transparent 6%);
+    box-shadow: var(--shadow-sm);
+}
+
+.workspace-arranger-controls-main {
+    min-width: 0;
+}
+
+.workspace-arranger-controls-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    align-items: stretch;
+    justify-self: end;
+    min-width: 0;
+}
+
+.workspace-arranger-controls-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: calc(var(--z-panel-header) + 1);
+}
+
+.workspace-arranger-controls-panel .key-controls {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.workspace-arranger-controls-panel .time-sig-group {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.workspace-arranger-controls-panel #timeSigSelect,
+.workspace-arranger-controls-panel #keySelect {
+    min-width: 0;
+    width: auto;
+}
+
+.workspace-arranger-controls-panel #timeSigSelect {
+    width: clamp(52px, 12vw, 64px);
+}
+
+.workspace-arranger-controls-panel #keySelect {
+    width: clamp(62px, 16vw, 80px);
+}
+
+.workspace-arranger-controls-panel .rel-key-btn {
+    min-width: 0;
+    padding-inline: 0.3rem;
+}
+
+.workspace-arranger-controls-panel .header-btn {
+    padding-inline: 0.45rem;
+}
+
+.workspace-arranger-controls-panel .seed-input {
+    min-width: 6.5rem;
+}
+
+.workspace-arranger-controls-panel .workspace-seed-control {
+    justify-self: end;
+}
+
+.workspace-arranger-controls-panel .workspace-seed-row {
+    justify-content: flex-end;
+}
+
+.workspace-arranger-controls-actions .workspace-fab-menu {
+    margin-left: 0;
+    z-index: calc(var(--z-panel-header) + 1);
+}
+
+.workspace-arranger-controls-actions .workspace-actions-trigger {
+    min-width: 2.4rem;
+}
+
+.workspace-arranger-controls-actions .header-btn {
+    min-width: 32px;
+}
+
 .workspace-library-fab {
     width: 100%;
+}
+
+.workspace-fab-item--seed {
+    cursor: default;
+    height: auto;
+    min-height: 0;
+    padding: 0.65rem 0.7rem;
+    align-items: stretch;
+    gap: 0.45rem;
+}
+
+.workspace-fab-item--seed .workspace-seed-control {
+    width: 100%;
+}
+
+.workspace-fab-item--seed .workspace-seed-label {
+    font-size: 0.68rem;
+}
+
+.workspace-fab-item--seed .seed-input {
+    min-width: 0;
+    width: min(100%, 5.75rem);
+    flex: 0 1 5.75rem;
+}
+
+.workspace-transpose-fab {
+    display: none;
+}
+
+.workspace-arranger-menu-backdrop {
+    display: none;
 }
 
 .settings-content.workspace-library-modal {
@@ -1089,10 +1264,6 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         overflow: visible;
         padding-bottom: 0;
-    }
-
-    .workspace-arranger-tools {
-        justify-content: flex-start;
     }
 
     .workspace-stats-grid,

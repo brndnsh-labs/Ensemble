@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { transposeKey } from '../arranger-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
+import { useEnsembleState } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { KeySignatureControls } from './KeySignatureControls.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
@@ -116,6 +118,11 @@ function LibraryModal({ isOpen, onClose }) {
 export function ArrangerWorkspace() {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+    const { isMaximized } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            isMaximized: s.vizState.isMaximized,
+        }),
+    );
 
     return (
         <section class="workspace-view workspace-view--arranger" data-workspace="arranger">
@@ -129,73 +136,141 @@ export function ArrangerWorkspace() {
                     <div class="panel-header chord-panel-header">
                         <div>
                             <p class="workspace-kicker">Arranger</p>
-                            <h2 class="panel-title">Current chords</h2>
-                        </div>
-                        <div class="panel-header-controls">
-                            <KeySignatureControls />
+                            <h2 class="panel-title workspace-arranger-header-title">Lead sheet</h2>
                             <div
-                                class={`workspace-fab-menu${isActionMenuOpen ? ' is-open' : ''}`}
-                                onMouseEnter={() => setIsActionMenuOpen(true)}
-                                onMouseLeave={() => setIsActionMenuOpen(false)}
-                                onFocusCapture={() => setIsActionMenuOpen(true)}
-                                onBlurCapture={(event) => {
-                                    const relatedTarget =
-                                        event.relatedTarget instanceof Node
-                                            ? event.relatedTarget
-                                            : null;
-                                    if (!event.currentTarget.contains(relatedTarget)) {
-                                        setIsActionMenuOpen(false);
-                                    }
-                                }}
+                                class="workspace-arranger-controls-panel"
+                                aria-label="Arranger controls"
                             >
-                                <button
-                                    type="button"
-                                    class="primary-btn workspace-fab-trigger"
-                                    aria-label="Open arranger actions"
-                                    aria-expanded={isActionMenuOpen}
-                                    onClick={() => setIsActionMenuOpen((value) => !value)}
-                                >
-                                    ✨ Actions
-                                </button>
-                                <div class="workspace-fab-items" aria-label="Arranger actions">
-                                    <button
-                                        id="editArrangementBtn"
-                                        class="workspace-fab-item"
-                                        onClick={() => {
-                                            openModal('editor');
-                                            setIsActionMenuOpen(false);
-                                        }}
+                                <div class="workspace-arranger-controls-main">
+                                    <KeySignatureControls
+                                        showMaximize={false}
+                                        showTranspose={true}
+                                    />
+                                </div>
+                                <div class="workspace-arranger-controls-side">
+                                    <div
+                                        class="workspace-arranger-controls-actions"
+                                        aria-label="Arranger actions"
                                     >
-                                        ✏️ Edit
-                                    </button>
-                                    <button
-                                        id="shareHubBtn"
-                                        class="workspace-fab-item"
-                                        onClick={() => {
-                                            openModal('share');
-                                            setIsActionMenuOpen(false);
-                                        }}
-                                    >
-                                        📤 Share
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="workspace-fab-item workspace-library-fab"
-                                        aria-label="Open progression library"
-                                        onClick={() => {
-                                            setIsLibraryOpen(true);
-                                            setIsActionMenuOpen(false);
-                                        }}
-                                    >
-                                        📚 Library
-                                    </button>
+                                        <button
+                                            id="maximizeChordBtn"
+                                            title={isMaximized ? 'Exit Maximize' : 'Maximize'}
+                                            class={`header-btn arranger-maximize-btn ${
+                                                isMaximized ? 'active' : ''
+                                            }`}
+                                            aria-label={
+                                                isMaximized ? 'Exit Maximize' : 'Maximize Chords'
+                                            }
+                                            onClick={() =>
+                                                dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS)
+                                            }
+                                        >
+                                            {isMaximized ? '✕' : '⛶'}
+                                        </button>
+                                        <div
+                                            class={`workspace-fab-menu${
+                                                isActionMenuOpen ? ' is-open' : ''
+                                            }`}
+                                            onMouseEnter={() => setIsActionMenuOpen(true)}
+                                            onMouseLeave={() => setIsActionMenuOpen(false)}
+                                            onFocusCapture={() => setIsActionMenuOpen(true)}
+                                            onBlurCapture={(event) => {
+                                                const relatedTarget =
+                                                    event.relatedTarget instanceof Node
+                                                        ? event.relatedTarget
+                                                        : null;
+                                                if (!event.currentTarget.contains(relatedTarget)) {
+                                                    setIsActionMenuOpen(false);
+                                                }
+                                            }}
+                                        >
+                                            <button
+                                                type="button"
+                                                class="header-btn workspace-actions-trigger"
+                                                aria-label="Open arranger actions"
+                                                aria-expanded={isActionMenuOpen}
+                                                onClick={() =>
+                                                    setIsActionMenuOpen((value) => !value)
+                                                }
+                                            >
+                                                ⋮
+                                            </button>
+                                            <div
+                                                class="workspace-fab-items"
+                                                aria-label="Arranger actions"
+                                            >
+                                                <button
+                                                    id="editArrangementBtn"
+                                                    class="workspace-fab-item"
+                                                    onClick={() => {
+                                                        openModal('editor');
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                >
+                                                    ✏️ Edit
+                                                </button>
+                                                <button
+                                                    id="shareHubBtn"
+                                                    class="workspace-fab-item"
+                                                    onClick={() => {
+                                                        openModal('share');
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                >
+                                                    📤 Share
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="workspace-fab-item workspace-library-fab"
+                                                    aria-label="Open progression library"
+                                                    onClick={() => {
+                                                        setIsLibraryOpen(true);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                >
+                                                    📚 Library
+                                                </button>
+                                                <div class="menu-divider" aria-hidden="true" />
+                                                <button
+                                                    type="button"
+                                                    class="workspace-fab-item workspace-transpose-fab"
+                                                    aria-label="Transpose down"
+                                                    onClick={() => {
+                                                        transposeKey(-1);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                >
+                                                    ♭ Transpose down
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="workspace-fab-item workspace-transpose-fab"
+                                                    aria-label="Transpose up"
+                                                    onClick={() => {
+                                                        transposeKey(1);
+                                                        setIsActionMenuOpen(false);
+                                                    }}
+                                                >
+                                                    ♯ Transpose up
+                                                </button>
+                                                <div class="menu-divider" aria-hidden="true" />
+                                                <div class="workspace-fab-item workspace-fab-item--seed">
+                                                    <SoloistSeedControl />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                            {isActionMenuOpen && (
+                                <button
+                                    type="button"
+                                    class="workspace-arranger-menu-backdrop"
+                                    aria-label="Dismiss arranger actions"
+                                    onClick={() => setIsActionMenuOpen(false)}
+                                />
+                            )}
                         </div>
-                    </div>
-
-                    <div class="workspace-arranger-tools" aria-label="Arranger secondary controls">
-                        <SoloistSeedControl />
                     </div>
 
                     <div class="workspace-arranger-chords">
