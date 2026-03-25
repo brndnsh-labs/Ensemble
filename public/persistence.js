@@ -38,7 +38,6 @@ export function saveCurrentState() {
             volume: chords.volume,
             reverb: chords.reverb,
             pianoRoots: chords.pianoRoots,
-            activeTab: chords.activeTab,
         },
         bass: {
             enabled: bass.enabled,
@@ -46,7 +45,6 @@ export function saveCurrentState() {
             octave: bass.octave,
             volume: bass.volume,
             reverb: bass.reverb,
-            activeTab: bass.activeTab,
         },
         soloist: {
             enabled: soloist.enabled,
@@ -56,7 +54,6 @@ export function saveCurrentState() {
             volume: soloist.volume,
             reverb: soloist.reverb,
             mode: soloist.mode,
-            activeTab: soloist.activeTab,
         },
         harmony: {
             enabled: harmony.enabled,
@@ -65,7 +62,6 @@ export function saveCurrentState() {
             volume: harmony.volume,
             reverb: harmony.reverb,
             complexity: harmony.complexity,
-            activeTab: harmony.activeTab,
         },
         groove: {
             enabled: groove.enabled,
@@ -80,8 +76,6 @@ export function saveCurrentState() {
             larsMode: groove.larsMode,
             larsIntensity: groove.larsIntensity,
             lastSmartGenre: groove.lastSmartGenre,
-            activeTab: groove.activeTab,
-            mobileTab: groove.mobileTab,
             creativity: groove.creativity,
             sectionSeedMap: groove.sectionSeedMap,
             pattern: groove.instruments.map((inst) => ({

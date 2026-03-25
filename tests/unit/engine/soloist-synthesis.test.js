@@ -98,7 +98,7 @@ describe('Soloist Synthesis', () => {
         vi.clearAllMocks();
         soloist.activeVoices = [];
         soloist.mode = 'monophonic';
-        soloist.preset = 'classic'; // Force classic for these tests
+        soloist.preset = 'saxophone';
         playback.audio.currentTime = 10;
     });
 
@@ -159,24 +159,20 @@ describe('Soloist Synthesis', () => {
         expect(vibSpeed).toBeCloseTo(5.0, 0);
     });
 
-    it('should disable vibrato and use piano-specific synthesis settings', () => {
+    it('should disable vibrato in piano mode while preserving saxophone routing', () => {
         soloist.mode = 'piano';
         const freq = 440;
         const playTime = 10;
-        playSoloNote(getState(), freq, playTime, 1.0, 0.4, 0, 'blues'); // low velocity
+        playSoloNote(getState(), freq, playTime, 1.0, 0.4, 0, 'blues');
 
-        // 1. Vibrato Check
         const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
-        expect(oscs.length).toBe(2); // No vibrato osc
+        expect(oscs.length).toBe(3); // osc1, osc2, breath LFO; no vibrato oscillator
 
-        // 2. Filter Q Check
-        const filter = playback.audio.createBiquadFilter.mock.results[0].value;
-        expect(filter.Q.value).toBe(0.7);
+        const formantFilter = playback.audio.createBiquadFilter.mock.results[0].value;
+        expect(formantFilter.Q.value).toBe(3.0);
 
-        // 3. Release Check (Sustain Pedal Emulation)
         const gainNode = playback.audio.createGain.mock.results[0].value;
-        // Expect setTargetAtTime with timeConstant 0.3 for slower release (third call in new logic)
-        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, expect.any(Number), 0.3);
+        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.85, 0.1);
     });
 
     it('should use mixed sawtooth and triangle oscillators for rich tone', () => {
@@ -199,62 +195,34 @@ describe('Soloist Synthesis', () => {
         // Only 1 voice should be active at the end since they are all new gestures
         expect(soloist.activeVoices.length).toBe(1);
 
-        // Old voices should have been told to ramp down
-        const mockGains = playback.audio.createGain.mock.results;
-        // Each call creates ~2 gains (main + vibrato). Main is at 0, 2, 4...
-        expect(mockGains[0].value.gain.setTargetAtTime).toHaveBeenCalledWith(
-            0,
-            expect.any(Number),
-            0.01,
+        const voiceSteals = playback.audio.createGain.mock.results.filter((result) =>
+            result.value.gain.setTargetAtTime.mock.calls.some(
+                ([target, _time, timeConstant]) => target === 0 && timeConstant === 0.01,
+            ),
         );
-        expect(mockGains[2].value.gain.setTargetAtTime).toHaveBeenCalledWith(
-            0,
-            expect.any(Number),
-            0.01,
-        );
+        expect(voiceSteals.length).toBeGreaterThan(1);
     });
 
-    it('should apply snappy palm-mute envelopes in guitar mode at low velocity', () => {
+    it('should apply aggressive shred envelopes in guitar mode', () => {
         soloist.mode = 'guitar';
+        soloist.preset = 'shred';
         const freq = 440;
         const playTime = 10;
+        playSoloNote(getState(), freq, playTime, 1.0, 0.8);
 
-        // 1. Low Velocity (Muted)
-        playSoloNote(getState(), freq, playTime, 1.0, 0.4); // vol = 0.4 < 0.6
+        const filter = playback.audio.createBiquadFilter.mock.results[0].value;
+        const gainNode = playback.audio.createGain.mock.results[0].value;
 
-        const filterMuted = playback.audio.createBiquadFilter.mock.results[0].value;
-        const gainMuted = playback.audio.createGain.mock.results[0].value;
-
-        // Expect snappy filter decay (80ms)
-        expect(filterMuted.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(
-            freq * 1.5,
-            playTime + 0.08,
-        );
-        expect(filterMuted.Q.value).toBe(4);
-
-        // Expect short gain decay (50ms)
-        expect(gainMuted.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.05, 0.02);
-
-        // 2. High Velocity (Normal)
-        vi.clearAllMocks();
-        playSoloNote(getState(), freq, playTime, 1.0, 0.8); // vol = 0.8 > 0.6
-
-        const filterNormal = playback.audio.createBiquadFilter.mock.results[0].value;
-        const gainNormal = playback.audio.createGain.mock.results[0].value;
-
-        // Expect normal filter decay (over full duration)
-        expect(filterNormal.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(
-            expect.any(Number),
-            playTime + 1.0,
-        );
-        // Expect normal gain release (usually at 80% of duration)
-        expect(gainNormal.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.8, 0.1);
+        expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(freq * 6, playTime);
+        expect(filter.Q.value).toBe(2.0);
+        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0.8 * 1.3, playTime, 0.005);
+        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.9, 0.05);
     });
 
     describe('Vibrato Engine Extensivenss', () => {
         it('should create vibrato for long notes', () => {
             // Note > 0.4s triggers vibrato
-            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'classic');
+            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'scalar');
             expect(playback.audio.createOscillator).toHaveBeenCalled();
         });
 

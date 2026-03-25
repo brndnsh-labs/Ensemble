@@ -14,7 +14,6 @@ import {
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState, getSyncState, stateMap } from './state.js';
 import { ACTIONS } from './types.js';
-import { showToast } from './ui.js';
 import { getStepsPerMeasure } from './utils.js';
 import { flushWorker, syncWorker } from './worker-client.js';
 
@@ -28,18 +27,6 @@ export function switchMeasure(idx) {
         return;
     }
     dispatch(ACTIONS.SET_ACTIVE_MEASURE, idx);
-}
-
-/** @param {string|number} val */
-export function updateMeasures(val) {
-    const numVal = parseInt(val.toString(), 10);
-    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: numVal });
-
-    const { groove } = getState();
-    if (groove.currentMeasure >= numVal) {
-        dispatch(ACTIONS.SET_ACTIVE_MEASURE, 0);
-    }
-    saveCurrentState();
 }
 
 /** @param {string} name */
@@ -82,67 +69,6 @@ export async function loadDrumPreset(name) {
     });
 
     dispatch('DRUM_PRESET_LOADED');
-}
-
-export function saveDrumPreset() {
-    const { groove } = getState();
-    const name = prompt('Name your drum pattern:', groove.lastDrumPreset || 'My Pattern');
-    if (!name) {
-        return;
-    }
-
-    let userPresets = [];
-    try {
-        userPresets = JSON.parse(localStorage.getItem('ensemble_userDrumPresets') || '[]');
-        if (!Array.isArray(userPresets)) {
-            userPresets = [];
-        }
-    } catch (e) {
-        console.warn('[State] Failed to parse ensemble_userDrumPresets from storage:', e);
-    }
-    const newPreset = {
-        name: name.substring(0, 32),
-        measures: groove.measures,
-        swing: groove.swing,
-        swingSub: groove.swingSub,
-        pattern: groove.instruments.map((inst) => ({
-            name: inst.name,
-            steps: [...inst.steps],
-        })),
-        timestamp: Date.now(),
-    };
-
-    userPresets.push(newPreset);
-    localStorage.setItem('ensemble_userDrumPresets', JSON.stringify(userPresets));
-    window.dispatchEvent(new Event('storage_sync'));
-    showToast(`Saved "${name}" to drum library`);
-}
-
-export function cloneMeasure() {
-    const { groove, arranger } = getState();
-    const spm = getStepsPerMeasure(arranger.timeSignature);
-    const sourceOffset = groove.currentMeasure * spm;
-    const newInstruments = groove.instruments.map((inst) => {
-        const newSteps = [...inst.steps];
-        const pattern = inst.steps.slice(sourceOffset, sourceOffset + spm);
-        for (let m = 0; m < groove.measures; m++) {
-            if (m === groove.currentMeasure) {
-                continue;
-            }
-            const targetOffset = m * spm;
-            for (let i = 0; i < spm; i++) {
-                newSteps[targetOffset + i] = pattern[i];
-            }
-        }
-        return { ...inst, steps: newSteps };
-    });
-    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'instruments', value: newInstruments });
-    showToast(`Measure ${groove.currentMeasure + 1} copied to all`);
-    dispatch('DRUM_MEASURE_CLONED');
-}
-
-export function clearDrumPresetHighlight() {
-    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'lastDrumPreset', value: null });
 }
 
 /** @type {number[]} */

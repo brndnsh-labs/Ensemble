@@ -9,16 +9,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock state and controller dependencies
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        playback: {},
-        groove: { enabled: true, activeTab: 'smart', lastDrumPreset: null, instruments: [] },
+        playback: { modals: { performance: false } },
+        groove: {
+            enabled: true,
+            genreFeel: 'Rock',
+            larsMode: true,
+            larsIntensity: 0.4,
+            creativity: false,
+            fillActive: false,
+        },
         arranger: { lastChordPreset: null, isDirty: false },
-        chords: { enabled: true, activeTab: 'smart' },
-        bass: { enabled: true, activeTab: 'smart' },
-        soloist: { enabled: true, activeTab: 'smart' },
-        harmony: { enabled: true, activeTab: 'smart' },
+        chords: { enabled: true },
+        bass: { enabled: true },
+        soloist: { enabled: true, tradeMode: 'manual' },
+        harmony: { enabled: true },
     };
     return {
         dispatch: vi.fn(),
+        groove: mockState.groove,
         stateMap: mockState,
         getState: () => mockState,
         subscribe: vi.fn(() => () => {}),
@@ -28,23 +36,25 @@ vi.mock('../../public/state.js', () => {
 vi.mock('../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) =>
         selector({
-            playback: {},
-            groove: { enabled: true, activeTab: 'smart', lastDrumPreset: null, instruments: [] },
+            playback: { modals: { performance: false } },
+            groove: {
+                enabled: true,
+                genreFeel: 'Rock',
+                larsMode: true,
+                larsIntensity: 0.4,
+                creativity: false,
+                fillActive: false,
+            },
             arranger: { lastChordPreset: null, isDirty: false },
-            chords: { enabled: true, activeTab: 'smart' },
-            bass: { enabled: true, activeTab: 'smart' },
-            soloist: { enabled: true, activeTab: 'smart' },
-            harmony: { enabled: true, activeTab: 'smart' },
+            chords: { enabled: true },
+            bass: { enabled: true },
+            soloist: { enabled: true, tradeMode: 'manual' },
+            harmony: { enabled: true },
         }),
-    useDispatch: () => vi.fn(),
 }));
 
 vi.mock('../../public/instrument-controller.js', () => ({
     togglePower: vi.fn(),
-    cloneMeasure: vi.fn(),
-    saveDrumPreset: vi.fn(),
-    updateMeasures: vi.fn(),
-    switchMeasure: vi.fn(),
 }));
 
 vi.mock('../../public/worker-client.js', () => ({
@@ -91,8 +101,8 @@ describe('Menu Interaction Regression Tests', () => {
             render(<GroovePanel isActiveMobile={false} />, container);
         });
 
-        const kebabBtn = container.querySelector('.panel-menu-btn[aria-label="Grooves Settings"]');
-        const settingsMenu = container.querySelector('.grooves-settings-menu');
+        const kebabBtn = container.querySelector('.panel-menu-btn[aria-label="Groove Settings"]');
+        const settingsMenu = container.querySelector('.groove-settings-menu');
 
         // Initially closed
         expect(settingsMenu.classList.contains('open')).toBe(false);
@@ -119,7 +129,6 @@ describe('Menu Interaction Regression Tests', () => {
                     id="test-panel"
                     module="chords"
                     title="Chords"
-                    styles={[]}
                     isActiveMobile={false}
                 />,
                 container,
@@ -128,7 +137,7 @@ describe('Menu Interaction Regression Tests', () => {
 
         const kebabBtn = container.querySelector('.panel-menu-btn');
         const settingsMenu = container.querySelector('.panel-settings-menu');
-        const panelBody = container.querySelector('.instrument-tab-content');
+        const panelBody = container.querySelector('.studio-mode-section');
 
         // Click to open
         act(() => {
@@ -152,7 +161,6 @@ describe('Menu Interaction Regression Tests', () => {
                     id="test-panel"
                     module="chords"
                     title="Chords"
-                    styles={[]}
                     isActiveMobile={false}
                 />,
                 container,

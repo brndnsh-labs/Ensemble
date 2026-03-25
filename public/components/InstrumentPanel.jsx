@@ -1,23 +1,18 @@
-import { flushBuffers, togglePower } from '../instrument-controller.js';
-import { saveCurrentState } from '../persistence.js';
+import { togglePower } from '../instrument-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { syncWorker } from '../worker-client.js';
 import { useClickOutside } from './hooks.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
-import { StyleSelector } from './StyleSelector.jsx';
 
 /**
  * @typedef {Object} InstrumentPanelProps
  * @property {string} id
  * @property {string} module
  * @property {string} title
- * @property {any} styles
- * @property {boolean} isActiveMobile
+ * @property {boolean} [isActiveMobile]
  * @property {boolean} [showPerformanceAction]
- * @property {boolean} [compactStudio]
  */
 /**
  * @param {InstrumentPanelProps} props
@@ -26,16 +21,13 @@ export function InstrumentPanel({
     id,
     module,
     title,
-    styles,
-    isActiveMobile,
+    isActiveMobile = true,
     showPerformanceAction = true,
-    compactStudio = false,
 }) {
-    const { activeTab, enabled, tradeMode, performanceOpen } = useEnsembleState(
+    const { enabled, tradeMode, performanceOpen } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => {
             const modState = /** @type {any} */ (s)[module];
             return {
-                activeTab: modState.activeTab,
                 enabled: modState.enabled,
                 tradeMode: modState.tradeMode,
                 performanceOpen: s.playback.modals?.performance,
@@ -45,50 +37,15 @@ export function InstrumentPanel({
 
     const [isMenuOpen, setIsMenuOpen, menuRef] = useClickOutside();
 
-    const switchTab = (/** @type {any} */ tab) => {
-        if (tab === 'smart') {
-            dispatch(ACTIONS.SET_STYLE, { module, style: 'smart' });
-            flushBuffers();
-            dispatch(ACTIONS.RESTORE_GAINS);
-        }
-
-        dispatch(ACTIONS.SET_ACTIVE_TAB, { module, tab });
-        syncWorker();
-        saveCurrentState();
-    };
-
-    const headerClass = `${module === 'chords' ? 'chord' : module === 'harmony' ? 'harmony' : module}-panel-header`;
+    const panelTheme = module === 'chords' ? 'chord' : module;
+    const headerClass = `${panelTheme}-panel-header`;
     const isWaiting = module === 'soloist' && !enabled && tradeMode !== 'manual';
     const isPerformanceMode = module === 'soloist' && performanceOpen;
     const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''} ${isPerformanceMode ? 'performance-active' : ''}`;
 
-    const classicContent = (
-        <div
-            id={`${module === 'chords' ? 'chord' : module}-tab-classic`}
-            class="instrument-tab-content active"
-        >
-            <label class="section-label">Style</label>
-            <div
-                id={`${module === 'harmony' ? 'harmony' : module}StylePresets`}
-                class="presets-container"
-            >
-                <StyleSelector module={module} styles={styles} />
-            </div>
-        </div>
-    );
-
-    const smartStatus = (
-        <div class="smart-status" style={`--module-color-rgb: var(--${module}-color-rgb);`}>
-            <p class="smart-status-copy">
-                ✨ <strong>Smart Follow</strong> Active
-            </p>
-        </div>
-    );
-    const compactSmartContent = module === 'soloist' ? <SoloistControls /> : smartStatus;
-
     return (
         <div
-            class={`panel dashboard-panel instrument-panel ${activeTab === 'smart' ? 'smart-active' : ''} ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} ${compactStudio ? 'studio-compact-panel' : ''}`}
+            class={`panel dashboard-panel instrument-panel smart-active ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} studio-compact-panel`}
             id={id}
             data-id={module}
         >
@@ -96,24 +53,6 @@ export function InstrumentPanel({
                 <div class="panel-header-main">
                     <h2 class="panel-title">{title}</h2>
                 </div>
-                {!compactStudio && (
-                    <div class="instrument-tabs">
-                        <button
-                            class={`instrument-tab-btn ${activeTab === 'classic' ? 'active' : ''}`}
-                            aria-pressed={activeTab === 'classic'}
-                            onClick={() => switchTab('classic')}
-                        >
-                            Classic
-                        </button>
-                        <button
-                            class={`instrument-tab-btn ${activeTab === 'smart' ? 'active' : ''}`}
-                            aria-pressed={activeTab === 'smart'}
-                            onClick={() => switchTab('smart')}
-                        >
-                            Smart
-                        </button>
-                    </div>
-                )}
                 <div class="panel-header-actions" ref={menuRef}>
                     {module === 'soloist' && showPerformanceAction && (
                         <button
@@ -161,39 +100,20 @@ export function InstrumentPanel({
                 </div>
             </div>
 
-            {compactStudio ? (
-                <div class="studio-mode-grid">
-                    <section class="studio-mode-section studio-mode-section--smart">
-                        <div class="studio-mode-section-header">
-                            <p class="workspace-kicker">Smart first</p>
-                            <h3 class="studio-mode-title">Smart</h3>
-                        </div>
-                        {compactSmartContent}
-                    </section>
-
-                    <details
-                        class="studio-mode-section studio-mode-section--legacy"
-                        open={activeTab === 'classic'}
-                    >
-                        <summary class="studio-mode-summary">
-                            <span>Classic controls</span>
-                            <span class="studio-mode-summary-hint">Legacy</span>
-                        </summary>
-                        <div class="studio-mode-section-body">{classicContent}</div>
-                    </details>
-                </div>
-            ) : (
-                <>
-                    {module === 'soloist' && <SoloistControls />}
-                    {classicContent}
+            <div class="studio-mode-section studio-mode-section--smart">
+                {module === 'soloist' ? (
+                    <SoloistControls />
+                ) : (
                     <div
-                        id={`${module === 'chords' ? 'chord' : module}-tab-smart`}
-                        class={`instrument-tab-content ${activeTab === 'smart' ? 'active' : ''}`}
+                        class="smart-status"
+                        style={`--module-color-rgb: var(--${panelTheme}-color-rgb);`}
                     >
-                        {smartStatus}
+                        <p class="smart-status-copy">
+                            ✨ <strong>Smart Follow</strong> Active
+                        </p>
                     </div>
-                </>
-            )}
+                )}
+            </div>
         </div>
     );
 }

@@ -5,6 +5,39 @@
     gap: 0.5rem;
 }
 
+.preset-library {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.preset-library-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.preset-library-section h4 {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.preset-chip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+}
+
+.preset-chip-stack {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
 .preset-chip {
     font-size: 0.75rem;
     padding: 0.3rem 0.6rem;
@@ -14,9 +47,39 @@
     transition: all var(--anim-normal) var(--anim-ease);
     border: 1px solid var(--border-color);
     color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    min-height: 72px;
+    text-align: left;
 
     /* Entrance */
     animation: fade-in-up var(--anim-normal) var(--anim-ease) both;
+}
+
+.preset-chip-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.preset-chip-meta {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.preset-chip.active .preset-chip-meta {
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.preset-chip-delete {
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
+    align-self: stretch;
 }
 
 .preset-chip:hover {

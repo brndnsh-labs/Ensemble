@@ -16,17 +16,6 @@ describe('Groove Reducer', () => {
         expect(groove.instruments[0].steps[0]).toBe(0);
     });
 
-    it('should set groove steps for a specific instrument', () => {
-        const steps = new Array(128).fill(0);
-        steps[0] = 1;
-        grooveReducer(ACTIONS.SET_GROOVE_STEPS, { instrument: 'Kick', steps });
-        expect(groove.instruments.find((i) => i.name === 'Kick').steps[0]).toBe(1);
-
-        // Invalid instrument
-        const result = grooveReducer(ACTIONS.SET_GROOVE_STEPS, { instrument: 'Invalid', steps });
-        expect(result).toBe(false);
-    });
-
     it('should set active measure', () => {
         grooveReducer(ACTIONS.SET_ACTIVE_MEASURE, 2);
         expect(groove.currentMeasure).toBe(2);
@@ -72,26 +61,12 @@ describe('Groove Reducer', () => {
         expect(result).toBe(false);
     });
 
-    it('should handle SET_ACTIVE_TAB for groove', () => {
-        grooveReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'grid' });
-        expect(groove.activeTab).toBe('grid');
-
-        const result = grooveReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'other', tab: 'grid' });
-        expect(result).toBe(false);
-    });
-
     it('should trigger drum fills', () => {
         const payload = { steps: { 0: 1 }, startStep: 16, length: 16, crash: true };
         grooveReducer(ACTIONS.TRIGGER_FILL, payload);
         expect(groove.fillActive).toBe(true);
         expect(groove.fillSteps[0]).toBe(1);
         expect(groove.pendingCrash).toBe(true);
-    });
-
-    it('should increment grid version on step toggle', () => {
-        const initial = groove.gridVersion;
-        grooveReducer(ACTIONS.STEP_TOGGLE);
-        expect(groove.gridVersion).toBe(initial + 1);
     });
 
     it('should handle SET_GENRE_FEEL - immediate update when NOT playing', () => {
@@ -141,15 +116,12 @@ describe('Groove Reducer', () => {
                 pendingGenreFeel: { feel: 'Funk' },
                 genreSwitchCountdown: 2,
                 fillActive: true,
-                activeTab: 'grid',
-                mobileTab: 'drums',
                 lastHatGain: 0.8,
                 fillStartStep: 32,
                 fillLength: 8,
                 snareMask: 123,
                 pendingCrash: true,
                 creativity: true,
-                gridVersion: 99,
             };
 
             for (const [param, value] of Object.entries(params)) {

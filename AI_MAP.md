@@ -113,7 +113,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Logic Views** | `public/components/Arranger.jsx` | Chord progression manager. |
 | **Controls** | `public/components/Transport.jsx` | Playback controls and tempo. |
 | **Visuals** | `public/components/Visualizer.jsx` | Canvas rendering container. |
-| **Grid** | `public/components/SequencerGrid.jsx` | Interactive drum editor. |
+| **Library** | `public/components/PresetLibrary.jsx` | Chord progression library modal. |
 | **Panels** | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
 

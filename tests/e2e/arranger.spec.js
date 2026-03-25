@@ -41,7 +41,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
         await expect(modal.locator('#workspaceLibraryTitle')).toHaveText('Progression Library');
-        await expect(modal.locator('.presets-container').first()).toBeVisible();
+        await expect(modal.locator('.preset-chip-grid').first()).toBeVisible();
 
         await modal.locator('.preset-chip').first().click();
         await expect(modal).toBeHidden();

@@ -159,13 +159,12 @@ export function InstrumentSettings({ module }) {
                         <SettingRow label="Lead Sound" id="soloistPresetSelect">
                             <Select
                                 id="soloistPresetSelect"
-                                value={state.preset || 'classic'}
+                                value={state.preset || 'trumpet'}
                                 onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
                                     saveCurrentState();
                                 }}
                                 options={[
-                                    { value: 'classic', label: 'Classic Sawtooth' },
                                     { value: 'neo', label: 'Neo-Juno' },
                                     { value: 'vowel', label: 'Vowel Lead' },
                                     { value: 'trumpet', label: 'Trumpet' },

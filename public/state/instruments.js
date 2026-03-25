@@ -17,7 +17,6 @@ import { groove } from './groove.js';
  * @property {number|null} scheduledChordIndex - Index of the last scheduled chord (Internal).
  * @property {Map<number, any>} buffer - Scheduled notes buffer.
  * @property {number} rhythmicMask - 16-bit mask of the current comping pattern.
- * @property {string} activeTab - Currently active UI tab ('classic' or 'smart').
  * @property {string} [instrument] - Optional instrument name.
  */
 /** @type {import('deepsignal').DeepSignal<ChordState>} */
@@ -33,7 +32,6 @@ export const chords = deepSignal({
     scheduledChordIndex: null,
     buffer: new Map(),
     rhythmicMask: 0,
-    activeTab: 'smart',
     instrument: 'Clean',
 });
 
@@ -49,7 +47,6 @@ export const chords = deepSignal({
  * @property {string} style - Playing style ID (e.g., 'walking', 'funk').
  * @property {number} busySteps - Counter for "busy" playing periods.
  * @property {number|null} lastMidiPlayed - Last MIDI note value played.
- * @property {string} activeTab - Currently active UI tab.
  * @property {GainNode|null} lastBassGain - Last gain node for dynamic continuity.
  */
 /** @type {import('deepsignal').DeepSignal<BassState>} */
@@ -64,7 +61,6 @@ export const bass = deepSignal({
     style: 'smart',
     busySteps: 0,
     lastMidiPlayed: null,
-    activeTab: 'smart',
     lastBassGain: null,
 });
 
@@ -73,7 +69,7 @@ export const bass = deepSignal({
  * @property {boolean} enabled - Whether the soloist is active.
  * @property {number} volume - Mix volume (0.0 - 1.0).
  * @property {number} reverb - Reverb level.
- * @property {string} preset - The synth sound profile ('classic', 'neo', 'vowel').
+ * @property {string} preset - The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone').
  * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
  * @property {string} seed - Thematic seed for deterministic generation.
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
@@ -116,7 +112,6 @@ export const bass = deepSignal({
  * @property {Array<any>} activeVoices - Active polyphonic voices.
  * @property {number|null} lastMidiPlayed - Last MIDI note value played.
  * @property {string} [style] - Optional playing style.
- * @property {string} [activeTab] - Optional active UI tab.
  * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
  * @property {number} octave - Base MIDI octave.
  * @property {number} lastNoteEnd - Last note end time.
@@ -167,7 +162,6 @@ export const soloist = deepSignal({
     activeVoices: [],
     sessionSteps: 0,
     deviceBuffer: [],
-    activeTab: 'smart',
     seed: '',
     lastMidiPlayed: null,
     lastFreq: null,
@@ -198,7 +192,6 @@ export const soloist = deepSignal({
  * @property {number} complexity - Local complexity override (0.0 - 1.0).
  * @property {Array<any>} motifBuffer - Short-term memory for current section hooks.
  * @property {number} rhythmicMask - 16-bit mask of the current rhythmic motif (16th notes).
- * @property {string} activeTab - Currently active UI tab.
  * @property {Array<number>} lastMidis - Array of recently played MIDI notes.
  * @property {Array<any>} activeVoices - Currently playing polyphonic voices.
  * @property {number} pocketOffset - Current micro-timing offset.
@@ -216,7 +209,6 @@ export const harmony = deepSignal({
     lastMidis: [],
     activeVoices: [],
     rhythmicMask: 0,
-    activeTab: 'smart',
     pocketOffset: 0,
 });
 
@@ -290,14 +282,12 @@ export function instrumentReducer(action, payload) {
             chords.octave = 65;
             chords.density = 'standard';
             chords.pianoRoots = false;
-            chords.activeTab = 'smart';
 
             bass.enabled = true;
             bass.volume = 0.45;
             bass.reverb = 0.05;
             bass.octave = 38;
             bass.style = 'smart';
-            bass.activeTab = 'smart';
 
             soloist.enabled = false;
             soloist.preset = 'trumpet';
@@ -305,7 +295,6 @@ export function instrumentReducer(action, payload) {
             soloist.reverb = 0.6;
             soloist.octave = 72;
             soloist.style = 'smart';
-            soloist.activeTab = 'smart';
             soloist.mode = 'monophonic';
             soloist.complexity = 0.5;
             soloist.tradeMode = 'manual';
@@ -338,7 +327,6 @@ export function instrumentReducer(action, payload) {
             harmony.octave = 60;
             harmony.style = 'smart';
             harmony.complexity = 0.5;
-            harmony.activeTab = 'smart';
             return true;
         case ACTIONS.SET_STYLE:
             if (instrumentStateMap[payload.module]) {
@@ -377,19 +365,15 @@ export function instrumentReducer(action, payload) {
             // When a smart genre is selected, update all instrument styles and switch to smart mode
             if (payload.chord) {
                 chords.style = payload.chord;
-                chords.activeTab = 'smart';
             }
             if (payload.bass) {
                 bass.style = payload.bass;
-                bass.activeTab = 'smart';
             }
             if (payload.soloist) {
                 soloist.style = payload.soloist;
-                soloist.activeTab = 'smart';
             }
             if (payload.harmony) {
                 harmony.style = payload.harmony;
-                harmony.activeTab = 'smart';
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
@@ -398,14 +382,6 @@ export function instrumentReducer(action, payload) {
             }
             if (payload.hookProb) {
                 soloist.hookRetentionProb = payload.hookProb;
-            }
-            return true;
-        case ACTIONS.SET_ACTIVE_TAB:
-            if (payload.module === 'groove') {
-                // We'll handle this in state.js or groove.js instead to avoid circularity
-                return false;
-            } else if (instrumentStateMap[payload.module]) {
-                instrumentStateMap[payload.module].activeTab = payload.tab;
             }
             return true;
         case ACTIONS.UPDATE_HB:

@@ -1,51 +1,31 @@
-import { render } from 'preact';
-import React from 'preact/compat';
 /**
  * @vitest-environment happy-dom
  */
+
+import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies BEFORE imports
-vi.mock('../../../public/ui-bridge.js', () => ({
-    useEnsembleState: (selector) => {
-        // Mock state
-        const state = {
-            groove: {
-                activeTab: 'smart',
-                enabled: true,
-                measures: 1,
-                fillActive: false,
-                lastSmartGenre: 'Rock',
-                pendingGenreFeel: null,
-                creativity: false,
-            },
-            playback: {
-                bandIntensity: 0.5,
-                autoIntensity: false,
-                complexity: 0.5,
-            },
-        };
-        return selector(state);
+const mockState = {
+    groove: {
+        enabled: true,
+        genreFeel: 'Rock',
+        larsMode: true,
+        larsIntensity: 0.42,
+        creativity: false,
+        fillActive: false,
     },
-    useDispatch: () => vi.fn(),
+};
+
+vi.mock('../../../public/ui-bridge.js', () => ({
+    useEnsembleState: (selector) => selector(mockState),
 }));
 
 vi.mock('../../../public/state.js', () => ({
     dispatch: vi.fn(),
-    ACTIONS: {
-        SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
-        SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
-        SET_COMPLEXITY: 'SET_COMPLEXITY',
-        SET_CREATIVITY: 'SET_CREATIVITY',
-    },
-}));
-
-vi.mock('../../../public/types.js', () => ({
-    ACTIONS: {
-        SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
-        SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
-        SET_COMPLEXITY: 'SET_COMPLEXITY',
-        SET_CREATIVITY: 'SET_CREATIVITY',
+    groove: {
+        creativity: false,
+        larsIntensity: 0.42,
+        larsMode: true,
     },
 }));
 
@@ -59,28 +39,15 @@ vi.mock('../../../public/persistence.js', () => ({
 
 vi.mock('../../../public/instrument-controller.js', () => ({
     togglePower: vi.fn(),
-    updateMeasures: vi.fn(),
-    cloneMeasure: vi.fn(),
-    saveDrumPreset: vi.fn(),
 }));
 
-// Mock child components to simplify testing
 vi.mock('../../../public/components/InstrumentSettings.jsx', () => ({
     InstrumentSettings: () => <div data-testid="instrument-settings">Settings</div>,
 }));
 
-vi.mock('../../../public/components/PresetLibrary.jsx', () => ({
-    PresetLibrary: () => <div data-testid="preset-library">Presets</div>,
-}));
-
-vi.mock('../../../public/components/SequencerGrid.jsx', () => ({
-    SequencerGrid: () => <div data-testid="sequencer-grid">Grid</div>,
-}));
-
-// Import component under test
 import { GroovePanel } from '../../../public/components/GroovePanel.jsx';
 
-describe('GroovePanel Accessibility', () => {
+describe('GroovePanel accessibility', () => {
     let container;
 
     beforeEach(() => {
@@ -88,25 +55,26 @@ describe('GroovePanel Accessibility', () => {
         render(<GroovePanel />, container);
     });
 
-    it('Creativity Toggle should have accessible label', () => {
-        const check = container.querySelector('#creativityCheck');
-        expect(check).toBeTruthy();
-
-        // 1. Check for associated label
-        const label = check.closest('label');
-        expect(label).toBeTruthy();
-        expect(label.textContent).toContain('Creativity');
+    it('exposes the genre selector as a labeled button', () => {
+        const genreButton = container.querySelector('button[aria-label="Change groove genre"]');
+        expect(genreButton).toBeTruthy();
+        expect(genreButton.textContent).toContain('Rock');
     });
 
-    it('Intensity Slider should have accessible label', () => {
+    it('labels the intensity slider', () => {
         const slider = container.querySelector('#intensitySlider');
+        const label = container.querySelector('label[for="intensitySlider"]');
+
         expect(slider).toBeTruthy();
+        expect(label?.textContent).toContain('Intensity');
+    });
 
-        const id = slider.getAttribute('id');
-        const label = container.querySelector(`label[for="${id}"]`);
+    it('labels the creativity switch', () => {
+        const toggle = container.querySelector('#creativityCheck');
+        const label = container.querySelector('label[for="creativityCheck"]');
 
-        // This is expected to FAIL currently
-        expect(label).toBeTruthy();
-        expect(label.textContent).toContain('Intensity');
+        expect(toggle).toBeTruthy();
+        expect(toggle?.getAttribute('aria-label')).toBe('Creativity');
+        expect(label?.textContent).toContain('Creativity');
     });
 });

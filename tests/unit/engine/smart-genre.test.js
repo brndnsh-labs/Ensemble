@@ -97,12 +97,7 @@ describe('Smart Genre System', () => {
     });
 
     describe('State Updates & Presets', () => {
-        it('should update all instruments and switch to smart tabs when a genre is selected', () => {
-            // Set some non-default states first to verify reset/update
-            chords.activeTab = 'classic';
-            bass.activeTab = 'classic';
-            groove.activeTab = 'classic';
-
+        it('should update all instrument styles when a genre is selected', () => {
             const payload = {
                 genreName: 'Funk',
                 feel: 'Funk',
@@ -121,29 +116,21 @@ describe('Smart Genre System', () => {
             expect(groove.genreFeel).toBe('Funk');
             expect(groove.swing).toBe(15);
             expect(groove.swingSub).toBe('16th');
-            expect(groove.activeTab).toBe('smart');
 
             // Check Chords
             expect(chords.style).toBe('funk');
-            expect(chords.activeTab).toBe('smart');
 
             // Check Bass
             expect(bass.style).toBe('funk');
-            expect(bass.activeTab).toBe('smart');
 
             // Check Soloist
             expect(soloist.style).toBe('blues');
-            expect(soloist.activeTab).toBe('smart');
 
             // Check Harmony
             expect(harmony.style).toBe('horns');
-            expect(harmony.activeTab).toBe('smart');
         });
 
         it('should set appropriate instrument styles for each smart genre configuration', () => {
-            // This simulates what ui-controller.js does when it dispatches SET_GENRE_FEEL
-            // and then dispatches SET_STYLE/SET_ACTIVE_TAB sequence
-
             const JAZZ_CONFIG = {
                 feel: 'Jazz',
                 swing: 60,

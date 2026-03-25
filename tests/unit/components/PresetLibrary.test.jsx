@@ -6,173 +6,120 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies
-const mockUseEnsembleState = vi.fn();
 const mockDispatch = vi.fn();
-const mockGetState = vi.fn(() => ({
-    playback: { applyPresetSettings: true },
-}));
-
-vi.mock('../../../public/ui-bridge.js', () => ({
-    useEnsembleState: (selector) => mockUseEnsembleState(selector),
-    useDispatch: () => mockDispatch,
-}));
+const mockState = {
+    arranger: { lastChordPreset: 'Pop (Standard)', isDirty: false },
+    playback: { applyPresetSettings: false },
+};
 
 vi.mock('../../../public/state.js', () => ({
-    getState: () => mockGetState(),
     dispatch: (action, payload) => mockDispatch(action, payload),
-}));
-
-// Mock Presets
-vi.mock('../../../public/data/chord-presets.js', () => ({
-    CHORD_PRESETS: [
-        { name: 'Pop (Standard)', category: 'Pop/Rock', sections: [] },
-        { name: 'Another Preset', category: 'Other', sections: [] },
-    ],
-}));
-
-vi.mock('../../../public/data/drum-presets.js', () => ({
-    DRUM_PRESETS: {
-        'Basic Rock': { category: 'Pop/Rock', swing: 0, sub: '8th' },
-        Jazz: { category: 'Jazz', swing: 60, sub: '8th' },
-    },
-}));
-
-// Mock Utils
-vi.mock('../../../public/utils.js', () => ({
-    formatUnicodeSymbols: (s) => s,
-    generateId: () => 'test-id',
-    decompressSections: (s) => s,
-}));
-
-// Mock Controllers
-vi.mock('../../../public/instrument-controller.js', () => ({
-    loadDrumPreset: vi.fn(),
-    flushBuffers: vi.fn(),
-    switchMeasure: vi.fn(),
-    saveDrumPreset: vi.fn(),
-}));
-
-vi.mock('../../../public/arranger-controller.js', () => ({
-    validateAndAnalyze: vi.fn(),
-    clearChordPresetHighlight: vi.fn(), // We mock it to verify calls if needed, though we test Reactivity
-    saveProgression: vi.fn(),
+    getState: () => mockState,
 }));
 
 vi.mock('../../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 
-vi.mock('../../../public/worker-client.js', () => ({
-    syncWorker: vi.fn(),
+vi.mock('../../../public/arranger-controller.js', () => ({
+    validateAndAnalyze: vi.fn(),
+}));
+
+vi.mock('../../../public/instrument-controller.js', () => ({
+    flushBuffers: vi.fn(),
+}));
+
+vi.mock('../../../public/data/chord-presets.js', () => ({
+    CHORD_PRESETS: [
+        {
+            name: 'Pop (Standard)',
+            sections: [{ label: 'Main', value: 'I | V | vi | IV' }],
+        },
+        {
+            name: 'Autumn Leaves',
+            sections: [{ label: 'Main', value: 'ii | V | I' }],
+            settings: { bpm: 140, style: 'jazz', timeSignature: '4/4' },
+        },
+    ],
+}));
+
+vi.mock('../../../public/utils.js', () => ({
+    decompressSections: vi.fn((sections) => sections),
+    formatUnicodeSymbols: vi.fn((value) => value),
+    generateId: vi.fn(() => 'generated-section-id'),
 }));
 
 import { PresetLibrary } from '../../../public/components/PresetLibrary.jsx';
 
-describe('PresetLibrary Component', () => {
+describe('PresetLibrary', () => {
     let container;
 
     beforeEach(() => {
         container = document.createElement('div');
         document.body.appendChild(container);
-
-        // Mock localStorage
-        const storage = {};
         vi.stubGlobal('localStorage', {
-            getItem: vi.fn((key) => storage[key] || null),
-            setItem: vi.fn((key, value) => {
-                storage[key] = value;
-            }),
-            removeItem: vi.fn((key) => {
-                delete storage[key];
-            }),
-            clear: vi.fn(() => {
-                for (const key in storage) {
-                    delete storage[key];
-                }
-            }),
+            getItem: vi.fn(() => null),
+            setItem: vi.fn(),
+            removeItem: vi.fn(),
+            clear: vi.fn(),
         });
+        mockDispatch.mockClear();
+        mockState.arranger.lastChordPreset = 'Pop (Standard)';
+        mockState.arranger.isDirty = false;
+        mockState.playback.applyPresetSettings = false;
     });
 
     afterEach(() => {
-        if (container?.parentNode) {
-            document.body.removeChild(container);
-        }
-        vi.restoreAllMocks();
+        render(null, container);
+        container.remove();
         vi.unstubAllGlobals();
+        vi.clearAllMocks();
     });
 
-    it('should show chord preset as active when isDirty is false', async () => {
-        // Setup state: dirty=false, lastChordPreset='Pop (Standard)'
-        mockUseEnsembleState.mockImplementation((selector) => {
-            const state = {
-                arranger: { lastChordPreset: 'Pop (Standard)', isDirty: false },
-                groove: { lastDrumPreset: 'Basic Rock' },
-            };
-            return selector(state);
-        });
-
-        act(() => {
-            render(<PresetLibrary type="chord" />, container);
-        });
-
-        // Wait for dynamic import
+    it('highlights the last loaded chord preset when the arranger is clean', async () => {
         await act(async () => {
-            await new Promise((r) => setTimeout(r, 0));
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
-        const activeChip = container.querySelector('.chord-preset-chip.active');
-        expect(activeChip).not.toBeNull();
-        expect(activeChip.textContent).toBe('Pop (Standard)');
+        const activeChip = container.querySelector('.preset-chip.active .preset-chip-name');
+        expect(activeChip?.textContent).toBe('Pop (Standard)');
     });
 
-    it('should NOT show chord preset as active when isDirty is true', async () => {
-        // Setup state: dirty=true, lastChordPreset='Pop (Standard)'
-        mockUseEnsembleState.mockImplementation((selector) => {
-            const state = {
-                arranger: { lastChordPreset: 'Pop (Standard)', isDirty: true },
-                groove: { lastDrumPreset: 'Basic Rock' },
-            };
-            return selector(state);
-        });
+    it('clears the active highlight when the arranger has unsaved edits', async () => {
+        mockState.arranger.isDirty = true;
 
-        act(() => {
-            render(<PresetLibrary type="chord" />, container);
-        });
-
-        // Wait for dynamic import
         await act(async () => {
-            await new Promise((r) => setTimeout(r, 0));
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
-        const activeChip = container.querySelector('.chord-preset-chip.active');
-        // This expectation validates the FIX.
-        // Currently (before fix), this test is expected to FAIL because the component ignores isDirty.
-        expect(activeChip).toBeNull();
+        expect(container.querySelector('.preset-chip.active')).toBeNull();
     });
 
-    it('should show drum preset as active regardless of isDirty', async () => {
-        // Setup state: dirty=true (arranger dirty), lastDrumPreset='Basic Rock'
-        mockUseEnsembleState.mockImplementation((selector) => {
-            const state = {
-                arranger: { lastChordPreset: 'Pop (Standard)', isDirty: true },
-                groove: { lastDrumPreset: 'Basic Rock' },
-            };
-            return selector(state);
-        });
+    it('loads a preset and notifies the caller', async () => {
+        const onSelect = vi.fn();
+        mockState.playback.applyPresetSettings = true;
 
-        act(() => {
-            render(<PresetLibrary type="drum" />, container);
-        });
-
-        // Wait for dynamic import
         await act(async () => {
-            await new Promise((r) => setTimeout(r, 0));
+            render(<PresetLibrary onSelect={onSelect} />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
-        // Drums should stay active even if arranger is dirty
-        const activeChip = container.querySelector('.drum-preset-chip.active');
-        expect(activeChip).not.toBeNull();
-        expect(activeChip.textContent).toBe('Basic Rock');
+        const autumnLeaves = Array.from(container.querySelectorAll('.preset-chip')).find((chip) =>
+            chip.textContent?.includes('Autumn Leaves'),
+        );
+
+        await act(async () => {
+            autumnLeaves?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onSelect).toHaveBeenCalled();
+        expect(mockDispatch).toHaveBeenCalledWith('SET_PARAM', {
+            module: 'arranger',
+            param: 'lastChordPreset',
+            value: 'Autumn Leaves',
+        });
+        expect(mockDispatch).toHaveBeenCalledWith('SET_BPM', 140);
     });
 });

@@ -375,10 +375,6 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
                 }
 
                 dispatch(ACTIONS.UPDATE_SB, sbUpdate);
-                dispatch(ACTIONS.SET_ACTIVE_TAB, {
-                    module: 'soloist',
-                    tab: soloistState.activeTab,
-                });
                 saveCurrentState();
             }
 

@@ -101,12 +101,6 @@
  */
 
 /**
- * @typedef {Object} ActionPayloadSetActiveTab
- * @property {string} module
- * @property {string} tab
- */
-
-/**
  * @typedef {Object} ActionPayloadSetModalOpen
  * @property {keyof ModalsState} modal
  * @property {boolean} open
@@ -157,12 +151,6 @@
  * @property {number} startStep
  * @property {number} length
  * @property {boolean} [crash]
- */
-
-/**
- * @typedef {Object} ActionPayloadSetGrooveSteps
- * @property {string} instrument
- * @property {Array<number>} steps
  */
 
 /**
@@ -253,7 +241,6 @@
  * @property {ActionPayloadSetReverb} SET_REVERB
  * @property {string} SET_SOLOIST_MODE
  * @property {string} SET_SOLOIST_SEED
- * @property {ActionPayloadSetActiveTab} SET_ACTIVE_TAB
  * @property {string} SET_SOLOIST_PRESET
  * @property {ActionPayloadUpdateSB} UPDATE_SB
  * @property {number} SET_SWING
@@ -264,10 +251,8 @@
  * @property {boolean} SET_CREATIVITY
  * @property {ActionPayloadSetGenreFeel} SET_GENRE_FEEL
  * @property {number | null} SET_GENRE_COUNTDOWN
- * @property {ActionPayloadSetGrooveSteps} SET_GROOVE_STEPS
  * @property {number | string} SET_ACTIVE_MEASURE
  * @property {ActionPayloadSetGrooveSeed} SET_GROOVE_SEED
- * @property {undefined} STEP_TOGGLE
  * @property {ActionPayloadTriggerFill} TRIGGER_FILL
  * @property {ActionPayloadUpdateHB} UPDATE_HB
  * @property {ActionPayloadUpdateGB} UPDATE_GB
@@ -304,8 +289,6 @@
  * @property {any} [VIS_UPDATE]
  * @property {undefined} [PROG_VALIDATED]
  * @property {undefined} [DRUM_PRESET_LOADED]
- * @property {undefined} [DRUM_MEASURE_CLONED]
- * @property {undefined} [MOBILE_TAB_SWITCH]
  */
 
 export const ACTIONS = {
@@ -335,7 +318,6 @@ export const ACTIONS = {
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SOLOIST_SEED: 'SET_SOLOIST_SEED',
-    SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
     SET_SOLOIST_PRESET: 'SET_SOLOIST_PRESET',
     UPDATE_SB: 'UPDATE_SB',
 
@@ -348,10 +330,8 @@ export const ACTIONS = {
     SET_CREATIVITY: 'SET_CREATIVITY',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
     SET_GENRE_COUNTDOWN: 'SET_GENRE_COUNTDOWN',
-    SET_GROOVE_STEPS: 'SET_GROOVE_STEPS',
     SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',
     SET_GROOVE_SEED: 'SET_GROOVE_SEED',
-    STEP_TOGGLE: 'STEP_TOGGLE',
     TRIGGER_FILL: 'TRIGGER_FILL',
     UPDATE_HB: 'UPDATE_HB',
     UPDATE_GB: 'UPDATE_GB',

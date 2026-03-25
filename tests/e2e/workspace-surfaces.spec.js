@@ -21,13 +21,12 @@ test.describe('Workspace surfaces @ui', () => {
 
         const studio = page.locator('[data-workspace="studio"]');
         await expect(studio.locator('.workspace-panel-copy')).toHaveCount(0);
-        await expect(studio.locator('.studio-mode-grid')).toHaveCount(5);
-        await expect(studio.locator('.studio-mode-summary').first()).toBeVisible();
         await expect(studio.locator('#panel-grooves')).toBeVisible();
         await expect(studio.locator('#panel-chords')).toBeVisible();
         await expect(studio.locator('#panel-bass')).toBeVisible();
         await expect(studio.locator('#panel-soloist')).toBeVisible();
         await expect(studio.locator('#panel-harmonies')).toBeVisible();
+        await expect(studio.locator('.workspace-group-header')).toHaveCount(2);
 
         const wideGroove = await studio.locator('#panel-grooves').boundingBox();
         const wideSoloist = await studio.locator('#panel-soloist').boundingBox();

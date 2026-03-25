@@ -105,7 +105,7 @@ function LibraryModal({ isOpen, onClose }) {
                     </button>
                 </div>
                 <div class="workspace-library-body">
-                    <PresetLibrary type="chord" onSelect={onClose} />
+                    <PresetLibrary onSelect={onClose} />
                 </div>
             </div>
         </div>

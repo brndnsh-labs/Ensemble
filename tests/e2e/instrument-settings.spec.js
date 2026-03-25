@@ -7,11 +7,12 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
         await page.goto('/');
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
         await page.click('[data-workspace-nav="studio"]');
+        await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
     });
 
     test('Chords Kebab Menu - Layout & Content @desktop', async ({ page }) => {
         const chordPanel = page.locator('#panel-chords');
-        const kebabBtn = chordPanel.locator('.panel-menu-btn').filter({ hasText: '⋮' });
+        const kebabBtn = chordPanel.getByRole('button', { name: 'Chords Settings' });
 
         await expect(kebabBtn).toBeVisible();
         await kebabBtn.click();
@@ -30,7 +31,7 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
 
     test('Grooves Kebab Menu - Layout & Content @desktop', async ({ page }) => {
         const groovePanel = page.locator('#panel-grooves');
-        const kebabBtn = groovePanel.locator('.panel-menu-btn').filter({ hasText: '⋮' });
+        const kebabBtn = groovePanel.getByRole('button', { name: 'Groove Settings' });
 
         await expect(kebabBtn).toBeVisible();
         await kebabBtn.click();
@@ -48,7 +49,7 @@ test.describe('Instrument Kebab Menus - Visual & Interaction', () => {
 
     test('Soloist Kebab Menu - Alignment & Compactness @desktop', async ({ page }) => {
         const soloistPanel = page.locator('#panel-soloist');
-        const kebabBtn = soloistPanel.locator('.panel-menu-btn').filter({ hasText: '⋮' });
+        const kebabBtn = soloistPanel.getByRole('button', { name: 'Soloist Settings' });
 
         await expect(kebabBtn).toBeVisible();
         await kebabBtn.click();
