@@ -294,11 +294,6 @@ button {
     min-height: 60px;
 }
 
-#col-sidebar {
-    grid-area: sidebar;
-    height: fit-content;
-}
-
 @media (max-width: 1100px) {
     .app-main-layout {
         grid-template-columns: 1fr 320px;
@@ -314,8 +309,7 @@ button {
     }
 
     #panel-arranger,
-    #panel-visualizer,
-    #col-sidebar {
+    #panel-visualizer {
         grid-area: auto;
         min-height: 0;
     }
@@ -328,11 +322,6 @@ button {
     #panel-arranger {
         margin-bottom: 1rem;
         order: 1;
-    }
-
-    #col-sidebar {
-        order: 3;
-        display: contents;
     }
 
     .instrument-panel {
@@ -1640,36 +1629,18 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 .workspace-studio-surface {
     --studio-surface-accent: var(--accent-color);
     position: fixed;
-    padding: 1rem;
+    padding: 0.85rem;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
+    gap: 0.75rem;
     border-radius: 22px;
     border: 1px solid color-mix(in srgb, var(--studio-surface-accent), transparent 72%);
-    background: linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--studio-surface-accent), transparent 88%) 0%,
-        color-mix(in srgb, var(--panel-color), black 1%) 24%,
-        color-mix(in srgb, var(--panel-color), black 4%) 100%
-    );
+    background: var(--panel-color);
     box-shadow:
         0 22px 60px rgba(2, 6, 23, 0.28),
         0 0 0 1px color-mix(in srgb, var(--studio-surface-accent), transparent 88%);
     z-index: var(--z-modal);
     overflow: hidden;
-}
-
-.workspace-studio-surface::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    height: 3px;
-    background: linear-gradient(
-        90deg,
-        color-mix(in srgb, var(--studio-surface-accent), white 10%),
-        color-mix(in srgb, var(--studio-surface-accent), transparent 22%)
-    );
-    opacity: 1;
 }
 
 .workspace-studio-surface--modal {
@@ -1710,7 +1681,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.75rem;
     min-width: 0;
 }
 
@@ -1718,7 +1689,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.28rem;
+    gap: 0.2rem;
 }
 
 .workspace-studio-surface-header h3 {
@@ -1730,7 +1701,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     margin: 0;
     font-size: 0.84rem;
     color: var(--text-muted);
-    line-height: 1.45;
+    line-height: 1.4;
 }
 
 .workspace-studio-surface-meta {
@@ -1749,7 +1720,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     scroll-padding-block-end: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
+    gap: 0.75rem;
     padding-right: 0.1rem;
     scrollbar-gutter: stable;
 }
@@ -1814,51 +1785,51 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface--settings .grid-2-col {
     grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: 0.85rem;
+    gap: 0.65rem;
     align-items: start;
 }
 
 .workspace-studio-surface--settings .setting-group,
 .workspace-studio-surface-card {
     margin: 0;
-    padding: 0.95rem;
+    padding: 0.8rem;
     border: 1px solid color-mix(in srgb, var(--studio-surface-accent), transparent 78%);
     border-radius: 18px;
-    background: color-mix(in srgb, var(--card-bg), var(--studio-surface-accent) 4%);
+    background: var(--card-bg);
     box-shadow: var(--shadow-sm);
 }
 
 .workspace-studio-surface--settings .setting-group:last-child {
     margin: 0;
-    padding: 0.95rem;
+    padding: 0.8rem;
     border-radius: 18px;
     border-top: 1px solid color-mix(in srgb, var(--studio-surface-accent), transparent 78%);
-    background: color-mix(in srgb, var(--input-bg), var(--studio-surface-accent) 3%);
+    background: var(--input-bg);
 }
 
 [data-theme="light"] .workspace-studio-surface--settings .setting-group:last-child {
-    background: rgba(0, 0, 0, 0.025);
+    background: var(--input-bg);
 }
 
 .workspace-studio-surface--settings .setting-group-title {
     font-size: 0.68rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.38rem;
+    margin-bottom: 0.55rem;
+    padding-bottom: 0.3rem;
     letter-spacing: 0.1em;
     color: var(--text-muted);
-    opacity: 0.82;
+    opacity: 1;
     border-bottom: 1px solid color-mix(in srgb, var(--studio-surface-accent), transparent 82%);
 }
 
 .workspace-studio-surface--settings .setting-row {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
     min-height: 0;
-    gap: 0.55rem;
+    gap: 0.45rem;
     align-items: flex-start;
 }
 
 .workspace-studio-surface--settings .setting-label {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
 }
 
 .workspace-studio-surface--settings .setting-info {
@@ -1875,7 +1846,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .setting-value-display {
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     min-width: 2.4rem;
 }
 
@@ -1898,8 +1869,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .divider-top {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
 }
 
 .workspace-studio-surface--settings .instrument-settings-swing-controls {
@@ -1919,7 +1890,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface--settings .smart-tab-layout {
     padding: 0;
-    gap: 0.65rem;
+    gap: 0.55rem;
 }
 
 .workspace-studio-surface--settings .flex-between {
@@ -1936,7 +1907,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface--settings .button-group-btn {
     border-radius: 999px;
-    padding: 0.35rem 0.75rem;
+    padding: 0.3rem 0.7rem;
 }
 
 .workspace-studio-surface-card--soloist {

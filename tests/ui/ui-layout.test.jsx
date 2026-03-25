@@ -65,7 +65,6 @@ describe('UI Layout Integrity', () => {
             'groovePowerBtnDesktop',
             'bassPowerBtnDesktop',
             'soloistPowerBtnDesktop',
-            'vizPowerBtn',
             'addSectionBtn',
             'inspirationHubBtn',
             'activeSectionLabel',

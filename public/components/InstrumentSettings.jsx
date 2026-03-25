@@ -292,6 +292,22 @@ function GrooveControls({ state }) {
                 />
             </SettingRow>
 
+            <SettingRow label="Creativity" id="creativityCheck">
+                <Toggle
+                    id="creativityCheck"
+                    checked={!!state.creativity}
+                    ariaLabel="Creativity"
+                    onChange={(/** @type {any} */ val) => {
+                        dispatch(ACTIONS.SET_PARAM, {
+                            module: 'groove',
+                            param: 'creativity',
+                            value: val,
+                        });
+                        saveCurrentState();
+                    }}
+                />
+            </SettingRow>
+
             <SettingGroup title="Lars Mode" className="divider-top">
                 <SettingRow label="Enabled" id="larsModeCheck">
                     <Toggle

@@ -51,7 +51,7 @@ describe('Groove Reducer', () => {
     });
 
     it('should set creativity and countdown', () => {
-        grooveReducer(ACTIONS.SET_CREATIVITY, true);
+        grooveReducer(ACTIONS.SET_PARAM, { module: 'groove', param: 'creativity', value: true });
         expect(groove.creativity).toBe(true);
         grooveReducer(ACTIONS.SET_GENRE_COUNTDOWN, 4);
         expect(groove.genreSwitchCountdown).toBe(4);

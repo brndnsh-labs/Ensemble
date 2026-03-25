@@ -205,9 +205,6 @@ export function grooveReducer(action, payload, playback) {
         case ACTIONS.SET_LARS_INTENSITY:
             groove.larsIntensity = Math.max(0, Math.min(1, payload));
             return true;
-        case ACTIONS.SET_CREATIVITY:
-            groove.creativity = !!payload;
-            return true;
         case ACTIONS.SET_GROOVE_SEED:
             if (!groove.sectionSeedMap) {
                 groove.sectionSeedMap = {};

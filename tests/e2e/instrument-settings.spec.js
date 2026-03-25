@@ -90,15 +90,30 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
 
         const swingSlider = settingsSurface.locator('input#swingSlider');
         const swingBase = settingsSurface.locator('select#swingBaseSelect');
+        const creativityToggle = settingsSurface.locator(
+            'label.toggle-switch[for="creativityCheck"]',
+        );
         const larsIntensity = settingsSurface.locator('input#larsIntensitySlider');
         await expect(swingSlider).toBeVisible();
         await expect(swingBase).toBeVisible();
+        await expect(creativityToggle).toBeVisible();
         await expect(larsIntensity).toBeVisible();
         await expectWithinSurface(settingsSurface, swingSlider);
         await expectWithinSurface(settingsSurface, swingBase);
+        await expectWithinSurface(settingsSurface, creativityToggle);
         await expectWithinSurface(settingsSurface, larsIntensity);
-        await expectWithinSurface(settingsSurface, settingsSurface.locator('input#drumVolume'));
-        await expectWithinSurface(settingsSurface, settingsSurface.locator('input#drumReverb'));
+
+        const surfaceBody = settingsSurface.locator('.workspace-studio-surface-body');
+        await surfaceBody.evaluate((el) => {
+            el.scrollTop = el.scrollHeight;
+        });
+
+        const drumVolume = settingsSurface.locator('input#drumVolume');
+        const drumReverb = settingsSurface.locator('input#drumReverb');
+        await expect(drumVolume).toBeVisible();
+        await expect(drumReverb).toBeVisible();
+        await expectWithinSurface(settingsSurface, drumVolume);
+        await expectWithinSurface(settingsSurface, drumReverb);
     });
 
     test('Chords settings sheet keeps voicing and mixer controls visible @desktop', async ({

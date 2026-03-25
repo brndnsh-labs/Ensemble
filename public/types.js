@@ -248,7 +248,6 @@
  * @property {number} SET_HUMANIZE
  * @property {boolean} SET_LARS_MODE
  * @property {number} SET_LARS_INTENSITY
- * @property {boolean} SET_CREATIVITY
  * @property {ActionPayloadSetGenreFeel} SET_GENRE_FEEL
  * @property {number | null} SET_GENRE_COUNTDOWN
  * @property {number | string} SET_ACTIVE_MEASURE
@@ -327,7 +326,6 @@ export const ACTIONS = {
     SET_HUMANIZE: 'SET_HUMANIZE',
     SET_LARS_MODE: 'SET_LARS_MODE',
     SET_LARS_INTENSITY: 'SET_LARS_INTENSITY',
-    SET_CREATIVITY: 'SET_CREATIVITY',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
     SET_GENRE_COUNTDOWN: 'SET_GENRE_COUNTDOWN',
     SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',

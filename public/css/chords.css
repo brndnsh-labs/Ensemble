@@ -441,7 +441,6 @@
     width: 100%;
     z-index: var(--z-maximized-header);
 }
-.chord-maximized .sidebar-column,
 .chord-maximized #panel-visualizer,
 .chord-maximized #activeSectionLabel,
 .chord-maximized .library-label,

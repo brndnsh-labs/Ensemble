@@ -28,7 +28,7 @@ describe('Groove Section Memory (Creativity)', () => {
         dispatch(ACTIONS.RESET_STATE);
 
         // Enable creativity
-        dispatch(ACTIONS.SET_CREATIVITY, true);
+        dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'creativity', value: true });
 
         // Mock a simple 3-section arrangement: A (Verse) -> B (Chorus) -> A (Verse)
         // 4 bars per section, 4/4 time (16 steps per bar) = 64 steps per section
