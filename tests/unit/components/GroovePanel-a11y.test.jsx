@@ -9,10 +9,12 @@ const mockState = {
     groove: {
         enabled: true,
         genreFeel: 'Rock',
-        larsMode: true,
-        larsIntensity: 0.42,
         creativity: false,
         fillActive: false,
+    },
+    playback: {
+        autoIntensity: true,
+        bandIntensity: 0.35,
     },
 };
 
@@ -55,18 +57,22 @@ describe('GroovePanel accessibility', () => {
         render(<GroovePanel />, container);
     });
 
-    it('exposes the genre selector as a labeled button', () => {
-        const genreButton = container.querySelector('button[aria-label="Change groove genre"]');
-        expect(genreButton).toBeTruthy();
-        expect(genreButton.textContent).toContain('Rock');
+    it('labels the auto intensity toggle', () => {
+        const toggle = container.querySelector('#autoIntensityCheck');
+        const label = container.querySelector('label[for="autoIntensityCheck"]');
+
+        expect(toggle).toBeTruthy();
+        expect(toggle?.getAttribute('aria-label')).toBe('Auto intensity');
+        expect(label?.textContent).toContain('Auto intensity');
     });
 
     it('labels the intensity slider', () => {
-        const slider = container.querySelector('#intensitySlider');
-        const label = container.querySelector('label[for="intensitySlider"]');
+        const slider = container.querySelector('#bandIntensitySlider');
+        const label = container.querySelector('label[for="bandIntensitySlider"]');
 
         expect(slider).toBeTruthy();
-        expect(label?.textContent).toContain('Intensity');
+        expect(slider?.getAttribute('aria-label')).toBe('Band energy');
+        expect(label?.textContent).toContain('Band energy');
     });
 
     it('labels the creativity switch', () => {

@@ -17,11 +17,10 @@ export function GroovePanel({ isActiveMobile = true, showLaunchAction = true }) 
     const grooveState = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             enabled: s.groove.enabled,
-            genreFeel: s.groove.genreFeel,
-            larsMode: s.groove.larsMode,
-            larsIntensity: s.groove.larsIntensity,
             creativity: s.groove.creativity,
             fillActive: s.groove.fillActive,
+            autoIntensity: s.playback.autoIntensity,
+            bandIntensity: s.playback.bandIntensity,
         }),
     );
     const [isMenuOpen, setIsMenuOpen, menuRef] = useClickOutside();
@@ -84,10 +83,10 @@ export function GroovePanel({ isActiveMobile = true, showLaunchAction = true }) 
             </div>
 
             <div class="studio-mode-section studio-mode-section--smart">
-                <GenreSelector genreFeel={grooveState.genreFeel} />
-                <IntensitySlider
-                    larsMode={grooveState.larsMode}
-                    larsIntensity={grooveState.larsIntensity}
+                <AutoIntensityToggle autoIntensity={grooveState.autoIntensity} />
+                <BandIntensitySlider
+                    autoIntensity={grooveState.autoIntensity}
+                    bandIntensity={grooveState.bandIntensity}
                 />
                 <CreativityToggle creativity={grooveState.creativity} />
             </div>
@@ -96,99 +95,51 @@ export function GroovePanel({ isActiveMobile = true, showLaunchAction = true }) 
 }
 
 /**
- * @param {{ genreFeel: string }} props
+ * @param {{ autoIntensity: boolean }} props
  */
-function GenreSelector({ genreFeel }) {
-    const [isOpen, setIsOpen, menuRef] = useClickOutside();
-
+function AutoIntensityToggle({ autoIntensity }) {
     return (
-        <SettingRow label="Genre" valueDisplay={genreFeel}>
-            <div class="header-item genre-item" ref={menuRef}>
-                <button
-                    class={`dropdown-button ${isOpen ? 'open' : ''}`}
-                    onClick={() => setIsOpen(!isOpen)}
-                    aria-label="Change groove genre"
-                >
-                    <span class="genre-text">{genreFeel}</span>
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        class={`dropdown-arrow ${isOpen ? 'rotate' : ''}`}
-                    >
-                        <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                </button>
-                {isOpen && (
-                    <div class="dropdown-content">
-                        <div class="genre-list">
-                            {[
-                                'Rock',
-                                'Jazz',
-                                'Funk',
-                                'Latin',
-                                'Reggae',
-                                'Pop',
-                                'Acoustic',
-                                'Ska Punk',
-                            ].map((genre) => (
-                                <button
-                                    type="button"
-                                    class={`genre-option ${genreFeel === genre ? 'active' : ''}`}
-                                    key={genre}
-                                    onClick={() => {
-                                        dispatch(ACTIONS.SET_GENRE_FEEL, {
-                                            feel: genre,
-                                            genreName: genre,
-                                        });
-                                        syncWorker(ACTIONS.SET_GENRE_FEEL, {
-                                            feel: genre,
-                                            genreName: genre,
-                                        });
-                                        saveCurrentState();
-                                        setIsOpen(false);
-                                    }}
-                                >
-                                    {genre}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
+        <SettingRow
+            label="Auto intensity"
+            description="Starts at 35% and evolves with the performance."
+            id="autoIntensityCheck"
+        >
+            <Toggle
+                id="autoIntensityCheck"
+                ariaLabel="Auto intensity"
+                checked={autoIntensity}
+                onChange={(/** @type {boolean} */ checked) => {
+                    dispatch(ACTIONS.SET_AUTO_INTENSITY, checked);
+                    syncWorker(ACTIONS.SET_AUTO_INTENSITY, checked);
+                    if (checked) {
+                        dispatch(ACTIONS.SET_BAND_INTENSITY, 0.35);
+                        syncWorker(ACTIONS.SET_BAND_INTENSITY, 0.35);
+                    }
+                    saveCurrentState();
+                }}
+            />
         </SettingRow>
     );
 }
 
 /**
- * @param {{ larsMode: boolean, larsIntensity: number }} props
+ * @param {{ autoIntensity: boolean, bandIntensity: number }} props
  */
-function IntensitySlider({ larsMode, larsIntensity }) {
+function BandIntensitySlider({ autoIntensity, bandIntensity }) {
+    const displayValue = Math.round((bandIntensity || 0.35) * 100);
     return (
-        <SettingRow
-            label="Intensity"
-            valueDisplay={`${larsMode ? Math.round(larsIntensity * 100) : 0}%`}
-            id="intensitySlider"
-        >
+        <SettingRow label="Band energy" valueDisplay={`${displayValue}%`} id="bandIntensitySlider">
             <Slider
-                id="intensitySlider"
+                id="bandIntensitySlider"
                 min={0}
                 max={100}
-                value={larsMode ? Math.round(larsIntensity * 100) : 0}
-                disabled={!larsMode}
-                ariaLabel="Groove intensity"
+                value={displayValue}
+                disabled={autoIntensity}
+                ariaLabel="Band energy"
                 onInput={(/** @type {string | number} */ value) => {
                     const normalized = Number(value) / 100;
-                    dispatch(ACTIONS.SET_LARS_MODE, true);
-                    dispatch(ACTIONS.SET_LARS_INTENSITY, normalized);
-                    syncWorker(ACTIONS.SET_LARS_MODE, true);
-                    syncWorker(ACTIONS.SET_LARS_INTENSITY, normalized);
+                    dispatch(ACTIONS.SET_BAND_INTENSITY, normalized);
+                    syncWorker(ACTIONS.SET_BAND_INTENSITY, normalized);
                     saveCurrentState();
                 }}
             />

@@ -6,7 +6,7 @@ import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.js';
+import { decompressSections, generateId } from '../utils.js';
 
 /**
  * @typedef {import('../state/arranger.js').Section} Section
@@ -14,6 +14,7 @@ import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.j
  * @typedef {{
  *   name: string,
  *   sections: string | Array<Partial<Section>>,
+ *   category?: string,
  *   isMinor?: boolean,
  *   timestamp?: number,
  *   settings?: PresetSettings
@@ -143,13 +144,11 @@ export function PresetLibrary({ onSelect }) {
     /**
      * @param {LibraryPreset} preset
      */
-    const getPreview = (preset) => {
-        const preview = getPresetSections(preset)
-            .map((section) => section.value)
-            .filter(Boolean)
-            .join(' • ');
-
-        return formatUnicodeSymbols(preview);
+    const getMeta = (preset) => {
+        if (preset.category) {
+            return preset.category;
+        }
+        return 'Custom progression';
     };
 
     const activeName = isDirty ? null : lastChordPreset;
@@ -164,10 +163,12 @@ export function PresetLibrary({ onSelect }) {
                             type="button"
                             key={preset.name}
                             class={`preset-chip chord-preset-chip ${activeName === preset.name ? 'active' : ''}`}
+                            data-category={preset.category}
+                            data-id={preset.name}
                             onClick={() => handleSelect(preset)}
                         >
                             <span class="preset-chip-name">{preset.name}</span>
-                            <span class="preset-chip-meta">{getPreview(preset)}</span>
+                            <span class="preset-chip-meta">{getMeta(preset)}</span>
                         </button>
                     ))}
                 </div>
@@ -185,10 +186,12 @@ export function PresetLibrary({ onSelect }) {
                                 <button
                                     type="button"
                                     class={`preset-chip chord-preset-chip ${activeName === preset.name ? 'active' : ''}`}
+                                    data-category="User"
+                                    data-id={preset.name}
                                     onClick={() => handleSelect(preset)}
                                 >
                                     <span class="preset-chip-name">{preset.name}</span>
-                                    <span class="preset-chip-meta">{getPreview(preset)}</span>
+                                    <span class="preset-chip-meta">{getMeta(preset)}</span>
                                 </button>
                                 <button
                                     type="button"

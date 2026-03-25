@@ -33,10 +33,12 @@ vi.mock('../../../public/data/chord-presets.js', () => ({
     CHORD_PRESETS: [
         {
             name: 'Pop (Standard)',
+            category: 'Pop/Rock',
             sections: [{ label: 'Main', value: 'I | V | vi | IV' }],
         },
         {
             name: 'Autumn Leaves',
+            category: 'Jazz',
             sections: [{ label: 'Main', value: 'ii | V | I' }],
             settings: { bpm: 140, style: 'jazz', timeSignature: '4/4' },
         },
@@ -84,6 +86,12 @@ describe('PresetLibrary', () => {
 
         const activeChip = container.querySelector('.preset-chip.active .preset-chip-name');
         expect(activeChip?.textContent).toBe('Pop (Standard)');
+        expect(container.querySelector('.preset-chip')?.getAttribute('data-category')).toBe(
+            'Pop/Rock',
+        );
+        expect(container.querySelector('.preset-chip .preset-chip-meta')?.textContent).toBe(
+            'Pop/Rock',
+        );
     });
 
     it('clears the active highlight when the arranger has unsaved edits', async () => {

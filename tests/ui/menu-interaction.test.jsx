@@ -9,12 +9,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock state and controller dependencies
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        playback: { modals: { performance: false } },
+        playback: {
+            modals: { performance: false },
+            autoIntensity: true,
+            bandIntensity: 0.35,
+        },
         groove: {
             enabled: true,
             genreFeel: 'Rock',
-            larsMode: true,
-            larsIntensity: 0.4,
             creativity: false,
             fillActive: false,
         },
@@ -36,12 +38,14 @@ vi.mock('../../public/state.js', () => {
 vi.mock('../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) =>
         selector({
-            playback: { modals: { performance: false } },
+            playback: {
+                modals: { performance: false },
+                autoIntensity: true,
+                bandIntensity: 0.35,
+            },
             groove: {
                 enabled: true,
                 genreFeel: 'Rock',
-                larsMode: true,
-                larsIntensity: 0.4,
                 creativity: false,
                 fillActive: false,
             },
@@ -137,7 +141,7 @@ describe('Menu Interaction Regression Tests', () => {
 
         const kebabBtn = container.querySelector('.panel-menu-btn');
         const settingsMenu = container.querySelector('.panel-settings-menu');
-        const panelBody = container.querySelector('.studio-mode-section');
+        const panelBody = container.querySelector('#test-panel');
 
         // Click to open
         act(() => {

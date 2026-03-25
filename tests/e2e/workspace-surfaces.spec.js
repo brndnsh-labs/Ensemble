@@ -26,6 +26,8 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(studio.locator('#panel-bass')).toBeVisible();
         await expect(studio.locator('#panel-soloist')).toBeVisible();
         await expect(studio.locator('#panel-harmonies')).toBeVisible();
+        await expect(studio.locator('.workspace-studio-genre-strip')).toBeVisible();
+        await expect(studio.locator('.workspace-genre-pill')).toHaveCount(13);
         await expect(studio.locator('.workspace-group-header')).toHaveCount(2);
 
         const wideGroove = await studio.locator('#panel-grooves').boundingBox();
@@ -40,12 +42,24 @@ test.describe('Workspace surfaces @ui', () => {
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
         await openWorkspace(page, 'Studio');
 
-        const narrowGroove = await page.locator('#panel-grooves').boundingBox();
-        const narrowSoloist = await page.locator('#panel-soloist').boundingBox();
+        const tabletGroove = await page.locator('#panel-grooves').boundingBox();
+        const tabletSoloist = await page.locator('#panel-soloist').boundingBox();
 
-        expect(narrowGroove).not.toBeNull();
-        expect(narrowSoloist).not.toBeNull();
-        expect(Math.abs(narrowGroove.x - narrowSoloist.x)).toBeLessThan(40);
+        expect(tabletGroove).not.toBeNull();
+        expect(tabletSoloist).not.toBeNull();
+        expect(Math.abs(tabletGroove.x - tabletSoloist.x)).toBeGreaterThan(80);
+
+        await page.setViewportSize({ width: 640, height: 960 });
+        await page.reload();
+        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await openWorkspace(page, 'Studio');
+
+        const mobileGroove = await page.locator('#panel-grooves').boundingBox();
+        const mobileSoloist = await page.locator('#panel-soloist').boundingBox();
+
+        expect(mobileGroove).not.toBeNull();
+        expect(mobileSoloist).not.toBeNull();
+        expect(Math.abs(mobileGroove.x - mobileSoloist.x)).toBeLessThan(40);
     });
 
     test('perform launches and dismisses the live modals', async ({ page }) => {
@@ -84,9 +98,7 @@ test.describe('Workspace surfaces @ui', () => {
 
         const panel = visuals.locator('#panel-visualizer');
         const powerBtn = panel.locator('#vizPowerBtn');
-        if (!(await powerBtn.evaluate((el) => el.classList.contains('active')))) {
-            await powerBtn.click();
-        }
+        await expect(powerBtn).toHaveClass(/active/);
 
         await expect(panel).not.toHaveClass(/collapsed/);
 

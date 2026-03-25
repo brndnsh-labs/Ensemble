@@ -216,6 +216,10 @@
         --base-size: clamp(1.15rem, 4.5vw, 1.4rem);
     }
 
+    .display-area {
+        scroll-padding-block: 18vh;
+    }
+
     /* Maximized View: Tone down the scale */
     .chord-maximized .display-area {
         top: 64px;
@@ -235,6 +239,11 @@
 
     .chord-maximized .measure-box {
         border-width: 1px;
+    }
+
+    .measure-box,
+    .chord-card {
+        scroll-margin-block: 18vh;
     }
 }
 

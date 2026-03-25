@@ -245,15 +245,13 @@ export function ChordVisualizer() {
 
         const containerRect = container.getBoundingClientRect();
         const cardRect = activeCard.getBoundingClientRect();
-        const scrollThreshold = containerRect.top + containerRect.height * 0.7;
+        const isFullyVisible =
+            cardRect.top >= containerRect.top + 12 && cardRect.bottom <= containerRect.bottom - 12;
 
-        if (cardRect.bottom > scrollThreshold || cardRect.top < containerRect.top) {
-            const targetScrollTop =
-                container.scrollTop +
-                (cardRect.top - containerRect.top) -
-                containerRect.height * 0.2;
-            container.scrollTo({
-                top: targetScrollTop,
+        if (!isFullyVisible) {
+            activeCard.scrollIntoView({
+                block: 'center',
+                inline: 'nearest',
                 behavior: 'smooth',
             });
         }

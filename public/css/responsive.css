@@ -205,3 +205,187 @@
         grid-template-columns: 1fr 32rem; /* Wider sidebar on massive screens */
     }
 }
+
+@media (max-width: 700px) {
+    .workspace-view--arranger .workspace-arranger-layout {
+        height: calc(100dvh - 64px - 92px - 1rem);
+        overflow: hidden;
+    }
+
+    .workspace-view--arranger .workspace-arranger-main {
+        gap: 0.45rem;
+    }
+
+    .workspace-view--arranger .workspace-arranger-tools {
+        margin-top: -0.15rem;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords .display-area {
+        height: auto;
+        max-height: calc(100dvh - 64px - 92px - 7rem);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        scroll-padding-block: 18vh;
+        padding: 0.35rem;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords .section-block {
+        max-width: none;
+        margin-bottom: 0.55rem;
+        padding: 0.3rem 0.45rem;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords .section-block-header {
+        font-size: 0.58rem;
+        margin-bottom: 0.28rem;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords .section-block-content {
+        gap: 0.24rem;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords .measure-box {
+        min-height: 30px;
+    }
+
+    .workspace-view--arranger .workspace-arranger-chords .chord-card {
+        --base-size: clamp(0.82rem, 4vw, 1rem);
+        min-height: 28px;
+        padding: 0.12rem;
+        scroll-margin-block: 16vh;
+    }
+
+    .workspace-view--studio {
+        gap: 0.75rem;
+    }
+
+    .workspace-view--studio .workspace-columns {
+        gap: 0.6rem;
+    }
+
+    .workspace-view--studio .workspace-stack {
+        gap: 0.6rem;
+    }
+
+    .workspace-view--studio .workspace-group-header {
+        padding: 0.1rem 0 0.15rem;
+    }
+
+    .workspace-view--studio .workspace-group-header h2 {
+        font-size: 0.95rem;
+    }
+
+    .workspace-view--studio .workspace-studio-genre-strip {
+        gap: 0.75rem;
+        padding: 0.9rem;
+    }
+
+    .workspace-view--studio .workspace-studio-genre-header {
+        gap: 0.5rem;
+    }
+
+    .workspace-view--studio .workspace-studio-genre-header h2 {
+        font-size: 0.95rem;
+    }
+
+    .workspace-view--studio .workspace-studio-genre-badge {
+        align-self: flex-start;
+    }
+
+    .workspace-view--studio .workspace-studio-genre-pills {
+        gap: 0.45rem;
+    }
+
+    .workspace-view--studio .workspace-genre-pill {
+        padding: 0.42rem 0.7rem;
+        font-size: 0.8rem;
+    }
+
+    .workspace-view--studio .studio-compact-panel {
+        padding: 0.8rem;
+    }
+
+    .workspace-view--studio .studio-compact-panel .panel-header {
+        margin-bottom: 0.55rem;
+        padding-bottom: 0.45rem;
+    }
+
+    .workspace-view--studio .panel-header-main {
+        min-width: 0;
+    }
+
+    .workspace-view--studio .panel-header-actions {
+        gap: 0.35rem;
+    }
+
+    .workspace-view--studio .panel-menu-btn,
+    .workspace-view--studio .power-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 0.95rem;
+    }
+
+    .workspace-view--studio .studio-mode-section--smart {
+        gap: 0.55rem;
+    }
+
+    .workspace-view--studio .setting-group {
+        margin-bottom: 1rem;
+    }
+
+    .workspace-view--studio .setting-group-title {
+        margin-bottom: 0.55rem;
+        padding-bottom: 0.35rem;
+        font-size: 0.75rem;
+    }
+
+    .workspace-view--studio .setting-row {
+        gap: 0.65rem;
+        margin-bottom: 0.65rem;
+        min-height: 2rem;
+    }
+
+    .workspace-view--studio .setting-description {
+        display: none;
+    }
+
+    .workspace-view--studio .setting-info {
+        min-width: 0;
+    }
+
+    .workspace-view--studio .setting-control {
+        gap: 0.5rem;
+    }
+
+    .workspace-view--studio .setting-control > select,
+    .workspace-view--studio .setting-control input[type="range"] {
+        width: clamp(96px, 38vw, 160px);
+    }
+
+    .workspace-view--studio .panel-settings-menu {
+        left: 0.5rem;
+        right: 0.5rem;
+        width: auto;
+        max-width: none;
+    }
+
+    .workspace-view--studio .panel-settings-menu .grid-2-col {
+        gap: 0.65rem;
+    }
+
+    .workspace-view--studio .panel-settings-menu .setting-group {
+        margin-bottom: 0.65rem;
+    }
+
+    .workspace-view--studio .panel-settings-menu .setting-row {
+        margin-bottom: 0.45rem;
+        min-height: 1.8rem;
+    }
+}

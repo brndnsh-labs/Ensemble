@@ -4,6 +4,7 @@ import { ACTIONS } from '../types.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { KeySignatureControls } from './KeySignatureControls.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
+import { SoloistSeedControl } from './SoloistControls.jsx';
 
 const LIBRARY_CLOSE_ANIMATION_MS = 180;
 
@@ -191,6 +192,10 @@ export function ArrangerWorkspace() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="workspace-arranger-tools" aria-label="Arranger secondary controls">
+                        <SoloistSeedControl />
                     </div>
 
                     <div class="workspace-arranger-chords">

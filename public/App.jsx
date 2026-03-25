@@ -1,5 +1,5 @@
 import { Fragment } from 'preact';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { ArrangerWorkspace } from './components/ArrangerWorkspace.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { Modals } from './components/Modals.jsx';
@@ -10,6 +10,9 @@ import { StudioWorkspace } from './components/StudioWorkspace.jsx';
 import { Transport } from './components/Transport.jsx';
 import { VisualsWorkspace } from './components/VisualsWorkspace.jsx';
 import { WORKSPACE_META, WorkspaceNav } from './components/WorkspaceNav.jsx';
+import { saveCurrentState } from './persistence.js';
+import { dispatch } from './state.js';
+import { ACTIONS } from './types.js';
 import { useEnsembleState } from './ui-bridge.js';
 
 /**
@@ -28,6 +31,7 @@ export function App({ getVisualTime }) {
             activeWorkspace: s.ui.activeWorkspace,
         }),
     );
+    const previousWorkspaceRef = useRef(activeWorkspace);
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -52,6 +56,14 @@ export function App({ getVisualTime }) {
 
     useEffect(() => {
         document.body.dataset.workspace = activeWorkspace;
+    }, [activeWorkspace]);
+
+    useEffect(() => {
+        if (activeWorkspace === 'visuals' && previousWorkspaceRef.current !== 'visuals') {
+            dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: true });
+            saveCurrentState();
+        }
+        previousWorkspaceRef.current = activeWorkspace;
     }, [activeWorkspace]);
 
     const renderWorkspace = () => {

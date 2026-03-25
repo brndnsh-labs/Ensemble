@@ -107,19 +107,6 @@
     font-size: 0.75rem;
 }
 
-.smart-status {
-    padding: var(--space-2);
-    border: 1px dashed rgba(var(--module-color-rgb), 0.2);
-    border-radius: var(--radius-md);
-    background: rgba(var(--module-color-rgb), 0.05);
-    text-align: center;
-}
-
-.smart-status-copy {
-    margin: 0;
-    font-size: 0.8rem;
-}
-
 /* Measure numbers in maximized view */
 .measure-number {
     position: absolute;

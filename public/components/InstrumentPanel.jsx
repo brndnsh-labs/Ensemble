@@ -42,6 +42,7 @@ export function InstrumentPanel({
     const isWaiting = module === 'soloist' && !enabled && tradeMode !== 'manual';
     const isPerformanceMode = module === 'soloist' && performanceOpen;
     const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''} ${isPerformanceMode ? 'performance-active' : ''}`;
+    const hasBody = module === 'soloist';
 
     return (
         <div
@@ -100,20 +101,11 @@ export function InstrumentPanel({
                 </div>
             </div>
 
-            <div class="studio-mode-section studio-mode-section--smart">
-                {module === 'soloist' ? (
+            {hasBody && (
+                <div class="studio-mode-section studio-mode-section--smart">
                     <SoloistControls />
-                ) : (
-                    <div
-                        class="smart-status"
-                        style={`--module-color-rgb: var(--${panelTheme}-color-rgb);`}
-                    >
-                        <p class="smart-status-copy">
-                            ✨ <strong>Smart Follow</strong> Active
-                        </p>
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
