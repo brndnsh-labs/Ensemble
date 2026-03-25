@@ -97,9 +97,7 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(visuals.locator('.workspace-panel-copy')).toHaveCount(0);
 
         const panel = visuals.locator('#panel-visualizer');
-        const powerBtn = panel.locator('#vizPowerBtn');
-        await expect(powerBtn).toHaveClass(/active/);
-
+        await expect(panel.locator('#vizPowerBtn')).toHaveCount(0);
         await expect(panel).not.toHaveClass(/collapsed/);
 
         const canvas = panel.locator('canvas').first();

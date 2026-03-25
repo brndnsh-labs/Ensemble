@@ -36,6 +36,7 @@ function StudioGenreStrip() {
                             type="button"
                             class={`workspace-genre-pill ${isActive ? 'active' : ''}`}
                             aria-pressed={isActive}
+                            aria-label={`Set groove language to ${genreName}`}
                             onClick={() => {
                                 const payload = {
                                     genreName,

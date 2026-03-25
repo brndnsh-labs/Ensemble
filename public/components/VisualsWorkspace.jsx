@@ -1,4 +1,3 @@
-import { togglePower } from '../instrument-controller.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { Visualizer } from './Visualizer.jsx';
 
@@ -19,22 +18,13 @@ export function VisualsWorkspace({ getVisualTime }) {
         <section class="workspace-view workspace-view--visuals" data-workspace="visuals">
             <div class="workspace-grid workspace-grid--visuals">
                 <div
-                    class={`panel dashboard-panel workspace-panel workspace-panel--hero ${
-                        !enabled ? 'collapsed' : ''
-                    }`}
+                    class="panel dashboard-panel workspace-panel workspace-panel--hero"
                     id="panel-visualizer"
                     data-id="visualizer"
                 >
                     <div class="panel-header">
-                        <div class="panel-header-main">
-                            <button
-                                id="vizPowerBtn"
-                                class={`power-btn ${enabled ? 'active' : ''}`}
-                                aria-label="Toggle Visualizer"
-                                onClick={() => togglePower('viz')}
-                            >
-                                ⏻
-                            </button>
+                        <div>
+                            <p class="workspace-kicker">Live motion</p>
                             <div>
                                 <h2 class="panel-title">Visuals</h2>
                             </div>

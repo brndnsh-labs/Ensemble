@@ -661,6 +661,12 @@ select option {
     font-weight: 700;
 }
 
+.workspace-launch-copy {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
 .workspace-shortcut-action {
     font-size: 0.82rem;
     color: var(--accent-color);
@@ -810,8 +816,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-arranger-chords .section-block {
-    width: min(760px, 100%);
-    max-width: 760px;
+    width: min(1200px, 100%);
+    max-width: 1200px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -961,18 +967,24 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-genre-pills {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
     gap: 0.65rem;
-    flex-wrap: wrap;
 }
 
 .workspace-genre-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
     border-radius: 999px;
     padding: 0.55rem 0.85rem;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
     font-weight: 700;
     white-space: nowrap;
+    text-align: center;
 }
 
 .workspace-genre-pill:hover {
@@ -1074,10 +1086,9 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     }
 
     .workspace-studio-genre-pills {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding-bottom: 0.2rem;
-        scrollbar-width: thin;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+        padding-bottom: 0;
     }
 
     .workspace-arranger-tools {
