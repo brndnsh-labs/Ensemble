@@ -13,9 +13,7 @@ test.describe('Workspace surfaces @ui', () => {
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
     });
 
-    test('studio keeps the controls split on wide screens and stacked on narrow screens', async ({
-        page,
-    }) => {
+    test('studio keeps a single live mix surface without menu clipping', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
         await openWorkspace(page, 'Studio');
 
@@ -26,16 +24,38 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(studio.locator('#panel-bass')).toBeVisible();
         await expect(studio.locator('#panel-soloist')).toBeVisible();
         await expect(studio.locator('#panel-harmonies')).toBeVisible();
-        await expect(studio.locator('.workspace-studio-genre-strip')).toBeVisible();
-        await expect(studio.locator('.workspace-genre-pill')).toHaveCount(13);
-        await expect(studio.locator('.workspace-group-header')).toHaveCount(2);
+        await expect(studio.locator('.workspace-studio-live-mix')).toBeVisible();
+        await expect(studio.locator('.workspace-studio-mix-row')).toHaveCount(5);
+        await expect(studio.locator('.workspace-studio-genre-button')).toBeVisible();
+        await expect(studio.locator('.workspace-studio-genre-option')).toHaveCount(13);
+        await expect(studio.locator('.workspace-instrument-state')).toHaveCount(5);
+        await expect(studio.locator('.workspace-columns')).toHaveCount(0);
+        await expect(studio.locator('.workspace-group-header')).toHaveCount(0);
 
-        const wideGroove = await studio.locator('#panel-grooves').boundingBox();
-        const wideSoloist = await studio.locator('#panel-soloist').boundingBox();
+        const genreButton = studio.locator('.workspace-studio-genre-button');
+        const initialGenre = (
+            await studio.locator('.workspace-studio-genre-button-value').textContent()
+        )?.trim();
+        await genreButton.click();
+        const desktopGenreSurface = page.locator('.workspace-studio-surface--genre.is-open');
+        await expect(desktopGenreSurface).toBeVisible();
+        const desktopGenreBox = await desktopGenreSurface.boundingBox();
+        expect(desktopGenreBox).not.toBeNull();
+        expect(desktopGenreBox.x).toBeGreaterThanOrEqual(0);
+        expect(desktopGenreBox.x + desktopGenreBox.width).toBeLessThanOrEqual(1440);
+        await desktopGenreSurface.getByRole('button', { name: 'Jazz' }).click();
+        await expect(studio.locator('.workspace-studio-genre-button-value')).toHaveText('Jazz');
+        await genreButton.click();
+        await desktopGenreSurface.getByRole('button', { name: initialGenre || 'Rock' }).click();
 
-        expect(wideGroove).not.toBeNull();
-        expect(wideSoloist).not.toBeNull();
-        expect(Math.abs(wideGroove.x - wideSoloist.x)).toBeGreaterThan(100);
+        await studio.locator('#panel-bass .workspace-studio-mix-menu-trigger').click();
+        const desktopSettingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
+        await expect(desktopSettingsSurface).toBeVisible();
+        const desktopSettingsBox = await desktopSettingsSurface.boundingBox();
+        expect(desktopSettingsBox).not.toBeNull();
+        expect(desktopSettingsBox.x).toBeGreaterThanOrEqual(0);
+        expect(desktopSettingsBox.x + desktopSettingsBox.width).toBeLessThanOrEqual(1440);
+        await desktopSettingsSurface.getByRole('button', { name: 'Close Bass settings' }).click();
 
         await page.setViewportSize({ width: 768, height: 1024 });
         await page.reload();
@@ -47,19 +67,49 @@ test.describe('Workspace surfaces @ui', () => {
 
         expect(tabletGroove).not.toBeNull();
         expect(tabletSoloist).not.toBeNull();
-        expect(Math.abs(tabletGroove.x - tabletSoloist.x)).toBeGreaterThan(80);
+        expect(Math.abs(tabletGroove.x - tabletSoloist.x)).toBeLessThan(20);
 
         await page.setViewportSize({ width: 640, height: 960 });
         await page.reload();
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
         await openWorkspace(page, 'Studio');
 
+        const header = page.locator('header');
+        const mobileGenreButton = page.locator('.workspace-studio-genre-button');
+        await expect(mobileGenreButton).toBeVisible();
+        const headerBox = await header.boundingBox();
+        const mobileGenreButtonBox = await mobileGenreButton.boundingBox();
+
+        expect(headerBox).not.toBeNull();
+        expect(mobileGenreButtonBox).not.toBeNull();
+        expect(mobileGenreButtonBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height - 1);
+
+        await mobileGenreButton.click();
+        const mobileGenreSurface = page.locator('.workspace-studio-surface--genre.is-open');
+        await expect(mobileGenreSurface).toBeVisible();
+        const mobileGenreBox = await mobileGenreSurface.boundingBox();
+        expect(mobileGenreBox).not.toBeNull();
+        expect(mobileGenreBox.x).toBeGreaterThanOrEqual(0);
+        expect(mobileGenreBox.x + mobileGenreBox.width).toBeLessThanOrEqual(640);
+        expect(mobileGenreBox.y).toBeGreaterThanOrEqual(0);
+        expect(mobileGenreBox.y + mobileGenreBox.height).toBeLessThanOrEqual(960);
+        await mobileGenreSurface.getByRole('button', { name: 'Close band feel menu' }).click();
+
         const mobileGroove = await page.locator('#panel-grooves').boundingBox();
         const mobileSoloist = await page.locator('#panel-soloist').boundingBox();
-
         expect(mobileGroove).not.toBeNull();
         expect(mobileSoloist).not.toBeNull();
         expect(Math.abs(mobileGroove.x - mobileSoloist.x)).toBeLessThan(40);
+
+        await page.locator('#panel-soloist .workspace-studio-mix-menu-trigger').click();
+        const mobileSettingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
+        await expect(mobileSettingsSurface).toBeVisible();
+        const mobileSettingsBox = await mobileSettingsSurface.boundingBox();
+        expect(mobileSettingsBox).not.toBeNull();
+        expect(mobileSettingsBox.x).toBeGreaterThanOrEqual(0);
+        expect(mobileSettingsBox.x + mobileSettingsBox.width).toBeLessThanOrEqual(640);
+        expect(mobileSettingsBox.y).toBeGreaterThanOrEqual(0);
+        expect(mobileSettingsBox.y + mobileSettingsBox.height).toBeLessThanOrEqual(960);
     });
 
     test('perform launches and dismisses the live modals', async ({ page }) => {

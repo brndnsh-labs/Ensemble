@@ -13,6 +13,7 @@ import { SoloistControls } from './SoloistControls.jsx';
  * @property {string} title
  * @property {boolean} [isActiveMobile]
  * @property {boolean} [showPerformanceAction]
+ * @property {boolean} [compact]
  */
 /**
  * @param {InstrumentPanelProps} props
@@ -23,6 +24,7 @@ export function InstrumentPanel({
     title,
     isActiveMobile = true,
     showPerformanceAction = true,
+    compact = false,
 }) {
     const { enabled, tradeMode, performanceOpen } = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => {
@@ -42,17 +44,21 @@ export function InstrumentPanel({
     const isWaiting = module === 'soloist' && !enabled && tradeMode !== 'manual';
     const isPerformanceMode = module === 'soloist' && performanceOpen;
     const powerClass = `power-btn desktop-power-btn ${enabled ? 'active' : isWaiting ? 'waiting' : ''} ${isPerformanceMode ? 'performance-active' : ''}`;
-    const hasBody = module === 'soloist';
+    const stateLabel = isWaiting ? 'Queued' : enabled ? 'On' : 'Off';
+    const stateClass = isWaiting
+        ? 'workspace-instrument-state--queued'
+        : enabled
+          ? 'workspace-instrument-state--on'
+          : 'workspace-instrument-state--off';
+    const hasBody = module === 'soloist' && !compact;
+    const panelClass = `panel dashboard-panel instrument-panel smart-active ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} studio-compact-panel ${compact ? 'studio-compact-panel--compact' : ''}`;
 
     return (
-        <div
-            class={`panel dashboard-panel instrument-panel smart-active ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} studio-compact-panel`}
-            id={id}
-            data-id={module}
-        >
+        <div class={panelClass} id={id} data-id={module}>
             <div class={`panel-header ${headerClass}`}>
                 <div class="panel-header-main">
                     <h2 class="panel-title">{title}</h2>
+                    <span class={`workspace-instrument-state ${stateClass}`}>{stateLabel}</span>
                 </div>
                 <div class="panel-header-actions" ref={menuRef}>
                     {module === 'soloist' && showPerformanceAction && (
@@ -88,6 +94,11 @@ export function InstrumentPanel({
                         class={`panel-settings-menu ${module}-settings-menu ${isMenuOpen ? 'open' : ''}`}
                     >
                         <InstrumentSettings module={module} />
+                        {compact && module === 'soloist' && (
+                            <div class="divider-top">
+                                <SoloistControls />
+                            </div>
+                        )}
                     </div>
                     <button
                         class={powerClass}

@@ -12,8 +12,9 @@ import { SettingRow, Slider, Toggle } from './UIControls.jsx';
  * @param {Object} props
  * @param {boolean} [props.isActiveMobile]
  * @param {boolean} [props.showLaunchAction]
+ * @param {boolean} [props.compact]
  */
-export function GroovePanel({ isActiveMobile = true, showLaunchAction = true }) {
+export function GroovePanel({ isActiveMobile = true, showLaunchAction = true, compact = false }) {
     const grooveState = useEnsembleState(
         (/** @type {import('../types.js').EnsembleState} */ s) => ({
             enabled: s.groove.enabled,
@@ -27,16 +28,19 @@ export function GroovePanel({ isActiveMobile = true, showLaunchAction = true }) 
 
     const powerClass = `power-btn desktop-power-btn ${grooveState.enabled ? 'active' : ''}`;
     const titleAccent = grooveState.fillActive ? ' panel-title-accent' : '';
+    const stateLabel = grooveState.enabled ? 'On' : 'Off';
+    const stateClass = grooveState.enabled
+        ? 'workspace-instrument-state--on'
+        : 'workspace-instrument-state--off';
+
+    const panelClass = `panel dashboard-panel instrument-panel smart-active ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} studio-compact-panel ${compact ? 'studio-compact-panel--compact' : ''}`;
 
     return (
-        <div
-            class={`panel dashboard-panel instrument-panel smart-active ${isActiveMobile ? 'active-mobile' : ''} ${isMenuOpen ? 'settings-open' : ''} studio-compact-panel`}
-            id="panel-grooves"
-            data-id="groove"
-        >
+        <div class={panelClass} id="panel-grooves" data-id="groove">
             <div class="panel-header groove-panel-header">
                 <div class="panel-header-main">
                     <h2 class={`panel-title${titleAccent}`}>Groove</h2>
+                    <span class={`workspace-instrument-state ${stateClass}`}>{stateLabel}</span>
                 </div>
                 <div class="panel-header-actions" ref={menuRef}>
                     {showLaunchAction && (
@@ -82,14 +86,16 @@ export function GroovePanel({ isActiveMobile = true, showLaunchAction = true }) 
                 </div>
             </div>
 
-            <div class="studio-mode-section studio-mode-section--smart">
-                <AutoIntensityToggle autoIntensity={grooveState.autoIntensity} />
-                <BandIntensitySlider
-                    autoIntensity={grooveState.autoIntensity}
-                    bandIntensity={grooveState.bandIntensity}
-                />
-                <CreativityToggle creativity={grooveState.creativity} />
-            </div>
+            {!compact && (
+                <div class="studio-mode-section studio-mode-section--smart">
+                    <AutoIntensityToggle autoIntensity={grooveState.autoIntensity} />
+                    <BandIntensitySlider
+                        autoIntensity={grooveState.autoIntensity}
+                        bandIntensity={grooveState.bandIntensity}
+                    />
+                    <CreativityToggle creativity={grooveState.creativity} />
+                </div>
+            )}
         </div>
     );
 }

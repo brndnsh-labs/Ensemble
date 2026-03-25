@@ -15,7 +15,7 @@ export function useClickOutside() {
             return;
         }
 
-        const handleClickOutside = (/** @type {MouseEvent|Event} */ event) => {
+        const handleClickOutside = (/** @type {PointerEvent|MouseEvent|Event} */ event) => {
             if (
                 menuRef.current &&
                 event.target instanceof Node &&
@@ -25,9 +25,19 @@ export function useClickOutside() {
             }
         };
 
+        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
+            if (event.key === 'Escape') {
+                setIsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', handleClickOutside);
         document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
         return () => {
+            document.removeEventListener('pointerdown', handleClickOutside);
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         };
     }, [isMenuOpen]);
 
