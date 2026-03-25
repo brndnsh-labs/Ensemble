@@ -3,7 +3,7 @@ import pkg from '@playwright/test';
 const { expect, test } = pkg;
 
 async function openWorkspace(page, name) {
-    await page.getByRole('button', { name }).click();
+    await page.locator(`button[data-workspace-nav="${name.toLowerCase()}"]`).click();
     await expect(page.locator(`section[data-workspace="${name.toLowerCase()}"]`)).toBeVisible();
 }
 
@@ -137,6 +137,23 @@ test.describe('Workspace surfaces @ui', () => {
 
         await drumPadModal.locator('button[aria-label="Close"]').first().click();
         await expect(drumPadModal).toBeHidden();
+    });
+
+    test('switching to visuals during playback stays responsive', async ({ page }) => {
+        await openWorkspace(page, 'Arranger');
+        await page.locator('#playBtn').click();
+        await expect(page.locator('#playBtnText')).toContainText('STOP');
+
+        await page.waitForTimeout(2000);
+
+        const switchStart = Date.now();
+        await page.locator('[data-workspace-nav="visuals"]').click();
+        await expect(page.locator('#panel-visualizer canvas').first()).toBeVisible({
+            timeout: 5000,
+        });
+
+        expect(Date.now() - switchStart).toBeLessThan(3000);
+        await expect(page.locator('#playBtnText')).toContainText('STOP');
     });
 
     test('visuals keeps the visualizer visible and roomy', async ({ page }) => {

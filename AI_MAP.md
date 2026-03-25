@@ -107,14 +107,19 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
-| **Containers** | `public/App.jsx` | Root layout and theme provider. |
+| **Containers** | `public/App.jsx` | Root workspace shell, header, and active surface rendering. |
+| **Navigation** | `public/components/WorkspaceNav.jsx` | Top-level workspace switcher for Arranger, Studio, Perform, and Visuals. |
+| **Workspaces** | `public/components/ArrangerWorkspace.jsx` | Lead-sheet workspace with arranger actions and progression library access. |
+| **Workspaces** | `public/components/StudioWorkspace.jsx` | Live-mix workspace with band feel chooser and compact instrument controls. |
+| **Workspaces** | `public/components/PerformWorkspace.jsx` | Launch surface for manual performance tools. |
+| **Workspaces** | `public/components/VisualsWorkspace.jsx` | Visualizer workspace shell. |
 | **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
-| **Logic Views** | `public/components/Arranger.jsx` | Chord progression manager. |
+| **Logic Views** | `public/components/Arranger.jsx` | Arranger editor surface used by the editor modal and related flows. |
 | **Controls** | `public/components/Transport.jsx` | Playback controls and tempo. |
 | **Visuals** | `public/components/Visualizer.jsx` | Canvas rendering container. |
 | **Library** | `public/components/PresetLibrary.jsx` | Chord progression library modal. |
-| **Panels** | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
+| **Settings** | `public/components/InstrumentSettings.jsx` | Reusable per-instrument settings surface used from Studio. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
 
 ## Domain State Slices (Modular State)

@@ -325,7 +325,7 @@
 /* Mobile Visibility Logic */
 @media (max-width: 900px) {
     .instrument-panel {
-        display: none; /* Hidden by default on mobile, toggled by tabs */
+        display: none; /* Hidden by default on mobile until the relevant panel opens */
         animation: fadeIn 0.2s ease-out;
     }
 

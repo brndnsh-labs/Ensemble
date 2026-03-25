@@ -30,6 +30,20 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(chordCard).toBeVisible();
     });
 
+    test('Chord Visualizer highlights the active chord during playback', async ({ page }) => {
+        const visualizer = page.locator('#chordVisualizer');
+        await expect(visualizer.locator('.chord-card.active')).toHaveCount(0);
+
+        await page.locator('#playBtn').click();
+
+        await expect(visualizer.locator('.chord-card.active').first()).toBeVisible({
+            timeout: 10000,
+        });
+        await expect(visualizer.locator('.measure-box:has(.chord-card.active)')).toHaveCount(1);
+
+        await page.locator('#playBtn').click();
+    });
+
     test('Progression Library Modal opens from FAB', async ({ page }) => {
         const actionTrigger = page.getByRole('button', { name: 'Open arranger actions' });
         await actionTrigger.click();

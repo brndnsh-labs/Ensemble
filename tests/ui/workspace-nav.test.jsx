@@ -12,6 +12,7 @@ import { ACTIONS } from '../../public/types.js';
 
 vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
+    debounceSaveState: vi.fn(),
 }));
 
 describe('Workspace navigation shell', () => {

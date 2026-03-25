@@ -180,16 +180,34 @@ describe('Scheduler Core Deep Dive', () => {
                 chord: { freqs: [440, 554, 659], beats: 2, rootMidi: 60, intervals: [0, 4, 7] },
             };
             state.playback.visualFlash = true;
+            state.vizState.enabled = true;
+            state.chords.lastActiveChordIndex = null;
 
             // We need to mock the imported triggerFlash or just check drawQueue
             scheduleChordVisuals(state, chordData, 10.0);
 
+            expect(state.chords.lastActiveChordIndex).toBe(2);
             expect(state.playback.drawQueue).toHaveLength(1);
             expect(state.playback.drawQueue[0]).toMatchObject({
                 type: 'chord_vis',
                 index: 2,
                 rootMidi: 60,
             });
+        });
+
+        it('should still update arranger highlighting when visuals are hidden', () => {
+            const chordData = {
+                stepInChord: 0,
+                chordIndex: 1,
+                chord: { freqs: [440, 554, 659], beats: 2, rootMidi: 60, intervals: [0, 4, 7] },
+            };
+            state.vizState.enabled = false;
+            state.chords.lastActiveChordIndex = null;
+
+            scheduleChordVisuals(state, chordData, 10.0);
+
+            expect(state.chords.lastActiveChordIndex).toBe(1);
+            expect(state.playback.drawQueue).toHaveLength(0);
         });
     });
 

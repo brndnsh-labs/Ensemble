@@ -1,4 +1,4 @@
-import { saveCurrentState } from '../persistence.js';
+import { debounceSaveState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -42,7 +42,7 @@ export function switchWorkspace(workspace) {
         param: 'activeWorkspace',
         value: workspace,
     });
-    saveCurrentState();
+    debounceSaveState();
 }
 
 export function WorkspaceNav() {

@@ -10,7 +10,7 @@ import { StudioWorkspace } from './components/StudioWorkspace.jsx';
 import { Transport } from './components/Transport.jsx';
 import { VisualsWorkspace } from './components/VisualsWorkspace.jsx';
 import { WORKSPACE_META, WorkspaceNav } from './components/WorkspaceNav.jsx';
-import { saveCurrentState } from './persistence.js';
+import { debounceSaveState } from './persistence.js';
 import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 import { useEnsembleState } from './ui-bridge.js';
@@ -61,7 +61,7 @@ export function App({ getVisualTime }) {
     useEffect(() => {
         if (activeWorkspace === 'visuals' && previousWorkspaceRef.current !== 'visuals') {
             dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: true });
-            saveCurrentState();
+            debounceSaveState();
         }
         previousWorkspaceRef.current = activeWorkspace;
     }, [activeWorkspace]);

@@ -491,7 +491,7 @@ describe('Scheduler Core System', () => {
     });
 
     describe('Visual Scheduling', () => {
-        it('should push chord_vis event to drawQueue even when visualizer is disabled', () => {
+        it('should not push chord_vis event while visualizer is disabled', () => {
             const chordData = {
                 stepInChord: 0,
                 chordIndex: 1,
@@ -509,12 +509,7 @@ describe('Scheduler Core System', () => {
 
             scheduleChordVisuals(getState(), chordData, time);
 
-            expect(playback.drawQueue.length).toBe(1);
-            expect(playback.drawQueue[0]).toMatchObject({
-                type: 'chord_vis',
-                time: time,
-                index: 1,
-            });
+            expect(playback.drawQueue.length).toBe(0);
         });
 
         it('should not push chord_vis event if stepInChord is not 0', () => {
