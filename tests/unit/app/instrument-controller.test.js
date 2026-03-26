@@ -4,17 +4,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Engine from '../../../public/engine/engine.js';
 import * as InstrumentController from '../../../public/instrument-controller.js';
-import * as Persistence from '../../../public/persistence.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
-import * as UI from '../../../public/ui.js';
 import * as WorkerClient from '../../../public/worker-client.js';
-
-// Mock dependencies
-vi.stubGlobal('localStorage', {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-});
 
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
@@ -42,10 +34,6 @@ vi.mock('../../../public/worker-client.js', () => ({
 vi.mock('../../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
     debounceSaveState: vi.fn(),
-}));
-
-vi.mock('../../../public/ui.js', () => ({
-    showToast: vi.fn(),
 }));
 
 vi.mock('../../../public/state.js', () => {
@@ -163,72 +151,12 @@ describe('Instrument Controller', () => {
         });
     });
 
-    describe('updateMeasures', () => {
-        it('should dispatch SET_PARAM and save state', () => {
-            InstrumentController.updateMeasures('4');
-            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
-                module: 'groove',
-                param: 'measures',
-                value: 4,
-            });
-            expect(Persistence.saveCurrentState).toHaveBeenCalled();
-        });
-
-        it('should reset currentMeasure if it exceeds the new limit', () => {
-            const state = getState();
-            state.groove.currentMeasure = 3;
-            InstrumentController.updateMeasures('2');
-            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_ACTIVE_MEASURE, 0);
-        });
-    });
-
     describe('loadDrumPreset', () => {
         it('should load a preset and update groove state', async () => {
             await InstrumentController.loadDrumPreset('Basic Rock');
             const state = getState();
             expect(state.groove.lastDrumPreset).toBe('Basic Rock');
             expect(dispatch).toHaveBeenCalledWith('DRUM_PRESET_LOADED');
-        });
-    });
-
-    describe('saveDrumPreset', () => {
-        it('should prompt for name and save to localStorage', () => {
-            window.prompt = vi.fn().mockReturnValue('My Cool Beat');
-            localStorage.getItem.mockReturnValue('[]');
-            localStorage.setItem.mockClear();
-
-            InstrumentController.saveDrumPreset();
-
-            expect(window.prompt).toHaveBeenCalled();
-            expect(localStorage.setItem).toHaveBeenCalled();
-            expect(UI.showToast).toHaveBeenCalledWith('Saved "My Cool Beat" to drum library');
-
-            delete window.prompt;
-        });
-
-        it('should abort if prompt is cancelled', () => {
-            window.prompt = vi.fn().mockReturnValue(null);
-            localStorage.setItem.mockClear();
-
-            InstrumentController.saveDrumPreset();
-
-            expect(localStorage.setItem).not.toHaveBeenCalled();
-            delete window.prompt;
-        });
-    });
-
-    describe('cloneMeasure', () => {
-        it('should clone the current measure to all other measures', () => {
-            const state = getState();
-            state.groove.measures = 2;
-            state.groove.currentMeasure = 0;
-            state.groove.instruments[0].steps[0] = 1; // Set a kick on step 0
-
-            InstrumentController.cloneMeasure();
-
-            expect(state.groove.instruments[0].steps[16]).toBe(1); // Assuming 16 spm
-            expect(dispatch).toHaveBeenCalledWith('DRUM_MEASURE_CLONED');
-            expect(UI.showToast).toHaveBeenCalled();
         });
     });
 

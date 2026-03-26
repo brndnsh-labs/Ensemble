@@ -18,12 +18,6 @@ vi.mock('../../../public/components/EditorModal.jsx', () => ({
 vi.mock('../../../public/components/GenerateSongModal.jsx', () => ({
     GenerateSongModal: () => <div id="gen-mock">Gen</div>,
 }));
-vi.mock('../../../public/components/ExportModal.jsx', () => ({
-    ExportModal: () => <div id="export-mock">Export</div>,
-}));
-vi.mock('../../../public/components/TemplatesModal.jsx', () => ({
-    TemplatesModal: () => <div id="templates-mock">Templates</div>,
-}));
 vi.mock('../../../public/components/AnalyzerModal.jsx', () => ({
     AnalyzerModal: () => <div id="analyzer-mock">Analyzer</div>,
 }));
@@ -34,8 +28,6 @@ describe('Modal Lifecycle & Animation', () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'export', open: false });
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'templates', open: false });
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'analyzer', open: false });
         document.body.innerHTML = '<div id="app"></div>';
     });

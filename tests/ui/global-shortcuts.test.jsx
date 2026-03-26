@@ -18,9 +18,8 @@ vi.mock('../../public/state.js', () => {
     const mockState = {
         playback: {
             viz: {},
-            modals: { editor: false, settings: false },
+            modals: { editor: false, settings: false, performance: false, drumPad: false },
         },
-        groove: { currentMeasure: 0, measures: 4 },
         dispatch: vi.fn(),
     };
     return {
@@ -30,11 +29,6 @@ vi.mock('../../public/state.js', () => {
         dispatch: mockState.dispatch,
     };
 });
-
-// Mock instrument-controller
-vi.mock('../../public/instrument-controller.js', () => ({
-    switchMeasure: vi.fn(),
-}));
 
 describe('Global Shortcuts', () => {
     let container;

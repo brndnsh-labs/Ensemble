@@ -7,7 +7,10 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
-const mockUseEnsembleState = vi.fn();
+const { mockUseEnsembleState, mockDispatch } = vi.hoisted(() => ({
+    mockUseEnsembleState: vi.fn(),
+    mockDispatch: vi.fn(),
+}));
 
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
@@ -29,7 +32,7 @@ vi.mock('../../../public/state.js', () => {
         ...mockState,
         stateMap: mockState,
         getState: () => mockState,
-        dispatch: mockState.dispatch,
+        dispatch: mockDispatch,
     };
 });
 
@@ -107,6 +110,7 @@ describe('InstrumentSettings Component', () => {
                     volume: 0.7,
                     reverb: 0.3,
                     humanize: 40,
+                    creativity: false,
                     larsMode: false,
                     larsIntensity: 0.5,
                     swing: 30,
@@ -148,5 +152,43 @@ describe('InstrumentSettings Component', () => {
         expect(larsSlider.hasAttribute('aria-valuetext')).toBe(true);
         // larsIntensity is 0.5, so 50%
         expect(larsSlider.getAttribute('aria-valuetext')).toBe('50%');
+    });
+
+    it('should render and dispatch the Creativity toggle for groove module', () => {
+        mockDispatch.mockClear();
+        mockUseEnsembleState.mockImplementation((cb) => {
+            const fullState = {
+                groove: {
+                    volume: 0.7,
+                    reverb: 0.3,
+                    humanize: 40,
+                    creativity: false,
+                    larsMode: false,
+                    larsIntensity: 0.5,
+                    swing: 30,
+                    swingSub: '8th',
+                },
+                playback: {},
+            };
+            return cb(fullState);
+        });
+
+        act(() => {
+            render(<InstrumentSettings module="groove" />, container);
+        });
+
+        const creativityToggle = container.querySelector('#creativityCheck');
+        expect(creativityToggle).not.toBeNull();
+        expect(creativityToggle.getAttribute('aria-label')).toBe('Creativity');
+
+        act(() => {
+            creativityToggle.click();
+        });
+
+        expect(mockDispatch).toHaveBeenCalledWith('SET_PARAM', {
+            module: 'groove',
+            param: 'creativity',
+            value: true,
+        });
     });
 });

@@ -112,20 +112,6 @@ describe('Instrument Reducer', () => {
         expect(soloist.tension).toBe(0.5);
     });
 
-    it('should set active tabs for modules', () => {
-        instrumentReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'bass', tab: 'classic' });
-        expect(bass.activeTab).toBe('classic');
-        // Groove should be ignored here (handled elsewhere)
-        const result = instrumentReducer(ACTIONS.SET_ACTIVE_TAB, { module: 'groove', tab: 'grid' });
-        expect(result).toBe(false);
-        // Invalid module
-        const invalidResult = instrumentReducer(ACTIONS.SET_ACTIVE_TAB, {
-            module: 'invalid',
-            tab: 'grid',
-        });
-        expect(invalidResult).toBe(true); // Since it hits the default return true at the end of the block
-    });
-
     it('should return false for unknown actions', () => {
         const result = instrumentReducer('UNKNOWN_ACTION', {});
         expect(result).toBe(false);

@@ -874,7 +874,7 @@ function scheduleSoloist(state, chordData, step, playTime) {
  * @param {number} t
  */
 export function scheduleChordVisuals(state, chordData, t) {
-    const { playback } = state;
+    const { playback, chords, vizState } = state;
     if (chordData.stepInChord === 0) {
         const freqs = chordData.chord.freqs;
         const fLen = freqs.length;
@@ -883,16 +883,23 @@ export function scheduleChordVisuals(state, chordData, t) {
             chordNotes[i] = getMidi(freqs[i]);
         }
 
-        // Push visual event for UI highlighting, even if canvas viz is disabled
-        playback.drawQueue.push({
-            type: 'chord_vis',
-            time: t,
-            index: chordData.chordIndex,
-            chordNotes,
-            rootMidi: chordData.chord.rootMidi,
-            intervals: chordData.chord.intervals,
-            duration: chordData.chord.beats * (60 / playback.bpm),
-        });
+        if (chords.lastActiveChordIndex !== chordData.chordIndex) {
+            chords.lastActiveChordIndex = chordData.chordIndex; // @direct-mutation
+        }
+
+        // Only queue canvas events when the Visuals workspace is active.
+        // Arranger highlighting is driven directly from the scheduler now.
+        if (vizState.enabled) {
+            playback.drawQueue.push({
+                type: 'chord_vis',
+                time: t,
+                index: chordData.chordIndex,
+                chordNotes,
+                rootMidi: chordData.chord.rootMidi,
+                intervals: chordData.chord.intervals,
+                duration: chordData.chord.beats * (60 / playback.bpm),
+            });
+        }
 
         if (playback.visualFlash) {
             triggerFlash(0.1);

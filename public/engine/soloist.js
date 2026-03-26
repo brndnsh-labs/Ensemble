@@ -128,23 +128,23 @@ export function getSoloistNote(
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
+    const hasSessionSeed = Boolean(soloist.sessionSeed && soloist.sessionSeed.notes.length > 0);
+    const headSessionSeed = hasSessionSeed ? soloist.sessionSeed : null;
     const isHeadMode =
         loopCount === 0 &&
-        soloist.sessionSeed &&
-        soloist.sessionSeed.notes.length > 0 &&
-        step % soloist.sessionSeed.loopLengthSteps < soloist.sessionSeed.loopLengthSteps - 1;
+        headSessionSeed &&
+        step % headSessionSeed.loopLengthSteps < headSessionSeed.loopLengthSteps - 1;
 
     // We only force strict head playback on loop 0, AND if there is actually a seed to play.
-    const isStrictHeadPlayback =
-        loopCount === 0 && soloist.sessionSeed && soloist.sessionSeed.notes.length > 0;
+    const isStrictHeadPlayback = loopCount === 0 && hasSessionSeed;
+    const isFirstRestatementLoop = loopCount === 1 && hasSessionSeed;
 
     // Themed Improvisation: If loop > 0, we can still use the head as a base but with more variation.
     // As intensity rises, the "Thematic Anchor" dissolves into more generative playing.
     const isThemedImprov =
-        loopCount > 0 &&
-        soloist.sessionSeed &&
-        soloist.sessionSeed.notes.length > 0 &&
-        Math.random() < intentBehavior.thematicAnchorScale;
+        hasSessionSeed &&
+        (isFirstRestatementLoop ||
+            (loopCount > 1 && Math.random() < intentBehavior.thematicAnchorScale));
 
     const isHeadPerformanceMode = isStrictHeadPlayback || isThemedImprov;
 
@@ -202,7 +202,8 @@ export function getSoloistNote(
 
         // Apply rhythmic entropy for themed improvisation
         if (isThemedImprov) {
-            timingOffset += (soloist.rhythmicEntropy || 0) * 0.02;
+            const entropyTimingScale = isFirstRestatementLoop ? 0.5 : 1.0;
+            timingOffset += (soloist.rhythmicEntropy || 0) * 0.02 * entropyTimingScale;
         }
 
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
@@ -274,14 +275,14 @@ export function getSoloistNote(
     }
 
     // --- Head Mode / Themed Improv Direct Playback Bypass ---
-    if (isHeadPerformanceMode && soloist.sessionSeed) {
+    if (isHeadPerformanceMode && headSessionSeed) {
         // While playing the head/themed improv, the soloist is technically actively phrasing,
         // so we must force isResting = false to prevent the global orchestrator from giving
         // the solo away to comping instruments due to assumed inactivity.
         soloist.isResting = false; // @worker-mutation
         soloist.phrasingState = 'active'; // @worker-mutation
 
-        const sessionSeed = soloist.sessionSeed;
+        const sessionSeed = headSessionSeed;
         const stepInLoop =
             ((step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
             sessionSeed.loopLengthSteps;
@@ -318,6 +319,12 @@ export function getSoloistNote(
             // 2. Micro-Phrasing (Probability Gate)
             // Survival Probability:
             // The seeder has already spaced the notes. We don't apply densityBase here to avoid double-penalizing the melody.
+            const isProtectedSeedTone =
+                headNote.isAnchor ||
+                isDownbeat ||
+                measureStep >= stepsPerMeasure - stepsPerBeat ||
+                (headNote.durationSteps || 0) >= stepsPerBeat;
+
             let survivalProb = 1.0;
 
             if (headNote.isAnchor) {
@@ -326,9 +333,14 @@ export function getSoloistNote(
                 if (isStrictHeadPlayback) {
                     // Loop 0: Play exactly as composed. Guaranteed density for the head.
                     survivalProb = 1.0;
+                } else if (isFirstRestatementLoop) {
+                    // Loop 1: Preserve the head as a paraphrase, especially at cadence tones.
+                    survivalProb = isProtectedSeedTone
+                        ? 1.0
+                        : Math.min(0.95, 0.72 + intentBehavior.thematicAnchorScale * 0.2);
                 } else {
-                    // Loop 1+: Themed Improv. Lower density to make room for generative fills/space
-                    survivalProb = 0.5 + effectiveIntensity * 0.4;
+                    // Later loops: the head remains a guide, but can dissolve into freer playing.
+                    survivalProb = 0.45 + effectiveIntensity * 0.35;
                 }
             }
 
@@ -338,7 +350,8 @@ export function getSoloistNote(
             if (
                 isMacroRestZone &&
                 !headNote.isAnchor &&
-                !isStrictHeadPlayback && // Never force macro-rests during the Head or very low intensity strict mode
+                !isStrictHeadPlayback &&
+                !isFirstRestatementLoop &&
                 Math.random() > intentBehavior.phrasingBridgeProb
             ) {
                 survivalProb = 0; // Force "Breath"
@@ -355,11 +368,15 @@ export function getSoloistNote(
 
                 // --- Improvisation Layer (Phase 3) ---
                 let targetMidi = headNote.midi;
-                if (isThemedImprov && !headNote.isAnchor) {
-                    // Apply ±1-2 semitone "jitter" to seeded pitches based on intensity
-                    // Reduced probability (0.2) to keep Head recognizable
-                    const jitterRange = effectiveIntensity > 0.6 ? 2 : 1;
-                    if (Math.random() < 0.2) {
+                if (isThemedImprov && !isProtectedSeedTone) {
+                    // Keep the first paraphrase close to the tune: only light offbeat nudges.
+                    const jitterRange = isFirstRestatementLoop
+                        ? 1
+                        : effectiveIntensity > 0.6
+                          ? 2
+                          : 1;
+                    const jitterProb = isFirstRestatementLoop ? 0.1 : 0.2;
+                    if (Math.random() < jitterProb) {
                         targetMidi +=
                             Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
                     }
@@ -418,6 +435,7 @@ export function getSoloistNote(
         let shouldFallThrough = false;
         if (isThemedImprov && headNotes.length === 0 && (soloist.activeSteps || 0) <= 0) {
             let minGap = sessionSeed.loopLengthSteps;
+            let nextSeedNote = null;
             for (let i = 0; i < sessionSeed.notes.length; i++) {
                 let nStep = sessionSeed.notes[i].step;
                 if (nStep < 0) {
@@ -429,15 +447,32 @@ export function getSoloistNote(
                 }
                 if (diff < minGap) {
                     minGap = diff;
+                    nextSeedNote = sessionSeed.notes[i];
                 }
             }
 
-            // Allow fills if the gap is at least a beat (usually 4 steps) and based on intensity
-            // Motivic Gap Fill: Instead of random fills, we bias towards the current genre's density.
-            if (minGap >= stepsPerBeat && Math.random() < effectiveIntensity * 0.7) {
+            const fillGapThreshold = isFirstRestatementLoop
+                ? Math.max(stepsPerBeat * 3, Math.floor(stepsPerMeasure * 0.75))
+                : stepsPerBeat;
+            const gapFillProb = isFirstRestatementLoop
+                ? effectiveIntensity * 0.35
+                : effectiveIntensity * 0.7;
+            const isCadenceGap = measureStep >= stepsPerMeasure - stepsPerBeat;
+            const leavesRunwayIntoAnchor = nextSeedNote?.isAnchor && minGap <= stepsPerBeat * 2;
+
+            // Loop 1 should only fill long interior gaps; later loops can be more talkative.
+            if (
+                !isCadenceGap &&
+                !leavesRunwayIntoAnchor &&
+                minGap >= fillGapThreshold &&
+                Math.random() < gapFillProb
+            ) {
                 shouldFallThrough = true;
-                // Allow the generative engine to play for half the gap to prevent "over-playing" into the next seed note
-                soloist.activeSteps = Math.floor(minGap / 2); /* @worker-mutation */
+                // Keep the first restatement's fills short so the next seed note still feels inevitable.
+                const gapFillSteps = isFirstRestatementLoop
+                    ? Math.max(2, Math.floor(stepsPerBeat / 2), Math.floor(minGap / 3))
+                    : Math.floor(minGap / 2);
+                soloist.activeSteps = gapFillSteps; // @worker-mutation
                 soloist.isResting = false; // @worker-mutation
                 logDebug(
                     `[Gap-Fill] Found gap of ${minGap} steps. Waking generative engine for ${soloist.activeSteps} steps.`,

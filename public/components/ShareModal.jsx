@@ -172,7 +172,7 @@ export function ShareModal(_props) {
                     </button>
                 </div>
 
-                <div class="modal-body" style="padding: 1.5rem;">
+                <div class="modal-body share-modal-body">
                     {/* --- SECTION 1: CONFIGURE CONTENT --- */}
                     <SettingGroup title="1. Configure Content">
                         <div class="instrument-selection-grid">
@@ -208,14 +208,12 @@ export function ShareModal(_props) {
                             </div>
                         </div>
 
-                        <div class="flex-col" style="gap: 0.5rem;">
+                        <div class="flex-col">
                             <SettingRow
                                 label="Loops"
                                 description="Number of times to repeat the arrangement"
                                 valueDisplay={
-                                    <span style="color: var(--accent-color); font-weight: bold; margin-right: 0.5rem;">
-                                        {durationDisplay}
-                                    </span>
+                                    <span class="share-duration-value">{durationDisplay}</span>
                                 }
                             >
                                 <Stepper
@@ -237,29 +235,27 @@ export function ShareModal(_props) {
                     </SettingGroup>
 
                     {/* --- SECTION 2: SELECT DESTINATION --- */}
-                    <div class="settings-section" style="border-bottom: none; margin-top: 1rem;">
+                    <div class="settings-section settings-section--spaced settings-section--borderless">
                         <h3>2. Select Destination</h3>
-                        <div class="flex-col" style="gap: 1.5rem; margin-top: 1rem;">
+                        <div class="flex-col share-destination-stack">
                             {/* Link Card */}
-                            <div class="help-card" style="margin: 0; padding: 1.25rem;">
-                                <h4 style="margin-bottom: 0.5rem;">🔗 Cloud Link</h4>
-                                <p class="text-mini-muted" style="margin-bottom: 1rem;">
+                            <div class="help-card share-card">
+                                <h4 class="share-card-title">🔗 Cloud Link</h4>
+                                <p class="text-mini-muted share-card-copy">
                                     Generates a unique URL containing your exact mixer levels and
                                     instrument choices.
                                 </p>
-                                <div class="flex-row" style="gap: 0.75rem;">
+                                <div class="flex-row share-actions">
                                     <button
-                                        class="primary-btn flex-1"
+                                        class="primary-btn flex-1 share-action-btn"
                                         onClick={handleCopyLink}
-                                        style="padding: 0.75rem;"
                                     >
                                         Copy Link
                                     </button>
                                     {canNativeShare && (
                                         <button
-                                            class="secondary-btn"
+                                            class="secondary-btn share-action-btn"
                                             onClick={handleNativeShare}
-                                            style="padding: 0.75rem;"
                                         >
                                             📤 Share
                                         </button>
@@ -268,16 +264,13 @@ export function ShareModal(_props) {
                             </div>
 
                             {/* MIDI Card */}
-                            <div
-                                class="help-card"
-                                style="margin: 0; padding: 1.25rem; border-color: rgba(var(--accent-color-rgb), 0.3);"
-                            >
-                                <h4 style="margin-bottom: 0.5rem;">🎹 DAW MIDI File</h4>
-                                <p class="text-mini-muted" style="margin-bottom: 1rem;">
+                            <div class="help-card share-card share-card--accent">
+                                <h4 class="share-card-title">🎹 DAW MIDI File</h4>
+                                <p class="text-mini-muted share-card-copy">
                                     Download a multi-track MIDI file for use in Logic, Ableton, or
                                     other DAWs.
                                 </p>
-                                <div class="flex-col" style="gap: 0.75rem;">
+                                <div class="flex-col">
                                     <input
                                         id="exportFilenameInput"
                                         type="text"
@@ -290,14 +283,12 @@ export function ShareModal(_props) {
                                         }}
                                         placeholder="Filename..."
                                         maxLength={64}
-                                        class="w-full"
-                                        style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; color: var(--text-color);"
+                                        class="w-full share-filename-input"
                                     />
                                     <button
-                                        class="secondary-btn w-full"
+                                        class="secondary-btn w-full share-action-btn share-action-btn--accent"
                                         onClick={handleExport}
                                         disabled={isExporting}
-                                        style="padding: 0.75rem; border-color: var(--accent-color); color: var(--accent-color);"
                                     >
                                         {isExporting ? 'Generating...' : 'Download .mid'}
                                     </button>

@@ -6,20 +6,27 @@ Welcome to Ensemble, your AI-powered virtual band. Whether you're practicing sol
 
 ## 🚀 The 30-Second Jam
 If you want to start playing immediately:
-1.  **Pick a Genre:** Select a style from the **Grooves** panel (e.g., Jazz, Rock, or Funk).
-2.  **Type Chords:** Enter your progression in the **Arranger** (e.g., `C | F G`).
+1.  **Choose a Band Feel:** Open **Studio** and pick a genre from the **Band feel** chooser.
+2.  **Type Chords:** Enter your progression in **Arranger** (e.g., `C | F G`).
 3.  **Press Start:** The band will instantly begin playing.
-*✨ **Pro Tip:** Click the **Dice Icon** for an instant, musically coherent song structure!*
+4.  **Move Between Workspaces:** Use the workspace navigation to jump between **Arranger**, **Studio**, **Perform**, and **Visuals** while the music keeps running.
+*✨ **Pro Tip:** In **Arranger**, open the `⋮` actions menu for edit, share, library, transpose, and soloist seed controls without covering the lead sheet.*
 
 ---
 
 ## 🎹 Common Workflows
 
+### Understanding the Four Workspaces
+- **Arranger:** Your lead-sheet view for chords, form, transposition, sharing, and the progression library.
+- **Studio:** A compact live-mix surface where you can see which instruments are active, toggle them on or off, and open per-instrument settings.
+- **Perform:** A clean launchpad for manual performance tools such as the solo surface and drum pad.
+- **Visuals:** A dedicated visualizer view that stays out of the way until you want a larger visual performance display.
+
 ### "I want to practice soloing"
 Ensemble is built for improvisation. 
-- **Trade Mode:** In the Soloist settings, enable **Trade Sections**. The band will play for one section, then "hand off" the lead to you for the next.
-- **Status Indicator:** Watch the Soloist power button (⏻). **Green** means the AI is playing; **Yellow** means it's your turn!
-- **Soloist Performance:** Press `S` to open the Performance Card. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
+- **Trade Mode:** In **Studio**, open the Soloist settings and enable **Trade Sections**. The band will play for one section, then hand off the lead to you for the next.
+- **Status Indicator:** Watch the Soloist state pill in **Studio**. **On** means the AI is active, and **Queued** means the soloist is waiting for the next trading section.
+- **Soloist Performance:** Open **Perform** and launch **Soloist Performance**, or press `S`. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
 
 ### "I want the soloist to sound more intentional"
 The AI Soloist uses a **Dynamic Head** system to provide thematic direction to each session. Every time you press play, the soloist generates a unique "seed melody" that fits your specific chord progression.
@@ -29,8 +36,8 @@ The AI Soloist uses a **Dynamic Head** system to provide thematic direction to e
 
 ### "I want to play the drums manually"
 If you want to take over the rhythm section or just troubleshoot the kit:
-- **Drum Pad:** Press `D` (or click the 🥁 icon in the Grooves panel) to open the **Drum Pad & Diagnostic Lab**.
-- **Performance Mode:** When the Drum Pad is open, the automatic drum patterns will stop, giving you full manual control.
+- **Drum Pad:** Open **Perform** and launch the **Groove Drum Pad**, or press `D` to open **Drum Performance Mode** directly.
+- **Performance Mode:** When the drum pad is open, the automatic drum patterns stop, giving you full manual control.
 - **Ergonomic Layout:** The pads are mapped to your home row:
     - **Kick:** `Space`
     - **Pocket (Left Hand):** `F` (Snare), `D` (Rim)
@@ -38,9 +45,10 @@ If you want to take over the rhythm section or just troubleshoot the kit:
     - **Fills:** `R`, `T`, `Y` (Toms) and `U` (Crash)
 
 ### "I'm writing a new song"
-Use the **Audio Workbench** to bridge your ideas with the AI.
-- **Seeding:** Have a cool riff? Type it in, then use the **Song Generator** with **Seeding** enabled. The AI will keep your chords as the "Verse" and compose an Intro/Chorus/Outro around it.
-- **Melody Harmonizer:** Sing or play a melody into your mic in the Workbench. The AI will analyze your notes and suggest a chord progression that fits.
+Use the **Arranger** tools to bridge your ideas with the AI.
+- **Progression Library:** Open the Arranger actions menu and use **Library** when you want a quick starting point or a standard form to practice over.
+- **Inspiration Hub:** From the editor, open **Inspiration Hub** to generate full song forms or seed a new arrangement from existing material.
+- **Melody Harmonizer / Analyzer:** Use the analyzer tools when you want to capture a melodic idea and turn it into harmonic material inside the arranger.
 
 ### "I want to record into my DAW"
 Ensemble can act as a high-precision MIDI controller for Logic, Ableton, or hardware synths.
@@ -53,7 +61,7 @@ Ensemble can act as a high-precision MIDI controller for Logic, Ableton, or hard
 ## 🧠 Understanding the Band
 
 ### The Conductor (Intensity & Complexity)
-These two sliders are the most powerful tools in the app:
+These controls are some of the most powerful ways to shape the band:
 - **Intensity:** Controls the band's energy. At 0.1, the drummer might just use cross-sticks; at 0.9, they'll be playing heavy crashes and busy fills.
 - **Complexity:** Controls "how much" the band plays. Higher values add jazzy chord extensions, walking bass variations, and rhythmic "pockets."
 

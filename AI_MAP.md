@@ -25,6 +25,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/groove.js` | Genre, intensity, and drum kit selection. | `groove` |
 | `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
+| `public/state/ui.js` | Top-level UI workspace navigation state. | `ui`, `normalizeWorkspace` |
 | `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.js` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
@@ -106,14 +107,19 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
-| **Containers** | `public/App.jsx` | Root layout and theme provider. |
+| **Containers** | `public/App.jsx` | Root workspace shell, header, and active surface rendering. |
+| **Navigation** | `public/components/WorkspaceNav.jsx` | Top-level workspace switcher for Arranger, Studio, Perform, and Visuals. |
+| **Workspaces** | `public/components/ArrangerWorkspace.jsx` | Lead-sheet workspace with arranger actions and progression library access. |
+| **Workspaces** | `public/components/StudioWorkspace.jsx` | Live-mix workspace with band feel chooser and compact instrument controls. |
+| **Workspaces** | `public/components/PerformWorkspace.jsx` | Launch surface for manual performance tools. |
+| **Workspaces** | `public/components/VisualsWorkspace.jsx` | Visualizer workspace shell. |
 | **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
-| **Logic Views** | `public/components/Arranger.jsx` | Chord progression manager. |
+| **Logic Views** | `public/components/Arranger.jsx` | Arranger editor surface used by the editor modal and related flows. |
 | **Controls** | `public/components/Transport.jsx` | Playback controls and tempo. |
 | **Visuals** | `public/components/Visualizer.jsx` | Canvas rendering container. |
-| **Grid** | `public/components/SequencerGrid.jsx` | Interactive drum editor. |
-| **Panels** | `public/components/GroovePanel.jsx` | Genre and vibe selection. |
+| **Library** | `public/components/PresetLibrary.jsx` | Chord progression library modal. |
+| **Settings** | `public/components/InstrumentSettings.jsx` | Reusable per-instrument settings surface used from Studio. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
 
 ## Domain State Slices (Modular State)
@@ -126,6 +132,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/instruments.js` | Bass, Chords, Soloist, and Harmony settings. |
 | `public/state/conductor.js` | Auto-intensity target, tempo drift, and form tracking. |
 | `public/state/midi.js` | MIDI device and channel configuration. |
+| `public/state/ui.js` | Top-level workspace selection for the app shell. |
 | `public/state/visualizer.js` | Visualizer rendering and flash state. |
 
 ## High-Level Controllers & Integration

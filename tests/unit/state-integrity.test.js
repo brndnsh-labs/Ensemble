@@ -65,7 +65,7 @@ describe('State Integrity Audit', () => {
             });
 
             // Special exceptions for actions that might be dynamically generated or used in ways this regex misses
-            const exceptions = ['HYDRATE', 'TOAST_EXPIRED', 'FLASH_EXPIRED'];
+            const exceptions = ['HYDRATE', 'TOAST_EXPIRED', 'FLASH_EXPIRED', 'SET_AUTO_INTENSITY'];
 
             if (!isDispatched && !exceptions.includes(key)) {
                 unusedInDispatch.push(key);

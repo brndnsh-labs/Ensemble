@@ -64,7 +64,7 @@ export function InstrumentSettings({ module }) {
     };
 
     return (
-        <div class="grid-2-col">
+        <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
             {/* Left Column: Instrument Specifics */}
             <SettingGroup
                 title={
@@ -159,13 +159,12 @@ export function InstrumentSettings({ module }) {
                         <SettingRow label="Lead Sound" id="soloistPresetSelect">
                             <Select
                                 id="soloistPresetSelect"
-                                value={state.preset || 'classic'}
+                                value={state.preset || 'trumpet'}
                                 onChange={(/** @type {any} */ val) => {
                                     dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
                                     saveCurrentState();
                                 }}
                                 options={[
-                                    { value: 'classic', label: 'Classic Sawtooth' },
                                     { value: 'neo', label: 'Neo-Juno' },
                                     { value: 'vowel', label: 'Vowel Lead' },
                                     { value: 'trumpet', label: 'Trumpet' },
@@ -248,7 +247,7 @@ function GrooveControls({ state }) {
     return (
         <Fragment>
             <SettingRow label="Swing" id="swingSlider" valueDisplay={`${swing || 0}%`}>
-                <div class="flex-row">
+                <div class="flex-row instrument-settings-swing-controls">
                     <Slider
                         id="swingSlider"
                         min="0"
@@ -290,6 +289,22 @@ function GrooveControls({ state }) {
                         saveCurrentState();
                     }}
                     ariaValueText={`${state.humanize || 0}%`}
+                />
+            </SettingRow>
+
+            <SettingRow label="Creativity" id="creativityCheck">
+                <Toggle
+                    id="creativityCheck"
+                    checked={!!state.creativity}
+                    ariaLabel="Creativity"
+                    onChange={(/** @type {any} */ val) => {
+                        dispatch(ACTIONS.SET_PARAM, {
+                            module: 'groove',
+                            param: 'creativity',
+                            value: val,
+                        });
+                        saveCurrentState();
+                    }}
                 />
             </SettingRow>
 

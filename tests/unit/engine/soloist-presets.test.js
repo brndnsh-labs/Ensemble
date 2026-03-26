@@ -78,7 +78,7 @@ vi.mock('../../../public/state.js', () => {
     const mockSoloist = {
         activeVoices: [],
         mode: 'monophonic',
-        preset: 'classic',
+        preset: 'neo',
     };
 
     const mockStateMap = {
@@ -109,19 +109,9 @@ describe('Soloist Presets', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         soloist.activeVoices = [];
-        soloist.preset = 'classic';
+        soloist.preset = 'neo';
         soloist.mode = 'monophonic';
         playback.audio.currentTime = 10;
-    });
-
-    it('should play Classic preset (Osc + Filter)', () => {
-        soloist.preset = 'classic';
-        playSoloNote(getState(), 440, 10, 1.0);
-
-        // Classic uses 2 oscs (saw + tri) + 1 osc (vibrato) = 3 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
-        expect(soloist.activeVoices.length).toBe(1);
     });
 
     it('should play Neo-Juno (Dual Saw + 2 LFOs)', () => {

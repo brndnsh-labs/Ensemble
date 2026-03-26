@@ -23,7 +23,14 @@ const GROUPING_OPTIONS = {
     ],
 };
 
-export function KeySignatureControls() {
+/**
+ * @typedef {Object} KeySignatureControlsProps
+ * @property {boolean} [showMaximize]
+ * @property {boolean} [showTranspose]
+ */
+
+/** @param {KeySignatureControlsProps} [props] */
+export function KeySignatureControls({ showMaximize = true, showTranspose = true } = {}) {
     const dispatch = useDispatch();
     const { arrangerKey, timeSignature, isMinor, grouping, lastDrumPreset, isMaximized } =
         useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
@@ -86,15 +93,17 @@ export function KeySignatureControls() {
 
     return (
         <div class="key-controls">
-            <button
-                id="maximizeChordBtn"
-                title={isMaximized ? 'Exit Maximize' : 'Maximize'}
-                class={`header-btn ${isMaximized ? 'active' : ''}`}
-                aria-label={isMaximized ? 'Exit Maximize' : 'Maximize Chords'}
-                onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS)}
-            >
-                {isMaximized ? '✕' : '⛶'}
-            </button>
+            {showMaximize && (
+                <button
+                    id="maximizeChordBtn"
+                    title={isMaximized ? 'Exit Maximize' : 'Maximize'}
+                    class={`header-btn ${isMaximized ? 'active' : ''}`}
+                    aria-label={isMaximized ? 'Exit Maximize' : 'Maximize Chords'}
+                    onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS)}
+                >
+                    {isMaximized ? '✕' : '⛶'}
+                </button>
+            )}
 
             <div class="time-sig-group">
                 <select
@@ -161,31 +170,35 @@ export function KeySignatureControls() {
                 {isMinor ? 'min' : 'maj'}
             </button>
 
-            <button
-                id="transDownBtn"
-                title="Transpose Down"
-                class="header-btn"
-                aria-label="Transpose Down"
-                onClick={() => {
-                    transposeKey(-1);
-                    dispatch('TRANSPOSE');
-                }}
-            >
-                ♭
-            </button>
+            {showTranspose && (
+                <>
+                    <button
+                        id="transDownBtn"
+                        title="Transpose Down"
+                        class="header-btn"
+                        aria-label="Transpose Down"
+                        onClick={() => {
+                            transposeKey(-1);
+                            dispatch('TRANSPOSE');
+                        }}
+                    >
+                        ♭
+                    </button>
 
-            <button
-                id="transUpBtn"
-                title="Transpose Up"
-                class="header-btn"
-                aria-label="Transpose Up"
-                onClick={() => {
-                    transposeKey(1);
-                    dispatch('TRANSPOSE');
-                }}
-            >
-                ♯
-            </button>
+                    <button
+                        id="transUpBtn"
+                        title="Transpose Up"
+                        class="header-btn"
+                        aria-label="Transpose Up"
+                        onClick={() => {
+                            transposeKey(1);
+                            dispatch('TRANSPOSE');
+                        }}
+                    >
+                        ♯
+                    </button>
+                </>
+            )}
         </div>
     );
 }

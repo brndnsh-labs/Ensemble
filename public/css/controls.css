@@ -1,142 +1,129 @@
 /* --- Smart Controls --- */
-.smart-control-group {
-    margin-bottom: 1.5rem;
-}
-
-.genre-selector {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
-    gap: 0.5rem;
-}
-
-.genre-btn {
-    flex: none; /* Reset flex since we're using grid now */
-    padding: 0.75rem 0.25rem; /* Slightly narrower horizontal padding for 3-col fit */
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    border-radius: 6px;
+.setting-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-secondary);
     cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s;
-    font-size: 0.85rem;
-    white-space: nowrap;
+    font-size: var(--font-xs);
 }
 
-.genre-btn:hover {
+.section-label {
+    display: block;
+    margin-bottom: var(--space-2);
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+}
+
+.stepper-control {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--input-bg);
+}
+
+.stepper-btn {
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: bold;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease);
+}
+
+.stepper-btn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: -2px;
+}
+
+.stepper-input {
+    width: 40px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-color);
+    text-align: center;
+    font-weight: bold;
+    -moz-appearance: textfield;
+}
+
+.tap-btn {
+    height: auto;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--font-xs);
+}
+
+.button-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.button-group-btn {
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--input-bg);
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: var(--font-xs);
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
+}
+
+.button-group-btn.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.button-group-btn:hover {
     border-color: var(--accent-color);
     background: var(--card-bg-hover);
 }
 
-.genre-btn[data-genre="Rock"] {
-    border-color: var(--blue);
-}
-.genre-btn[data-genre="Jazz"] {
-    border-color: var(--green);
-}
-.genre-btn[data-genre="Funk"] {
-    border-color: var(--magenta);
-}
-.genre-btn[data-genre="Disco"] {
-    border-color: var(--violet);
-}
-.genre-btn[data-genre="Blues"] {
-    border-color: var(--cyan);
-}
-.genre-btn[data-genre="Neo-Soul"] {
-    border-color: var(--magenta);
-}
-.genre-btn[data-genre="Reggae"] {
-    border-color: var(--orange);
-}
-.genre-btn[data-genre="Acoustic"] {
-    border-color: var(--yellow);
-}
-.genre-btn[data-genre="Bossa"] {
-    border-color: var(--green);
-}
-.genre-btn[data-genre="Ska-Punk"] {
-    border-color: var(--orange);
-}
-
-.genre-btn.active {
+.button-group-btn.active:hover {
     background: var(--accent-color);
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.genre-btn.pending {
-    position: relative;
-    animation: genre-pulse 1s infinite alternate;
-    border-style: dashed;
+.button-group-btn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
-.genre-btn.pending::after {
-    content: attr(data-countdown);
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--error-color);
-    color: white;
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-weight: bold;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    z-index: var(--z-controls);
+.seed-input {
+    width: 80px;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--font-xs);
+    text-transform: uppercase;
 }
 
-@keyframes genre-pulse {
-    from {
-        opacity: 0.7;
-        transform: scale(0.98);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1.02);
-    }
+.seed-input:focus-visible {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
 }
 
-.genre-btn.active[data-genre="Rock"] {
-    background: var(--blue);
-    border-color: var(--blue);
-}
-.genre-btn.active[data-genre="Jazz"] {
-    background: var(--green);
-    border-color: var(--green);
-}
-.genre-btn.active[data-genre="Funk"] {
-    background: var(--magenta);
-    border-color: var(--magenta);
-}
-.genre-btn.active[data-genre="Disco"] {
-    background: var(--violet);
-    border-color: var(--violet);
-}
-.genre-btn.active[data-genre="Blues"] {
-    background: var(--cyan);
-    border-color: var(--cyan);
-}
-.genre-btn.active[data-genre="Neo-Soul"] {
-    background: var(--magenta);
-    border-color: var(--magenta);
-}
-.genre-btn.active[data-genre="Reggae"] {
-    background: var(--orange);
-    border-color: var(--orange);
-}
-.genre-btn.active[data-genre="Acoustic"] {
-    background: var(--yellow);
-    border-color: var(--yellow);
-}
-.genre-btn.active[data-genre="Bossa"] {
-    background: var(--green);
-    border-color: var(--green);
-}
-.genre-btn.active[data-genre="Ska-Punk"] {
-    background: var(--orange);
-    border-color: var(--orange);
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-1);
+    line-height: 1;
 }
 
 /* Play Button Internal Layout */
@@ -155,41 +142,16 @@
     }
 }
 
-.btn-timer {
-    font-family: monospace;
-    font-size: 0.75rem;
-    font-weight: normal;
-    color: rgba(255, 255, 255, 0.8);
-    margin-top: 2px;
-}
-
-.btn-timer.warning {
-    color: var(--error-color);
-    animation: timer-pulse-text 1s infinite;
-}
-
-@keyframes timer-pulse-text {
-    0% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
-    100% {
-        opacity: 1;
-    }
-}
-
 /* Badge Button (Micro-interaction) */
 .badge-btn {
     font-size: 0.65rem;
     color: var(--accent-color);
     font-weight: bold;
     cursor: pointer;
-    padding: 1px 4px;
+    padding: 1px var(--space-1);
     background: rgba(59, 130, 246, 0.1);
     border: 1px solid rgba(59, 130, 246, 0.2);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     min-width: 28px;
     text-align: center;
     margin-top: 2px;
@@ -200,7 +162,10 @@
     display: inline-block;
     appearance: none;
     -webkit-appearance: none;
-    transition: all 0.2s ease;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
 }
 
 .badge-btn:hover {

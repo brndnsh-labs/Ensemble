@@ -6,6 +6,7 @@ import {
     SOLOIST_STYLES,
 } from './data/instrument-styles.js';
 import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
+import { normalizeWorkspace } from './state/ui.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
 import {
@@ -31,6 +32,19 @@ const clamp = (val, min, max, defaultVal) => {
     }
     return Math.min(Math.max(min, num), max);
 };
+
+const SUPPORTED_SOLOIST_PRESETS = new Set(['neo', 'vowel', 'trumpet', 'saxophone', 'shred']);
+
+/**
+ * @param {any} preset
+ * @param {string} fallback
+ */
+function normalizeSoloistPreset(preset, fallback = 'trumpet') {
+    if (preset === 'classic') {
+        return 'neo';
+    }
+    return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;
+}
 
 /**
  * Decompresses the Base64 band settings string.
@@ -106,7 +120,7 @@ function validateSections(sections) {
 }
 
 export function hydrateState() {
-    const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
+    const { playback, chords, bass, soloist, harmony, groove, arranger, vizState, ui } = getState();
     const savedState = storage.get('currentState');
     if (savedState?.sections) {
         const validatedSections = validateSections(savedState.sections);
@@ -174,7 +188,6 @@ export function hydrateState() {
                 volume: clamp(savedState.chords.volume, 0, 1, 0.5),
                 reverb: clamp(savedState.chords.reverb, 0, 1, 0.3),
                 pianoRoots: savedState.chords.pianoRoots || false,
-                activeTab: savedState.chords.activeTab || 'smart',
             });
         }
         if (savedState.bass) {
@@ -184,7 +197,6 @@ export function hydrateState() {
                 octave: clamp(savedState.bass.octave, 0, 127, 36),
                 volume: clamp(savedState.bass.volume, 0, 1, 0.45),
                 reverb: clamp(savedState.bass.reverb, 0, 1, 0.05),
-                activeTab: savedState.bass.activeTab || 'smart',
             });
         }
         if (savedState.soloist) {
@@ -192,7 +204,7 @@ export function hydrateState() {
                 enabled:
                     savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
                 style: savedState.soloist.style || 'smart',
-                preset: savedState.soloist.preset || 'trumpet',
+                preset: normalizeSoloistPreset(savedState.soloist.preset, 'trumpet'),
                 octave:
                     savedState.soloist.octave === 77 ||
                     savedState.soloist.octave === 67 ||
@@ -206,7 +218,6 @@ export function hydrateState() {
                     : savedState.soloist.doubleStops
                       ? 'guitar'
                       : 'monophonic',
-                activeTab: savedState.soloist.activeTab || 'smart',
                 seed: savedState.soloist.seed || '',
                 leadSheetMelody: savedState.soloist.leadSheetMelody || [],
             });
@@ -220,7 +231,6 @@ export function hydrateState() {
                 volume: clamp(savedState.harmony.volume, 0, 1, 0.4),
                 reverb: clamp(savedState.harmony.reverb, 0, 1, 0.4),
                 complexity: clamp(savedState.harmony.complexity, 0, 1, 0.5),
-                activeTab: savedState.harmony.activeTab || 'smart',
             });
         }
         if (savedState.groove) {
@@ -251,8 +261,6 @@ export function hydrateState() {
                         (k) => GENRE_FEELS[GENRE_NAMES.indexOf(k)] === savedState.groove.genreFeel,
                     ) ||
                     'Rock',
-                activeTab: savedState.groove.activeTab || 'smart',
-                mobileTab: savedState.groove.mobileTab || 'chords',
                 creativity:
                     savedState.groove.creativity !== undefined
                         ? !!savedState.groove.creativity
@@ -297,6 +305,10 @@ export function hydrateState() {
                         ? savedState.midi.velocitySensitivity
                         : 1.0,
             });
+        }
+
+        if (ui) {
+            ui.activeWorkspace = normalizeWorkspace(savedState.ui?.activeWorkspace); // @direct-mutation
         }
     } else {
         dispatch(ACTIONS.RESET_STATE);
@@ -408,7 +420,7 @@ export function loadFromUrl() {
                 Object.assign(soloist, {
                     enabled: !!band.s.e,
                     style: SOLOIST_STYLES.some((s) => s.id === band.s.s) ? band.s.s : soloist.style,
-                    preset: band.s.p || soloist.preset,
+                    preset: normalizeSoloistPreset(band.s.p, soloist.preset),
                     octave: clamp(band.s.o, 0, 127, 72),
                     volume: clamp(band.s.v, 0, 1, 0.5),
                     reverb: clamp(band.s.r, 0, 1, 0.6),

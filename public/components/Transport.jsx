@@ -109,8 +109,7 @@ export function Transport() {
                 />
                 <button
                     id="tapBtn"
-                    class={tapActive ? 'handle-tap' : ''}
-                    style="padding: 0.2rem 0.5rem; font-size: 0.8rem; height: auto;"
+                    class={`tap-btn ${tapActive ? 'handle-tap' : ''}`}
                     aria-label="Tap Tempo"
                     onClick={onTap}
                 >

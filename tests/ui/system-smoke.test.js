@@ -83,7 +83,6 @@ const setupMinimalDOM = () => {
             <button id="groovePowerBtn"></button>
             <button id="bassPowerBtn"></button>
             <button id="soloistPowerBtn"></button>
-            <button id="vizPowerBtn"></button>
             <button id="chordPowerBtnDesktop"></button>
             <button id="groovePowerBtnDesktop"></button>
             <button id="bassPowerBtnDesktop"></button>

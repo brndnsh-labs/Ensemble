@@ -1,5 +1,4 @@
 import { useEffect } from 'preact/hooks';
-import { switchMeasure } from '../instrument-controller.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 
@@ -12,7 +11,7 @@ import { ACTIONS } from '../types.js';
 export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (/** @type {any} */ e) => {
-            const { playback, groove } = getState();
+            const { playback } = getState();
             const isTyping =
                 ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) ||
                 e.target.isContentEditable;
@@ -75,23 +74,6 @@ export function GlobalShortcuts() {
                 setTimeout(() => {
                     dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'drumPad', open: true });
                 }, 0);
-            }
-
-            // 1-5: Switch Mobile Tabs
-            if (['1', '2', '3', '4', '5'].includes(e.key) && !isTyping && !anyModalOpen) {
-                const btns = document.querySelectorAll('.mobile-tabs-nav .tab-btn');
-                const btn = btns[parseInt(e.key, 10) - 1];
-                if (btn instanceof HTMLElement) {
-                    btn.click();
-                }
-            }
-
-            // [ ]: Switch Measures
-            if (e.key === '[' && !isTyping) {
-                switchMeasure((groove.currentMeasure - 1 + groove.measures) % groove.measures);
-            }
-            if (e.key === ']' && !isTyping) {
-                switchMeasure((groove.currentMeasure + 1) % groove.measures);
             }
 
             // Escape: Close Modal / Unmaximize

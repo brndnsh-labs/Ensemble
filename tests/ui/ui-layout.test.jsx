@@ -8,22 +8,17 @@ import React from 'preact/compat';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dispatch, getState } from '../../public/state.js';
 
-const { arranger, groove } = getState();
+const { arranger } = getState();
 
 import { Arranger } from '../../public/components/Arranger.jsx';
 import { ChordVisualizer } from '../../public/components/ChordVisualizer.jsx';
-import { SequencerGrid } from '../../public/components/SequencerGrid.jsx';
 
 // Mock dependencies that we don't need for layout testing
 vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/instrument-controller.js', () => ({
-    clearDrumPresetHighlight: vi.fn(),
-    saveDrumPreset: vi.fn(),
     togglePower: vi.fn(),
-    updateMeasures: vi.fn(),
-    cloneMeasure: vi.fn(),
 }));
 vi.mock('../../public/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
@@ -70,7 +65,6 @@ describe('UI Layout Integrity', () => {
             'groovePowerBtnDesktop',
             'bassPowerBtnDesktop',
             'soloistPowerBtnDesktop',
-            'vizPowerBtn',
             'addSectionBtn',
             'inspirationHubBtn',
             'activeSectionLabel',
@@ -91,14 +85,9 @@ describe('UI Layout Integrity', () => {
             'chordReverb',
             'bassReverb',
             'soloistReverb',
-            'drumPresets',
-            'userDrumPresetsContainer',
-            'cloneMeasureBtn',
             'autoFollowCheck',
             'humanizeSlider',
-            'saveDrumBtn',
             'drumReverb',
-            'smartDrumPresets',
             'settingsOverlay',
             'settingsBtn',
             'themeSelect',
@@ -269,76 +258,6 @@ describe('UI Layout Integrity', () => {
             expect(card.querySelector('.section-label-input')).not.toBeNull();
             expect(card.querySelector('.section-prog-input')).not.toBeNull();
             expect(card.querySelector('.section-delete-btn')).not.toBeNull();
-        });
-    });
-
-    describe('SequencerGrid Component', () => {
-        it('should render the correct number of instruments and steps', async () => {
-            groove.instruments = [
-                { name: 'Kick', steps: new Array(128).fill(0) },
-                { name: 'Snare', steps: new Array(128).fill(0) },
-            ];
-            groove.measures = 1;
-            arranger.timeSignature = '4/4';
-
-            const container = document.getElementById('sequencerGrid');
-            render(<SequencerGrid />, container);
-
-            await new Promise((r) => setTimeout(r, 0));
-
-            const rows = document.querySelectorAll('.track:not(.label-row)');
-            expect(rows.length).toBe(2);
-
-            const steps = rows[0].querySelectorAll('.step');
-            expect(steps.length).toBe(16);
-        });
-
-        it('should update step count when measures change', async () => {
-            groove.instruments = [{ name: 'Kick', steps: new Array(128).fill(0) }];
-            groove.measures = 2;
-            arranger.timeSignature = '4/4';
-
-            const container = document.getElementById('sequencerGrid');
-            render(<SequencerGrid />, container);
-
-            await new Promise((r) => setTimeout(r, 0));
-
-            const steps = document.querySelectorAll('.step');
-            expect(steps.length).toBe(32);
-        });
-
-        it('should not leak rows when re-rendering', async () => {
-            groove.instruments = [
-                { name: 'Kick', steps: new Array(128).fill(0) },
-                { name: 'Snare', steps: new Array(128).fill(0) },
-            ];
-            groove.measures = 1;
-            arranger.timeSignature = '4/4';
-
-            const container = document.getElementById('sequencerGrid');
-            render(<SequencerGrid />, container);
-            await new Promise((r) => setTimeout(r, 0));
-            render(<SequencerGrid />, container);
-            await new Promise((r) => setTimeout(r, 0));
-
-            const rows = document.querySelectorAll('.track:not(.label-row)');
-            expect(rows.length).toBe(2);
-        });
-
-        it('should render the correct number of subdivision labels', async () => {
-            groove.instruments = [{ name: 'Kick', steps: new Array(128).fill(0) }];
-            groove.measures = 1;
-            arranger.timeSignature = '4/4';
-
-            const container = document.getElementById('sequencerGrid');
-            render(<SequencerGrid />, container);
-
-            await new Promise((r) => setTimeout(r, 0));
-
-            const labelRow = document.querySelector('.label-row');
-            expect(labelRow).not.toBeNull();
-            const labels = labelRow.querySelectorAll('.steps > div');
-            expect(labels.length).toBe(16);
         });
     });
 });

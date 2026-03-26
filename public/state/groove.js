@@ -38,8 +38,6 @@ import { ACTIONS } from '../types.js';
  * @property {number} larsIntensity - Intensity of tempo drift (0.0 - 1.0).
  * @property {boolean} fillActive - Whether a drum fill is currently being played.
  * @property {Object} fillSteps - Transient storage for the generated fill pattern.
- * @property {string} activeTab - Currently active UI tab.
- * @property {string} mobileTab - Currently active mobile tab.
  * @property {GainNode|null} lastHatGain - Last gain node for the hi-hat.
  * @property {GainNode|null} lastRideGain - Last gain node for the ride cymbal.
  * @property {number} fillStartStep - Step index where the current fill began.
@@ -48,7 +46,6 @@ import { ACTIONS } from '../types.js';
  * @property {boolean} pendingCrash - Whether a crash cymbal is queued for the next downbeat.
  * @property {boolean} creativity - Whether generative fills/variations are enabled.
  * @property {Object} sectionSeedMap - Random seeds for each song section.
- * @property {number} gridVersion - Counter for grid UI updates.
  * @property {PocketState} pocket - Unified rhythmic pocket configuration.
  * @property {string} lastSmartGenre - Last selected smart genre.
  * @property {{genreName?: string, feel?: string}|null} pendingGenreFeel - Genre queued for the next measure.
@@ -102,8 +99,6 @@ export const groove = deepSignal({
     fillActive: false,
     fillSteps: {},
     buffer: new Map(),
-    activeTab: 'smart',
-    mobileTab: 'chords',
     lastHatGain: null,
     lastRideGain: null,
     fillStartStep: 0,
@@ -112,7 +107,6 @@ export const groove = deepSignal({
     pendingCrash: false,
     creativity: false,
     sectionSeedMap: {},
-    gridVersion: 0,
     variations: null,
     // --- Unified Rhythmic Pocket System ---
     pocket: {
@@ -155,7 +149,6 @@ export function grooveReducer(action, payload, playback) {
             groove.swing = 0;
             groove.swingSub = '8th';
             groove.genreFeel = 'Rock';
-            groove.activeTab = 'smart';
             groove.lastSmartGenre = 'Rock';
             groove.measures = 1;
             groove.currentMeasure = 0;
@@ -174,19 +167,6 @@ export function grooveReducer(action, payload, playback) {
                 inst.muted = false;
             });
             return true;
-        case ACTIONS.SET_GROOVE_STEPS: {
-            const inst = groove.instruments.find((i) => i.name === payload.instrument);
-            if (inst) {
-                inst.steps.fill(0);
-                payload.steps.forEach((/** @type {number} */ v, /** @type {number} */ i) => {
-                    if (i < 128) {
-                        inst.steps[i] = v;
-                    }
-                });
-                return true;
-            }
-            return false;
-        }
         case ACTIONS.SET_ACTIVE_MEASURE:
             groove.currentMeasure = parseInt(payload, 10);
             return true;
@@ -225,9 +205,6 @@ export function grooveReducer(action, payload, playback) {
         case ACTIONS.SET_LARS_INTENSITY:
             groove.larsIntensity = Math.max(0, Math.min(1, payload));
             return true;
-        case ACTIONS.SET_CREATIVITY:
-            groove.creativity = !!payload;
-            return true;
         case ACTIONS.SET_GROOVE_SEED:
             if (!groove.sectionSeedMap) {
                 groove.sectionSeedMap = {};
@@ -248,7 +225,6 @@ export function grooveReducer(action, payload, playback) {
                 groove.genreFeel = payload.feel;
                 groove.pendingGenreFeel = null;
                 groove.lastSmartGenre = payload.genreName || groove.lastSmartGenre;
-                groove.activeTab = 'smart';
                 // DeepSignal handles nested reactivity, but we still map to ensure fresh references
                 // for any legacy components that might rely on shallow comparison.
                 groove.instruments = groove.instruments.map((inst) => ({
@@ -264,21 +240,12 @@ export function grooveReducer(action, payload, playback) {
                 }
             }
             return true;
-        case ACTIONS.SET_ACTIVE_TAB:
-            if (payload.module === 'groove') {
-                groove.activeTab = payload.tab;
-                return true;
-            }
-            return false;
         case ACTIONS.TRIGGER_FILL:
             groove.fillSteps = payload.steps;
             groove.fillActive = true;
             groove.fillStartStep = payload.startStep;
             groove.fillLength = payload.length;
             groove.pendingCrash = !!payload.crash;
-            return true;
-        case ACTIONS.STEP_TOGGLE:
-            groove.gridVersion++;
             return true;
     }
     return false;

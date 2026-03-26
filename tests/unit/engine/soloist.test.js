@@ -163,6 +163,17 @@ describe('Soloist Engine', () => {
             randomMock.mockRestore();
         });
 
+        it('should honor the seeded pitch during strict head playback', () => {
+            const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
+            const result = getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
+            const primary = Array.isArray(result) ? result[result.length - 1] : result;
+
+            expect(primary).not.toBeNull();
+            expect(primary.midi).toBe(72);
+            expect(primary.device).toBeUndefined();
+            randomMock.mockRestore();
+        });
+
         it('should rest if no seed note exists at current step in Loop 0', () => {
             const result = getSoloistNote(mockState, chordC, null, 1, 261.63, 72, 'scalar', 1, {});
             expect(result).toBeNull();
@@ -174,6 +185,23 @@ describe('Soloist Engine', () => {
             mockState.soloist.isResting = false;
 
             const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
+            getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
+
+            expect(pitchEngine.selectPitchAndDevices).toHaveBeenCalled();
+            const callArgs = pitchEngine.selectPitchAndDevices.mock.calls[0];
+            const pseudoRhythmNode = callArgs[2];
+
+            expect(pseudoRhythmNode.isHeadBypass).toBe(true);
+            expect(pseudoRhythmNode.targetMidi).toBe(72);
+            randomMock.mockRestore();
+        });
+
+        it('should keep loop 1 tied to the theme even when anchor-scale randomness would fail', () => {
+            mockState.playback.currentLoopCount = 1;
+            mockState.playback.bandIntensity = 0.5;
+            mockState.soloist.isResting = false;
+
+            const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0.99);
             getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
 
             expect(pitchEngine.selectPitchAndDevices).toHaveBeenCalled();

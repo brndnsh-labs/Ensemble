@@ -229,11 +229,7 @@ export function DrumPadModal() {
                 `}
             >
                 {pad.label}
-                {!isMobile && (
-                    <span style="position: absolute; bottom: 6px; right: 8px; font-size: 0.6rem; opacity: 0.5; font-family: var(--font-mono);">
-                        {pad.keyHint}
-                    </span>
-                )}
+                {!isMobile && <span class="drum-pad-key-hint">{pad.keyHint}</span>}
             </button>
         );
     };
@@ -241,13 +237,10 @@ export function DrumPadModal() {
     return (
         <div ref={modalRef} tabIndex={0} class="modal-overlay active" onClick={close}>
             <div
-                class="modal PerformanceSurfaceModal"
+                class={`modal PerformanceSurfaceModal drum-pad-modal ${
+                    isMobile ? 'drum-pad-modal--mobile' : 'drum-pad-modal--desktop'
+                }`}
                 onClick={(/** @type {any} */ e) => e.stopPropagation()}
-                style={
-                    isMobile
-                        ? 'width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; border-radius: 0; border: none; padding: 0;'
-                        : 'max-width: 1200px; height: 85vh; max-height: 700px; overflow-y: auto;'
-                }
             >
                 {!isMobile && (
                     <div class="modal-header">
@@ -259,37 +252,32 @@ export function DrumPadModal() {
                 )}
 
                 <div
-                    style={
-                        isMobile
-                            ? 'padding: 1rem;'
-                            : 'padding: 4rem 2rem 2rem 2rem; display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 500px; justify-content: center;'
-                    }
+                    class={`drum-pad-modal-body ${
+                        isMobile ? 'drum-pad-modal-body--mobile' : 'drum-pad-modal-body--desktop'
+                    }`}
                 >
-                    <div style="display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2.5rem; align-items: center; width: 100%;">
+                    <div class="drum-pad-stack">
                         {/* Upper Deck */}
-                        <div style="display: flex; gap: 1rem; justify-content: center; width: 100%; max-width: 500px;">
+                        <div class="drum-pad-upper-row">
                             {PAD_GROUPS.upper.map((/** @type {any} */ pad) => (
-                                <div
-                                    key={pad.name}
-                                    style="flex: 1; min-width: 80px; max-width: 120px;"
-                                >
+                                <div key={pad.name} class="drum-pad-pad-slot">
                                     {renderPad(pad)}
                                 </div>
                             ))}
                         </div>
 
                         {/* Home Row: Left & Right */}
-                        <div style="display: flex; gap: 2rem; justify-content: center; width: 100%; max-width: 600px;">
-                            <div style="display: flex; gap: 1rem; flex: 1; justify-content: flex-end;">
+                        <div class="drum-pad-home-row">
+                            <div class="drum-pad-home-side drum-pad-home-side--left">
                                 {PAD_GROUPS.left.map((/** @type {any} */ pad) => (
-                                    <div key={pad.name} style="width: 100%; max-width: 120px;">
+                                    <div key={pad.name} class="drum-pad-pad-slot">
                                         {renderPad(pad)}
                                     </div>
                                 ))}
                             </div>
-                            <div style="display: flex; gap: 1rem; flex: 1.5; justify-content: flex-start;">
+                            <div class="drum-pad-home-side drum-pad-home-side--right">
                                 {PAD_GROUPS.right.map((/** @type {any} */ pad) => (
-                                    <div key={pad.name} style="width: 100%; max-width: 120px;">
+                                    <div key={pad.name} class="drum-pad-pad-slot">
                                         {renderPad(pad)}
                                     </div>
                                 ))}
@@ -297,8 +285,8 @@ export function DrumPadModal() {
                         </div>
 
                         {/* Kick */}
-                        <div style="display: flex; justify-content: center; width: 100%;">
-                            <div style="width: 100%; max-width: 400px; height: 80px;">
+                        <div class="drum-pad-kick-row">
+                            <div class="drum-pad-kick-slot">
                                 <button
                                     class={`drum-pad ${activePads.has('Kick') ? 'active' : ''}`}
                                     onPointerDown={(/** @type {any} */ e) => {
@@ -345,7 +333,7 @@ export function DrumPadModal() {
                                 >
                                     {PAD_GROUPS.kick[0].label}
                                     {!isMobile && (
-                                        <span style="position: absolute; bottom: 6px; right: 12px; font-size: 0.6rem; opacity: 0.5; font-family: var(--font-mono);">
+                                        <span class="drum-pad-key-hint drum-pad-key-hint--kick">
                                             {PAD_GROUPS.kick[0].keyHint}
                                         </span>
                                     )}
@@ -354,13 +342,14 @@ export function DrumPadModal() {
                         </div>
                     </div>
 
-                    <div style="background: rgba(15, 23, 42, 0.4); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); width: 100%; max-width: 800px;">
-                        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                                <div style="flex: 1; min-width: 250px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <div class="drum-pad-controls-panel">
+                        <div class="drum-pad-controls-stack">
+                            <div class="drum-pad-controls-row">
+                                <div class="drum-pad-velocity-column">
+                                    <div class="drum-pad-velocity-header">
                                         <label
-                                            style={`font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; opacity: ${autoVelocity ? 0.4 : 1}; transition: opacity 0.2s;`}
+                                            class="drum-pad-velocity-label"
+                                            style={`opacity: ${autoVelocity ? 0.4 : 1};`}
                                         >
                                             {autoVelocity
                                                 ? 'Auto Intensity Scaling'
@@ -370,24 +359,18 @@ export function DrumPadModal() {
                                         </label>
                                         <button
                                             onClick={() => setAutoVelocity(!autoVelocity)}
+                                            class="drum-pad-auto-velocity-btn"
                                             style={`
                                                 background: ${autoVelocity ? 'var(--soloist-color)' : 'rgba(255,255,255,0.1)'};
                                                 color: ${autoVelocity ? '#fff' : '#94a3b8'};
-                                                border: none;
-                                                padding: 0.2rem 0.6rem;
-                                                border-radius: 4px;
-                                                font-size: 0.7rem;
-                                                font-weight: bold;
-                                                cursor: pointer;
-                                                text-transform: uppercase;
-                                                letter-spacing: 0.05em;
                                             `}
                                         >
                                             {autoVelocity ? '✓ Auto Velocity' : 'Auto Velocity'}
                                         </button>
                                     </div>
                                     <div
-                                        style={`opacity: ${autoVelocity ? 0.3 : 1}; transition: opacity 0.2s; pointer-events: ${autoVelocity ? 'none' : 'auto'};`}
+                                        class="drum-pad-slider-shell"
+                                        style={`opacity: ${autoVelocity ? 0.3 : 1}; pointer-events: ${autoVelocity ? 'none' : 'auto'};`}
                                     >
                                         <Slider
                                             min="10"
@@ -400,7 +383,7 @@ export function DrumPadModal() {
                                         />
                                     </div>{' '}
                                 </div>
-                                <div style="display: flex; gap: 2rem; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 2rem;">
+                                <div class="drum-pad-stats-group">
                                     <div class="drum-pad-stat">
                                         <div class="drum-pad-stat-label">Swing</div>
                                         <div class="drum-pad-stat-value">{swing}%</div>

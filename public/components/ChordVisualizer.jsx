@@ -2,6 +2,8 @@ import { Fragment } from 'preact';
 import React, { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
+import { dispatch } from '../state.js';
+import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
@@ -11,6 +13,7 @@ import { formatUnicodeSymbols } from '../utils.js';
  * @property {boolean} isActive
  * @property {number} totalMeasures
  * @property {boolean} isMaximized
+ * @property {boolean} isDense
  * @property {string} notation
  * @property {any[]} [leadSheetMelody]
  * @property {string} soloistStyle
@@ -23,6 +26,7 @@ const ChordCardComponent = ({
     isActive,
     totalMeasures,
     isMaximized,
+    isDense,
     notation,
     leadSheetMelody,
     soloistStyle,
@@ -52,6 +56,16 @@ const ChordCardComponent = ({
             if (totalMeasures > 48) {
                 scale *= 0.7;
             }
+        } else if (isDense) {
+            if (totalMeasures > 24) {
+                scale *= 0.92;
+            }
+            if (totalMeasures > 32) {
+                scale *= 0.86;
+            }
+            if (totalMeasures > 40) {
+                scale *= 0.8;
+            }
         }
         if (charCount > 7) {
             scale *= 0.9;
@@ -68,7 +82,7 @@ const ChordCardComponent = ({
         } else {
             card.style.removeProperty('--font-scale');
         }
-    }, [disp, chord.absName, isMaximized, totalMeasures]);
+    }, [disp, chord.absName, isDense, isMaximized, totalMeasures]);
 
     const handleClick = (/** @type {any} */ e) => {
         e.stopPropagation();
@@ -227,6 +241,7 @@ export function ChordVisualizer() {
         () => groupedSections.reduce((acc, s) => acc + s.measures.length, 0),
         [groupedSections],
     );
+    const isDenseLeadSheet = totalMeasures >= 24;
 
     useEffect(() => {
         const container = containerRef.current;
@@ -245,15 +260,13 @@ export function ChordVisualizer() {
 
         const containerRect = container.getBoundingClientRect();
         const cardRect = activeCard.getBoundingClientRect();
-        const scrollThreshold = containerRect.top + containerRect.height * 0.7;
+        const isFullyVisible =
+            cardRect.top >= containerRect.top + 12 && cardRect.bottom <= containerRect.bottom - 12;
 
-        if (cardRect.bottom > scrollThreshold || cardRect.top < containerRect.top) {
-            const targetScrollTop =
-                container.scrollTop +
-                (cardRect.top - containerRect.top) -
-                containerRect.height * 0.2;
-            container.scrollTo({
-                top: targetScrollTop,
+        if (!isFullyVisible) {
+            activeCard.scrollIntoView({
+                block: 'center',
+                inline: 'nearest',
                 behavior: 'smooth',
             });
         }
@@ -261,11 +274,23 @@ export function ChordVisualizer() {
 
     return (
         <div
-            className="display-area"
+            className={`display-area${isDenseLeadSheet ? ' display-area--dense' : ''}${
+                totalMeasures >= 32 ? ' display-area--dense-xl' : ''
+            }`}
             id="chordVisualizer"
             ref={containerRef}
             data-total-measures={totalMeasures}
         >
+            {isMaximized && (
+                <button
+                    type="button"
+                    className="chord-maximize-exit-btn"
+                    aria-label="Exit maximize"
+                    onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false)}
+                >
+                    ✕
+                </button>
+            )}
             {groupedSections.map((/** @type {any} */ section) => (
                 <div
                     key={section.id}
@@ -281,7 +306,10 @@ export function ChordVisualizer() {
                     <div className="section-block-content">
                         {section.measures.map(
                             (/** @type {any} */ measure, /** @type {any} */ mIdx) => (
-                                <div key={mIdx} className="measure-box">
+                                <div
+                                    key={mIdx}
+                                    className={`measure-box${measure.sectionLabel ? ' has-key-label' : ''}`}
+                                >
                                     {measure.sectionLabel && (
                                         <div className="key-label">
                                             {formatUnicodeSymbols(measure.sectionLabel)}
@@ -294,6 +322,7 @@ export function ChordVisualizer() {
                                             isActive={chord.globalIndex === lastActiveChordIndex}
                                             totalMeasures={totalMeasures}
                                             isMaximized={isMaximized}
+                                            isDense={isDenseLeadSheet}
                                             notation={notation}
                                             leadSheetMelody={leadSheetMelody}
                                             soloistStyle={soloistStyle}

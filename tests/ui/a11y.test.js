@@ -44,7 +44,6 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'groovePowerBtnDesktop',
             'bassPowerBtnDesktop',
             'soloistPowerBtnDesktop',
-            'vizPowerBtn',
             'addSectionBtn',
             'inspirationHubBtn',
             'activeSectionLabel',

@@ -387,7 +387,7 @@ export function Settings() {
                                         label={loopLimit > 0 ? 'Choruses' : 'Minutes'}
                                         id="sessionTimerStepper"
                                     >
-                                        <div class="flex-col" style="align-items: flex-end;">
+                                        <div class="flex-col settings-stepper-column">
                                             <Stepper
                                                 id="sessionTimer"
                                                 value={loopLimit > 0 ? loopLimit : sessionTimer}
@@ -425,10 +425,7 @@ export function Settings() {
                                                 }}
                                             />
                                             {loopLimit > 0 && (
-                                                <div
-                                                    class="text-mini-muted"
-                                                    style="color: var(--accent-color); font-weight: 500;"
-                                                >
+                                                <div class="text-mini-muted settings-estimated-time">
                                                     {(() => {
                                                         const { arranger, playback } = getState();
                                                         const totalSteps =
@@ -615,13 +612,12 @@ export function Settings() {
                     {/* Actions Section */}
                     <SettingGroup
                         title="System Actions"
-                        style="border-bottom: none; padding-bottom: 0;"
+                        className="settings-section--borderless settings-section--no-padding"
                     >
                         <div class="grid-actions">
                             <button
                                 id="settingsShareHubBtn"
-                                class="secondary-btn flex-row"
-                                style="justify-content: center;"
+                                class="secondary-btn flex-row settings-action-center"
                                 onClick={() => {
                                     closeSettings();
                                     dispatch(ACTIONS.SET_MODAL_OPEN, {
@@ -634,35 +630,31 @@ export function Settings() {
                             </button>
                             <button
                                 id="installAppBtn"
-                                class="secondary-btn flex-row"
-                                style="display: none; justify-content: center;"
+                                class="secondary-btn flex-row settings-install-btn"
                                 onClick={handleInstall}
                             >
                                 <span>📲</span> Install App
                             </button>
                             {showConfirmReset ? (
                                 <div
-                                    class="confirm-reset-panel danger-bg"
+                                    class="confirm-reset-panel settings-reset-panel"
                                     role="alert"
                                     aria-live="polite"
-                                    style="grid-column: 1 / -1; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; display: flex; flex-direction: column; gap: 0.5rem;"
                                 >
-                                    <div style="font-size: 0.8rem; color: var(--text-color); text-align: center;">
+                                    <div class="settings-reset-copy">
                                         Reset all settings and progress?
                                     </div>
-                                    <div style="display: flex; gap: 0.5rem;">
+                                    <div class="settings-reset-actions">
                                         <button
                                             id="confirmResetBtn"
-                                            class="primary-btn"
-                                            style="flex: 1; padding: 0.4rem; font-size: 0.8rem; background: var(--red); color: white; border: none; font-weight: bold;"
+                                            class="primary-btn settings-reset-btn settings-reset-btn--primary"
                                             onClick={handleReset}
                                         >
                                             Yes, Reset
                                         </button>
                                         <button
                                             id="cancelResetBtn"
-                                            class="secondary-btn"
-                                            style="flex: 1; padding: 0.4rem; font-size: 0.8rem; border-color: var(--border-color); color: var(--text-color); background: transparent;"
+                                            class="secondary-btn settings-reset-btn settings-reset-btn--secondary"
                                             onClick={() => {
                                                 setShowConfirmReset(false);
                                                 setTimeout(() => {
@@ -697,8 +689,7 @@ export function Settings() {
                             )}
                             <button
                                 id="refreshAppBtn"
-                                class="secondary-btn flex-row"
-                                style="justify-content: center;"
+                                class="secondary-btn flex-row settings-action-center"
                                 onClick={() => window.location.reload()}
                             >
                                 <span>🔄</span> Force Refresh
@@ -746,8 +737,7 @@ export function Settings() {
                                                 open: true,
                                             })
                                         }
-                                        class="manual-link"
-                                        style="border: none; cursor: pointer; width: 100%; text-align: center;"
+                                        class="manual-link settings-manual-btn"
                                     >
                                         Open User Manual
                                     </button>

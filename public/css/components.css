@@ -1,8 +1,8 @@
 /* Spacing & Dividers */
 .divider-top {
     border-top: 1px solid var(--border-color);
-    padding-top: 1rem;
-    margin-top: 1rem;
+    padding-top: var(--space-4);
+    margin-top: var(--space-4);
 }
 
 /* Power Button Styles (Restored & Enhanced) */
@@ -17,8 +17,13 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 1rem;
+    transition:
+        color var(--anim-fast) var(--anim-ease),
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease);
+    font-size: var(--font-base);
     padding: 0;
 }
 
@@ -35,19 +40,16 @@
     box-shadow: 0 0 10px rgba(133, 153, 0, 0.2);
 }
 
-/* Dashboard Specific Layout Utilities */
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+.power-btn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 .panel {
     background: var(--panel-color);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
     position: relative;
     overflow: hidden;
 }
@@ -56,12 +58,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-5);
 }
 
 .panel-header h2 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: var(--font-lg);
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -81,7 +83,6 @@
 }
 
 /* Accessibility Focus States */
-.mode-option:focus-within,
 .analyzer-drop-zone:focus-within {
     outline: 2px solid var(--accent-color);
     outline-offset: 2px;
@@ -89,27 +90,27 @@
 
 /* Setting Groups & Rows (Consolidated UI) */
 .setting-group {
-    margin-bottom: 2rem;
-    padding-bottom: 0.5rem;
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-2);
 }
 
 .setting-group-title {
     margin-top: 0;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
+    margin-bottom: var(--space-4);
+    font-size: var(--font-sm);
     color: var(--accent-color);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.5rem;
+    padding-bottom: var(--space-2);
 }
 
 .setting-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1.5rem;
-    margin-bottom: 1.25rem;
+    gap: var(--space-5);
+    margin-bottom: var(--space-4);
     min-height: 2.5rem;
     flex-wrap: wrap;
 }
@@ -122,18 +123,18 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--space-1);
     min-width: 120px; /* Reduced from 150 to better support compact kebab menus */
 }
 
 .setting-label {
-    font-size: 0.9rem;
+    font-size: var(--font-sm);
     font-weight: 500;
     color: var(--text-color);
 }
 
 .setting-description {
-    font-size: 0.8rem;
+    font-size: var(--font-xs);
     color: var(--text-muted);
     line-height: 1.4;
 }
@@ -141,12 +142,12 @@
 .setting-control {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
     min-width: fit-content;
 }
 
 .setting-value-display {
-    font-size: 0.85rem;
+    font-size: var(--font-sm);
     color: var(--accent-color);
     font-family: var(--font-mono);
     min-width: 3.5rem;
@@ -176,8 +177,11 @@
     bottom: 0;
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
-    transition: 0.3s;
-    border-radius: 20px;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
+    border-radius: 999px;
 }
 
 .toggle-slider:before {
@@ -188,7 +192,9 @@
     left: 2px;
     bottom: 2px;
     background-color: var(--text-muted);
-    transition: 0.3s;
+    transition:
+        transform var(--anim-fast) var(--anim-ease),
+        background-color var(--anim-fast) var(--anim-ease);
     border-radius: 50%;
 }
 
@@ -209,8 +215,8 @@ input:focus-visible + .toggle-slider {
 
 /* Select Control Overrides */
 .setting-control > select {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.85rem;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-sm);
     width: 220px;
 }
 
@@ -232,8 +238,8 @@ input:focus-visible + .toggle-slider {
     align-items: center;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    padding: 0 var(--space-2);
     height: 28px;
 }
 
@@ -241,28 +247,21 @@ input:focus-visible + .toggle-slider {
 .smart-tab-layout {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.25rem 0;
-}
-
-.smart-tab-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.4rem;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
 }
 
 .smart-tab-label {
-    font-size: 0.75rem;
+    font-size: var(--font-xs);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-.smart-tab-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0.25rem;
+.chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
 }
 
 /* Notification Box */
@@ -319,10 +318,6 @@ input:focus-visible + .toggle-slider {
     color: var(--text-muted);
 }
 
-.text-capitalize {
-    text-transform: capitalize;
-}
-
 .danger-btn {
     color: var(--error-color);
     background: rgba(239, 68, 68, 0.1);
@@ -360,15 +355,20 @@ input:focus-visible + .toggle-slider {
     background: var(--accent-color);
     color: white;
     border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
     font-weight: bold;
-    font-size: 0.85rem;
+    font-size: var(--font-sm);
     cursor: pointer;
 }
 
 #updateRefreshBtn:hover {
     background: var(--accent-hover);
+}
+
+#updateRefreshBtn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 @media (max-width: 600px) {

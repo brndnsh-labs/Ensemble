@@ -1,306 +1,211 @@
-import { Fragment } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+
 import { validateAndAnalyze } from '../arranger-controller.js';
-import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
+import { CHORD_PRESETS } from '../data/chord-presets.js';
+import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
-import { getState } from '../state.js';
+import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { useDispatch, useEnsembleState } from '../ui-bridge.js';
-import { decompressSections, formatUnicodeSymbols, generateId } from '../utils.js';
-import { syncWorker } from '../worker-client.js';
+import { decompressSections, generateId } from '../utils.js';
 
 /**
- * @typedef {Object} PresetLibraryProps
- * @property {string} type
+ * @typedef {import('../state/arranger.js').Section} Section
+ * @typedef {{ bpm?: number, style?: string, timeSignature?: string }} PresetSettings
+ * @typedef {{
+ *   name: string,
+ *   sections: string | Array<Partial<Section>>,
+ *   category?: string,
+ *   isMinor?: boolean,
+ *   timestamp?: number,
+ *   settings?: PresetSettings
+ * }} LibraryPreset
  */
+
 /**
- * @param {PresetLibraryProps} props
+ * @param {{ onSelect?: (() => void) | undefined }} props
  */
-export function PresetLibrary({ type }) {
-    const dispatch = useDispatch();
-    const { lastChordPreset, lastDrumPreset, isDirty } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            lastChordPreset: s.arranger.lastChordPreset,
-            lastDrumPreset: s.groove.lastDrumPreset,
-            isDirty: s.arranger.isDirty,
-        }),
-    );
-
-    const [userPresets, setUserPresets] = useState(/** @type {any[]} */ ([]));
-    const [confirmSelect, setConfirmSelect] = useState(/** @type {string|number|null} */ (null)); // stores id of preset to confirm
-    const [confirmDelete, setConfirmDelete] = useState(/** @type {string|number|null} */ (null)); // stores id of preset to delete
-    const [systemPresets, setSystemPresets] = useState(/** @type {any[]} */ ([]));
+export function PresetLibrary({ onSelect }) {
+    const [isDirty, setIsDirty] = useState(false);
+    const [lastChordPreset, setLastChordPreset] = useState('');
+    const [userPresets, setUserPresets] = useState(/** @type {LibraryPreset[]} */ ([]));
 
     useEffect(() => {
-        if (type === 'chord') {
-            import('../data/chord-presets.js').then((m) => setSystemPresets(m.CHORD_PRESETS));
-        } else {
-            import('../data/drum-presets.js').then((m) => {
-                const mapped = Object.keys(m.DRUM_PRESETS).map((name) => ({
-                    name,
-                    .../** @type {any} */ (m.DRUM_PRESETS)[name],
-                }));
-                setSystemPresets(mapped);
-            });
-        }
-    }, [type]);
-
-    useEffect(() => {
-        const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
-        const load = () => {
-            let data = [];
+        const loadUserPresets = () => {
             try {
-                data = JSON.parse(localStorage.getItem(key) || '[]');
-                if (!Array.isArray(data)) {
-                    data = [];
-                }
-            } catch (e) {
-                console.warn(`[State] Failed to parse ${key} from storage:`, e);
+                const stored = localStorage.getItem('ensemble_userPresets');
+                setUserPresets(stored ? JSON.parse(stored) : []);
+            } catch {
+                setUserPresets([]);
             }
-            setUserPresets(data);
         };
-        load();
 
-        // Listen for internal storage events (from same window)
-        window.addEventListener('storage_sync', load);
-        return () => window.removeEventListener('storage_sync', load);
-    }, [type]);
+        loadUserPresets();
+        window.addEventListener('storage', loadUserPresets);
+        return () => window.removeEventListener('storage', loadUserPresets);
+    }, []);
 
-    const presets = systemPresets;
+    useEffect(() => {
+        const refreshDirtyState = () => {
+            const state = getState();
+            setLastChordPreset(state.arranger?.lastChordPreset || '');
+            setIsDirty(Boolean(state.arranger?.isDirty));
+        };
 
-    // Optimization: Check isDirty state instead of manual DOM manipulation in arranger-controller
-    const activeId = type === 'chord' ? (isDirty ? null : lastChordPreset) : lastDrumPreset;
+        refreshDirtyState();
+        const intervalId = window.setInterval(refreshDirtyState, 500);
+        return () => window.clearInterval(intervalId);
+    }, []);
 
-    const handleSelect = (/** @type {any} */ item, isUser = false) => {
-        if (type === 'chord') {
-            if (isDirty) {
-                const itemId = item.id || item.name;
-                if (confirmSelect !== itemId) {
-                    setConfirmSelect(itemId);
-                    setConfirmDelete(null); // Clear other
-                    return;
-                }
-                setConfirmSelect(null);
-            }
+    /**
+     * @param {LibraryPreset} preset
+     * @returns {Section[]}
+     */
+    const getPresetSections = (preset) => {
+        const rawSections =
+            typeof preset.sections === 'string'
+                ? decompressSections(preset.sections)
+                : Array.isArray(preset.sections)
+                  ? preset.sections
+                  : [];
 
-            const newSections = isUser
-                ? item.sections
-                    ? decompressSections(item.sections)
-                    : [{ id: generateId(), label: 'Main', value: item.prog }]
-                : item.sections.map((/** @type {any} */ s) => ({
-                      id: generateId(),
-                      label: s.label,
-                      value: s.value,
-                      repeat: s.repeat || 1,
-                      key: s.key || '',
-                      timeSignature: s.timeSignature || '',
-                      seamless: !!s.seamless,
-                  }));
-
-            dispatch(ACTIONS.SET_ARRANGEMENT, newSections);
-            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: false });
-            dispatch(ACTIONS.SET_PARAM, {
-                module: 'arranger',
-                param: 'isMinor',
-                value: item.isMinor || false,
-            });
-            dispatch(ACTIONS.SET_PARAM, {
-                module: 'arranger',
-                param: 'lastChordPreset',
-                value: item.name,
-            });
-
-            if (item.settings) {
-                if (getState().playback.applyPresetSettings) {
-                    if (item.settings.bpm) {
-                        dispatch(ACTIONS.SET_BPM, item.settings.bpm);
-                    }
-                    if (item.settings.style) {
-                        dispatch(ACTIONS.SET_STYLE, {
-                            module: 'chords',
-                            style: item.settings.style,
-                        });
-                    }
-                }
-                if (item.settings.timeSignature) {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'arranger',
-                        param: 'timeSignature',
-                        value: item.settings.timeSignature,
-                    });
-                } else {
-                    // Default back to 4/4 if not specified in preset
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'arranger',
-                        param: 'timeSignature',
-                        value: '4/4',
-                    });
-                }
-            }
-
-            validateAndAnalyze();
-            flushBuffers();
-            saveCurrentState();
-        } else {
-            if (isUser) {
-                if (item.measures) {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'groove',
-                        param: 'measures',
-                        value: item.measures,
-                    });
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'groove',
-                        param: 'currentMeasure',
-                        value: 0,
-                    });
-                }
-                item.pattern.forEach((/** @type {any} */ savedInst) => {
-                    dispatch(ACTIONS.SET_GROOVE_STEPS, {
-                        instrument: savedInst.name,
-                        steps: savedInst.steps,
-                    });
-                });
-                if (item.swing !== undefined) {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'groove',
-                        param: 'swing',
-                        value: item.swing,
-                    });
-                }
-                if (item.swingSub) {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'groove',
-                        param: 'swingSub',
-                        value: item.swingSub,
-                    });
-                }
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'groove',
-                    param: 'lastDrumPreset',
-                    value: item.name,
-                });
-                syncWorker();
-                saveCurrentState();
-            } else {
-                loadDrumPreset(item.name);
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'groove',
-                    param: 'lastDrumPreset',
-                    value: item.name,
-                });
-                syncWorker();
-                saveCurrentState();
-            }
-        }
+        return rawSections.map((section, index) => ({
+            id: section.id || generateId(),
+            label: section.label || `Section ${index + 1}`,
+            value: section.value || '',
+            repeat: section.repeat || 1,
+            key: section.key,
+            timeSignature: section.timeSignature,
+            seamless: section.seamless,
+        }));
     };
 
-    const handleDelete = (/** @type {Event} */ e, /** @type {number} */ index) => {
-        e.stopPropagation();
-        if (confirmDelete !== index) {
-            setConfirmDelete(index);
-            setConfirmSelect(null); // Clear other
+    /**
+     * @param {LibraryPreset} preset
+     */
+    const handleSelect = (preset) => {
+        const sections = getPresetSections(preset);
+        if (sections.length === 0) {
             return;
         }
-        setConfirmDelete(null);
 
-        const key = type === 'chord' ? 'ensemble_userPresets' : 'ensemble_userDrumPresets';
-        /** @type {any[]} */
-        const updated = [...userPresets];
-        updated.splice(index, 1);
-        localStorage.setItem(key, JSON.stringify(updated));
-        setUserPresets(updated);
-        // Trigger other components
-        window.dispatchEvent(new Event('storage_sync'));
+        flushBuffers();
+        dispatch(ACTIONS.SET_ARRANGEMENT, sections);
+        dispatch(ACTIONS.SET_IS_MINOR, !!preset.isMinor);
+
+        const { playback } = getState();
+        if (playback.applyPresetSettings) {
+            if (preset.settings?.timeSignature) {
+                dispatch(ACTIONS.SET_TIME_SIGNATURE, preset.settings.timeSignature);
+            }
+            if (typeof preset.settings?.bpm === 'number') {
+                dispatch(ACTIONS.SET_BPM, preset.settings.bpm);
+            }
+            if (preset.settings?.style) {
+                dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: preset.settings.style });
+            }
+        }
+
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'arranger',
+            param: 'lastChordPreset',
+            value: preset.name,
+        });
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'arranger',
+            param: 'isDirty',
+            value: false,
+        });
+
+        validateAndAnalyze();
+        saveCurrentState();
+        onSelect?.();
     };
 
-    const sorted = [...presets].sort((a, b) => {
-        const catA = a.category || '';
-        const catB = b.category || '';
-        if (catA !== catB) {
-            return catA.localeCompare(catB);
+    /**
+     * @param {LibraryPreset} preset
+     */
+    const handleDelete = (preset) => {
+        if (!confirm(`Delete user preset "${preset.name}"?`)) {
+            return;
         }
-        return (a.name || '').localeCompare(b.name || '');
-    });
+
+        try {
+            const updated = userPresets.filter(
+                (candidate) =>
+                    candidate.timestamp !== preset.timestamp || candidate.name !== preset.name,
+            );
+            localStorage.setItem('ensemble_userPresets', JSON.stringify(updated));
+            setUserPresets(updated);
+        } catch {
+            alert('Failed to delete user preset.');
+        }
+    };
+
+    /**
+     * @param {LibraryPreset} preset
+     */
+    const getMeta = (preset) => {
+        if (preset.category) {
+            return preset.category;
+        }
+        return 'Custom progression';
+    };
+
+    const activeName = isDirty ? null : lastChordPreset;
 
     return (
-        <Fragment>
-            <div className="presets-container">
-                {sorted.map((item, idx) => {
-                    const id = item.id || item.name;
-                    return (
+        <div class="preset-library">
+            <div class="preset-library-section">
+                <h4>Library</h4>
+                <div class="preset-chip-grid">
+                    {CHORD_PRESETS.map((preset) => (
                         <button
-                            key={id}
-                            className={`preset-chip ${type}-preset-chip ${activeId === id ? 'active' : ''}`}
-                            onClick={() => handleSelect(item)}
-                            data-id={id}
-                            data-category={item.category || 'Other'}
-                            style={{
-                                animationDelay: `${Math.min(idx * 0.03, 0.6)}s`,
-                            }}
-                            aria-label={
-                                confirmSelect === id
-                                    ? 'Discard arrangement and load preset?'
-                                    : undefined
-                            }
-                            aria-live={confirmSelect === id ? 'polite' : 'off'}
+                            type="button"
+                            key={preset.name}
+                            class={`preset-chip chord-preset-chip ${activeName === preset.name ? 'active' : ''}`}
+                            data-category={preset.category}
+                            data-id={preset.name}
+                            onClick={() => handleSelect(preset)}
                         >
-                            {confirmSelect === id ? '⚠️ Replace?' : formatUnicodeSymbols(item.name)}
+                            <span class="preset-chip-name">{preset.name}</span>
+                            <span class="preset-chip-meta">{getMeta(preset)}</span>
                         </button>
-                    );
-                })}
+                    ))}
+                </div>
             </div>
 
             {userPresets.length > 0 && (
-                <div
-                    className="user-presets-section"
-                    style="border-top: 1px solid #334155; padding-top: 0.5rem; margin-top: 0.5rem;"
-                >
-                    <label
-                        className="library-label"
-                        style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.4rem; display: block;"
-                    >
-                        User
-                    </label>
-                    <div className="presets-container">
-                        {userPresets.map((/** @type {any} */ item, /** @type {number} */ idx) => {
-                            const id = item.id || item.name;
-                            return (
+                <div class="preset-library-section">
+                    <h4>Your presets</h4>
+                    <div class="preset-chip-grid">
+                        {userPresets.map((preset) => (
+                            <div
+                                key={`${preset.name}-${preset.timestamp || 'user'}`}
+                                class="preset-chip-stack"
+                            >
                                 <button
-                                    key={`user-${idx}`}
-                                    className={`preset-chip user-preset-chip ${type}-preset-chip ${activeId === item.name ? 'active' : ''}`}
-                                    onClick={() => handleSelect(item, true)}
-                                    style={{
-                                        animationDelay: `${Math.min(idx * 0.05, 0.6)}s`,
-                                    }}
-                                    aria-label={
-                                        confirmSelect === id
-                                            ? 'Discard arrangement and load preset?'
-                                            : undefined
-                                    }
-                                    aria-live={confirmSelect === id ? 'polite' : 'off'}
+                                    type="button"
+                                    class={`preset-chip chord-preset-chip ${activeName === preset.name ? 'active' : ''}`}
+                                    data-category="User"
+                                    data-id={preset.name}
+                                    onClick={() => handleSelect(preset)}
                                 >
-                                    {confirmSelect === id ? '⚠️ Replace?' : item.name}
-                                    <span
-                                        className="delete-btn"
-                                        onClick={(e) => handleDelete(e, idx)}
-                                        style="margin-left: 0.5rem; opacity: 0.5; font-size: 0.8rem;"
-                                        aria-label={
-                                            confirmDelete === idx
-                                                ? 'Confirm delete preset'
-                                                : 'Delete preset'
-                                        }
-                                        aria-live={confirmDelete === idx ? 'polite' : 'off'}
-                                        role={confirmDelete === idx ? 'alert' : 'button'}
-                                    >
-                                        {confirmDelete === idx ? '⚠️ Sure?' : '✕'}
-                                    </span>
+                                    <span class="preset-chip-name">{preset.name}</span>
+                                    <span class="preset-chip-meta">{getMeta(preset)}</span>
                                 </button>
-                            );
-                        })}
+                                <button
+                                    type="button"
+                                    class="preset-chip-delete"
+                                    aria-label={`Delete preset ${preset.name}`}
+                                    onClick={() => handleDelete(preset)}
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
-        </Fragment>
+        </div>
     );
 }

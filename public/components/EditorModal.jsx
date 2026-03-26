@@ -21,7 +21,7 @@ import { KEY_ORDER } from '../config.js';
 import { pushHistory, undo } from '../history.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
-import { generateId } from '../utils.js';
+import { formatUnicodeSymbols, generateId } from '../utils.js';
 
 /**
  * @typedef {import('../ui-types.js').ComponentChildren} ComponentChildren
@@ -33,15 +33,26 @@ import { generateId } from '../utils.js';
 
 /** @param {EditorModalProps} _props */
 export function EditorModal(_props) {
-    const { isOpen, hasLeadSheet, leadSheetMelody, currentKey, totalSteps } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            isOpen: s.playback.modals.editor,
-            hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
-            leadSheetMelody: s.soloist.leadSheetMelody,
-            currentKey: s.arranger.key,
-            totalSteps: s.arranger.totalSteps,
-        }),
-    );
+    const {
+        isOpen,
+        hasLeadSheet,
+        leadSheetMelody,
+        currentKey,
+        totalSteps,
+        sectionCount,
+        linkedCount,
+        sectionKeyCount,
+    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
+        isOpen: s.playback.modals.editor,
+        hasLeadSheet: s.soloist.leadSheetMelody && s.soloist.leadSheetMelody.length > 0,
+        leadSheetMelody: s.soloist.leadSheetMelody,
+        currentKey: s.arranger.key,
+        totalSteps: s.arranger.totalSteps,
+        sectionCount: (s.arranger.sections || []).length,
+        linkedCount: (s.arranger.sections || []).filter((section) => section.seamless).length,
+        sectionKeyCount: (s.arranger.sections || []).filter((section) => Boolean(section.key))
+            .length,
+    }));
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isImportMode, setIsImportMode] = useState(false);
     const [tabText, setTabText] = useState('');
@@ -133,11 +144,16 @@ export function EditorModal(_props) {
         }
     }, [isOpen]);
 
-    /** @param {function(): void} fn */
-    const _handleAction = (fn) => {
+    useEffect(() => {
+        if (isOpen) {
+            return;
+        }
+
         setIsMenuOpen(false);
-        fn();
-    };
+        setIsImportMode(false);
+        setTabText('');
+        setShowConfirmClear(false);
+    }, [isOpen]);
 
     const handleAddSection = () => {
         setIsMenuOpen(false);
@@ -260,11 +276,28 @@ export function EditorModal(_props) {
         reader.readAsText(file);
     };
 
+    const editorSummary = isImportMode
+        ? 'Paste a tab or text chart to build sections automatically.'
+        : 'Reorder sections, mark modulations, link transitions, and edit chords in one focused view.';
+    const arrangementStats = [
+        `${sectionCount} ${sectionCount === 1 ? 'section' : 'sections'}`,
+        sectionKeyCount === 0
+            ? `Global key ${formatUnicodeSymbols(currentKey || 'C')}`
+            : `${sectionKeyCount} key change${sectionKeyCount === 1 ? '' : 's'}`,
+        linkedCount === 0
+            ? 'Independent transitions'
+            : `${linkedCount} linked transition${linkedCount === 1 ? '' : 's'}`,
+        'Drag to reorder',
+    ];
+
     return (
         <div
             id="editorOverlay"
             ref={overlayRef}
             class={`settings-overlay ${isOpen ? 'active' : ''}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editorModalTitle"
             aria-hidden={!isOpen ? 'true' : 'false'}
             onClick={(/** @type {MouseEvent} */ e) => {
                 const target = /** @type {HTMLElement} */ (e.target);
@@ -277,19 +310,218 @@ export function EditorModal(_props) {
                 class="settings-content editor-modal"
                 onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
             >
-                <div class="modal-header">
-                    <h2>{isImportMode ? 'Import Tab' : 'Arrangement Editor'}</h2>
-                    <input
-                        type="file"
-                        id="xml-upload-editor"
-                        accept=".xml,.mxl,.musicxml"
-                        style="display:none;"
-                        onChange={handleFileUpload}
-                    />
-                    <button id="closeEditorBtn" class="primary-btn" onClick={closeEditor}>
-                        Done
-                    </button>
+                <div class="modal-header editor-modal-header">
+                    <div class="editor-modal-header-copy">
+                        <p class="editor-modal-kicker">Arranger</p>
+                        <h2 id="editorModalTitle">
+                            {isImportMode ? 'Import Tab' : 'Arrangement Editor'}
+                        </h2>
+                        <p class="editor-modal-summary">{editorSummary}</p>
+                    </div>
+                    <div class="editor-modal-header-actions">
+                        {!isImportMode && (
+                            <button
+                                id="addSectionBtn"
+                                class="primary-btn editor-toolbar-btn editor-add-section-btn"
+                                title="Add Section"
+                                onClick={handleAddSection}
+                            >
+                                <span>➕ Add Section</span>
+                            </button>
+                        )}
+                        {!isImportMode && (
+                            <div class="arranger-action-container editor-action-container">
+                                {isMenuOpen && (
+                                    <div
+                                        class="menu-click-away"
+                                        onClick={() => setIsMenuOpen(false)}
+                                    />
+                                )}
+                                <button
+                                    id="arrangerActionTrigger"
+                                    aria-label="Arrangement Tools Menu"
+                                    aria-haspopup="true"
+                                    aria-expanded={isMenuOpen}
+                                    class={`action-trigger-btn editor-action-trigger ${
+                                        isMenuOpen ? 'active' : ''
+                                    }`}
+                                    title="Arrangement Tools"
+                                    onClick={(/** @type {MouseEvent} */ e) => {
+                                        e.stopPropagation();
+                                        setIsMenuOpen(!isMenuOpen);
+                                    }}
+                                >
+                                    <span class="editor-action-trigger-label">Tools</span>
+                                    <span class="editor-action-trigger-icon" aria-hidden="true">
+                                        ⋮
+                                    </span>
+                                </button>
+
+                                <div
+                                    id="arrangerActionMenu"
+                                    class={`action-menu-content editor-action-menu ${
+                                        isMenuOpen ? 'open' : ''
+                                    }`}
+                                >
+                                    <div class="menu-section-header">Structure</div>
+                                    <button
+                                        id="importTabBtn"
+                                        title="Import from Text/Tab"
+                                        aria-label="Import Tab (from Text)"
+                                        onClick={handleImportTab}
+                                    >
+                                        📥 <span>Import Tab</span>
+                                    </button>
+                                    <button
+                                        id="inspirationHubBtn"
+                                        title="Inspiration Hub"
+                                        aria-label="Inspiration Hub"
+                                        onClick={handleInspirationHub}
+                                    >
+                                        ✨ <span>Inspiration Hub</span>
+                                    </button>
+                                    {showConfirmClear ? (
+                                        <div
+                                            role="alert"
+                                            aria-live="polite"
+                                            class="editor-clear-confirm"
+                                        >
+                                            <div class="editor-clear-confirm-copy">
+                                                Clear entire progression?
+                                            </div>
+                                            <div class="editor-clear-confirm-actions">
+                                                <button
+                                                    class="editor-clear-confirm-btn editor-clear-confirm-btn--danger"
+                                                    onClick={confirmClear}
+                                                >
+                                                    Yes
+                                                </button>
+                                                <button
+                                                    class="editor-clear-confirm-btn editor-clear-confirm-btn--secondary"
+                                                    onClick={() => setShowConfirmClear(false)}
+                                                >
+                                                    No
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            id="clearProgBtn"
+                                            title="Clear Progression"
+                                            aria-label="Clear All (Progression)"
+                                            onClick={handleClear}
+                                        >
+                                            🗑️ <span>Clear All</span>
+                                        </button>
+                                    )}
+
+                                    <div class="menu-divider" />
+                                    <div class="menu-section-header">Melody & Intelligence</div>
+                                    <button
+                                        id="importLeadSeedBtn"
+                                        title="Import Lead Seed (MusicXML)"
+                                        aria-label="Import XML (Lead Seed from MusicXML)"
+                                        onClick={() => {
+                                            setIsMenuOpen(false);
+                                            const input =
+                                                document.getElementById('xml-upload-editor');
+                                            if (input) {
+                                                input.click();
+                                            }
+                                        }}
+                                    >
+                                        📥 <span>Import XML</span>
+                                    </button>
+                                    <button
+                                        id="analyzeAudioBtn"
+                                        title="Analyze Audio / Harmonize Melody"
+                                        aria-label="Analyze (Audio / Harmonize Melody)"
+                                        onClick={handleAnalyze}
+                                    >
+                                        👂 <span>Analyze</span>
+                                    </button>
+                                    <button
+                                        id="mutateBtn"
+                                        title="Mutate Progression"
+                                        aria-label="Mutate (Progression)"
+                                        onClick={handleMutate}
+                                    >
+                                        ✨ <span>Mutate</span>
+                                    </button>
+                                    {hasLeadSheet && (
+                                        <button
+                                            id="reharmonizeMelodyBtn"
+                                            title="Re-harmonize Lead Seed"
+                                            aria-label="Re-harmonize (Lead Seed)"
+                                            onClick={handleReharmonize}
+                                        >
+                                            🎹 <span>Re-harmonize</span>
+                                        </button>
+                                    )}
+                                    {hasLeadSheet && (
+                                        <button
+                                            id="clearLeadSeedBtn"
+                                            title="Clear Lead Seed"
+                                            aria-label="Clear Lead Seed"
+                                            onClick={handleClearLeadSeed}
+                                        >
+                                            🚫 <span>Clear Lead Seed</span>
+                                        </button>
+                                    )}
+
+                                    <div class="menu-divider" />
+                                    <div class="menu-section-header">Project</div>
+                                    <button
+                                        id="undoBtn"
+                                        title="Undo Last Change"
+                                        aria-label="Undo (Last Change)"
+                                        onClick={handleUndo}
+                                    >
+                                        ↩️ <span>Undo</span>
+                                    </button>
+                                    <button
+                                        id="saveBtn"
+                                        title="Save to Library"
+                                        aria-label="Save (to Library)"
+                                        onClick={handleSave}
+                                    >
+                                        💾 <span>Save</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        <input
+                            type="file"
+                            id="xml-upload-editor"
+                            accept=".xml,.mxl,.musicxml"
+                            class="editor-upload-input"
+                            onChange={handleFileUpload}
+                        />
+                        <button
+                            id="closeEditorBtn"
+                            class="secondary-btn editor-toolbar-btn editor-done-btn"
+                            onClick={closeEditor}
+                        >
+                            Done
+                        </button>
+                    </div>
                 </div>
+
+                {!isImportMode && (
+                    <div class="editor-modal-toolbar">
+                        <div
+                            class="editor-modal-stats"
+                            role="list"
+                            aria-label="Arrangement summary"
+                        >
+                            {arrangementStats.map((item) => (
+                                <span key={item} role="listitem" class="editor-stat-chip">
+                                    {item}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div class="editor-scroll-area">
                     <div id="sectionList" class="section-list">
@@ -333,168 +565,6 @@ Em  C  G  D"
                         ) : (
                             <Arranger />
                         )}
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <div class="footer-primary-actions">
-                        <button
-                            id="addSectionBtn"
-                            class="primary-btn footer-main-btn"
-                            title="Add Section"
-                            onClick={handleAddSection}
-                        >
-                            <span>➕ Add Section</span>
-                        </button>
-                        <button
-                            id="arrangerActionTrigger"
-                            aria-label="Arranger Actions Menu"
-                            aria-haspopup="true"
-                            aria-expanded={isMenuOpen}
-                            class={`action-trigger-btn ${isMenuOpen ? 'active' : ''}`}
-                            title="Arranger Actions"
-                            style="justify-content: center; padding: 0.75rem 1rem;"
-                            onClick={(/** @type {MouseEvent} */ e) => {
-                                e.stopPropagation();
-                                setIsMenuOpen(!isMenuOpen);
-                            }}
-                        >
-                            <span style="font-size: 1.2rem;">⋮</span>
-                        </button>
-                    </div>
-
-                    <div class="arranger-action-container">
-                        {isMenuOpen && (
-                            <div class="menu-click-away" onClick={() => setIsMenuOpen(false)} />
-                        )}
-                        <div
-                            id="arrangerActionMenu"
-                            class={`action-menu-content ${isMenuOpen ? 'open' : ''}`}
-                        >
-                            <div class="menu-section-header">Structure</div>
-                            <button
-                                id="importTabBtn"
-                                title="Import from Text/Tab"
-                                aria-label="Import Tab (from Text)"
-                                onClick={handleImportTab}
-                            >
-                                📥 <span>Import Tab</span>
-                            </button>
-                            <button
-                                id="inspirationHubBtn"
-                                title="Inspiration Hub"
-                                aria-label="Inspiration Hub"
-                                onClick={handleInspirationHub}
-                            >
-                                ✨ <span>Inspiration Hub</span>
-                            </button>
-                            {showConfirmClear ? (
-                                <div
-                                    role="alert"
-                                    aria-live="polite"
-                                    style="padding: 0.5rem; background: rgba(255, 0, 0, 0.1); border-radius: 4px; margin: 0 0.5rem;"
-                                >
-                                    <div style="font-size: 0.8rem; color: var(--text-color); margin-bottom: 0.5rem; text-align: center;">
-                                        Clear entire progression?
-                                    </div>
-                                    <div style="display: flex; gap: 0.5rem;">
-                                        <button
-                                            style="flex: 1; padding: 0.3rem; font-size: 0.8rem; background: var(--red); color: white; border: none; border-radius: 4px; cursor: pointer;"
-                                            onClick={confirmClear}
-                                        >
-                                            Yes
-                                        </button>
-                                        <button
-                                            style="flex: 1; padding: 0.3rem; font-size: 0.8rem; background: transparent; color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;"
-                                            onClick={() => setShowConfirmClear(false)}
-                                        >
-                                            No
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button
-                                    id="clearProgBtn"
-                                    title="Clear Progression"
-                                    aria-label="Clear All (Progression)"
-                                    onClick={handleClear}
-                                >
-                                    🗑️ <span>Clear All</span>
-                                </button>
-                            )}
-
-                            <div class="menu-divider" />
-                            <div class="menu-section-header">Melody & Intelligence</div>
-                            <button
-                                id="importLeadSeedBtn"
-                                title="Import Lead Seed (MusicXML)"
-                                aria-label="Import XML (Lead Seed from MusicXML)"
-                                onClick={() => {
-                                    setIsMenuOpen(false);
-                                    const input = document.getElementById('xml-upload-editor');
-                                    if (input) {
-                                        input.click();
-                                    }
-                                }}
-                            >
-                                📥 <span>Import XML</span>
-                            </button>
-                            <button
-                                id="analyzeAudioBtn"
-                                title="Analyze Audio / Harmonize Melody"
-                                aria-label="Analyze (Audio / Harmonize Melody)"
-                                onClick={handleAnalyze}
-                            >
-                                👂 <span>Analyze</span>
-                            </button>
-                            <button
-                                id="mutateBtn"
-                                title="Mutate Progression"
-                                aria-label="Mutate (Progression)"
-                                onClick={handleMutate}
-                            >
-                                ✨ <span>Mutate</span>
-                            </button>
-                            {hasLeadSheet && (
-                                <button
-                                    id="reharmonizeMelodyBtn"
-                                    title="Re-harmonize Lead Seed"
-                                    aria-label="Re-harmonize (Lead Seed)"
-                                    onClick={handleReharmonize}
-                                >
-                                    🎹 <span>Re-harmonize</span>
-                                </button>
-                            )}
-                            {hasLeadSheet && (
-                                <button
-                                    id="clearLeadSeedBtn"
-                                    title="Clear Lead Seed"
-                                    aria-label="Clear Lead Seed"
-                                    onClick={handleClearLeadSeed}
-                                >
-                                    🚫 <span>Clear Lead Seed</span>
-                                </button>
-                            )}
-
-                            <div class="menu-divider" />
-                            <div class="menu-section-header">Project</div>
-                            <button
-                                id="undoBtn"
-                                title="Undo Last Change"
-                                aria-label="Undo (Last Change)"
-                                onClick={handleUndo}
-                            >
-                                ↩️ <span>Undo</span>
-                            </button>
-                            <button
-                                id="saveBtn"
-                                title="Save to Library"
-                                aria-label="Save (to Library)"
-                                onClick={handleSave}
-                            >
-                                💾 <span>Save</span>
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>

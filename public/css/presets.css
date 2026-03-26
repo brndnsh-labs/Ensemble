@@ -2,26 +2,100 @@
 .presets-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--space-2);
+}
+
+.preset-library {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.preset-library-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.preset-library-section h4 {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.preset-chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.preset-chip-stack {
+    display: flex;
+    gap: var(--space-2);
+    align-items: stretch;
 }
 
 .preset-chip {
-    font-size: 0.75rem;
-    padding: 0.3rem 0.6rem;
+    font-size: var(--font-xs);
+    padding: var(--space-2) var(--space-3);
     background: var(--input-bg);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
     transition: all var(--anim-normal) var(--anim-ease);
     border: 1px solid var(--border-color);
     color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: var(--space-1);
+    width: auto;
+    min-width: 150px;
+    max-width: 220px;
+    min-height: 0;
+    text-align: left;
 
     /* Entrance */
     animation: fade-in-up var(--anim-normal) var(--anim-ease) both;
 }
 
+.preset-chip-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.preset-chip-meta {
+    color: var(--text-secondary);
+    font-size: var(--font-xs);
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.preset-chip.active .preset-chip-meta {
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.preset-chip-delete {
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-lg);
+    align-self: stretch;
+}
+
 .preset-chip:hover {
     background: var(--card-bg-hover);
     color: var(--text-color);
+}
+
+.preset-chip:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    border-color: var(--accent-color);
+    background: var(--card-bg-hover);
 }
 
 .preset-chip.active {
