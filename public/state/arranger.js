@@ -9,6 +9,7 @@ import { ACTIONS } from '../types.js';
  * @property {string} [color] - Optional color hex code for UI accent.
  * @property {number} [repeat] - Number of times to repeat this section (default 1).
  * @property {string} [key] - Local key for this section (e.g., "G").
+ * @property {boolean} [isMinor] - Whether the local key should be treated as minor.
  * @property {string} [timeSignature] - Local time signature for this section (e.g., "3/4").
  * @property {boolean} [seamless] - Whether this section transitions seamlessly from the previous one (suppresses fills).
  */

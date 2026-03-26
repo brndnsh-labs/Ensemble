@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+// cspell:ignore tonicization
 import { getSoloistNote } from '../../../public/engine/soloist.js';
 import * as pitchEngine from '../../../public/engine/soloist-pitch-engine.js';
 import { getScaleForChord } from '../../../public/engine/theory-scales.js';
@@ -308,11 +309,17 @@ describe('Soloist Engine', () => {
             ]);
         });
 
-        it('should select Phrygian Dominant for V7 to minor resolution', () => {
+        it('should select Phrygian Dominant for V7 to an explicitly minor tonicization', () => {
             mockState.soloist.tension = 0;
             // G7 (67) to Cm (60). 60 - 67 = -7 = +5 semitones.
             const G7 = { rootMidi: 67, intervals: [0, 4, 7, 10], quality: '7' };
-            const Cm = { rootMidi: 60, intervals: [0, 3, 7], quality: 'minor' };
+            const Cm = {
+                rootMidi: 60,
+                intervals: [0, 3, 7],
+                quality: 'minor',
+                key: 'C',
+                keyIsMinor: true,
+            };
             expect(getScaleForChord(mockState, G7, Cm, 'bird')).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
     });

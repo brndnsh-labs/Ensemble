@@ -4,8 +4,10 @@ import { TIME_SIGNATURES } from '../../../public/config.js';
 import {
     calculateTimingOffset,
     clampFreq,
+    compressSections,
     createReverbImpulse,
     createSoftClipCurve,
+    decompressSections,
     formatUnicodeSymbols,
     getChordMidiNotes,
     getFrequency,
@@ -13,6 +15,7 @@ import {
     getStepInfo,
     midiToNote,
     normalizeKey,
+    transposeKeyName,
 } from '../../../public/utils.js';
 
 describe('Utility Functions', () => {
@@ -212,6 +215,13 @@ describe('Utility Functions', () => {
         });
     });
 
+    describe('transposeKeyName', () => {
+        it('should transpose normalized keys across large negative intervals', () => {
+            expect(transposeKeyName('C', -13)).toBe('B');
+            expect(transposeKeyName('F#', -1)).toBe('F');
+        });
+    });
+
     describe('getFrequency', () => {
         it('should return 440Hz for MIDI note 69 (A4)', () => {
             expect(getFrequency(69)).toBe(440);
@@ -271,6 +281,21 @@ describe('Utility Functions', () => {
             expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81, 69, 72, 76, 79, 83]);
         });
 
+        it('should honor parsed diminished-seventh intervals from the chord engine', () => {
+            const chord = { rootMidi: 60, quality: 'dim', is7th: true, intervals: [0, 3, 6, 9] };
+            expect(getChordMidiNotes(chord, 4)).toEqual([60, 63, 66, 69, 72, 61, 65, 68, 73, 75]);
+        });
+
+        it('should place slash bass notes below the helper voicing output', () => {
+            const chord = {
+                rootMidi: 60,
+                quality: 'maj7',
+                intervals: [0, 4, 7, 11, 14],
+                bassMidi: 67,
+            };
+            expect(getChordMidiNotes(chord, 4)).toEqual([55, 60, 64, 71, 74, 62, 65, 69, 72, 76]);
+        });
+
         it('should return empty array for invalid input', () => {
             expect(getChordMidiNotes(null)).toEqual([]);
             expect(getChordMidiNotes({})).toEqual([]);
@@ -317,10 +342,7 @@ describe('Utility Functions', () => {
     });
 
     describe('Compression/Decompression', () => {
-        it('should correctly compress an array of sections into a base64 string and decompress it back to the original object structure', async () => {
-            const { compressSections, decompressSections } = await import(
-                '../../../public/utils.js'
-            );
+        it('should correctly compress an array of sections into a base64 string and decompress it back to the original object structure', () => {
             const sections = [
                 { id: '1', label: 'Verse', value: 'C | F' },
                 { id: '2', label: 'Chorus', value: 'G | C' },
@@ -339,14 +361,30 @@ describe('Utility Functions', () => {
             expect(decompressed[0].id).not.toBe('1');
         });
 
-        it('should correctly preserve Unicode characters (like emojis) during section compression/decompression cycle', async () => {
-            const { compressSections, decompressSections } = await import(
-                '../../../public/utils.js'
-            );
+        it('should correctly preserve Unicode characters (like emojis) during section compression/decompression cycle', () => {
             const sections = [{ id: '1', label: 'Intro 🎵', value: 'Cm7' }];
             const compressed = compressSections(sections);
             const decompressed = decompressSections(compressed);
             expect(decompressed[0].label).toBe('Intro 🎵');
+        });
+
+        it('should preserve explicit local minor flags through section compression', () => {
+            const sections = [
+                { id: '1', label: 'Verse', value: 'E7 | Am7', key: 'A', isMinor: true },
+                { id: '2', label: 'Bridge', value: 'Amaj7', key: 'A', isMinor: false },
+            ];
+            const decompressed = decompressSections(compressSections(sections));
+
+            expect(decompressed[0]).toMatchObject({
+                label: 'Verse',
+                key: 'A',
+                isMinor: true,
+            });
+            expect(decompressed[1]).toMatchObject({
+                label: 'Bridge',
+                key: 'A',
+                isMinor: false,
+            });
         });
     });
 });

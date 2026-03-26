@@ -1,5 +1,7 @@
 import { KEY_ORDER } from '../config.js';
 
+// cspell:ignore tonicization
+
 /**
  * THEORY-SCALES.JS
  *
@@ -21,6 +23,7 @@ const SCALE_INTERVALS = {
     LYDIAN: [0, 2, 4, 6, 7, 9, 11],
     MIXOLYDIAN: [0, 2, 4, 5, 7, 9, 10],
     LOCRIAN: [0, 1, 3, 5, 6, 8, 10],
+    LOCRIAN_NATURAL_2: [0, 2, 3, 5, 6, 8, 10],
 
     // Pentatonics / Blues
     MAJOR_PENTATONIC: [0, 2, 4, 7, 9],
@@ -38,6 +41,78 @@ const SCALE_INTERVALS = {
 };
 
 /**
+ * @param {any} chord
+ * @returns {boolean}
+ */
+function hasDominantFunction(chord) {
+    const quality = chord?.quality || 'major';
+    const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
+    return (
+        !isMinor &&
+        !quality.startsWith('maj') &&
+        !['dim', 'halfdim'].includes(quality) &&
+        (chord?.is7th ||
+            ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
+            quality.startsWith('7'))
+    );
+}
+
+/**
+ * @param {string | undefined} quality
+ * @returns {boolean}
+ */
+function isMinorQuality(quality) {
+    return !!quality && quality.startsWith('m') && !quality.startsWith('maj');
+}
+
+/**
+ * @param {any} chord
+ * @param {any} nextChord
+ * @returns {boolean}
+ */
+function resolvesByDescendingFifth(chord, nextChord) {
+    return !!nextChord && (nextChord.rootMidi - chord.rootMidi + 120) % 12 === 5;
+}
+
+const ENHARMONIC_KEY_MAP = {
+    'C#': 'Db',
+    'D#': 'Eb',
+    'F#': 'Gb',
+    'G#': 'Ab',
+    'A#': 'Bb',
+};
+
+/**
+ * Resolves the active harmonic key center for a chord.
+ * Section-local keys should take precedence over the global arranger key.
+ *
+ * @param {import('../types.js').EnsembleState} state
+ * @param {any} chord
+ * @returns {{ keyName: string | null, keyRootIdx: number, isMinor: boolean }}
+ */
+function getKeyContext(state, chord) {
+    const { arranger } = state;
+    const rawKey = chord?.key || arranger.key;
+    const isMinor = typeof chord?.keyIsMinor === 'boolean' ? chord.keyIsMinor : arranger.isMinor;
+    if (!rawKey) {
+        return {
+            keyName: null,
+            keyRootIdx: -1,
+            isMinor,
+        };
+    }
+
+    const keyName = Object.prototype.hasOwnProperty.call(ENHARMONIC_KEY_MAP, rawKey)
+        ? ENHARMONIC_KEY_MAP[/** @type {keyof typeof ENHARMONIC_KEY_MAP} */ (rawKey)]
+        : rawKey;
+    return {
+        keyName,
+        keyRootIdx: KEY_ORDER.indexOf(keyName),
+        isMinor,
+    };
+}
+
+/**
  * Determines the most appropriate musical scale for a given chord and context.
  *
  * @param {import('../types.js').EnsembleState} state
@@ -47,10 +122,11 @@ const SCALE_INTERVALS = {
  * @returns {number[]} An array of semitone intervals representing the selected scale.
  */
 export function getScaleForChord(state, chord, nextChord = null, style = 'smart') {
-    const { arranger, groove, soloist } = state;
+    const { groove, soloist } = state;
     if (!chord) {
         return SCALE_INTERVALS.MAJOR;
     }
+    const keyContext = getKeyContext(state, chord);
 
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
@@ -90,24 +166,28 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     }
 
     const quality = chord.quality || 'major';
-    const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
-    const isDominant =
-        !isMinor &&
-        !quality.startsWith('maj') &&
-        !['dim', 'halfdim'].includes(quality) &&
-        (chord.is7th ||
-            ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
-            quality.startsWith('7'));
+    const isMinor = isMinorQuality(quality);
+    const isDominant = hasDominantFunction(chord);
 
     // --- SPECIAL QUALITY HANDLING ---
 
-    // Diminished
-    if (quality === 'dim' || quality === 'dim7') {
+    // Fully diminished chords typically want the symmetric collection.
+    // Plain dim triads can still fall through to diatonic awareness (for example natural vii degrees).
+    if (quality === 'dim7') {
         return SCALE_INTERVALS.WHOLE_HALF_DIMINISHED;
     }
 
     // Half-Diminished (m7b5)
     if (quality === 'halfdim') {
+        if (nextChord && hasDominantFunction(nextChord)) {
+            const pointsToMinorCadence =
+                keyContext.isMinor ||
+                nextChord.keyIsMinor === true ||
+                ['7alt', '7b9', '7b13'].includes(nextChord.quality);
+            if (resolvesByDescendingFifth(chord, nextChord) && pointsToMinorCadence) {
+                return SCALE_INTERVALS.LOCRIAN_NATURAL_2;
+            }
+        }
         return SCALE_INTERVALS.LOCRIAN;
     }
 
@@ -122,13 +202,8 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     // --- DOMINANT CHORD HANDLING ---
 
     if (isDominant) {
-        // High Tension / Altered Dominants
-        if (
-            quality === '7alt' ||
-            quality === '7#9' ||
-            (soloist.tension > 0.7 &&
-                !['rock', 'scalar', 'country'].includes(/** @type {string} */ (style)))
-        ) {
+        // Explicit altered dominants should always outrank global tension heuristics.
+        if (quality === '7alt' || quality === '7#9') {
             if (style === 'funk' || style === 'blues') {
                 return SCALE_INTERVALS.BLUES;
             }
@@ -140,32 +215,43 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
             return SCALE_INTERVALS.LYDIAN_DOMINANT;
         }
 
+        // Phrygian Dominant (7b9, 7b13)
+        if (quality === '7b9' || quality === '7b13') {
+            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+        }
+
+        // High Tension / Altered Dominants
+        if (
+            soloist.tension > 0.7 &&
+            !['rock', 'scalar', 'country'].includes(/** @type {string} */ (style))
+        ) {
+            if (style === 'funk' || style === 'blues') {
+                return SCALE_INTERVALS.BLUES;
+            }
+            return SCALE_INTERVALS.ALTERED;
+        }
+
         // Lydian Dominant detection for Jazz/Bossa
-        if (arranger.key && ['jazz', 'bird', 'bossa'].includes(/** @type {string} */ (style))) {
-            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
+        if (
+            keyContext.keyRootIdx !== -1 &&
+            ['jazz', 'bird', 'bossa'].includes(/** @type {string} */ (style))
+        ) {
+            const intervalFromKey = (chord.rootMidi - keyContext.keyRootIdx + 120) % 12;
             if (intervalFromKey === 10 || intervalFromKey === 2) {
                 // b7 or II7
                 return SCALE_INTERVALS.LYDIAN_DOMINANT;
             }
         }
 
-        // Phrygian Dominant (7b9, 7b13)
-        if (quality === '7b9' || quality === '7b13') {
-            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
-        }
-
         // V7 resolving to i (Minor) -> Phrygian Dominant (Harmonic Minor 5th mode)
-        if (nextChord) {
-            const isNextMinor =
-                nextChord.quality.startsWith('m') && !nextChord.quality.startsWith('maj');
-            if (isNextMinor) {
-                const interval = (nextChord.rootMidi - chord.rootMidi + 120) % 12;
-                if (interval === 5) {
-                    // Resolving down a 5th (or up a 4th) to a minor chord
-                    return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
-                }
-            }
+        if (
+            nextChord &&
+            isMinorQuality(nextChord.quality) &&
+            resolvesByDescendingFifth(chord, nextChord) &&
+            (keyContext.isMinor || nextChord.keyIsMinor === true)
+        ) {
+            // Resolving down a 5th (or up a 4th) into an explicitly minor tonicization
+            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
         }
 
         if (style === 'blues' || style === 'rock') {
@@ -206,9 +292,8 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         }
 
         // V in Minor Key -> Phrygian Dominant (Dominant function even if triad)
-        if (arranger.isMinor && arranger.key) {
-            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
+        if (keyContext.isMinor && keyContext.keyRootIdx !== -1) {
+            const intervalFromKey = (chord.rootMidi - keyContext.keyRootIdx + 120) % 12;
             if (intervalFromKey === 7) {
                 // V
                 return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
@@ -222,12 +307,13 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     // If the chord fits within the current Key, use the Key's mode starting on the Chord Root.
     // This correctly handles ii(Dorian), iii(Phrygian), IV(Lydian), vi(Aeolian).
 
-    if (arranger.key) {
-        const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-        const keyIntervals = arranger.isMinor
+    if (keyContext.keyRootIdx !== -1) {
+        const keyIntervals = keyContext.isMinor
             ? SCALE_INTERVALS.NATURAL_MINOR
             : SCALE_INTERVALS.MAJOR;
-        const keyNotes = keyIntervals.map((/** @type {number} */ i) => (keyRootIdx + i) % 12);
+        const keyNotes = keyIntervals.map(
+            (/** @type {number} */ i) => (keyContext.keyRootIdx + i) % 12,
+        );
 
         const chordRootPC = chord.rootMidi % 12;
         const chordTones = chord.intervals.map((/** @type {number} */ i) => (chordRootPC + i) % 12);
@@ -243,6 +329,10 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
                 .sort((a, b) => a - b);
             return mode;
         }
+    }
+
+    if (quality === 'dim') {
+        return SCALE_INTERVALS.WHOLE_HALF_DIMINISHED;
     }
 
     // --- GENRE SPECIFIC FALLBACKS ---

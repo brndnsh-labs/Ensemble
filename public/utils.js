@@ -1,4 +1,4 @@
-import { ENHARMONIC_MAP } from './config.js';
+import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
 
 /**
  * Creates a seeded pseudo-random number generator (Mulberry32).
@@ -56,6 +56,21 @@ export function normalizeKey(k) {
     /** @type {any} */
     const map = ENHARMONIC_MAP;
     return map[k] || k;
+}
+
+/**
+ * Transposes a note-name key by semitones using the app's normalized spelling policy.
+ * @param {string} key
+ * @param {number} semitoneShift
+ * @returns {string}
+ */
+export function transposeKeyName(key, semitoneShift) {
+    const normalized = normalizeKey(key);
+    const currentIndex = KEY_ORDER.indexOf(normalized);
+    if (currentIndex === -1) {
+        return normalized;
+    }
+    return KEY_ORDER[(((currentIndex + semitoneShift) % 12) + 12) % 12];
 }
 
 const REGEX_AMP = /&/g;
@@ -208,30 +223,46 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         return [];
     }
 
-    // Group 1: Odds (1, 3, 5, 7, 9) | Group 2: Evens (2, 4, 6, 8, 10)
-    let intervals = [0, 4, 7, 11, 14, 2, 5, 9, 12, 16]; // Default to Major
-
     const quality = chordObj.quality || 'major';
-
-    if (quality === 'minor' || quality === 'm9' || quality === 'm11' || quality === 'm13') {
-        intervals = [0, 3, 7, 10, 14, 2, 5, 8, 12, 15]; // Minor
-    } else if (
-        quality === 'diminished' ||
-        quality === 'm7b5' ||
-        quality === 'dim7' ||
-        quality === 'half-diminished'
-    ) {
-        intervals = [0, 3, 6, 10, 13, 1, 5, 8, 12, 15]; // Diminished
-    } else if (quality === 'augmented' || quality === 'aug' || quality === '+') {
-        intervals = [0, 4, 8, 10, 14, 2, 6, 9, 12, 16]; // Augmented
-    } else if (
+    const isMinorQuality =
+        quality === 'minor' ||
+        quality === 'm6' ||
+        quality === 'm9' ||
+        quality === 'm11' ||
+        quality === 'm13';
+    const isDiminishedFamily = [
+        'dim',
+        'dim7',
+        'diminished',
+        'halfdim',
+        'm7b5',
+        'half-diminished',
+    ].includes(quality);
+    const isDominantFamily =
+        quality === 'dominant' ||
         quality === '7' ||
         quality === '9' ||
         quality === '11' ||
         quality === '13' ||
-        quality === 'dominant'
-    ) {
-        intervals = [0, 4, 7, 10, 14, 2, 5, 9, 12, 16]; // Dominant
+        quality.startsWith('7');
+
+    /** @type {number[]} */
+    let safeIntervals = [0, 4, 7, 11, 14];
+    /** @type {number[]} */
+    let colorIntervals = [2, 5, 9, 12, 16];
+
+    if (isMinorQuality) {
+        safeIntervals = [0, 3, 7, 10, 14];
+        colorIntervals = [2, 5, 8, 12, 15];
+    } else if (isDiminishedFamily) {
+        safeIntervals = [0, 3, 6, 10, 13];
+        colorIntervals = [1, 5, 8, 12, 15];
+    } else if (quality === 'augmented' || quality === 'aug' || quality === '+') {
+        safeIntervals = [0, 4, 8, 10, 14];
+        colorIntervals = [2, 6, 9, 12, 16];
+    } else if (isDominantFamily) {
+        safeIntervals = [0, 4, 7, 10, 14];
+        colorIntervals = [2, 5, 9, 12, 16];
     }
 
     // rootMidi from the engine is usually based around C4 = 60
@@ -240,7 +271,80 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
     const pc = chordObj.rootMidi % 12;
     const baseMidi = (baseOctave + 1) * 12 + pc; // C4 is MIDI 60, so (4+1)*12 = 60
 
-    return intervals.map((interval) => baseMidi + interval);
+    /**
+     * @param {number[]} source
+     * @param {number} targetCount
+     * @returns {number[]}
+     */
+    const expandIntervals = (source, targetCount) => {
+        const unique = [...new Set(source.filter(Number.isFinite))].sort((a, b) => a - b);
+        if (unique.length === 0) {
+            return [];
+        }
+        const result = unique.slice(0, targetCount);
+        let octaveOffset = 12;
+        while (result.length < targetCount) {
+            for (const interval of unique) {
+                const candidate = interval + octaveOffset;
+                if (!result.includes(candidate)) {
+                    result.push(candidate);
+                }
+                if (result.length >= targetCount) {
+                    break;
+                }
+            }
+            octaveOffset += 12;
+        }
+        return result.sort((a, b) => a - b);
+    };
+
+    const parsedIntervals = Array.isArray(chordObj.intervals)
+        ? chordObj.intervals.filter(Number.isFinite)
+        : [];
+    if (parsedIntervals.length > 0) {
+        safeIntervals = expandIntervals(parsedIntervals, 5);
+        const remainingParsed = parsedIntervals.filter(
+            (/** @type {number} */ interval) => !safeIntervals.includes(interval),
+        );
+        const mergedColors = [...remainingParsed, ...colorIntervals].filter(
+            (/** @type {number} */ interval) => !safeIntervals.includes(interval),
+        );
+        colorIntervals = expandIntervals(mergedColors, 5);
+    }
+
+    /** @type {number[]} */
+    let notes = [
+        ...safeIntervals.map((interval) => baseMidi + interval),
+        ...colorIntervals.map((interval) => baseMidi + interval),
+    ];
+
+    if (
+        typeof chordObj.bassMidi === 'number' &&
+        Number.isFinite(chordObj.bassMidi) &&
+        notes.length > 0
+    ) {
+        const bassPc = chordObj.bassMidi % 12;
+        let slashBassMidi = (baseOctave + 1) * 12 + bassPc;
+        while (slashBassMidi >= notes[0]) {
+            slashBassMidi -= 12;
+        }
+
+        let removedUpperBass = false;
+        const upperNotes = notes.filter((note) => {
+            if (!removedUpperBass && note % 12 === bassPc) {
+                removedUpperBass = true;
+                return false;
+            }
+            return true;
+        });
+
+        if (!removedUpperBass && upperNotes.length > 0) {
+            upperNotes.pop();
+        }
+        notes = [slashBassMidi, ...upperNotes].slice(0, 10);
+    }
+
+    return notes;
 }
 
 /**
@@ -254,6 +358,10 @@ export function compressSections(sections) {
         if (s.key) {
             // @ts-expect-error
             m.k = s.key;
+        }
+        if (typeof s.isMinor === 'boolean') {
+            // @ts-expect-error
+            m.m = s.isMinor ? 1 : 0;
         }
         if (s.repeat && s.repeat > 1) {
             // @ts-expect-error
@@ -321,6 +429,7 @@ export function decompressSections(str) {
                 label: safeLabel,
                 value: safeValue,
                 key: typeof s.k === 'string' ? escapeHTML(s.k) : '',
+                isMinor: typeof s.m === 'number' ? s.m === 1 : undefined,
                 repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
                 timeSignature: typeof s.t === 'string' && s.t.length < 10 ? s.t : '',
                 seamless: !!s.s,

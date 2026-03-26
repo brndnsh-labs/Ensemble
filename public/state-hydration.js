@@ -78,6 +78,7 @@ function validateSections(sections) {
                 label: `Section ${i + 1}`,
                 value: '',
                 key: '',
+                isMinor: undefined,
                 repeat: 1,
                 timeSignature: '',
                 seamless: false,
@@ -108,6 +109,7 @@ function validateSections(sections) {
             label: safeLabel,
             value: safeValue,
             key: safeKey,
+            isMinor: typeof s.isMinor === 'boolean' ? s.isMinor : undefined,
             repeat: Math.min(Math.max(1, parseInt(s.repeat, 10) || 1), 64),
             timeSignature:
                 typeof s.timeSignature === 'string' &&

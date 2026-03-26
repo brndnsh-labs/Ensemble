@@ -6,18 +6,21 @@ import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { decompressSections, generateId } from '../utils.js';
+import { decompressSections, generateId, transposeKeyName } from '../utils.js';
 
 /**
  * @typedef {import('../state/arranger.js').Section} Section
+ * @typedef {Partial<Section> & { keyShift?: number }} PresetSection
  * @typedef {{ bpm?: number, style?: string, timeSignature?: string }} PresetSettings
+ * @typedef {{ variant?: string, notes?: string, references?: string[] }} PresetProvenance
  * @typedef {{
  *   name: string,
- *   sections: string | Array<Partial<Section>>,
+ *   sections: string | Array<PresetSection>,
  *   category?: string,
  *   isMinor?: boolean,
  *   timestamp?: number,
- *   settings?: PresetSettings
+ *   settings?: PresetSettings,
+ *   provenance?: PresetProvenance
  * }} LibraryPreset
  */
 
@@ -61,11 +64,13 @@ export function PresetLibrary({ onSelect }) {
      * @returns {Section[]}
      */
     const getPresetSections = (preset) => {
+        const baseKey = getState().arranger?.key || 'C';
+        /** @type {PresetSection[]} */
         const rawSections =
             typeof preset.sections === 'string'
-                ? decompressSections(preset.sections)
+                ? /** @type {PresetSection[]} */ (decompressSections(preset.sections))
                 : Array.isArray(preset.sections)
-                  ? preset.sections
+                  ? /** @type {PresetSection[]} */ (preset.sections)
                   : [];
 
         return rawSections.map((section, index) => ({
@@ -73,7 +78,12 @@ export function PresetLibrary({ onSelect }) {
             label: section.label || `Section ${index + 1}`,
             value: section.value || '',
             repeat: section.repeat || 1,
-            key: section.key,
+            key:
+                section.key ||
+                (typeof section.keyShift === 'number'
+                    ? transposeKeyName(baseKey, section.keyShift)
+                    : undefined),
+            isMinor: typeof section.isMinor === 'boolean' ? section.isMinor : undefined,
             timeSignature: section.timeSignature,
             seamless: section.seamless,
         }));

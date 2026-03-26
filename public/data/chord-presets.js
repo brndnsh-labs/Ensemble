@@ -1,3 +1,5 @@
+// cspell:ignore iidim Yelverton tonicized Coltrane Gershwin Pachelbel reharmonized polyrhythmic
+
 const DEFAULT_SETTINGS = {
     bpm: 120,
     style: 'pop',
@@ -194,6 +196,11 @@ const PRESETS_RAW = [
             bpm: 220,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Coltrane cycle with major-third key centers',
+            notes: 'Keeps the rapid B -> G -> Eb major-axis motion explicit so the preset reads as a true Coltrane matrix rather than a flattened chain of secondary dominants.',
+            references: ['John Coltrane, Giant Steps (Atlantic, 1960)'],
+        },
     },
     {
         name: 'Ornithology',
@@ -220,6 +227,11 @@ const PRESETS_RAW = [
         settings: {
             bpm: 160,
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Bird head with reharmonized bridge turnaround',
+            notes: 'Uses the bebop-friendly bVI area and minor ii-V pull in the bridge so the preset keeps Parker-style chromatic pressure instead of collapsing into plain diatonic rhythm-changes language.',
+            references: ['Charlie Parker, Ornithology (1946)'],
         },
     },
     {
@@ -248,6 +260,11 @@ const PRESETS_RAW = [
             bpm: 220,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Bop form with chromatic C-section descent',
+            notes: 'Preserves the IVmaj7 -> #IVdim7 -> Imaj7/V move so the chromatic passing diminished and tonic-over-dominant bass remain visible in the chart.',
+            references: ['Charlie Parker and Miles Davis, Donna Lee (1947)'],
+        },
     },
     {
         name: 'Rhythm Changes',
@@ -275,25 +292,30 @@ const PRESETS_RAW = [
             bpm: 180,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Common post-swing bridge dominant chain',
+            notes: 'Uses the standard III7 -> VI7 -> II7 -> V7 bridge rather than a substitute turnaround, which keeps the foundational rhythm-changes teaching form explicit.',
+            references: ['George Gershwin, I Got Rhythm (1930)'],
+        },
     },
     {
         name: 'Autumn Leaves',
         sections: [
             {
                 label: 'A',
-                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7+ | vi7 | vi7',
+                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7alt | vi7 | vi7',
             },
             {
                 label: 'A',
-                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7+ | vi7 | vi7',
+                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7alt | vi7 | vi7',
             },
             {
                 label: 'B',
-                value: 'viiø7 | III7+ | vi7 | vi7 | ii7 | V7 | Imaj7 | IVmaj7',
+                value: 'viiø7 | III7alt | vi7 | vi7 | ii7 | V7 | Imaj7 | IVmaj7',
             },
             {
                 label: 'C',
-                value: 'viiø7 | III7+ | vi7 | vi7 | viiø7 | III7+ | vi7 | vi7',
+                value: 'viiø7 | III7alt | vi7 | vi7 | viiø7 | III7alt | vi7 | vi7',
             },
         ],
         category: 'Jazz',
@@ -302,25 +324,29 @@ const PRESETS_RAW = [
             bpm: 140,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Common-practice concert-major relative-minor chart',
+            notes: 'Keeps the turnaround as vii half-diminished -> III7alt so the relative-minor pull stays explicit instead of being flattened into a generic dominant.',
+        },
     },
     {
         name: 'Stella by Starlight',
         sections: [
             {
                 label: 'A',
-                value: '#ivm7b5 | VII7alt | iim7 | V7 | vm7 | I7 | IVmaj7 | bVII7',
+                value: '#ivm7b5 | VII7b9 | iim7 | V7b9 | vm7 | I7 | IVmaj7 | bVII7',
             },
             {
                 label: 'B',
-                value: 'Imaj7 | #ivm7b5 VII7 | iiim7b5 | VI7alt | iim7b5 | V7alt | Imaj7 | vm7 I7',
+                value: 'Imaj7 | #ivm7b5 VII7b9 | iiim7 | im7 IV7 | Vmaj7 | #ivm7b5 VII7 | viim7b5 | III7b9',
             },
             {
                 label: 'C',
-                value: 'IVmaj7 | bVII7#11 | Imaj7 | #ivm7b5 VII7alt | iiim7b5 | VI7alt | iim7b5 | V7alt',
+                value: 'VI7+ | VI7+ | iim7 | iim7 | bVII7 | bVII7 | Imaj7 | Imaj7',
             },
             {
                 label: 'D',
-                value: 'Imaj7 | #ivm7b5 VII7alt | iiim7b5 | VI7alt | iim7b5 | V7alt | Imaj7 | iim7 V7',
+                value: '#ivm7b5 | VII7b9 | iiim7b5 | VI7b9 | iim7b5 | V7b9 | Imaj7 | Imaj7',
             },
         ],
         category: 'Jazz',
@@ -328,40 +354,50 @@ const PRESETS_RAW = [
         settings: {
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Modern / Real Book-oriented changes',
+            notes: 'Uses the modern interrupted ii-V chains, the Ab7 backdoor, and the final half-diminished-to-b9 turnaround chosen in the March 2026 standards audit.',
+            references: ['Nat Yelverton, "Analysis of Stella by Starlight"'],
+        },
     },
     {
         name: 'All The Things You Are',
         sections: [
             {
-                label: 'A (Tonic)',
+                label: 'A (Ab)',
                 value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7',
             },
             {
-                label: 'A (III)',
-                value: '#ivm7 | VII7 | IIImaj7',
+                label: 'A (C)',
+                value: 'iim7 V7 | Imaj7 | Imaj7',
+                keyShift: 4,
                 seamless: true,
             },
             {
-                label: 'A2 (V)',
-                value: 'iiim7 | vi7 | II7 | Vmaj7 | Imaj7',
+                label: 'A2 (Eb)',
+                value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7',
+                keyShift: 7,
             },
             {
-                label: 'A2 (VII)',
-                value: 'biim7 | #IV7 | VIImaj7',
+                label: 'A2 (G)',
+                value: 'iim7 V7 | Imaj7 | Imaj7',
+                keyShift: -1,
                 seamless: true,
             },
             {
-                label: 'B (VII)',
-                value: 'biim7 | #IV7 | VIImaj7 | VIImaj7',
+                label: 'B (G)',
+                value: 'iim7 | V7 | Imaj7 | Imaj7',
+                keyShift: -1,
             },
             {
-                label: 'B (#IV)',
-                value: 'vm7b5 | I7 | IVmaj7 | II7+',
+                label: 'B (E)',
+                value: 'iidim7 | V7 | Imaj7 | bVI7alt',
+                keyShift: 8,
                 seamless: true,
             },
             {
-                label: 'A3 (Tonic)',
-                value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7+ | Imaj7 | Imaj7',
+                label: 'A3 (Ab)',
+                value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7 | Imaj7 | III7alt',
             },
         ],
         category: 'Jazz',
@@ -369,6 +405,10 @@ const PRESETS_RAW = [
         settings: {
             bpm: 135,
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Common 36-bar cycle with explicit local key centers',
+            notes: 'Spells the form as a transposable Ab -> C -> Eb -> G -> E -> Ab cycle so each local tonic remains visible in the preset data.',
         },
     },
     {
@@ -453,6 +493,14 @@ const PRESETS_RAW = [
         ],
         category: 'Theory',
         isMinor: false,
+        settings: {
+            bpm: 120,
+            style: 'jazz',
+        },
+        provenance: {
+            variant: 'Pedagogical dominant circle',
+            notes: 'A theory drill built from falling-fourth dominant motion, intended to expose functional pull and transposition practice rather than represent a named tune.',
+        },
     },
     {
         name: 'Plagal Flow',
@@ -464,40 +512,51 @@ const PRESETS_RAW = [
         ],
         category: 'Theory',
         isMinor: false,
+        settings: {
+            bpm: 100,
+            style: 'pad',
+        },
+        provenance: {
+            variant: 'Pedagogical plagal-cadence loop',
+            notes: 'A minimal IV-I study form for hearing subdominant release without added turnaround machinery or borrowed dominant function.',
+        },
     },
     {
         name: 'Cherokee',
         sections: [
             {
                 label: 'A',
-                value: 'Imaj7 | vm7 I7 | IVmaj7 | ivm7 bVII7 | Imaj7 II7 | iim7 V7 | Imaj7 | iim7 V7',
+                value: 'Imaj7 | Imaj7 | vm7 | I7 | IVmaj7 | IVmaj7 | bVII7 | bVII7 | Imaj7 | Imaj7 | II7 | II7 | iim7 | VI7 | iim7 | V7+',
             },
             {
-                label: 'A',
-                value: 'Imaj7 | vm7 I7 | IVmaj7 | ivm7 bVII7 | Imaj7 II7 | iim7 V7 | Imaj7 | Imaj7',
+                label: 'A2',
+                value: 'Imaj7 | Imaj7 | vm7 | I7 | IVmaj7 | IVmaj7 | bVII7 | bVII7 | Imaj7 | Imaj7 | II7 | II7 | iim7 | V7 | Imaj7 | Imaj7',
             },
             {
-                label: 'B (bII)',
-                value: 'biim7 | bVI7 | bIImaj7 | bIImaj7',
+                label: 'B (B)',
+                value: 'iim7 | V7 | Imaj7 | Imaj7',
+                keyShift: 1,
             },
             {
-                label: 'B (VII)',
-                value: 'viim7 | III7 | VIImaj7 | VIImaj7',
+                label: 'B (A)',
+                value: 'iim7 | V7 | Imaj7 | Imaj7',
+                keyShift: -1,
                 seamless: true,
             },
             {
-                label: 'B (bVI)',
-                value: 'bviim7 | bIII7 | bVImaj7 | bVImaj7',
+                label: 'B (G)',
+                value: 'iim7 | V7 | Imaj7 | Imaj7',
+                keyShift: -3,
                 seamless: true,
             },
             {
-                label: 'B (I)',
-                value: 'vim7 II7 | iim7 V7',
+                label: 'B (Bb)',
+                value: 'vim7 | II7 | iim7 | V7+',
                 seamless: true,
             },
             {
-                label: 'A',
-                value: 'Imaj7 | vm7 I7 | IVmaj7 | ivm7 bVII7 | Imaj7 II7 | iim7 V7 | Imaj7 | Imaj7',
+                label: 'A3',
+                value: 'Imaj7 | Imaj7 | vm7 | I7 | IVmaj7 | IVmaj7 | bVII7 | bVII7 | Imaj7 | Imaj7 | II7 | II7 | iim7 | V7 | Imaj7 | Imaj7',
             },
         ],
         category: 'Jazz',
@@ -505,6 +564,10 @@ const PRESETS_RAW = [
         settings: {
             bpm: 240,
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Common 64-bar linearized bridge',
+            notes: 'Uses the bridge through local B, A, and G major before the Bb return, matching the fast-swing common-practice variant targeted by the audit.',
         },
     },
     {
@@ -516,7 +579,8 @@ const PRESETS_RAW = [
             },
             {
                 label: 'Modulation',
-                value: 'biim7 | bVI7 | bIImaj7 | bIImaj7',
+                value: 'iim7 | V7 | Imaj7 | Imaj7',
+                keyShift: 1,
             },
             {
                 label: 'Turnaround',
@@ -528,6 +592,10 @@ const PRESETS_RAW = [
         settings: {
             bpm: 140,
             style: 'bossa',
+        },
+        provenance: {
+            variant: 'Minor form with local major-key bridge',
+            notes: 'Stores the modulation as a true local ii-V-I into the temporary major key instead of jumping straight to a tonicized major chord.',
         },
     },
     {
@@ -562,6 +630,11 @@ const PRESETS_RAW = [
             bpm: 130,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Common Porter-style chromatic-descent chorus',
+            notes: 'Keeps the #ivm7 -> ivm7 -> iiim7 -> bIIIdim7 descent so the passing diminished color is preserved instead of being simplified into plain ii-V language.',
+            references: ['Cole Porter, Night and Day (1932)'],
+        },
     },
     {
         name: 'All Blues',
@@ -584,6 +657,11 @@ const PRESETS_RAW = [
             bpm: 110,
             style: 'jazz',
             timeSignature: '6/8',
+        },
+        provenance: {
+            variant: 'Kind of Blue 6/8 modal-blues frame',
+            notes: 'Retains the compound-meter head and chromatic D7#9 -> Eb7#9 D7alt turnaround so the modal-blues color stays closer to the Miles Davis small-group language.',
+            references: ['Miles Davis, All Blues (Kind of Blue, 1959)'],
         },
     },
     {

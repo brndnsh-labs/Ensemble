@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// cspell:ignore Bdim tonicization tonicized
+
 // --- Global Mocks ---
 
 const { mockState } = vi.hoisted(() => ({
@@ -98,9 +100,22 @@ describe('Music Theory: Scale Correctness', () => {
     });
 
     describe('Special Quality Specialists', () => {
-        it('assigns Whole-Half Diminished to dim chords', () => {
+        it('assigns Whole-Half Diminished to chromatic dim chords', () => {
             const chordDim = { rootMidi: 60, quality: 'dim', intervals: [0, 3, 6] };
             expect(getScaleForChord(mockState, chordDim)).toEqual([0, 2, 3, 5, 6, 8, 9, 11]);
+        });
+
+        it('uses diatonic Locrian for natural vii diminished triads in major', () => {
+            mockState.groove.genreFeel = 'Rock';
+            const chordBdim = { rootMidi: 71, quality: 'dim', intervals: [0, 3, 6] };
+            expect(getScaleForChord(mockState, chordBdim, null, 'scalar')).toEqual([
+                0, 1, 3, 5, 6, 8, 10,
+            ]);
+        });
+
+        it('assigns Whole-Half Diminished to dim7 chords', () => {
+            const chordDim7 = { rootMidi: 60, quality: 'dim7', intervals: [0, 3, 6, 9] };
+            expect(getScaleForChord(mockState, chordDim7)).toEqual([0, 2, 3, 5, 6, 8, 9, 11]);
         });
 
         it('assigns Whole Tone to aug chords', () => {
@@ -125,9 +140,27 @@ describe('Music Theory: Scale Correctness', () => {
             expect(getScaleForChord(mockState, chord7sharp11)).toEqual([0, 2, 4, 6, 7, 9, 10]);
         });
 
-        it('assigns Phrygian Dominant to V7 resolving to minor', () => {
+        it('preserves explicit 7#11 quality even when tension is high', () => {
+            mockState.soloist.tension = 0.8;
+            const chord7sharp11 = { rootMidi: 67, quality: '7#11', intervals: [0, 4, 7, 10, 18] };
+            expect(getScaleForChord(mockState, chord7sharp11)).toEqual([0, 2, 4, 6, 7, 9, 10]);
+        });
+
+        it('defaults plain dominants to Mixolydian when the minor target is not explicitly tonicized', () => {
             const chordV7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10] };
             const chordIm = { rootMidi: 60, quality: 'minor', intervals: [0, 3, 7] };
+            expect(getScaleForChord(mockState, chordV7, chordIm)).toEqual([0, 2, 4, 5, 7, 9, 10]);
+        });
+
+        it('assigns Phrygian Dominant when local minor metadata marks the target tonicization', () => {
+            const chordV7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10], key: 'C' };
+            const chordIm = {
+                rootMidi: 60,
+                quality: 'minor',
+                intervals: [0, 3, 7],
+                key: 'C',
+                keyIsMinor: true,
+            };
             expect(getScaleForChord(mockState, chordV7, chordIm)).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
 
@@ -136,11 +169,63 @@ describe('Music Theory: Scale Correctness', () => {
             expect(getScaleForChord(mockState, chord7b9)).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
 
+        it('preserves explicit 7b9 quality over the jazz Lydian-dominant shortcut', () => {
+            mockState.arranger.key = 'C';
+            mockState.groove.genreFeel = 'Jazz';
+            const chordD7b9 = { rootMidi: 62, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
+            const chordBb7b9 = { rootMidi: 70, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
+            expect(getScaleForChord(mockState, chordD7b9, null, 'bird')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]);
+            expect(getScaleForChord(mockState, chordBb7b9, null, 'bird')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]);
+        });
+
+        it('uses Locrian natural 2 for half-diminished chords approaching a minor-colored dominant', () => {
+            mockState.arranger.key = 'Bb';
+            mockState.arranger.isMinor = false;
+            const chordDm7b5 = { rootMidi: 62, quality: 'halfdim', intervals: [0, 3, 6, 10] };
+            const chordG7b9 = { rootMidi: 67, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
+            expect(getScaleForChord(mockState, chordDm7b5, chordG7b9, 'bird')).toEqual([
+                0, 2, 3, 5, 6, 8, 10,
+            ]);
+        });
+
+        it('uses Locrian natural 2 for half-diminished chords in an explicitly minor local key', () => {
+            const chordBm7b5 = {
+                rootMidi: 71,
+                quality: 'halfdim',
+                intervals: [0, 3, 6, 10],
+                key: 'A',
+                keyIsMinor: true,
+            };
+            const chordE7 = {
+                rootMidi: 64,
+                quality: '7',
+                intervals: [0, 4, 7, 10],
+                key: 'A',
+                keyIsMinor: true,
+            };
+            expect(getScaleForChord(mockState, chordBm7b5, chordE7, 'bird')).toEqual([
+                0, 2, 3, 5, 6, 8, 10,
+            ]);
+        });
+
         it('detects Lydian Dominant for bVII7 in Jazz', () => {
             mockState.arranger.key = 'C';
             mockState.groove.genreFeel = 'Jazz';
             const chordBb7 = { rootMidi: 70, quality: '7', intervals: [0, 4, 7, 10] };
             expect(getScaleForChord(mockState, chordBb7, null, 'smart')).toEqual([
+                0, 2, 4, 6, 7, 9, 10,
+            ]);
+        });
+
+        it('uses a chord local key center for dominant-function detection in modulated sections', () => {
+            mockState.arranger.key = 'C';
+            mockState.groove.genreFeel = 'Jazz';
+            const chordF7 = { rootMidi: 65, quality: '7', intervals: [0, 4, 7, 10], key: 'G' };
+            expect(getScaleForChord(mockState, chordF7, null, 'bird')).toEqual([
                 0, 2, 4, 6, 7, 9, 10,
             ]);
         });
@@ -216,6 +301,16 @@ describe('Music Theory: Scale Correctness', () => {
             const chordEb = { rootMidi: 63, quality: 'major', intervals: [0, 4, 7] };
             expect(getScaleForChord(mockState, chordEb, null, 'smart')).toEqual([
                 0, 2, 4, 5, 7, 9, 11,
+            ]);
+        });
+
+        it('normalizes sharp keys before doing diatonic mode checks', () => {
+            mockState.arranger.key = 'F#';
+            mockState.arranger.isMinor = false;
+            mockState.groove.genreFeel = 'Rock';
+            const chordAbm = { rootMidi: 68, quality: 'minor', intervals: [0, 3, 7] };
+            expect(getScaleForChord(mockState, chordAbm, null, 'scalar')).toEqual([
+                0, 2, 3, 5, 7, 9, 10,
             ]);
         });
     });

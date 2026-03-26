@@ -64,13 +64,7 @@ describe('Modulation Scale Selection Integration', () => {
         // #11 of F is B (11).
 
         arranger.sections = [
-            {
-                id: 'A',
-                label: 'Modulation',
-                value: 'F7',
-                key: 'G',
-                timeSignature: '4/4',
-            },
+            { id: 'A', label: 'Modulation', value: 'F7', key: 'G', timeSignature: '4/4' },
         ];
 
         // Trigger the progression parser
@@ -81,39 +75,17 @@ describe('Modulation Scale Selection Integration', () => {
         expect(f7Chord.absName).toBe('F7');
         expect(f7Chord.rootMidi % 12).toBe(5); // F
 
-        // Get scale using 'bird' (Jazz) style
-        const scale = getScaleForChord(f7Chord, null, 'bird');
+        // Get scale using 'bird' (Jazz) style and honor the local section key.
+        const scale = getScaleForChord(getState(), f7Chord, null, 'bird');
 
-        // Convert scale intervals to absolute pitch classes
+        expect(scale).toEqual([0, 2, 4, 6, 7, 9, 10]);
+
+        // Convert scale intervals to absolute pitch classes.
         const scalePCs = scale
             .map((interval) => (f7Chord.rootMidi + interval) % 12)
             .sort((a, b) => a - b);
 
-        // We expect B natural (11) for Lydian Dominant (F Lydian Dom has B natural)
-        // If it falls back to Mixolydian (treating F7 as IV7 in C or just generic),
-        // it might give Bb (10) if it thinks F7 is related to C (IV7 is Lydian Dom?)
-        // Wait, F7 in C Major is IV7.
-        // IV7 in Jazz is often Lydian Dominant too.
-        // Let's check the code:
-        // if (relativeRoot === 2) ... (II7)
-        // if (relativeRoot === 10) ... (bVII7)
-        // relativeRoot of F(5) in C(0) is 5.
-        // There is NO check for relativeRoot === 5 (IV7) in the "IsDominant" block in soloist.js.
-        // So it falls to Mixolydian: [0, 2, 4, 5, 7, 9, 10].
-        // F Mixolydian: F, G, A, Bb, C, D, Eb.
-        // Bb is 10.
-
-        // So in C Major, F7 gets Bb.
-        // But in G Major (our local key), F7 is bVII7.
-        // bVII7 should get Lydian Dominant (B natural).
-
-        const _hasBNatural = scalePCs.includes(11);
-        const hasBb = scalePCs.includes(10);
-
-        // We want Lydian Dominant because it's bVII7 in the LOCAL key of G.
-        // Current logic falls back to Mixolydian which is acceptable safe default
-        // expect(hasBNatural).toBe(true);
-        expect(true).toBe(true);
-        expect(hasBb).toBe(true); // Mixolydian has Bb (4th/b7 depending on perspective, but it's present)
+        expect(scalePCs).toContain(11); // B natural = #11 of F
+        expect(scalePCs).not.toContain(10); // Bb would imply plain Mixolydian
     });
 });
