@@ -352,14 +352,6 @@ button:focus-visible {
         order: 1;
     }
 
-    .instrument-panel {
-        order: 3;
-    }
-
-    .instrument-panel.active-mobile {
-        margin-bottom: 1rem;
-    }
-
     #panel-visualizer {
         order: 4;
         margin-bottom: 2rem;
@@ -669,10 +661,6 @@ select option {
 
 .workspace-view--studio .workspace-stack {
     gap: 1rem;
-}
-
-.workspace-view--studio .workspace-stack .instrument-panel {
-    min-height: 0;
 }
 
 .workspace-view--studio .workspace-studio-active-strip {
@@ -2126,14 +2114,6 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
     .workspace-visualizer-area {
         min-height: 260px;
-    }
-
-    .app-main-layout.workspace-shell .dashboard-panel.instrument-panel.active-mobile {
-        border-top-style: solid;
-        border-top-width: 4px;
-        border-top-left-radius: 16px;
-        border-top-right-radius: 16px;
-        box-shadow: var(--shadow-sm);
     }
 }
 

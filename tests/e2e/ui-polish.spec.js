@@ -112,7 +112,11 @@ test.describe('UI polish consistency @ui', () => {
         expect(selectors).toContain('button:focus-visible');
         expect(selectors).toContain('.workspace-nav-btn:focus-visible');
         expect(selectors).toContain('.workspace-studio-genre-button:focus-visible');
-        expect(selectors).toContain('.genre-btn:focus-visible');
+        expect(
+            selectors.some((selector) =>
+                selector.includes('.workspace-studio-genre-option:focus-visible'),
+            ),
+        ).toBe(true);
         expect(selectors).toContain('.preset-chip:focus-visible');
         expect(selectors).toContain('.seed-input:focus-visible');
     });

@@ -45,14 +45,6 @@
     outline-offset: 2px;
 }
 
-/* Dashboard Specific Layout Utilities */
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: var(--space-5);
-    margin-bottom: var(--space-6);
-}
-
 .panel {
     background: var(--panel-color);
     border: 1px solid var(--border-color);
@@ -91,7 +83,6 @@
 }
 
 /* Accessibility Focus States */
-.mode-option:focus-within,
 .analyzer-drop-zone:focus-within {
     outline: 2px solid var(--accent-color);
     outline-offset: 2px;
@@ -260,35 +251,11 @@ input:focus-visible + .toggle-slider {
     padding: var(--space-1) 0;
 }
 
-.smart-tab-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-2);
-}
-
 .smart-tab-label {
     font-size: var(--font-xs);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-}
-
-.smart-tab-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0.25rem;
-}
-
-.style-category + .style-category {
-    margin-top: var(--space-2);
-}
-
-.category-label {
-    margin-top: var(--space-2);
-    margin-bottom: var(--space-1);
-    color: var(--text-muted);
-    font-size: 0.75rem;
 }
 
 .chip-grid {
@@ -349,10 +316,6 @@ input:focus-visible + .toggle-slider {
 .text-mini-muted {
     font-size: 0.75rem;
     color: var(--text-muted);
-}
-
-.text-capitalize {
-    text-transform: capitalize;
 }
 
 .danger-btn {
