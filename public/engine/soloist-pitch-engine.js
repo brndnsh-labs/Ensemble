@@ -84,6 +84,10 @@ export function selectPitchAndDevices(
 
     // Derived from the Rhythm Engine node
     const { velocity, durationSteps, isStrongBeat, vibrato } = rhythmNode;
+    const isHeadBypass = Boolean(rhythmNode.isHeadBypass);
+    const targetMidi = Number.isFinite(rhythmNode.targetMidi)
+        ? Math.round(rhythmNode.targetMidi)
+        : null;
 
     let targetChord = currentChord;
 
@@ -484,7 +488,9 @@ export function selectPitchAndDevices(
     }
 
     let selectedMidi = -1;
-    if (totalWeight > 0) {
+    if (isHeadBypass && targetMidi !== null) {
+        selectedMidi = targetMidi;
+    } else if (totalWeight > 0) {
         let randomVal = Math.random() * totalWeight;
         for (let m = searchMin; m <= searchMax; m++) {
             const w = CANDIDATE_WEIGHTS[m];
@@ -511,6 +517,9 @@ export function selectPitchAndDevices(
 
     if (loopCount === 0 && sessionSeed && sessionSeed.notes.length > 0) {
         deviceBaseProb *= 0.2; // Clean head
+    }
+    if (isHeadBypass && loopCount === 0) {
+        deviceBaseProb = 0;
     }
     const isPolyphonic =
         soloistState.mode !== 'monophonic' &&

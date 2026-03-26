@@ -64,6 +64,244 @@ const PICKUP_DICTIONARY = {
  */
 
 /**
+ * @param {number} interval
+ * @returns {number}
+ */
+function normalizeInterval(interval) {
+    return ((interval % 12) + 12) % 12;
+}
+
+/**
+ * @param {string | undefined} label
+ * @param {string} style
+ * @returns {string}
+ */
+function getSectionCategory(label, style) {
+    const normalized = (label || 'Main').toLowerCase();
+
+    if (normalized.includes('intro')) {
+        return 'intro';
+    }
+    if (normalized.includes('chorus') || normalized.includes('drop')) {
+        return 'chorus';
+    }
+    if (normalized.includes('outro') || normalized.includes('end')) {
+        return 'outro';
+    }
+    if (style === 'jazz' || style === 'bird' || style === 'bossa') {
+        return 'jazz';
+    }
+
+    const category = normalized.replace(/[^a-z]/g, '');
+    return category || 'main';
+}
+
+/**
+ * @param {string} category
+ * @returns {boolean}
+ */
+function isDepartureCategory(category) {
+    return (
+        category === 'chorus' ||
+        category === 'bridge' ||
+        category === 'b' ||
+        category === 'prechorus'
+    );
+}
+
+/**
+ * @param {number} interval
+ * @returns {boolean}
+ */
+function isSoftCadenceInterval(interval) {
+    const normalized = normalizeInterval(interval);
+    return normalized === 2 || normalized === 5 || normalized === 9;
+}
+
+/**
+ * @param {number} interval
+ * @param {number[]} chordIntervals
+ * @returns {boolean}
+ */
+function isStableCadenceInterval(interval, chordIntervals) {
+    const normalized = normalizeInterval(interval);
+    return chordIntervals.some((chordInterval) => normalizeInterval(chordInterval) === normalized);
+}
+
+/**
+ * @param {number[]} scale
+ * @param {number[]} chordIntervals
+ * @param {{ preferStable?: boolean, preferConclusive?: boolean }} [options]
+ * @returns {number[]}
+ */
+function buildCadenceDegreePool(
+    scale,
+    chordIntervals,
+    { preferStable = false, preferConclusive = false } = {},
+) {
+    /** @type {number[]} */
+    const rootDegrees = [];
+    /** @type {number[]} */
+    const thirdDegrees = [];
+    /** @type {number[]} */
+    const stableDegrees = [];
+    /** @type {number[]} */
+    const colorDegrees = [];
+
+    scale.forEach((interval, degree) => {
+        const normalized = normalizeInterval(interval);
+
+        if (normalized === 0) {
+            rootDegrees.push(degree);
+        }
+        if (normalized === 3 || normalized === 4) {
+            thirdDegrees.push(degree);
+        }
+        if (isStableCadenceInterval(normalized, chordIntervals)) {
+            stableDegrees.push(degree);
+        } else if (isSoftCadenceInterval(normalized)) {
+            colorDegrees.push(degree);
+        }
+    });
+
+    if (preferConclusive) {
+        return [...rootDegrees, ...rootDegrees, ...thirdDegrees, ...thirdDegrees, ...stableDegrees];
+    }
+
+    if (preferStable) {
+        return [...thirdDegrees, ...stableDegrees, ...stableDegrees, ...colorDegrees];
+    }
+
+    return [...stableDegrees, ...stableDegrees, ...colorDegrees];
+}
+
+/**
+ * @param {SeedNote} note
+ * @param {SeedNote | null} previousNote
+ * @param {any} chord
+ * @param {boolean} allowSoftColor
+ * @returns {number}
+ */
+function selectLandingMidi(note, previousNote, chord, allowSoftColor) {
+    const chordIntervals = chord.intervals || [0, 4, 7];
+    /** @type {number[]} */
+    const allowedIntervals = [...chordIntervals];
+
+    if (allowSoftColor) {
+        allowedIntervals.push(2, 5, 9);
+    }
+
+    let bestMidi = note.midi;
+    let minScore = Number.POSITIVE_INFINITY;
+    const baseOctave = Math.floor(note.midi / 12) * 12;
+
+    for (const interval of allowedIntervals) {
+        const targetPitchClass = normalizeInterval(chord.rootMidi + interval);
+        for (const octaveShift of [-12, 0, 12]) {
+            const candidateMidi = baseOctave + targetPitchClass + octaveShift;
+            const movePenalty = Math.abs(candidateMidi - note.midi) * 2.0;
+            const linePenalty = previousNote
+                ? Math.abs(candidateMidi - previousNote.midi) * 0.5
+                : 0;
+            const stableBonus =
+                interval === 0 || interval === 3 || interval === 4
+                    ? -1.25
+                    : interval === 7 || interval === 10 || interval === 11
+                      ? -0.5
+                      : 0;
+            const totalScore = movePenalty + linePenalty + stableBonus;
+
+            if (totalScore < minScore) {
+                minScore = totalScore;
+                bestMidi = candidateMidi;
+            }
+        }
+    }
+
+    return bestMidi;
+}
+
+/**
+ * @param {SeedNote[]} notes
+ * @param {any[]} stepMap
+ * @param {any[]} sectionMap
+ * @param {number} actualTotalSteps
+ * @param {number} stepsPerMeasure
+ * @param {string} style
+ * @returns {SeedNote[]}
+ */
+function polishCadenceLandings(
+    notes,
+    stepMap,
+    sectionMap,
+    actualTotalSteps,
+    stepsPerMeasure,
+    style,
+) {
+    if (style === 'jazz' || style === 'bird' || style === 'bossa') {
+        return notes;
+    }
+
+    const polishedNotes = [...notes].sort((a, b) => a.step - b.step);
+
+    for (let measureStart = 0; measureStart < actualTotalSteps; measureStart += stepsPerMeasure) {
+        const measureEnd = measureStart + stepsPerMeasure;
+        const noteIndexes = [];
+
+        for (let i = 0; i < polishedNotes.length; i++) {
+            const note = polishedNotes[i];
+            if (note.step >= measureStart && note.step < measureEnd) {
+                noteIndexes.push(i);
+            }
+        }
+
+        if (noteIndexes.length === 0) {
+            continue;
+        }
+
+        const lastIndex = noteIndexes[noteIndexes.length - 1];
+        const note = polishedNotes[lastIndex];
+        const stepEntry = binarySearchMap(stepMap, Math.min(note.step, actualTotalSteps - 1));
+
+        if (!stepEntry?.chord) {
+            continue;
+        }
+
+        const currentSection = sectionMap.find(
+            (/** @type {any} */ section) =>
+                measureStart >= section.start && measureStart < section.end,
+        );
+        const category = getSectionCategory(currentSection?.label, style);
+        const isDeparture = isDepartureCategory(category);
+        const isSectionEnding = currentSection ? measureEnd >= currentSection.end : false;
+        const chordIntervals = stepEntry.chord.intervals || [0, 4, 7];
+        const interval = normalizeInterval(note.midi - stepEntry.chord.rootMidi);
+        const isStable = isStableCadenceInterval(interval, chordIntervals);
+        const isSoft = isSoftCadenceInterval(interval);
+        const shouldRepairHarshLanding = !isStable && !isSoft;
+        const shouldTightenStatementEnding = !isDeparture && isSectionEnding && !isStable;
+
+        if (!shouldRepairHarshLanding && !shouldTightenStatementEnding) {
+            continue;
+        }
+
+        const previousNote = lastIndex > 0 ? polishedNotes[lastIndex - 1] : null;
+        const replacementMidi = selectLandingMidi(
+            note,
+            previousNote,
+            stepEntry.chord,
+            !shouldTightenStatementEnding,
+        );
+
+        if (replacementMidi !== note.midi) {
+            polishedNotes[lastIndex] = { ...note, midi: replacementMidi };
+        }
+    }
+
+    return polishedNotes;
+}
+
+/**
  * Generates a song-wide seed melody for the soloist.
  * @param {import('../types.js').EnsembleState} state
  * @param {import('../state/arranger.js').ArrangerState} arranger
@@ -122,23 +360,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     sectionMap.forEach((sectionRange, index) => {
         const label = (sectionRange.label || 'Main').toLowerCase();
 
-        // Generalize labels
-        let category = 'verse';
-        if (label.includes('intro')) {
-            category = 'intro';
-        } else if (label.includes('chorus') || label.includes('drop')) {
-            category = 'chorus';
-        } else if (label.includes('outro') || label.includes('end')) {
-            category = 'outro';
-        } else if (style === 'jazz' || style === 'bird' || style === 'bossa') {
-            category = 'jazz';
-        } else {
-            // Keep generic label like "a", "b", "verse" if standard to allow them to map to themselves
-            category = label.replace(/[^a-z]/g, '');
-            if (!category) {
-                category = 'main';
-            }
-        }
+        const category = getSectionCategory(label, style);
 
         const sectionStartMeasure = Math.floor(sectionRange.start / stepsPerMeasure);
         const sectionEndMeasure = Math.ceil(sectionRange.end / stepsPerMeasure);
@@ -147,11 +369,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             `[Seeder Debug] Section ${label}: start measure ${sectionStartMeasure}, end measure ${sectionEndMeasure}. Applying motif.`,
         );
 
-        const isDeparture =
-            category === 'chorus' ||
-            category === 'bridge' ||
-            category === 'b' ||
-            category === 'prechorus';
+        const isDeparture = isDepartureCategory(category);
 
         // Track iterations to apply restatement mutations
         const iteration = sectionIterationCount.get(category) || 0;
@@ -159,6 +377,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
         const rhythmicDensity = config.rhythmicDensity || 0.5;
+        const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
+        const isForwardStatement = !isJazzStyle && (index === 0 || !isDeparture);
+        const statementDensity = isForwardStatement
+            ? Math.min(0.75, rhythmicDensity + 0.12)
+            : rhythmicDensity;
 
         /**
          * Helper to generate a 1-measure rhythmic cell
@@ -221,8 +444,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             } else {
                 // Standard Meter: Use Rhythm Dictionary
                 let pool = RH_CELLS.BASIC;
+                const forwardPool = [
+                    RH_CELLS.BASIC[0],
+                    RH_CELLS.BASIC[1],
+                    RH_CELLS.SYNC[1],
+                    RH_CELLS.SYNC[3],
+                ];
                 if (beatsPerCell === 3) {
                     pool = RH_CELLS.WALTZ;
+                } else if (isForwardStatement && density >= 0.55) {
+                    pool = prng() < 0.7 ? forwardPool : [...forwardPool, ...RH_CELLS.SYNC];
                 } else if (density > 0.7 || dense || prng() < 0.3) {
                     pool = [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
                 }
@@ -308,11 +539,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
 
             // 1. Generate the initial A cell
-            const cellA = generateCell(forceSparse, forceDense, rhythmicDensity);
+            const cellA = generateCell(forceSparse, forceDense, statementDensity);
 
             // Generate secondary cells for longer phrases
-            const cellB = generateCell(forceSparse, forceDense, rhythmicDensity);
-            const cellC = generateCell(forceSparse, forceDense, rhythmicDensity);
+            const cellB = generateCell(forceSparse, forceDense, statementDensity);
+            const cellC = generateCell(forceSparse, forceDense, statementDensity);
 
             // Determine motif structure based on phrase length
             const structureRoll = prng();
@@ -489,7 +720,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         lastActiveNote &&
                         lastActiveNote.beatOffset >= measure * tsConfig.beats + (tsConfig.beats - 1)
                     ) {
-                        const tieProb = ['bossa', 'jazz', 'bird'].includes(style) ? 0.5 : 0.25;
+                        const tieProb = isJazzStyle ? 0.5 : isForwardStatement ? 0.1 : 0.25;
                         if (prng() < tieProb) {
                             const tieLengthBeats = prng() > 0.5 ? 1 : 0.5;
                             lastActiveNote.duration += tieLengthBeats * stepsPerBeat;
@@ -614,17 +845,21 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         let registerBase = 60; // Middle C
         const intensityVal = _intensity || 0.5;
 
-        if (category === 'chorus') {
-            // Chorus boost: 0 or 12. For Jazz/Bossa Head, we stay grounded to keep it singable.
-            const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
-            const boost = isJazzStyle ? 0 : 12;
-            registerBase += intensityVal >= 0.5 ? boost : 0;
-        } else if (category === 'intro' || index === 0) {
-            // Force lower start for Intros or the very first section
-            registerBase = 48;
+        // Keep non-jazz heads in a singable middle register. Jazz-family heads stay
+        // more grounded, but still get a modest floor later in note scoring.
+        if (isJazzStyle) {
+            if (category === 'chorus') {
+                registerBase = 60;
+            } else if (category === 'intro' || index === 0) {
+                registerBase = 48;
+            } else {
+                registerBase = intensityVal > 0.7 ? 60 : 48;
+            }
+        } else if (category === 'chorus' || isDeparture) {
+            const boost = intensityVal >= 0.5 ? 12 : 0;
+            registerBase = 60 + boost;
         } else {
-            // Verse/Standard: slight climb based on intensity (still multiples of 12)
-            registerBase = intensityVal > 0.7 ? 60 : 48;
+            registerBase = intensityVal > 0.7 ? 72 : 60;
         }
 
         let lastMidi = registerBase;
@@ -766,6 +1001,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 const currentChord = stepEntry.chord;
                 const scale = getScaleForChord(state, currentChord, null, style);
                 const currentScalePitches = scale.map((ivl) => (currentChord.rootMidi + ivl) % 12);
+                const chordIntervals = currentChord.intervals || [0, 4, 7];
 
                 // Map scale degree offset to an actual interval
                 const scaleLen = scale.length;
@@ -779,13 +1015,21 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                 if (isFinalNoteOfSection) {
                     if (isConclusion) {
-                        // Conclusion: Resolve to Root (0) or 3rd (2)
-                        degree = prng() > 0.3 ? 0 : 2;
-                    } else if (!isDeparture) {
-                        // Statement: Chance to end on "Tense" degrees (2nd, 5th, 7th) to ask a question
-                        if (prng() > 0.5) {
-                            const tenseDegrees = [1, 4, 6]; // 2nd, 5th, 7th
-                            degree = tenseDegrees[Math.floor(prng() * tenseDegrees.length)];
+                        const conclusiveDegrees = buildCadenceDegreePool(scale, chordIntervals, {
+                            preferConclusive: true,
+                        });
+                        if (conclusiveDegrees.length > 0) {
+                            degree =
+                                conclusiveDegrees[Math.floor(prng() * conclusiveDegrees.length)];
+                        }
+                    } else if (!isDeparture && !isJazzStyle) {
+                        // Statement endings can still leave a question in the air, but they should
+                        // do it with soft color or chord tones rather than a harsh landing.
+                        const statementDegrees = buildCadenceDegreePool(scale, chordIntervals, {
+                            preferStable: true,
+                        });
+                        if (statementDegrees.length > 0) {
+                            degree = statementDegrees[Math.floor(prng() * statementDegrees.length)];
                         }
                     }
                 }
@@ -837,6 +1081,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         const isFreshNote = isPivotStep && !prevScalePitches.includes(testPC);
                         const pivotBonus = isFreshNote ? -3 : 0;
 
+                        const singableFloor = isJazzStyle ? 55 : 60;
+                        const floorPenalty =
+                            testMidi < singableFloor ? (singableFloor - testMidi) * 2.5 : 0;
                         // Singable Register Penalty: Penalize notes above MIDI 76 (E5)
                         // to avoid "neck creep" or shrillness in the Head.
                         const ceilingPenalty = testMidi > 76 ? (testMidi - 76) * 2.0 : 0;
@@ -847,6 +1094,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             motifPenalty +
                             guideBonus +
                             pivotBonus +
+                            floorPenalty +
                             ceilingPenalty;
 
                         if (totalScore < minScore) {
@@ -1044,9 +1292,68 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         }
     }
 
-    // Sort the processed notes by step just in case our pushes messed up the order
-    processedNotes.sort((a, b) => a.step - b.step);
+    // Reinforce sparse late-entry statement bars with a lead-in attack so
+    // non-jazz heads speak earlier in the measure instead of waiting until beat 4.
+    if (!['jazz', 'bird', 'bossa'].includes(style)) {
+        /** @type {SeedNote[]} */
+        const reinforcedNotes = [];
+        const sortedSeedNotes = [...processedNotes].sort((a, b) => a.step - b.step);
 
-    console.log(`[Seeder Debug] Finished generation. Total seed notes: ${processedNotes.length}.`);
-    return { notes: processedNotes, loopLengthSteps: actualTotalSteps };
+        for (let i = 0; i < sortedSeedNotes.length; i++) {
+            const note = sortedSeedNotes[i];
+            const measureStart =
+                Math.floor(Math.max(0, note.step) / stepsPerMeasure) * stepsPerMeasure;
+            const measureEnd = measureStart + stepsPerMeasure;
+            const measureNotes = sortedSeedNotes.filter(
+                (candidate) => candidate.step >= measureStart && candidate.step < measureEnd,
+            );
+            const isLateSingleAttack =
+                note.step >= measureStart + stepsPerBeat * 2 &&
+                measureNotes.length === 1 &&
+                note.durationSteps >= stepsPerBeat;
+
+            if (isLateSingleAttack) {
+                const pickupStep = note.step - stepsPerBeat;
+                const pickupDuration = note.step - pickupStep;
+                const hasLeadInSpace =
+                    pickupStep >= measureStart &&
+                    pickupDuration >= stepsPerBeat / 2 &&
+                    !sortedSeedNotes.some(
+                        (candidate) =>
+                            candidate !== note &&
+                            candidate.step >= pickupStep &&
+                            candidate.step < note.step,
+                    );
+
+                if (hasLeadInSpace) {
+                    reinforcedNotes.push({
+                        ...note,
+                        step: pickupStep,
+                        durationSteps: pickupDuration,
+                        velocity: Math.min(note.velocity, 0.75),
+                        isAnchor: false,
+                    });
+                }
+            }
+
+            reinforcedNotes.push(note);
+        }
+
+        processedNotes.length = 0;
+        processedNotes.push(...reinforcedNotes);
+    }
+
+    // Sort the processed notes by step just in case our pushes or reinforcements messed up the order
+    const polishedNotes = polishCadenceLandings(
+        processedNotes,
+        stepMap,
+        sectionMap,
+        actualTotalSteps,
+        stepsPerMeasure,
+        style,
+    );
+    polishedNotes.sort((/** @type {SeedNote} */ a, /** @type {SeedNote} */ b) => a.step - b.step);
+
+    console.log(`[Seeder Debug] Finished generation. Total seed notes: ${polishedNotes.length}.`);
+    return { notes: polishedNotes, loopLengthSteps: actualTotalSteps };
 }
