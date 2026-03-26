@@ -159,6 +159,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
         const rhythmicDensity = config.rhythmicDensity || 0.5;
+        const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
+        const isForwardStatement = !isJazzStyle && (index === 0 || !isDeparture);
+        const statementDensity = isForwardStatement
+            ? Math.min(0.75, rhythmicDensity + 0.12)
+            : rhythmicDensity;
 
         /**
          * Helper to generate a 1-measure rhythmic cell
@@ -221,8 +226,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             } else {
                 // Standard Meter: Use Rhythm Dictionary
                 let pool = RH_CELLS.BASIC;
+                const forwardPool = [
+                    RH_CELLS.BASIC[0],
+                    RH_CELLS.BASIC[1],
+                    RH_CELLS.SYNC[1],
+                    RH_CELLS.SYNC[3],
+                ];
                 if (beatsPerCell === 3) {
                     pool = RH_CELLS.WALTZ;
+                } else if (isForwardStatement && density >= 0.55) {
+                    pool = prng() < 0.7 ? forwardPool : [...forwardPool, ...RH_CELLS.SYNC];
                 } else if (density > 0.7 || dense || prng() < 0.3) {
                     pool = [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
                 }
@@ -308,11 +321,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
 
             // 1. Generate the initial A cell
-            const cellA = generateCell(forceSparse, forceDense, rhythmicDensity);
+            const cellA = generateCell(forceSparse, forceDense, statementDensity);
 
             // Generate secondary cells for longer phrases
-            const cellB = generateCell(forceSparse, forceDense, rhythmicDensity);
-            const cellC = generateCell(forceSparse, forceDense, rhythmicDensity);
+            const cellB = generateCell(forceSparse, forceDense, statementDensity);
+            const cellC = generateCell(forceSparse, forceDense, statementDensity);
 
             // Determine motif structure based on phrase length
             const structureRoll = prng();
@@ -489,7 +502,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         lastActiveNote &&
                         lastActiveNote.beatOffset >= measure * tsConfig.beats + (tsConfig.beats - 1)
                     ) {
-                        const tieProb = ['bossa', 'jazz', 'bird'].includes(style) ? 0.5 : 0.25;
+                        const tieProb = isJazzStyle ? 0.5 : isForwardStatement ? 0.1 : 0.25;
                         if (prng() < tieProb) {
                             const tieLengthBeats = prng() > 0.5 ? 1 : 0.5;
                             lastActiveNote.duration += tieLengthBeats * stepsPerBeat;
@@ -614,17 +627,21 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         let registerBase = 60; // Middle C
         const intensityVal = _intensity || 0.5;
 
-        if (category === 'chorus') {
-            // Chorus boost: 0 or 12. For Jazz/Bossa Head, we stay grounded to keep it singable.
-            const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
-            const boost = isJazzStyle ? 0 : 12;
-            registerBase += intensityVal >= 0.5 ? boost : 0;
-        } else if (category === 'intro' || index === 0) {
-            // Force lower start for Intros or the very first section
-            registerBase = 48;
+        // Keep non-jazz heads in a singable middle register. Jazz-family heads stay
+        // more grounded, but still get a modest floor later in note scoring.
+        if (isJazzStyle) {
+            if (category === 'chorus') {
+                registerBase = 60;
+            } else if (category === 'intro' || index === 0) {
+                registerBase = 48;
+            } else {
+                registerBase = intensityVal > 0.7 ? 60 : 48;
+            }
+        } else if (category === 'chorus' || isDeparture) {
+            const boost = intensityVal >= 0.5 ? 12 : 0;
+            registerBase = 60 + boost;
         } else {
-            // Verse/Standard: slight climb based on intensity (still multiples of 12)
-            registerBase = intensityVal > 0.7 ? 60 : 48;
+            registerBase = intensityVal > 0.7 ? 72 : 60;
         }
 
         let lastMidi = registerBase;
@@ -837,6 +854,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         const isFreshNote = isPivotStep && !prevScalePitches.includes(testPC);
                         const pivotBonus = isFreshNote ? -3 : 0;
 
+                        const singableFloor = isJazzStyle ? 55 : 60;
+                        const floorPenalty =
+                            testMidi < singableFloor ? (singableFloor - testMidi) * 2.5 : 0;
                         // Singable Register Penalty: Penalize notes above MIDI 76 (E5)
                         // to avoid "neck creep" or shrillness in the Head.
                         const ceilingPenalty = testMidi > 76 ? (testMidi - 76) * 2.0 : 0;
@@ -847,6 +867,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             motifPenalty +
                             guideBonus +
                             pivotBonus +
+                            floorPenalty +
                             ceilingPenalty;
 
                         if (totalScore < minScore) {
@@ -1044,7 +1065,58 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         }
     }
 
-    // Sort the processed notes by step just in case our pushes messed up the order
+    // Reinforce sparse late-entry statement bars with a lead-in attack so
+    // non-jazz heads speak earlier in the measure instead of waiting until beat 4.
+    if (!['jazz', 'bird', 'bossa'].includes(style)) {
+        /** @type {SeedNote[]} */
+        const reinforcedNotes = [];
+        const sortedSeedNotes = [...processedNotes].sort((a, b) => a.step - b.step);
+
+        for (let i = 0; i < sortedSeedNotes.length; i++) {
+            const note = sortedSeedNotes[i];
+            const measureStart =
+                Math.floor(Math.max(0, note.step) / stepsPerMeasure) * stepsPerMeasure;
+            const measureEnd = measureStart + stepsPerMeasure;
+            const measureNotes = sortedSeedNotes.filter(
+                (candidate) => candidate.step >= measureStart && candidate.step < measureEnd,
+            );
+            const isLateSingleAttack =
+                note.step >= measureStart + stepsPerBeat * 2 &&
+                measureNotes.length === 1 &&
+                note.durationSteps >= stepsPerBeat;
+
+            if (isLateSingleAttack) {
+                const pickupStep = note.step - stepsPerBeat;
+                const pickupDuration = note.step - pickupStep;
+                const hasLeadInSpace =
+                    pickupStep >= measureStart &&
+                    pickupDuration >= stepsPerBeat / 2 &&
+                    !sortedSeedNotes.some(
+                        (candidate) =>
+                            candidate !== note &&
+                            candidate.step >= pickupStep &&
+                            candidate.step < note.step,
+                    );
+
+                if (hasLeadInSpace) {
+                    reinforcedNotes.push({
+                        ...note,
+                        step: pickupStep,
+                        durationSteps: pickupDuration,
+                        velocity: Math.min(note.velocity, 0.75),
+                        isAnchor: false,
+                    });
+                }
+            }
+
+            reinforcedNotes.push(note);
+        }
+
+        processedNotes.length = 0;
+        processedNotes.push(...reinforcedNotes);
+    }
+
+    // Sort the processed notes by step just in case our pushes or reinforcements messed up the order
     processedNotes.sort((a, b) => a.step - b.step);
 
     console.log(`[Seeder Debug] Finished generation. Total seed notes: ${processedNotes.length}.`);
