@@ -17,6 +17,12 @@ const { mockState } = vi.hoisted(() => ({
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
@@ -62,6 +68,12 @@ describe('Soloist Smart Genre Statistics', () => {
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         };
         mockState.groove.genreFeel = genreName;
         mockState.playback.bandIntensity = intensity;
@@ -185,6 +197,12 @@ describe('Soloist Smart Genre Statistics', () => {
                 deviceBuffer: [],
                 motifBuffer: [],
                 sessionSteps: 0,
+                phraseContext: {
+                    role: 'call',
+                    skeleton: [],
+                    lastInterval: null,
+                    profile: 'srv',
+                },
             };
 
             let headNotes = 0;
@@ -246,6 +264,12 @@ describe('Soloist Smart Genre Statistics', () => {
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         };
 
         const phraseLengths = [];
@@ -326,6 +350,12 @@ describe('Soloist Smart Genre Statistics', () => {
                 deviceBuffer: [],
                 motifBuffer: [],
                 sessionSteps: 0,
+                phraseContext: {
+                    role: 'call',
+                    skeleton: [],
+                    lastInterval: null,
+                    profile: 'srv',
+                },
                 evolutionEnabled: false, // Disable replaying motifs for this test
             };
 
@@ -441,6 +471,12 @@ describe('Soloist Smart Genre Statistics', () => {
                 deviceBuffer: [],
                 motifBuffer: [],
                 sessionSteps: 0,
+                phraseContext: {
+                    role: 'call',
+                    skeleton: [],
+                    lastInterval: null,
+                    profile: 'srv',
+                },
             };
 
             let count = 0;

@@ -16,6 +16,12 @@ const { mockState } = vi.hoisted(() => ({
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
@@ -71,6 +77,12 @@ describe('Soloist Density Analysis', () => {
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         };
         mockState.playback.bandIntensity = intensity;
 

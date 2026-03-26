@@ -169,6 +169,18 @@ describe('Security: Hydration & Storage Resilience', () => {
             expect(state.groove.humanize).toBe(0);
         });
 
+        it('should treat retired classic soloist preset values as unsupported', () => {
+            const payload = {
+                sections: [{ id: '1', label: 'A', value: 'I' }],
+                soloist: { preset: 'classic' },
+            };
+            localStorage.setItem('ensemble_currentState', JSON.stringify(payload));
+
+            hydrateState();
+
+            expect(stateModule.getState().soloist.preset).toBe('trumpet');
+        });
+
         it('should clamp numeric fields even if strings are provided', () => {
             const payload = {
                 sections: [{ id: '1', label: 'A', value: 'I' }],

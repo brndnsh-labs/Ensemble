@@ -400,6 +400,7 @@ export function generateMelodicDevice(deviceType, ctx) {
             const notes = Array.isArray(n) ? n : [n];
             const shifted = notes.map((note) => ({
                 ...note,
+                device: note.device || deviceType,
                 midi: Math.max(minMidi, Math.min(maxMidi, note.midi + octaveShift)),
             }));
             return shifted.length === 1 ? shifted[0] : shifted;

@@ -16,6 +16,12 @@ vi.mock('../../../public/state.js', () => {
             pitchHistory: [],
             motifBuffer: [],
             deviceBuffer: [],
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         groove: { genreFeel: 'Rock' },
         arranger: { timeSignature: '4/4', totalSteps: 64 },

@@ -1,3 +1,5 @@
+import { SMART_GENRES } from '../data/smart-genres.js';
+
 const DEFAULT_STYLE_CONFIG = {
     genreGravityOffset: 0,
     restBase: 0.1,
@@ -1040,23 +1042,6 @@ export const STYLE_CONFIG = /** @type {any} */ (
     }, {})
 );
 
-export const STYLE_EMPHASIS = {
-    jazz: [0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9, 0.8, 0.4, 0.7, 0.9],
-    scalar: [1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3, 1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3],
-    bird: [0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0, 0.7, 0.5, 0.8, 1.0],
-    shred: [1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9, 1.0, 0.9],
-    funk: [1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4, 1.0, 0.4, 0.7, 0.4, 0.9, 0.4, 0.7, 0.4],
-    blues: [1.0, 0.2, 0.6, 0.9, 0.8, 0.2, 0.6, 0.9, 1.0, 0.2, 0.6, 0.9, 0.8, 0.2, 0.6, 0.9],
-    neo: [1.0, 0.1, 0.3, 0.8, 0.8, 0.1, 0.3, 0.8, 1.0, 0.1, 0.3, 0.8, 0.8, 0.1, 0.3, 0.8],
-    minimal: [1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0],
-    disco: [1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2, 1.0, 0.2, 0.9, 0.2],
-    bossa: [1.0, 0.1, 0.5, 0.1, 0.8, 0.1, 0.5, 0.1, 1.0, 0.1, 0.5, 0.1, 0.8, 0.1, 0.5, 0.1],
-    country: [1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2, 1.0, 0.2, 0.5, 0.2, 0.8, 0.2, 0.5, 0.2],
-    metal: [1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8, 1.0, 0.8],
-    ska: [0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1, 0.3, 0.1, 1.0, 0.1],
-    rock: [1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3, 1.0, 0.3, 0.5, 0.3, 0.8, 0.3, 0.5, 0.3],
-};
-
 export const GENRE_STYLE_MAPPING = {
     Rock: 'rock',
     Jazz: 'jazz',
@@ -1085,9 +1070,11 @@ export const GENRE_STYLE_MAPPING = {
 export const INFLUENCE_POOLS = {
     rock: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
     jazz: ['bird', 'evans', 'coltrane', 'miles'],
+    bird: ['bird', 'evans', 'coltrane', 'miles'],
     blues: ['srv', 'monk', 'armstrong', 'miles'],
     neo: ['miles', 'srv'], // Cross-genre influences
     funk: ['srv', 'slash'],
+    shred: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
 };
 
 /**
@@ -1122,3 +1109,306 @@ export const SOLOIST_INTENTS = {
         stationaryScale: 0.1, // Minimal repetition, favor motion
     },
 };
+
+const DEFAULT_REGISTER_PROFILE = {
+    seedFloor: 60,
+    seedCenter: 66,
+    seedCeiling: 84,
+    seedIntroDrop: 4,
+    seedChorusLift: 4,
+    seedDepartureLift: 3,
+    liveFloor: 60,
+    liveCenter: 68,
+    liveCeiling: 92,
+    liveLoopLift: 2,
+};
+
+export const SOLOIST_REGISTER_PROFILES = {
+    scalar: {},
+    acoustic: {
+        seedFloor: 60,
+        seedCenter: 64,
+        seedCeiling: 82,
+        liveFloor: 60,
+        liveCenter: 66,
+        liveCeiling: 88,
+    },
+    blues: {
+        seedFloor: 58,
+        seedCenter: 64,
+        seedCeiling: 84,
+        seedIntroDrop: 3,
+        seedChorusLift: 4,
+        seedDepartureLift: 4,
+        liveFloor: 58,
+        liveCenter: 67,
+        liveCeiling: 89,
+        liveLoopLift: 2,
+    },
+    bird: {
+        seedFloor: 60,
+        seedCenter: 66,
+        seedCeiling: 86,
+        seedIntroDrop: 1,
+        seedChorusLift: 4,
+        seedDepartureLift: 5,
+        liveFloor: 60,
+        liveCenter: 70,
+        liveCeiling: 92,
+        liveLoopLift: 3,
+    },
+    bossa: {
+        seedFloor: 58,
+        seedCenter: 62,
+        seedCeiling: 82,
+        seedIntroDrop: 2,
+        seedChorusLift: 2,
+        seedDepartureLift: 3,
+        liveFloor: 58,
+        liveCenter: 65,
+        liveCeiling: 88,
+        liveLoopLift: 2,
+    },
+    country: {
+        seedFloor: 60,
+        seedCenter: 65,
+        seedCeiling: 84,
+        seedIntroDrop: 3,
+        seedChorusLift: 4,
+        seedDepartureLift: 3,
+        liveFloor: 60,
+        liveCenter: 67,
+        liveCeiling: 89,
+        liveLoopLift: 2,
+    },
+    disco: {
+        seedFloor: 60,
+        seedCenter: 66,
+        seedCeiling: 86,
+        seedIntroDrop: 2,
+        seedChorusLift: 4,
+        seedDepartureLift: 4,
+        liveFloor: 60,
+        liveCenter: 69,
+        liveCeiling: 90,
+        liveLoopLift: 2,
+    },
+    funk: {
+        seedFloor: 60,
+        seedCenter: 64,
+        seedCeiling: 86,
+        seedIntroDrop: 2,
+        seedChorusLift: 4,
+        seedDepartureLift: 4,
+        liveFloor: 60,
+        liveCenter: 68,
+        liveCeiling: 90,
+        liveLoopLift: 2,
+    },
+    jazz: {
+        seedFloor: 58,
+        seedCenter: 63,
+        seedCeiling: 82,
+        seedIntroDrop: 2,
+        seedChorusLift: 3,
+        seedDepartureLift: 4,
+        liveFloor: 58,
+        liveCenter: 66,
+        liveCeiling: 90,
+        liveLoopLift: 2,
+    },
+    metal: {
+        seedFloor: 60,
+        seedCenter: 66,
+        seedCeiling: 88,
+        seedIntroDrop: 2,
+        seedChorusLift: 5,
+        seedDepartureLift: 5,
+        liveFloor: 60,
+        liveCenter: 70,
+        liveCeiling: 92,
+        liveLoopLift: 3,
+    },
+    minimal: {
+        seedFloor: 60,
+        seedCenter: 64,
+        seedCeiling: 80,
+        seedIntroDrop: 2,
+        seedChorusLift: 2,
+        seedDepartureLift: 2,
+        liveFloor: 60,
+        liveCenter: 65,
+        liveCeiling: 84,
+        liveLoopLift: 1,
+    },
+    neo: {
+        seedFloor: 60,
+        seedCenter: 65,
+        seedCeiling: 84,
+        seedIntroDrop: 2,
+        seedChorusLift: 3,
+        seedDepartureLift: 4,
+        liveFloor: 60,
+        liveCenter: 68,
+        liveCeiling: 90,
+        liveLoopLift: 2,
+    },
+    reggae: {
+        seedFloor: 60,
+        seedCenter: 64,
+        seedCeiling: 82,
+        seedIntroDrop: 3,
+        seedChorusLift: 3,
+        seedDepartureLift: 3,
+        liveFloor: 60,
+        liveCenter: 66,
+        liveCeiling: 88,
+        liveLoopLift: 2,
+    },
+    rock: {
+        seedFloor: 60,
+        seedCenter: 66,
+        seedCeiling: 84,
+        seedIntroDrop: 2,
+        seedChorusLift: 5,
+        seedDepartureLift: 4,
+        liveFloor: 60,
+        liveCenter: 68,
+        liveCeiling: 90,
+        liveLoopLift: 2,
+    },
+    shred: {
+        seedFloor: 62,
+        seedCenter: 69,
+        seedCeiling: 90,
+        seedIntroDrop: 1,
+        seedChorusLift: 5,
+        seedDepartureLift: 6,
+        liveFloor: 62,
+        liveCenter: 73,
+        liveCeiling: 94,
+        liveLoopLift: 3,
+    },
+    ska: {
+        seedFloor: 60,
+        seedCenter: 66,
+        seedCeiling: 86,
+        seedIntroDrop: 1,
+        seedChorusLift: 4,
+        seedDepartureLift: 4,
+        liveFloor: 60,
+        liveCenter: 69,
+        liveCeiling: 90,
+        liveLoopLift: 2,
+    },
+};
+
+/** @type {Record<string, keyof typeof SOLOIST_REGISTER_PROFILES>} */
+const REGISTER_PROFILE_ALIASES = {
+    armstrong: 'jazz',
+    beck: 'rock',
+    coltrane: 'bird',
+    evans: 'jazz',
+    evh: 'shred',
+    gilmour: 'rock',
+    hendrix: 'rock',
+    miles: 'jazz',
+    monk: 'jazz',
+    slash: 'rock',
+    srv: 'blues',
+};
+
+/** @type {Record<string, string>} */
+const SOLOIST_STYLE_ALIASES = {
+    ...REGISTER_PROFILE_ALIASES,
+    'ska-horns': 'ska',
+};
+
+/**
+ * @param {string | undefined} genreFeel
+ * @returns {string | null}
+ */
+function getSmartGenreSoloistStyle(genreFeel) {
+    if (!genreFeel || !Object.hasOwn(SMART_GENRES, genreFeel)) {
+        return null;
+    }
+
+    const config = Reflect.get(SMART_GENRES, genreFeel);
+    if (
+        !config ||
+        typeof config !== 'object' ||
+        !('soloist' in config) ||
+        typeof config.soloist !== 'string'
+    ) {
+        return null;
+    }
+
+    return config.soloist;
+}
+
+/**
+ * @param {string | undefined} genreFeel
+ * @returns {string}
+ */
+function getGenreMappedSoloistStyle(genreFeel) {
+    if (!genreFeel || !Object.hasOwn(GENRE_STYLE_MAPPING, genreFeel)) {
+        return 'scalar';
+    }
+
+    return GENRE_STYLE_MAPPING[/** @type {keyof typeof GENRE_STYLE_MAPPING} */ (genreFeel)];
+}
+
+/**
+ * Resolve the effective soloist style for smart-mode playback.
+ * The active Studio genre feel should be the source of truth for smart instruments,
+ * while a few legacy UI-only style ids still need lightweight aliasing.
+ * @param {string | undefined} style
+ * @param {string | undefined} genreFeel
+ * @returns {string}
+ */
+export function resolveSoloistStyle(style, genreFeel) {
+    if (style === 'lead_sheet') {
+        return 'lead_sheet';
+    }
+
+    if (!style || style === 'smart') {
+        const smartStyle = getSmartGenreSoloistStyle(genreFeel);
+        if (smartStyle && smartStyle !== 'smart') {
+            return resolveSoloistStyle(smartStyle, genreFeel);
+        }
+        return getGenreMappedSoloistStyle(genreFeel);
+    }
+
+    if (Object.hasOwn(STYLE_CONFIG, style)) {
+        return style;
+    }
+
+    if (Object.hasOwn(SOLOIST_STYLE_ALIASES, style)) {
+        return SOLOIST_STYLE_ALIASES[style];
+    }
+
+    return getGenreMappedSoloistStyle(genreFeel);
+}
+
+/**
+ * Resolve a register profile for the active soloist style.
+ * Seeded heads stay within a genre-appropriate singable lane, while live loops
+ * can climb a little more with intensity and later choruses.
+ * @param {string} style
+ * @param {string | undefined} [genreFeel]
+ */
+export function getSoloistRegisterProfile(style, genreFeel) {
+    const effectiveStyle = resolveSoloistStyle(style, genreFeel);
+    /** @type {keyof typeof SOLOIST_REGISTER_PROFILES} */
+    let resolvedStyle = 'scalar';
+    if (Object.hasOwn(SOLOIST_REGISTER_PROFILES, effectiveStyle)) {
+        resolvedStyle = /** @type {keyof typeof SOLOIST_REGISTER_PROFILES} */ (effectiveStyle);
+    } else if (Object.hasOwn(REGISTER_PROFILE_ALIASES, effectiveStyle)) {
+        resolvedStyle = REGISTER_PROFILE_ALIASES[effectiveStyle];
+    }
+
+    return {
+        ...DEFAULT_REGISTER_PROFILE,
+        ...SOLOIST_REGISTER_PROFILES[resolvedStyle],
+    };
+}

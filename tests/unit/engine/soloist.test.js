@@ -175,6 +175,17 @@ describe('Soloist Engine', () => {
             randomMock.mockRestore();
         });
 
+        it('should resolve smart soloist playback through the selected genre feel', () => {
+            mockState.groove.genreFeel = 'Jazz';
+            const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
+            getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'smart', 0, {});
+
+            expect(pitchEngine.selectPitchAndDevices).toHaveBeenCalled();
+            const callArgs = pitchEngine.selectPitchAndDevices.mock.calls[0];
+            expect(callArgs[5]).toBe('bird');
+            randomMock.mockRestore();
+        });
+
         it('should rest if no seed note exists at current step in Loop 0', () => {
             const result = getSoloistNote(mockState, chordC, null, 1, 261.63, 72, 'scalar', 1, {});
             expect(result).toBeNull();
@@ -200,6 +211,23 @@ describe('Soloist Engine', () => {
         it('should keep loop 1 tied to the theme even when anchor-scale randomness would fail', () => {
             mockState.playback.currentLoopCount = 1;
             mockState.playback.bandIntensity = 0.5;
+            mockState.soloist.isResting = false;
+
+            const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+            getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
+
+            expect(pitchEngine.selectPitchAndDevices).toHaveBeenCalled();
+            const callArgs = pitchEngine.selectPitchAndDevices.mock.calls[0];
+            const pseudoRhythmNode = callArgs[2];
+
+            expect(pseudoRhythmNode.isHeadBypass).toBe(true);
+            expect(pseudoRhythmNode.targetMidi).toBe(72);
+            randomMock.mockRestore();
+        });
+
+        it('should keep seeded anchor moments theme-aware on later loops', () => {
+            mockState.playback.currentLoopCount = 3;
+            mockState.playback.bandIntensity = 0.85;
             mockState.soloist.isResting = false;
 
             const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0.99);

@@ -1,8 +1,8 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import {
-    GENRE_STYLE_MAPPING,
     INFLUENCE_POOLS,
+    resolveSoloistStyle,
     SOLOIST_INTENTS,
     STYLE_CONFIG,
 } from './soloist-config.js';
@@ -63,24 +63,9 @@ export function getSoloistNote(
         return null;
     }
 
-    let activeStyle = style;
-    if (activeStyle === 'smart') {
-        /** @type {any} */
-        const mapping = GENRE_STYLE_MAPPING;
-        activeStyle = mapping[groove.genreFeel] || 'scalar';
-    }
+    const activeStyle = resolveSoloistStyle(style, groove.genreFeel);
 
     let intensity = playback.bandIntensity || 0.5;
-
-    // --- Safety: Initialize phraseContext if missing (for tests/legacy) ---
-    if (!soloist.phraseContext) {
-        soloist.phraseContext = /* @direct-mutation */ {
-            role: 'call',
-            skeleton: [],
-            lastInterval: null,
-            profile: 'srv',
-        };
-    }
 
     // --- Greats Profiles: Intensity/Density Overrides ---
     if (activeStyle === 'blues' && soloist.phraseContext?.profile === 'miles') {
@@ -130,21 +115,29 @@ export function getSoloistNote(
 
     const hasSessionSeed = Boolean(soloist.sessionSeed && soloist.sessionSeed.notes.length > 0);
     const headSessionSeed = hasSessionSeed ? soloist.sessionSeed : null;
-    const isHeadMode =
-        loopCount === 0 &&
-        headSessionSeed &&
-        step % headSessionSeed.loopLengthSteps < headSessionSeed.loopLengthSteps - 1;
+    const headNotes = headSessionSeed
+        ? headSessionSeed.notes.filter((/** @type {any} */ n) => {
+              if (step < 0 && n.step === step) {
+                  return true;
+              }
+              const wrappedNoteStep =
+                  ((n.step % headSessionSeed.loopLengthSteps) + headSessionSeed.loopLengthSteps) %
+                  headSessionSeed.loopLengthSteps;
+              const stepInLoop =
+                  ((step % headSessionSeed.loopLengthSteps) + headSessionSeed.loopLengthSteps) %
+                  headSessionSeed.loopLengthSteps;
+              return wrappedNoteStep === stepInLoop;
+          })
+        : [];
 
     // We only force strict head playback on loop 0, AND if there is actually a seed to play.
     const isStrictHeadPlayback = loopCount === 0 && hasSessionSeed;
     const isFirstRestatementLoop = loopCount === 1 && hasSessionSeed;
 
-    // Themed Improvisation: If loop > 0, we can still use the head as a base but with more variation.
-    // As intensity rises, the "Thematic Anchor" dissolves into more generative playing.
-    const isThemedImprov =
-        hasSessionSeed &&
-        (isFirstRestatementLoop ||
-            (loopCount > 1 && Math.random() < intentBehavior.thematicAnchorScale));
+    // Later loops should always acknowledge seed-note moments, but the spaces between those moments
+    // belong to the generative engine. This keeps anchors intelligible without making every future
+    // chorus a rigid replay.
+    const isThemedImprov = hasSessionSeed && (isFirstRestatementLoop || headNotes.length > 0);
 
     const isHeadPerformanceMode = isStrictHeadPlayback || isThemedImprov;
 
@@ -281,22 +274,8 @@ export function getSoloistNote(
         // the solo away to comping instruments due to assumed inactivity.
         soloist.isResting = false; // @worker-mutation
         soloist.phrasingState = 'active'; // @worker-mutation
-
         const sessionSeed = headSessionSeed;
-        const stepInLoop =
-            ((step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
-            sessionSeed.loopLengthSteps;
-        const headNotes = sessionSeed.notes.filter((/** @type {any} */ n) => {
-            // If we are in the count-in (step < 0), check for the explicit negative step
-            if (step < 0 && n.step === step) {
-                return true;
-            }
-            // Otherwise, wrap the stored note's step to find its position in the loop
-            const wrappedNoteStep =
-                ((n.step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
-                sessionSeed.loopLengthSteps;
-            return wrappedNoteStep === stepInLoop;
-        });
+        let shouldFallThrough = false;
 
         if (headNotes.length > 0) {
             const headNote = headNotes[0];
@@ -337,10 +316,13 @@ export function getSoloistNote(
                     // Loop 1: Preserve the head as a paraphrase, especially at cadence tones.
                     survivalProb = isProtectedSeedTone
                         ? 1.0
-                        : Math.min(0.95, 0.72 + intentBehavior.thematicAnchorScale * 0.2);
+                        : Math.min(0.98, 0.82 + intentBehavior.thematicAnchorScale * 0.12);
                 } else {
-                    // Later loops: the head remains a guide, but can dissolve into freer playing.
-                    survivalProb = 0.45 + effectiveIntensity * 0.35;
+                    // Later loops: keep structural notes audible, but let non-anchors become
+                    // springboards for more generative motion instead of simply disappearing.
+                    survivalProb = isProtectedSeedTone
+                        ? Math.min(0.96, 0.84 + intentBehavior.thematicAnchorScale * 0.12)
+                        : 0.55 + effectiveIntensity * 0.28;
                 }
             }
 
@@ -372,10 +354,12 @@ export function getSoloistNote(
                     // Keep the first paraphrase close to the tune: only light offbeat nudges.
                     const jitterRange = isFirstRestatementLoop
                         ? 1
-                        : effectiveIntensity > 0.6
-                          ? 2
-                          : 1;
-                    const jitterProb = isFirstRestatementLoop ? 0.1 : 0.2;
+                        : effectiveIntensity > 0.75
+                          ? 3
+                          : effectiveIntensity > 0.5
+                            ? 2
+                            : 1;
+                    const jitterProb = isFirstRestatementLoop ? 0.16 : 0.32;
                     if (Math.random() < jitterProb) {
                         targetMidi +=
                             Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
@@ -417,13 +401,15 @@ export function getSoloistNote(
                 logDebug(
                     `[Head/Themed Performance] Gated/Skipped seeded note for phrasing. (Prob: ${survivalProb.toFixed(2)})`,
                 );
-                // Signal to coordination so band can fill
-                if (coordination) {
+                const canSubstituteGeneratively =
+                    loopCount > 1 && !headNote.isAnchor && !isProtectedSeedTone;
+                if (canSubstituteGeneratively) {
+                    shouldFallThrough = true;
+                } else if (coordination) {
                     coordination.soloistYield = true;
                 }
             }
         }
-
         if ((soloist.busySteps || 0) > 0) {
             soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
             return null;
@@ -432,8 +418,10 @@ export function getSoloistNote(
         // --- Gap-Fill Improvisation ---
         // If we are in themed improv, have no seeded note here, and aren't busy,
         // see if the gap to the next note is large enough to warrant a generative fill.
-        let shouldFallThrough = false;
         if (isThemedImprov && headNotes.length === 0 && (soloist.activeSteps || 0) <= 0) {
+            const stepInLoop =
+                ((step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
+                sessionSeed.loopLengthSteps;
             let minGap = sessionSeed.loopLengthSteps;
             let nextSeedNote = null;
             for (let i = 0; i < sessionSeed.notes.length; i++) {
@@ -452,11 +440,11 @@ export function getSoloistNote(
             }
 
             const fillGapThreshold = isFirstRestatementLoop
-                ? Math.max(stepsPerBeat * 3, Math.floor(stepsPerMeasure * 0.75))
+                ? Math.max(stepsPerBeat * 2, Math.floor(stepsPerMeasure * 0.5))
                 : stepsPerBeat;
             const gapFillProb = isFirstRestatementLoop
-                ? effectiveIntensity * 0.35
-                : effectiveIntensity * 0.7;
+                ? Math.min(0.85, 0.25 + effectiveIntensity * 0.45)
+                : Math.min(0.9, 0.4 + effectiveIntensity * 0.4);
             const isCadenceGap = measureStep >= stepsPerMeasure - stepsPerBeat;
             const leavesRunwayIntoAnchor = nextSeedNote?.isAnchor && minGap <= stepsPerBeat * 2;
 
@@ -567,7 +555,7 @@ export function getSoloistNote(
             }
         }
 
-        if ((soloist.restSteps || 0) <= 0 || coordination.bypassRhythm || isHeadMode) {
+        if ((soloist.restSteps || 0) <= 0 || coordination.bypassRhythm || isStrictHeadPlayback) {
             const isGoodEntry =
                 isBeatStart ||
                 (measureStep % (stepsPerBeat / 2) === 0 &&
@@ -580,7 +568,7 @@ export function getSoloistNote(
             if (
                 !preventBreakout &&
                 (isGoodEntry ||
-                    isHeadMode ||
+                    isStrictHeadPlayback ||
                     coordination.bypassRhythm ||
                     (soloist.restSteps || 0) < -stepsPerMeasure)
             ) {
@@ -593,13 +581,13 @@ export function getSoloistNote(
                     baseLength * stepsPerBeat * (0.3 + Math.random() * 1.2),
                 );
 
-                if (isHeadMode && soloist.sessionSeed) {
+                if (isStrictHeadPlayback && soloist.sessionSeed) {
                     _nextActiveSteps = soloist.sessionSeed.loopLengthSteps;
                 }
 
                 soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
                 logDebug(
-                    `Waking up for ~${soloist.activeSteps} steps${isHeadMode ? ' (Head Mode)' : ''}. Generating new rhythm plan.`,
+                    `Waking up for ~${soloist.activeSteps} steps${isStrictHeadPlayback ? ' (Head Mode)' : ''}. Generating new rhythm plan.`,
                 );
 
                 // --- Call & Response Framework ---
@@ -660,7 +648,7 @@ export function getSoloistNote(
             (soloist.activeSteps || 0) <= 0 &&
             isStrongResolution &&
             !coordination.bypassRhythm &&
-            !isHeadMode
+            !isStrictHeadPlayback
         ) {
             soloist.isResting = true; // @worker-mutation
             soloist.phrasingState = 'rest'; // @worker-mutation
@@ -675,8 +663,9 @@ export function getSoloistNote(
             );
             soloist.restSteps = nextRestSteps; // @worker-mutation
 
-            if (soloist.restSteps < 4) {
-                soloist.restSteps = 4; // @worker-mutation
+            const minimumRestSteps = activeStyle === 'bird' ? 2 : activeStyle === 'jazz' ? 3 : 4;
+            if (soloist.restSteps < minimumRestSteps) {
+                soloist.restSteps = minimumRestSteps; // @worker-mutation
             }
             logDebug(
                 `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.restSteps} steps. (Fatigue: ${fatigueMultiplier.toFixed(2)})`,

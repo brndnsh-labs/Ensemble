@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { KEY_ORDER } from '../../public/config.js';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { dispatch, getState } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 import {
     bootstrapSoloistAudit,
     buildHookAuditArrangement,
@@ -27,6 +32,38 @@ function createHookSeedState(arrangement) {
 
 function getLoopWindowNotes(seed, arrangement) {
     return seed.notes.filter((note) => note.step >= 0 && note.step < arrangement.totalSteps);
+}
+
+function getKeyAtOffset(startKey, semitones) {
+    const startIdx = KEY_ORDER.indexOf(startKey);
+    return KEY_ORDER[(startIdx + semitones + 12) % 12];
+}
+
+function createPresetSeedState(name, baseKey, genreFeel = 'Jazz', intensity = 0.62) {
+    dispatch(ACTIONS.RESET_STATE);
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, '4/4');
+    dispatch(ACTIONS.SET_KEY, baseKey);
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel });
+    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart' });
+    dispatch(ACTIONS.SET_BAND_INTENSITY, intensity);
+
+    const state = getState();
+    const preset = CHORD_PRESETS.find((candidate) => candidate.name === name);
+    expect(preset).toBeDefined();
+
+    state.arranger.key = baseKey;
+    state.arranger.isMinor = false;
+    state.arranger.sections = preset.sections.map((section, index) => ({
+        ...section,
+        id: `${name}-${index}`,
+        key:
+            section.key ||
+            (typeof section.keyShift === 'number'
+                ? getKeyAtOffset(baseKey, section.keyShift)
+                : undefined),
+    }));
+    validateProgression(state);
+    return state;
 }
 
 describe('Soloist Seeder Hook Shape', () => {
@@ -77,5 +114,77 @@ describe('Soloist Seeder Hook Shape', () => {
         for (const row of loop1Measures) {
             expect(row.cadenceFlavor).not.toBe('tension');
         }
+    });
+
+    it('keeps jazz hook heads out of a murky low register', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const state = createHookSeedState(arrangement);
+        const seed = generateSessionSeed(state, state.arranger, 'jazz', 0.62, 'DEEP_DIVE');
+        const loopWindowNotes = getLoopWindowNotes(seed, arrangement);
+        const averageMidi =
+            loopWindowNotes.reduce((sum, note) => sum + note.midi, 0) / loopWindowNotes.length;
+        const belowA3Ratio =
+            loopWindowNotes.filter((note) => note.midi < 57).length / loopWindowNotes.length;
+
+        expect(averageMidi).toBeGreaterThanOrEqual(59);
+        expect(belowA3Ratio).toBeLessThan(0.25);
+    });
+
+    it('resolves smart jazz heads through the active genre feel', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const state = createHookSeedState(arrangement);
+        state.groove.genreFeel = 'Jazz';
+
+        const smartSeed = generateSessionSeed(state, state.arranger, 'smart', 0.62, 'SMART_JAZZ');
+        const birdSeed = generateSessionSeed(state, state.arranger, 'bird', 0.62, 'SMART_JAZZ');
+
+        expect(smartSeed).toEqual(birdSeed);
+    });
+
+    it('keeps Autumn Leaves smart jazz heads in a clear Bb register with some skip vocabulary', () => {
+        const state = createPresetSeedState('Autumn Leaves', 'Bb');
+        const seed = generateSessionSeed(state, state.arranger, 'smart', 0.62, 'AUTUMN_SNAPSHOT');
+        const loopWindowNotes = seed.notes.filter(
+            (note) => note.step >= 0 && note.step < state.arranger.totalSteps,
+        );
+        const averageMidi =
+            loopWindowNotes.reduce((sum, note) => sum + note.midi, 0) / loopWindowNotes.length;
+        const belowG3Ratio =
+            loopWindowNotes.filter((note) => note.midi < 55).length / loopWindowNotes.length;
+        let skipMoves = 0;
+        for (let i = 1; i < loopWindowNotes.length; i++) {
+            const diff = Math.abs(loopWindowNotes[i].midi - loopWindowNotes[i - 1].midi);
+            if (diff >= 3 && diff <= 7) {
+                skipMoves++;
+            }
+        }
+
+        expect(averageMidi).toBeGreaterThanOrEqual(67);
+        expect(belowG3Ratio).toBeLessThan(0.1);
+        expect(skipMoves).toBeGreaterThanOrEqual(10);
+    });
+
+    it('keeps smart jazz live loops line-driven instead of device spray', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const { state } = bootstrapSoloistAudit({
+            arrangement,
+            genre: 'Jazz',
+            bpm: 140,
+            intensity: 0.62,
+            timeSignature: arrangement.timeSignature,
+            style: 'smart',
+            key: 'Bb',
+            seed: 'HOOK_SNAPSHOT',
+        });
+        const capture = simulateSoloistLoops({ state, arrangement, loops: 4, style: 'smart' });
+        const liveNotes = capture.events
+            .filter((event) => event.loop >= 1 && event.loop <= 3 && event.loopStep >= 0)
+            .map((event) => event.note);
+        const deviceRatio = liveNotes.filter((note) => note.device).length / liveNotes.length;
+        const lineDurationRatio =
+            liveNotes.filter((note) => (note.durationSteps || 1) >= 2).length / liveNotes.length;
+
+        expect(deviceRatio).toBeLessThan(0.6);
+        expect(lineDurationRatio).toBeGreaterThanOrEqual(0.34);
     });
 });

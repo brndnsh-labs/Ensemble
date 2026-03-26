@@ -45,6 +45,12 @@ describe('Soloist Jazz Critique', () => {
             deviceBuffer: [],
             lastFreq: 0,
             currentCell: null,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         };
 
         getState.mockReturnValue({

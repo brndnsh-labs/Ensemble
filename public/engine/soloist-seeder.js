@@ -1,7 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
-import { STYLE_CONFIG } from './soloist-config.js';
+import { getSoloistRegisterProfile, resolveSoloistStyle, STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -24,6 +24,12 @@ const RH_CELLS = {
         [0, 0.5, 1.25, 1.5, 2, 2.5, 3.25, 3.5], // 16th pushes
         [0.5, 1, 1.5, 2, 2.5, 3, 3.5], // Off-beat start
         [0, 1, 2, 2.75, 3, 3.75], // Gallop finish
+    ],
+    LINE: [
+        [0, 0.5, 1, 2, 2.5, 3], // Quarter anchors with 8th-note continuation
+        [0, 0.5, 1.5, 2, 2.5, 3.5], // 8th-note line with a small breath
+        [0.5, 1, 1.5, 2.5, 3, 3.5], // Pickup-leaning line
+        [0, 1, 1.5, 2, 2.5, 3, 3.5], // Hooky quarter + 8th tail
     ],
     // 3/4 Cells
     WALTZ: [
@@ -238,10 +244,6 @@ function polishCadenceLandings(
     stepsPerMeasure,
     style,
 ) {
-    if (style === 'jazz' || style === 'bird' || style === 'bossa') {
-        return notes;
-    }
-
     const polishedNotes = [...notes].sort((a, b) => a.step - b.step);
 
     for (let measureStart = 0; measureStart < actualTotalSteps; measureStart += stepsPerMeasure) {
@@ -311,6 +313,8 @@ function polishCadenceLandings(
  * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
  */
 export function generateSessionSeed(state, arranger, style, _intensity, seedStr) {
+    style = resolveSoloistStyle(style, state?.groove?.genreFeel);
+
     // Unroll the arrangement for virtual macro-form (max 128 bars for performance)
     const unrolled = unrollArrangement(arranger, 128);
     const { stepMap, sectionMap, totalSteps } = unrolled;
@@ -376,6 +380,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         sectionIterationCount.set(category, iteration + 1);
 
         const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+        const registerProfile = getSoloistRegisterProfile(style);
         const rhythmicDensity = config.rhythmicDensity || 0.5;
         const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
         const isForwardStatement = !isJazzStyle && (index === 0 || !isDeparture);
@@ -450,8 +455,34 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     RH_CELLS.SYNC[1],
                     RH_CELLS.SYNC[3],
                 ];
+                const linePool = [
+                    RH_CELLS.BASIC[1],
+                    RH_CELLS.SYNC[1],
+                    RH_CELLS.SYNC[2],
+                    ...RH_CELLS.LINE,
+                ];
+                const hookPool = [
+                    RH_CELLS.BASIC[2],
+                    RH_CELLS.BASIC[3],
+                    RH_CELLS.SYNC[3],
+                    RH_CELLS.LINE[3],
+                ];
                 if (beatsPerCell === 3) {
                     pool = RH_CELLS.WALTZ;
+                } else if (isJazzStyle) {
+                    if (dense || density > 0.72) {
+                        pool = [...linePool, ...hookPool, ...RH_CELLS.SYNC];
+                    } else if (density >= 0.55) {
+                        pool =
+                            prng() < 0.75
+                                ? [...linePool, ...hookPool]
+                                : [...linePool, ...RH_CELLS.BASIC];
+                    } else {
+                        pool =
+                            prng() < 0.7
+                                ? [...linePool, RH_CELLS.BASIC[0], RH_CELLS.BASIC[3]]
+                                : [...RH_CELLS.BASIC, ...RH_CELLS.LINE];
+                    }
                 } else if (isForwardStatement && density >= 0.55) {
                     pool = prng() < 0.7 ? forwardPool : [...forwardPool, ...RH_CELLS.SYNC];
                 } else if (density > 0.7 || dense || prng() < 0.3) {
@@ -460,6 +491,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                 const selectedPattern = pool[Math.floor(prng() * pool.length)];
                 const restProb = 1.0 - density;
+                const restScale = isJazzStyle ? 0.08 : 0.15;
 
                 selectedPattern.forEach((beatOffset, idx) => {
                     // Sparse mode drops non-anchors
@@ -468,7 +500,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     }
 
                     // General rest probability (significantly reduced since dictionary cells are already musical)
-                    if (!dense && prng() < restProb * 0.15) {
+                    if (!dense && prng() < restProb * restScale) {
                         return;
                     }
 
@@ -476,7 +508,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     let dur = (nextOffset - beatOffset) * stepsPerBeat;
 
                     // Add some length variety to basic patterns
-                    if (!dense && dur === stepsPerBeat && prng() < 0.2) {
+                    if (!dense && !isJazzStyle && dur === stepsPerBeat && prng() < 0.2) {
                         dur *= 2;
                     }
 
@@ -533,9 +565,22 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             }
 
             // --- Melodic Intent Phase ---
-            const contourType = ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC'][
-                Math.floor(prng() * 5)
-            ];
+            const contourPool = isJazzStyle
+                ? [
+                      'ASCEND',
+                      'DESCEND',
+                      'ARCH',
+                      'VALLEY',
+                      'STATIC',
+                      'HOOK',
+                      'ARPEGGIATE',
+                      'HOOK',
+                      'ARPEGGIATE',
+                  ]
+                : isForwardStatement
+                  ? ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'HOOK', 'HOOK']
+                  : ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'ARPEGGIATE'];
+            const contourType = contourPool[Math.floor(prng() * contourPool.length)];
             console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
 
             // 1. Generate the initial A cell
@@ -550,7 +595,19 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             let structureType = 'A-B'; // fallback
 
             if (phraseLength === 4) {
-                if (structureRoll < 0.25) {
+                if (isJazzStyle || isForwardStatement) {
+                    if (structureRoll < 0.35) {
+                        structureType = 'A-A-B-A';
+                    } else if (structureRoll < 0.65) {
+                        structureType = 'A-A-A-B';
+                    } else if (structureRoll < 0.82) {
+                        structureType = 'A-B-A-B';
+                    } else if (structureRoll < 0.95) {
+                        structureType = 'A-B-A-C';
+                    } else {
+                        structureType = 'A-B-A-Rest';
+                    }
+                } else if (structureRoll < 0.25) {
                     structureType = 'A-A-A-B';
                 } else if (structureRoll < 0.5) {
                     structureType = 'A-B-A-C';
@@ -562,10 +619,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     structureType = 'A-B-A-Rest'; // More tasteful than A-Rest-B-Rest
                 }
             } else {
-                if (structureRoll < 0.5) {
+                if (isJazzStyle) {
+                    if (structureRoll < 0.62) {
+                        structureType = 'A-A';
+                    } else if (structureRoll < 0.92) {
+                        structureType = 'A-B';
+                    } else {
+                        structureType = 'A-Rest';
+                    }
+                } else if (structureRoll < 0.5) {
                     structureType = 'A-A';
-                } else if (structureRoll < 0.7 && ['jazz', 'bird', 'bossa'].includes(style)) {
-                    structureType = 'A-Rest';
                 }
             }
 
@@ -630,7 +693,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     }
 
                     // Imperfect Symmetry: Even if A-A, let repeated measures drift slightly
-                    if (measure > 0 && cellType === 'A' && prng() < 0.3) {
+                    const symmetryMutationProb =
+                        contourType === 'HOOK' ? 0.15 : isJazzStyle ? 0.22 : 0.3;
+                    if (measure > 0 && cellType === 'A' && prng() < symmetryMutationProb) {
                         const r = prng();
                         if (r < 0.4) {
                             isRest = !isRest; // Flip rest status
@@ -666,8 +731,28 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             }
 
                             // Leap-and-Fill Logic: If we just jumped, must step back
-                            if (Math.abs(lastMotion) >= 3) {
+                            if (Math.abs(lastMotion) >= (contourType === 'ARPEGGIATE' ? 4 : 3)) {
                                 motion = lastMotion > 0 ? -1 : 1; // Step in opposite direction
+                            } else if (contourType === 'ARPEGGIATE') {
+                                if (r < 0.42) {
+                                    motion = prng() < upProb ? 2 : -2; // Thirds
+                                } else if (r < 0.62) {
+                                    motion = prng() < upProb ? 4 : -4; // Fifth-ish vaults
+                                } else if (r < 0.82) {
+                                    motion = prng() < upProb ? 1 : -1; // Filling step
+                                } else {
+                                    motion = 0; // Tasteful repeat
+                                }
+                            } else if (contourType === 'HOOK') {
+                                if (r < 0.3) {
+                                    motion = 0; // Repetition keeps the hook singable
+                                } else if (r < 0.62) {
+                                    motion = prng() < upProb ? 2 : -2; // Skips add contour
+                                } else if (r < 0.84) {
+                                    motion = prng() < upProb ? 1 : -1;
+                                } else {
+                                    motion = prng() < upProb ? 3 : -3;
+                                }
                             } else {
                                 // Normal motion logic
                                 if (r < 0.6) {
@@ -683,10 +768,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                             // Magnetic Center: Pull back towards 0 if we drift too far
                             // This ensures contour doesn't drift too high or low
-                            if (currentDegreeOffset > 5 && motion > 0) {
+                            const excursionLimit = contourType === 'ARPEGGIATE' ? 6 : 5;
+                            if (currentDegreeOffset > excursionLimit && motion > 0) {
                                 motion = prng() > 0.5 ? -1 : -2;
                             }
-                            if (currentDegreeOffset < -5 && motion < 0) {
+                            if (currentDegreeOffset < -excursionLimit && motion < 0) {
                                 motion = prng() > 0.5 ? 1 : 2;
                             }
                         }
@@ -766,10 +852,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             });
         }
 
-        let { motif, phraseLength, isStationaryMotif } = sectionMotifs.get(category) || {
+        let { motif, phraseLength, isStationaryMotif, contourType } = sectionMotifs.get(
+            category,
+        ) || {
             motif: [],
             phraseLength: 2,
             isStationaryMotif: false,
+            contourType: 'STATIC',
         };
 
         // Motivic Mutation (Restatement)
@@ -842,25 +931,22 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         // Apply motif to the section, typically repeating in 2-measure blocks
         // within a larger 4 or 8 measure block with a forced rest at the end.
-        let registerBase = 60; // Middle C
+        let registerBase = registerProfile.seedCenter;
         const intensityVal = _intensity || 0.5;
 
-        // Keep non-jazz heads in a singable middle register. Jazz-family heads stay
-        // more grounded, but still get a modest floor later in note scoring.
-        if (isJazzStyle) {
-            if (category === 'chorus') {
-                registerBase = 60;
-            } else if (category === 'intro' || index === 0) {
-                registerBase = 48;
-            } else {
-                registerBase = intensityVal > 0.7 ? 60 : 48;
-            }
-        } else if (category === 'chorus' || isDeparture) {
-            const boost = intensityVal >= 0.5 ? 12 : 0;
-            registerBase = 60 + boost;
-        } else {
-            registerBase = intensityVal > 0.7 ? 72 : 60;
+        if (category === 'intro' || index === 0) {
+            registerBase -= registerProfile.seedIntroDrop;
+        } else if (category === 'chorus') {
+            registerBase += registerProfile.seedChorusLift;
+        } else if (isDeparture) {
+            registerBase += registerProfile.seedDepartureLift;
+        } else if (intensityVal > 0.7) {
+            registerBase += 2;
         }
+        registerBase = Math.max(
+            registerProfile.seedFloor,
+            Math.min(registerProfile.seedCeiling - 6, registerBase),
+        );
 
         let lastMidi = registerBase;
 
@@ -951,25 +1037,40 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const targetInterval = chordTones[Math.floor(prng() * chordTones.length)]; // Root, 3rd, 5th, etc.
             const targetPitchClass = (targetChord.rootMidi + targetInterval) % 12;
 
-            let anchorMidi = registerBase + targetPitchClass;
-            // Octave anchoring: Keep Head melody centered within a tighter +/- 6 semitone range
-            // to avoid shrill jumps at low intensity.
-            if (Math.abs(anchorMidi - lastMidi) > 6) {
+            const registerOctaveBase = Math.floor(registerBase / 12) * 12;
+            let anchorMidi = registerOctaveBase + targetPitchClass;
+            while (anchorMidi < registerBase - 6) {
+                anchorMidi += 12;
+            }
+            while (anchorMidi > registerBase + 6) {
+                anchorMidi -= 12;
+            }
+            // Give arpeggio / hook contours a little more room before we fold the octave.
+            const anchorSpan = contourType === 'ARPEGGIATE' || contourType === 'HOOK' ? 8 : 6;
+            if (Math.abs(anchorMidi - lastMidi) > anchorSpan) {
                 if (anchorMidi > lastMidi) {
                     anchorMidi -= 12;
                 } else {
                     anchorMidi += 12;
                 }
             }
+            anchorMidi = Math.max(
+                registerProfile.seedFloor,
+                Math.min(registerProfile.seedCeiling, anchorMidi),
+            );
 
             // Find the last active note in the motif to apply resolution biases
             const lastActiveMotifNote = activeMotif.filter((n) => !n.isRest).pop();
             const isLastMeasureOfSection = m >= sectionEndMeasure - 2;
+            const isArpeggioContour = contourType === 'ARPEGGIATE';
+            const isHookContour = contourType === 'HOOK';
 
             /** @type {any} */
             let prevNoteChord = null;
             /** @type {number[]} */
             let prevScalePitches = [];
+            /** @type {number | null} */
+            let previousMotifDegree = null;
 
             activeMotif.forEach((motifNote) => {
                 if (motifNote.isRest) {
@@ -1046,8 +1147,12 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // --- NEW: Voice-Leading Scoring Logic ---
                 // If the chord has just changed, or we're in Loop 0, try to find a note in the scale
                 // that is a "Common Tone" or "Guide Tone" and is close to lastMidi.
-                let bestMidi = registerBase + pitchClass + octaveShift;
+                let bestMidi = registerOctaveBase + pitchClass + octaveShift;
                 let minScore = 999;
+                const expectedDirection =
+                    previousMotifDegree === null
+                        ? 0
+                        : Math.sign(motifNote.scaleDegreeOffset - previousMotifDegree);
 
                 // Search all scale degrees for the "best" melodic path
                 for (let d = 0; d < scaleLen; d++) {
@@ -1056,17 +1161,42 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                     // Possible Octaves
                     for (const oShift of [-12, 0, 12]) {
-                        const testMidi = registerBase + testPC + oShift;
+                        const testMidi = registerOctaveBase + testPC + oShift;
                         const distToLast = Math.abs(testMidi - lastMidi);
                         const distToAnchor = Math.abs(testMidi - anchorMidi);
 
                         // Scoring components
-                        const jumpPenalty = distToLast * 1.5; // High penalty for large jumps
+                        const jumpWeight = isArpeggioContour ? 1.0 : isHookContour ? 1.15 : 1.5;
+                        const jumpPenalty = distToLast * jumpWeight;
                         const anchorPenalty = distToAnchor * 0.3; // Slight pull to anchor
 
                         // Motif adherence: How far is this degree from the intended motif degree?
                         const degreeDist = Math.abs(d - modDegree);
-                        const motifPenalty = degreeDist * 2.0;
+                        const motifWeight = isStationaryMotif
+                            ? 1.5
+                            : isArpeggioContour
+                              ? 2.4
+                              : isHookContour
+                                ? 2.8
+                                : 4.0;
+                        const motifPenalty = degreeDist * motifWeight;
+                        const wrongWayPenalty = isArpeggioContour ? 4 : isHookContour ? 5 : 7;
+                        const directionPenalty =
+                            expectedDirection === 0
+                                ? 0
+                                : expectedDirection > 0
+                                  ? testMidi <= lastMidi
+                                      ? wrongWayPenalty
+                                      : 0
+                                  : testMidi >= lastMidi
+                                    ? wrongWayPenalty
+                                    : 0;
+                        const motionPenalty =
+                            expectedDirection !== 0 && testMidi === lastMidi
+                                ? isHookContour
+                                    ? 4
+                                    : 9
+                                : 0;
 
                         // Guide Tone Bonus (3rd or 7th)
                         const isGuideTone =
@@ -1080,20 +1210,36 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         // This helps highlight key changes (modulations).
                         const isFreshNote = isPivotStep && !prevScalePitches.includes(testPC);
                         const pivotBonus = isFreshNote ? -3 : 0;
+                        const chordToneBonus =
+                            (isArpeggioContour ||
+                                (isHookContour && motifNote.beatOffset % 1 === 0)) &&
+                            chordIntervals.includes(testInterval)
+                                ? -2.5
+                                : 0;
+                        const arpeggioMotionBonus =
+                            isArpeggioContour && distToLast >= 3 && distToLast <= 7 ? -1.5 : 0;
+                        const hookMotionBonus = isHookContour && distToLast <= 5 ? -1.0 : 0;
 
-                        const singableFloor = isJazzStyle ? 55 : 60;
                         const floorPenalty =
-                            testMidi < singableFloor ? (singableFloor - testMidi) * 2.5 : 0;
-                        // Singable Register Penalty: Penalize notes above MIDI 76 (E5)
-                        // to avoid "neck creep" or shrillness in the Head.
-                        const ceilingPenalty = testMidi > 76 ? (testMidi - 76) * 2.0 : 0;
+                            testMidi < registerProfile.seedFloor
+                                ? (registerProfile.seedFloor - testMidi) * 2.5
+                                : 0;
+                        const ceilingPenalty =
+                            testMidi > registerProfile.seedCeiling
+                                ? (testMidi - registerProfile.seedCeiling) * 2.0
+                                : 0;
 
                         const totalScore =
                             jumpPenalty +
                             anchorPenalty +
                             motifPenalty +
+                            directionPenalty +
+                            motionPenalty +
                             guideBonus +
                             pivotBonus +
+                            chordToneBonus +
+                            arpeggioMotionBonus +
+                            hookMotionBonus +
                             floorPenalty +
                             ceilingPenalty;
 
@@ -1106,6 +1252,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
                 const midi = bestMidi;
                 lastMidi = midi;
+                previousMotifDegree = motifNote.scaleDegreeOffset;
                 prevNoteChord = currentChord;
                 prevScalePitches = currentScalePitches;
 

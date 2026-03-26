@@ -23,6 +23,12 @@ const { soloistState } = vi.hoisted(() => ({
         lastInterval: 0,
         stagnationCount: 0,
         mode: 'monophonic',
+        phraseContext: {
+            role: 'call',
+            skeleton: [],
+            lastInterval: null,
+            profile: 'srv',
+        },
     },
 }));
 
@@ -44,6 +50,12 @@ vi.mock('../../public/state.js', () => {
             pitchHistory: [],
             deviceBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         groove: { genreFeel: 'Jazz' },
         playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },

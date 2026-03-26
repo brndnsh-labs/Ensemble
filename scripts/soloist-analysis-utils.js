@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../public/config.js';
 import { getSoloistNote } from '../public/engine/soloist.js';
-import { GENRE_STYLE_MAPPING } from '../public/engine/soloist-config.js';
+import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
 import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
@@ -46,13 +46,6 @@ function withMutedComposerLogs(callback, muted = true) {
 
 function getOptionValue(options, key, fallback) {
     return Object.hasOwn(options, key) ? options[key] : fallback;
-}
-
-function getSeedStyle(genre, style) {
-    if (style !== 'smart') {
-        return style;
-    }
-    return GENRE_STYLE_MAPPING[genre] || 'scalar';
 }
 
 function formatMidi(midi) {
@@ -474,7 +467,7 @@ export function bootstrapSoloistAudit({
     state.arranger.sectionMap = arrangement.sectionMap;
     state.playback.currentLoopCount = 0;
 
-    const seedStyle = getSeedStyle(genre, style);
+    const seedStyle = resolveSoloistStyle(style, genre);
     const sessionSeed = withMutedComposerLogs(
         () => generateSessionSeed(state, state.arranger, seedStyle, intensity, seed),
         quietSeedLogs,

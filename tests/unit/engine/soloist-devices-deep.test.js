@@ -133,6 +133,12 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             expect(Array.isArray(device[0])).toBe(true);
         });
 
+        it('tags generated device notes for downstream analysis', () => {
+            const device = generateMelodicDevice('quartal', ctx);
+            const notes = device.flatMap((entry) => (Array.isArray(entry) ? entry : [entry]));
+            expect(notes.every((note) => note.device === 'quartal')).toBe(true);
+        });
+
         it('should handle quartalStack', () => {
             const device = generateMelodicDevice('quartalStack', ctx);
             expect(Array.isArray(device[0])).toBe(true);

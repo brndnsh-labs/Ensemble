@@ -1,4 +1,4 @@
-import { STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
+import { STYLE_CONFIG } from './soloist-config.js';
 
 /**
  * @param {number} startStep
@@ -27,7 +27,7 @@ export function generateRhythmPlan(
     /** @type {any[]} */
     const plan = [];
     const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
-    const emphasisMap = /** @type {any} */ (STYLE_EMPHASIS)[style] || STYLE_EMPHASIS.scalar;
+    const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
 
     let notesInPhrase = 0;
 
@@ -77,6 +77,8 @@ export function generateRhythmPlan(
             // Evaluate everything as if we are on 'step'
             const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
             const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
+            const isOffbeatEighth = stepInBeat === stepsPerBeat / 2;
+            const isSixteenthSubdivision = stepInBeat % 2 !== 0;
 
             // Use stepInfo if available for high-precision meter logic
             const currentStepInfo = _stepInfo && _stepInfo.mStep === measureStep ? _stepInfo : null;
@@ -105,11 +107,6 @@ export function generateRhythmPlan(
                 baseAttackProb = 0.5;
             }
 
-            // Fallback to legacy emphasis map for 4/4 or if no specific pulse
-            if (!currentStepInfo?.isPulse && !isBeatStart) {
-                baseAttackProb = Math.max(baseAttackProb, emphasisMap[emphasisIdx] || 0.1);
-            }
-
             // --- Emphasis Mutation: Prevent Stagnant Rhythms ---
             if (['rock', 'scalar', 'blues'].includes(style)) {
                 // Gently shift emphasis based on session progress to prevent 100% predictability
@@ -133,6 +130,15 @@ export function generateRhythmPlan(
             const intensityScale = rhythmicDensity * densityScale * 2.0; // Normalized to ~1.0 at medium
 
             let attackProb = baseAttackProb * intensityScale * warmUpScale;
+
+            if (isLineStyle) {
+                attackProb *= 1.05 + intensity * 0.1;
+                if (isBeatStart || isOffbeatEighth) {
+                    attackProb *= 1.2;
+                } else if (isSixteenthSubdivision) {
+                    attackProb *= intensity > 0.72 ? 1.0 : 0.72;
+                }
+            }
 
             // --- Rock Profile Bursts (EVH / Beck) ---
             if ((style === 'rock' || style === 'scalar') && intensity > 0.65) {
@@ -170,10 +176,7 @@ export function generateRhythmPlan(
 
             // Rhythmic Simplification at Low Intensity:
             if (intensity < 0.4) {
-                const isSixteenthNote = stepInBeat % 2 !== 0; // Steps 1, 3
-                const isOffbeatEighth = stepInBeat === stepsPerBeat / 2; // Step 2 (the "and")
-
-                if (isSixteenthNote) {
+                if (isSixteenthSubdivision) {
                     attackProb *= intensity * 1.5; // Drastic penalty for 16ths
                 } else if (isOffbeatEighth) {
                     attackProb *= 0.4 + intensity; // Moderate penalty for offbeat 8ths
@@ -227,11 +230,11 @@ export function generateRhythmPlan(
             }
 
             // --- Jazz Specifics ---
-            if (style === 'jazz') {
+            if (isLineStyle) {
                 const profile = soloistState.phraseContext?.profile;
                 // Double-time bursts for Bird/Coltrane
                 if ((profile === 'bird' || profile === 'coltrane') && intensity > 0.7) {
-                    if (stepInBeat % 2 !== 0) {
+                    if (isSixteenthSubdivision) {
                         attackProb *= 1.5; // Favor 16ths
                     }
                 }
@@ -246,6 +249,10 @@ export function generateRhythmPlan(
 
             if (Math.random() <= attackProb) {
                 notesInPhrase++;
+                const isBebopStyle =
+                    style === 'bird' ||
+                    soloistState.phraseContext?.profile === 'bird' ||
+                    soloistState.phraseContext?.profile === 'coltrane';
 
                 let stepVelocity = 0.6 + intensity * 0.4;
                 if (isDownbeat) {
@@ -257,7 +264,7 @@ export function generateRhythmPlan(
                 }
 
                 // Jazz Ghosting
-                if (style === 'jazz' && !isBeatStart && Math.random() < 0.4) {
+                if ((style === 'jazz' || style === 'bird') && !isBeatStart && Math.random() < 0.4) {
                     stepVelocity *= 0.6; // Soft ghost note
                 }
 
@@ -267,7 +274,7 @@ export function generateRhythmPlan(
                 let finalSustainProb = baseSustainProb;
 
                 // 1. Resolution Hold: Boost sustain if we land on a strong beat after a period of density
-                if (notesInPhrase >= 6 && (isDownbeat || isBeatStart)) {
+                if (!isBebopStyle && notesInPhrase >= 6 && (isDownbeat || isBeatStart)) {
                     finalSustainProb += 0.3 * intensity;
                 }
 
@@ -289,11 +296,17 @@ export function generateRhythmPlan(
                     finalSustainProb += 0.2;
                 }
 
+                if (isBebopStyle) {
+                    finalSustainProb *= 0.55;
+                }
+
                 if (Math.random() < finalSustainProb) {
                     isSustained = true;
                     // Held for a logical amount of time (4 steps = 1 beat, 8 steps = 2 beats)
                     const maxSustain = _config.maxSustainSteps || 8;
-                    const sustainLength = Math.floor(3 + Math.random() * maxSustain);
+                    const sustainLength = isBebopStyle
+                        ? 2 + Math.floor(Math.random() * 3)
+                        : Math.floor(3 + Math.random() * maxSustain);
                     sustainStepsRemaining = sustainLength;
                 }
 
@@ -348,6 +361,8 @@ export function generateRhythmPlan(
             baseDuration = current.durationSteps;
         } else if (['funk', 'disco', 'ska'].includes(style)) {
             baseDuration = 1;
+        } else if (isLineStyle) {
+            baseDuration = Math.min(gap, current.isStrongBeat ? 4 : 2);
         } else if (['blues', 'neo'].includes(style)) {
             baseDuration = gap;
         } else {

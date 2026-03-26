@@ -39,6 +39,12 @@ describe('MIDI Worker Logic Deep Dive', () => {
                 lastMidi: 60,
                 dynamicCenter: 60,
                 octave: 0,
+                phraseContext: {
+                    role: 'call',
+                    skeleton: [],
+                    lastInterval: null,
+                    profile: 'srv',
+                },
             },
             harmony: { enabled: true, style: 'Standard', volume: 0.5, octave: 0, complexity: 0.5 },
             groove: {

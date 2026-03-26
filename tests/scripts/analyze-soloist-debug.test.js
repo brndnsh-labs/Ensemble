@@ -16,6 +16,12 @@ const { mockState } = vi.hoisted(() => ({
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
@@ -63,6 +69,12 @@ describe('Soloist Phrasing Debugger', () => {
             deviceBuffer: [],
             motifBuffer: [],
             sessionSteps: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         };
 
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
