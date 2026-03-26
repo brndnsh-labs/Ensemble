@@ -126,7 +126,7 @@
     text-transform: uppercase;
 }
 
-.seed-input:focus {
+.seed-input:focus-visible {
     outline: none;
     border-color: var(--accent-color);
     box-shadow: 0 0 0 2px var(--focus-ring-color);

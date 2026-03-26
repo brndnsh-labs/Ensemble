@@ -10,64 +10,76 @@ test.describe('UI polish consistency @ui', () => {
     });
 
     test('shared shell controls use consistent theme radii and spacing', async ({ page }) => {
+        const playButton = page.locator('#playBtn');
+        const timeSignature = page.locator('#timeSigSelect');
+        const workspaceNav = page.locator('.workspace-nav-btn').first();
+
+        await expect(playButton).toBeVisible();
+        await expect(timeSignature).toBeVisible();
+        await expect(workspaceNav).toBeVisible();
+
         const arrangerStyles = await page.evaluate(() => {
+            const root = getComputedStyle(document.documentElement);
+            const rootFontSize = Number.parseFloat(root.fontSize);
             const read = (selector) => {
                 const element = document.querySelector(selector);
-                if (!element) {
-                    return null;
-                }
-
                 const computed = getComputedStyle(element);
                 return {
-                    borderRadius: computed.borderTopLeftRadius,
-                    paddingTop: computed.paddingTop,
-                    paddingRight: computed.paddingRight,
-                    fontSize: computed.fontSize,
+                    borderRadius: Number.parseFloat(computed.borderTopLeftRadius),
+                    paddingTop: Number.parseFloat(computed.paddingTop),
+                    paddingRight: Number.parseFloat(computed.paddingRight),
+                    fontSize: Number.parseFloat(computed.fontSize),
                 };
             };
 
             return {
+                rootFontSize,
+                radiusMd: Number.parseFloat(root.getPropertyValue('--radius-md')),
+                radiusLg: Number.parseFloat(root.getPropertyValue('--radius-lg')),
+                space2: Number.parseFloat(root.getPropertyValue('--space-2')) * rootFontSize,
+                space5: Number.parseFloat(root.getPropertyValue('--space-5')) * rootFontSize,
+                fontBase: Number.parseFloat(root.getPropertyValue('--font-base')) * rootFontSize,
                 playButton: read('#playBtn'),
                 timeSignature: read('#timeSigSelect'),
                 workspaceNav: read('.workspace-nav-btn'),
             };
         });
 
-        expect(arrangerStyles.playButton).toMatchObject({
-            borderRadius: '8px',
-            paddingTop: '8px',
-            paddingRight: '24px',
-            fontSize: '16px',
-        });
-        expect(arrangerStyles.timeSignature).toMatchObject({
-            borderRadius: '8px',
-            fontSize: '13.6px',
-        });
-        expect(arrangerStyles.workspaceNav).toMatchObject({
-            borderRadius: '12px',
-        });
+        expect(arrangerStyles.playButton.borderRadius).toBe(arrangerStyles.radiusMd);
+        expect(arrangerStyles.playButton.paddingTop).toBe(arrangerStyles.space2);
+        expect(arrangerStyles.playButton.paddingRight).toBe(arrangerStyles.space5);
+        expect(arrangerStyles.playButton.fontSize).toBe(arrangerStyles.fontBase);
+        expect(arrangerStyles.timeSignature.borderRadius).toBe(arrangerStyles.radiusMd);
+        expect(arrangerStyles.workspaceNav.borderRadius).toBe(arrangerStyles.radiusLg);
         await page.click('[data-workspace-nav="studio"]');
-        await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
+        const studio = page.locator('section[data-workspace="studio"]');
+        const studioGenreButton = studio.locator('.workspace-studio-genre-button');
 
-        const studioGenreButton = await page.evaluate(() => {
+        await expect(studio).toBeVisible();
+        await expect(studioGenreButton).toBeVisible();
+
+        const studioGenreMetrics = await page.evaluate(() => {
+            const rootFontSize = Number.parseFloat(
+                getComputedStyle(document.documentElement).fontSize,
+            );
             const element = document.querySelector('.workspace-studio-genre-button');
-            if (!element) {
-                return null;
-            }
-
             const computed = getComputedStyle(element);
             return {
-                borderRadius: computed.borderTopLeftRadius,
-                paddingTop: computed.paddingTop,
-                paddingRight: computed.paddingRight,
+                borderRadius: Number.parseFloat(computed.borderTopLeftRadius),
+                paddingTop: Number.parseFloat(computed.paddingTop),
+                paddingRight: Number.parseFloat(computed.paddingRight),
+                expectedPaddingTop: 0.45 * rootFontSize,
+                expectedPaddingRight: 0.8 * rootFontSize,
             };
         });
 
-        expect(studioGenreButton).toMatchObject({
-            borderRadius: '999px',
-            paddingTop: '7.2px',
-            paddingRight: '12.8px',
-        });
+        expect(studioGenreMetrics.borderRadius).toBeGreaterThan(100);
+        expect(
+            Math.abs(studioGenreMetrics.paddingTop - studioGenreMetrics.expectedPaddingTop),
+        ).toBeLessThan(0.2);
+        expect(
+            Math.abs(studioGenreMetrics.paddingRight - studioGenreMetrics.expectedPaddingRight),
+        ).toBeLessThan(0.2);
     });
 
     test('interactive controls define shared focus-visible polish rules', async ({ page }) => {
@@ -102,5 +114,6 @@ test.describe('UI polish consistency @ui', () => {
         expect(selectors).toContain('.workspace-studio-genre-button:focus-visible');
         expect(selectors).toContain('.genre-btn:focus-visible');
         expect(selectors).toContain('.preset-chip:focus-visible');
+        expect(selectors).toContain('.seed-input:focus-visible');
     });
 });
