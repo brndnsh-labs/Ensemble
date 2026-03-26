@@ -44,6 +44,12 @@ vi.mock('../../../public/state.js', () => {
             sessionSteps: 1000,
             motifBuffer: [],
             deviceBuffer: [],
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         chords: { enabled: true, octave: 60, density: 'standard' },
         bass: { enabled: true, lastFreq: 110, pocketOffset: 0, octave: 36, style: 'smart' },

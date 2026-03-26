@@ -48,10 +48,6 @@ function getOptionValue(options, key, fallback) {
     return Object.hasOwn(options, key) ? options[key] : fallback;
 }
 
-function getSeedStyle(genre, style) {
-    return resolveSoloistStyle(style, genre);
-}
-
 function formatMidi(midi) {
     const note = midiToNote(midi);
     return `${note.name}${note.octave}`;
@@ -471,7 +467,7 @@ export function bootstrapSoloistAudit({
     state.arranger.sectionMap = arrangement.sectionMap;
     state.playback.currentLoopCount = 0;
 
-    const seedStyle = getSeedStyle(genre, style);
+    const seedStyle = resolveSoloistStyle(style, genre);
     const sessionSeed = withMutedComposerLogs(
         () => generateSessionSeed(state, state.arranger, seedStyle, intensity, seed),
         quietSeedLogs,

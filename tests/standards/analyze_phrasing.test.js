@@ -142,6 +142,12 @@ function simulateEngine(totalSteps, timeSignature = '4/4', style = 'bird') {
             sessionSteps: 0,
             motifBuffer: [],
             isResting: true, // Start resting
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
     };
 

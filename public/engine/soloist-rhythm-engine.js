@@ -1,4 +1,4 @@
-import { STYLE_CONFIG, STYLE_EMPHASIS } from './soloist-config.js';
+import { STYLE_CONFIG } from './soloist-config.js';
 
 /**
  * @param {number} startStep
@@ -27,7 +27,6 @@ export function generateRhythmPlan(
     /** @type {any[]} */
     const plan = [];
     const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
-    const emphasisMap = /** @type {any} */ (STYLE_EMPHASIS)[style] || STYLE_EMPHASIS.scalar;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
 
     let notesInPhrase = 0;
@@ -106,11 +105,6 @@ export function generateRhythmPlan(
                 baseAttackProb = 0.4;
             } else if (currentStepInfo?.isPulse) {
                 baseAttackProb = 0.5;
-            }
-
-            // Fallback to legacy emphasis map for 4/4 or if no specific pulse
-            if (!currentStepInfo?.isPulse && !isBeatStart) {
-                baseAttackProb = Math.max(baseAttackProb, emphasisMap[emphasisIdx] || 0.1);
             }
 
             // --- Emphasis Mutation: Prevent Stagnant Rhythms ---

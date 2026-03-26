@@ -18,6 +18,12 @@ vi.mock('../../public/state.js', () => {
             hookBuffer: [],
             lastFreq: 440,
             hookRetentionProb: 0.5,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         chords: { enabled: true, octave: 60, density: 'standard', pianoRoots: true },
         playback: {

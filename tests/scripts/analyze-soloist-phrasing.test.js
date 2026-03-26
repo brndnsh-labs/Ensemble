@@ -18,6 +18,12 @@ const { mockState } = vi.hoisted(() => ({
             motifBuffer: [],
             sessionSteps: 0,
             isPhraseActive: false,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         groove: { genreFeel: 'Blues' },
         playback: {
@@ -110,6 +116,12 @@ describe('Soloist Phrasing Analysis', () => {
             motifBuffer: [],
             motifCache: [],
             sessionSteps: 64, // Bypass warmup
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         };
         mockState.playback.bandIntensity = intensity;
         mockState.playback.complexity = intensity;

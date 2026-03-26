@@ -27,6 +27,12 @@ const { testState } = vi.hoisted(() => ({
             pitchHistory: [],
             lastInterval: 0,
             stagnationCount: 0,
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+            },
         },
         harmony: { enabled: false },
         arranger: { timeSignature: '4/4' },

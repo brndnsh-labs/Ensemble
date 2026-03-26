@@ -67,16 +67,6 @@ export function getSoloistNote(
 
     let intensity = playback.bandIntensity || 0.5;
 
-    // --- Safety: Initialize phraseContext if missing (for tests/legacy) ---
-    if (!soloist.phraseContext) {
-        soloist.phraseContext = /* @direct-mutation */ {
-            role: 'call',
-            skeleton: [],
-            lastInterval: null,
-            profile: 'srv',
-        };
-    }
-
     // --- Greats Profiles: Intensity/Density Overrides ---
     if (activeStyle === 'blues' && soloist.phraseContext?.profile === 'miles') {
         intensity *= 0.6; // Miles uses much more space
