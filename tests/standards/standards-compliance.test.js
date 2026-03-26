@@ -1,5 +1,5 @@
 /* eslint-disable */
-// cspell:ignore Emaj Yelverton
+// cspell:ignore Emaj Ebdim Yelverton
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
@@ -372,6 +372,66 @@ describe('Standards Compliance Test Suite', () => {
             expect(getScaleForChord(getState(), v7, minorTarget, 'bird')).toEqual([
                 0, 1, 4, 5, 7, 8, 10,
             ]);
+        });
+    });
+
+    // --- Rhythm Changes ---
+    describe('Rhythm Changes', () => {
+        beforeEach(() => {
+            loadPreset('Rhythm Changes', 'Bb', false);
+            groove.genreFeel = 'Jazz';
+        });
+
+        it('keeps plain bridge dominants idiomatic without forcing altered colors', () => {
+            const bridge = arranger.progression.filter((chord) => chord.sectionLabel === 'B');
+            expect(bridge.map((chord) => chord.absName)).toEqual([
+                'D7',
+                'D7',
+                'G7',
+                'G7',
+                'C7',
+                'C7',
+                'F7',
+                'F7',
+            ]);
+
+            expect(getScaleForChord(getState(), bridge[1], bridge[2], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // III7 stays Mixolydian
+            expect(getScaleForChord(getState(), bridge[3], bridge[4], 'bird')).toEqual([
+                0, 2, 4, 5, 7, 9, 10,
+            ]); // VI7 stays Mixolydian
+            expect(getScaleForChord(getState(), bridge[5], bridge[6], 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 10,
+            ]); // II7 keeps the brighter Lydian Dominant color
+        });
+    });
+
+    // --- Night and Day ---
+    describe('Night and Day', () => {
+        beforeEach(() => {
+            loadPreset('Night and Day', 'C', false);
+            groove.genreFeel = 'Jazz';
+        });
+
+        it('keeps chromatic diminished passing chords on the symmetric whole-half collection', () => {
+            const verseB = arranger.progression.filter(
+                (chord) => chord.sectionLabel === 'Verse (B)',
+            );
+            expect(verseB.map((chord) => chord.absName)).toEqual([
+                'F#m7',
+                'Fm7',
+                'Em7',
+                'Ebdim7',
+                'Dm7',
+                'G7',
+                'Cmaj7',
+                'Cmaj7',
+            ]);
+
+            expect(getScaleForChord(getState(), verseB[3], verseB[4], 'bird')).toEqual([
+                0, 2, 3, 5, 6, 8, 9, 11,
+            ]); // Ebdim7 as chromatic passing diminished
         });
     });
 
