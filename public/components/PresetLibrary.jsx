@@ -12,13 +12,15 @@ import { decompressSections, generateId, transposeKeyName } from '../utils.js';
  * @typedef {import('../state/arranger.js').Section} Section
  * @typedef {Partial<Section> & { keyShift?: number }} PresetSection
  * @typedef {{ bpm?: number, style?: string, timeSignature?: string }} PresetSettings
+ * @typedef {{ variant?: string, notes?: string, references?: string[] }} PresetProvenance
  * @typedef {{
  *   name: string,
  *   sections: string | Array<PresetSection>,
  *   category?: string,
  *   isMinor?: boolean,
  *   timestamp?: number,
- *   settings?: PresetSettings
+ *   settings?: PresetSettings,
+ *   provenance?: PresetProvenance
  * }} LibraryPreset
  */
 

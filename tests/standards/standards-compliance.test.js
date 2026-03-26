@@ -1,5 +1,5 @@
 /* eslint-disable */
-// cspell:ignore Emaj
+// cspell:ignore Emaj Yelverton
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
@@ -311,6 +311,28 @@ describe('Standards Compliance Test Suite', () => {
                 'Bbmaj7',
             ]);
             expect(new Set(turnaround.map((chord) => chord.key))).toEqual(new Set(['Bb']));
+        });
+
+        it('stores provenance notes for the audited standards', () => {
+            const auditedPresets = [
+                'Blue Bossa',
+                'Autumn Leaves',
+                'All The Things You Are',
+                'Cherokee',
+                'Stella by Starlight',
+            ].map((name) => CHORD_PRESETS.find((preset) => preset.name === name));
+
+            auditedPresets.forEach((preset) => {
+                expect(preset).toBeDefined();
+                expect(preset.provenance?.variant).toBeTruthy();
+                expect(preset.provenance?.notes).toBeTruthy();
+            });
+
+            const stella = CHORD_PRESETS.find((preset) => preset.name === 'Stella by Starlight');
+            expect(stella.provenance).toMatchObject({
+                variant: 'Modern / Real Book-oriented changes',
+                references: ['Nat Yelverton, "Analysis of Stella by Starlight"'],
+            });
         });
     });
 

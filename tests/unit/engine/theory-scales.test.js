@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// cspell:ignore Bdim
+
 // --- Global Mocks ---
 
 const { mockState } = vi.hoisted(() => ({
@@ -98,9 +100,22 @@ describe('Music Theory: Scale Correctness', () => {
     });
 
     describe('Special Quality Specialists', () => {
-        it('assigns Whole-Half Diminished to dim chords', () => {
+        it('assigns Whole-Half Diminished to chromatic dim chords', () => {
             const chordDim = { rootMidi: 60, quality: 'dim', intervals: [0, 3, 6] };
             expect(getScaleForChord(mockState, chordDim)).toEqual([0, 2, 3, 5, 6, 8, 9, 11]);
+        });
+
+        it('uses diatonic Locrian for natural vii diminished triads in major', () => {
+            mockState.groove.genreFeel = 'Rock';
+            const chordBdim = { rootMidi: 71, quality: 'dim', intervals: [0, 3, 6] };
+            expect(getScaleForChord(mockState, chordBdim, null, 'scalar')).toEqual([
+                0, 1, 3, 5, 6, 8, 10,
+            ]);
+        });
+
+        it('assigns Whole-Half Diminished to dim7 chords', () => {
+            const chordDim7 = { rootMidi: 60, quality: 'dim7', intervals: [0, 3, 6, 9] };
+            expect(getScaleForChord(mockState, chordDim7)).toEqual([0, 2, 3, 5, 6, 8, 9, 11]);
         });
 
         it('assigns Whole Tone to aug chords', () => {
@@ -121,6 +136,12 @@ describe('Music Theory: Scale Correctness', () => {
         });
 
         it('assigns Lydian Dominant to 7#11 chords', () => {
+            const chord7sharp11 = { rootMidi: 67, quality: '7#11', intervals: [0, 4, 7, 10, 18] };
+            expect(getScaleForChord(mockState, chord7sharp11)).toEqual([0, 2, 4, 6, 7, 9, 10]);
+        });
+
+        it('preserves explicit 7#11 quality even when tension is high', () => {
+            mockState.soloist.tension = 0.8;
             const chord7sharp11 = { rootMidi: 67, quality: '7#11', intervals: [0, 4, 7, 10, 18] };
             expect(getScaleForChord(mockState, chord7sharp11)).toEqual([0, 2, 4, 6, 7, 9, 10]);
         });

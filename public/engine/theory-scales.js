@@ -151,8 +151,9 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
 
     // --- SPECIAL QUALITY HANDLING ---
 
-    // Diminished
-    if (quality === 'dim' || quality === 'dim7') {
+    // Fully diminished chords typically want the symmetric collection.
+    // Plain dim triads can still fall through to diatonic awareness (for example natural vii degrees).
+    if (quality === 'dim7') {
         return SCALE_INTERVALS.WHOLE_HALF_DIMINISHED;
     }
 
@@ -180,13 +181,8 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     // --- DOMINANT CHORD HANDLING ---
 
     if (isDominant) {
-        // High Tension / Altered Dominants
-        if (
-            quality === '7alt' ||
-            quality === '7#9' ||
-            (soloist.tension > 0.7 &&
-                !['rock', 'scalar', 'country'].includes(/** @type {string} */ (style)))
-        ) {
+        // Explicit altered dominants should always outrank global tension heuristics.
+        if (quality === '7alt' || quality === '7#9') {
             if (style === 'funk' || style === 'blues') {
                 return SCALE_INTERVALS.BLUES;
             }
@@ -201,6 +197,17 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         // Phrygian Dominant (7b9, 7b13)
         if (quality === '7b9' || quality === '7b13') {
             return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+        }
+
+        // High Tension / Altered Dominants
+        if (
+            soloist.tension > 0.7 &&
+            !['rock', 'scalar', 'country'].includes(/** @type {string} */ (style))
+        ) {
+            if (style === 'funk' || style === 'blues') {
+                return SCALE_INTERVALS.BLUES;
+            }
+            return SCALE_INTERVALS.ALTERED;
         }
 
         // Lydian Dominant detection for Jazz/Bossa
@@ -303,6 +310,10 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
                 .sort((a, b) => a - b);
             return mode;
         }
+    }
+
+    if (quality === 'dim') {
+        return SCALE_INTERVALS.WHOLE_HALF_DIMINISHED;
     }
 
     // --- GENRE SPECIFIC FALLBACKS ---

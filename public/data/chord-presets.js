@@ -1,4 +1,4 @@
-// cspell:ignore iidim
+// cspell:ignore iidim Yelverton tonicized
 
 const DEFAULT_SETTINGS = {
     bpm: 120,
@@ -304,6 +304,10 @@ const PRESETS_RAW = [
             bpm: 140,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Common-practice concert-major relative-minor chart',
+            notes: 'Keeps the turnaround as vii half-diminished -> III7alt so the relative-minor pull stays explicit instead of being flattened into a generic dominant.',
+        },
     },
     {
         name: 'Stella by Starlight',
@@ -329,6 +333,11 @@ const PRESETS_RAW = [
         isMinor: false,
         settings: {
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Modern / Real Book-oriented changes',
+            notes: 'Uses the modern interrupted ii-V chains, the Ab7 backdoor, and the final half-diminished-to-b9 turnaround chosen in the March 2026 standards audit.',
+            references: ['Nat Yelverton, "Analysis of Stella by Starlight"'],
         },
     },
     {
@@ -376,6 +385,10 @@ const PRESETS_RAW = [
         settings: {
             bpm: 135,
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Common 36-bar cycle with explicit local key centers',
+            notes: 'Spells the form as a transposable Ab -> C -> Eb -> G -> E -> Ab cycle so each local tonic remains visible in the preset data.',
         },
     },
     {
@@ -516,6 +529,10 @@ const PRESETS_RAW = [
             bpm: 240,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Common 64-bar linearized bridge',
+            notes: 'Uses the bridge through local B, A, and G major before the Bb return, matching the fast-swing common-practice variant targeted by the audit.',
+        },
     },
     {
         name: 'Blue Bossa',
@@ -539,6 +556,10 @@ const PRESETS_RAW = [
         settings: {
             bpm: 140,
             style: 'bossa',
+        },
+        provenance: {
+            variant: 'Minor form with local major-key bridge',
+            notes: 'Stores the modulation as a true local ii-V-I into the temporary major key instead of jumping straight to a tonicized major chord.',
         },
     },
     {
