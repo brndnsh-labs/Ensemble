@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
-import { buildHookAuditArrangement } from '../../scripts/soloist-analysis-utils.js';
+import {
+    bootstrapSoloistAudit,
+    buildHookAuditArrangement,
+    buildMeasureAudit,
+    simulateSoloistLoops,
+} from '../../scripts/soloist-analysis-utils.js';
 
 function createHookSeedState(arrangement) {
     return {
@@ -47,5 +52,30 @@ describe('Soloist Seeder Hook Shape', () => {
         const notesPerMeasure = loopWindowNotes.length / arrangement.measuresPerLoop;
 
         expect(notesPerMeasure).toBeGreaterThanOrEqual(2.25);
+    });
+
+    it('avoids harsh cadence landings in the default rock hook audit', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const { state } = bootstrapSoloistAudit({
+            arrangement,
+            genre: 'Rock',
+            bpm: 102,
+            intensity: 0.5,
+            timeSignature: '4/4',
+            style: 'smart',
+            seed: 'HEAD_AUDIT',
+        });
+        const capture = simulateSoloistLoops({ state, arrangement, loops: 2, style: 'smart' });
+        const loop0Rows = buildMeasureAudit(capture, 0);
+        const loop1Rows = buildMeasureAudit(capture, 1);
+        const loop0Measure8 = loop0Rows.find((row) => row.measureNumber === 8);
+        const loop1Measures = loop1Rows.filter(
+            (row) => row.measureNumber === 3 || row.measureNumber === 7,
+        );
+
+        expect(loop0Measure8?.cadenceFlavor).not.toBe('tension');
+        for (const row of loop1Measures) {
+            expect(row.cadenceFlavor).not.toBe('tension');
+        }
     });
 });
