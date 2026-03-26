@@ -1,5 +1,5 @@
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
-import { STYLE_CONFIG } from './soloist-config.js';
+import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';
 import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -74,6 +74,7 @@ export function selectPitchAndDevices(
     /** @type {any} */
     const styleConfigAny = STYLE_CONFIG;
     const config = { ...(styleConfigAny[activeStyle] || STYLE_CONFIG.scalar) };
+    const registerProfile = getSoloistRegisterProfile(activeStyle);
 
     // Musical Intent Scaling:
     // Scale stylistic flourishes based on the performance intent (Conservative vs. Exploratory)
@@ -88,6 +89,7 @@ export function selectPitchAndDevices(
     const targetMidi = Number.isFinite(rhythmNode.targetMidi)
         ? Math.round(rhythmNode.targetMidi)
         : null;
+    const seedNote = rhythmNode.seedNote || null;
 
     let targetChord = currentChord;
 
@@ -97,8 +99,8 @@ export function selectPitchAndDevices(
         targetChord = nextChord;
     }
 
-    const minMidi = 60; // C4
-    const maxMidi = 96; // C7
+    const minMidi = registerProfile.liveFloor;
+    const maxMidi = registerProfile.liveCeiling;
     const lastMidi = soloistState.lastMidiPlayed || 72;
 
     // Determine context
@@ -107,6 +109,12 @@ export function selectPitchAndDevices(
     const isSectionDownbeat =
         step === coordination.sectionStart && soloistState.transitionState === 'lead_in';
     const isBeatStart = isStrongBeat;
+    const isProtectedSeedTone = Boolean(
+        seedNote?.isAnchor ||
+            isStrongBeat ||
+            durationSteps >= stepsPerBeat ||
+            (seedNote?.durationSteps || 0) >= stepsPerBeat,
+    );
 
     // Helper to finalize note (formerly inline in getSoloistNote)
     const finalizeNote = (/** @type {any} */ res) => {
@@ -191,7 +199,8 @@ export function selectPitchAndDevices(
     const rootMidi = targetChord.rootMidi;
     let totalWeight = 0;
 
-    const dynamicCenter = 64 + intensity * 12;
+    const loopLift = Math.min(playback.currentLoopCount || 0, 3) * registerProfile.liveLoopLift;
+    const dynamicCenter = registerProfile.liveCenter + intensity * 8 + loopLift;
     const searchMin = Math.max(minMidi, lastMidi - 14);
     const searchMax = Math.min(maxMidi, lastMidi + 14);
 
@@ -511,9 +520,14 @@ export function selectPitchAndDevices(
     let deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const sessionSeed = soloistState.sessionSeed;
     const loopCount = playback.currentLoopCount || 0;
+    const isLaterHeadBypass = isHeadBypass && loopCount > 0;
+    const isLineStyle = ['jazz', 'bird', 'bossa'].includes(activeStyle);
 
     // Progressive Ornamentation: Increase device probability by 20% per loop
     deviceBaseProb *= 1.0 + loopCount * 0.2;
+    if (isLineStyle) {
+        deviceBaseProb *= isLaterHeadBypass ? 0.58 : 0.68;
+    }
 
     if (loopCount === 0 && sessionSeed && sessionSeed.notes.length > 0) {
         deviceBaseProb *= 0.2; // Clean head
@@ -521,6 +535,23 @@ export function selectPitchAndDevices(
     if (isHeadBypass && loopCount === 0) {
         deviceBaseProb = 0;
     }
+    if (isLaterHeadBypass) {
+        const thematicBoost = isLineStyle
+            ? loopCount === 1
+                ? 1.55
+                : 1.95
+            : loopCount === 1
+              ? 2.4
+              : 3.1;
+        deviceBaseProb *= thematicBoost;
+    }
+    if (loopCount > 1 && !isHeadBypass) {
+        deviceBaseProb *= isLineStyle ? 0.95 + intensity * 0.2 : 1.15 + intensity * 0.35;
+    }
+    if (seedNote?.isAnchor) {
+        deviceBaseProb *= 0.35;
+    }
+    deviceBaseProb = Math.min(loopCount === 0 ? 0.4 : isLineStyle ? 0.62 : 0.85, deviceBaseProb);
     const isPolyphonic =
         soloistState.mode !== 'monophonic' &&
         (soloistState.doubleStopProb ?? 1.0) > 0 &&
@@ -558,8 +589,44 @@ export function selectPitchAndDevices(
         }
     }
 
-    if (isBeatStart && Math.random() < deviceBaseProb) {
+    const canTriggerDevice =
+        isBeatStart ||
+        (isLaterHeadBypass &&
+            !isProtectedSeedTone &&
+            (!isLineStyle || durationSteps >= stepsPerBeat / 2)) ||
+        (loopCount > 1 && !isStrongBeat && durationSteps <= stepsPerBeat && !isLineStyle);
+    if (canTriggerDevice && Math.random() < deviceBaseProb) {
         let allowed = [...(config.allowedDevices || [])];
+
+        if (isLaterHeadBypass && !isProtectedSeedTone) {
+            const thematicDevices = [];
+            if (!allowed.includes('graceNote')) {
+                thematicDevices.push('graceNote');
+            }
+            if (
+                ['jazz', 'bird', 'bossa', 'funk', 'neo', 'scalar'].includes(activeStyle) &&
+                !allowed.includes('enclosure')
+            ) {
+                thematicDevices.push('enclosure');
+            }
+            if (intensity > 0.7 && (!isLineStyle || isStrongBeat) && !allowed.includes('run')) {
+                thematicDevices.push('run');
+            }
+            if (
+                ['rock', 'blues', 'funk', 'scalar'].includes(activeStyle) &&
+                !allowed.includes('slide')
+            ) {
+                thematicDevices.push('slide');
+            }
+            allowed = [...thematicDevices, ...allowed];
+        }
+
+        if (isLineStyle && !isStrongBeat) {
+            allowed = allowed.filter(
+                (device) =>
+                    device !== 'run' && device !== 'birdFlurry' && device !== 'sheetsOfSound',
+            );
+        }
 
         // --- Greats Profiles: Device Priority ---
         if (

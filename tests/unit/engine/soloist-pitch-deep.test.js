@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SOLOIST_INTENTS } from '../../../public/engine/soloist-config.js';
 import { selectPitchAndDevices } from '../../../public/engine/soloist-pitch-engine.js';
 import { getState } from '../../../public/state.js';
@@ -104,5 +104,35 @@ describe('Soloist Pitch Engine Deep Dive', () => {
             }
         }
         expect(repeats).toBeGreaterThan(15);
+    });
+
+    it('should allow a tasteful ornament on later-loop head-bypass notes', () => {
+        const randomSpy = vi.spyOn(Math, 'random');
+
+        args[1] = {
+            velocity: 0.8,
+            durationSteps: 2,
+            isStrongBeat: false,
+            isHeadBypass: true,
+            targetMidi: 67,
+            seedNote: { midi: 67, durationSteps: 2, isAnchor: false },
+        };
+        args[4] = 'scalar';
+        args[8] = { currentLoopCount: 2 };
+        args[9] = {
+            mode: 'monophonic',
+            tension: 0.5,
+            lastMidiPlayed: 65,
+            deviceBuffer: [],
+        };
+        args[14] = SOLOIST_INTENTS.EXPLORATORY;
+
+        randomSpy.mockReturnValueOnce(0.05).mockReturnValueOnce(0);
+
+        const result = selectPitchAndDevices(getState(), ...args);
+
+        expect(result).toBeDefined();
+        expect(args[9].deviceBuffer.length).toBeGreaterThan(0);
+        randomSpy.mockRestore();
     });
 });

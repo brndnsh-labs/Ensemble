@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../public/config.js';
 import { getSoloistNote } from '../public/engine/soloist.js';
-import { GENRE_STYLE_MAPPING } from '../public/engine/soloist-config.js';
+import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
 import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
@@ -49,10 +49,7 @@ function getOptionValue(options, key, fallback) {
 }
 
 function getSeedStyle(genre, style) {
-    if (style !== 'smart') {
-        return style;
-    }
-    return GENRE_STYLE_MAPPING[genre] || 'scalar';
+    return resolveSoloistStyle(style, genre);
 }
 
 function formatMidi(midi) {
