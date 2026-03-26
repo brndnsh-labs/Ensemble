@@ -1,4 +1,5 @@
 /* eslint-disable */
+// cspell:ignore Emaj
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
@@ -90,6 +91,7 @@ vi.mock('../../public/config.js', async (importOriginal) => {
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { getBassNote } from '../../public/engine/bass-engine.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
@@ -106,6 +108,26 @@ function getKeyAtOffset(startKey, semitones) {
     const startIdx = KEY_ORDER.indexOf(startKey);
     const targetIdx = (startIdx + semitones + 12) % 12;
     return KEY_ORDER[targetIdx];
+}
+
+function loadPreset(name, baseKey, isMinor = false) {
+    const preset = CHORD_PRESETS.find((candidate) => candidate.name === name);
+    expect(preset).toBeDefined();
+
+    arranger.key = baseKey;
+    arranger.isMinor = isMinor;
+    arranger.sections = preset.sections.map((section, index) => ({
+        ...section,
+        id: `${name}-${index}`,
+        key:
+            section.key ||
+            (typeof section.keyShift === 'number'
+                ? getKeyAtOffset(baseKey, section.keyShift)
+                : undefined),
+    }));
+
+    validateProgression(getState());
+    return preset;
 }
 
 describe('Standards Compliance Test Suite', () => {
@@ -142,6 +164,153 @@ describe('Standards Compliance Test Suite', () => {
             const result = getBassNote(getState(), p[0], p[1], 0, 55, 38, 'quarter', 0, 0, 0);
             expect(result).not.toBeNull();
             expect(result.midi % 12).toBe(p[0].rootMidi % 12);
+        });
+    });
+
+    describe('Shipped Standards Presets', () => {
+        it('Blue Bossa uses a local ii-V-I when it modulates to Db major', () => {
+            loadPreset('Blue Bossa', 'C', true);
+
+            const modulation = arranger.progression.filter(
+                (chord) => chord.sectionLabel === 'Modulation',
+            );
+            expect(modulation.map((chord) => chord.absName)).toEqual([
+                'Ebm7',
+                'Ab7',
+                'Dbmaj7',
+                'Dbmaj7',
+            ]);
+            expect(new Set(modulation.map((chord) => chord.key))).toEqual(new Set(['Db']));
+        });
+
+        it('Autumn Leaves stores the turnaround dominant as altered rather than merely augmented', () => {
+            loadPreset('Autumn Leaves', 'Bb', false);
+
+            const turnaroundChord = arranger.progression.find(
+                (chord) => chord.sectionLabel === 'A' && chord.localIndex === 5,
+            );
+            expect(turnaroundChord.absName).toBe('D7alt');
+            expect(turnaroundChord.quality).toBe('7alt');
+        });
+
+        it('All The Things You Are follows the common descending local-key cycle', () => {
+            loadPreset('All The Things You Are', 'Ab', false);
+
+            const cSection = arranger.progression.filter((chord) => chord.sectionLabel === 'A (C)');
+            expect(cSection.map((chord) => chord.absName)).toEqual(['Dm7', 'G7', 'Cmaj7', 'Cmaj7']);
+            expect(new Set(cSection.map((chord) => chord.key))).toEqual(new Set(['C']));
+
+            const ebSection = arranger.progression.filter(
+                (chord) => chord.sectionLabel === 'A2 (Eb)',
+            );
+            expect(ebSection.map((chord) => chord.absName)).toEqual([
+                'Cm7',
+                'Fm7',
+                'Bb7',
+                'Ebmaj7',
+                'Abmaj7',
+            ]);
+            expect(new Set(ebSection.map((chord) => chord.key))).toEqual(new Set(['Eb']));
+
+            const gSection = arranger.progression.filter(
+                (chord) => chord.sectionLabel === 'A2 (G)',
+            );
+            expect(gSection.map((chord) => chord.absName)).toEqual(['Am7', 'D7', 'Gmaj7', 'Gmaj7']);
+            expect(new Set(gSection.map((chord) => chord.key))).toEqual(new Set(['G']));
+
+            const eSection = arranger.progression.filter((chord) => chord.sectionLabel === 'B (E)');
+            expect(eSection.map((chord) => chord.absName)).toEqual([
+                'F#dim7',
+                'B7',
+                'Emaj7',
+                'C7alt',
+            ]);
+            expect(new Set(eSection.map((chord) => chord.key))).toEqual(new Set(['E']));
+
+            const turnaround = arranger.progression.at(-1);
+            expect(turnaround.absName).toBe('C7alt');
+            expect(turnaround.quality).toBe('7alt');
+        });
+
+        it('Cherokee uses the common B-A-G bridge and a 64-bar linearized form', () => {
+            loadPreset('Cherokee', 'Bb', false);
+
+            expect(arranger.measureMap).toHaveLength(64);
+
+            const bSection = arranger.progression.filter((chord) => chord.sectionLabel === 'B (B)');
+            expect(bSection.map((chord) => chord.absName)).toEqual([
+                'C#m7',
+                'F#7',
+                'Bmaj7',
+                'Bmaj7',
+            ]);
+            expect(new Set(bSection.map((chord) => chord.key))).toEqual(new Set(['B']));
+
+            const aSection = arranger.progression.filter((chord) => chord.sectionLabel === 'B (A)');
+            expect(aSection.map((chord) => chord.absName)).toEqual(['Bm7', 'E7', 'Amaj7', 'Amaj7']);
+            expect(new Set(aSection.map((chord) => chord.key))).toEqual(new Set(['A']));
+
+            const gSection = arranger.progression.filter((chord) => chord.sectionLabel === 'B (G)');
+            expect(gSection.map((chord) => chord.absName)).toEqual(['Am7', 'D7', 'Gmaj7', 'Gmaj7']);
+            expect(new Set(gSection.map((chord) => chord.key))).toEqual(new Set(['G']));
+
+            const returnSection = arranger.progression.filter(
+                (chord) => chord.sectionLabel === 'B (Bb)',
+            );
+            expect(returnSection.map((chord) => chord.absName)).toEqual([
+                'Gm7',
+                'C7',
+                'Cm7',
+                'F7+',
+            ]);
+            expect(new Set(returnSection.map((chord) => chord.key))).toEqual(new Set(['Bb']));
+        });
+
+        it('Stella by Starlight matches the source-backed modern Real Book changes', () => {
+            loadPreset('Stella by Starlight', 'Bb', false);
+
+            expect(arranger.measureMap).toHaveLength(32);
+
+            expect(arranger.progression.slice(0, 8).map((chord) => chord.absName)).toEqual([
+                'Em7b5',
+                'A7b9',
+                'Cm7',
+                'F7b9',
+                'Fm7',
+                'Bb7',
+                'Ebmaj7',
+                'Ab7',
+            ]);
+
+            const bridgeInPlace = arranger.progression.filter(
+                (chord) => chord.sectionLabel === 'B',
+            );
+            expect(bridgeInPlace.map((chord) => chord.absName)).toEqual([
+                'Bbmaj7',
+                'Em7b5',
+                'A7b9',
+                'Dm7',
+                'Bbm7',
+                'Eb7',
+                'Fmaj7',
+                'Em7b5',
+                'A7',
+                'Am7b5',
+                'D7b9',
+            ]);
+
+            const turnaround = arranger.progression.filter((chord) => chord.sectionLabel === 'D');
+            expect(turnaround.map((chord) => chord.absName)).toEqual([
+                'Em7b5',
+                'A7b9',
+                'Dm7b5',
+                'G7b9',
+                'Cm7b5',
+                'F7b9',
+                'Bbmaj7',
+                'Bbmaj7',
+            ]);
+            expect(new Set(turnaround.map((chord) => chord.key))).toEqual(new Set(['Bb']));
         });
     });
 
@@ -193,7 +362,13 @@ describe('Standards Compliance Test Suite', () => {
                     id: 'A1',
                     label: 'A',
                     key: 'Bb',
-                    value: 'Bbmaj7 | Fm7 Bb7 | Ebmaj7 | Ebm7 Ab7 | Bbmaj7 C7 | Cm7 F7 | Bbmaj7 | Cm7 F7',
+                    value: 'Bbmaj7 | Bbmaj7 | Fm7 | Bb7 | Ebmaj7 | Ebmaj7 | Ab7 | Ab7 | Bbmaj7 | Bbmaj7 | C7 | C7 | Cm7 | G7 | Cm7 | F7+',
+                },
+                {
+                    id: 'A2',
+                    label: 'A2',
+                    key: 'Bb',
+                    value: 'Bbmaj7 | Bbmaj7 | Fm7 | Bb7 | Ebmaj7 | Ebmaj7 | Ab7 | Ab7 | Bbmaj7 | Bbmaj7 | C7 | C7 | Cm7 | F7 | Bbmaj7 | Bbmaj7',
                 },
                 { id: 'B1', label: 'B (B)', key: 'B', value: 'C#m7 | F#7 | Bmaj7 | Bmaj7' },
                 {
@@ -201,6 +376,20 @@ describe('Standards Compliance Test Suite', () => {
                     label: 'B (A)',
                     key: 'A',
                     value: 'Bm7 | E7 | Amaj7 | Amaj7',
+                    seamless: true,
+                },
+                {
+                    id: 'B3',
+                    label: 'B (G)',
+                    key: 'G',
+                    value: 'Am7 | D7 | Gmaj7 | Gmaj7',
+                    seamless: true,
+                },
+                {
+                    id: 'B4',
+                    label: 'B (Bb)',
+                    key: 'Bb',
+                    value: 'Gm7 | C7 | Cm7 | F7+',
                     seamless: true,
                 },
             ];
@@ -227,6 +416,29 @@ describe('Standards Compliance Test Suite', () => {
             expect(scale).toContain(0);
             expect(scale).toContain(4);
             expect(scale).toContain(11);
+        });
+
+        it('should shift key center for the G Major modulation', () => {
+            const gSection = arranger.progression.find(
+                (c) => c.sectionLabel === 'B (G)' && c.quality === 'maj7',
+            );
+            expect(gSection.key).toBe('G');
+            const scale = getScaleForChord(getState(), gSection, null, 'bird');
+            expect(scale).toContain(0);
+            expect(scale).toContain(4);
+            expect(scale).toContain(11);
+        });
+
+        it('should return toward Bb with the common Gm7-C7 / Cm7-F7#5 motion', () => {
+            const returnSection = arranger.progression.filter((c) => c.sectionLabel === 'B (Bb)');
+            expect(returnSection.map((chord) => chord.absName)).toEqual([
+                'Gm7',
+                'C7',
+                'Cm7',
+                'F7+',
+            ]);
+            expect(returnSection.at(-1).quality).toBe('aug');
+            expect(returnSection.at(-1).is7th).toBe(true);
         });
     });
 
@@ -569,23 +781,60 @@ describe('Standards Compliance Test Suite', () => {
                 {
                     id: 'A',
                     label: 'A',
-                    value: 'Em7b5 | A7alt | Cm7 | F7 | Fm7 | Bb7 | Ebmaj7 | Ab7',
+                    value: 'Em7b5 | A7b9 | Cm7 | F7b9 | Fm7 | Bb7 | Ebmaj7 | Ab7',
+                },
+                {
+                    id: 'B',
+                    label: 'B',
+                    value: 'Bbmaj7 | Em7b5 A7b9 | Dm7 | Bbm7 Eb7 | Fmaj7 | Em7b5 A7 | Am7b5 | D7b9',
+                },
+                {
+                    id: 'C',
+                    label: 'C',
+                    value: 'G7#5 | G7#5 | Cm7 | Cm7 | Ab7 | Ab7 | Bbmaj7 | Bbmaj7',
+                },
+                {
+                    id: 'D',
+                    label: 'D',
+                    value: 'Em7b5 | A7b9 | Dm7b5 | G7b9 | Cm7b5 | F7b9 | Bbmaj7 | Bbmaj7',
                 },
             ];
             validateProgression(getState());
         });
 
-        it('should select appropriate scales', () => {
+        it('should parse the source-backed modern form', () => {
+            expect(arranger.measureMap).toHaveLength(32);
+            expect(arranger.progression.slice(0, 8).map((chord) => chord.absName)).toEqual([
+                'Em7b5',
+                'A7b9',
+                'Cm7',
+                'F7b9',
+                'Fm7',
+                'Bb7',
+                'Ebmaj7',
+                'Ab7',
+            ]);
+            expect(
+                arranger.progression
+                    .filter((chord) => chord.sectionLabel === 'D')
+                    .map((chord) => chord.absName),
+            ).toEqual(['Em7b5', 'A7b9', 'Dm7b5', 'G7b9', 'Cm7b5', 'F7b9', 'Bbmaj7', 'Bbmaj7']);
+        });
+
+        it('should select appropriate scales for the modern dominant colors', () => {
             const p = arranger.progression;
             expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
                 0, 1, 3, 5, 6, 8, 10,
             ]); // Locrian
             expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
-                0, 1, 3, 4, 6, 8, 10,
-            ]); // Altered
-            expect(getScaleForChord(getState(), p[7], null, 'bird')).toEqual([
-                0, 2, 4, 6, 7, 9, 10,
-            ]); // Lydian Dominant
+                0, 1, 4, 5, 7, 8, 10,
+            ]); // Phrygian Dominant
+            expect(getScaleForChord(getState(), p[3], p[4], 'bird')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]); // Phrygian Dominant
+            expect(getScaleForChord(getState(), p[17], p[18], 'bird')).toEqual([
+                0, 1, 3, 5, 6, 8, 10,
+            ]); // Locrian on Am7b5
         });
     });
 

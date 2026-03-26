@@ -1,3 +1,5 @@
+// cspell:ignore iidim
+
 import { TIME_SIGNATURES } from '../public/config.js';
 import { getAccompanimentNotes } from '../public/engine/accompaniment.js';
 import { getBassNote } from '../public/engine/bass-engine.js';
@@ -21,10 +23,18 @@ const STANDARDS = {
         bpm: 120,
         intensity: 0.75,
         sections: [
-            { label: 'A', value: '#ivm7b5 | VII7alt | iim7 | V7 | vm7 | I7 | IVmaj7 | bVII7' },
+            { label: 'A', value: '#ivm7b5 | VII7b9 | iim7 | V7b9 | vm7 | I7 | IVmaj7 | bVII7' },
             {
                 label: 'B',
-                value: 'Imaj7 | #ivm7b5 VII7 | iiim7b5 | VI7alt | iim7b5 | V7alt | Imaj7 | vm7 I7',
+                value: 'Imaj7 | #ivm7b5 VII7b9 | iiim7 | im7 IV7 | Vmaj7 | #ivm7b5 VII7 | viim7b5 | III7b9',
+            },
+            {
+                label: 'C',
+                value: 'VI7+ | VI7+ | iim7 | iim7 | bVII7 | bVII7 | Imaj7 | Imaj7',
+            },
+            {
+                label: 'D',
+                value: '#ivm7b5 | VII7b9 | iiim7b5 | VI7b9 | iim7b5 | V7b9 | Imaj7 | Imaj7',
             },
         ],
     },
@@ -34,9 +44,16 @@ const STANDARDS = {
         bpm: 135,
         intensity: 0.75,
         sections: [
-            { label: 'A (Tonic)', value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7' },
-            { label: 'A (III)', value: '#ivm7 | VII7 | IIImaj7', seamless: true },
-            { label: 'A2 (V)', value: 'iiim7 | vi7 | II7 | Vmaj7 | Imaj7' },
+            { label: 'A (Ab)', value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7' },
+            { label: 'A (C)', value: 'iim7 V7 | Imaj7 | Imaj7', keyShift: 4, seamless: true },
+            { label: 'A2 (Eb)', value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7', keyShift: 7 },
+            { label: 'A2 (G)', value: 'iim7 V7 | Imaj7 | Imaj7', keyShift: -1, seamless: true },
+            { label: 'B (G)', value: 'iim7 | V7 | Imaj7 | Imaj7', keyShift: -1 },
+            { label: 'B (E)', value: 'iidim7 | V7 | Imaj7 | bVI7alt', keyShift: 8, seamless: true },
+            {
+                label: 'A3 (Ab)',
+                value: 'vi7 | ii7 | V7 | Imaj7 | IVmaj7 | ivm7 | iiim7 | bIIIdim7 | iim7 | V7 | Imaj7 | III7alt',
+            },
         ],
     },
     'giant-steps': {
