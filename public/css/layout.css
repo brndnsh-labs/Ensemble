@@ -26,9 +26,9 @@ body {
     overflow-x: hidden;
     touch-action: manipulation;
     transition:
-        background-color 0.3s,
-        color 0.3s,
-        border-color 0.3s;
+        background-color var(--anim-normal) var(--anim-ease),
+        color var(--anim-normal) var(--anim-ease),
+        border-color var(--anim-normal) var(--anim-ease);
 }
 
 #flashOverlay {
@@ -51,23 +51,26 @@ body {
 }
 
 .stepper-control {
-    transition: border-color 0.2s;
+    transition:
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
 }
 
 .stepper-control:focus-within {
     border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
 }
 
 header {
     background: var(--panel-color);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    padding: 1rem 2rem;
+    padding: var(--space-4) var(--space-6);
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
     z-index: var(--z-header);
     height: 80px;
     position: sticky;
@@ -76,14 +79,28 @@ header {
 }
 
 #settingsBtn {
-    padding: 0.5rem;
+    padding: var(--space-2);
     background: transparent;
     border: none;
+    border-radius: var(--radius-sm);
     font-size: 1.2rem;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transition:
+        color var(--anim-fast) var(--anim-ease),
+        background-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
+}
+
+#settingsBtn:hover {
+    background: color-mix(in srgb, var(--accent-color), transparent 92%);
+}
+
+#settingsBtn:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 @media (max-width: 600px) {
@@ -176,13 +193,13 @@ h1 {
     background-color: var(--accent-color);
     color: white;
     border: none;
-    padding: 0.5rem 1.5rem;
-    border-radius: 6px;
+    padding: var(--space-2) var(--space-5);
+    border-radius: var(--radius-md);
     font-weight: bold;
     cursor: pointer;
     transition: all var(--anim-fast) var(--anim-ease);
-    font-size: 1rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    font-size: var(--font-base);
+    box-shadow: var(--shadow-sm);
     min-width: 100px; /* Prevent width shifting between START/STOP */
     height: 42px; /* Fixed height to prevent vertical jitter */
     display: inline-flex;
@@ -209,13 +226,13 @@ h1 {
     display: flex;
     align-items: center;
     background: var(--input-bg);
-    border-radius: 6px;
-    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-md);
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-color);
 }
 
 .control-label {
-    font-size: 0.75rem;
+    font-size: var(--font-xs);
     text-transform: uppercase;
     color: var(--text-secondary);
     margin-right: 0.5rem;
@@ -240,9 +257,20 @@ button {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-color);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease);
+}
+
+button:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    border-color: var(--accent-color);
 }
 
 .rel-key-btn {
@@ -252,8 +280,8 @@ button {
 }
 
 .header-btn {
-    padding: 0.4rem;
-    font-size: 0.85rem;
+    padding: var(--space-2);
+    font-size: var(--font-sm);
     min-width: 32px;
     height: 32px;
     display: inline-flex;
@@ -351,13 +379,16 @@ select {
     background-color: var(--select-bg);
     color: var(--select-text);
     border: 1px solid var(--select-border);
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
     font-family: inherit;
-    font-size: 0.9rem;
+    font-size: var(--font-sm);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease);
     width: 100%;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
@@ -370,7 +401,7 @@ select:hover {
 select:focus {
     outline: none;
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color), transparent 70%);
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
 }
 
 /* Specific selects that should not be full-width */
@@ -535,6 +566,13 @@ select option {
 .workspace-nav-btn:hover {
     border-color: color-mix(in srgb, var(--accent-color), transparent 60%);
     transform: translateY(-1px);
+}
+
+.workspace-nav-btn:focus-visible {
+    border-color: color-mix(in srgb, var(--accent-color), transparent 45%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 65%),
+        0 0 0 2px var(--focus-ring-color);
 }
 
 .workspace-nav-btn.active {
@@ -1583,6 +1621,12 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     transform: translateY(-1px);
 }
 
+.workspace-studio-genre-button:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    border-color: color-mix(in srgb, var(--accent-color), transparent 35%);
+}
+
 .workspace-studio-genre-button.is-open {
     border-color: color-mix(in srgb, var(--accent-color), transparent 32%);
     background: color-mix(in srgb, var(--accent-color), transparent 88%);
@@ -1743,6 +1787,12 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 .workspace-studio-surface-close:hover {
     background: var(--card-bg-hover);
     border-color: color-mix(in srgb, var(--studio-surface-accent), transparent 55%);
+}
+
+.workspace-studio-surface-close:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    border-color: color-mix(in srgb, var(--studio-surface-accent), transparent 45%);
 }
 
 .workspace-studio-genre-grid {

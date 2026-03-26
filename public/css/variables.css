@@ -5,6 +5,11 @@
     --font-mono:
         "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas,
         monospace;
+    --font-xs: 0.75rem;
+    --font-sm: 0.875rem;
+    --font-base: 1rem;
+    --font-lg: 1.125rem;
+    --focus-ring-color: color-mix(in srgb, var(--accent-color), transparent 70%);
 
     /* Solarized Dark (Default) */
     --base03: #002b36;
