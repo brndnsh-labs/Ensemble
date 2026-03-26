@@ -179,8 +179,8 @@ describe('UI Layout Integrity', () => {
             const measures = document.querySelectorAll('.measure-box');
             expect(measures.length).toBe(2);
 
-            const sections = document.querySelectorAll('.section-block');
-            expect(sections.length).toBe(1);
+            const rows = document.querySelectorAll('.lead-sheet-row');
+            expect(rows.length).toBe(1);
         });
 
         it('should handle multi-chord measures correctly', async () => {

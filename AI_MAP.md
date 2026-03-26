@@ -116,6 +116,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
 | **Logic Views** | `public/components/Arranger.jsx` | Arranger editor surface used by the editor modal and related flows. |
+| **Logic Views** | `public/components/ChordVisualizer.jsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
 | **Controls** | `public/components/Transport.jsx` | Playback controls and tempo. |
 | **Visuals** | `public/components/Visualizer.jsx` | Canvas rendering container. |
 | **Library** | `public/components/PresetLibrary.jsx` | Chord progression library modal. |
@@ -146,6 +147,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/midi-export.js` | Main-thread MIDI file triggers. |
 | `public/song-generator.js` | Algorithmic song structure generation. |
 | `public/melody-harmonizer.js` | Monophonic analysis for chord generation. |
+| `public/lead-sheet-model.js` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/persistence.js` | LocalStorage session saving. |
 | `public/platform.js` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/sharing.js` | URL-based song sharing. | `getShareURL` |

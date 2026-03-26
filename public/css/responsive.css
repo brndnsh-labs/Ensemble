@@ -116,18 +116,15 @@
         height: 100%;
         max-height: none;
         overflow: hidden;
+        --lead-row-gap: 0.3rem;
+        --lead-measure-gap: 0.22rem;
+        --lead-measure-min-height: 34px;
+        --lead-chord-min-height: 30px;
+        --lead-font-size: clamp(0.86rem, 3.6vw, 1rem);
     }
 
-    .workspace-arranger-chords .section-block {
+    .workspace-arranger-chords .lead-sheet-row {
         width: 100%;
-        max-width: none;
-        margin-left: 0;
-        margin-right: 0;
-        margin-bottom: 0.65rem;
-    }
-
-    .workspace-arranger-chords .section-block-content {
-        gap: 0.3rem;
     }
 
     .workspace-arranger-chords .measure-box {
@@ -135,7 +132,6 @@
     }
 
     .workspace-arranger-chords .chord-card {
-        --base-size: clamp(0.9rem, 3.8vw, 1.15rem);
         min-height: 30px;
     }
 }
@@ -182,14 +178,18 @@
     }
 
     .workspace-view--arranger .workspace-arranger-main {
-        gap: 0.45rem;
+        gap: 0.3rem;
+    }
+
+    .workspace-view--arranger #panel-arranger {
+        padding: 0.75rem 0.75rem 0.7rem;
     }
 
     .workspace-view--arranger #panel-arranger .panel-header {
         flex-direction: column;
         align-items: stretch;
-        gap: 0.65rem;
-        padding-bottom: 0.5rem;
+        gap: 0.38rem;
+        padding-bottom: 0.28rem;
     }
 
     .workspace-view--arranger #panel-arranger .panel-header > div {
@@ -211,13 +211,13 @@
     }
 
     .workspace-view--arranger #panel-arranger .workspace-arranger-controls-panel {
-        margin-top: 0.45rem;
-        padding: 0.55rem;
+        margin-top: 0.22rem;
+        padding: 0.4rem 0.42rem;
     }
 
     .workspace-view--arranger .workspace-arranger-controls-panel {
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 0.45rem;
+        gap: 0.34rem;
         align-items: center;
     }
 
@@ -231,7 +231,7 @@
         justify-content: stretch;
         display: flex;
         flex-wrap: nowrap;
-        gap: 0.25rem;
+        gap: 0.2rem;
     }
 
     .workspace-view--arranger .workspace-arranger-controls-actions .header-btn,
@@ -378,38 +378,77 @@
 
     .workspace-view--arranger .workspace-arranger-chords .display-area {
         height: auto;
-        max-height: calc(100dvh - 64px - 92px - 9.75rem);
+        max-height: calc(100dvh - 64px - 92px - 8.7rem);
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
         scroll-padding-block: 18vh;
-        padding: 0.35rem;
+        padding: 0.28rem;
+        --lead-row-gap: 0.22rem;
+        --lead-measure-gap: 0.14rem;
+        --lead-marker-reserve: 0.38rem;
+        --lead-measure-min-height: 28px;
+        --lead-chord-min-height: 26px;
+        --lead-font-size: clamp(0.84rem, 4.1vw, 0.98rem);
     }
 
-    .workspace-view--arranger .workspace-arranger-chords .section-block {
-        max-width: none;
-        margin-bottom: 0.55rem;
-        padding: 0.3rem 0.45rem;
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords .section-block-header {
-        font-size: 0.58rem;
-        margin-bottom: 0.28rem;
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords .section-block-content {
-        gap: 0.24rem;
+    .workspace-view--arranger .workspace-arranger-chords .lead-sheet-row {
+        width: 100%;
     }
 
     .workspace-view--arranger .workspace-arranger-chords .measure-box {
-        min-height: 30px;
+        min-height: 28px;
     }
 
     .workspace-view--arranger .workspace-arranger-chords .chord-card {
-        --base-size: clamp(0.82rem, 4vw, 1rem);
-        min-height: 28px;
-        padding: 0.12rem;
+        min-height: 26px;
+        padding: 0.08rem 0.06rem;
         scroll-margin-block: 16vh;
+    }
+
+    .chord-maximized .workspace-view--arranger .workspace-arranger-chords .display-area {
+        max-height: none;
+        height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+        padding: 0.24rem 0.24rem calc(0.24rem + env(safe-area-inset-bottom));
+        --lead-row-gap: 0.24rem;
+        --lead-measure-gap: 0.14rem;
+        --lead-marker-reserve: 0.42rem;
+        --lead-marker-size: 0.56rem;
+        --lead-measure-min-height: 36px;
+        --lead-chord-min-height: 30px;
+        --lead-font-size: clamp(1.06rem, 4.9vw, 1.22rem);
+    }
+
+    .chord-maximized
+        .workspace-view--arranger
+        .workspace-arranger-chords
+        .display-area.lead-sheet--compact {
+        --lead-row-gap: 0.2rem;
+        --lead-measure-gap: 0.12rem;
+        --lead-marker-reserve: 0.38rem;
+        --lead-font-size: clamp(1.02rem, 4.6vw, 1.14rem);
+        --lead-measure-min-height: 34px;
+        --lead-chord-min-height: 28px;
+    }
+
+    .chord-maximized
+        .workspace-view--arranger
+        .workspace-arranger-chords
+        .display-area.lead-sheet--ultra-compact {
+        --lead-row-gap: 0.18rem;
+        --lead-measure-gap: 0.12rem;
+        --lead-marker-reserve: 0.36rem;
+        --lead-font-size: clamp(0.98rem, 4.3vw, 1.08rem);
+        --lead-measure-min-height: 32px;
+        --lead-chord-min-height: 27px;
+    }
+
+    .chord-maximized .workspace-view--arranger .workspace-arranger-chords .measure-box {
+        min-height: var(--lead-measure-min-height);
+    }
+
+    .chord-maximized .workspace-view--arranger .workspace-arranger-chords .chord-card {
+        min-height: var(--lead-chord-min-height);
     }
 
     .workspace-view--studio {

@@ -93,6 +93,8 @@ describe('ChordVisualizer Component', () => {
         const cards = container.querySelectorAll('.chord-card');
         expect(cards[0].classList.contains('active')).toBe(false);
         expect(cards[1].classList.contains('active')).toBe(true);
+        expect(container.querySelectorAll('.lead-sheet-row--active')).toHaveLength(1);
+        expect(container.querySelectorAll('.measure-box--active')).toHaveLength(1);
     });
 
     it('should render section labels', () => {
@@ -105,7 +107,40 @@ describe('ChordVisualizer Component', () => {
         expect(container.textContent).toContain('Verse');
     });
 
-    it('should render sparklines when leadSheetMelody is present', () => {
+    it('should render a continuous lead-sheet row', () => {
+        setupState({
+            arranger: {
+                progression: [
+                    {
+                        sectionId: 's1',
+                        sectionLabel: 'Verse',
+                        beats: 4,
+                        absName: 'C',
+                        globalIndex: 0,
+                    },
+                    {
+                        sectionId: 's1',
+                        sectionLabel: 'Verse',
+                        beats: 4,
+                        absName: 'G',
+                        globalIndex: 1,
+                    },
+                ],
+                timeSignature: '4/4',
+                sections: [{ id: 's1', label: 'Verse', seamless: false }],
+                notation: 'absolute',
+            },
+        });
+
+        act(() => {
+            render(<ChordVisualizer />, container);
+        });
+
+        expect(container.querySelectorAll('.lead-sheet-row')).toHaveLength(1);
+        expect(container.querySelectorAll('.lead-sheet-marker')).toHaveLength(1);
+    });
+
+    it('should render sparklines for short maximized lead sheets', () => {
         setupState({
             soloist: {
                 leadSheetMelody: [
@@ -122,13 +157,14 @@ describe('ChordVisualizer Component', () => {
                         beats: 4,
                         absName: 'C',
                         globalIndex: 0,
-                        start: 0,
-                        end: 16,
                     },
                 ],
                 timeSignature: '4/4',
                 sections: [{ id: 's1', label: 'Verse', seamless: false }],
                 notation: 'absolute',
+            },
+            vizState: {
+                isMaximized: true,
             },
         });
 

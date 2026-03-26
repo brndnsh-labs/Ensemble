@@ -10,35 +10,39 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     });
 
     test('Chord Visualizer - Default Layout', async ({ page }) => {
-        // Scroll to panel-arranger if needed
         const visualizer = page.locator('#chordVisualizer');
         await expect(visualizer).toBeVisible();
 
-        // Verify some chord cards are rendered
-        const chordCard = visualizer.locator('.chord-card').first();
-        await expect(chordCard).toBeVisible();
+        await expect(visualizer.locator('.lead-sheet-row').first()).toBeVisible();
+        await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
 
-    test('Chord Visualizer - Section Labels and Measures', async ({ page }) => {
+    test('Chord Visualizer - Continuous lead-sheet rows', async ({ page }) => {
+        await page.getByRole('button', { name: 'Open arranger actions' }).click();
+        await page.locator('.workspace-library-fab').dispatchEvent('click');
+        await page.getByRole('button', { name: 'Autumn Leaves' }).click();
+
         const visualizer = page.locator('#chordVisualizer');
-
         // Verify structural elements are present
-        const measureBox = visualizer.locator('.measure-box').first();
-        await expect(measureBox).toBeVisible();
-
-        const chordCard = visualizer.locator('.chord-card').first();
-        await expect(chordCard).toBeVisible();
+        await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
+        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.measure-box').first()).toBeVisible();
+        await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
 
     test('Chord Visualizer highlights the active chord during playback', async ({ page }) => {
         const visualizer = page.locator('#chordVisualizer');
         await expect(visualizer.locator('.chord-card.active')).toHaveCount(0);
+        await expect(visualizer.locator('.lead-sheet-row--active')).toHaveCount(0);
+        await expect(visualizer.locator('.measure-box--active')).toHaveCount(0);
 
         await page.locator('#playBtn').click();
 
         await expect(visualizer.locator('.chord-card.active').first()).toBeVisible({
             timeout: 10000,
         });
+        await expect(visualizer.locator('.lead-sheet-row--active')).toHaveCount(1);
+        await expect(visualizer.locator('.measure-box--active')).toHaveCount(1);
         await expect(visualizer.locator('.measure-box:has(.chord-card.active)')).toHaveCount(1);
 
         await page.locator('#playBtn').click();
@@ -79,6 +83,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const firstChord = visualizer.locator('.chord-card').first();
 
         await expect(firstChord).toBeVisible();
+        await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
+        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(4);
         await expect
             .poll(async () =>
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
@@ -88,6 +94,56 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             'scrollHeight',
             await visualizer.evaluate((el) => el.clientHeight),
         );
+    });
+
+    test('All The Things You Are stays legible in ultra-compact mode', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+
+        await page.getByRole('button', { name: 'Open arranger actions' }).click();
+        await page.locator('.workspace-library-fab').dispatchEvent('click');
+
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        await expect(modal).toBeVisible();
+
+        await page.getByRole('button', { name: 'All The Things You Are' }).click();
+        await expect(modal).toBeHidden();
+
+        const visualizer = page.locator('#chordVisualizer');
+        const firstChord = visualizer.locator('.chord-card').first();
+        const rowMeasureCounts = await visualizer
+            .locator('.lead-sheet-row')
+            .evaluateAll((rows) => rows.map((row) => row.querySelectorAll('.measure-box').length));
+
+        await expect(visualizer).toHaveAttribute('data-total-measures', '36');
+        await expect(visualizer).toHaveAttribute('data-density', 'ultra-compact');
+        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(7);
+        await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(9);
+        expect(rowMeasureCounts).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 4]);
+        await expect(firstChord).toBeVisible();
+        await expect
+            .poll(async () =>
+                firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+            )
+            .toBeGreaterThan(16);
+        await expect(visualizer).toHaveJSProperty(
+            'scrollHeight',
+            await visualizer.evaluate((el) => el.clientHeight),
+        );
+
+        const standardFontSize = await firstChord.evaluate((el) =>
+            parseFloat(getComputedStyle(el).fontSize),
+        );
+
+        await page.click('#maximizeChordBtn');
+        await expect(page.locator('body')).toHaveClass(/chord-maximized/);
+        await expect
+            .poll(async () =>
+                visualizer
+                    .locator('.chord-card')
+                    .first()
+                    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+            )
+            .toBeGreaterThan(standardFontSize);
     });
 
     test('Arranger action menu stays fully visible after loading a short preset', async ({

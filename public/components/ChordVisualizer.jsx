@@ -2,6 +2,11 @@ import { Fragment } from 'preact';
 import React, { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
+import {
+    buildLeadSheetRows,
+    buildLeadSheetSections,
+    getLeadSheetDensity,
+} from '../lead-sheet-model.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -11,26 +16,15 @@ import { formatUnicodeSymbols } from '../utils.js';
  * @typedef {Object} ChordCardProps
  * @property {any} chord
  * @property {boolean} isActive
- * @property {number} totalMeasures
- * @property {boolean} isMaximized
- * @property {boolean} isDense
  * @property {string} notation
  * @property {any[]} [leadSheetMelody]
- * @property {string} soloistStyle
+ * @property {boolean} showSparkline
  */
+
 /**
  * @param {ChordCardProps} props
  */
-const ChordCardComponent = ({
-    chord,
-    isActive,
-    totalMeasures,
-    isMaximized,
-    isDense,
-    notation,
-    leadSheetMelody,
-    soloistStyle,
-}) => {
+const ChordCardComponent = ({ chord, isActive, notation, leadSheetMelody, showSparkline }) => {
     const disp = chord.display ? chord.display[notation] : null;
 
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
@@ -40,82 +34,61 @@ const ChordCardComponent = ({
         if (!cardRef.current) {
             return;
         }
+
         const card = cardRef.current;
         const charCount = disp
             ? disp.root.length + disp.suffix.length + (disp.bass ? disp.bass.length + 1 : 0)
             : chord.absName?.length || 0;
 
         let scale = 1.0;
-        if (isMaximized) {
-            if (totalMeasures > 24) {
-                scale *= 0.9;
-            }
-            if (totalMeasures > 32) {
-                scale *= 0.8;
-            }
-            if (totalMeasures > 48) {
-                scale *= 0.7;
-            }
-        } else if (isDense) {
-            if (totalMeasures > 24) {
-                scale *= 0.92;
-            }
-            if (totalMeasures > 32) {
-                scale *= 0.86;
-            }
-            if (totalMeasures > 40) {
-                scale *= 0.8;
-            }
-        }
         if (charCount > 7) {
-            scale *= 0.9;
+            scale *= 0.92;
         }
         if (charCount > 10) {
-            scale *= 0.8;
+            scale *= 0.84;
         }
-
-        // Note: measure chord count scaling is harder without measure context here,
-        // but we can pass it if needed.
+        if (charCount > 13) {
+            scale *= 0.76;
+        }
 
         if (scale < 1.0) {
             card.style.setProperty('--font-scale', scale.toFixed(2));
         } else {
             card.style.removeProperty('--font-scale');
         }
-    }, [disp, chord.absName, isDense, isMaximized, totalMeasures]);
+    }, [disp, chord.absName]);
 
-    const handleClick = (/** @type {any} */ e) => {
-        e.stopPropagation();
+    const handleClick = (/** @type {any} */ event) => {
+        event.stopPropagation();
         if (/** @type {any} */ (window).previewChord) {
             /** @type {any} */ (window).previewChord(chord.globalIndex);
         }
     };
 
+    const sparklineNotes = useMemo(() => {
+        if (!showSparkline || !leadSheetMelody || leadSheetMelody.length === 0) {
+            return [];
+        }
+
+        if (chord.start === undefined) {
+            return [];
+        }
+
+        return leadSheetMelody.filter(
+            (/** @type {any} */ note) =>
+                note.globalStep >= chord.start && note.globalStep < chord.end,
+        );
+    }, [chord.end, chord.start, leadSheetMelody, showSparkline]);
+
     const classNames = [
         'chord-card',
+        sparklineNotes.length > 0 ? 'chord-card--with-sparkline' : '',
         chord.isMinor ? 'minor' : '',
         chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
         isActive ? 'active' : '',
     ]
         .filter(Boolean)
         .join(' ');
-
-    // --- Melody Sparkline Logic ---
-    const sparklineNotes = useMemo(() => {
-        if (
-            soloistStyle !== 'lead_sheet' ||
-            !leadSheetMelody ||
-            leadSheetMelody.length === 0 ||
-            chord.start === undefined
-        ) {
-            return [];
-        }
-
-        // Filter notes for this specific chord's step range
-        return leadSheetMelody.filter(
-            (/** @type {any} */ n) => n.globalStep >= chord.start && n.globalStep < chord.end,
-        );
-    }, [leadSheetMelody, soloistStyle, chord.start, chord.end]);
 
     return (
         <div className={classNames} ref={cardRef} onClick={handleClick}>
@@ -133,11 +106,14 @@ const ChordCardComponent = ({
 
             {sparklineNotes.length > 0 && (
                 <div className="sparkline-container">
-                    {sparklineNotes.map((/** @type {any} */ n, /** @type {any} */ i) => {
-                        // Normalize MIDI 48-84 to 0-100% height
-                        const height = Math.min(100, Math.max(15, ((n.midi - 48) / 36) * 100));
+                    {sparklineNotes.map((/** @type {any} */ note, /** @type {any} */ index) => {
+                        const height = Math.min(100, Math.max(15, ((note.midi - 48) / 36) * 100));
                         return (
-                            <div key={i} className="sparkline-bar" style={`height: ${height}%`} />
+                            <div
+                                key={index}
+                                className="sparkline-bar"
+                                style={`height: ${height}%`}
+                            />
                         );
                     })}
                 </div>
@@ -147,6 +123,14 @@ const ChordCardComponent = ({
 };
 
 const ChordCard = memo(ChordCardComponent);
+
+/**
+ * @param {string} sectionId
+ */
+function openSectionEditor(sectionId) {
+    const detail = { detail: { sectionId } };
+    document.dispatchEvent(new CustomEvent('open-editor', detail));
+}
 
 export function ChordVisualizer() {
     const {
@@ -158,98 +142,40 @@ export function ChordVisualizer() {
         leadSheetMelody,
         soloistStyle,
         isMaximized,
-    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
-        progression: s.arranger.progression,
-        timeSignature: s.arranger.timeSignature,
-        lastActiveChordIndex: s.chords.lastActiveChordIndex,
-        sectionsState: s.arranger.sections,
-        notation: s.arranger.notation || 'roman',
-        leadSheetMelody: s.soloist.leadSheetMelody,
-        soloistStyle: s.soloist.style || 'smart',
-        isMaximized: s.vizState.isMaximized,
+    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ state) => ({
+        progression: state.arranger.progression,
+        timeSignature: state.arranger.timeSignature,
+        lastActiveChordIndex: state.chords.lastActiveChordIndex,
+        sectionsState: state.arranger.sections,
+        notation: state.arranger.notation || 'roman',
+        leadSheetMelody: state.soloist.leadSheetMelody,
+        soloistStyle: state.soloist.style || 'smart',
+        isMaximized: state.vizState.isMaximized,
     }));
 
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const containerRef = useRef(null);
-    const ts = /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
+    const timeSignatureConfig =
+        /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
 
-    const groupedSections = useMemo(() => {
-        /** @type {any[]} */
-        const blocks = [];
-        /** @type {any} */
-        let currentBlock = null;
-        /** @type {any} */
-        let currentMeasure = null;
-        let currentMeasureBeats = 0;
-        let currentStep = 0;
+    const sectionBlocks = useMemo(
+        () => buildLeadSheetSections(progression, sectionsState, timeSignatureConfig),
+        [progression, sectionsState, timeSignatureConfig],
+    );
 
-        progression.forEach((/** @type {any} */ chord, /** @type {any} */ i) => {
-            const sectionData = sectionsState.find(
-                (/** @type {any} */ s) => s.id === chord.sectionId,
-            );
-            const isSeamless = sectionData?.seamless;
-            const isNewSection = !currentBlock || currentBlock.lastSectionId !== chord.sectionId;
-
-            if (isNewSection) {
-                if (!currentBlock || !isSeamless) {
-                    currentBlock = {
-                        id: chord.sectionId,
-                        label: chord.sectionLabel,
-                        measures: [],
-                        lastSectionId: chord.sectionId,
-                    };
-                    blocks.push(currentBlock);
-                    currentMeasure = null;
-                    currentMeasureBeats = 0;
-                } else {
-                    currentBlock.lastSectionId = chord.sectionId;
-                }
-            }
-
-            // Force new measure if section changes?
-            // Usually nice for visual clarity, unless it's a mid-bar modulation.
-            // Let's force new measure for section change to keep labels clean for now.
-            if (isNewSection && currentMeasureBeats > 0) {
-                currentMeasure = null;
-                currentMeasureBeats = 0;
-            }
-
-            if (!currentMeasure || currentMeasureBeats >= ts.beats) {
-                currentMeasure = {
-                    chords: [],
-                    // Tag measure if it starts a seamless section
-                    sectionLabel: isNewSection && isSeamless ? chord.sectionLabel : null,
-                };
-                currentBlock.measures.push(currentMeasure);
-                currentMeasureBeats = 0;
-            }
-
-            const durationSteps = Math.round(chord.beats * ts.stepsPerBeat);
-            currentMeasure.chords.push({
-                ...chord,
-                globalIndex: i,
-                start: currentStep,
-                end: currentStep + durationSteps,
-            });
-            currentStep += durationSteps;
-            currentMeasureBeats += chord.beats;
-        });
-        return blocks;
-    }, [progression, ts, sectionsState]);
+    const leadSheetRows = useMemo(() => buildLeadSheetRows(sectionBlocks), [sectionBlocks]);
 
     const totalMeasures = useMemo(
-        () => groupedSections.reduce((acc, s) => acc + s.measures.length, 0),
-        [groupedSections],
+        () => leadSheetRows.reduce((total, row) => total + row.measures.length, 0),
+        [leadSheetRows],
     );
-    const isDenseLeadSheet = totalMeasures >= 24;
+
+    const density = getLeadSheetDensity(totalMeasures);
+    const showSparkline = isMaximized && soloistStyle === 'lead_sheet' && totalMeasures <= 16;
 
     useEffect(() => {
         const container = containerRef.current;
-        if (!container) {
-            return;
-        }
-
-        if (isMaximized) {
+        if (!container || isMaximized) {
             return;
         }
 
@@ -270,16 +196,15 @@ export function ChordVisualizer() {
                 behavior: 'smooth',
             });
         }
-    }, [lastActiveChordIndex, isMaximized, totalMeasures]);
+    }, [isMaximized, lastActiveChordIndex]);
 
     return (
         <div
-            className={`display-area${isDenseLeadSheet ? ' display-area--dense' : ''}${
-                totalMeasures > 32 ? ' display-area--dense-xl' : ''
-            }`}
+            className={`display-area lead-sheet lead-sheet--${density}`}
             id="chordVisualizer"
             ref={containerRef}
             data-total-measures={totalMeasures}
+            data-density={density}
         >
             {isMaximized && (
                 <button
@@ -291,49 +216,71 @@ export function ChordVisualizer() {
                     ✕
                 </button>
             )}
-            {groupedSections.map((/** @type {any} */ section) => (
-                <div
-                    key={section.id}
-                    className="section-block"
-                    onClick={() => {
-                        const detail = { detail: { sectionId: section.id } };
-                        document.dispatchEvent(new CustomEvent('open-editor', detail));
-                    }}
-                >
-                    <div className="section-block-header">
-                        {formatUnicodeSymbols(section.label)}
-                    </div>
-                    <div className="section-block-content">
-                        {section.measures.map(
-                            (/** @type {any} */ measure, /** @type {any} */ mIdx) => (
-                                <div
-                                    key={mIdx}
-                                    className={`measure-box${measure.sectionLabel ? ' has-key-label' : ''}`}
-                                >
-                                    {measure.sectionLabel && (
-                                        <div className="key-label">
-                                            {formatUnicodeSymbols(measure.sectionLabel)}
-                                        </div>
-                                    )}
-                                    {measure.chords.map((/** @type {any} */ chord) => (
-                                        <ChordCard
-                                            key={chord.globalIndex}
-                                            chord={chord}
-                                            isActive={chord.globalIndex === lastActiveChordIndex}
-                                            totalMeasures={totalMeasures}
-                                            isMaximized={isMaximized}
-                                            isDense={isDenseLeadSheet}
-                                            notation={notation}
-                                            leadSheetMelody={leadSheetMelody}
-                                            soloistStyle={soloistStyle}
-                                        />
-                                    ))}
-                                </div>
-                            ),
+            {leadSheetRows.map((/** @type {any} */ row) => {
+                const isActiveRow = row.measures.some((/** @type {any} */ measure) =>
+                    measure.chords.some(
+                        (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
+                    ),
+                );
+
+                return (
+                    <div
+                        key={row.id}
+                        className={`lead-sheet-row${row.isSectionStart ? ' lead-sheet-row--section-start' : ''}${
+                            isActiveRow ? ' lead-sheet-row--active' : ''
+                        }`}
+                        data-section-id={row.sectionId}
+                    >
+                        {row.measures.map(
+                            (/** @type {any} */ measure, /** @type {any} */ measureIndex) => {
+                                const isActiveMeasure = measure.chords.some(
+                                    (/** @type {any} */ chord) =>
+                                        chord.globalIndex === lastActiveChordIndex,
+                                );
+
+                                return (
+                                    <div
+                                        key={`${row.id}-${measureIndex}`}
+                                        className={`measure-box${
+                                            measure.isSectionStart
+                                                ? ' measure-box--section-start'
+                                                : ''
+                                        }${isActiveMeasure ? ' measure-box--active' : ''}`}
+                                        data-section-id={measure.sectionId}
+                                        onClick={() => openSectionEditor(measure.sectionId)}
+                                    >
+                                        {measure.isSectionStart && (
+                                            <button
+                                                type="button"
+                                                className="lead-sheet-marker"
+                                                aria-label={`Open section ${measure.sectionLabel} in editor`}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    openSectionEditor(measure.sectionId);
+                                                }}
+                                            >
+                                                {formatUnicodeSymbols(measure.sectionLabel)}
+                                            </button>
+                                        )}
+                                        {measure.chords.map((/** @type {any} */ chord) => (
+                                            <ChordCard
+                                                key={chord.globalIndex}
+                                                chord={chord}
+                                                isActive={
+                                                    chord.globalIndex === lastActiveChordIndex
+                                                }
+                                                notation={notation}
+                                                leadSheetMelody={leadSheetMelody}
+                                                showSparkline={showSparkline}
+                                            />
+                                        ))}
+                                    </div>
+                                );
+                            },
                         )}
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
