@@ -83,6 +83,7 @@ export function PresetLibrary({ onSelect }) {
                 (typeof section.keyShift === 'number'
                     ? transposeKeyName(baseKey, section.keyShift)
                     : undefined),
+            isMinor: typeof section.isMinor === 'boolean' ? section.isMinor : undefined,
             timeSignature: section.timeSignature,
             seamless: section.seamless,
         }));

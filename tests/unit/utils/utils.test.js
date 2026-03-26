@@ -4,8 +4,10 @@ import { TIME_SIGNATURES } from '../../../public/config.js';
 import {
     calculateTimingOffset,
     clampFreq,
+    compressSections,
     createReverbImpulse,
     createSoftClipCurve,
+    decompressSections,
     formatUnicodeSymbols,
     getChordMidiNotes,
     getFrequency,
@@ -325,10 +327,7 @@ describe('Utility Functions', () => {
     });
 
     describe('Compression/Decompression', () => {
-        it('should correctly compress an array of sections into a base64 string and decompress it back to the original object structure', async () => {
-            const { compressSections, decompressSections } = await import(
-                '../../../public/utils.js'
-            );
+        it('should correctly compress an array of sections into a base64 string and decompress it back to the original object structure', () => {
             const sections = [
                 { id: '1', label: 'Verse', value: 'C | F' },
                 { id: '2', label: 'Chorus', value: 'G | C' },
@@ -347,14 +346,30 @@ describe('Utility Functions', () => {
             expect(decompressed[0].id).not.toBe('1');
         });
 
-        it('should correctly preserve Unicode characters (like emojis) during section compression/decompression cycle', async () => {
-            const { compressSections, decompressSections } = await import(
-                '../../../public/utils.js'
-            );
+        it('should correctly preserve Unicode characters (like emojis) during section compression/decompression cycle', () => {
             const sections = [{ id: '1', label: 'Intro 🎵', value: 'Cm7' }];
             const compressed = compressSections(sections);
             const decompressed = decompressSections(compressed);
             expect(decompressed[0].label).toBe('Intro 🎵');
+        });
+
+        it('should preserve explicit local minor flags through section compression', () => {
+            const sections = [
+                { id: '1', label: 'Verse', value: 'E7 | Am7', key: 'A', isMinor: true },
+                { id: '2', label: 'Bridge', value: 'Amaj7', key: 'A', isMinor: false },
+            ];
+            const decompressed = decompressSections(compressSections(sections));
+
+            expect(decompressed[0]).toMatchObject({
+                label: 'Verse',
+                key: 'A',
+                isMinor: true,
+            });
+            expect(decompressed[1]).toMatchObject({
+                label: 'Bridge',
+                key: 'A',
+                isMinor: false,
+            });
         });
     });
 });

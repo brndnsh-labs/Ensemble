@@ -881,6 +881,8 @@ export function validateProgression(state, dispatch, renderCallback) {
                     ...c,
                     sectionId: section.id,
                     sectionLabel: section.label,
+                    keyIsMinor:
+                        typeof section.isMinor === 'boolean' ? section.isMinor : arranger.isMinor,
                     localIndex: idx,
                     repeatIndex: r,
                 }));

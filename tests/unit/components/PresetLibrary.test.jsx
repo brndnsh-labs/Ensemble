@@ -39,7 +39,7 @@ vi.mock('../../../public/data/chord-presets.js', () => ({
         {
             name: 'Autumn Leaves',
             category: 'Jazz',
-            sections: [{ label: 'Main', value: 'ii | V | I', keyShift: 1 }],
+            sections: [{ label: 'Main', value: 'ii | V | I', keyShift: 1, isMinor: true }],
             settings: { bpm: 140, style: 'jazz', timeSignature: '4/4' },
         },
     ],
@@ -140,6 +140,7 @@ describe('PresetLibrary', () => {
                 value: 'ii | V | I',
                 repeat: 1,
                 key: 'Db',
+                isMinor: true,
                 timeSignature: undefined,
                 seamless: undefined,
             },

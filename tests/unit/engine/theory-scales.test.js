@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// cspell:ignore Bdim
+// cspell:ignore Bdim tonicization tonicized
 
 // --- Global Mocks ---
 
@@ -146,9 +146,21 @@ describe('Music Theory: Scale Correctness', () => {
             expect(getScaleForChord(mockState, chord7sharp11)).toEqual([0, 2, 4, 6, 7, 9, 10]);
         });
 
-        it('assigns Phrygian Dominant to V7 resolving to minor', () => {
+        it('defaults plain dominants to Mixolydian when the minor target is not explicitly tonicized', () => {
             const chordV7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10] };
             const chordIm = { rootMidi: 60, quality: 'minor', intervals: [0, 3, 7] };
+            expect(getScaleForChord(mockState, chordV7, chordIm)).toEqual([0, 2, 4, 5, 7, 9, 10]);
+        });
+
+        it('assigns Phrygian Dominant when local minor metadata marks the target tonicization', () => {
+            const chordV7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10], key: 'C' };
+            const chordIm = {
+                rootMidi: 60,
+                quality: 'minor',
+                intervals: [0, 3, 7],
+                key: 'C',
+                keyIsMinor: true,
+            };
             expect(getScaleForChord(mockState, chordV7, chordIm)).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
 
@@ -176,6 +188,26 @@ describe('Music Theory: Scale Correctness', () => {
             const chordDm7b5 = { rootMidi: 62, quality: 'halfdim', intervals: [0, 3, 6, 10] };
             const chordG7b9 = { rootMidi: 67, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
             expect(getScaleForChord(mockState, chordDm7b5, chordG7b9, 'bird')).toEqual([
+                0, 2, 3, 5, 6, 8, 10,
+            ]);
+        });
+
+        it('uses Locrian natural 2 for half-diminished chords in an explicitly minor local key', () => {
+            const chordBm7b5 = {
+                rootMidi: 71,
+                quality: 'halfdim',
+                intervals: [0, 3, 6, 10],
+                key: 'A',
+                keyIsMinor: true,
+            };
+            const chordE7 = {
+                rootMidi: 64,
+                quality: '7',
+                intervals: [0, 4, 7, 10],
+                key: 'A',
+                keyIsMinor: true,
+            };
+            expect(getScaleForChord(mockState, chordBm7b5, chordE7, 'bird')).toEqual([
                 0, 2, 3, 5, 6, 8, 10,
             ]);
         });

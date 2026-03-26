@@ -368,6 +368,8 @@ describe('Standards Compliance Test Suite', () => {
                 rootMidi: v7.rootMidi + 5,
                 quality: 'minor',
                 intervals: [0, 3, 7],
+                key: 'G',
+                keyIsMinor: true,
             };
             expect(getScaleForChord(getState(), v7, minorTarget, 'bird')).toEqual([
                 0, 1, 4, 5, 7, 8, 10,

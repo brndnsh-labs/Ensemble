@@ -270,6 +270,10 @@ export function compressSections(sections) {
             // @ts-expect-error
             m.k = s.key;
         }
+        if (typeof s.isMinor === 'boolean') {
+            // @ts-expect-error
+            m.m = s.isMinor ? 1 : 0;
+        }
         if (s.repeat && s.repeat > 1) {
             // @ts-expect-error
             m.r = s.repeat;
@@ -336,6 +340,7 @@ export function decompressSections(str) {
                 label: safeLabel,
                 value: safeValue,
                 key: typeof s.k === 'string' ? escapeHTML(s.k) : '',
+                isMinor: typeof s.m === 'number' ? s.m === 1 : undefined,
                 repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
                 timeSignature: typeof s.t === 'string' && s.t.length < 10 ? s.t : '',
                 seamless: !!s.s,

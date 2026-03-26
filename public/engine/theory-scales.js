@@ -1,5 +1,7 @@
 import { KEY_ORDER } from '../config.js';
 
+// cspell:ignore tonicization
+
 /**
  * THEORY-SCALES.JS
  *
@@ -55,6 +57,23 @@ function hasDominantFunction(chord) {
     );
 }
 
+/**
+ * @param {string | undefined} quality
+ * @returns {boolean}
+ */
+function isMinorQuality(quality) {
+    return !!quality && quality.startsWith('m') && !quality.startsWith('maj');
+}
+
+/**
+ * @param {any} chord
+ * @param {any} nextChord
+ * @returns {boolean}
+ */
+function resolvesByDescendingFifth(chord, nextChord) {
+    return !!nextChord && (nextChord.rootMidi - chord.rootMidi + 120) % 12 === 5;
+}
+
 const ENHARMONIC_KEY_MAP = {
     'C#': 'Db',
     'D#': 'Eb',
@@ -74,11 +93,12 @@ const ENHARMONIC_KEY_MAP = {
 function getKeyContext(state, chord) {
     const { arranger } = state;
     const rawKey = chord?.key || arranger.key;
+    const isMinor = typeof chord?.keyIsMinor === 'boolean' ? chord.keyIsMinor : arranger.isMinor;
     if (!rawKey) {
         return {
             keyName: null,
             keyRootIdx: -1,
-            isMinor: arranger.isMinor,
+            isMinor,
         };
     }
 
@@ -88,7 +108,7 @@ function getKeyContext(state, chord) {
     return {
         keyName,
         keyRootIdx: KEY_ORDER.indexOf(keyName),
-        isMinor: arranger.isMinor,
+        isMinor,
     };
 }
 
@@ -146,7 +166,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     }
 
     const quality = chord.quality || 'major';
-    const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
+    const isMinor = isMinorQuality(quality);
     const isDominant = hasDominantFunction(chord);
 
     // --- SPECIAL QUALITY HANDLING ---
@@ -160,10 +180,11 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     // Half-Diminished (m7b5)
     if (quality === 'halfdim') {
         if (nextChord && hasDominantFunction(nextChord)) {
-            const interval = (nextChord.rootMidi - chord.rootMidi + 120) % 12;
             const pointsToMinorCadence =
-                keyContext.isMinor || ['7alt', '7b9', '7b13'].includes(nextChord.quality);
-            if (interval === 5 && pointsToMinorCadence) {
+                keyContext.isMinor ||
+                nextChord.keyIsMinor === true ||
+                ['7alt', '7b9', '7b13'].includes(nextChord.quality);
+            if (resolvesByDescendingFifth(chord, nextChord) && pointsToMinorCadence) {
                 return SCALE_INTERVALS.LOCRIAN_NATURAL_2;
             }
         }
@@ -223,16 +244,14 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         }
 
         // V7 resolving to i (Minor) -> Phrygian Dominant (Harmonic Minor 5th mode)
-        if (nextChord) {
-            const isNextMinor =
-                nextChord.quality.startsWith('m') && !nextChord.quality.startsWith('maj');
-            if (isNextMinor) {
-                const interval = (nextChord.rootMidi - chord.rootMidi + 120) % 12;
-                if (interval === 5) {
-                    // Resolving down a 5th (or up a 4th) to a minor chord
-                    return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
-                }
-            }
+        if (
+            nextChord &&
+            isMinorQuality(nextChord.quality) &&
+            resolvesByDescendingFifth(chord, nextChord) &&
+            (keyContext.isMinor || nextChord.keyIsMinor === true)
+        ) {
+            // Resolving down a 5th (or up a 4th) into an explicitly minor tonicization
+            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
         }
 
         if (style === 'blues' || style === 'rock') {
