@@ -63,6 +63,33 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(page.getByRole('button', { name: 'Open arranger actions' })).toBeVisible();
     });
 
+    test('Autumn Leaves stays readable without adding scroll at desktop size', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+
+        await page.getByRole('button', { name: 'Open arranger actions' }).click();
+        await page.locator('.workspace-library-fab').dispatchEvent('click');
+
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        await expect(modal).toBeVisible();
+
+        await page.getByRole('button', { name: 'Autumn Leaves' }).click();
+        await expect(modal).toBeHidden();
+
+        const visualizer = page.locator('#chordVisualizer');
+        const firstChord = visualizer.locator('.chord-card').first();
+
+        await expect(firstChord).toBeVisible();
+        await expect
+            .poll(async () =>
+                firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+            )
+            .toBeGreaterThan(16);
+        await expect(visualizer).toHaveJSProperty(
+            'scrollHeight',
+            await visualizer.evaluate((el) => el.clientHeight),
+        );
+    });
+
     test('Arranger action menu stays fully visible after loading a short preset', async ({
         page,
     }) => {

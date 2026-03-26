@@ -275,7 +275,7 @@ export function ChordVisualizer() {
     return (
         <div
             className={`display-area${isDenseLeadSheet ? ' display-area--dense' : ''}${
-                totalMeasures >= 32 ? ' display-area--dense-xl' : ''
+                totalMeasures > 32 ? ' display-area--dense-xl' : ''
             }`}
             id="chordVisualizer"
             ref={containerRef}
