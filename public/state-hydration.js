@@ -40,9 +40,6 @@ const SUPPORTED_SOLOIST_PRESETS = new Set(['neo', 'vowel', 'trumpet', 'saxophone
  * @param {string} fallback
  */
 function normalizeSoloistPreset(preset, fallback = 'trumpet') {
-    if (preset === 'classic') {
-        return 'neo';
-    }
     return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;
 }
 
