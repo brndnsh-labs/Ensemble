@@ -136,6 +136,29 @@ describe('Music Theory: Scale Correctness', () => {
             expect(getScaleForChord(mockState, chord7b9)).toEqual([0, 1, 4, 5, 7, 8, 10]);
         });
 
+        it('preserves explicit 7b9 quality over the jazz Lydian-dominant shortcut', () => {
+            mockState.arranger.key = 'C';
+            mockState.groove.genreFeel = 'Jazz';
+            const chordD7b9 = { rootMidi: 62, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
+            const chordBb7b9 = { rootMidi: 70, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
+            expect(getScaleForChord(mockState, chordD7b9, null, 'bird')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]);
+            expect(getScaleForChord(mockState, chordBb7b9, null, 'bird')).toEqual([
+                0, 1, 4, 5, 7, 8, 10,
+            ]);
+        });
+
+        it('uses Locrian natural 2 for half-diminished chords approaching a minor-colored dominant', () => {
+            mockState.arranger.key = 'Bb';
+            mockState.arranger.isMinor = false;
+            const chordDm7b5 = { rootMidi: 62, quality: 'halfdim', intervals: [0, 3, 6, 10] };
+            const chordG7b9 = { rootMidi: 67, quality: '7b9', intervals: [0, 4, 7, 10, 13] };
+            expect(getScaleForChord(mockState, chordDm7b5, chordG7b9, 'bird')).toEqual([
+                0, 2, 3, 5, 6, 8, 10,
+            ]);
+        });
+
         it('detects Lydian Dominant for bVII7 in Jazz', () => {
             mockState.arranger.key = 'C';
             mockState.groove.genreFeel = 'Jazz';

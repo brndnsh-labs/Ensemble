@@ -78,6 +78,7 @@ import {
     validateProgression,
 } from '../../../public/engine/chords-engine.js';
 import { getState } from '../../../public/state.js';
+import { getMidi } from '../../../public/utils.js';
 
 const { arranger, playback, chords, bass, groove } = getState();
 
@@ -279,6 +280,24 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression[0].absName).toBe('F#dim7');
             expect(arranger.progression[1].absName).toBe('B7');
             expect(arranger.progression[2].absName).toBe('Emaj7');
+        });
+
+        it('should place slash bass notes below the upper chord voicing', () => {
+            arranger.sections = [
+                { id: 's1', label: 'Verse', value: 'IVmaj9/5 | III7#9', repeat: 1 },
+            ];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Neo-Soul';
+
+            validateProgression(getState());
+
+            const slashChord = arranger.progression[0];
+            const voicedMidis = slashChord.freqs.map((freq) => getMidi(freq));
+
+            expect(slashChord.bassMidi % 12).toBe(7);
+            expect(Math.min(...voicedMidis)).toBe(slashChord.bassMidi);
+            expect(slashChord.bassMidi).toBeLessThan(Math.max(...voicedMidis));
         });
     });
 });

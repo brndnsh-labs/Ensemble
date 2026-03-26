@@ -758,6 +758,9 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                     84,
                 );
                 if (bassMidi !== null) {
+                    while (bassMidi >= currentMidis[0]) {
+                        bassMidi -= 12;
+                    }
                     const bassPC = bassMidi % 12;
                     const filtered = currentMidis.filter(
                         (/** @type {any} */ m) => m % 12 !== bassPC,

@@ -21,6 +21,7 @@ const SCALE_INTERVALS = {
     LYDIAN: [0, 2, 4, 6, 7, 9, 11],
     MIXOLYDIAN: [0, 2, 4, 5, 7, 9, 10],
     LOCRIAN: [0, 1, 3, 5, 6, 8, 10],
+    LOCRIAN_NATURAL_2: [0, 2, 3, 5, 6, 8, 10],
 
     // Pentatonics / Blues
     MAJOR_PENTATONIC: [0, 2, 4, 7, 9],
@@ -36,6 +37,23 @@ const SCALE_INTERVALS = {
     WHOLE_TONE: [0, 2, 4, 6, 8, 10],
     PHRYGIAN_DOMINANT: [0, 1, 4, 5, 7, 8, 10], // 5th mode of harmonic minor
 };
+
+/**
+ * @param {any} chord
+ * @returns {boolean}
+ */
+function hasDominantFunction(chord) {
+    const quality = chord?.quality || 'major';
+    const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
+    return (
+        !isMinor &&
+        !quality.startsWith('maj') &&
+        !['dim', 'halfdim'].includes(quality) &&
+        (chord?.is7th ||
+            ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
+            quality.startsWith('7'))
+    );
+}
 
 const ENHARMONIC_KEY_MAP = {
     'C#': 'Db',
@@ -129,13 +147,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
 
     const quality = chord.quality || 'major';
     const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
-    const isDominant =
-        !isMinor &&
-        !quality.startsWith('maj') &&
-        !['dim', 'halfdim'].includes(quality) &&
-        (chord.is7th ||
-            ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
-            quality.startsWith('7'));
+    const isDominant = hasDominantFunction(chord);
 
     // --- SPECIAL QUALITY HANDLING ---
 
@@ -146,6 +158,14 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
 
     // Half-Diminished (m7b5)
     if (quality === 'halfdim') {
+        if (nextChord && hasDominantFunction(nextChord)) {
+            const interval = (nextChord.rootMidi - chord.rootMidi + 120) % 12;
+            const pointsToMinorCadence =
+                keyContext.isMinor || ['7alt', '7b9', '7b13'].includes(nextChord.quality);
+            if (interval === 5 && pointsToMinorCadence) {
+                return SCALE_INTERVALS.LOCRIAN_NATURAL_2;
+            }
+        }
         return SCALE_INTERVALS.LOCRIAN;
     }
 
@@ -178,6 +198,11 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
             return SCALE_INTERVALS.LYDIAN_DOMINANT;
         }
 
+        // Phrygian Dominant (7b9, 7b13)
+        if (quality === '7b9' || quality === '7b13') {
+            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
+        }
+
         // Lydian Dominant detection for Jazz/Bossa
         if (
             keyContext.keyRootIdx !== -1 &&
@@ -188,11 +213,6 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
                 // b7 or II7
                 return SCALE_INTERVALS.LYDIAN_DOMINANT;
             }
-        }
-
-        // Phrygian Dominant (7b9, 7b13)
-        if (quality === '7b9' || quality === '7b13') {
-            return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
         }
 
         // V7 resolving to i (Minor) -> Phrygian Dominant (Harmonic Minor 5th mode)

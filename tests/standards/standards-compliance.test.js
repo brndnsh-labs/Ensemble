@@ -152,8 +152,8 @@ describe('Standards Compliance Test Suite', () => {
                 0, 2, 4, 5, 7, 9, 10,
             ]); // V7
             expect(getScaleForChord(getState(), p[4], p[5], 'bird')).toEqual([
-                0, 1, 3, 5, 6, 8, 10,
-            ]); // viiø7
+                0, 2, 3, 5, 6, 8, 10,
+            ]); // viiø7 -> minor-colored dominant
             expect(getScaleForChord(getState(), p[5], p[6], 'bird')).toEqual([
                 0, 1, 3, 4, 6, 8, 10,
             ]); // III7alt
@@ -824,8 +824,8 @@ describe('Standards Compliance Test Suite', () => {
         it('should select appropriate scales for the modern dominant colors', () => {
             const p = arranger.progression;
             expect(getScaleForChord(getState(), p[0], p[1], 'bird')).toEqual([
-                0, 1, 3, 5, 6, 8, 10,
-            ]); // Locrian
+                0, 2, 3, 5, 6, 8, 10,
+            ]); // Locrian natural 2
             expect(getScaleForChord(getState(), p[1], p[2], 'bird')).toEqual([
                 0, 1, 4, 5, 7, 8, 10,
             ]); // Phrygian Dominant
@@ -833,8 +833,8 @@ describe('Standards Compliance Test Suite', () => {
                 0, 1, 4, 5, 7, 8, 10,
             ]); // Phrygian Dominant
             expect(getScaleForChord(getState(), p[17], p[18], 'bird')).toEqual([
-                0, 1, 3, 5, 6, 8, 10,
-            ]); // Locrian on Am7b5
+                0, 2, 3, 5, 6, 8, 10,
+            ]); // Locrian natural 2 on Am7b5
         });
     });
 
