@@ -1,4 +1,4 @@
-import { ENHARMONIC_MAP } from './config.js';
+import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
 
 /**
  * Creates a seeded pseudo-random number generator (Mulberry32).
@@ -56,6 +56,21 @@ export function normalizeKey(k) {
     /** @type {any} */
     const map = ENHARMONIC_MAP;
     return map[k] || k;
+}
+
+/**
+ * Transposes a note-name key by semitones using the app's normalized spelling policy.
+ * @param {string} key
+ * @param {number} semitoneShift
+ * @returns {string}
+ */
+export function transposeKeyName(key, semitoneShift) {
+    const normalized = normalizeKey(key);
+    const currentIndex = KEY_ORDER.indexOf(normalized);
+    if (currentIndex === -1) {
+        return normalized;
+    }
+    return KEY_ORDER[(((currentIndex + semitoneShift) % 12) + 12) % 12];
 }
 
 const REGEX_AMP = /&/g;

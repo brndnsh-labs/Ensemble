@@ -13,6 +13,7 @@ import {
     getStepInfo,
     midiToNote,
     normalizeKey,
+    transposeKeyName,
 } from '../../../public/utils.js';
 
 describe('Utility Functions', () => {
@@ -209,6 +210,13 @@ describe('Utility Functions', () => {
         it('should return the same key if no normalization is needed', () => {
             expect(normalizeKey('C')).toBe('C');
             expect(normalizeKey('F')).toBe('F');
+        });
+    });
+
+    describe('transposeKeyName', () => {
+        it('should transpose normalized keys across large negative intervals', () => {
+            expect(transposeKeyName('C', -13)).toBe('B');
+            expect(transposeKeyName('F#', -1)).toBe('F');
         });
     });
 

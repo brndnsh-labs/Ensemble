@@ -11,6 +11,36 @@ import { getFrequency, normalizeKey } from '../utils.js';
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
+const SHARP_NOTE_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SHARP_FRIENDLY_KEYS = new Set(['G', 'D', 'A', 'E', 'B', 'F#', 'C#']);
+
+/**
+ * Formats an absolute note name using explicit accidentals first, then the local key context.
+ * This avoids flat-biased spellings like Gb inside sharp-oriented keys such as E major.
+ * @param {number} pitchClass
+ * @param {string} keyContext
+ * @param {string} [accidentalHint]
+ * @param {string} [explicitNote]
+ * @returns {string}
+ */
+function getAbsoluteDisplayNoteName(
+    pitchClass,
+    keyContext,
+    accidentalHint = '',
+    explicitNote = '',
+) {
+    if (accidentalHint === '#' || explicitNote.includes('#')) {
+        return SHARP_NOTE_ORDER[pitchClass];
+    }
+    if (accidentalHint === 'b' || explicitNote.includes('b')) {
+        return /** @type {any} */ (KEY_ORDER)[pitchClass];
+    }
+
+    const tonic = (keyContext || '').replace(/m$/, '');
+    return SHARP_FRIENDLY_KEYS.has(tonic)
+        ? SHARP_NOTE_ORDER[pitchClass]
+        : /** @type {any} */ (KEY_ORDER)[pitchClass];
+}
 
 /**
  * Extracts quality and 7th status from a chord symbol string.
@@ -639,7 +669,7 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                 const part = token.trim();
                 const [chordPart, bassPart] = part.split('/');
 
-                const { rootMidi, rootPart, romanMatch } = resolveChordRoot(
+                const { rootMidi, rootPart, romanMatch, nnsMatch, noteMatch } = resolveChordRoot(
                     chordPart,
                     keyRootMidi,
                     baseOctave,
@@ -655,7 +685,20 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                     bassMidi = resolvedBass.rootMidi;
 
                     const bassInterval = (bassMidi - keyRootMidi + 24) % 12;
-                    bassNameAbs = /** @type {any} */ (KEY_ORDER)[bassMidi % 12];
+                    const bassAccidentalHint =
+                        resolvedBass.romanMatch?.[1] ||
+                        resolvedBass.nnsMatch?.[1] ||
+                        (resolvedBass.noteMatch?.[1]?.includes('#')
+                            ? '#'
+                            : resolvedBass.noteMatch?.[1]?.includes('b')
+                              ? 'b'
+                              : '');
+                    bassNameAbs = getAbsoluteDisplayNoteName(
+                        bassMidi % 12,
+                        key,
+                        bassAccidentalHint,
+                        resolvedBass.noteMatch?.[1] || '',
+                    );
                     bassNameNNS = /** @type {any} */ (INTERVAL_TO_NNS)[bassInterval];
                     bassNameRom = /** @type {any} */ (INTERVAL_TO_ROMAN)[bassInterval];
                 }
@@ -682,9 +725,10 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
 
                     // Only auto-diminished if it's a natural vii (no b or # prefix)
                     if (
+                        isLowercase &&
                         numeral.toLowerCase() === 'vii' &&
                         !accidental &&
-                        !suffixPart.match(/(maj|min|m|dim|o|°|aug|\+|ø|h|7b5)/)
+                        (suffixPart === '' || suffixPart === '7')
                     ) {
                         quality = 'halfdim';
                         is7th = true;
@@ -728,8 +772,23 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
 
                 const interval = (rootMidi - keyRootMidi + 24) % 12;
                 const rootNNS = /** @type {any} */ (INTERVAL_TO_NNS)[interval];
-                const displayRomanBase = /** @type {any} */ (INTERVAL_TO_ROMAN)[interval];
-                const rootName = /** @type {any} */ (KEY_ORDER)[rootMidi % 12];
+                const displayRomanBase = romanMatch
+                    ? `${romanMatch[1] || ''}${romanMatch[2].toUpperCase()}`
+                    : /** @type {any} */ (INTERVAL_TO_ROMAN)[interval];
+                const rootAccidentalHint =
+                    romanMatch?.[1] ||
+                    nnsMatch?.[1] ||
+                    (noteMatch?.[1]?.includes('#')
+                        ? '#'
+                        : noteMatch?.[1]?.includes('b')
+                          ? 'b'
+                          : '');
+                const rootName = getAbsoluteDisplayNoteName(
+                    rootMidi % 12,
+                    key,
+                    rootAccidentalHint,
+                    noteMatch?.[1] || '',
+                );
 
                 const formatted = getFormattedChordNames(
                     rootName,

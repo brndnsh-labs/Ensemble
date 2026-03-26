@@ -25,7 +25,7 @@ export const INTERVAL_TO_ROMAN = {
     3: 'bIII',
     4: 'III',
     5: 'IV',
-    6: 'bV',
+    6: '#IV',
     7: 'V',
     8: 'bVI',
     9: 'VI',

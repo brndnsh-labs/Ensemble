@@ -1,4 +1,5 @@
 /* eslint-disable */
+// cspell:ignore iidim Emaj
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
@@ -43,7 +44,7 @@ vi.mock('../../../public/config.js', () => ({
         3: 'bIII',
         4: 'III',
         5: 'IV',
-        6: 'bV',
+        6: '#IV',
         7: 'V',
         8: 'bVI',
         9: 'VI',
@@ -210,6 +211,10 @@ describe('Chords & Voicing Logic', () => {
             expect(transformRelativeProgression('C/E | G/B', 2, false)).toBe('D/Gb | A/Db');
             expect(transformRelativeProgression('i | IV | V7', 3, false)).toBe('vi | II | III7');
         });
+
+        it('should keep sharp roman spellings for tritone functions', () => {
+            expect(transformRelativeProgression('I | #IVdim7 | V', 0)).toBe('I | #IVdim7 | V');
+        });
     });
 
     describe('Preset Validation (validateProgression)', () => {
@@ -224,6 +229,56 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression[0].absName).toBe('Cm7');
             expect(arranger.progression[2].absName).toBe('Fm7');
             expect(arranger.progression[3].absName).toBe('G7');
+        });
+
+        it('should preserve explicit sharp roman spellings in parsed display names', () => {
+            arranger.sections = [
+                { id: 's1', label: 'Main', value: '#ivm7b5 | VII7alt', repeat: 1 },
+            ];
+            arranger.key = 'Bb';
+            arranger.isMinor = false;
+
+            validateProgression(getState());
+
+            expect(arranger.progression[0].romanName).toBe('#ivø');
+            expect(arranger.progression[1].romanName).toBe('VII7alt');
+        });
+
+        it('should still treat plain vii7 as the natural half-diminished leading-tone chord', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'vii7 | Imaj7', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+
+            validateProgression(getState());
+
+            expect(arranger.progression[0].quality).toBe('halfdim');
+            expect(arranger.progression[0].romanName).toBe('viiø');
+        });
+
+        it('should preserve uppercase VII7 as an explicit dominant rather than forcing half-diminished', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'VII7 | Imaj7', repeat: 1 }];
+            arranger.key = 'Bb';
+            arranger.isMinor = false;
+
+            validateProgression(getState());
+
+            expect(arranger.progression[0].absName).toBe('A7');
+            expect(arranger.progression[0].quality).toBe('7');
+            expect(arranger.progression[0].romanName).toBe('VII7');
+        });
+
+        it('should spell sharp-side local-key chords with sharp absolute names', () => {
+            arranger.sections = [
+                { id: 's1', label: 'Bridge', key: 'E', value: 'iidim7 | V7 | Imaj7' },
+            ];
+            arranger.key = 'Ab';
+            arranger.isMinor = false;
+
+            validateProgression(getState());
+
+            expect(arranger.progression[0].absName).toBe('F#dim7');
+            expect(arranger.progression[1].absName).toBe('B7');
+            expect(arranger.progression[2].absName).toBe('Emaj7');
         });
     });
 });

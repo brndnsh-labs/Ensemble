@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDispatch = vi.fn();
 const mockState = {
-    arranger: { lastChordPreset: 'Pop (Standard)', isDirty: false },
+    arranger: { key: 'C', lastChordPreset: 'Pop (Standard)', isDirty: false },
     playback: { applyPresetSettings: false },
 };
 
@@ -39,7 +39,7 @@ vi.mock('../../../public/data/chord-presets.js', () => ({
         {
             name: 'Autumn Leaves',
             category: 'Jazz',
-            sections: [{ label: 'Main', value: 'ii | V | I' }],
+            sections: [{ label: 'Main', value: 'ii | V | I', keyShift: 1 }],
             settings: { bpm: 140, style: 'jazz', timeSignature: '4/4' },
         },
     ],
@@ -49,6 +49,11 @@ vi.mock('../../../public/utils.js', () => ({
     decompressSections: vi.fn((sections) => sections),
     formatUnicodeSymbols: vi.fn((value) => value),
     generateId: vi.fn(() => 'generated-section-id'),
+    transposeKeyName: vi.fn((key, shift) => {
+        const keys = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const index = keys.indexOf(key);
+        return keys[(index + shift + 12) % 12];
+    }),
 }));
 
 import { PresetLibrary } from '../../../public/components/PresetLibrary.jsx';
@@ -128,6 +133,17 @@ describe('PresetLibrary', () => {
             param: 'lastChordPreset',
             value: 'Autumn Leaves',
         });
+        expect(mockDispatch).toHaveBeenCalledWith('SET_ARRANGEMENT', [
+            {
+                id: 'generated-section-id',
+                label: 'Main',
+                value: 'ii | V | I',
+                repeat: 1,
+                key: 'Db',
+                timeSignature: undefined,
+                seamless: undefined,
+            },
+        ]);
         expect(mockDispatch).toHaveBeenCalledWith('SET_BPM', 140);
     });
 });

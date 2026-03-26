@@ -144,6 +144,15 @@ describe('Music Theory: Scale Correctness', () => {
                 0, 2, 4, 6, 7, 9, 10,
             ]);
         });
+
+        it('uses a chord local key center for dominant-function detection in modulated sections', () => {
+            mockState.arranger.key = 'C';
+            mockState.groove.genreFeel = 'Jazz';
+            const chordF7 = { rootMidi: 65, quality: '7', intervals: [0, 4, 7, 10], key: 'G' };
+            expect(getScaleForChord(mockState, chordF7, null, 'bird')).toEqual([
+                0, 2, 4, 6, 7, 9, 10,
+            ]);
+        });
     });
 
     describe('Genre & Style Overrides', () => {
@@ -216,6 +225,16 @@ describe('Music Theory: Scale Correctness', () => {
             const chordEb = { rootMidi: 63, quality: 'major', intervals: [0, 4, 7] };
             expect(getScaleForChord(mockState, chordEb, null, 'smart')).toEqual([
                 0, 2, 4, 5, 7, 9, 11,
+            ]);
+        });
+
+        it('normalizes sharp keys before doing diatonic mode checks', () => {
+            mockState.arranger.key = 'F#';
+            mockState.arranger.isMinor = false;
+            mockState.groove.genreFeel = 'Rock';
+            const chordAbm = { rootMidi: 68, quality: 'minor', intervals: [0, 3, 7] };
+            expect(getScaleForChord(mockState, chordAbm, null, 'scalar')).toEqual([
+                0, 2, 3, 5, 7, 9, 10,
             ]);
         });
     });

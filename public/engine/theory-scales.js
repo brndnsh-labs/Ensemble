@@ -37,6 +37,43 @@ const SCALE_INTERVALS = {
     PHRYGIAN_DOMINANT: [0, 1, 4, 5, 7, 8, 10], // 5th mode of harmonic minor
 };
 
+const ENHARMONIC_KEY_MAP = {
+    'C#': 'Db',
+    'D#': 'Eb',
+    'F#': 'Gb',
+    'G#': 'Ab',
+    'A#': 'Bb',
+};
+
+/**
+ * Resolves the active harmonic key center for a chord.
+ * Section-local keys should take precedence over the global arranger key.
+ *
+ * @param {import('../types.js').EnsembleState} state
+ * @param {any} chord
+ * @returns {{ keyName: string | null, keyRootIdx: number, isMinor: boolean }}
+ */
+function getKeyContext(state, chord) {
+    const { arranger } = state;
+    const rawKey = chord?.key || arranger.key;
+    if (!rawKey) {
+        return {
+            keyName: null,
+            keyRootIdx: -1,
+            isMinor: arranger.isMinor,
+        };
+    }
+
+    const keyName = Object.prototype.hasOwnProperty.call(ENHARMONIC_KEY_MAP, rawKey)
+        ? ENHARMONIC_KEY_MAP[/** @type {keyof typeof ENHARMONIC_KEY_MAP} */ (rawKey)]
+        : rawKey;
+    return {
+        keyName,
+        keyRootIdx: KEY_ORDER.indexOf(keyName),
+        isMinor: arranger.isMinor,
+    };
+}
+
 /**
  * Determines the most appropriate musical scale for a given chord and context.
  *
@@ -47,10 +84,11 @@ const SCALE_INTERVALS = {
  * @returns {number[]} An array of semitone intervals representing the selected scale.
  */
 export function getScaleForChord(state, chord, nextChord = null, style = 'smart') {
-    const { arranger, groove, soloist } = state;
+    const { groove, soloist } = state;
     if (!chord) {
         return SCALE_INTERVALS.MAJOR;
     }
+    const keyContext = getKeyContext(state, chord);
 
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
@@ -141,9 +179,11 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         }
 
         // Lydian Dominant detection for Jazz/Bossa
-        if (arranger.key && ['jazz', 'bird', 'bossa'].includes(/** @type {string} */ (style))) {
-            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
+        if (
+            keyContext.keyRootIdx !== -1 &&
+            ['jazz', 'bird', 'bossa'].includes(/** @type {string} */ (style))
+        ) {
+            const intervalFromKey = (chord.rootMidi - keyContext.keyRootIdx + 120) % 12;
             if (intervalFromKey === 10 || intervalFromKey === 2) {
                 // b7 or II7
                 return SCALE_INTERVALS.LYDIAN_DOMINANT;
@@ -206,9 +246,8 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         }
 
         // V in Minor Key -> Phrygian Dominant (Dominant function even if triad)
-        if (arranger.isMinor && arranger.key) {
-            const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-            const intervalFromKey = (chord.rootMidi - keyRootIdx + 120) % 12;
+        if (keyContext.isMinor && keyContext.keyRootIdx !== -1) {
+            const intervalFromKey = (chord.rootMidi - keyContext.keyRootIdx + 120) % 12;
             if (intervalFromKey === 7) {
                 // V
                 return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
@@ -222,12 +261,13 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     // If the chord fits within the current Key, use the Key's mode starting on the Chord Root.
     // This correctly handles ii(Dorian), iii(Phrygian), IV(Lydian), vi(Aeolian).
 
-    if (arranger.key) {
-        const keyRootIdx = KEY_ORDER.indexOf(arranger.key);
-        const keyIntervals = arranger.isMinor
+    if (keyContext.keyRootIdx !== -1) {
+        const keyIntervals = keyContext.isMinor
             ? SCALE_INTERVALS.NATURAL_MINOR
             : SCALE_INTERVALS.MAJOR;
-        const keyNotes = keyIntervals.map((/** @type {number} */ i) => (keyRootIdx + i) % 12);
+        const keyNotes = keyIntervals.map(
+            (/** @type {number} */ i) => (keyContext.keyRootIdx + i) % 12,
+        );
 
         const chordRootPC = chord.rootMidi % 12;
         const chordTones = chord.intervals.map((/** @type {number} */ i) => (chordRootPC + i) % 12);
