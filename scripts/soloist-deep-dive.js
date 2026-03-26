@@ -1,134 +1,83 @@
 /**
- * Soloist Deep-Dive Diagnostic Script
- * Provides a granular, note-by-note log of a full simulated session.
+ * Soloist deep-dive script.
+ * Defaults to focus-first output; add --full for the raw event log.
  */
 
-import { TIME_SIGNATURES } from '../public/config.js';
-import { getSoloistNote } from '../public/engine/soloist.js';
-import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
-import { dispatch, getState } from '../public/state.js';
-import { ACTIONS } from '../public/types.js';
-import { getStepInfo, midiToNote } from '../public/utils.js';
+import {
+    bootstrapSoloistAudit,
+    buildEventLogRows,
+    buildFocusMeasures,
+    buildHookAuditArrangement,
+    buildLoopComparison,
+    buildMeasureAudit,
+    buildRestatementNotes,
+    buildSectionSummary,
+    logEventRows,
+    logFocusMeasures,
+    logLoopComparison,
+    logMeasureAudit,
+    logSectionSummary,
+    parseCliArgs,
+    readBooleanOption,
+    readNumberOption,
+    readStringOption,
+    simulateSoloistLoops,
+} from './soloist-analysis-utils.js';
 
-function deepDiveSession(genre = 'Rock', bpm = 102, measures = 32, intensity = 0.6) {
-    console.log(`\n=== Soloist Deep Dive: ${genre} @ ${bpm} BPM (Intensity: ${intensity}) ===`);
-    console.log(`Simulating ${measures} measures with seed "TEST"\n`);
+function deepDiveSession(argv = process.argv.slice(2)) {
+    const options = parseCliArgs(argv);
+    const genre = readStringOption(options, 'genre', 'Rock');
+    const bpm = readNumberOption(options, 'bpm', 102);
+    const intensity = readNumberOption(options, 'intensity', 0.6);
+    const loops = Math.max(2, Math.floor(readNumberOption(options, 'loops', 3)));
+    const full = readBooleanOption(options, 'full', false);
+    const showSeederLog = readBooleanOption(options, 'show-seeder-log', false);
 
-    dispatch(ACTIONS.RESET_STATE);
-    dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: genre, enabled: true });
-    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart' });
-    dispatch(ACTIONS.UPDATE_PLAYBACK, { bandIntensity: intensity, bpm: bpm, currentLoopCount: 0 });
-
-    const { arranger, soloist } = getState();
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-
-    arranger.totalSteps = measures * stepsPerMeasure;
-    const chord = {
-        rootMidi: 60,
-        scale: [0, 2, 4, 5, 7, 9, 11],
-        intervals: [0, 4, 7],
-        quality: 'major',
-    };
-
-    arranger.stepMap = [{ start: 0, end: arranger.totalSteps, chord: chord }];
-    arranger.sectionMap = [{ start: 0, end: arranger.totalSteps, label: 'main' }];
-
-    soloist.sessionSeed = generateSessionSeed(
-        getState(),
-        arranger,
-        genre.toLowerCase(),
+    const arrangement = buildHookAuditArrangement('4/4');
+    const { state, seedStyle, sessionSeed } = bootstrapSoloistAudit({
+        genre,
+        bpm,
         intensity,
-        'TEST',
+        timeSignature: arrangement.timeSignature,
+        style: 'smart',
+        key: 'C',
+        seed: 'DEEP_DIVE',
+        arrangement,
+        quietSeedLogs: !showSeederLog,
+    });
+    const capture = simulateSoloistLoops({ state, arrangement, loops, style: 'smart' });
+    const loopRows = buildLoopComparison(capture);
+    const headRows = buildMeasureAudit(capture, 0);
+    const sectionRows = buildSectionSummary(capture, 0);
+    const restatementNotes = buildRestatementNotes(sectionRows);
+    const focusRows = buildFocusMeasures(
+        capture,
+        Array.from({ length: loops }, (_, index) => index),
+        12,
     );
 
-    console.log(`Step | M:B  | Note | MIDI | Dur | Vel  | Role | Profile | Flags`);
-    console.log(`-------------------------------------------------------------------`);
+    console.log(`\n=== Soloist Deep Dive: ${genre} @ ${bpm} BPM ===`);
+    console.log(
+        `Form: hook-AABA | Measures: ${arrangement.measuresPerLoop} | Loops: ${loops} | Seed style: ${seedStyle}`,
+    );
+    console.log(
+        `Seed notes: ${sessionSeed?.notes.length || 0} across ${Math.round((sessionSeed?.loopLengthSteps || arrangement.totalSteps) / arrangement.stepsPerMeasure)} macro measures`,
+    );
 
-    let lastMidi = null;
-    const intervals = [];
+    logLoopComparison(loopRows);
+    logMeasureAudit('Loop 0 head audit', headRows);
+    logSectionSummary(sectionRows, restatementNotes);
+    logFocusMeasures(focusRows);
 
-    const loopsToSimulate = 3;
-    const stepsPerLoop = arranger.totalSteps;
-
-    for (let loop = 0; loop < loopsToSimulate; loop++) {
-        getState().playback.currentLoopCount = loop;
-        console.log(`\n>>> STARTING LOOP ${loop} <<<`);
-
-        const startOffset = loop === 0 ? -stepsPerMeasure : 0;
-
-        for (let loopStep = startOffset; loopStep < stepsPerLoop; loopStep++) {
-            const absoluteStep = loop * stepsPerLoop + loopStep;
-            const stepInfo = getStepInfo(absoluteStep, ts, null, TIME_SIGNATURES);
-            const res = getSoloistNote(
-                getState(),
-                chord,
-                chord,
-                absoluteStep,
-                440,
-                0,
-                'smart',
-                absoluteStep % 16,
-                { sectionStart: 0, sectionEnd: stepsPerLoop, bypassRhythm: false },
-                stepInfo,
-            );
-
-            if (res) {
-                const notes = Array.isArray(res) ? res : [res];
-                notes.forEach((n) => {
-                    const measureInLoop = Math.floor(loopStep / stepsPerMeasure) + 1;
-                    const beatInMeasure = Math.floor(stepInfo.mStep / ts.stepsPerBeat) + 1;
-                    const m_b = `${measureInLoop}:${beatInMeasure}`.padEnd(5);
-                    const noteInfo = midiToNote(n.midi);
-                    const noteName = `${noteInfo.name}${noteInfo.octave}`.padEnd(4);
-                    const midi = `${n.midi}`.padStart(4);
-                    const dur = `${n.durationSteps || 1}`.padStart(3);
-                    const vel = n.velocity.toFixed(2);
-                    const role = (soloist.phraseContext.role || '-').padEnd(4);
-                    const profile = (soloist.phraseContext.profile || '-').padEnd(8);
-
-                    const flags = [];
-                    if (n.isSustained) {
-                        flags.push('HOLD');
-                    }
-                    if (n.vibrato) {
-                        flags.push('VIB');
-                    }
-                    if (n.isDoubleStop) {
-                        flags.push('DBL');
-                    }
-                    if (n.device) {
-                        flags.push(n.device.toUpperCase());
-                    }
-
-                    const flagStr = flags.join('|');
-
-                    console.log(
-                        `${String(absoluteStep).padStart(4)} | ${m_b} | ${noteName} | ${midi} | ${dur} | ${vel} | ${role} | ${profile} | ${flagStr}`,
-                    );
-
-                    if (lastMidi !== null && !n.isDoubleStop) {
-                        intervals.push(Math.abs(n.midi - lastMidi));
-                    }
-                    lastMidi = n.midi;
-                });
-            }
-        }
+    if (full) {
+        logEventRows(
+            buildEventLogRows(
+                capture,
+                Array.from({ length: loops }, (_, index) => index),
+                focusRows,
+            ),
+        );
     }
-
-    // melo-stats
-    const avgInterval =
-        intervals.length > 0
-            ? (intervals.reduce((a, b) => a + b, 0) / intervals.length).toFixed(1)
-            : 0;
-    const stepwise = intervals.filter((i) => i <= 2).length;
-    const jumps = intervals.filter((i) => i > 2).length;
-    const stepwisePct = intervals.length > 0 ? ((stepwise / intervals.length) * 100).toFixed(1) : 0;
-
-    console.log(`\n--- Melodic Continuity Analysis ---`);
-    console.log(`Avg Interval: ${avgInterval} semitones`);
-    console.log(`Stepwise Motion (<= 2st): ${stepwisePct}%`);
-    console.log(`Leaps (> 2st): ${jumps}`);
 }
 
-deepDiveSession('Rock', 102, 16, 0.6);
+deepDiveSession();

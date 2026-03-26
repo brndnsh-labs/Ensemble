@@ -1,131 +1,95 @@
 /**
- * Soloist Narrative Diagnostic Script
- * Simulates a full 3-minute session and analyzes the "arc" of the solo.
+ * Soloist head and thematic-retention audit.
+ * Default output is compact and measure-focused; add --drill-down or --full for more detail.
  */
 
-import { TIME_SIGNATURES } from '../public/config.js';
-import { getSoloistNote } from '../public/engine/soloist.js';
-import { dispatch, getState } from '../public/state.js';
-import { ACTIONS } from '../public/types.js';
-import { getStepInfo } from '../public/utils.js';
+import {
+    bootstrapSoloistAudit,
+    buildEventLogRows,
+    buildFocusMeasures,
+    buildHookAuditArrangement,
+    buildLoopComparison,
+    buildMeasureAudit,
+    buildPickupSummary,
+    buildRestatementNotes,
+    buildSectionSummary,
+    logEventRows,
+    logFocusMeasures,
+    logLoopComparison,
+    logMeasureAudit,
+    logSectionSummary,
+    parseCliArgs,
+    readBooleanOption,
+    readNumberOption,
+    readStringOption,
+    simulateSoloistLoops,
+} from './soloist-analysis-utils.js';
 
-function analyzeNarrative(genre = 'Rock', bpm = 102, minutes = 3, intensity = 0.5) {
-    const totalBeats = bpm * minutes;
-    const measures = Math.ceil(totalBeats / 4);
+function evaluateSoloist(argv = process.argv.slice(2)) {
+    const options = parseCliArgs(argv);
+    const genre = readStringOption(options, 'genre', 'Rock');
+    const bpm = readNumberOption(options, 'bpm', 102);
+    const intensity = readNumberOption(options, 'intensity', 0.5);
+    const loops = Math.max(1, Math.floor(readNumberOption(options, 'loops', 3)));
+    const drillDown =
+        readBooleanOption(options, 'drill-down', false) ||
+        readBooleanOption(options, 'deep', false);
+    const full = readBooleanOption(options, 'full', false);
+    const showSeederLog = readBooleanOption(options, 'show-seeder-log', false);
 
-    console.log(`\n=== Soloist Narrative Analysis: ${genre} @ ${bpm} BPM ===`);
-    console.log(`Duration: ${minutes}m (~${measures} measures)\n`);
-
-    dispatch(ACTIONS.RESET_STATE);
-    dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: genre, enabled: true });
-    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart' });
-    dispatch(ACTIONS.UPDATE_PLAYBACK, { bandIntensity: intensity, bpm: bpm });
-
-    const { arranger, soloist } = getState();
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-
-    // Mock arrangement (Simple loop)
-    arranger.totalSteps = 64; // 4-bar loop
-    const chord = { rootMidi: 60, scale: [0, 2, 4, 5, 7, 9, 11], intervals: [0, 4, 7] };
-
-    const stats = {
-        totalNotes: 0,
-        pickupNotes: 0,
-        influenceShifts: 0,
-        entropyMutations: 0,
-        syncopationPoints: 0,
-        profileTimeline: [],
-        entropyTimeline: [],
-        densityPerBar: [],
-    };
-
-    let currentBarNotes = 0;
-    let lastProfile = null;
-    let lastEntropy = null;
-
-    // Simulate Count-in + Full Duration
-    const totalSteps = measures * stepsPerMeasure;
-    for (let s = -stepsPerMeasure; s < totalSteps; s++) {
-        const stepInfo = getStepInfo(s, ts, null, TIME_SIGNATURES);
-        const res = getSoloistNote(
-            getState(),
-            chord,
-            chord,
-            s,
-            440,
-            0,
-            'smart',
-            0,
-            { sectionStart: 0, sectionEnd: 64, bypassRhythm: false },
-            stepInfo,
-        );
-
-        // Track Statistics
-        if (res) {
-            stats.totalNotes++;
-            currentBarNotes++;
-            if (s < 0) {
-                stats.pickupNotes++;
-            }
-
-            const stepInBeat =
-                ((stepInfo.mStep % ts.stepsPerBeat) + ts.stepsPerBeat) % ts.stepsPerBeat;
-            if (stepInBeat % 2 !== 0) {
-                stats.syncopationPoints++;
-            }
-        }
-
-        if (soloist.phraseContext.profile !== lastProfile) {
-            stats.influenceShifts++;
-            stats.profileTimeline.push({ step: s, profile: soloist.phraseContext.profile });
-            lastProfile = soloist.phraseContext.profile;
-        }
-
-        if (soloist.rhythmicEntropy !== lastEntropy) {
-            stats.entropyMutations++;
-            stats.entropyTimeline.push({ step: s, entropy: soloist.rhythmicEntropy.toFixed(2) });
-            lastEntropy = soloist.rhythmicEntropy;
-        }
-
-        if (stepInfo.isMeasureStart && s >= 0) {
-            stats.densityPerBar.push(currentBarNotes);
-            currentBarNotes = 0;
-        }
-    }
-
-    // --- Output Summary ---
-    console.log(`--- High-Level Summary ---`);
-    console.log(`Total Notes: ${stats.totalNotes}`);
-    console.log(`Avg Density: ${(stats.totalNotes / measures).toFixed(1)} notes/bar`);
-    console.log(
-        `Syncopation Ratio: ${((stats.syncopationPoints / stats.totalNotes) * 100).toFixed(1)}%`,
-    );
-    console.log(`Pick-up Notes (Count-in): ${stats.pickupNotes}`);
-    console.log(`Influence Shifts (Section Starts): ${stats.influenceShifts}`);
-    console.log(`Entropy Mutations: ${stats.entropyMutations}`);
-
-    console.log(`\n--- Influence Narrative (Timeline) ---`);
-    stats.profileTimeline.forEach((entry) => {
-        console.log(`Step ${String(entry.step).padStart(4)}: Channeling ${entry.profile}`);
+    const arrangement = buildHookAuditArrangement('4/4');
+    const { state, seedStyle, sessionSeed } = bootstrapSoloistAudit({
+        genre,
+        bpm,
+        intensity,
+        timeSignature: arrangement.timeSignature,
+        style: 'smart',
+        key: 'C',
+        seed: 'HEAD_AUDIT',
+        arrangement,
+        quietSeedLogs: !showSeederLog,
     });
+    const capture = simulateSoloistLoops({ state, arrangement, loops, style: 'smart' });
 
-    console.log(`\n--- Rhythmic Entropy Narrative (Timeline) ---`);
-    // Sample every few mutations to keep it readable
-    stats.entropyTimeline
-        .filter((_, i) => i % 4 === 0)
-        .forEach((entry) => {
-            console.log(
-                `Step ${String(entry.step).padStart(4)}: Entropy Shifted to ${entry.entropy}`,
-            );
-        });
+    const pickupSummary = buildPickupSummary(capture);
+    const headRows = buildMeasureAudit(capture, 0);
+    const loopRows = buildLoopComparison(capture);
+    const sectionRows = buildSectionSummary(capture, 0);
+    const restatementNotes = buildRestatementNotes(sectionRows);
+    const focusRows = buildFocusMeasures(
+        capture,
+        drillDown ? Array.from({ length: loops }, (_, index) => index) : [0, 1],
+        10,
+    );
 
-    console.log(`\n--- Density Map (per measure) ---`);
-    const barChunks = [];
-    for (let i = 0; i < stats.densityPerBar.length; i += 8) {
-        barChunks.push(stats.densityPerBar.slice(i, i + 8).join(' | '));
+    console.log(`\n=== Soloist Head Audit: ${genre} @ ${bpm} BPM ===`);
+    console.log(
+        `Form: hook-AABA | Measures: ${arrangement.measuresPerLoop} | Loops: ${loops} | Seed style: ${seedStyle}`,
+    );
+    console.log(
+        `Seed notes: ${sessionSeed?.notes.length || 0} across ${Math.round((sessionSeed?.loopLengthSteps || arrangement.totalSteps) / arrangement.stepsPerMeasure)} macro measures`,
+    );
+    console.log(`Pickups: seed ${pickupSummary.seedCount}, performed ${pickupSummary.playedCount}`);
+    if (pickupSummary.seedCount > 0 || pickupSummary.playedCount > 0) {
+        console.log(`Pickup seed : ${pickupSummary.seedLine}`);
+        console.log(`Pickup live : ${pickupSummary.playedLine}`);
     }
-    barChunks.forEach((chunk) => console.log(`[ ${chunk} ]`));
+
+    logMeasureAudit('Loop 0 head audit', headRows);
+    logLoopComparison(loopRows);
+    logSectionSummary(sectionRows, restatementNotes);
+    logFocusMeasures(focusRows);
+
+    if (drillDown && loops > 1) {
+        for (let loop = 1; loop < loops; loop++) {
+            logMeasureAudit(`Loop ${loop} variation audit`, buildMeasureAudit(capture, loop));
+        }
+    }
+
+    if (full) {
+        const flaggedMeasures = focusRows.length > 0 ? focusRows : null;
+        logEventRows(buildEventLogRows(capture, [0, 1], flaggedMeasures));
+    }
 }
 
-analyzeNarrative('Rock', 102, 3, 0.5);
+evaluateSoloist();
