@@ -1,4 +1,4 @@
-// cspell:ignore iidim Yelverton tonicized
+// cspell:ignore iidim Yelverton tonicized Coltrane Gershwin Pachelbel reharmonized polyrhythmic
 
 const DEFAULT_SETTINGS = {
     bpm: 120,
@@ -196,6 +196,11 @@ const PRESETS_RAW = [
             bpm: 220,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Coltrane cycle with major-third key centers',
+            notes: 'Keeps the rapid B -> G -> Eb major-axis motion explicit so the preset reads as a true Coltrane matrix rather than a flattened chain of secondary dominants.',
+            references: ['John Coltrane, Giant Steps (Atlantic, 1960)'],
+        },
     },
     {
         name: 'Ornithology',
@@ -222,6 +227,11 @@ const PRESETS_RAW = [
         settings: {
             bpm: 160,
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Bird head with reharmonized bridge turnaround',
+            notes: 'Uses the bebop-friendly bVI area and minor ii-V pull in the bridge so the preset keeps Parker-style chromatic pressure instead of collapsing into plain diatonic rhythm-changes language.',
+            references: ['Charlie Parker, Ornithology (1946)'],
         },
     },
     {
@@ -250,6 +260,11 @@ const PRESETS_RAW = [
             bpm: 220,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Bop form with chromatic C-section descent',
+            notes: 'Preserves the IVmaj7 -> #IVdim7 -> Imaj7/V move so the chromatic passing diminished and tonic-over-dominant bass remain visible in the chart.',
+            references: ['Charlie Parker and Miles Davis, Donna Lee (1947)'],
+        },
     },
     {
         name: 'Rhythm Changes',
@@ -276,6 +291,11 @@ const PRESETS_RAW = [
         settings: {
             bpm: 180,
             style: 'jazz',
+        },
+        provenance: {
+            variant: 'Common post-swing bridge dominant chain',
+            notes: 'Uses the standard III7 -> VI7 -> II7 -> V7 bridge rather than a substitute turnaround, which keeps the foundational rhythm-changes teaching form explicit.',
+            references: ['George Gershwin, I Got Rhythm (1930)'],
         },
     },
     {
@@ -473,6 +493,14 @@ const PRESETS_RAW = [
         ],
         category: 'Theory',
         isMinor: false,
+        settings: {
+            bpm: 120,
+            style: 'jazz',
+        },
+        provenance: {
+            variant: 'Pedagogical dominant circle',
+            notes: 'A theory drill built from falling-fourth dominant motion, intended to expose functional pull and transposition practice rather than represent a named tune.',
+        },
     },
     {
         name: 'Plagal Flow',
@@ -484,6 +512,14 @@ const PRESETS_RAW = [
         ],
         category: 'Theory',
         isMinor: false,
+        settings: {
+            bpm: 100,
+            style: 'pad',
+        },
+        provenance: {
+            variant: 'Pedagogical plagal-cadence loop',
+            notes: 'A minimal IV-I study form for hearing subdominant release without added turnaround machinery or borrowed dominant function.',
+        },
     },
     {
         name: 'Cherokee',
@@ -594,6 +630,11 @@ const PRESETS_RAW = [
             bpm: 130,
             style: 'jazz',
         },
+        provenance: {
+            variant: 'Common Porter-style chromatic-descent chorus',
+            notes: 'Keeps the #ivm7 -> ivm7 -> iiim7 -> bIIIdim7 descent so the passing diminished color is preserved instead of being simplified into plain ii-V language.',
+            references: ['Cole Porter, Night and Day (1932)'],
+        },
     },
     {
         name: 'All Blues',
@@ -616,6 +657,11 @@ const PRESETS_RAW = [
             bpm: 110,
             style: 'jazz',
             timeSignature: '6/8',
+        },
+        provenance: {
+            variant: 'Kind of Blue 6/8 modal-blues frame',
+            notes: 'Retains the compound-meter head and chromatic D7#9 -> Eb7#9 D7alt turnaround so the modal-blues color stays closer to the Miles Davis small-group language.',
+            references: ['Miles Davis, All Blues (Kind of Blue, 1959)'],
         },
     },
     {

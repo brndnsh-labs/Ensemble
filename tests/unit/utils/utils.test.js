@@ -281,6 +281,21 @@ describe('Utility Functions', () => {
             expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81, 69, 72, 76, 79, 83]);
         });
 
+        it('should honor parsed diminished-seventh intervals from the chord engine', () => {
+            const chord = { rootMidi: 60, quality: 'dim', is7th: true, intervals: [0, 3, 6, 9] };
+            expect(getChordMidiNotes(chord, 4)).toEqual([60, 63, 66, 69, 72, 61, 65, 68, 73, 75]);
+        });
+
+        it('should place slash bass notes below the helper voicing output', () => {
+            const chord = {
+                rootMidi: 60,
+                quality: 'maj7',
+                intervals: [0, 4, 7, 11, 14],
+                bassMidi: 67,
+            };
+            expect(getChordMidiNotes(chord, 4)).toEqual([55, 60, 64, 71, 74, 62, 65, 69, 72, 76]);
+        });
+
         it('should return empty array for invalid input', () => {
             expect(getChordMidiNotes(null)).toEqual([]);
             expect(getChordMidiNotes({})).toEqual([]);

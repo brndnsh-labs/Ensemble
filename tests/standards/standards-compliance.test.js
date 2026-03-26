@@ -1,5 +1,5 @@
 /* eslint-disable */
-// cspell:ignore Emaj Ebdim Yelverton
+// cspell:ignore Emaj Ebdim Yelverton Gershwin Pachelbel Coltrane
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock state and global config
@@ -97,7 +97,7 @@ import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
-import { getFrequency } from '../../public/utils.js';
+import { getFrequency, getMidi } from '../../public/utils.js';
 
 const { arranger, playback, soloist, groove } = getState();
 
@@ -313,13 +313,21 @@ describe('Standards Compliance Test Suite', () => {
             expect(new Set(turnaround.map((chord) => chord.key))).toEqual(new Set(['Bb']));
         });
 
-        it('stores provenance notes for the audited standards', () => {
+        it('stores provenance notes for audited standards and theory-heavy reference presets', () => {
             const auditedPresets = [
                 'Blue Bossa',
                 'Autumn Leaves',
                 'All The Things You Are',
                 'Cherokee',
                 'Stella by Starlight',
+                'Giant Steps',
+                'Ornithology',
+                'Donna Lee',
+                'Rhythm Changes',
+                'Night and Day',
+                'All Blues',
+                'Circle of 4ths',
+                'Plagal Flow',
             ].map((name) => CHORD_PRESETS.find((preset) => preset.name === name));
 
             auditedPresets.forEach((preset) => {
@@ -332,6 +340,16 @@ describe('Standards Compliance Test Suite', () => {
             expect(stella.provenance).toMatchObject({
                 variant: 'Modern / Real Book-oriented changes',
                 references: ['Nat Yelverton, "Analysis of Stella by Starlight"'],
+            });
+
+            const referencedPresets = [
+                'Giant Steps',
+                'Donna Lee',
+                'Rhythm Changes',
+                'Night and Day',
+            ].map((name) => CHORD_PRESETS.find((preset) => preset.name === name));
+            referencedPresets.forEach((preset) => {
+                expect(preset.provenance?.references?.length).toBeGreaterThan(0);
             });
         });
     });
@@ -832,6 +850,10 @@ describe('Standards Compliance Test Suite', () => {
                 0, 2, 3, 5, 6, 8, 9, 11,
             ]); // Ddim7 Whole-Half
             expect(ab_eb.bassMidi % 12).toBe(3); // Eb bass (V of Ab)
+            const voicedPitchClasses = new Set(ab_eb.freqs.map((freq) => getMidi(freq) % 12));
+            expect(voicedPitchClasses.has(8)).toBe(true); // Ab root
+            expect(voicedPitchClasses.has(0)).toBe(true); // C third
+            expect(voicedPitchClasses.has(7)).toBe(true); // G major seventh
         });
     });
 

@@ -299,5 +299,25 @@ describe('Chords & Voicing Logic', () => {
             expect(Math.min(...voicedMidis)).toBe(slashChord.bassMidi);
             expect(slashChord.bassMidi).toBeLessThan(Math.max(...voicedMidis));
         });
+
+        it('should preserve rootless jazz guide tones when a slash bass claims one chord tone', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'G7/B | Cmaj7', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Jazz';
+            chords.pianoRoots = false;
+
+            validateProgression(getState());
+
+            const slashChord = arranger.progression[0];
+            const voicedMidis = slashChord.freqs.map((freq) => getMidi(freq));
+            const voicedPitchClasses = voicedMidis.map((midi) => midi % 12);
+
+            expect(slashChord.bassMidi % 12).toBe(11); // B bass
+            expect(Math.min(...voicedMidis)).toBe(slashChord.bassMidi);
+            expect(voicedPitchClasses.filter((pc) => pc === 11)).toHaveLength(1);
+            expect(voicedPitchClasses).toContain(2); // D retained above the bass
+            expect(voicedPitchClasses).toContain(5); // F retained above the bass
+        });
     });
 });
