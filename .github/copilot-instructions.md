@@ -2,6 +2,8 @@
 
 Before making broad changes, skim `AI_MAP.md` for file ownership and `AI.md` / `GEMINI.md` for the repo's architectural and state-management rules. Those files contain project-specific guidance that is more important here than generic JavaScript advice.
 
+The repository also includes a workspace Playwright MCP config at `.vscode/mcp.json`; keep it aligned with any browser automation changes so the setup remains portable across machines.
+
 ## Build, test, and lint commands
 
 Ensemble is strictly `npm`-based. Use `npm install` and `npm run <script>`. Do not introduce `pnpm`, `yarn`, or `bun`, and do not create non-`package-lock.json` lockfiles.
