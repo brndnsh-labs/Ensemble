@@ -57,6 +57,7 @@ describe('Accompaniment Consistency Standards', () => {
         compingState.lockedUntil = 0;
         compingState.grooveRetentionCount = 0;
         compingState.lastSectionId = null;
+        compingState.lastVoicingMidis = [];
 
         arranger.progression = [mockChord];
         chords.enabled = true;

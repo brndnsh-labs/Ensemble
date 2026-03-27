@@ -133,6 +133,7 @@ describe('Jazz Comping Integrity', () => {
         compingState.lockedUntil = 0;
         compingState.lastChordIndex = -1;
         compingState.soloistActivity = 0;
+        compingState.lastVoicingMidis = [];
     });
 
     it('should use shell voicings (3 & 7) for complex jazz chords at high intensity', () => {

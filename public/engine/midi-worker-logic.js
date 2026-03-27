@@ -161,6 +161,7 @@ export class ExportProcessor {
         compingState.lockedUntil = 0; // @worker-mutation
         compingState.lastChordIndex = -1; // @worker-mutation
         compingState.grooveRetentionCount = 0; // @worker-mutation
+        compingState.lastVoicingMidis = []; // @worker-mutation
 
         // Conductor State
         this.exportConductor = {
