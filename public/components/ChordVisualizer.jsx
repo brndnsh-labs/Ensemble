@@ -169,6 +169,34 @@ export function ChordVisualizer() {
         () => leadSheetRows.reduce((total, row) => total + row.measures.length, 0),
         [leadSheetRows],
     );
+    const activeSectionId =
+        leadSheetRows.find((/** @type {any} */ row) =>
+            row.measures.some((/** @type {any} */ measure) =>
+                measure.chords.some(
+                    (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
+                ),
+            ),
+        )?.sectionId ?? null;
+    const leadSheetSectionGroups = useMemo(() => {
+        /** @type {any[]} */
+        const groups = [];
+
+        leadSheetRows.forEach((row) => {
+            const lastGroup = groups[groups.length - 1];
+            if (lastGroup && lastGroup.sectionId === row.sectionId) {
+                lastGroup.rows.push(row);
+                return;
+            }
+
+            groups.push({
+                id: `${row.sectionId}-section-${groups.length}`,
+                sectionId: row.sectionId,
+                rows: [row],
+            });
+        });
+
+        return groups;
+    }, [leadSheetRows]);
 
     const density = getLeadSheetDensity(totalMeasures);
     const showSparkline = isMaximized && soloistStyle === 'lead_sheet' && totalMeasures <= 16;
@@ -216,73 +244,119 @@ export function ChordVisualizer() {
                     ✕
                 </button>
             )}
-            {leadSheetRows.map((/** @type {any} */ row) => {
-                const isActiveRow = row.measures.some((/** @type {any} */ measure) =>
-                    measure.chords.some(
-                        (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
-                    ),
-                );
-                const hasSectionMarkers = row.measures.some(
-                    (/** @type {any} */ measure) => measure.isSectionStart,
-                );
+            {leadSheetSectionGroups.map((/** @type {any} */ sectionGroup) => {
+                const isActiveSection = activeSectionId === sectionGroup.sectionId;
 
                 return (
                     <div
-                        key={row.id}
-                        className={`lead-sheet-row${row.isSectionStart ? ' lead-sheet-row--section-start' : ''}${
-                            isActiveRow ? ' lead-sheet-row--active' : ''
-                        }${hasSectionMarkers ? ' lead-sheet-row--with-markers' : ''}`}
-                        data-section-id={row.sectionId}
+                        key={sectionGroup.id}
+                        className={`lead-sheet-section-group${
+                            isActiveSection ? ' lead-sheet-section-group--active' : ''
+                        }`}
+                        data-section-id={sectionGroup.sectionId}
                     >
-                        {row.measures.map(
-                            (/** @type {any} */ measure, /** @type {any} */ measureIndex) =>
-                                measure.isSectionStart ? (
-                                    <div
-                                        key={`${row.id}-marker-${measureIndex}`}
-                                        className="lead-sheet-marker-slot"
-                                        style={{ gridColumn: `${measureIndex + 1}`, gridRow: '1' }}
-                                        aria-hidden="true"
-                                    >
-                                        <span className="lead-sheet-row-marker">
-                                            {formatUnicodeSymbols(measure.sectionLabel)}
-                                        </span>
-                                    </div>
-                                ) : null,
-                        )}
-                        {row.measures.map(
-                            (/** @type {any} */ measure, /** @type {any} */ measureIndex) => {
-                                const isActiveMeasure = measure.chords.some(
+                        {sectionGroup.rows.map((/** @type {any} */ row) => {
+                            const isActiveRow = row.measures.some((/** @type {any} */ measure) =>
+                                measure.chords.some(
                                     (/** @type {any} */ chord) =>
                                         chord.globalIndex === lastActiveChordIndex,
-                                );
+                                ),
+                            );
+                            const hasSectionMarkers = row.measures.some(
+                                (/** @type {any} */ measure) => measure.isSectionStart,
+                            );
 
-                                return (
-                                    <div
-                                        key={`${row.id}-${measureIndex}`}
-                                        className={`measure-box${isActiveMeasure ? ' measure-box--active' : ''}`}
-                                        data-section-id={measure.sectionId}
-                                        style={{
-                                            gridColumn: `${measureIndex + 1}`,
-                                            gridRow: hasSectionMarkers ? '2' : '1',
-                                        }}
-                                        onClick={() => openSectionEditor(measure.sectionId)}
-                                    >
-                                        {measure.chords.map((/** @type {any} */ chord) => (
-                                            <ChordCard
-                                                key={chord.globalIndex}
-                                                chord={chord}
-                                                isActive={
-                                                    chord.globalIndex === lastActiveChordIndex
-                                                }
-                                                notation={notation}
-                                                leadSheetMelody={leadSheetMelody}
-                                                showSparkline={showSparkline}
-                                            />
-                                        ))}
-                                    </div>
-                                );
-                            },
-                        )}
+                            return (
+                                <div
+                                    key={row.id}
+                                    className={`lead-sheet-row${
+                                        row.isSectionStart ? ' lead-sheet-row--section-start' : ''
+                                    }${isActiveRow ? ' lead-sheet-row--active' : ''}${
+                                        hasSectionMarkers ? ' lead-sheet-row--with-markers' : ''
+                                    }`}
+                                    data-section-id={row.sectionId}
+                                >
+                                    {row.measures.map(
+                                        (
+                                            /** @type {any} */ measure,
+                                            /** @type {any} */ measureIndex,
+                                        ) =>
+                                            measure.isSectionStart ? (
+                                                <div
+                                                    key={`${row.id}-marker-${measureIndex}`}
+                                                    className={`lead-sheet-marker-slot${
+                                                        activeSectionId &&
+                                                        measure.sectionId === activeSectionId
+                                                            ? ' lead-sheet-marker-slot--section-active'
+                                                            : ''
+                                                    }${
+                                                        isActiveRow &&
+                                                        activeSectionId &&
+                                                        measure.sectionId === activeSectionId
+                                                            ? ' lead-sheet-marker-slot--row-active'
+                                                            : ''
+                                                    }`}
+                                                    style={{
+                                                        gridColumn: `${measureIndex + 1}`,
+                                                        gridRow: '1',
+                                                    }}
+                                                    aria-hidden="true"
+                                                >
+                                                    <span className="lead-sheet-row-marker">
+                                                        {formatUnicodeSymbols(measure.sectionLabel)}
+                                                    </span>
+                                                </div>
+                                            ) : null,
+                                    )}
+                                    {row.measures.map(
+                                        (
+                                            /** @type {any} */ measure,
+                                            /** @type {any} */ measureIndex,
+                                        ) => {
+                                            const isActiveMeasure = measure.chords.some(
+                                                (/** @type {any} */ chord) =>
+                                                    chord.globalIndex === lastActiveChordIndex,
+                                            );
+
+                                            return (
+                                                <div
+                                                    key={`${row.id}-${measureIndex}`}
+                                                    className={`measure-box${
+                                                        isActiveMeasure
+                                                            ? ' measure-box--active'
+                                                            : ''
+                                                    }`}
+                                                    data-section-id={measure.sectionId}
+                                                    style={{
+                                                        gridColumn: `${measureIndex + 1}`,
+                                                        gridRow: hasSectionMarkers ? '2' : '1',
+                                                    }}
+                                                    onClick={() =>
+                                                        openSectionEditor(measure.sectionId)
+                                                    }
+                                                >
+                                                    {measure.chords.map(
+                                                        (/** @type {any} */ chord) => (
+                                                            <ChordCard
+                                                                key={chord.globalIndex}
+                                                                chord={chord}
+                                                                isActive={
+                                                                    chord.globalIndex ===
+                                                                    lastActiveChordIndex
+                                                                }
+                                                                notation={notation}
+                                                                leadSheetMelody={leadSheetMelody}
+                                                                showSparkline={showSparkline}
+                                                            />
+                                                        ),
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 );
             })}

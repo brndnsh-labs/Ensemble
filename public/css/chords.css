@@ -52,6 +52,24 @@
     --lead-font-size: clamp(0.88rem, 2vw, 1.06rem);
 }
 
+.lead-sheet-section-group {
+    display: grid;
+    gap: var(--lead-row-gap);
+    position: relative;
+    isolation: isolate;
+}
+
+.lead-sheet-section-group--active::before {
+    content: "";
+    position: absolute;
+    inset: -0.12rem -0.22rem;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--accent-color), transparent 94%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 90%);
+    pointer-events: none;
+    z-index: 0;
+}
+
 .lead-sheet-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -60,6 +78,7 @@
     width: 100%;
     position: relative;
     align-items: start;
+    isolation: isolate;
 }
 
 .lead-sheet-row--with-markers {
@@ -76,6 +95,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--accent-color), transparent 18%);
     box-shadow: 0 0 10px color-mix(in srgb, var(--accent-color), transparent 60%);
+    z-index: 2;
 }
 
 .lead-sheet-marker-slot {
@@ -85,6 +105,8 @@
     align-items: flex-end;
     justify-content: flex-start;
     padding-left: 0.08rem;
+    position: relative;
+    z-index: 1;
 }
 
 .lead-sheet-row-marker {
@@ -103,6 +125,28 @@
     line-height: 1;
     text-transform: uppercase;
     pointer-events: none;
+    transition:
+        border-color var(--anim-fast) var(--anim-ease),
+        background-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease);
+}
+
+.lead-sheet-marker-slot--section-active .lead-sheet-row-marker {
+    border-color: color-mix(in srgb, var(--accent-color), transparent 48%);
+    background: color-mix(in srgb, var(--accent-color), transparent 80%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white, transparent 88%),
+        0 3px 8px rgba(0, 0, 0, 0.06);
+}
+
+.lead-sheet-marker-slot--row-active .lead-sheet-row-marker {
+    color: white;
+    border-color: color-mix(in srgb, var(--accent-color), transparent 18%);
+    background: color-mix(in srgb, var(--accent-color), white 6%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white, transparent 72%),
+        0 5px 12px color-mix(in srgb, var(--accent-color), transparent 84%);
 }
 
 .measure-box {
@@ -117,6 +161,7 @@
     border-radius: 12px;
     background: var(--panel-color);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    z-index: 1;
     scroll-margin-block: 16vh;
     transition:
         border-color var(--anim-fast) var(--anim-ease),
