@@ -209,6 +209,26 @@ describe('Soloist Seeder Hook Shape', () => {
         expect(summary.focusRows[0]?.oneBeatShare).toBeLessThan(0.7);
     });
 
+    it('keeps Neo-Soul HEAD_C from collapsing into a narrow scalar lane', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const rows = buildSeedSweep({
+            arrangement,
+            genre: 'Neo-Soul',
+            bpm: 92,
+            intensity: 0.55,
+            timeSignature: arrangement.timeSignature,
+            style: 'smart',
+            seeds: ['HEAD_A', 'HEAD_B', 'HEAD_C'],
+        });
+        const headC = rows.find((row) => row.seed === 'HEAD_C');
+
+        expect(headC).toBeDefined();
+        expect(headC?.oneBeatShare).toBeLessThan(0.58);
+        expect(headC?.stepShare).toBeLessThan(0.6);
+        expect(headC?.richContourShare).toBeGreaterThanOrEqual(0.6);
+        expect(headC?.range).toBeGreaterThanOrEqual(18);
+    });
+
     it('keeps Bossa Nova seed sweeps rhythmically lighter than straight quarters', () => {
         const arrangement = buildHookAuditArrangement('4/4');
         const summary = buildSeedSweepSummary(
@@ -226,5 +246,25 @@ describe('Soloist Seeder Hook Shape', () => {
         expect(summary.aggregate.oneBeatShare).toBeLessThan(0.62);
         expect(summary.aggregate.richContourShare).toBeGreaterThanOrEqual(0.35);
         expect(summary.focusRows[0]?.oneBeatShare).toBeLessThan(0.7);
+    });
+
+    it('keeps Bossa Nova HEAD_C from reverting to static stepwise drift', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const rows = buildSeedSweep({
+            arrangement,
+            genre: 'Bossa Nova',
+            bpm: 120,
+            intensity: 0.5,
+            timeSignature: arrangement.timeSignature,
+            style: 'smart',
+            seeds: ['HEAD_A', 'HEAD_B', 'HEAD_C'],
+        });
+        const headC = rows.find((row) => row.seed === 'HEAD_C');
+
+        expect(headC).toBeDefined();
+        expect(headC?.oneBeatShare).toBeLessThan(0.6);
+        expect(headC?.stepShare).toBeLessThan(0.55);
+        expect(headC?.richContourShare).toBeGreaterThanOrEqual(0.45);
+        expect(headC?.range).toBeGreaterThanOrEqual(18);
     });
 });

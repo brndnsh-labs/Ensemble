@@ -383,6 +383,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         const registerProfile = getSoloistRegisterProfile(style);
         const rhythmicDensity = config.rhythmicDensity || 0.5;
         const syncBias = config.syncopationLikelihood || 0.2;
+        const isBossaStyle = style === 'bossa';
+        const isNeoStyle = style === 'neo';
+        const isSmoothSyncStyle = isBossaStyle || isNeoStyle;
         const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
         const isForwardStatement = !isJazzStyle && (index === 0 || !isDeparture);
         const statementDensity = isForwardStatement
@@ -544,8 +547,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // A motif is a 2-measure rhythmic/melodic contour template
         if (!sectionMotifs.has(category)) {
             const stationaryProb = Math.max(
-                0.02,
-                (config.stationaryProb || 0.05) * Math.max(0.35, 1 - syncBias * 0.7),
+                isSmoothSyncStyle && !isDeparture ? 0.01 : 0.02,
+                (config.stationaryProb || 0.05) *
+                    Math.max(0.35, 1 - syncBias * 0.7) *
+                    (isSmoothSyncStyle && !isDeparture ? 0.4 : 1),
             );
             const isStationaryMotif = prng() < stationaryProb;
 
@@ -586,53 +591,77 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             }
 
             // --- Melodic Intent Phase ---
-            const contourPool = isJazzStyle
+            const contourPool = isBossaStyle
                 ? [
                       'ASCEND',
                       'DESCEND',
                       'ARCH',
+                      'ARCH',
                       'VALLEY',
                       'HOOK',
                       'ARPEGGIATE',
-                      'HOOK',
                       'ARPEGGIATE',
-                      'ARCH',
+                      'ARPEGGIATE',
                   ]
-                : isForwardStatement
-                  ? syncBias > 0.65
-                      ? [
-                            'ASCEND',
-                            'DESCEND',
-                            'ARCH',
-                            'VALLEY',
-                            'HOOK',
-                            'HOOK',
-                            'ARPEGGIATE',
-                            'ARPEGGIATE',
-                            'ARCH',
-                        ]
-                      : [
-                            'ASCEND',
-                            'DESCEND',
-                            'ARCH',
-                            'VALLEY',
-                            'STATIC',
-                            'HOOK',
-                            'HOOK',
-                            'ARPEGGIATE',
-                        ]
-                  : syncBias > 0.55
+                : isJazzStyle
+                  ? [
+                        'ASCEND',
+                        'DESCEND',
+                        'ARCH',
+                        'VALLEY',
+                        'HOOK',
+                        'ARPEGGIATE',
+                        'HOOK',
+                        'ARPEGGIATE',
+                        'ARCH',
+                    ]
+                  : isNeoStyle
                     ? [
                           'ASCEND',
                           'DESCEND',
+                          'ARCH',
                           'ARCH',
                           'VALLEY',
                           'HOOK',
                           'ARPEGGIATE',
                           'ARPEGGIATE',
-                          'STATIC',
+                          'ARPEGGIATE',
                       ]
-                    : ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'HOOK', 'ARPEGGIATE'];
+                    : isForwardStatement
+                      ? syncBias > 0.65
+                          ? [
+                                'ASCEND',
+                                'DESCEND',
+                                'ARCH',
+                                'VALLEY',
+                                'HOOK',
+                                'HOOK',
+                                'ARPEGGIATE',
+                                'ARPEGGIATE',
+                                'ARCH',
+                            ]
+                          : [
+                                'ASCEND',
+                                'DESCEND',
+                                'ARCH',
+                                'VALLEY',
+                                'STATIC',
+                                'HOOK',
+                                'HOOK',
+                                'ARPEGGIATE',
+                            ]
+                      : syncBias > 0.55
+                        ? [
+                              'ASCEND',
+                              'DESCEND',
+                              'ARCH',
+                              'VALLEY',
+                              'HOOK',
+                              'ARPEGGIATE',
+                              'ARPEGGIATE',
+                              'STATIC',
+                          ]
+                        : ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'HOOK', 'ARPEGGIATE'];
             const contourType = contourPool[Math.floor(prng() * contourPool.length)];
             console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
 
@@ -992,11 +1021,33 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     targetNote.scaleDegreeOffset += 2; // Diatonic third
                 }
             } else if (r < 0.85) {
-                // Stationary Transformation: Collapse all pitches to a single anchor tone (Root/5th)
-                // This creates "tension hooks" during restatements
-                motif.forEach((n) => {
-                    n.scaleDegreeOffset = 0;
-                });
+                if (isSmoothSyncStyle) {
+                    // Smooth-sync styles still benefit from a memorable restatement,
+                    // but a total pitch collapse tends to produce overly static weak seeds.
+                    let gestureDir = prng() > 0.5 ? 1 : -1;
+                    let activeIndex = 0;
+                    motif.forEach((n) => {
+                        if (n.isRest) {
+                            return;
+                        }
+                        const gestureSlot = activeIndex % 4;
+                        if (gestureSlot === 0 || gestureSlot === 2) {
+                            n.scaleDegreeOffset = 0;
+                        } else if (gestureSlot === 1) {
+                            n.scaleDegreeOffset = gestureDir * 2;
+                        } else {
+                            n.scaleDegreeOffset = gestureDir;
+                            gestureDir *= -1;
+                        }
+                        activeIndex++;
+                    });
+                } else {
+                    // Stationary Transformation: Collapse all pitches to a single anchor tone (Root/5th)
+                    // This creates "tension hooks" during restatements
+                    motif.forEach((n) => {
+                        n.scaleDegreeOffset = 0;
+                    });
+                }
             } else {
                 // Sequencing: Transpose the entire motif by a diatonic step or third
                 const shift = prng() > 0.5 ? 1 : 2;
