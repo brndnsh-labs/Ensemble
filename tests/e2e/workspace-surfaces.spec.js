@@ -148,12 +148,15 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(drumPadModal).toBeHidden();
     });
 
-    test('switching to visuals during playback stays responsive', async ({ page }) => {
+    test('switching to visuals after extended playback stays responsive', async ({ page }) => {
         await openWorkspace(page, 'Arranger');
+        await page.locator('#bpmInput').fill('240');
+        await expect(page.locator('#bpmInput')).toHaveValue('240');
         await page.locator('#playBtn').click();
         await expect(page.locator('#playBtnText')).toContainText('STOP');
 
-        await page.waitForTimeout(2000);
+        // 15s at 240 BPM stresses the same queue-growth path as ~36s at the default tempo.
+        await page.waitForTimeout(15000);
 
         const switchStart = Date.now();
         await page.locator('[data-workspace-nav="visuals"]').click();

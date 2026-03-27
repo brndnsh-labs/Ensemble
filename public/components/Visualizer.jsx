@@ -9,6 +9,54 @@ import { UnifiedVisualizer } from '../visualizer-proxy.js';
 
 let lastFrameTime = 0;
 let missedFrames = 0;
+const STALE_DRAW_QUEUE_WINDOW_SECONDS = 2.0;
+const MAX_DRAW_QUEUE_EVENTS = 300;
+const RETAINED_DRAW_QUEUE_EVENTS = 200;
+
+/**
+ * Partitions the visual event queue into due events for this frame and the remaining backlog.
+ * Old events are dropped in a single batch so Visuals startup never replays a long stale queue.
+ *
+ * @param {Array<{time?: number}>} drawQueue
+ * @param {number} now
+ * @returns {{ readyEvents: Array<any>, remainingEvents: Array<any> }}
+ */
+export function partitionDrawQueue(drawQueue, now) {
+    let startIndex = 0;
+
+    while (startIndex < drawQueue.length) {
+        const event = drawQueue[startIndex];
+        if (!event || typeof event.time !== 'number') {
+            break;
+        }
+        if (event.time >= now - STALE_DRAW_QUEUE_WINDOW_SECONDS) {
+            break;
+        }
+        startIndex++;
+    }
+
+    if (drawQueue.length - startIndex > MAX_DRAW_QUEUE_EVENTS) {
+        startIndex = Math.max(startIndex, drawQueue.length - RETAINED_DRAW_QUEUE_EVENTS);
+    }
+
+    let readyEndIndex = startIndex;
+    while (readyEndIndex < drawQueue.length) {
+        const event = drawQueue[readyEndIndex];
+        if (!event || typeof event.time !== 'number' || event.time > now) {
+            break;
+        }
+        readyEndIndex++;
+    }
+
+    if (startIndex === 0 && readyEndIndex === 0) {
+        return { readyEvents: [], remainingEvents: drawQueue };
+    }
+
+    return {
+        readyEvents: drawQueue.slice(startIndex, readyEndIndex),
+        remainingEvents: drawQueue.slice(readyEndIndex),
+    };
+}
 
 /**
  * @typedef {Object} VisualizerProps
@@ -226,36 +274,17 @@ export function Visualizer({ enabled, getVisualTime }) {
                 return;
             }
 
-            while (
-                playback.drawQueue.length > 0 &&
-                /** @type {any} */ (playback.drawQueue[0]).time < now - 2.0
-            ) {
+            const { readyEvents, remainingEvents } = partitionDrawQueue(playback.drawQueue, now);
+            if (remainingEvents !== playback.drawQueue) {
                 dispatch(ACTIONS.SET_PARAM, {
                     module: 'playback',
                     param: 'drawQueue',
-                    value: playback.drawQueue.slice(1),
-                });
-            }
-            if (playback.drawQueue.length > 300) {
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'playback',
-                    param: 'drawQueue',
-                    value: playback.drawQueue.slice(playback.drawQueue.length - 200),
+                    value: remainingEvents,
                 });
             }
             const spm = getStepsPerMeasure(arranger.timeSignature);
 
-            while (
-                playback.drawQueue.length &&
-                /** @type {any} */ (playback.drawQueue[0]).time <= now
-            ) {
-                /** @type {any} */
-                const ev = playback.drawQueue[0];
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'playback',
-                    param: 'drawQueue',
-                    value: playback.drawQueue.slice(1),
-                });
+            for (const ev of readyEvents) {
                 if (!ev) {
                     continue;
                 }

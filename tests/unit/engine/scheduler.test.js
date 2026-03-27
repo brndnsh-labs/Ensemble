@@ -392,6 +392,7 @@ describe('Scheduler Core System', () => {
         it('should push visual flash events (lines 1198-1205)', () => {
             playback.visualFlash = true;
             groove.enabled = true;
+            vizState.enabled = true;
 
             // Step 0 is Measure Start (Flash intensity 0.2)
             scheduleGlobalEvent(getState(), 0, 10.0);
@@ -403,6 +404,17 @@ describe('Scheduler Core System', () => {
             scheduleGlobalEvent(getState(), 8, 11.0);
             const flash8 = playback.drawQueue.find((e) => e.type === 'flash');
             expect(flash8.intensity).toBe(0.15);
+        });
+
+        it('should not queue visual-only global events while visuals are disabled', () => {
+            playback.visualFlash = true;
+            groove.enabled = true;
+            vizState.enabled = false;
+
+            scheduleGlobalEvent(getState(), 0, 10.0);
+
+            expect(playback.drawQueue.find((e) => e.type === 'flash')).toBeUndefined();
+            expect(playback.drawQueue.find((e) => e.type === 'drum_vis')).toBeUndefined();
         });
         it('should emit a key-updated event when playhead crosses section threshold', () => {
             // Trigger Step 0 (Key A)

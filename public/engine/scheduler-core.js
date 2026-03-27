@@ -411,11 +411,11 @@ function advanceCountIn(state) {
  * @param {number} time
  */
 function scheduleCountIn(state, beat, time) {
-    const { playback, arranger, soloist } = state;
+    const { playback, arranger, soloist, vizState } = state;
     if (!playback.audio) {
         return;
     }
-    if (playback.visualFlash) {
+    if (vizState.enabled && playback.visualFlash) {
         playback.drawQueue.push({ type: 'flash', time: time, intensity: 0.3, beat: 1 });
     }
     const osc = playback.audio.createOscillator();
@@ -1063,7 +1063,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
  * @param {Function} [dispatch] - State dispatch function.
  */
 export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined) {
-    const { arranger, playback, groove, soloist, chords, bass, harmony } = state;
+    const { arranger, playback, groove, soloist, chords, bass, harmony, vizState } = state;
     /** @type {any} */
     const signatures = TIME_SIGNATURES;
     const globalTS = signatures[arranger.timeSignature] || signatures['4/4'];
@@ -1146,7 +1146,7 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
         playback.unswungNextNoteTime * straightness + swungTime * (1.0 - straightness);
 
     if (groove.enabled) {
-        if (stepInfo.isBeatStart && playback.visualFlash) {
+        if (vizState.enabled && stepInfo.isBeatStart && playback.visualFlash) {
             playback.drawQueue.push({
                 type: 'flash',
                 time: swungTime,
@@ -1155,7 +1155,9 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
             });
         }
 
-        playback.drawQueue.push({ type: 'drum_vis', step: drumStep, time: swungTime });
+        if (vizState.enabled) {
+            playback.drawQueue.push({ type: 'drum_vis', step: drumStep, time: swungTime });
+        }
 
         const chordDataForDrums = /** @type {any} */ (getChordAtStep(state, step));
         const sectionId = chordDataForDrums?.chord?.sectionId || null;
