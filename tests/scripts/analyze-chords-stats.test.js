@@ -186,4 +186,21 @@ describe('Chord audit scripts', () => {
         expect(voiceJumpMeasures).toHaveLength(0);
         expect(Math.max(...rows.map((row) => Math.abs(row.centerDrift)))).toBeLessThanOrEqual(7);
     });
+
+    it('keeps Funk changes in a clav pocket without octave jumps', () => {
+        const { capture } = runAudit({
+            genre: 'Funk',
+            arrangementName: 'changes',
+            loops: 1,
+            seed: 'FUNK_CHANGES',
+            intensity: 0.75,
+        });
+
+        const rows = buildMeasureAudit(capture, 0);
+        const voiceJumpMeasures = rows.filter((row) => row.flags.includes('voice-jump'));
+
+        expect(voiceJumpMeasures).toHaveLength(0);
+        expect(Math.max(...rows.map((row) => Math.abs(row.centerDrift)))).toBeLessThanOrEqual(7);
+        expect(rows.every((row) => row.avgVoices <= 2.1)).toBe(true);
+    });
 });

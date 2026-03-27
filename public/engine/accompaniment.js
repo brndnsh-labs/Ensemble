@@ -71,6 +71,61 @@ function selectCompactCluster(midis, previousMidis = [], maxVoices = 3, minMidi 
 }
 
 /**
+ * Keeps a voicing in the same register pocket as the previous hit when possible.
+ * @param {number[]} midis
+ * @param {number[]} previousMidis
+ * @param {number} minMidi
+ * @param {number} maxMidi
+ * @returns {number[]}
+ */
+function recenterVoicing(midis, previousMidis = [], minMidi = 0, maxMidi = 127) {
+    const sorted = [...new Set(midis.filter((midi) => Number.isFinite(midi)))].sort(
+        (a, b) => a - b,
+    );
+    if (sorted.length === 0) {
+        return [];
+    }
+
+    const targetCenter =
+        previousMidis.length > 0 ? averageMidi(previousMidis) : averageMidi(sorted);
+    let best = sorted;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const octaveShifts = [-24, -12, 0, 12, 24];
+
+    for (const shift of octaveShifts) {
+        const shifted = sorted.map((midi) => midi + shift);
+        const shiftedMin = Math.min(...shifted);
+        const shiftedMax = Math.max(...shifted);
+        if (shiftedMin < minMidi || shiftedMax > maxMidi) {
+            continue;
+        }
+
+        const center = averageMidi(shifted);
+        const span = shiftedMax - shiftedMin;
+        const score = Math.abs(center - targetCenter) + span * 0.1;
+        if (score < bestScore) {
+            bestScore = score;
+            best = shifted;
+        }
+    }
+
+    if (bestScore < Number.POSITIVE_INFINITY) {
+        return best;
+    }
+
+    return sorted.map((midi) => {
+        let shifted = midi;
+        while (shifted < minMidi) {
+            shifted += 12;
+        }
+        while (shifted > maxMidi) {
+            shifted -= 12;
+        }
+        return shifted;
+    });
+}
+
+/**
  * Algorithmic Pattern Generator
  * Replaces static PIANO_CELLS table to save space and increase variety.
  * @param {import('../types.js').EnsembleState} state
@@ -846,34 +901,30 @@ export function getAccompanimentNotes(
         const isGhost = !isHit && Math.random() < ghostProb;
 
         if (isHit || isGhost) {
-            // CLAV-STYLE VOICING: Lean 2-note voicings (Guide Tones: 3rd and 7th)
-            // This maintains the "lean, funky pocket" requested.
-            let voicing = [];
+            const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+            const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
 
-            // Extract 3rd and 7th from intervals if possible, otherwise use slice
-            const third = chord.intervals
-                ? chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4)
-                : undefined;
-            const seven = chord.intervals
-                ? chord.intervals.find((/** @type {number} */ i) => i === 10 || i === 11 || i === 9)
-                : undefined;
+            let voicing = chord.freqs
+                .map((/** @type {number} */ f) => getMidi(f))
+                .filter((/** @type {number | null} */ midi) => Number.isFinite(midi));
 
-            if (third !== undefined && seven !== undefined) {
-                voicing = [chord.rootMidi + third, chord.rootMidi + seven];
-            } else {
-                voicing = chord.freqs.slice(0, 2).map((/** @type {number} */ f) => getMidi(f));
+            if (voicing.length === 0) {
+                voicing = [chord.rootMidi + 4, chord.rootMidi + 10];
             }
 
-            // Register Slotting: Ensure it stays in a punchy mid-register (E3-C6)
-            voicing = voicing.map((/** @type {any} */ m) => {
-                while (m < 52) {
-                    m += 12;
-                }
-                while (m > 84) {
-                    m -= 12;
-                }
-                return m;
-            });
+            voicing = selectCompactCluster(
+                voicing,
+                compingState.lastVoicingMidis,
+                2,
+                reserveBassSpace && bassMidi ? bassMidi + 13 : 52,
+            );
+            voicing = recenterVoicing(
+                voicing,
+                compingState.lastVoicingMidis,
+                reserveBassSpace && bassMidi ? bassMidi + 13 : 52,
+                84,
+            );
+            compingState.lastVoicingMidis = [...voicing];
 
             voicing.forEach((/** @type {any} */ m, /** @type {number} */ i) => {
                 notes.push({
