@@ -113,21 +113,25 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-vi.mock('../../../public/config.js', () => ({
-    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-    TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12] },
-    },
-    REGGAE_RIDDIMS: {},
-    MIXER_GAIN_MULTIPLIERS: {
-        chords: 0.22,
-        bass: 0.35,
-        soloist: 0.32,
-        harmonies: 0.28,
-        drums: 0.45,
-        master: 0.85,
-    },
-}));
+vi.mock('../../../public/config.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
+        TIME_SIGNATURES: {
+            '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th', pulse: [0, 4, 8, 12] },
+        },
+        REGGAE_RIDDIMS: {},
+        MIXER_GAIN_MULTIPLIERS: {
+            chords: 0.22,
+            bass: 0.35,
+            soloist: 0.32,
+            harmonies: 0.28,
+            drums: 0.45,
+            master: 0.85,
+        },
+    };
+});
 
 import { getState } from '../../../public/state.js';
 
