@@ -222,15 +222,33 @@ export function ChordVisualizer() {
                         (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
                     ),
                 );
+                const hasSectionMarkers = row.measures.some(
+                    (/** @type {any} */ measure) => measure.isSectionStart,
+                );
 
                 return (
                     <div
                         key={row.id}
                         className={`lead-sheet-row${row.isSectionStart ? ' lead-sheet-row--section-start' : ''}${
                             isActiveRow ? ' lead-sheet-row--active' : ''
-                        }`}
+                        }${hasSectionMarkers ? ' lead-sheet-row--with-markers' : ''}`}
                         data-section-id={row.sectionId}
                     >
+                        {row.measures.map(
+                            (/** @type {any} */ measure, /** @type {any} */ measureIndex) =>
+                                measure.isSectionStart ? (
+                                    <div
+                                        key={`${row.id}-marker-${measureIndex}`}
+                                        className="lead-sheet-marker-slot"
+                                        style={{ gridColumn: `${measureIndex + 1}`, gridRow: '1' }}
+                                        aria-hidden="true"
+                                    >
+                                        <span className="lead-sheet-row-marker">
+                                            {formatUnicodeSymbols(measure.sectionLabel)}
+                                        </span>
+                                    </div>
+                                ) : null,
+                        )}
                         {row.measures.map(
                             (/** @type {any} */ measure, /** @type {any} */ measureIndex) => {
                                 const isActiveMeasure = measure.chords.some(
@@ -241,27 +259,14 @@ export function ChordVisualizer() {
                                 return (
                                     <div
                                         key={`${row.id}-${measureIndex}`}
-                                        className={`measure-box${
-                                            measure.isSectionStart
-                                                ? ' measure-box--section-start'
-                                                : ''
-                                        }${isActiveMeasure ? ' measure-box--active' : ''}`}
+                                        className={`measure-box${isActiveMeasure ? ' measure-box--active' : ''}`}
                                         data-section-id={measure.sectionId}
+                                        style={{
+                                            gridColumn: `${measureIndex + 1}`,
+                                            gridRow: hasSectionMarkers ? '2' : '1',
+                                        }}
                                         onClick={() => openSectionEditor(measure.sectionId)}
                                     >
-                                        {measure.isSectionStart && (
-                                            <button
-                                                type="button"
-                                                className="lead-sheet-marker"
-                                                aria-label={`Open section ${measure.sectionLabel} in editor`}
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    openSectionEditor(measure.sectionId);
-                                                }}
-                                            >
-                                                {formatUnicodeSymbols(measure.sectionLabel)}
-                                            </button>
-                                        )}
                                         {measure.chords.map((/** @type {any} */ chord) => (
                                             <ChordCard
                                                 key={chord.globalIndex}

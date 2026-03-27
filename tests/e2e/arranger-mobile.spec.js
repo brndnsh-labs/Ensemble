@@ -40,7 +40,7 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
         expect(metrics.height).toBeGreaterThan(0);
 
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
         await expect
             .poll(async () =>
                 visualizer

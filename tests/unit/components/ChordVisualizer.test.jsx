@@ -137,7 +137,7 @@ describe('ChordVisualizer Component', () => {
         });
 
         expect(container.querySelectorAll('.lead-sheet-row')).toHaveLength(1);
-        expect(container.querySelectorAll('.lead-sheet-marker')).toHaveLength(1);
+        expect(container.querySelectorAll('.lead-sheet-row-marker')).toHaveLength(1);
     });
 
     it('should render sparklines for short maximized lead sheets', () => {

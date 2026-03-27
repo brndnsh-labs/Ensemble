@@ -25,7 +25,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const visualizer = page.locator('#chordVisualizer');
         // Verify structural elements are present
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
         await expect(visualizer.locator('.measure-box').first()).toBeVisible();
         await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
@@ -84,7 +84,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await expect(firstChord).toBeVisible();
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
         await expect
             .poll(async () =>
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
@@ -116,7 +116,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await expect(visualizer).toHaveAttribute('data-total-measures', '36');
         await expect(visualizer).toHaveAttribute('data-density', 'ultra-compact');
-        await expect(visualizer.locator('.lead-sheet-marker')).toHaveCount(7);
+        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(7);
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(9);
         expect(rowMeasureCounts).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 4]);
         await expect(firstChord).toBeVisible();

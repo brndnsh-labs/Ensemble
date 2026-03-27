@@ -3,6 +3,7 @@
     --lead-row-gap: 0.34rem;
     --lead-measure-gap: 0.24rem;
     --lead-marker-reserve: 0.62rem;
+    --lead-marker-lane-gap: 0.12rem;
     --lead-marker-size: 0.6rem;
     --lead-measure-min-height: 44px;
     --lead-chord-min-height: 36px;
@@ -31,6 +32,7 @@
     --lead-row-gap: 0.28rem;
     --lead-measure-gap: 0.18rem;
     --lead-marker-reserve: 0.54rem;
+    --lead-marker-lane-gap: 0.1rem;
     --lead-marker-size: 0.54rem;
     --lead-measure-min-height: 36px;
     --lead-chord-min-height: 30px;
@@ -42,6 +44,7 @@
     --lead-row-gap: 0.24rem;
     --lead-measure-gap: 0.16rem;
     --lead-marker-reserve: 0.48rem;
+    --lead-marker-lane-gap: 0.08rem;
     --lead-marker-size: 0.52rem;
     --lead-measure-min-height: 34px;
     --lead-chord-min-height: 28px;
@@ -52,9 +55,15 @@
 .lead-sheet-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--lead-measure-gap);
+    column-gap: var(--lead-measure-gap);
+    row-gap: 0;
     width: 100%;
     position: relative;
+    align-items: start;
+}
+
+.lead-sheet-row--with-markers {
+    row-gap: var(--lead-marker-lane-gap);
 }
 
 .lead-sheet-row--active::before {
@@ -67,6 +76,33 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--accent-color), transparent 18%);
     box-shadow: 0 0 10px color-mix(in srgb, var(--accent-color), transparent 60%);
+}
+
+.lead-sheet-marker-slot {
+    min-width: 0;
+    min-height: var(--lead-marker-reserve);
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    padding-left: 0.08rem;
+}
+
+.lead-sheet-row-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    padding: 0.1rem 0.32rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent-color), transparent 58%);
+    background: color-mix(in srgb, var(--accent-color), transparent 88%);
+    color: var(--text-color);
+    font-size: var(--lead-marker-size);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    pointer-events: none;
 }
 
 .measure-box {
@@ -88,70 +124,12 @@
         background-color var(--anim-fast) var(--anim-ease);
 }
 
-.measure-box--section-start {
-    padding-top: var(--lead-marker-reserve);
-}
-
-.lead-sheet-marker {
-    position: absolute;
-    top: 0.18rem;
-    left: 0.22rem;
-    z-index: var(--z-controls);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.35rem;
-    padding: 0.1rem 0.32rem;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--accent-color), transparent 58%);
-    background: color-mix(in srgb, var(--accent-color), transparent 88%);
-    color: var(--text-color);
-    font-size: var(--lead-marker-size);
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    text-transform: uppercase;
-    cursor: pointer;
-}
-
-.lead-sheet-marker:focus-visible {
-    outline: 2px solid var(--focus-ring-color);
-    outline-offset: 2px;
-}
-
-.measure-box:has(.chord-card.active) .lead-sheet-marker {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
-    color: white;
-}
-
 .measure-box--active {
     border-color: color-mix(in srgb, var(--accent-color), transparent 25%);
     box-shadow:
         inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 35%),
         0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 75%);
     background: color-mix(in srgb, var(--panel-color), var(--accent-color) 8%);
-}
-
-.measure-box--active.measure-box--section-start {
-    background: color-mix(in srgb, var(--panel-color), var(--accent-color) 5%);
-    box-shadow:
-        inset 0 3px 0 color-mix(in srgb, var(--accent-color), transparent 36%),
-        inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 45%),
-        0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 78%);
-}
-
-.measure-box--active.measure-box--section-start .lead-sheet-marker {
-    background: color-mix(in srgb, var(--accent-color), white 10%);
-    border-color: color-mix(in srgb, var(--accent-color), white 16%);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-}
-
-.measure-box--active.measure-box--section-start .chord-card.active {
-    background: color-mix(in srgb, var(--accent-color), white 8%);
-    box-shadow:
-        inset 0 0 0 1px color-mix(in srgb, white, transparent 60%),
-        0 2px 10px rgba(0, 0, 0, 0.16);
 }
 
 .chord-card {
@@ -223,6 +201,7 @@
     --lead-row-gap: 0.42rem;
     --lead-measure-gap: 0.3rem;
     --lead-marker-reserve: 0.72rem;
+    --lead-marker-lane-gap: 0.14rem;
     --lead-marker-size: 0.68rem;
     --lead-measure-min-height: 56px;
     --lead-chord-min-height: 48px;
@@ -344,6 +323,7 @@
         --lead-row-gap: 0.24rem;
         --lead-measure-gap: 0.16rem;
         --lead-marker-reserve: 0.5rem;
+        --lead-marker-lane-gap: 0.08rem;
         --lead-marker-size: 0.55rem;
         --lead-measure-min-height: 34px;
         --lead-chord-min-height: 28px;
@@ -355,6 +335,7 @@
 
     .lead-sheet--compact {
         --lead-marker-reserve: 0.44rem;
+        --lead-marker-lane-gap: 0.06rem;
         --lead-measure-min-height: 32px;
         --lead-chord-min-height: 27px;
         --lead-font-size: clamp(0.88rem, 3.55vw, 1rem);
@@ -364,14 +345,17 @@
         --lead-row-gap: 0.2rem;
         --lead-measure-gap: 0.14rem;
         --lead-marker-reserve: 0.4rem;
+        --lead-marker-lane-gap: 0.04rem;
         --lead-measure-min-height: 30px;
         --lead-chord-min-height: 26px;
         --lead-font-size: clamp(0.82rem, 3.35vw, 0.92rem);
     }
 
-    .lead-sheet-marker {
-        top: 0.15rem;
-        left: 0.18rem;
+    .lead-sheet-marker-slot {
+        padding-left: 0.04rem;
+    }
+
+    .lead-sheet-row-marker {
         padding: 0.08rem 0.26rem;
     }
 
@@ -379,6 +363,7 @@
         --lead-row-gap: 0.24rem;
         --lead-measure-gap: 0.14rem;
         --lead-marker-reserve: 0.42rem;
+        --lead-marker-lane-gap: 0.06rem;
         --lead-marker-size: 0.56rem;
         --lead-measure-min-height: 36px;
         --lead-chord-min-height: 30px;
@@ -393,6 +378,7 @@
         --lead-row-gap: 0.2rem;
         --lead-measure-gap: 0.12rem;
         --lead-marker-reserve: 0.38rem;
+        --lead-marker-lane-gap: 0.04rem;
         --lead-font-size: clamp(1.02rem, 4.6vw, 1.14rem);
         --lead-measure-min-height: 34px;
         --lead-chord-min-height: 28px;
@@ -402,6 +388,7 @@
         --lead-row-gap: 0.18rem;
         --lead-measure-gap: 0.12rem;
         --lead-marker-reserve: 0.36rem;
+        --lead-marker-lane-gap: 0.04rem;
         --lead-font-size: clamp(0.98rem, 4.3vw, 1.08rem);
         --lead-measure-min-height: 32px;
         --lead-chord-min-height: 27px;
