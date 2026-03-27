@@ -172,7 +172,10 @@
         "Drumkit",
         "clicky",
         "detunes",
-        "crackier"
+        "crackier",
+        "networkidle",
+        "goertzel",
+        "coeff"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

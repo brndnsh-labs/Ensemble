@@ -24,7 +24,7 @@ const TAU = Math.PI * 2;
 const CYMBAL_BUFFER_PROFILES = {
     HiHat: {
         key: 'hihatMetal',
-        duration: 0.55,
+        duration: 0.6,
         baseFreq: 2050,
         partials: [1, 1.29, 1.67, 2.18, 2.86, 3.62],
         metalMix: 0.61,
@@ -98,11 +98,11 @@ const CYMBAL_RUNTIME_PROFILES = {
         q: 0.85,
         attack: 0.0015,
         decayDelay: 0.006,
-        decayBase: 0.05,
+        decayBase: 0.058,
         decayVelocityFocus: 0.01,
         decayIntensityFocus: 0.006,
-        minDecay: 0.036,
-        stopTime: 0.42,
+        minDecay: 0.041,
+        stopTime: 0.46,
     },
     Open: {
         volumeScale: 0.62,
@@ -292,7 +292,7 @@ export function getCymbalMixScale(state, name) {
         1 -
         crowding *
             (name === 'HiHat' ? 0.05 : name === 'Ride' ? 0.09 : name === 'Open' ? 0.16 : 0.14);
-    const genreBoost = name === 'Ride' && genreFeel === 'Jazz' ? 1.08 : 1;
+    const genreBoost = name === 'Ride' && genreFeel === 'Jazz' ? 1.03 : 1;
 
     return Math.max(0.55, instrumentBase * intensityTrim * crowdingTrim * genreBoost);
 }
@@ -306,11 +306,33 @@ export function getCymbalMixScale(state, name) {
 export function getSnareMixScale(state, velocity) {
     const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
     const genreFeel = state.groove?.genreFeel;
-    const genreBoost = genreFeel === 'Rock' || genreFeel === 'Blues' ? 1.06 : 1;
+    const genreBoost =
+        genreFeel === 'Rock' || genreFeel === 'Blues' ? 1.06 : genreFeel === 'Jazz' ? 1.03 : 1;
     const intensityLift = 1 + Math.max(0, bandIntensity - 0.55) * 0.04;
     const velocityLift = 1 + Math.max(0, velocity - 0.9) * 0.08;
 
     return Math.max(0.94, genreBoost * intensityLift * velocityLift);
+}
+
+/**
+ * Keep the rhythm section's low-mid body a touch more forward in Blues/Jazz without
+ * inflating cymbal presence.
+ * @param {import('../types.js').EnsembleState} state
+ * @param {string} name
+ * @returns {number}
+ */
+export function getRhythmBodyMixScale(state, name) {
+    const genreFeel = state.groove?.genreFeel;
+
+    if (name === 'Kick') {
+        return genreFeel === 'Jazz' ? 1.05 : genreFeel === 'Blues' ? 1.04 : 1;
+    }
+
+    if (name.includes('Tom')) {
+        return genreFeel === 'Jazz' ? 1.04 : genreFeel === 'Blues' ? 1.03 : 1;
+    }
+
+    return 1;
 }
 
 /**
@@ -577,7 +599,7 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
 
     if (name === 'Kick') {
         const voiceConfig = getKickVoiceConfig(velocity, playback.bandIntensity || 0.5);
-        const vol = masterVol * rr();
+        const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
         if (playback.bassSidechain) {
@@ -998,7 +1020,7 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         });
     } else if (name.includes('Tom')) {
         const voiceConfig = getTomVoiceConfig(name, velocity);
-        const vol = masterVol * 0.8 * rr();
+        const vol = masterVol * 0.8 * getRhythmBodyMixScale(state, name) * rr();
 
         // 1. Stick Impact (The "Thwack")
         playResonantTone(playback.audio, panner, playTime, {

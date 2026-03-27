@@ -136,6 +136,19 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Snare:** Added a small genre-aware presence lift for Rock and Blues backbeats so the snare sits a touch more forward without inflating the rest of the kit.
     - **Verification:** Focused drum and genre suites passed after the snare mix adjustment.
 
+### [Date: 2026-03-27] (Blues/Jazz Mix Pass)
+- **Status:** Genre-specific drum balance.
+- **Action:**
+    - **Blues:** Lifted kick/tom body slightly so the shuffle feels anchored without pushing cymbals forward.
+    - **Jazz:** Reduced the extra ride boost a little and added a small low-mid body lift so the ride-led feel stays clear without dominating the presence band.
+    - **Verification:** Focused drum synthesis, Blues drummer, Jazz drummer, and the internal mix report all passed after the genre mix tweak.
+
+### [Date: 2026-03-27] (Closed Hi-Hat Sustain Nudge)
+- **Status:** Closed hat tail.
+- **Action:**
+    - **HiHat:** Extended the shortest closed-hat decay/stop values slightly so the hat keeps a more natural residual ring without opening up.
+    - **Verification:** Focused drum synthesis and the internal mix report passed after the subtle sustain nudge.
+
 ---
 
 ## Intensity-Aware Mixing Rules

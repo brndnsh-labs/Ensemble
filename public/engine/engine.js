@@ -41,19 +41,31 @@ export function _resetChromiumCheck() {
  * Initializes the Web Audio context and global audio nodes.
  * Must be called in response to a user gesture.
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ * @param {{audioContext?: AudioContext, enableWatchdog?: boolean}} [options]
  */
-export function initAudio(state) {
+export function initAudio(state, options = {}) {
     const { playback, groove, chords, bass, soloist, harmony, midi } = state;
-    if (!playback.audio || playback.audio.state === 'closed') {
-        if (/** @type {any} */ (navigator).audioSession) {
+    const providedAudioContext = options.audioContext;
+    const usingOfflineContext = Boolean(
+        providedAudioContext &&
+            typeof (/** @type {any} */ (providedAudioContext).startRendering) === 'function',
+    );
+    const enableWatchdog = options.enableWatchdog ?? !usingOfflineContext;
+
+    if (!playback.audio || playback.audio.state === 'closed' || providedAudioContext) {
+        if (!providedAudioContext && /** @type {any} */ (navigator).audioSession) {
             /** @type {any} */ (navigator).audioSession.type = 'playback';
         }
 
-        const AudioContextClass =
-            window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
-        playback.audio = new AudioContextClass(); // @direct-mutation
+        if (providedAudioContext) {
+            playback.audio = providedAudioContext; // @direct-mutation
+        } else {
+            const AudioContextClass =
+                window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+            playback.audio = new AudioContextClass(); // @direct-mutation
+        }
 
-        if (playback.audio) {
+        if (playback.audio && !usingOfflineContext) {
             playback.audio.onstatechange = () => {
                 if (playback.audio && playback.audio.state === 'suspended' && playback.isPlaying) {
                     playback.audio
@@ -74,25 +86,27 @@ export function initAudio(state) {
         }
 
         // Attach the Watchdog
-        if (playback.masterGain) {
+        if (enableWatchdog && playback.masterGain) {
             audioWatchdog.attachToMaster(playback.masterGain, playback);
         }
-        audioWatchdog.onRecover = async (
-            /** @type {import('../state/playback.js').GlobalContext} */ pbState,
-        ) => {
-            await killAllNotes(state);
-            if (pbState.audio) {
-                pbState.audio.close().then(() => {
-                    pbState.audio = null; // @worker-mutation
-                    initAudio(state);
-                    restoreGains(state);
-                    if (pbState.masterGain) {
-                        audioWatchdog.attachToMaster(pbState.masterGain, pbState);
-                    }
-                });
-            }
-        };
-        audioWatchdog.start(() => state.playback);
+        if (enableWatchdog) {
+            audioWatchdog.onRecover = async (
+                /** @type {import('../state/playback.js').GlobalContext} */ pbState,
+            ) => {
+                await killAllNotes(state);
+                if (pbState.audio) {
+                    pbState.audio.close().then(() => {
+                        pbState.audio = null; // @worker-mutation
+                        initAudio(state);
+                        restoreGains(state);
+                        if (pbState.masterGain) {
+                            audioWatchdog.attachToMaster(pbState.masterGain, pbState);
+                        }
+                    });
+                }
+            };
+            audioWatchdog.start(() => state.playback);
+        }
 
         if (playback.audio) {
             playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation

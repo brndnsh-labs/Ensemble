@@ -92,6 +92,7 @@ import {
     getCymbalMixScale,
     getCymbalVoiceConfig,
     getKickVoiceConfig,
+    getRhythmBodyMixScale,
     getSnareMixScale,
     getSnareVoiceConfig,
     getTomVoiceConfig,
@@ -224,6 +225,21 @@ describe('Drum Synthesis', () => {
         expect(rock).toBeGreaterThan(1);
     });
 
+    it('should give Blues and Jazz rhythm-body hits a small mix lift', () => {
+        const rockState = { playback: { bandIntensity: 0.8 }, groove: { genreFeel: 'Rock' } };
+        const bluesState = { playback: { bandIntensity: 0.8 }, groove: { genreFeel: 'Blues' } };
+        const jazzState = { playback: { bandIntensity: 0.8 }, groove: { genreFeel: 'Jazz' } };
+
+        expect(getRhythmBodyMixScale(bluesState, 'Kick')).toBeGreaterThan(1);
+        expect(getRhythmBodyMixScale(jazzState, 'Kick')).toBeGreaterThan(
+            getRhythmBodyMixScale(rockState, 'Kick'),
+        );
+        expect(getRhythmBodyMixScale(bluesState, 'Low Tom')).toBeGreaterThan(1);
+        expect(getRhythmBodyMixScale(jazzState, 'Mid Tom')).toBeGreaterThan(
+            getRhythmBodyMixScale(rockState, 'Mid Tom'),
+        );
+    });
+
     it('should implement a 4-layer model for Toms (Stick, Body, Skin, Shell)', () => {
         playDrumSound(getState(), 'High Tom', 10, 1.0);
 
@@ -285,7 +301,7 @@ describe('Drum Synthesis', () => {
         expect(open.decayTime).toBeGreaterThan(hihat.decayTime);
         expect(ride.decayTime).toBeGreaterThan(open.decayTime);
         expect(crash.decayTime).toBeGreaterThan(ride.decayTime);
-        expect(hihat.stopTime).toBeGreaterThan(0.35);
+        expect(hihat.stopTime).toBeGreaterThan(0.42);
         expect(open.stopTime).toBeGreaterThan(3.0);
         expect(ride.stopTime).toBeGreaterThan(4.5);
         expect(crash.stopTime).toBeGreaterThan(6.8);
