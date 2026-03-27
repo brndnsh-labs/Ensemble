@@ -72,7 +72,10 @@ test.describe('Performance Modal @ui', () => {
         // Set up a known chord progression where we know there are common tones
         // C major (C, E, G) -> A minor (A, C, E). Common = C, E.
         await page.evaluate(async () => {
-            const { ACTIONS, dispatch, validateProgression } = window.ensemble;
+            const { ACTIONS, dispatch } = window.ensemble;
+
+            await window.ensemble.loadTools();
+            const { validateProgression } = window.ensemble;
 
             // 1. Set global key
             dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: 'C' });
