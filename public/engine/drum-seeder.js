@@ -81,10 +81,13 @@ export function generateDrumOrchestration(_state, arranger, _style, intensity, s
         let rideVoice = 'HiHat-Closed';
         if (role === 'Chorus') {
             const r = prng();
-            if (energyLevel > 0.7) {
-                rideVoice = r > 0.4 ? 'Ride' : 'Open';
+            // At higher intensities, prefer ride definition over fully open wash.
+            if (energyLevel > 0.82) {
+                rideVoice = r > 0.15 ? 'Ride' : 'Open';
+            } else if (energyLevel > 0.7) {
+                rideVoice = r > 0.25 ? 'Ride' : 'HiHat-Closed';
             } else {
-                rideVoice = r > 0.6 ? 'Ride' : 'HiHat-Closed';
+                rideVoice = r > 0.7 ? 'Ride' : 'HiHat-Closed';
             }
         } else if (role === 'Bridge') {
             rideVoice = prng() > 0.5 ? 'Tom-Groove' : 'HiHat-Closed';

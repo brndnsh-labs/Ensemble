@@ -76,6 +76,7 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
+        beatIndex,
         drumComplexity,
         orchestration,
         sectionSeed,
@@ -96,22 +97,46 @@ export function applyOverrides(context, state) {
             // Drop for fills
         } else if (isEighthNote) {
             shouldPlay = true;
+            const openAccent =
+                isOffbeat &&
+                (beatIndex === 3 ||
+                    (beatIndex === 1 && intensity > 0.85 && roll(0.35, intensity)) ||
+                    (beatIndex === 0 && intensity > 0.9 && roll(0.2, intensity)));
 
             // Orchestration Override
             if (orchestration?.rideVoice === 'Ride') {
-                soundName = 'Ride';
-                velocity = isBeatStart ? 1.1 : 0.9;
+                if (openAccent && intensity > 0.88 && (beatIndex === 3 || roll(0.18, intensity))) {
+                    soundName = 'Open';
+                    velocity = 1.0;
+                } else {
+                    soundName = 'Ride';
+                    velocity = isBeatStart ? 1.1 : 0.9;
+                }
             } else if (orchestration?.rideVoice === 'Open') {
-                soundName = 'Open';
-                velocity = isBeatStart ? 1.05 : 0.85;
+                soundName = openAccent ? 'Open' : 'HiHat';
+                velocity = soundName === 'Open' ? 1.0 : isBeatStart ? 0.98 : 0.78;
             } else if (orchestration?.rideVoice === 'HiHat-Closed') {
                 soundName = 'HiHat';
                 velocity = isBeatStart ? 0.95 : 0.75;
             } else {
                 // Legacy logic fallback
                 if (activeMotif === 3 || intensity > 0.8) {
-                    soundName = sectionSeed < 0.5 ? 'Ride' : 'Open';
-                    velocity = isBeatStart ? 1.15 : 0.95;
+                    if (activeMotif === 3 || sectionSeed < 0.6) {
+                        if (
+                            openAccent &&
+                            intensity > 0.88 &&
+                            (beatIndex === 3 || roll(0.18, intensity))
+                        ) {
+                            soundName = 'Open';
+                            velocity = 1.0;
+                        } else {
+                            soundName = 'Ride';
+                            velocity = isBeatStart ? 1.1 : 0.9;
+                        }
+                    } else {
+                        soundName = openAccent ? 'Open' : 'HiHat';
+                        velocity = soundName === 'Open' ? 1.0 : isBeatStart ? 1.0 : 0.8;
+                    }
                 } else if (intensity > 0.6) {
                     soundName = roll(0.7, intensity) ? 'HiHat' : 'Open';
                     velocity = isBeatStart ? 1.05 : 0.85;

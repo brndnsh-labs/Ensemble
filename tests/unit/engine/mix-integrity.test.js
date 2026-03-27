@@ -73,7 +73,7 @@ vi.mock('../../../public/config.js', () => ({
         bass: 0.35,
         soloist: 0.32,
         harmonies: 0.28,
-        drums: 0.48,
+        drums: 0.52,
     },
     TIME_SIGNATURES: {},
 }));
@@ -242,16 +242,16 @@ describe('Mix & Signal Integrity Audit', () => {
 
         const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain + harmonyGain;
 
-        // Verification: The sum should be safe (~0.7945 based on 0.5/0.48/etc volumes)
+        // Verification: The sum should be safe (~0.8145 based on 0.5/0.52/etc volumes)
         expect(totalInstrumentGain).toBeLessThan(1.0);
         // Recalculating expected:
-        // Drums: 0.5 * 0.48 = 0.24
+        // Drums: 0.5 * 0.52 = 0.26
         // Bass: 0.45 * 0.35 = 0.1575
         // Chords: 0.5 * 0.25 = 0.125
         // Soloist: 0.5 * 0.32 = 0.16
         // Harmony: 0.4 * 0.28 = 0.112
-        // Total = 0.7945
-        expect(totalInstrumentGain).toBeCloseTo(0.7945, 4);
+        // Total = 0.8145
+        expect(totalInstrumentGain).toBeCloseTo(0.8145, 4);
     });
 
     it('should calculate master gain correctly (Headroom Check)', () => {

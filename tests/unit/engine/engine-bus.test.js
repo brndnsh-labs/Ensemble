@@ -135,7 +135,7 @@ describe('Engine Bus Management', () => {
             state.groove.enabled = false;
             state.playback.modals.drumPad = true;
             restoreGains(state);
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.24, 10.0, 0.04); // 0.5 * 0.48
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.26, 10.0, 0.04); // 0.5 * 0.52
         });
 
         it('should mute local audio if MIDI muteLocal is active', () => {

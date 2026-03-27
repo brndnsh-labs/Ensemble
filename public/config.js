@@ -108,7 +108,7 @@ export const MIXER_GAIN_MULTIPLIERS = {
     bass: 0.35, // More solid foundation
     soloist: 0.32, // Tamed melodic focus
     harmonies: 0.28, // More supportive presence
-    drums: 0.48, // Balanced rhythm
+    drums: 0.52, // Balanced rhythm with a clearer beat anchor
 };
 
 export const REGGAE_RIDDIMS = {

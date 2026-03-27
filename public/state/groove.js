@@ -40,6 +40,7 @@ import { ACTIONS } from '../types.js';
  * @property {Object} fillSteps - Transient storage for the generated fill pattern.
  * @property {GainNode|null} lastHatGain - Last gain node for the hi-hat.
  * @property {GainNode|null} lastRideGain - Last gain node for the ride cymbal.
+ * @property {GainNode|null} lastCrashGain - Last gain node for the crash cymbal.
  * @property {number} fillStartStep - Step index where the current fill began.
  * @property {number} fillLength - Length of the current fill in steps.
  * @property {number} snareMask - 16-bit mask of the current snare pattern.
@@ -101,6 +102,7 @@ export const groove = deepSignal({
     buffer: new Map(),
     lastHatGain: null,
     lastRideGain: null,
+    lastCrashGain: null,
     fillStartStep: 0,
     fillLength: 0,
     snareMask: 0,
@@ -155,6 +157,9 @@ export function grooveReducer(action, payload, playback) {
             groove.orchestrationMap = null;
             groove.fillMap = null;
             groove.accentMap = null;
+            groove.lastHatGain = null;
+            groove.lastRideGain = null;
+            groove.lastCrashGain = null;
 
             groove.pocket.globalDrive = 0;
             groove.pocket.tightness = 0.5;

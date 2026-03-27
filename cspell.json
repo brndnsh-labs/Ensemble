@@ -166,7 +166,13 @@
         "biim",
         "viim",
         "jscpd",
-        "BARLINE"
+        "BARLINE",
+        "Herbie",
+        "timbral",
+        "Drumkit",
+        "clicky",
+        "detunes",
+        "crackier"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

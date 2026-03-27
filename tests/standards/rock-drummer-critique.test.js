@@ -63,8 +63,8 @@ describe('Rock Drummer Critique', () => {
                         tsConfig: info.tsConfig,
                     };
                     const result = applyGrooveOverrides(getState(), params);
-                    if (result.shouldPlay && result.soundName === instName) {
-                        stepData.instruments[instName] = {
+                    if (result.shouldPlay) {
+                        stepData.instruments[result.soundName || instName] = {
                             velocity: result.velocity,
                             sound: result.soundName,
                             offset: result.instTimeOffset,
@@ -192,5 +192,31 @@ describe('Rock Drummer Critique', () => {
         );
         expect(highOpen).toBeGreaterThan(lowOpen);
         expect(lowOpen).toBe(0); // Should be mostly closed at low intensity
+    });
+
+    it('should keep open hats as accents instead of a continuous wash at high intensity', () => {
+        const performance = simulatePerformance(64, { playback: { bandIntensity: 0.9 } });
+        let openHits = 0;
+        let timekeepingHits = 0;
+
+        performance.forEach((bar) =>
+            bar.forEach((step) => {
+                const hat =
+                    step.instruments.HiHat || step.instruments.Open || step.instruments.Ride;
+                if (!hat) {
+                    return;
+                }
+                timekeepingHits++;
+                if (hat.sound === 'Open') {
+                    openHits++;
+                }
+            }),
+        );
+
+        const openRatio = openHits / (timekeepingHits || 1);
+        console.log(
+            `[Rock Cymbal Focus] Open-hat ratio: ${(openRatio * 100).toFixed(1)}% (Target: <25%)`,
+        );
+        expect(openRatio).toBeLessThan(0.25);
     });
 });
