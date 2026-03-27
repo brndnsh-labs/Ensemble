@@ -9,6 +9,8 @@ import {
     bootstrapSoloistAudit,
     buildHookAuditArrangement,
     buildMeasureAudit,
+    buildSeedSweep,
+    buildSeedSweepSummary,
     simulateSoloistLoops,
 } from '../../scripts/soloist-analysis-utils.js';
 
@@ -186,5 +188,43 @@ describe('Soloist Seeder Hook Shape', () => {
 
         expect(deviceRatio).toBeLessThan(0.6);
         expect(lineDurationRatio).toBeGreaterThanOrEqual(0.34);
+    });
+
+    it('keeps Neo-Soul seed sweeps out of quarter-note lockstep', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const summary = buildSeedSweepSummary(
+            buildSeedSweep({
+                arrangement,
+                genre: 'Neo-Soul',
+                bpm: 92,
+                intensity: 0.55,
+                timeSignature: arrangement.timeSignature,
+                style: 'smart',
+                seeds: ['HEAD_A', 'HEAD_B', 'HEAD_C'],
+            }),
+        );
+
+        expect(summary.aggregate.oneBeatShare).toBeLessThan(0.6);
+        expect(summary.aggregate.richContourShare).toBeGreaterThanOrEqual(0.45);
+        expect(summary.focusRows[0]?.oneBeatShare).toBeLessThan(0.7);
+    });
+
+    it('keeps Bossa Nova seed sweeps rhythmically lighter than straight quarters', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const summary = buildSeedSweepSummary(
+            buildSeedSweep({
+                arrangement,
+                genre: 'Bossa Nova',
+                bpm: 120,
+                intensity: 0.5,
+                timeSignature: arrangement.timeSignature,
+                style: 'smart',
+                seeds: ['HEAD_A', 'HEAD_B', 'HEAD_C'],
+            }),
+        );
+
+        expect(summary.aggregate.oneBeatShare).toBeLessThan(0.62);
+        expect(summary.aggregate.richContourShare).toBeGreaterThanOrEqual(0.35);
+        expect(summary.focusRows[0]?.oneBeatShare).toBeLessThan(0.7);
     });
 });

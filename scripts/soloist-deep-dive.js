@@ -5,9 +5,9 @@
 
 import {
     bootstrapSoloistAudit,
+    buildAuditArrangement,
     buildEventLogRows,
     buildFocusMeasures,
-    buildHookAuditArrangement,
     buildLoopComparison,
     buildMeasureAudit,
     buildRestatementNotes,
@@ -30,10 +30,17 @@ function deepDiveSession(argv = process.argv.slice(2)) {
     const bpm = readNumberOption(options, 'bpm', 102);
     const intensity = readNumberOption(options, 'intensity', 0.6);
     const loops = Math.max(2, Math.floor(readNumberOption(options, 'loops', 3)));
+    const arrangementName = readStringOption(options, 'arrangement', 'hook');
+    const timeSignature = readStringOption(
+        options,
+        'time-signature',
+        arrangementName.toLowerCase() === 'blues' ? '6/8' : '4/4',
+    );
+    const seed = readStringOption(options, 'seed', 'DEEP_DIVE');
     const full = readBooleanOption(options, 'full', false);
     const showSeederLog = readBooleanOption(options, 'show-seeder-log', false);
 
-    const arrangement = buildHookAuditArrangement('4/4');
+    const arrangement = buildAuditArrangement(arrangementName, timeSignature);
     const { state, seedStyle, sessionSeed } = bootstrapSoloistAudit({
         genre,
         bpm,
@@ -41,7 +48,7 @@ function deepDiveSession(argv = process.argv.slice(2)) {
         timeSignature: arrangement.timeSignature,
         style: 'smart',
         key: 'C',
-        seed: 'DEEP_DIVE',
+        seed,
         arrangement,
         quietSeedLogs: !showSeederLog,
     });
@@ -58,7 +65,7 @@ function deepDiveSession(argv = process.argv.slice(2)) {
 
     console.log(`\n=== Soloist Deep Dive: ${genre} @ ${bpm} BPM ===`);
     console.log(
-        `Form: hook-AABA | Measures: ${arrangement.measuresPerLoop} | Loops: ${loops} | Seed style: ${seedStyle}`,
+        `Form: ${arrangementName} | Measures: ${arrangement.measuresPerLoop} | Loops: ${loops} | Seed style: ${seedStyle} | Seed: ${seed}`,
     );
     console.log(
         `Seed notes: ${sessionSeed?.notes.length || 0} across ${Math.round((sessionSeed?.loopLengthSteps || arrangement.totalSteps) / arrangement.stepsPerMeasure)} macro measures`,

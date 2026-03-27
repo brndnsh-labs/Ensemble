@@ -5,19 +5,22 @@
 
 import {
     bootstrapSoloistAudit,
+    buildAuditArrangement,
     buildEventLogRows,
     buildFocusMeasures,
-    buildHookAuditArrangement,
     buildLoopComparison,
     buildMeasureAudit,
     buildPickupSummary,
     buildRestatementNotes,
     buildSectionSummary,
+    buildSeedSweep,
+    buildSeedSweepSummary,
     logEventRows,
     logFocusMeasures,
     logLoopComparison,
     logMeasureAudit,
     logSectionSummary,
+    logSeedSweepSummary,
     parseCliArgs,
     readBooleanOption,
     readNumberOption,
@@ -31,13 +34,60 @@ function evaluateSoloist(argv = process.argv.slice(2)) {
     const bpm = readNumberOption(options, 'bpm', 102);
     const intensity = readNumberOption(options, 'intensity', 0.5);
     const loops = Math.max(1, Math.floor(readNumberOption(options, 'loops', 3)));
+    const arrangementName = readStringOption(options, 'arrangement', 'hook');
+    const timeSignature = readStringOption(
+        options,
+        'time-signature',
+        arrangementName.toLowerCase() === 'blues' ? '6/8' : '4/4',
+    );
+    const seed = readStringOption(options, 'seed', 'HEAD_AUDIT');
+    const seedSweepOption = readStringOption(
+        options,
+        'seed-sweep',
+        readStringOption(options, 'seeds', ''),
+    );
+    const seedSweep = seedSweepOption
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
     const drillDown =
         readBooleanOption(options, 'drill-down', false) ||
         readBooleanOption(options, 'deep', false);
     const full = readBooleanOption(options, 'full', false);
     const showSeederLog = readBooleanOption(options, 'show-seeder-log', false);
 
-    const arrangement = buildHookAuditArrangement('4/4');
+    const arrangement = buildAuditArrangement(arrangementName, timeSignature);
+    let auditSeed = seed;
+
+    if (seedSweep.length > 0) {
+        const sweepSummary = buildSeedSweepSummary(
+            buildSeedSweep({
+                genre,
+                bpm,
+                intensity,
+                timeSignature: arrangement.timeSignature,
+                style: 'smart',
+                key: 'C',
+                arrangement,
+                seeds: seedSweep,
+                loops,
+                quietSeedLogs: !showSeederLog,
+            }),
+        );
+
+        console.log(`\n=== Soloist Seed Sweep: ${genre} @ ${bpm} BPM ===`);
+        console.log(
+            `Form: ${arrangementName} | Measures: ${arrangement.measuresPerLoop} | Seeds: ${seedSweep.length}`,
+        );
+        logSeedSweepSummary(sweepSummary);
+
+        auditSeed = sweepSummary.focusRows[0]?.seed || seedSweep[0];
+        if (!drillDown && !full) {
+            return;
+        }
+        console.log(`\nDrill-down focus seed: ${auditSeed}`);
+    }
+
     const { state, seedStyle, sessionSeed } = bootstrapSoloistAudit({
         genre,
         bpm,
@@ -45,7 +95,7 @@ function evaluateSoloist(argv = process.argv.slice(2)) {
         timeSignature: arrangement.timeSignature,
         style: 'smart',
         key: 'C',
-        seed: 'HEAD_AUDIT',
+        seed: auditSeed,
         arrangement,
         quietSeedLogs: !showSeederLog,
     });
@@ -64,7 +114,7 @@ function evaluateSoloist(argv = process.argv.slice(2)) {
 
     console.log(`\n=== Soloist Head Audit: ${genre} @ ${bpm} BPM ===`);
     console.log(
-        `Form: hook-AABA | Measures: ${arrangement.measuresPerLoop} | Loops: ${loops} | Seed style: ${seedStyle}`,
+        `Form: ${arrangementName} | Measures: ${arrangement.measuresPerLoop} | Loops: ${loops} | Seed style: ${seedStyle} | Seed: ${auditSeed}`,
     );
     console.log(
         `Seed notes: ${sessionSeed?.notes.length || 0} across ${Math.round((sessionSeed?.loopLengthSteps || arrangement.totalSteps) / arrangement.stepsPerMeasure)} macro measures`,

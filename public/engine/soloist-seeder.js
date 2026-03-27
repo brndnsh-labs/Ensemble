@@ -382,10 +382,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
         const registerProfile = getSoloistRegisterProfile(style);
         const rhythmicDensity = config.rhythmicDensity || 0.5;
+        const syncBias = config.syncopationLikelihood || 0.2;
         const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
         const isForwardStatement = !isJazzStyle && (index === 0 || !isDeparture);
         const statementDensity = isForwardStatement
-            ? Math.min(0.75, rhythmicDensity + 0.12)
+            ? Math.min(0.8, rhythmicDensity + 0.08 + syncBias * 0.1)
             : rhythmicDensity;
 
         /**
@@ -470,28 +471,40 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 if (beatsPerCell === 3) {
                     pool = RH_CELLS.WALTZ;
                 } else if (isJazzStyle) {
-                    if (dense || density > 0.72) {
-                        pool = [...linePool, ...hookPool, ...RH_CELLS.SYNC];
+                    if (dense || density > 0.72 || syncBias > 0.82) {
+                        pool = [...linePool, ...hookPool, ...RH_CELLS.SYNC, ...RH_CELLS.SYNC];
                     } else if (density >= 0.55) {
                         pool =
-                            prng() < 0.75
-                                ? [...linePool, ...hookPool]
+                            prng() < 0.55 + syncBias * 0.25
+                                ? [...linePool, ...hookPool, ...RH_CELLS.SYNC]
                                 : [...linePool, ...RH_CELLS.BASIC];
                     } else {
                         pool =
-                            prng() < 0.7
-                                ? [...linePool, RH_CELLS.BASIC[0], RH_CELLS.BASIC[3]]
+                            prng() < 0.65 + syncBias * 0.15
+                                ? [...linePool, ...RH_CELLS.SYNC, RH_CELLS.BASIC[3]]
                                 : [...RH_CELLS.BASIC, ...RH_CELLS.LINE];
                     }
                 } else if (isForwardStatement && density >= 0.55) {
-                    pool = prng() < 0.7 ? forwardPool : [...forwardPool, ...RH_CELLS.SYNC];
+                    pool =
+                        syncBias > 0.65
+                            ? prng() < 0.8
+                                ? [...RH_CELLS.LINE, ...forwardPool, ...RH_CELLS.SYNC]
+                                : [...RH_CELLS.SYNC, ...hookPool]
+                            : prng() < 0.65
+                              ? forwardPool
+                              : [...forwardPool, ...RH_CELLS.SYNC];
+                } else if (syncBias > 0.6 && (density > 0.5 || dense)) {
+                    pool =
+                        prng() < 0.7
+                            ? [...RH_CELLS.LINE, ...RH_CELLS.SYNC, ...hookPool]
+                            : [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
                 } else if (density > 0.7 || dense || prng() < 0.3) {
                     pool = [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
                 }
 
                 const selectedPattern = pool[Math.floor(prng() * pool.length)];
                 const restProb = 1.0 - density;
-                const restScale = isJazzStyle ? 0.08 : 0.15;
+                const restScale = isJazzStyle ? 0.08 : Math.max(0.06, 0.15 - syncBias * 0.08);
 
                 selectedPattern.forEach((beatOffset, idx) => {
                     // Sparse mode drops non-anchors
@@ -508,7 +521,12 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     let dur = (nextOffset - beatOffset) * stepsPerBeat;
 
                     // Add some length variety to basic patterns
-                    if (!dense && !isJazzStyle && dur === stepsPerBeat && prng() < 0.2) {
+                    if (
+                        !dense &&
+                        !isJazzStyle &&
+                        dur === stepsPerBeat &&
+                        prng() < Math.max(0.05, 0.2 - syncBias * 0.12)
+                    ) {
                         dur *= 2;
                     }
 
@@ -525,7 +543,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
         if (!sectionMotifs.has(category)) {
-            const stationaryProb = config.stationaryProb || 0.05;
+            const stationaryProb = Math.max(
+                0.02,
+                (config.stationaryProb || 0.05) * Math.max(0.35, 1 - syncBias * 0.7),
+            );
             const isStationaryMotif = prng() < stationaryProb;
 
             // Generate a 2-measure template
@@ -571,15 +592,47 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                       'DESCEND',
                       'ARCH',
                       'VALLEY',
-                      'STATIC',
                       'HOOK',
                       'ARPEGGIATE',
                       'HOOK',
                       'ARPEGGIATE',
+                      'ARCH',
                   ]
                 : isForwardStatement
-                  ? ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'HOOK', 'HOOK']
-                  : ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'ARPEGGIATE'];
+                  ? syncBias > 0.65
+                      ? [
+                            'ASCEND',
+                            'DESCEND',
+                            'ARCH',
+                            'VALLEY',
+                            'HOOK',
+                            'HOOK',
+                            'ARPEGGIATE',
+                            'ARPEGGIATE',
+                            'ARCH',
+                        ]
+                      : [
+                            'ASCEND',
+                            'DESCEND',
+                            'ARCH',
+                            'VALLEY',
+                            'STATIC',
+                            'HOOK',
+                            'HOOK',
+                            'ARPEGGIATE',
+                        ]
+                  : syncBias > 0.55
+                    ? [
+                          'ASCEND',
+                          'DESCEND',
+                          'ARCH',
+                          'VALLEY',
+                          'HOOK',
+                          'ARPEGGIATE',
+                          'ARPEGGIATE',
+                          'STATIC',
+                      ]
+                    : ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'HOOK', 'ARPEGGIATE'];
             const contourType = contourPool[Math.floor(prng() * contourPool.length)];
             console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
 
@@ -714,6 +767,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             motion = previousOffsets[noteIdx];
                         } else if (!isStationaryMotif) {
                             const r = prng();
+                            const highSyncContour =
+                                syncBias > 0.75 && !['jazz', 'bird'].includes(style);
 
                             // CONTOUR BIASING
                             const progress = measure / phraseLength;
@@ -731,44 +786,68 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             }
 
                             // Leap-and-Fill Logic: If we just jumped, must step back
-                            if (Math.abs(lastMotion) >= (contourType === 'ARPEGGIATE' ? 4 : 3)) {
+                            if (
+                                Math.abs(lastMotion) >=
+                                (contourType === 'ARPEGGIATE' ? 5 : contourType === 'HOOK' ? 4 : 4)
+                            ) {
                                 motion = lastMotion > 0 ? -1 : 1; // Step in opposite direction
                             } else if (contourType === 'ARPEGGIATE') {
-                                if (r < 0.42) {
+                                if (r < (highSyncContour ? 0.34 : 0.38)) {
                                     motion = prng() < upProb ? 2 : -2; // Thirds
-                                } else if (r < 0.62) {
+                                } else if (r < (highSyncContour ? 0.74 : 0.68)) {
                                     motion = prng() < upProb ? 4 : -4; // Fifth-ish vaults
-                                } else if (r < 0.82) {
+                                } else if (r < 0.92) {
                                     motion = prng() < upProb ? 1 : -1; // Filling step
                                 } else {
                                     motion = 0; // Tasteful repeat
                                 }
                             } else if (contourType === 'HOOK') {
-                                if (r < 0.3) {
+                                if (r < (highSyncContour ? 0.18 : 0.24)) {
                                     motion = 0; // Repetition keeps the hook singable
-                                } else if (r < 0.62) {
+                                } else if (r < (highSyncContour ? 0.58 : 0.6)) {
                                     motion = prng() < upProb ? 2 : -2; // Skips add contour
-                                } else if (r < 0.84) {
+                                } else if (r < (highSyncContour ? 0.76 : 0.82)) {
                                     motion = prng() < upProb ? 1 : -1;
                                 } else {
-                                    motion = prng() < upProb ? 3 : -3;
+                                    motion =
+                                        prng() < upProb
+                                            ? highSyncContour
+                                                ? 4
+                                                : 3
+                                            : highSyncContour
+                                              ? -4
+                                              : -3;
                                 }
                             } else {
                                 // Normal motion logic
-                                if (r < 0.6) {
+                                if (r < (highSyncContour ? 0.44 : 0.52)) {
                                     motion = prng() < upProb ? 1 : -1; // Step
-                                } else if (r < 0.8) {
+                                } else if (r < (highSyncContour ? 0.76 : 0.79)) {
                                     motion = prng() < upProb ? 2 : -2; // Skip
-                                } else if (r < 0.9) {
+                                } else if (r < (highSyncContour ? 0.84 : 0.88)) {
                                     motion = 0; // Repeat
                                 } else {
-                                    motion = prng() < upProb ? 3 : -3; // Leap
+                                    motion =
+                                        prng() < upProb
+                                            ? highSyncContour
+                                                ? 4
+                                                : 3
+                                            : highSyncContour
+                                              ? -4
+                                              : -3; // Leap
                                 }
                             }
 
                             // Magnetic Center: Pull back towards 0 if we drift too far
                             // This ensures contour doesn't drift too high or low
-                            const excursionLimit = contourType === 'ARPEGGIATE' ? 6 : 5;
+                            const excursionLimit =
+                                contourType === 'ARPEGGIATE'
+                                    ? 8
+                                    : contourType === 'HOOK'
+                                      ? 7
+                                      : syncBias > 0.75
+                                        ? 7
+                                        : 6;
                             if (currentDegreeOffset > excursionLimit && motion > 0) {
                                 motion = prng() > 0.5 ? -1 : -2;
                             }
@@ -1046,7 +1125,14 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 anchorMidi -= 12;
             }
             // Give arpeggio / hook contours a little more room before we fold the octave.
-            const anchorSpan = contourType === 'ARPEGGIATE' || contourType === 'HOOK' ? 8 : 6;
+            const anchorSpan =
+                contourType === 'ARPEGGIATE' || contourType === 'HOOK'
+                    ? syncBias > 0.75 && !['jazz', 'bird'].includes(style)
+                        ? 9
+                        : 8
+                    : syncBias > 0.75 && !['jazz', 'bird'].includes(style)
+                      ? 7
+                      : 6;
             if (Math.abs(anchorMidi - lastMidi) > anchorSpan) {
                 if (anchorMidi > lastMidi) {
                     anchorMidi -= 12;
@@ -1166,21 +1252,54 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         const distToAnchor = Math.abs(testMidi - anchorMidi);
 
                         // Scoring components
-                        const jumpWeight = isArpeggioContour ? 1.0 : isHookContour ? 1.15 : 1.5;
+                        const contourFreedom = syncBias > 0.75 && !['jazz', 'bird'].includes(style);
+                        const jumpWeight = contourFreedom
+                            ? isArpeggioContour
+                                ? 0.75
+                                : isHookContour
+                                  ? 0.9
+                                  : 1.15
+                            : isArpeggioContour
+                              ? 0.85
+                              : isHookContour
+                                ? 1.0
+                                : 1.35;
                         const jumpPenalty = distToLast * jumpWeight;
-                        const anchorPenalty = distToAnchor * 0.3; // Slight pull to anchor
+                        const anchorPenalty =
+                            distToAnchor *
+                            (contourFreedom
+                                ? 0.18
+                                : isArpeggioContour || isHookContour
+                                  ? 0.22
+                                  : 0.3);
 
                         // Motif adherence: How far is this degree from the intended motif degree?
                         const degreeDist = Math.abs(d - modDegree);
                         const motifWeight = isStationaryMotif
                             ? 1.5
-                            : isArpeggioContour
-                              ? 2.4
-                              : isHookContour
-                                ? 2.8
-                                : 4.0;
+                            : contourFreedom
+                              ? isArpeggioContour
+                                  ? 1.9
+                                  : isHookContour
+                                    ? 2.3
+                                    : 3.0
+                              : isArpeggioContour
+                                ? 2.1
+                                : isHookContour
+                                  ? 2.6
+                                  : 3.6;
                         const motifPenalty = degreeDist * motifWeight;
-                        const wrongWayPenalty = isArpeggioContour ? 4 : isHookContour ? 5 : 7;
+                        const wrongWayPenalty = contourFreedom
+                            ? isArpeggioContour
+                                ? 2
+                                : isHookContour
+                                  ? 3
+                                  : 5
+                            : isArpeggioContour
+                              ? 3
+                              : isHookContour
+                                ? 4
+                                : 6;
                         const directionPenalty =
                             expectedDirection === 0
                                 ? 0
@@ -1194,8 +1313,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         const motionPenalty =
                             expectedDirection !== 0 && testMidi === lastMidi
                                 ? isHookContour
-                                    ? 4
-                                    : 9
+                                    ? 3
+                                    : 7
                                 : 0;
 
                         // Guide Tone Bonus (3rd or 7th)
@@ -1293,13 +1412,18 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // and make the melody sound more intentional and vocal.
     /** @type {SeedNote[]} */
     const processedNotes = [];
+    const postSyncBias =
+        /** @type {any} */ (STYLE_CONFIG[style] || STYLE_CONFIG.scalar).syncopationLikelihood ||
+        0.2;
+    const flairProb = Math.min(0.55, 0.22 + postSyncBias * 0.28);
+    const subdivisionProb = Math.max(0, postSyncBias - 0.45);
 
     for (let i = 0; i < notes.length; i++) {
         const currentNote = notes[i];
         const nextNote = notes[i + 1];
 
         // We only apply flair probabilistically
-        if (prng() < 0.35) {
+        if (prng() < flairProb) {
             let mutationApplied = false;
             const r = prng();
 
@@ -1341,6 +1465,39 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         });
                         mutationApplied = true;
                     }
+                }
+            }
+
+            // Device 1b: Split selected one-beat attacks into two lighter syllables.
+            // This keeps high-sync heads from defaulting to too many square quarter-note attacks.
+            if (
+                !mutationApplied &&
+                subdivisionProb > 0 &&
+                currentNote.durationSteps === stepsPerBeat &&
+                stepsPerBeat >= 2
+            ) {
+                const nextStep = nextNote
+                    ? nextNote.step
+                    : currentNote.step + currentNote.durationSteps + stepsPerBeat;
+                const hasRoomToSplit = nextStep >= currentNote.step + currentNote.durationSteps;
+                const splitChance = currentNote.isAnchor
+                    ? subdivisionProb * 0.35
+                    : subdivisionProb * 0.75;
+
+                if (hasRoomToSplit && prng() < splitChance) {
+                    const splitPoint = stepsPerBeat / 2;
+                    processedNotes.push({
+                        ...currentNote,
+                        durationSteps: splitPoint,
+                    });
+                    processedNotes.push({
+                        ...currentNote,
+                        step: currentNote.step + splitPoint,
+                        durationSteps: currentNote.durationSteps - splitPoint,
+                        velocity: Math.max(0.55, (currentNote.velocity || 0.75) - 0.08),
+                        isAnchor: false,
+                    });
+                    mutationApplied = true;
                 }
             }
 

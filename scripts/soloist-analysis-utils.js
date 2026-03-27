@@ -259,6 +259,176 @@ function getLoopEvents(capture, loop) {
     return capture.events.filter((event) => event.loop === loop && event.loopStep >= 0);
 }
 
+function getLoopAttackEvents(capture, loop) {
+    const loopEvents = getLoopEvents(capture, loop).sort(
+        (a, b) => a.absoluteStep - b.absoluteStep || a.note.midi - b.note.midi,
+    );
+    const attacks = [];
+    for (const event of loopEvents) {
+        const lastAttack = attacks[attacks.length - 1];
+        if (!lastAttack || lastAttack.absoluteStep !== event.absoluteStep) {
+            attacks.push(event);
+        } else {
+            attacks[attacks.length - 1] = event;
+        }
+    }
+    return attacks;
+}
+
+function average(values) {
+    return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function isCloseDuration(value, target) {
+    return Math.abs(value - target) < 0.001;
+}
+
+function getMonotonyScore(row) {
+    return row.oneBeatShare * 0.45 + row.stepShare * 0.35 - row.richContourShare * 0.2;
+}
+
+export function buildPerformanceMetrics(capture, loop = 0) {
+    const attacks = getLoopAttackEvents(capture, loop);
+    const durations = attacks.map((event) => event.note.durationSteps || 1);
+    const midis = attacks.map((event) => event.note.midi);
+    const intervals = [];
+
+    for (let index = 1; index < attacks.length; index++) {
+        const diff = Math.abs(attacks[index].note.midi - attacks[index - 1].note.midi);
+        if (diff > 0) {
+            intervals.push(diff);
+        }
+    }
+
+    const measureRows = buildMeasureAudit(capture, loop);
+    const totalAnchors = measureRows.reduce((sum, row) => sum + row.anchorCount, 0);
+    const exactAnchors = measureRows.reduce((sum, row) => sum + row.anchorExactHits, 0);
+    const richContours = measureRows.filter((row) =>
+        ['arch', 'valley', 'mixed'].includes(row.contour),
+    ).length;
+
+    return {
+        loop,
+        attackCount: attacks.length,
+        notesPerMeasure: attacks.length / Math.max(1, capture.arrangement.measuresPerLoop),
+        oneBeatShare: durations.length
+            ? durations.filter((duration) => isCloseDuration(duration, capture.ts.stepsPerBeat))
+                  .length / durations.length
+            : 0,
+        subBeatShare: durations.length
+            ? durations.filter((duration) => duration < capture.ts.stepsPerBeat).length /
+              durations.length
+            : 0,
+        longShare: durations.length
+            ? durations.filter((duration) => duration > capture.ts.stepsPerBeat).length /
+              durations.length
+            : 0,
+        avgInterval: average(intervals),
+        stepShare: intervals.length
+            ? intervals.filter((interval) => interval <= 2).length / intervals.length
+            : 0,
+        skipShare: intervals.length
+            ? intervals.filter((interval) => interval >= 3 && interval <= 4).length /
+              intervals.length
+            : 0,
+        leapShare: intervals.length
+            ? intervals.filter((interval) => interval >= 5).length / intervals.length
+            : 0,
+        octaveLeapShare: intervals.length
+            ? intervals.filter((interval) => interval >= 12).length / intervals.length
+            : 0,
+        range: midis.length ? Math.max(...midis) - Math.min(...midis) : 0,
+        richContourShare: measureRows.length ? richContours / measureRows.length : 0,
+        stableCadenceShare: measureRows.length
+            ? measureRows.filter((row) => row.cadenceFlavor === 'stable').length /
+              measureRows.length
+            : 0,
+        anchorExactRate: totalAnchors > 0 ? exactAnchors / totalAnchors : 1,
+    };
+}
+
+export function buildSeedSweep({
+    genre,
+    bpm,
+    intensity,
+    timeSignature,
+    style = 'smart',
+    key = 'C',
+    arrangement,
+    seeds = [],
+    loops = 2,
+    quietSeedLogs = true,
+}) {
+    const auditArrangement = arrangement || buildAuditArrangement('hook', timeSignature);
+    const effectiveSeeds = seeds.length > 0 ? seeds : ['AUDIT_SEED'];
+    const sweepRows = [];
+
+    for (const seed of effectiveSeeds) {
+        const { state, seedStyle, sessionSeed } = bootstrapSoloistAudit({
+            genre,
+            bpm,
+            intensity,
+            timeSignature: auditArrangement.timeSignature,
+            style,
+            key,
+            seed,
+            arrangement: auditArrangement,
+            quietSeedLogs,
+        });
+        const capture = simulateSoloistLoops({
+            state,
+            arrangement: auditArrangement,
+            loops: Math.max(1, loops),
+            style,
+        });
+
+        sweepRows.push({
+            genre,
+            bpm,
+            intensity,
+            timeSignature: auditArrangement.timeSignature,
+            seed,
+            seedStyle,
+            sessionSeedNotes: sessionSeed?.notes.length || 0,
+            measuresPerLoop: auditArrangement.measuresPerLoop,
+            ...buildPerformanceMetrics(capture, 0),
+        });
+    }
+
+    return sweepRows;
+}
+
+export function buildSeedSweepSummary(rows, focusCount = 5) {
+    const focusRows = [...rows]
+        .map((row) => ({
+            ...row,
+            monotonyScore: getMonotonyScore(row),
+        }))
+        .sort((a, b) => b.monotonyScore - a.monotonyScore)
+        .slice(0, focusCount);
+
+    return {
+        rows,
+        focusRows,
+        aggregate: {
+            seedCount: rows.length,
+            notesPerMeasure: average(rows.map((row) => row.notesPerMeasure)),
+            oneBeatShare: average(rows.map((row) => row.oneBeatShare)),
+            subBeatShare: average(rows.map((row) => row.subBeatShare)),
+            longShare: average(rows.map((row) => row.longShare)),
+            avgInterval: average(rows.map((row) => row.avgInterval)),
+            stepShare: average(rows.map((row) => row.stepShare)),
+            skipShare: average(rows.map((row) => row.skipShare)),
+            leapShare: average(rows.map((row) => row.leapShare)),
+            octaveLeapShare: average(rows.map((row) => row.octaveLeapShare)),
+            range: average(rows.map((row) => row.range)),
+            richContourShare: average(rows.map((row) => row.richContourShare)),
+            stableCadenceShare: average(rows.map((row) => row.stableCadenceShare)),
+            anchorExactRate: average(rows.map((row) => row.anchorExactRate)),
+        },
+    };
+}
+
 function getMeasureEvents(capture, loop, measureIndex) {
     return capture.events.filter(
         (event) =>
@@ -439,6 +609,14 @@ export function buildAllBluesArrangement(timeSignature = '6/8') {
         { label: 'Turn', measures: [d7, eb7] },
         { label: 'I', measures: [g7, g7] },
     ]);
+}
+
+export function buildAuditArrangement(kind = 'hook', timeSignature = undefined) {
+    const normalized = String(kind || 'hook').toLowerCase();
+    if (normalized === 'blues' || normalized === 'all-blues' || normalized === 'all_blues') {
+        return buildAllBluesArrangement(timeSignature || '6/8');
+    }
+    return buildHookAuditArrangement(timeSignature || '4/4');
 }
 
 export function bootstrapSoloistAudit({
@@ -886,6 +1064,10 @@ export function buildEventLogRows(capture, loops = [0], flaggedMeasures = null) 
         }));
 }
 
+function formatPercent(value) {
+    return `${(value * 100).toFixed(0)}%`;
+}
+
 export function logMeasureAudit(title, rows) {
     console.log(`\n--- ${title} ---`);
     for (const row of rows) {
@@ -937,6 +1119,59 @@ export function logEventRows(rows) {
     for (const row of rows) {
         console.log(
             `L${row.loop} M${String(row.measure).padStart(2, '0')} ${row.beat.padEnd(3)} | ${row.note.padEnd(4)} ${String(row.midi).padStart(3)} x${String(row.dur).padEnd(2)} | ${row.chord.padEnd(6)} | role ${row.role.padEnd(8)} | profile ${row.profile.padEnd(8)} | seed ${row.seed.padEnd(4)} | ${row.match.padEnd(5)} | ${row.device}`,
+        );
+    }
+}
+
+export function logSeedSweepSummary(summary) {
+    console.log(`\n--- Seed Sweep Summary (${summary.aggregate.seedCount} seeds) ---`);
+    console.table(
+        summary.rows.map((row) => ({
+            Seed: row.seed,
+            Style: row.seedStyle,
+            'Attacks/M': row.notesPerMeasure.toFixed(2),
+            '1-beat %': formatPercent(row.oneBeatShare),
+            '<1 beat %': formatPercent(row.subBeatShare),
+            'Step %': formatPercent(row.stepShare),
+            'Skip %': formatPercent(row.skipShare),
+            'Leap %': formatPercent(row.leapShare),
+            'Rich contour %': formatPercent(row.richContourShare),
+            Range: row.range.toFixed(1),
+            'Anchor exact %': formatPercent(row.anchorExactRate),
+        })),
+    );
+
+    console.log('\nAggregate averages:');
+    console.table([
+        {
+            'Attacks/M': summary.aggregate.notesPerMeasure.toFixed(2),
+            '1-beat %': formatPercent(summary.aggregate.oneBeatShare),
+            '<1 beat %': formatPercent(summary.aggregate.subBeatShare),
+            '>1 beat %': formatPercent(summary.aggregate.longShare),
+            'Avg interval': summary.aggregate.avgInterval.toFixed(2),
+            'Step %': formatPercent(summary.aggregate.stepShare),
+            'Skip %': formatPercent(summary.aggregate.skipShare),
+            'Leap %': formatPercent(summary.aggregate.leapShare),
+            'Oct+ %': formatPercent(summary.aggregate.octaveLeapShare),
+            Range: summary.aggregate.range.toFixed(1),
+            'Rich contour %': formatPercent(summary.aggregate.richContourShare),
+            'Stable cadence %': formatPercent(summary.aggregate.stableCadenceShare),
+            'Anchor exact %': formatPercent(summary.aggregate.anchorExactRate),
+        },
+    ]);
+
+    if (summary.focusRows.length > 0) {
+        console.log('\nMost monotony-prone seeds:');
+        console.table(
+            summary.focusRows.map((row) => ({
+                Seed: row.seed,
+                Score: row.monotonyScore.toFixed(3),
+                '1-beat %': formatPercent(row.oneBeatShare),
+                'Step %': formatPercent(row.stepShare),
+                'Leap %': formatPercent(row.leapShare),
+                'Rich contour %': formatPercent(row.richContourShare),
+                Range: row.range.toFixed(1),
+            })),
         );
     }
 }

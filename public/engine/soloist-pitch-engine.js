@@ -526,7 +526,7 @@ export function selectPitchAndDevices(
     // Progressive Ornamentation: Increase device probability by 20% per loop
     deviceBaseProb *= 1.0 + loopCount * 0.2;
     if (isLineStyle) {
-        deviceBaseProb *= isLaterHeadBypass ? 0.58 : 0.68;
+        deviceBaseProb *= isLaterHeadBypass ? 0.54 : 0.66;
     }
 
     if (loopCount === 0 && sessionSeed && sessionSeed.notes.length > 0) {
@@ -538,8 +538,8 @@ export function selectPitchAndDevices(
     if (isLaterHeadBypass) {
         const thematicBoost = isLineStyle
             ? loopCount === 1
-                ? 1.55
-                : 1.95
+                ? 1.4
+                : 1.7
             : loopCount === 1
               ? 2.4
               : 3.1;
@@ -551,7 +551,7 @@ export function selectPitchAndDevices(
     if (seedNote?.isAnchor) {
         deviceBaseProb *= 0.35;
     }
-    deviceBaseProb = Math.min(loopCount === 0 ? 0.4 : isLineStyle ? 0.62 : 0.85, deviceBaseProb);
+    deviceBaseProb = Math.min(loopCount === 0 ? 0.4 : isLineStyle ? 0.58 : 0.85, deviceBaseProb);
     const isPolyphonic =
         soloistState.mode !== 'monophonic' &&
         (soloistState.doubleStopProb ?? 1.0) > 0 &&
