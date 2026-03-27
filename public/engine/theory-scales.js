@@ -1,4 +1,4 @@
-import { KEY_ORDER } from '../config.js';
+import { KEY_ORDER, resolveMappedStyle, SMART_SCALE_STYLE_MAP } from '../config.js';
 
 // cspell:ignore tonicization
 
@@ -130,26 +130,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
 
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
-        /** @type {any} */
-        const mapping = {
-            Rock: 'rock',
-            Jazz: 'jazz',
-            Funk: 'funk',
-            Blues: 'blues',
-            'Neo-Soul': 'neo',
-            Disco: 'disco',
-            Bossa: 'bossa',
-            'Bossa Nova': 'bossa',
-            Afrobeat: 'funk',
-            Acoustic: 'minimal',
-            Reggae: 'minimal',
-            Country: 'country',
-            Metal: 'metal',
-            'Rock/Metal': 'metal',
-            'Ska-Punk': 'rock',
-            Ska: 'rock',
-        };
-        style = mapping[groove.genreFeel] || 'rock';
+        style = resolveMappedStyle(SMART_SCALE_STYLE_MAP, groove.genreFeel);
     }
 
     if (style === 'country') {

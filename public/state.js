@@ -11,14 +11,46 @@ import { ACTIONS } from './types.js';
 
 // --- Global Export for E2E ---
 if (typeof window !== 'undefined') {
-    import('./engine/chords-engine.js').then(({ validateProgression }) => {
-        /** @type {any} */ (window).ensemble = {
-            dispatch,
-            getState,
-            ACTIONS,
-            validateProgression,
-        };
-    });
+    /** @type {Promise<any> | null} */
+    let toolLoaderPromise = null;
+
+    const ensemble = {
+        dispatch,
+        getState,
+        ACTIONS,
+        loadTools: () => {
+            if (!toolLoaderPromise) {
+                toolLoaderPromise = Promise.all([
+                    import('./engine/chords-engine.js'),
+                    import('./engine/scheduler-core.js'),
+                    import('./engine/engine.js'),
+                    import('./instrument-controller.js'),
+                    import('./engine/tick-logic.js'),
+                ]).then(
+                    ([
+                        chordsEngine,
+                        schedulerCore,
+                        engineModule,
+                        instrumentController,
+                        tickLogic,
+                    ]) => {
+                        Object.assign(ensemble, {
+                            validateProgression: chordsEngine.validateProgression,
+                            scheduleGlobalEvent: schedulerCore.scheduleGlobalEvent,
+                            initAudio: engineModule.initAudio,
+                            loadDrumPreset: instrumentController.loadDrumPreset,
+                            generateNotesForStep: tickLogic.generateNotesForStep,
+                        });
+                        return ensemble;
+                    },
+                );
+            }
+
+            return toolLoaderPromise;
+        },
+    };
+
+    /** @type {any} */ (window).ensemble = ensemble;
 }
 
 // Central State Map for Generic PARAM Updates

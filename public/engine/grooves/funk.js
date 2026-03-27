@@ -63,6 +63,7 @@ export function applyOverrides(context, state) {
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
+        beatIndex,
         drumComplexity,
         orchestration,
         sectionSeed,
@@ -85,18 +86,13 @@ export function applyOverrides(context, state) {
 
         const useOrchestration = orchestration?.rideVoice !== undefined;
         const voice = orchestration?.rideVoice;
+        const rideSection = voice === 'Ride';
+        const openSection = voice === 'Open';
 
         // 16th note shimmer (Texture)
         if (intensity > 0.5 || (useOrchestration && voice !== 'None')) {
             shouldPlay = true;
-            soundName = 'HiHat';
-
-            if (voice === 'Ride') {
-                soundName = 'Ride';
-            }
-            if (voice === 'Open') {
-                soundName = 'Open';
-            }
+            soundName = rideSection && (isBeatStart || isOffbeat) ? 'Ride' : 'HiHat';
 
             // Tiered velocity for the shimmer
             if (isBeatStart) {
@@ -106,6 +102,16 @@ export function applyOverrides(context, state) {
             } else {
                 velocity = scaleVelocity(0.45, intensity, 0.1);
             }
+
+            if (
+                openSection &&
+                isOffbeat &&
+                (isEOfBeat || beatIndex === 3 || (isAOfBeat && intensity > 0.75)) &&
+                roll(0.55, intensity)
+            ) {
+                soundName = 'Open';
+                velocity = 1.05;
+            }
         } else if (isBeatStart || isOffbeat) {
             shouldPlay = true;
             soundName = 'HiHat';
@@ -113,11 +119,11 @@ export function applyOverrides(context, state) {
         }
 
         // Barks (Open Hat syncopation)
-        const barkProb = (activeMotif === 2 ? 0.6 : 0.2) * intensity;
+        const barkProb = (activeMotif === 2 ? 0.6 : openSection ? 0.45 : 0.2) * intensity;
         if (isOffbeat && roll(barkProb) && voice !== 'HiHat-Closed') {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = 1.1;
+            velocity = openSection ? 1.0 : 1.1;
         }
 
         // Turnaround Bark

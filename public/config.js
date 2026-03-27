@@ -108,8 +108,65 @@ export const MIXER_GAIN_MULTIPLIERS = {
     bass: 0.35, // More solid foundation
     soloist: 0.32, // Tamed melodic focus
     harmonies: 0.28, // More supportive presence
-    drums: 0.48, // Balanced rhythm
+    drums: 0.52, // Balanced rhythm with a clearer beat anchor
 };
+
+export const SMART_BASS_STYLE_MAP = {
+    Rock: 'rock',
+    Jazz: 'quarter',
+    Funk: 'funk',
+    Disco: 'disco',
+    Reggae: 'dub',
+    'Neo-Soul': 'neo',
+    'Bossa Nova': 'bossa',
+    Afrobeat: 'funk',
+    Blues: 'blues',
+    Acoustic: 'acoustic',
+    'Hip Hop': 'hiphop',
+    Country: 'country',
+    Metal: 'metal',
+    'Ska-Punk': 'walking-ska',
+    Ska: 'walking-ska',
+};
+
+export const SMART_SCALE_STYLE_MAP = {
+    Rock: 'rock',
+    Jazz: 'jazz',
+    Funk: 'funk',
+    Blues: 'blues',
+    'Neo-Soul': 'neo',
+    Disco: 'disco',
+    Bossa: 'bossa',
+    'Bossa Nova': 'bossa',
+    Afrobeat: 'funk',
+    Acoustic: 'minimal',
+    Reggae: 'minimal',
+    Country: 'country',
+    Metal: 'metal',
+    'Rock/Metal': 'metal',
+    'Ska-Punk': 'rock',
+    Ska: 'rock',
+};
+
+/**
+ * Resolves a mapped style from one or two genre keys.
+ * @param {Record<string, string>} mapping
+ * @param {string | undefined} primaryKey
+ * @param {string | undefined} [secondaryKey]
+ * @param {string} [fallback='rock']
+ * @returns {string}
+ */
+export function resolveMappedStyle(mapping, primaryKey, secondaryKey, fallback = 'rock') {
+    if (primaryKey && Object.hasOwn(mapping, primaryKey)) {
+        return mapping[primaryKey];
+    }
+
+    if (secondaryKey && Object.hasOwn(mapping, secondaryKey)) {
+        return mapping[secondaryKey];
+    }
+
+    return fallback;
+}
 
 export const REGGAE_RIDDIMS = {
     Stalag: [

@@ -166,7 +166,16 @@
         "biim",
         "viim",
         "jscpd",
-        "BARLINE"
+        "BARLINE",
+        "Herbie",
+        "timbral",
+        "Drumkit",
+        "clicky",
+        "detunes",
+        "crackier",
+        "networkidle",
+        "goertzel",
+        "coeff"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

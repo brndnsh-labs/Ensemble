@@ -19,6 +19,512 @@ const RIGHT_PANNED_INSTRUMENTS = new Set([
     'Clave',
 ]);
 
+const TAU = Math.PI * 2;
+
+const CYMBAL_BUFFER_PROFILES = {
+    HiHat: {
+        key: 'hihatMetal',
+        duration: 0.6,
+        baseFreq: 2050,
+        partials: [1, 1.29, 1.67, 2.18, 2.86, 3.62],
+        metalMix: 0.61,
+        noiseMix: 0.17,
+        transientMix: 0.18,
+        partialDecay: 14,
+        partialSpread: 4.2,
+        noiseDecay: 22,
+        smooth: 0.17,
+        saturation: 1.18,
+        jitter: 0.018,
+    },
+    Open: {
+        key: 'openHatMetal',
+        duration: 3.0,
+        baseFreq: 1700,
+        partials: [1, 1.24, 1.63, 2.09, 2.71, 3.32, 4.07],
+        metalMix: 0.54,
+        noiseMix: 0.17,
+        transientMix: 0.13,
+        partialDecay: 4.2,
+        partialSpread: 1.2,
+        noiseDecay: 7.0,
+        smooth: 0.16,
+        saturation: 1.12,
+        jitter: 0.016,
+    },
+    Ride: {
+        key: 'rideMetal',
+        duration: 4.4,
+        baseFreq: 1120,
+        partials: [1, 1.19, 1.49, 1.98, 2.57, 3.19, 3.89],
+        metalMix: 0.48,
+        noiseMix: 0.14,
+        transientMix: 0.09,
+        partialDecay: 2.0,
+        partialSpread: 0.8,
+        noiseDecay: 4.6,
+        smooth: 0.19,
+        saturation: 1.03,
+        jitter: 0.02,
+    },
+    Crash: {
+        key: 'crashMetal',
+        duration: 6.9,
+        baseFreq: 860,
+        partials: [1, 1.34, 1.79, 2.27, 2.96, 3.56, 4.23, 5.02],
+        metalMix: 0.38,
+        noiseMix: 0.28,
+        transientMix: 0.22,
+        partialDecay: 1.35,
+        partialSpread: 0.5,
+        noiseDecay: 2.4,
+        smooth: 0.22,
+        saturation: 0.98,
+        jitter: 0.024,
+    },
+};
+
+const CYMBAL_RUNTIME_PROFILES = {
+    HiHat: {
+        volumeScale: 0.69,
+        playbackRate: 1.0,
+        playbackVariance: 0.022,
+        bandpassBase: 6500,
+        bandpassVelocity: 520,
+        bandpassCap: 7600,
+        highpassBase: 3600,
+        highpassVelocity: 220,
+        highpassCap: 4200,
+        q: 0.85,
+        attack: 0.0015,
+        decayDelay: 0.006,
+        decayBase: 0.058,
+        decayVelocityFocus: 0.01,
+        decayIntensityFocus: 0.006,
+        minDecay: 0.041,
+        stopTime: 0.46,
+    },
+    Open: {
+        volumeScale: 0.62,
+        playbackRate: 1.0,
+        playbackVariance: 0.02,
+        bandpassBase: 5150,
+        bandpassVelocity: 380,
+        bandpassCap: 5900,
+        highpassBase: 2700,
+        highpassVelocity: 160,
+        highpassCap: 3150,
+        q: 0.72,
+        attack: 0.01,
+        decayDelay: 0.07,
+        decayBase: 0.62,
+        decayVelocityFocus: 0.06,
+        decayIntensityFocus: 0.03,
+        minDecay: 0.42,
+        stopTime: 3.1,
+    },
+    Ride: {
+        volumeScale: 0.74,
+        playbackRate: 1.0,
+        playbackVariance: 0.015,
+        bandpassBase: 4300,
+        bandpassVelocity: 340,
+        bandpassCap: 5200,
+        highpassBase: 2100,
+        highpassVelocity: 130,
+        highpassCap: 2550,
+        q: 0.46,
+        attack: 0.004,
+        decayDelay: 0.1,
+        decayBase: 1.55,
+        decayVelocityFocus: 0.08,
+        decayIntensityFocus: 0.04,
+        minDecay: 1.1,
+        stopTime: 4.8,
+        pingFreq: 1580,
+        pingVolume: 0.05,
+    },
+    Crash: {
+        volumeScale: 0.9,
+        playbackRate: 1.0,
+        playbackVariance: 0.02,
+        bandpassBase: 3500,
+        bandpassVelocity: 260,
+        bandpassCap: 4300,
+        highpassBase: 1450,
+        highpassVelocity: 100,
+        highpassCap: 1750,
+        q: 0.45,
+        attack: 0.004,
+        decayDelay: 0.16,
+        decayBase: 2.7,
+        decayVelocityFocus: 0.08,
+        decayIntensityFocus: 0.05,
+        minDecay: 2.0,
+        stopTime: 7.0,
+    },
+};
+
+const TOM_VOICE_PROFILES = {
+    High: {
+        baseFreq: 188,
+        stickRatioBase: 4.1,
+        stickRatioVelocity: 1.7,
+        stickVolume: 0.34,
+        skinFreqMultiplier: 11.5,
+        skinVolume: 0.18,
+        skinQ: 1.45,
+        bodyStartRatio: 1.24,
+        bodyVolume: 0.96,
+        bodyDecay: 0.11,
+        bodyDuration: 0.42,
+        shellVolume: 0.58,
+        shellDecay: 0.24,
+        shellDuration: 1.0,
+        shellAttack: 0.006,
+    },
+    Mid: {
+        baseFreq: 140,
+        stickRatioBase: 3.5,
+        stickRatioVelocity: 1.5,
+        stickVolume: 0.36,
+        skinFreqMultiplier: 9.5,
+        skinVolume: 0.2,
+        skinQ: 1.35,
+        bodyStartRatio: 1.2,
+        bodyVolume: 1.04,
+        bodyDecay: 0.16,
+        bodyDuration: 0.56,
+        shellVolume: 0.74,
+        shellDecay: 0.36,
+        shellDuration: 1.3,
+        shellAttack: 0.008,
+    },
+    Low: {
+        baseFreq: 94,
+        stickRatioBase: 2.9,
+        stickRatioVelocity: 1.3,
+        stickVolume: 0.38,
+        skinFreqMultiplier: 7.8,
+        skinVolume: 0.24,
+        skinQ: 1.2,
+        bodyStartRatio: 1.16,
+        bodyVolume: 1.14,
+        bodyDecay: 0.22,
+        bodyDuration: 0.7,
+        shellVolume: 0.9,
+        shellDecay: 0.52,
+        shellDuration: 1.75,
+        shellAttack: 0.012,
+    },
+};
+
+/**
+ * @param {number} value
+ * @returns {number}
+ */
+function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+/**
+ * @param {import('../state/groove.js').GrooveState} groove
+ * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
+ * @returns {AudioBuffer|null}
+ */
+function getCymbalBuffer(groove, name) {
+    const profile = CYMBAL_BUFFER_PROFILES[name];
+    return profile ? groove.audioBuffers[profile.key] || null : null;
+}
+
+/**
+ * @param {AudioContext} audioCtx
+ * @param {import('../state/groove.js').GrooveState} groove
+ * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
+ * @returns {AudioBuffer}
+ */
+function ensureCymbalBuffer(audioCtx, groove, name) {
+    const profile = CYMBAL_BUFFER_PROFILES[name];
+    if (!profile) {
+        return groove.audioBuffers.noise;
+    }
+    if (!groove.audioBuffers[profile.key]) {
+        groove.audioBuffers[profile.key] = createMetallicBuffer(audioCtx, profile);
+    }
+    return groove.audioBuffers[profile.key];
+}
+
+/**
+ * @param {import('../types.js').EnsembleState} state
+ * @returns {number}
+ */
+function getBandLayerCount(state) {
+    let layers = 0;
+    if (state.bass?.enabled) {
+        layers++;
+    }
+    if (state.chords?.enabled) {
+        layers++;
+    }
+    if (state.harmony?.enabled) {
+        layers++;
+    }
+    if (state.soloist?.enabled) {
+        layers++;
+    }
+    return layers;
+}
+
+/**
+ * Keep cymbals supportive when the full arrangement is active.
+ * @param {import('../types.js').EnsembleState} state
+ * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
+ * @returns {number}
+ */
+export function getCymbalMixScale(state, name) {
+    const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
+    const crowding = getBandLayerCount(state) / 4;
+    const genreFeel = state.groove?.genreFeel;
+    const instrumentBase =
+        name === 'HiHat' ? 0.96 : name === 'Ride' ? 0.92 : name === 'Open' ? 0.82 : 0.95;
+    const intensityTrim = 1 - Math.max(0, bandIntensity - 0.6) * 0.18;
+    const crowdingTrim =
+        1 -
+        crowding *
+            (name === 'HiHat' ? 0.05 : name === 'Ride' ? 0.09 : name === 'Open' ? 0.16 : 0.14);
+    const genreBoost = name === 'Ride' && genreFeel === 'Jazz' ? 1.03 : 1;
+
+    return Math.max(0.55, instrumentBase * intensityTrim * crowdingTrim * genreBoost);
+}
+
+/**
+ * Keep the snare present as the backbeat anchor, with a small lift for rock/blues.
+ * @param {import('../types.js').EnsembleState} state
+ * @param {number} velocity
+ * @returns {number}
+ */
+export function getSnareMixScale(state, velocity) {
+    const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
+    const genreFeel = state.groove?.genreFeel;
+    const genreBoost =
+        genreFeel === 'Rock' || genreFeel === 'Blues' ? 1.06 : genreFeel === 'Jazz' ? 1.03 : 1;
+    const intensityLift = 1 + Math.max(0, bandIntensity - 0.55) * 0.04;
+    const velocityLift = 1 + Math.max(0, velocity - 0.9) * 0.08;
+
+    return Math.max(0.94, genreBoost * intensityLift * velocityLift);
+}
+
+/**
+ * Keep the rhythm section's low-mid body a touch more forward in Blues/Jazz without
+ * inflating cymbal presence.
+ * @param {import('../types.js').EnsembleState} state
+ * @param {string} name
+ * @returns {number}
+ */
+export function getRhythmBodyMixScale(state, name) {
+    const genreFeel = state.groove?.genreFeel;
+
+    if (name === 'Kick') {
+        return genreFeel === 'Jazz' ? 1.05 : genreFeel === 'Blues' ? 1.04 : 1;
+    }
+
+    if (name.includes('Tom')) {
+        return genreFeel === 'Jazz' ? 1.04 : genreFeel === 'Blues' ? 1.03 : 1;
+    }
+
+    return 1;
+}
+
+/**
+ * Runtime cymbal shaping keeps high-intensity hits focused instead of simply brighter/longer.
+ * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
+ * @param {number} velocity
+ * @param {number} [bandIntensity=0.5]
+ * @returns {null|({
+ *   volumeScale: number,
+ *   playbackRate: number,
+ *   playbackVariance: number,
+ *   q: number,
+ *   attack: number,
+ *   decayDelay: number,
+ *   decayTime: number,
+ *   stopTime: number,
+ *   bandpassFreq: number,
+ *   highpassFreq: number,
+ *   pingFreq?: number,
+ *   pingVolume?: number
+ * })}
+ */
+export function getCymbalVoiceConfig(name, velocity, bandIntensity = 0.5) {
+    const base = CYMBAL_RUNTIME_PROFILES[name];
+    if (!base) {
+        return null;
+    }
+
+    const intensity = clamp01(bandIntensity);
+    const vel = Math.max(0.3, velocity);
+    const brightnessGuard = 1 - Math.max(0, vel - 1.0) * 0.1 - Math.max(0, intensity - 0.8) * 0.08;
+    const brightness = Math.max(0.76, brightnessGuard);
+
+    return {
+        ...base,
+        decayTime: Math.max(
+            base.minDecay,
+            base.decayBase -
+                Math.max(0, vel - 0.95) * base.decayVelocityFocus -
+                Math.max(0, intensity - 0.75) * base.decayIntensityFocus,
+        ),
+        bandpassFreq: Math.min(
+            base.bandpassCap,
+            (base.bandpassBase + vel * base.bandpassVelocity) * brightness,
+        ),
+        highpassFreq: Math.min(
+            base.highpassCap,
+            (base.highpassBase + vel * base.highpassVelocity) * brightness,
+        ),
+    };
+}
+
+/**
+ * Keep the kick centered on body/punch while trimming overly clicky top-end in dense sections.
+ * @param {number} velocity
+ * @param {number} [bandIntensity=0.5]
+ * @returns {{
+ *   beaterFreq: number,
+ *   beaterEndFreq: number,
+ *   beaterVolume: number,
+ *   beaterDecay: number,
+ *   skinVolume: number,
+ *   skinFreq: number,
+ *   knockStartFreq: number,
+ *   knockEndFreq: number,
+ *   knockVolume: number,
+ *   knockDecay: number,
+ *   shellFreq: number,
+ *   shellVolume: number,
+ *   shellDecay: number,
+ *   shellDuration: number
+ * }}
+ */
+export function getKickVoiceConfig(velocity, bandIntensity = 0.5) {
+    const vel = clamp01(Math.max(0.2, velocity));
+    const intensity = clamp01(bandIntensity);
+    const denseMix = Math.max(0, intensity - 0.6);
+    const beaterFocus = 1 - denseMix * 0.28;
+
+    return {
+        beaterFreq: Math.max(1700, (2150 + vel * 950) * beaterFocus),
+        beaterEndFreq: 520 + vel * 70,
+        beaterVolume: Math.max(0.24, 0.3 + vel * 0.06 - denseMix * 0.08),
+        beaterDecay: 0.0025 + vel * 0.0015,
+        skinVolume: 0.12 + vel * 0.06,
+        skinFreq: Math.max(650, 820 + vel * 260 - denseMix * 160),
+        knockStartFreq: 150 + vel * 24,
+        knockEndFreq: 54 + vel * 4,
+        knockVolume: 1.12 + vel * 0.16,
+        knockDecay: 0.035 + vel * 0.012,
+        shellFreq: 48 + vel * 4,
+        shellVolume: 0.94 + denseMix * 0.12 + vel * 0.04,
+        shellDecay: 0.09 + denseMix * 0.03 + vel * 0.02,
+        shellDuration: 0.55 + denseMix * 0.12,
+    };
+}
+
+/**
+ * Strong snare hits should crack and bloom; ghost notes should stay short and papery.
+ * @param {number} velocity
+ * @returns {{
+ *   lowBodyFreq: number,
+ *   highBodyFreq: number,
+ *   lowBodyVolume: number,
+ *   highBodyVolume: number,
+ *   bodyDecay: number,
+ *   wiresVolume: number,
+ *   wiresFreq: number,
+ *   wiresQ: number,
+ *   wiresDecay: number,
+ *   wiresDuration: number,
+ *   crackFreq: number,
+ *   crackEndFreq: number,
+ *   crackVolume: number,
+ *   crackDecay: number
+ * }}
+ */
+export function getSnareVoiceConfig(velocity) {
+    const vel = clamp01(Math.max(0.1, velocity));
+    const accent = clamp01((vel - 0.55) / 0.35);
+    const ghost = 1 - clamp01((vel - 0.35) / 0.45);
+
+    return {
+        lowBodyFreq: 182 + accent * 10,
+        highBodyFreq: 318 + accent * 28,
+        lowBodyVolume: 0.16 + vel * 0.08 + accent * 0.04,
+        highBodyVolume: 0.14 + vel * 0.06 + accent * 0.03,
+        bodyDecay: 0.038 + accent * 0.022,
+        wiresVolume: 0.62 + vel * 0.34 + accent * 0.08,
+        wiresFreq: 1350 + vel * 280 + accent * 620,
+        wiresQ: 1.0 + accent * 0.18,
+        wiresDecay: 0.045 + accent * 0.03 - ghost * 0.012,
+        wiresDuration: 0.24 + accent * 0.22 - ghost * 0.08,
+        crackFreq: 2200 + accent * 950,
+        crackEndFreq: 1500 + accent * 260,
+        crackVolume: 0.02 + accent * 0.18,
+        crackDecay: 0.006 + accent * 0.008,
+    };
+}
+
+/**
+ * Toms should separate more clearly by shell size, pitch drop, and sustain.
+ * @param {string} name
+ * @param {number} velocity
+ * @returns {{
+ *   register: 'High'|'Mid'|'Low',
+ *   baseFreq: number,
+ *   stickFreqStart: number,
+ *   stickFreqEnd: number,
+ *   stickVolume: number,
+ *   skinVolume: number,
+ *   skinFreq: number,
+ *   skinQ: number,
+ *   bodyFreqStart: number,
+ *   bodyFreqEnd: number,
+ *   bodyVolume: number,
+ *   bodyDecay: number,
+ *   bodyDuration: number,
+ *   shellFreq: number,
+ *   shellVolume: number,
+ *   shellDecay: number,
+ *   shellDuration: number,
+ *   shellAttack: number
+ * }}
+ */
+export function getTomVoiceConfig(name, velocity) {
+    const register = name.includes('High') ? 'High' : name.includes('Mid') ? 'Mid' : 'Low';
+    const base = TOM_VOICE_PROFILES[register];
+    const vel = clamp01(Math.max(0.2, velocity));
+
+    return {
+        register,
+        baseFreq: base.baseFreq,
+        stickFreqStart: base.baseFreq * (base.stickRatioBase + vel * base.stickRatioVelocity),
+        stickFreqEnd: base.baseFreq * (register === 'Low' ? 1.08 : register === 'Mid' ? 1.1 : 1.12),
+        stickVolume: base.stickVolume + vel * 0.04,
+        skinVolume: base.skinVolume * vel,
+        skinFreq: base.baseFreq * base.skinFreqMultiplier,
+        skinQ: base.skinQ,
+        bodyFreqStart: base.baseFreq * base.bodyStartRatio,
+        bodyFreqEnd: base.baseFreq,
+        bodyVolume: base.bodyVolume + vel * 0.08,
+        bodyDecay: base.bodyDecay + vel * 0.03,
+        bodyDuration: base.bodyDuration,
+        shellFreq: base.baseFreq * 0.98,
+        shellVolume: base.shellVolume + vel * 0.06,
+        shellDecay: base.shellDecay + vel * 0.04,
+        shellDuration: base.shellDuration,
+        shellAttack: base.shellAttack,
+    };
+}
+
 /**
  * Stop any currently decaying drum sounds (specifically hat/ride).
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
@@ -35,6 +541,10 @@ export function killDrumNote(state) {
     if (groove.lastRideGain) {
         rampGain(groove.lastRideGain.gain, 0, playback.audio.currentTime, 0.05);
         groove.lastRideGain = null; // @direct-mutation
+    }
+    if (groove.lastCrashGain) {
+        rampGain(groove.lastCrashGain.gain, 0, playback.audio.currentTime, 0.12);
+        groove.lastCrashGain = null; // @direct-mutation
     }
 }
 
@@ -88,7 +598,8 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
 
     if (name === 'Kick') {
-        const vol = masterVol * rr();
+        const voiceConfig = getKickVoiceConfig(velocity, playback.bandIntensity || 0.5);
+        const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
         if (playback.bassSidechain) {
@@ -100,44 +611,44 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         const beaterGain = playback.audio.createGain();
         beaterGain.gain.setValueAtTime(0, playTime);
         beater.type = 'sine';
-        const snapFreq = (3000 + velocity * 1500) * rr();
+        const snapFreq = voiceConfig.beaterFreq * rr();
         beater.frequency.setValueAtTime(snapFreq, playTime);
-        beater.frequency.exponentialRampToValueAtTime(600, playTime + 0.005);
-        beaterGain.gain.setTargetAtTime(vol * 0.4, playTime, 0.001);
-        beaterGain.gain.setTargetAtTime(0, playTime + 0.005, 0.003);
+        beater.frequency.exponentialRampToValueAtTime(voiceConfig.beaterEndFreq, playTime + 0.006);
+        beaterGain.gain.setTargetAtTime(vol * voiceConfig.beaterVolume, playTime, 0.001);
+        beaterGain.gain.setTargetAtTime(0, playTime + 0.004, voiceConfig.beaterDecay);
 
         // 2. Head "Skin": Higher velocity = More high-frequency noise
         playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
-            volume: vol * 0.2,
+            volume: vol * voiceConfig.skinVolume,
             filterType: 'bandpass',
-            freq: 1000 + velocity * 500,
-            Q: 1.0,
-            attack: 0.002,
-            decay: 0.01,
-            duration: 0.1,
+            freq: voiceConfig.skinFreq * rr(0.02),
+            Q: 0.9,
+            attack: 0.0015,
+            decay: 0.012,
+            duration: 0.12,
         });
 
         // 3. The "Knock": Fundamental impact
         playResonantTone(playback.audio, panner, playTime, {
             type: 'triangle',
-            freqStart: 180 * rr(),
-            freqEnd: 60,
+            freqStart: voiceConfig.knockStartFreq * rr(0.01),
+            freqEnd: voiceConfig.knockEndFreq,
             rampDuration: 0.02,
-            volume: vol * 1.3,
+            volume: vol * voiceConfig.knockVolume,
             attack: 0.001,
-            decay: 0.03,
-            duration: 0.2,
+            decay: voiceConfig.knockDecay,
+            duration: 0.24,
         });
 
         // 4. The "Shell": Deep resonance
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
-            freqStart: 52 * rr(),
-            freqEnd: 52 * rr(),
-            volume: vol * 1.0,
-            attack: 0.005,
-            decay: 0.07,
-            duration: 0.5,
+            freqStart: voiceConfig.shellFreq * rr(0.01),
+            freqEnd: voiceConfig.shellFreq * rr(0.006),
+            volume: vol * voiceConfig.shellVolume,
+            attack: 0.003,
+            decay: voiceConfig.shellDecay,
+            duration: voiceConfig.shellDuration,
         });
 
         // Connections
@@ -147,10 +658,11 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         beater.start(playTime);
         beater.stop(playTime + 0.1);
 
-        beater.onended = () => safeDisconnect([beater, beaterGain, panner]);
+        beater.onended = () => safeDisconnect([beater, beaterGain]);
     } else if (name === 'Snare' || name === 'Sidestick') {
         const isSidestick = name === 'Sidestick';
-        const vol = masterVol * rr() * (isSidestick ? 0.8 : 1.0);
+        const vol =
+            masterVol * getSnareMixScale(state, velocity) * rr() * (isSidestick ? 0.8 : 1.0);
 
         if (isSidestick) {
             playResonantTone(playback.audio, panner, playTime, {
@@ -184,86 +696,119 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
 
             return;
         }
+        const voiceConfig = getSnareVoiceConfig(velocity);
 
         playResonantTone(playback.audio, panner, playTime, {
             type: 'triangle',
-            freqStart: 180 * rr(),
-            volume: vol * 0.25,
+            freqStart: voiceConfig.lowBodyFreq * rr(0.015),
+            freqEnd: voiceConfig.lowBodyFreq * 0.9,
+            rampDuration: 0.05,
+            volume: vol * voiceConfig.lowBodyVolume,
             attack: 0.001,
-            decay: 0.05,
-            duration: 0.5,
+            decay: voiceConfig.bodyDecay,
+            duration: 0.45,
         });
 
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
-            freqStart: 330 * rr(),
-            volume: vol * 0.25,
+            freqStart: voiceConfig.highBodyFreq * rr(0.015),
+            freqEnd: voiceConfig.highBodyFreq * 0.88,
+            rampDuration: 0.04,
+            volume: vol * voiceConfig.highBodyVolume,
             attack: 0.001,
-            decay: 0.05,
-            duration: 0.5,
+            decay: voiceConfig.bodyDecay * 0.9,
+            duration: 0.4,
         });
+
+        if (voiceConfig.crackVolume > 0.03) {
+            playResonantTone(playback.audio, panner, playTime, {
+                type: 'triangle',
+                freqStart: voiceConfig.crackFreq * rr(0.02),
+                freqEnd: voiceConfig.crackEndFreq,
+                rampDuration: 0.015,
+                volume: vol * voiceConfig.crackVolume,
+                attack: 0.0008,
+                decay: voiceConfig.crackDecay,
+                duration: 0.12,
+            });
+        }
 
         playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
-            volume: vol * (1.0 + velocity * 0.5),
+            volume: vol * voiceConfig.wiresVolume,
             filterType: 'bandpass',
-            freq: (1200 + velocity * 1500) * rr(),
-            Q: 1.2,
-            attack: 0.001,
-            decay: 0.08,
-            duration: 0.5,
+            freq: voiceConfig.wiresFreq * rr(0.02),
+            Q: voiceConfig.wiresQ,
+            attack: 0.0008,
+            decay: voiceConfig.wiresDecay,
+            duration: voiceConfig.wiresDuration,
         });
     } else if (name === 'HiHat' || name === 'Open' || name === 'Ride') {
-        const isOpen = name === 'Open';
         const isRide = name === 'Ride';
-
-        // Rebalanced multipliers for better kit presence
-        // Old: Closed (0.7), Open (0.5)
-        // New: Closed (0.85), Open (0.75), Ride (0.8)
-        const vol = masterVol * (isOpen ? 0.75 : isRide ? 0.8 : 0.85) * rr();
+        const isClosedHat = name === 'HiHat';
+        const voiceConfig = getCymbalVoiceConfig(name, velocity, playback.bandIntensity || 0.5);
+        if (!voiceConfig) {
+            safeDisconnect([panner]);
+            return;
+        }
+        const hatArticulation = isClosedHat ? 0.985 + Math.random() * 0.035 : 1;
+        const hatDecayMult = isClosedHat ? 0.92 + Math.random() * 0.18 : 1;
+        const hatStopMult = isClosedHat ? 0.96 + Math.random() * 0.08 : 1;
+        const vol =
+            masterVol *
+            voiceConfig.volumeScale *
+            getCymbalMixScale(state, name) *
+            (isClosedHat ? 0.95 + Math.random() * 0.03 : 1) *
+            rr();
 
         if (isRide) {
             if (groove.lastRideGain) {
                 rampGain(groove.lastRideGain.gain, 0, playTime, 0.05);
             }
         } else if (groove.lastHatGain) {
-            rampGain(groove.lastHatGain.gain, 0, playTime, 0.005);
-        }
-
-        if (!groove.audioBuffers.hihatMetal) {
-            groove.audioBuffers.hihatMetal = createMetallicBuffer(playback.audio);
+            rampGain(groove.lastHatGain.gain, 0, playTime, isClosedHat ? 0.008 : 0.005);
         }
 
         const source = playback.audio.createBufferSource();
-        source.buffer = groove.audioBuffers.hihatMetal;
-        source.playbackRate.value = isRide ? 0.6 * rr(0.05) : rr(0.05); // Ride is lower pitched
+        source.buffer =
+            getCymbalBuffer(groove, name) || ensureCymbalBuffer(playback.audio, groove, name);
+        source.playbackRate.value =
+            voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
 
         const bpFilter = playback.audio.createBiquadFilter();
         bpFilter.type = 'bandpass';
-        // Cap frequencies to prevent brittle/splashy high-end
-        const bpFreq = Math.min(9200, (isRide ? 6000 : 8000) + velocity * 1500);
-        bpFilter.frequency.setValueAtTime(bpFreq, playTime);
-        bpFilter.Q.value = isRide ? 0.5 : 1.0;
+        const bpAttackMult = isRide ? 1.14 : isClosedHat ? 1.06 + Math.random() * 0.08 : 1.1;
+        const bpSustainTarget = isRide ? voiceConfig.bandpassFreq * 0.96 : voiceConfig.bandpassFreq;
+        bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * bpAttackMult, playTime);
+        bpFilter.frequency.setTargetAtTime(
+            bpSustainTarget * (isClosedHat ? 0.98 + Math.random() * 0.04 : 1),
+            playTime + 0.008,
+            isRide ? 0.08 : name === 'Open' ? 0.05 : 0.02,
+        );
+        bpFilter.Q.value = isClosedHat
+            ? voiceConfig.q * (0.92 + Math.random() * 0.22)
+            : voiceConfig.q;
 
         const hpFilter = playback.audio.createBiquadFilter();
         hpFilter.type = 'highpass';
-        const hpFreq = Math.min(5500, (isRide ? 3000 : 4500) + velocity * 500);
-        hpFilter.frequency.setValueAtTime(hpFreq, playTime);
+        const hpAttackMult = isRide ? 1.1 : isClosedHat ? 1.03 + Math.random() * 0.09 : 1.04;
+        const hpSustainTarget = isClosedHat
+            ? voiceConfig.highpassFreq * 0.97
+            : voiceConfig.highpassFreq * 0.95;
+        hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * hpAttackMult, playTime);
+        hpFilter.frequency.setTargetAtTime(
+            hpSustainTarget * (isClosedHat ? 0.98 + Math.random() * 0.03 : 1),
+            playTime + 0.008,
+            isRide ? 0.1 : name === 'Open' ? 0.06 : 0.025,
+        );
 
         const gain = playback.audio.createGain();
         gain.gain.setValueAtTime(0, playTime);
-
-        if (isOpen) {
-            gain.gain.setTargetAtTime(vol, playTime, 0.015);
-            gain.gain.setTargetAtTime(0, playTime + 0.02, (0.35 + velocity * 0.1) * rr());
-        } else if (isRide) {
-            gain.gain.setTargetAtTime(vol, playTime, 0.005);
-            // Tapered decay multiplier for high velocities to keep it focused
-            const decayMult = velocity > 1.0 ? 0.12 : 0.2;
-            gain.gain.setTargetAtTime(0, playTime + 0.05, (0.8 + velocity * decayMult) * rr());
-        } else {
-            gain.gain.setTargetAtTime(vol, playTime, 0.002);
-            gain.gain.setTargetAtTime(0, playTime + 0.005, (0.05 + velocity * 0.02) * rr());
-        }
+        gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
+        gain.gain.setTargetAtTime(
+            0,
+            playTime + voiceConfig.decayDelay * (isClosedHat ? 0.95 + Math.random() * 0.2 : 1),
+            voiceConfig.decayTime * hatDecayMult,
+        );
 
         if (isRide) {
             groove.lastRideGain = gain; // @direct-mutation
@@ -276,8 +821,21 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         hpFilter.connect(gain);
         gain.connect(panner);
 
+        if (isRide && velocity > 0.92 && voiceConfig.pingFreq && voiceConfig.pingVolume) {
+            playResonantTone(playback.audio, panner, playTime, {
+                type: 'triangle',
+                freqStart: voiceConfig.pingFreq * rr(0.02),
+                freqEnd: voiceConfig.pingFreq * 0.84,
+                rampDuration: 0.01,
+                volume: vol * voiceConfig.pingVolume,
+                attack: 0.0008,
+                decay: 0.01,
+                duration: 0.08,
+            });
+        }
+
         source.start(playTime);
-        source.stop(playTime + (isOpen ? 2.0 : isRide ? 3.0 : 0.4));
+        source.stop(playTime + voiceConfig.stopTime * hatStopMult);
 
         source.onended = () => {
             if (isRide) {
@@ -290,51 +848,62 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
         };
     } else if (name === 'Crash') {
-        const vol = masterVol * 0.85 * rr();
-        const duration = 2.0 * rr();
-        const baseFreq = 60 * rr();
-        const ratios = [2.0, 3.0, 4.16, 5.43, 6.79, 8.21];
+        const voiceConfig = getCymbalVoiceConfig('Crash', velocity, playback.bandIntensity || 0.5);
+        if (!voiceConfig) {
+            safeDisconnect([panner]);
+            return;
+        }
+        const vol = masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'Crash') * rr();
 
-        const oscs = new Array(ratios.length);
-        for (let i = 0; i < ratios.length; i++) {
-            const o = playback.audio.createOscillator();
-            o.type = 'square';
-            o.frequency.setValueAtTime(baseFreq * ratios[i], playTime);
-            oscs[i] = o;
+        if (groove.lastHatGain) {
+            rampGain(groove.lastHatGain.gain, 0, playTime, 0.04);
+            groove.lastHatGain = null; // @direct-mutation
+        }
+        if (groove.lastRideGain) {
+            rampGain(groove.lastRideGain.gain, 0, playTime, 0.12);
+            groove.lastRideGain = null; // @direct-mutation
+        }
+        if (groove.lastCrashGain) {
+            rampGain(groove.lastCrashGain.gain, 0, playTime, 0.18);
         }
 
-        const noise = playback.audio.createBufferSource();
-        noise.buffer = groove.audioBuffers.noise;
+        const source = playback.audio.createBufferSource();
+        source.buffer =
+            getCymbalBuffer(groove, 'Crash') || ensureCymbalBuffer(playback.audio, groove, 'Crash');
+        source.playbackRate.value = voiceConfig.playbackRate * rr(voiceConfig.playbackVariance);
+
+        const bpFilter = playback.audio.createBiquadFilter();
+        bpFilter.type = 'bandpass';
+        bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * 1.12, playTime);
+        bpFilter.frequency.setTargetAtTime(voiceConfig.bandpassFreq * 0.96, playTime + 0.01, 0.12);
+        bpFilter.Q.value = voiceConfig.q;
 
         const hpFilter = playback.audio.createBiquadFilter();
         hpFilter.type = 'highpass';
-        hpFilter.frequency.setValueAtTime(6000, playTime);
-        hpFilter.frequency.setTargetAtTime(1200, playTime, duration * 0.4);
-        hpFilter.Q.value = 0.5;
+        hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * 1.08, playTime);
+        hpFilter.frequency.setTargetAtTime(voiceConfig.highpassFreq * 0.94, playTime + 0.012, 0.16);
 
         const gain = playback.audio.createGain();
         gain.gain.setValueAtTime(0, playTime);
-        gain.gain.linearRampToValueAtTime(vol, playTime + 0.005);
-        gain.gain.setTargetAtTime(vol * 0.15, playTime + 0.01, 0.02);
-        gain.gain.setTargetAtTime(0, playTime + 0.08, duration * 0.2);
+        gain.gain.linearRampToValueAtTime(vol, playTime + voiceConfig.attack);
+        gain.gain.setTargetAtTime(vol * 0.35, playTime + 0.015, 0.08);
+        gain.gain.setTargetAtTime(0, playTime + voiceConfig.decayDelay, voiceConfig.decayTime);
+        groove.lastCrashGain = gain; // @direct-mutation
 
-        const killTime = playTime + duration;
-        gain.gain.setValueAtTime(0.001, killTime - 0.02);
-        gain.gain.linearRampToValueAtTime(0, killTime);
-
-        oscs.forEach((o) => {
-            o.connect(hpFilter);
-            o.start(playTime);
-            o.stop(killTime + 0.1);
-        });
-        noise.connect(hpFilter);
-        noise.start(playTime);
-        noise.stop(killTime + 0.1);
-
+        source.connect(bpFilter);
+        bpFilter.connect(hpFilter);
         hpFilter.connect(gain);
         gain.connect(panner);
 
-        oscs[0].onended = () => safeDisconnect([...oscs, noise, hpFilter, gain, panner]);
+        source.start(playTime);
+        source.stop(playTime + voiceConfig.stopTime);
+
+        source.onended = () => {
+            if (groove.lastCrashGain === gain) {
+                groove.lastCrashGain = null; // @direct-mutation
+            }
+            safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
+        };
     } else if (name === 'Clave') {
         const vol = masterVol * 0.7 * rr();
         playResonantTone(playback.audio, panner, playTime, {
@@ -450,29 +1019,27 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
             duration: 0.2,
         });
     } else if (name.includes('Tom')) {
-        const vol = masterVol * 0.8 * rr();
-        const isHigh = name.includes('High');
-        const isMid = name.includes('Mid');
-        const freq = isHigh ? 180 : isMid ? 135 : 90;
+        const voiceConfig = getTomVoiceConfig(name, velocity);
+        const vol = masterVol * 0.8 * getRhythmBodyMixScale(state, name) * rr();
 
         // 1. Stick Impact (The "Thwack")
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
-            freqStart: freq * (3.0 + velocity * 2.0) * rr(),
-            freqEnd: freq,
+            freqStart: voiceConfig.stickFreqStart * rr(0.015),
+            freqEnd: voiceConfig.stickFreqEnd,
             rampDuration: 0.015,
-            volume: vol * 0.4,
+            volume: vol * voiceConfig.stickVolume,
             attack: 0.001,
-            decay: 0.01,
+            decay: 0.009,
             duration: 0.1,
         });
 
         // 2. Head "Skin" Noise
         playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
-            volume: vol * 0.25 * velocity,
+            volume: vol * voiceConfig.skinVolume,
             filterType: 'bandpass',
-            freq: freq * 10,
-            Q: 1.5,
+            freq: voiceConfig.skinFreq,
+            Q: voiceConfig.skinQ,
             attack: 0.002,
             decay: 0.02,
             duration: 0.2,
@@ -481,49 +1048,68 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         // 3. Resonant Body
         playResonantTone(playback.audio, panner, playTime, {
             type: 'triangle',
-            freqStart: freq * 1.15 * rr(),
-            freqEnd: freq,
+            freqStart: voiceConfig.bodyFreqStart * rr(0.01),
+            freqEnd: voiceConfig.bodyFreqEnd,
             rampDuration: 0.05,
-            volume: vol * 1.1,
+            volume: vol * voiceConfig.bodyVolume,
             attack: 0.002,
-            decay: 0.15,
-            duration: 0.5,
+            decay: voiceConfig.bodyDecay,
+            duration: voiceConfig.bodyDuration,
         });
 
         // 4. Shell Resonance
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
-            freqStart: freq * rr(0.01),
-            volume: vol * 0.8,
-            attack: 0.01,
-            decay: 0.4 * rr(),
-            duration: 1.5,
+            freqStart: voiceConfig.shellFreq * rr(0.01),
+            volume: vol * voiceConfig.shellVolume,
+            attack: voiceConfig.shellAttack,
+            decay: voiceConfig.shellDecay * rr(),
+            duration: voiceConfig.shellDuration,
         });
     }
 }
 
 /**
  * @param {AudioContext} audioCtx
+ * @param {typeof CYMBAL_BUFFER_PROFILES.HiHat} profile
  * @returns {AudioBuffer}
  */
-function createMetallicBuffer(audioCtx) {
-    const duration = 2.0;
+function createMetallicBuffer(audioCtx, profile) {
     const sampleRate = audioCtx.sampleRate;
-    const length = sampleRate * duration;
-    const buffer = audioCtx.createBuffer(1, length, sampleRate);
+    const requestedLength = Math.max(1, Math.floor(sampleRate * profile.duration));
+    const buffer = audioCtx.createBuffer(1, requestedLength, sampleRate);
     const data = buffer.getChannelData(0);
-    const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
-    const baseFreq = 40;
+    const phases = profile.partials.map((_, index) => Math.random() * TAU + index * 0.73);
+    const detunes = profile.partials.map(() => 1 + (Math.random() - 0.5) * profile.jitter);
+    const partialWeights = profile.partials.map(() => 0.7 + Math.random() * 0.45);
+    const transientSamples = Math.max(1, Math.floor(sampleRate * 0.008));
+    let smoothed = 0;
 
-    for (let i = 0; i < length; i++) {
-        let sample = 0;
+    for (let i = 0; i < data.length; i++) {
         const t = i / sampleRate;
-        for (const r of ratios) {
-            const freq = baseFreq * r;
-            const phase = (t * freq) % 1;
-            sample += phase < 0.5 ? 1 : -1;
+        let metallic = 0;
+
+        for (let p = 0; p < profile.partials.length; p++) {
+            const partialEnv = Math.exp(-t * (profile.partialDecay + p * profile.partialSpread));
+            metallic +=
+                (Math.sin(
+                    TAU * profile.baseFreq * profile.partials[p] * detunes[p] * t + phases[p],
+                ) *
+                    partialWeights[p] *
+                    partialEnv) /
+                (1 + p * 0.26);
         }
-        data[i] = sample / ratios.length;
+
+        const noiseEnv = Math.exp(-t * profile.noiseDecay);
+        const noise = (Math.random() * 2 - 1) * profile.noiseMix * noiseEnv;
+        const transient =
+            i < transientSamples
+                ? (1 - i / transientSamples) * profile.transientMix * (Math.random() * 2 - 1)
+                : 0;
+        const raw = (metallic / profile.partials.length) * profile.metalMix + noise + transient;
+        smoothed = smoothed * profile.smooth + raw * (1 - profile.smooth);
+        data[i] = Math.tanh(smoothed * profile.saturation);
     }
+
     return buffer;
 }

@@ -88,8 +88,66 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Performance:** Implemented high-resolution "Logic Latency" monitoring. Round-trip worker communication is now tracked, with warnings triggered if processing exceeds 50ms.
     - **Mixing:** Automated "Intensity-Aware Mixing". Reverb sends and master compression now dynamically adapt to `bandIntensity` (see new Rules section below).
     - **Soloist:** Enhanced phrasing to prioritize "Guide Tones" (3rds and 7ths) on the downbeat of section changes to improve musical flow during transitions.
-    - **UX:** Implemented "Painting" mode for the Drum Sequencer and a spacious 2-column settings layout for desktop.
-    - **Verification:** 724 tests passing (100% pass rate after architectural decoupling).
+
+### [Date: 2026-03-27]
+- **Status:** Drumkit body/balance retune.
+- **Action:**
+    - **Kick:** Reduced dense-mix beater click, lifted low-body resonance slightly, and preserved shell tail instead of cutting it off with beater cleanup.
+    - **Snare:** Added velocity-aware crack emphasis so backbeats speak more clearly while ghost notes stay shorter and drier.
+    - **Toms:** Increased register separation with longer low-tom sustain, stronger pitch-drop contrast, and more distinct shell/body envelopes per drum size.
+    - **Verification:** Focused drum synthesis, seeder, and critique suites passed; full validation rerun after implementation.
+
+### [Date: 2026-03-27] (Jazz Ride Presence)
+- **Status:** Jazz ride cleanup.
+- **Action:**
+    - **Ride:** Increased sustain and mix presence slightly, with a small Jazz-specific mix boost so the ride reads more naturally in ride-led arrangements.
+    - **Verification:** Focused jazz drum tests and full validation passed after the tweak.
+
+### [Date: 2026-03-27] (Beat Anchor Mix Lift)
+- **Status:** Drum bus level trim.
+- **Action:**
+    - **Drums:** Raised the drum bus slightly so the beat sits more clearly in the full mix without undoing the cymbal realism work.
+    - **Verification:** Mix integrity, drum synthesis, genre critique suites, and full validation passed with the updated drum multiplier.
+
+### [Date: 2026-03-27] (Crash Accent Lift)
+- **Status:** Cymbal differentiation.
+- **Action:**
+    - **Crash:** Increased crash accent weight and transient noise so it reads louder and broader than ride, while ride remains the clearer sustained timekeeper.
+    - **Verification:** Focused drum and genre suites passed; full validation passed after the crash/ride split tweak.
+
+### [Date: 2026-03-27] (Cymbal Sustain Expansion)
+- **Status:** Cymbal envelope retune.
+- **Action:**
+    - **Cymbals:** Lengthened the underlying metallic buffers and eased the runtime damping across closed hat, open hat, ride, and crash so each voice keeps more natural residual sustain.
+    - **Musical target:** Closed hats stay crisp but no longer feel hard-gated; open hats sizzle longer; rides hold a clearer shimmer tail; crashes bloom longer before fading.
+    - **Verification:** Focused drum suites, synth bench, and full validation passed after the sustain retune.
+
+### [Date: 2026-03-27] (Hybrid Cymbal Liveliness Pass)
+- **Status:** Cymbal feel rebalance.
+- **Action:**
+    - **Closed hat:** Reduced playback-rate drift and narrowed level/decay variance so hats feel less distractingly pitchy, while keeping motion in the filter/tail behavior instead of obvious pitch wobble.
+    - **Crash:** Added a little more bloom and tail by lifting crash level slightly, extending the source/runtime decay, and holding the early sustain plateau a touch longer.
+    - **Mix target:** Preserve the newer anti-wash cymbal discipline while recovering some of the older implementation's liveliness.
+    - **Verification:** Focused drum suites, synth bench, and full validation passed after the hybrid retune.
+
+### [Date: 2026-03-27] (Snare Backbeat Lift)
+- **Status:** Snare mix presence.
+- **Action:**
+    - **Snare:** Added a small genre-aware presence lift for Rock and Blues backbeats so the snare sits a touch more forward without inflating the rest of the kit.
+    - **Verification:** Focused drum and genre suites passed after the snare mix adjustment.
+
+### [Date: 2026-03-27] (Blues/Jazz Mix Pass)
+- **Status:** Genre-specific drum balance.
+- **Action:**
+    - **Blues:** Lifted kick/tom body slightly so the shuffle feels anchored without pushing cymbals forward.
+    - **Jazz:** Reduced the extra ride boost a little and added a small low-mid body lift so the ride-led feel stays clear without dominating the presence band.
+    - **Verification:** Focused drum synthesis, Blues drummer, Jazz drummer, and the internal mix report all passed after the genre mix tweak.
+
+### [Date: 2026-03-27] (Closed Hi-Hat Sustain Nudge)
+- **Status:** Closed hat tail.
+- **Action:**
+    - **HiHat:** Extended the shortest closed-hat decay/stop values slightly so the hat keeps a more natural residual ring without opening up.
+    - **Verification:** Focused drum synthesis and the internal mix report passed after the subtle sustain nudge.
 
 ---
 
@@ -106,4 +164,3 @@ To maintain professional mix clarity, the engine now modulates the signal chain 
 - **Threshold:** Scales from **-0.5dB** (low intensity) down to **-2.0dB** (high intensity) to catch peaks.
 - **Ratio:** Scales from **12:1** up to **20:1** to "glue" the band together as the energy increases.
 - **Attack/Release:** Fast attack (2ms) and medium release (500ms) to ensure punch without pumping artifacts.
-

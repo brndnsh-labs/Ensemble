@@ -12,7 +12,7 @@ import { getScaleForChord } from './theory-scales.js';
  */
 
 // (Old getScaleForBass removed, using imported version)
-import { TIME_SIGNATURES } from '../config.js';
+import { resolveMappedStyle, SMART_BASS_STYLE_MAP, TIME_SIGNATURES } from '../config.js';
 import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 
 /**
@@ -44,25 +44,7 @@ export function isBassActive(state, style, step, stepInChord, stepInfo, coordina
     }
 
     if (style === 'smart') {
-        /** @type {any} */
-        const mapping = {
-            Rock: 'rock',
-            Jazz: 'quarter',
-            Funk: 'funk',
-            Disco: 'disco',
-            Reggae: 'dub',
-            'Neo-Soul': 'neo',
-            'Bossa Nova': 'bossa',
-            Afrobeat: 'funk',
-            Blues: 'blues',
-            Acoustic: 'acoustic',
-            'Hip Hop': 'hiphop',
-            Country: 'country',
-            Metal: 'metal',
-            'Ska-Punk': 'walking-ska',
-            Ska: 'walking-ska',
-        };
-        style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
+        style = resolveMappedStyle(SMART_BASS_STYLE_MAP, groove.genreFeel, groove.lastDrumPreset);
     }
 
     /** @type {any} */
@@ -123,24 +105,7 @@ export function getBassNote(
     }
 
     if (style === 'smart') {
-        /** @type {any} */
-        const mapping = {
-            Rock: 'rock',
-            Jazz: 'quarter',
-            Funk: 'funk',
-            Disco: 'disco',
-            Reggae: 'dub',
-            'Neo-Soul': 'neo',
-            'Bossa Nova': 'bossa',
-            Country: 'country',
-            Metal: 'metal',
-            Afrobeat: 'funk',
-            Blues: 'blues',
-            Acoustic: 'acoustic',
-            'Ska-Punk': 'walking-ska',
-            Ska: 'walking-ska',
-        };
-        style = mapping[groove.genreFeel] || mapping[groove.lastDrumPreset] || 'rock';
+        style = resolveMappedStyle(SMART_BASS_STYLE_MAP, groove.genreFeel, groove.lastDrumPreset);
     }
 
     /** @type {any} */

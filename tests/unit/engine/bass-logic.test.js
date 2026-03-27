@@ -31,19 +31,23 @@ vi.mock('../../../public/state.js', () => {
         getState: () => mockState,
     };
 });
-vi.mock('../../../public/config.js', () => ({
-    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-    TIME_SIGNATURES: {
-        '4/4': {
-            beats: 4,
-            stepsPerBeat: 4,
-            subdivision: '16th',
-            pulse: [0, 4, 8, 12],
-            grouping: [2, 2],
+vi.mock('../../../public/config.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
+        TIME_SIGNATURES: {
+            '4/4': {
+                beats: 4,
+                stepsPerBeat: 4,
+                subdivision: '16th',
+                pulse: [0, 4, 8, 12],
+                grouping: [2, 2],
+            },
         },
-    },
-    REGGAE_RIDDIMS: {},
-}));
+        REGGAE_RIDDIMS: {},
+    };
+});
 
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { getBassNote, isBassActive } from '../../../public/engine/bass-engine.js';
