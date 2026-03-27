@@ -301,6 +301,7 @@ function resetCompingAuditState(stepsPerMeasure = 16) {
     compingState.grooveRetentionCount = 0;
     compingState.maxGrooveLength = 4;
     compingState.lastSectionId = null;
+    compingState.lastVoicingMidis = [];
 }
 
 function buildChangesArrangement(timeSignature = '4/4') {

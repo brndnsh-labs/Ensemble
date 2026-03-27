@@ -94,6 +94,7 @@ function processMessage(type, data, startTime) {
 
                 compingState.lastChordIndex = -1;
                 compingState.lockedUntil = 0;
+                compingState.lastVoicingMidis = [];
                 /** @type {any} */ (compingState).rhythmPattern = [];
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;

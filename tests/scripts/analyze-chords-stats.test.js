@@ -170,4 +170,20 @@ describe('Chord audit scripts', () => {
         expect(Array.isArray(report.eventLog[0].notes)).toBe(true);
         expect(report.eventLog[0]).toHaveProperty('soloistBusy');
     });
+
+    it('keeps Neo-Soul voicing movement in a conversational pocket', () => {
+        const { capture } = runAudit({
+            genre: 'Neo-Soul',
+            arrangementName: 'neo-soul',
+            loops: 2,
+            seed: 'NEO_POCKET',
+            intensity: 0.6,
+        });
+
+        const rows = buildMeasureAudit(capture, 0);
+        const voiceJumpMeasures = rows.filter((row) => row.flags.includes('voice-jump'));
+
+        expect(voiceJumpMeasures).toHaveLength(0);
+        expect(Math.max(...rows.map((row) => Math.abs(row.centerDrift)))).toBeLessThanOrEqual(7);
+    });
 });

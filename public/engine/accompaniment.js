@@ -18,9 +18,57 @@ export const compingState = {
     grooveRetentionCount: 0,
     maxGrooveLength: 4,
     lastSectionId: null,
+    /** @type {number[]} */
+    lastVoicingMidis: [],
 };
 
 const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
+
+/**
+ * @param {number[]} midis
+ * @returns {number}
+ */
+function averageMidi(midis) {
+    return midis.length === 0 ? 0 : midis.reduce((sum, midi) => sum + midi, 0) / midis.length;
+}
+
+/**
+ * Neo-Soul favors compact upper-structure clusters, but we still want the line to move
+ * from the previous comp naturally instead of re-jumping from the root every hit.
+ * @param {number[]} midis
+ * @param {number[]} previousMidis
+ * @param {number} maxVoices
+ * @param {number} minMidi
+ * @returns {number[]}
+ */
+function selectCompactCluster(midis, previousMidis = [], maxVoices = 3, minMidi = 0) {
+    const sorted = [...new Set(midis.filter((midi) => Number.isFinite(midi)))].sort(
+        (a, b) => a - b,
+    );
+    if (sorted.length <= maxVoices) {
+        return sorted;
+    }
+
+    const targetCenter =
+        previousMidis.length > 0 ? averageMidi(previousMidis) : averageMidi(sorted);
+    let bestCluster = sorted.slice(sorted.length - maxVoices);
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let start = 0; start <= sorted.length - maxVoices; start++) {
+        const cluster = sorted.slice(start, start + maxVoices);
+        const center = averageMidi(cluster);
+        const span = cluster[cluster.length - 1] - cluster[0];
+        const floorPenalty = minMidi > 0 && cluster[0] < minMidi ? (minMidi - cluster[0]) * 2 : 0;
+        const score = Math.abs(center - targetCenter) + span * 0.15 + floorPenalty;
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestCluster = cluster;
+        }
+    }
+
+    return bestCluster;
+}
 
 /**
  * Algorithmic Pattern Generator
@@ -652,22 +700,28 @@ export function getAccompanimentNotes(
         const isGhost = !isHit && Math.random() < ghostProb;
 
         if (isHit || isGhost) {
-            let voicing = [];
-            // Strategy: Pick the 3rd, 7th, and 9th/11th for a rich, rootless cluster
-            const three = chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4);
-            const seven = chord.intervals.find((/** @type {number} */ i) => i === 10 || i === 11);
-            const ext = chord.intervals.find(
-                (/** @type {number} */ i) => i === 2 || i === 5 || i === 9 || i === 14,
-            ); // 9, 11, 13
+            const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+            const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
+            let voicing = chord.freqs
+                .map((/** @type {number} */ f) => getMidi(f))
+                .filter((/** @type {number | null} */ midi) => Number.isFinite(midi));
 
-            if (three !== undefined && seven !== undefined) {
-                voicing = [chord.rootMidi + three, chord.rootMidi + seven];
-                if (ext !== undefined) {
-                    voicing.push(chord.rootMidi + ext);
-                }
-            } else {
-                voicing = chord.freqs.slice(0, 3).map((/** @type {number} */ f) => getMidi(f));
+            if (voicing.length === 0) {
+                voicing = [chord.rootMidi + 3, chord.rootMidi + 10, chord.rootMidi + 14];
             }
+            voicing = selectCompactCluster(
+                voicing,
+                compingState.lastVoicingMidis,
+                Math.min(3, voicing.length),
+                reserveBassSpace && bassMidi ? bassMidi + 13 : 0,
+            );
+
+            if (reserveBassSpace && bassMidi) {
+                while (voicing.length > 0 && voicing[0] <= bassMidi + 12) {
+                    voicing = voicing.map((/** @type {number} */ midi) => midi + 12);
+                }
+            }
+            compingState.lastVoicingMidis = [...voicing];
 
             // Neo-Soul "Drunken" Timing (Randomized displacement) - TIGHTENED
             const drunk = (Math.random() - 0.5) * (intensity * 0.02);

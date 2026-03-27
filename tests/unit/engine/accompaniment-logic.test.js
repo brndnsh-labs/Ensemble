@@ -65,6 +65,7 @@ describe('Accompaniment Engine Logic', () => {
         arranger.timeSignature = '4/4';
         compingState.lockedUntil = 0;
         compingState.lastChordIndex = -1;
+        compingState.lastVoicingMidis = [];
         chords.enabled = true;
         chords.style = 'smart';
         groove.genreFeel = 'Rock';
