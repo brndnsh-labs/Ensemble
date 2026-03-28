@@ -130,7 +130,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         }
     });
 
-    test('All The Things You Are stays legible in ultra-compact mode', async ({ page }) => {
+    test('All The Things You Are stays legible in guided compact mode', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
 
         await page.getByRole('button', { name: 'Open arranger actions' }).click();
@@ -149,7 +149,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             .evaluateAll((rows) => rows.map((row) => row.querySelectorAll('.measure-box').length));
 
         await expect(visualizer).toHaveAttribute('data-total-measures', '36');
-        await expect(visualizer).toHaveAttribute('data-density', 'ultra-compact');
+        await expect(visualizer).toHaveAttribute('data-density', 'compact');
         await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
         await expect(visualizer).toHaveAttribute('data-scroll-mode', 'guided');
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(7);
@@ -160,7 +160,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             .poll(async () =>
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
             )
-            .toBeGreaterThan(16);
+            .toBeGreaterThan(19);
         await expect(visualizer).toHaveJSProperty(
             'scrollHeight',
             await visualizer.evaluate((el) => el.clientHeight),

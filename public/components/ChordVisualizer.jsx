@@ -263,7 +263,6 @@ export function ChordVisualizer() {
     const density = layoutProfile.density;
     const showSparkline = isMaximized && soloistStyle === 'lead_sheet' && totalMeasures <= 16;
     const containerStyle = {
-        '--lead-content-distribution': layoutProfile.contentDistribution,
         '--lead-vertical-fill': layoutProfile.verticalFillScale.toFixed(2),
         '--lead-vertical-gap-fill': layoutProfile.verticalGapScale.toFixed(2),
         '--lead-vertical-type-fill': layoutProfile.verticalTypeScale.toFixed(2),

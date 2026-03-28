@@ -218,7 +218,6 @@ describe('ChordVisualizer Component', () => {
 
         const visualizer = container.querySelector('#chordVisualizer');
         expect(visualizer?.getAttribute('data-vertical-fill')).toBe('generous');
-        expect(visualizer?.style.getPropertyValue('--lead-content-distribution')).toBe('start');
         expect(visualizer?.style.getPropertyValue('--lead-vertical-fill')).toBe('1.50');
         expect(visualizer?.style.getPropertyValue('--lead-vertical-type-fill')).toBe('1.28');
     });

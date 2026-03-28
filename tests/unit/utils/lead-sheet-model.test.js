@@ -125,6 +125,28 @@ describe('lead-sheet-model', () => {
         });
     });
 
+    it('keeps guided desktop standards in compact mode before falling to ultra-compact', () => {
+        expect(
+            getLeadSheetLayoutProfile({
+                totalMeasures: 36,
+                rowCount: 9,
+                viewportWidth: 1440,
+                viewportHeight: 900,
+                isMaximized: false,
+            }),
+        ).toMatchObject({
+            density: 'compact',
+            lookaheadRows: 2,
+            measuresPerRow: 4,
+            scrollMode: 'guided',
+            viewport: 'desktop',
+            verticalFillMode: 'compact',
+            verticalFillScale: 1,
+            verticalGapScale: 1,
+            verticalTypeScale: 1,
+        });
+    });
+
     it('switches long desktop charts into guided scrolling with lookahead', () => {
         expect(
             getLeadSheetLayoutProfile({
@@ -135,7 +157,6 @@ describe('lead-sheet-model', () => {
                 isMaximized: false,
             }),
         ).toMatchObject({
-            contentDistribution: 'start',
             density: 'ultra-compact',
             lookaheadRows: 2,
             measuresPerRow: 4,
@@ -158,7 +179,6 @@ describe('lead-sheet-model', () => {
                 isMaximized: false,
             }),
         ).toMatchObject({
-            contentDistribution: 'start',
             density: 'comfortable',
             scrollMode: 'fit',
             viewport: 'desktop',
@@ -179,7 +199,6 @@ describe('lead-sheet-model', () => {
                 isMaximized: false,
             }),
         ).toMatchObject({
-            contentDistribution: 'start',
             density: 'comfortable',
             scrollMode: 'fit',
             viewport: 'desktop',

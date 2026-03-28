@@ -116,23 +116,6 @@
         height: 100%;
         max-height: none;
         overflow: hidden;
-        --lead-row-gap: 0.3rem;
-        --lead-measure-gap: 0.22rem;
-        --lead-measure-min-height: 34px;
-        --lead-chord-min-height: 30px;
-        --lead-font-size: clamp(0.86rem, 3.6vw, 1rem);
-    }
-
-    .workspace-arranger-chords .lead-sheet-row {
-        width: 100%;
-    }
-
-    .workspace-arranger-chords .measure-box {
-        min-height: 34px;
-    }
-
-    .workspace-arranger-chords .chord-card {
-        min-height: 30px;
     }
 }
 
@@ -386,74 +369,12 @@
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
-        scroll-padding-block: 12vh;
-        padding: 0.12rem;
-        --lead-row-gap: 0.12rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.24rem;
-        --lead-marker-lane-gap: 0.03rem;
-        --lead-measure-min-height: 27px;
-        --lead-chord-min-height: 26px;
-        --lead-font-size: clamp(0.92rem, 4.34vw, 1.04rem);
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords .lead-sheet-row {
-        width: 100%;
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords .measure-box {
-        min-height: 28px;
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords .chord-card {
-        min-height: 26px;
-        padding: 0.05rem 0.04rem;
         scroll-margin-block: 12vh;
     }
 
     .chord-maximized .workspace-view--arranger .workspace-arranger-chords .display-area {
         max-height: none;
         height: calc(100dvh - 64px - env(safe-area-inset-bottom));
-        padding: 0.24rem 0.24rem calc(0.24rem + env(safe-area-inset-bottom));
-        --lead-row-gap: 0.18rem;
-        --lead-measure-gap: 0.1rem;
-        --lead-marker-reserve: 0.3rem;
-        --lead-marker-size: 0.48rem;
-        --lead-measure-min-height: 30px;
-        --lead-chord-min-height: 26px;
-        --lead-font-size: clamp(1.12rem, 5.4vw, 1.28rem);
-    }
-
-    .chord-maximized
-        .workspace-view--arranger
-        .workspace-arranger-chords
-        .display-area.lead-sheet--compact {
-        --lead-row-gap: 0.14rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.24rem;
-        --lead-font-size: clamp(1.08rem, 5.1vw, 1.2rem);
-        --lead-measure-min-height: 28px;
-        --lead-chord-min-height: 25px;
-    }
-
-    .chord-maximized
-        .workspace-view--arranger
-        .workspace-arranger-chords
-        .display-area.lead-sheet--ultra-compact {
-        --lead-row-gap: 0.12rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.2rem;
-        --lead-font-size: clamp(1.04rem, 4.95vw, 1.12rem);
-        --lead-measure-min-height: 26px;
-        --lead-chord-min-height: 23px;
-    }
-
-    .chord-maximized .workspace-view--arranger .workspace-arranger-chords .measure-box {
-        min-height: var(--lead-measure-min-height);
-    }
-
-    .chord-maximized .workspace-view--arranger .workspace-arranger-chords .chord-card {
-        min-height: var(--lead-chord-min-height);
     }
 
     .workspace-view--studio {

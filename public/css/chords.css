@@ -1,6 +1,5 @@
 /* --- Lead Sheet Base --- */
 .display-area {
-    --lead-content-distribution: start;
     --lead-vertical-fill: 1;
     --lead-vertical-gap-fill: 1;
     --lead-vertical-type-fill: 1;
@@ -32,7 +31,7 @@
     box-sizing: border-box;
     display: grid;
     gap: calc(var(--lead-row-gap) * var(--lead-vertical-gap-fill));
-    align-content: var(--lead-content-distribution);
+    align-content: start;
     align-items: start;
     scroll-behavior: smooth;
     scroll-padding-block: clamp(2rem, 16vh, 7rem);
@@ -63,6 +62,24 @@
     --lead-chord-min-height: 28px;
     --lead-card-padding: 0.1rem 0.08rem;
     --lead-font-size: clamp(0.86rem, 2.05vw, 1.08rem);
+}
+
+.lead-sheet--scroll-guided.lead-sheet--compact {
+    --lead-row-gap: 0.38rem;
+    --lead-measure-gap: 0.24rem;
+    --lead-marker-reserve: 0.56rem;
+    --lead-measure-min-height: 46px;
+    --lead-chord-min-height: 38px;
+    --lead-font-size: clamp(1.08rem, 2.35vw, 1.34rem);
+}
+
+.lead-sheet--scroll-guided.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.28rem;
+    --lead-measure-gap: 0.18rem;
+    --lead-marker-reserve: 0.44rem;
+    --lead-measure-min-height: 38px;
+    --lead-chord-min-height: 32px;
+    --lead-font-size: clamp(0.98rem, 2.18vw, 1.18rem);
 }
 
 .lead-sheet-section-group {
@@ -340,6 +357,24 @@
     --lead-font-size: clamp(0.96rem, 1.9vw, 1.18rem);
 }
 
+.chord-maximized .lead-sheet--scroll-guided.lead-sheet--compact {
+    --lead-row-gap: 0.32rem;
+    --lead-measure-gap: 0.2rem;
+    --lead-marker-reserve: 0.52rem;
+    --lead-measure-min-height: 42px;
+    --lead-chord-min-height: 36px;
+    --lead-font-size: clamp(1.16rem, 2.45vw, 1.52rem);
+}
+
+.chord-maximized .lead-sheet--scroll-guided.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.24rem;
+    --lead-measure-gap: 0.16rem;
+    --lead-marker-reserve: 0.42rem;
+    --lead-measure-min-height: 35px;
+    --lead-chord-min-height: 30px;
+    --lead-font-size: clamp(1.04rem, 2.08vw, 1.24rem);
+}
+
 .chord-maximize-exit-btn {
     display: none;
 }
@@ -422,85 +457,119 @@
 }
 
 /* --- Mobile / Small Screens --- */
+.lead-sheet--viewport-mobile {
+    --lead-row-width: 100%;
+    --lead-row-gap: 0.12rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.24rem;
+    --lead-marker-lane-gap: 0.03rem;
+    --lead-measure-min-height: 27px;
+    --lead-chord-min-height: 26px;
+    --lead-font-size: clamp(0.92rem, 4.34vw, 1.04rem);
+    padding: 0.12rem;
+    scroll-padding-block: 12vh;
+}
+
+.lead-sheet--viewport-mobile.lead-sheet--compact {
+    --lead-row-gap: 0.12rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.24rem;
+    --lead-marker-lane-gap: 0.03rem;
+    --lead-measure-min-height: 27px;
+    --lead-chord-min-height: 26px;
+    --lead-font-size: clamp(0.92rem, 4.34vw, 1.04rem);
+}
+
+.lead-sheet--viewport-mobile.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.12rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.22rem;
+    --lead-marker-lane-gap: 0.02rem;
+    --lead-measure-min-height: 26px;
+    --lead-chord-min-height: 24px;
+    --lead-font-size: clamp(0.86rem, 4.05vw, 0.98rem);
+}
+
+.lead-sheet--viewport-mobile.lead-sheet--scroll-guided.lead-sheet--compact {
+    --lead-row-gap: 0.16rem;
+    --lead-measure-gap: 0.1rem;
+    --lead-marker-reserve: 0.28rem;
+    --lead-measure-min-height: 30px;
+    --lead-chord-min-height: 27px;
+    --lead-font-size: clamp(0.98rem, 4.6vw, 1.08rem);
+}
+
+.lead-sheet--viewport-mobile.lead-sheet--scroll-guided.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.14rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.24rem;
+    --lead-measure-min-height: 28px;
+    --lead-chord-min-height: 25px;
+    --lead-font-size: clamp(0.92rem, 4.35vw, 1rem);
+}
+
+.lead-sheet--viewport-mobile .lead-sheet-row {
+    width: 100%;
+}
+
+.lead-sheet--viewport-mobile .lead-sheet-marker-slot {
+    padding-left: 0.04rem;
+}
+
+.lead-sheet--viewport-mobile .lead-sheet-row-marker {
+    padding: 0.05rem 0.18rem;
+}
+
+.chord-maximized .lead-sheet--viewport-mobile {
+    --lead-row-gap: 0.18rem;
+    --lead-measure-gap: 0.1rem;
+    --lead-marker-reserve: 0.3rem;
+    --lead-marker-size: 0.48rem;
+    --lead-measure-min-height: 30px;
+    --lead-chord-min-height: 26px;
+    --lead-font-size: clamp(1.12rem, 5.4vw, 1.28rem);
+    top: 64px;
+    height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+    padding: 0.24rem 0.24rem calc(0.24rem + env(safe-area-inset-bottom));
+}
+
+.chord-maximized .lead-sheet--viewport-mobile.lead-sheet--compact {
+    --lead-row-gap: 0.14rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.24rem;
+    --lead-font-size: clamp(1.08rem, 5.1vw, 1.2rem);
+    --lead-measure-min-height: 28px;
+    --lead-chord-min-height: 25px;
+}
+
+.chord-maximized .lead-sheet--viewport-mobile.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.12rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.2rem;
+    --lead-font-size: clamp(1.04rem, 4.95vw, 1.12rem);
+    --lead-measure-min-height: 26px;
+    --lead-chord-min-height: 23px;
+}
+
+.chord-maximized .lead-sheet--viewport-mobile.lead-sheet--scroll-guided.lead-sheet--compact {
+    --lead-row-gap: 0.16rem;
+    --lead-measure-gap: 0.1rem;
+    --lead-marker-reserve: 0.26rem;
+    --lead-measure-min-height: 29px;
+    --lead-chord-min-height: 26px;
+    --lead-font-size: clamp(1.12rem, 5.25vw, 1.22rem);
+}
+
+.chord-maximized .lead-sheet--viewport-mobile.lead-sheet--scroll-guided.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.14rem;
+    --lead-measure-gap: 0.08rem;
+    --lead-marker-reserve: 0.22rem;
+    --lead-measure-min-height: 27px;
+    --lead-chord-min-height: 24px;
+    --lead-font-size: clamp(1.06rem, 5vw, 1.14rem);
+}
+
 @media (max-width: 600px) {
-    .display-area {
-        --lead-row-width: 100%;
-        --lead-row-gap: 0.18rem;
-        --lead-measure-gap: 0.1rem;
-        --lead-marker-reserve: 0.34rem;
-        --lead-marker-lane-gap: 0.04rem;
-        --lead-marker-size: 0.46rem;
-        --lead-measure-min-height: 34px;
-        --lead-chord-min-height: 28px;
-        --lead-card-padding: 0.08rem 0.06rem;
-        --lead-font-size: clamp(0.96rem, 4.4vw, 1.12rem);
-        padding: 0.18rem;
-        scroll-padding-block: 14vh;
-    }
-
-    .lead-sheet--compact {
-        --lead-row-gap: 0.14rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.3rem;
-        --lead-marker-lane-gap: 0.03rem;
-        --lead-measure-min-height: 30px;
-        --lead-chord-min-height: 26px;
-        --lead-font-size: clamp(0.88rem, 4vw, 1rem);
-    }
-
-    .lead-sheet--ultra-compact {
-        --lead-row-gap: 0.12rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.22rem;
-        --lead-marker-lane-gap: 0.02rem;
-        --lead-measure-min-height: 26px;
-        --lead-chord-min-height: 24px;
-        --lead-font-size: clamp(0.8rem, 3.85vw, 0.96rem);
-    }
-
-    .lead-sheet-marker-slot {
-        padding-left: 0.04rem;
-    }
-
-    .lead-sheet-row-marker {
-        padding: 0.05rem 0.18rem;
-    }
-
-    .chord-maximized .display-area {
-        --lead-row-gap: 0.18rem;
-        --lead-measure-gap: 0.1rem;
-        --lead-marker-reserve: 0.3rem;
-        --lead-marker-lane-gap: 0.06rem;
-        --lead-marker-size: 0.48rem;
-        --lead-measure-min-height: 30px;
-        --lead-chord-min-height: 26px;
-        --lead-card-padding: 0.08rem 0.06rem;
-        --lead-font-size: clamp(0.98rem, 4.8vw, 1.16rem);
-        top: 64px;
-        height: calc(100dvh - 64px - env(safe-area-inset-bottom));
-        padding: 0.24rem 0.24rem calc(0.24rem + env(safe-area-inset-bottom));
-    }
-
-    .chord-maximized .lead-sheet--compact {
-        --lead-row-gap: 0.14rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.24rem;
-        --lead-marker-lane-gap: 0.04rem;
-        --lead-font-size: clamp(0.92rem, 4.4vw, 1.06rem);
-        --lead-measure-min-height: 28px;
-        --lead-chord-min-height: 25px;
-    }
-
-    .chord-maximized .lead-sheet--ultra-compact {
-        --lead-row-gap: 0.12rem;
-        --lead-measure-gap: 0.08rem;
-        --lead-marker-reserve: 0.2rem;
-        --lead-marker-lane-gap: 0.04rem;
-        --lead-font-size: clamp(0.86rem, 4.05vw, 0.98rem);
-        --lead-measure-min-height: 26px;
-        --lead-chord-min-height: 23px;
-    }
-
     .chord-maximized .chord-maximize-exit-btn {
         top: 0.5rem;
         right: 0.5rem;
