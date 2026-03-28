@@ -132,4 +132,33 @@ describe('Country Drummer Critique', () => {
         expect(avgBackbeatVel).toBeGreaterThan(avgGhostVel * 2.0); // Expecting at least 2x difference
         expect(kickHits / totalBars).toBeGreaterThan(1.8);
     });
+
+    it('should keep high-intensity train-beat hats articulate instead of fully washing open', () => {
+        const numBars = 32;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.85 },
+            groove: { creativity: true, genreFeel: 'Country' },
+        });
+
+        let openHits = 0;
+        let totalHatBeats = 0;
+
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                if (stepData.loopStep % 4 === 0) {
+                    totalHatBeats++;
+                    if (stepData.instruments.Open) {
+                        openHits++;
+                    }
+                }
+            });
+        });
+
+        const openRatio = openHits / (totalHatBeats || 1);
+        console.log(
+            `[Country Hats] Open ratio at high intensity: ${(openRatio * 100).toFixed(1)}%`,
+        );
+
+        expect(openRatio).toBeLessThan(0.4);
+    });
 });

@@ -219,6 +219,9 @@ export function syncWorker(action, payload) {
         case 'UPDATE_SB':
             data.soloist = payload;
             break;
+        case 'UPDATE_GB':
+            data.groove = payload;
+            break;
         case 'SET_PARAM':
             if (payload.module) {
                 /** @type {any} */ (data)[payload.module] = { [payload.param]: payload.value };

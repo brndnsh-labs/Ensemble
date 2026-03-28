@@ -100,6 +100,9 @@ describe('Conductor Logic', () => {
         conductor.formIteration = 0;
         conductor.loopCount = 0;
 
+        groove.fillMap = null;
+        groove.orchestrationMap = null;
+        groove.seedTimelineStartStep = 0;
         arranger.totalSteps = 16;
         arranger.stepMap = [{ start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'A' } }];
     });
@@ -250,6 +253,36 @@ describe('Conductor Logic', () => {
             conductor.formIteration = 0;
             checkSectionTransition(getState(), 0, 16, dispatch);
             expect(conductor.formIteration).toBeGreaterThan(0);
+        });
+
+        it('should prefer seeded fills over procedural fallback when a drum plan is present', () => {
+            groove.enabled = true;
+            groove.fillMap = {
+                0: { steps: { 0: [{ name: 'Snare', vel: 0.9 }] }, length: 16, crash: false },
+            };
+            groove.orchestrationMap = [
+                { start: 0, end: 16, energyLevel: 0.3 },
+                { start: 16, end: 32, energyLevel: 0.7 },
+            ];
+            groove.seedTimelineStartStep = 0;
+            arranger.totalSteps = 32;
+            arranger.stepMap = [
+                { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
+                { start: 16, end: 32, chord: { sectionId: 's2', sectionLabel: 'Chorus' } },
+            ];
+            arranger.sections = [
+                { id: 's1', seamless: false },
+                { id: 's2', seamless: false },
+            ];
+
+            checkSectionTransition(getState(), 0, 16, dispatch);
+
+            expect(dispatch).toHaveBeenCalledWith('TRIGGER_FILL', {
+                steps: { 0: [{ name: 'Snare', vel: 0.9 }] },
+                startStep: 0,
+                length: 16,
+                crash: false,
+            });
         });
 
         it('should adhere to the Grand Story macro-arc cycles', () => {

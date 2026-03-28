@@ -319,10 +319,43 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
         return;
     }
     const modStep = currentStep % total;
+    const seedTimelineStartStep = groove.seedTimelineStartStep || 0;
+    const seedTimelineStep = currentStep - seedTimelineStartStep;
+    const seededTimelineEnd =
+        groove.orchestrationMap?.[groove.orchestrationMap.length - 1]?.end || 0;
+    const seededTimelineActive =
+        seedTimelineStep >= 0 && (!seededTimelineEnd || seedTimelineStep < seededTimelineEnd);
 
     // Trigger major transitions (fills/intensity updates) only at the start of a measure.
     // We want to trigger when the measure about to be scheduled is the LAST measure of a section or the loop.
     if (modStep % stepsPerMeasure === 0) {
+        const seededFill = seededTimelineActive ? groove.fillMap?.[seedTimelineStep] : null;
+        const nextSeededOrchestration =
+            seededTimelineActive && groove.orchestrationMap
+                ? binarySearchMap(groove.orchestrationMap, seedTimelineStep + stepsPerMeasure)
+                : null;
+
+        if (seededFill && !groove.fillActive) {
+            dispatch(ACTIONS.TRIGGER_FILL, {
+                steps: seededFill.steps,
+                startStep: currentStep,
+                length: seededFill.length,
+                crash: seededFill.crash,
+            });
+
+            if (playback.visualFlash) {
+                triggerFlash(0.25);
+            }
+        }
+
+        if (playback.autoIntensity && nextSeededOrchestration?.energyLevel !== undefined) {
+            const targetEnergy = Math.max(0.1, Math.min(1.0, nextSeededOrchestration.energyLevel));
+            dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
+                targetIntensity: targetEnergy,
+                stepSize: (targetEnergy - playback.bandIntensity) / stepsPerMeasure,
+            });
+        }
+
         const measureEnd = modStep + stepsPerMeasure;
 
         // We look at the chord at the END of the measure to see if we are transitioning.
@@ -413,146 +446,153 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
             }
 
             if (shouldFill) {
-                let targetEnergy = 0.5;
-                const currentInt = playback.bandIntensity;
+                let targetEnergy = nextSeededOrchestration?.energyLevel;
 
-                // --- 1. THE MACRO-ARC ---
-                let macroFloor = 0.2,
-                    macroCeiling = 0.6;
+                if (targetEnergy === undefined) {
+                    targetEnergy = 0.5;
+                    const currentInt = playback.bandIntensity;
 
-                // Priority: SESSION TIMER ARC
-                if (playback.sessionTimer > 0 && playback.sessionStartTime > 0) {
-                    const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
-                    const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
-
-                    if (progress < 0.15) {
-                        // Initial (0-15%)
-                        macroFloor = 0.2;
-                        macroCeiling = 0.45;
-                    } else if (progress < 0.4) {
-                        // Building (15-40%)
-                        macroFloor = 0.4;
-                        macroCeiling = 0.7;
-                    } else if (progress < 0.65) {
-                        // The Pocket (40-65%)
-                        macroFloor = 0.5;
-                        macroCeiling = 0.8;
-                    } else if (progress < 0.85) {
-                        // Climax (65-85%)
-                        macroFloor = 0.7;
-                        macroCeiling = 1.0;
-                    } else {
-                        // Cool Down (85-100%)
-                        macroFloor = 0.2;
-                        macroCeiling = 0.5;
-                    }
-                } else {
-                    // Fallback: Repetition-Based Logic (5+ Minute Jam Logic)
-                    const grandCycle = conductor.formIteration % 8;
-                    if (grandCycle === 0) {
-                        macroFloor = 0.15;
-                        macroCeiling = 0.45;
-                    } else if (grandCycle < 3) {
-                        macroFloor = 0.35;
-                        macroCeiling = 0.75;
-                    } else if (grandCycle < 5) {
-                        macroFloor = 0.6;
-                        macroCeiling = 1.0;
-                    } else if (grandCycle < 7) {
-                        macroFloor = 0.3;
+                    // --- 1. THE MACRO-ARC ---
+                    let macroFloor = 0.2,
                         macroCeiling = 0.6;
-                    } else {
-                        macroFloor = 0.1;
-                        macroCeiling = 0.35;
-                    }
-                }
 
-                // --- 2. THE LOCAL FUNCTIONAL ROLE ---
-                if (conductor.form && /** @type {any} */ (conductor.form).sections) {
-                    const nextSection = /** @type {any} */ (conductor.form).sections.find(
-                        (/** @type {any} */ s) =>
-                            s.id === /** @type {any} */ (nextEntry.chord).sectionId,
-                    );
-                    if (nextSection) {
-                        const role = nextSection.role;
-                        switch (role) {
-                            case 'Exposition':
-                                targetEnergy = macroFloor + 0.1;
-                                break;
-                            case 'Development':
-                                targetEnergy = (macroFloor + macroCeiling) / 2 + 0.1;
-                                break;
-                            case 'Contrast':
-                                targetEnergy =
-                                    currentInt > (macroFloor + macroCeiling) / 2
-                                        ? macroFloor
-                                        : macroCeiling;
-                                break;
-                            case 'Build':
-                                targetEnergy = macroCeiling;
-                                break;
-                            case 'Climax':
-                                targetEnergy = macroCeiling + 0.1;
-                                break;
-                            case 'Recapitulation':
-                                targetEnergy = macroFloor + 0.2;
-                                break;
-                            case 'Resolution':
-                                targetEnergy = macroFloor - 0.1;
-                                break;
-                            default:
-                                targetEnergy = getSectionEnergy(nextSection.label);
+                    // Priority: SESSION TIMER ARC
+                    if (playback.sessionTimer > 0 && playback.sessionStartTime > 0) {
+                        const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
+                        const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
+
+                        if (progress < 0.15) {
+                            macroFloor = 0.2;
+                            macroCeiling = 0.45;
+                        } else if (progress < 0.4) {
+                            macroFloor = 0.4;
+                            macroCeiling = 0.7;
+                        } else if (progress < 0.65) {
+                            macroFloor = 0.5;
+                            macroCeiling = 0.8;
+                        } else if (progress < 0.85) {
+                            macroFloor = 0.7;
+                            macroCeiling = 1.0;
+                        } else {
+                            macroFloor = 0.2;
+                            macroCeiling = 0.5;
                         }
-                        if (nextSection.flux > 2.6) {
-                            targetEnergy += 0.1;
+                    } else {
+                        // Fallback: Repetition-Based Logic (5+ Minute Jam Logic)
+                        const grandCycle = conductor.formIteration % 8;
+                        if (grandCycle === 0) {
+                            macroFloor = 0.15;
+                            macroCeiling = 0.45;
+                        } else if (grandCycle < 3) {
+                            macroFloor = 0.35;
+                            macroCeiling = 0.75;
+                        } else if (grandCycle < 5) {
+                            macroFloor = 0.6;
+                            macroCeiling = 1.0;
+                        } else if (grandCycle < 7) {
+                            macroFloor = 0.3;
+                            macroCeiling = 0.6;
+                        } else {
+                            macroFloor = 0.1;
+                            macroCeiling = 0.35;
                         }
-                        if (nextSection.iteration === 2) {
-                            targetEnergy += 0.1;
-                        } else if (nextSection.iteration >= 3) {
-                            targetEnergy -= 0.15;
+                    }
+
+                    // --- 2. THE LOCAL FUNCTIONAL ROLE ---
+                    if (conductor.form && /** @type {any} */ (conductor.form).sections) {
+                        const nextSection = /** @type {any} */ (conductor.form).sections.find(
+                            (/** @type {any} */ s) =>
+                                s.id === /** @type {any} */ (nextEntry.chord).sectionId,
+                        );
+                        if (nextSection) {
+                            const role = nextSection.role;
+                            switch (role) {
+                                case 'Exposition':
+                                    targetEnergy = macroFloor + 0.1;
+                                    break;
+                                case 'Development':
+                                    targetEnergy = (macroFloor + macroCeiling) / 2 + 0.1;
+                                    break;
+                                case 'Contrast':
+                                    targetEnergy =
+                                        currentInt > (macroFloor + macroCeiling) / 2
+                                            ? macroFloor
+                                            : macroCeiling;
+                                    break;
+                                case 'Build':
+                                    targetEnergy = macroCeiling;
+                                    break;
+                                case 'Climax':
+                                    targetEnergy = macroCeiling + 0.1;
+                                    break;
+                                case 'Recapitulation':
+                                    targetEnergy = macroFloor + 0.2;
+                                    break;
+                                case 'Resolution':
+                                    targetEnergy = macroFloor - 0.1;
+                                    break;
+                                default:
+                                    targetEnergy = getSectionEnergy(nextSection.label);
+                            }
+                            if (nextSection.flux > 2.6) {
+                                targetEnergy += 0.1;
+                            }
+                            if (nextSection.iteration === 2) {
+                                targetEnergy += 0.1;
+                            } else if (nextSection.iteration >= 3) {
+                                targetEnergy -= 0.15;
+                            }
+                        } else {
+                            targetEnergy = getSectionEnergy(
+                                /** @type {any} */ (nextEntry.chord).sectionLabel,
+                            );
                         }
                     } else {
                         targetEnergy = getSectionEnergy(
                             /** @type {any} */ (nextEntry.chord).sectionLabel,
                         );
                     }
+
+                    targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
+                    targetEnergy += Math.random() * 0.15 - 0.075;
+
+                    // Genre-specific floors for auto-intensity
+                    if (groove.genreFeel === 'Rock' || groove.genreFeel === 'Metal') {
+                        targetEnergy = Math.max(0.35, targetEnergy);
+                    }
+
+                    targetEnergy = Math.max(0.1, Math.min(1.0, targetEnergy));
+
+                    if (isLoopEnd && playback.autoIntensity) {
+                        targetEnergy = Math.max(
+                            0.3,
+                            Math.min(0.95, targetEnergy + (Math.random() * 0.2 - 0.1)),
+                        );
+                    }
                 } else {
-                    targetEnergy = getSectionEnergy(
-                        /** @type {any} */ (nextEntry.chord).sectionLabel,
+                    targetEnergy = Math.max(0.1, Math.min(1.0, targetEnergy));
+                }
+
+                const shouldUseProceduralFallback =
+                    !groove.fillMap ||
+                    !seededTimelineActive ||
+                    seedTimelineStep >= seededTimelineEnd;
+                if (shouldUseProceduralFallback) {
+                    const fillSteps = generateProceduralFill(
+                        groove.genreFeel,
+                        playback.bandIntensity,
+                        stepsPerMeasure,
                     );
-                }
+                    dispatch(ACTIONS.TRIGGER_FILL, {
+                        steps: fillSteps,
+                        startStep: currentStep,
+                        length: stepsPerMeasure,
+                        crash: true,
+                    });
 
-                targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
-                targetEnergy += Math.random() * 0.15 - 0.075;
-
-                // Genre-specific floors for auto-intensity
-                if (groove.genreFeel === 'Rock' || groove.genreFeel === 'Metal') {
-                    targetEnergy = Math.max(0.35, targetEnergy);
-                }
-
-                targetEnergy = Math.max(0.1, Math.min(1.0, targetEnergy));
-
-                if (isLoopEnd && playback.autoIntensity) {
-                    targetEnergy = Math.max(
-                        0.3,
-                        Math.min(0.95, targetEnergy + (Math.random() * 0.2 - 0.1)),
-                    );
-                }
-
-                const fillSteps = generateProceduralFill(
-                    groove.genreFeel,
-                    playback.bandIntensity,
-                    stepsPerMeasure,
-                );
-                dispatch(ACTIONS.TRIGGER_FILL, {
-                    steps: fillSteps,
-                    startStep: currentStep,
-                    length: stepsPerMeasure,
-                    crash: true,
-                });
-
-                if (playback.visualFlash) {
-                    triggerFlash(0.25);
+                    if (playback.visualFlash) {
+                        triggerFlash(0.25);
+                    }
                 }
 
                 if (playback.autoIntensity) {

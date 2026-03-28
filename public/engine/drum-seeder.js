@@ -54,6 +54,17 @@ export function generateDrumOrchestration(_state, arranger, _style, intensity, s
 
     sectionMap.forEach((sectionRange, index) => {
         const label = (sectionRange.label || 'Verse').toLowerCase();
+        const sourceLabels = Array.isArray(sectionRange.sourceLabels)
+            ? /** @type {string[]} */ (sectionRange.sourceLabels)
+            : [sectionRange.label || ''];
+        const hasActualIntroLikeLabel = sourceLabels.some((sourceLabel) => {
+            const normalized = String(sourceLabel).toLowerCase();
+            return (
+                normalized.includes('intro') ||
+                normalized.includes('break') ||
+                normalized.includes('breakdown')
+            );
+        });
         const role = label.includes('intro')
             ? 'Intro'
             : label.includes('chorus') || label.includes('drop')
@@ -105,11 +116,16 @@ export function generateDrumOrchestration(_state, arranger, _style, intensity, s
 
         if (isRockFeel) {
             // Rock almost ALWAYS uses a full snare for the backbeat.
-            // Only use Sidestick in very quiet Intros or breakdowns.
-            if (energyLevel < 0.25 && role === 'Intro') {
+            // Only use Sidestick in very quiet ACTUAL intros or breakdowns,
+            // not just because the macro-form treats the first pass as an intro.
+            if (energyLevel <= 0.12 && hasActualIntroLikeLabel) {
                 snareVoice = 'Sidestick';
-            } else if (role === 'Intro' && energyLevel < 0.15) {
-                snareVoice = 'None';
+            }
+        } else if (_style === 'Disco') {
+            // Even at medium energy, Disco needs a clear snare backbeat.
+            // Reserve sidestick only for truly low-energy intros.
+            if (energyLevel < 0.2 && role === 'Intro') {
+                snareVoice = 'Sidestick';
             }
         } else {
             // Standard logic for Jazz/Bossa/Funk/Acoustic
@@ -172,6 +188,7 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
     const prng = createPRNG(seedStr || generateRandomSeed());
     /** @type {Record<number, FillMapEntry>} */
     const fillMap = {};
+    const isVirtualMacroForm = unrolled.totalSteps !== unrolled.originalSteps;
 
     const tsConfig =
         /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -181,14 +198,26 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
     const orchestrationMap = generateDrumOrchestration(state, arranger, genre, intensity, seedStr);
 
     sectionMap.forEach((sectionRange, index) => {
-        // Only consider fills at the end of sections
-        if (index === sectionMap.length - 1) {
+        // Keep the generated "Outro" quiet at the end of virtual macro form.
+        if (isVirtualMacroForm && index === sectionMap.length - 1) {
             return;
         }
 
-        const nextSection = sectionMap[index + 1];
+        const nextIndex = index === sectionMap.length - 1 ? 0 : index + 1;
+        const nextSection = sectionMap[nextIndex];
         const currentOrch = orchestrationMap[index];
-        const nextOrch = orchestrationMap[index + 1];
+        const nextOrch = orchestrationMap[nextIndex];
+
+        if (!currentOrch || !nextOrch || !nextSection) {
+            return;
+        }
+
+        const nextArrangerSection = arranger.sections?.find(
+            (/** @type {any} */ section) => section.id === nextSection.id,
+        );
+        if (nextArrangerSection?.seamless) {
+            return;
+        }
 
         // 1. Decide if we need a fill
         // Probability scales with overall intensity and "creativity" setting (if passed)

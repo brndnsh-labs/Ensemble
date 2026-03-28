@@ -58,6 +58,31 @@ describe('Drum Seeder', () => {
         }
     });
 
+    it('should skip fills into seamless sections', () => {
+        const seamlessArranger = {
+            ...mockArranger,
+            sections: [
+                { id: 's1', seamless: false },
+                { id: 's2', seamless: true },
+                { id: 's3', seamless: false },
+                { id: 's4', seamless: false },
+                { id: 's5', seamless: false },
+                { id: 's6', seamless: false },
+            ],
+            sectionMap: [
+                { id: 's1', start: 0, end: 64, label: 'Intro' },
+                { id: 's2', start: 64, end: 128, label: 'Verse 1' },
+                { id: 's3', start: 128, end: 192, label: 'Chorus 1' },
+                { id: 's4', start: 192, end: 256, label: 'Bridge' },
+                { id: 's5', start: 256, end: 320, label: 'Chorus 2' },
+                { id: 's6', start: 320, end: 384, label: 'Outro' },
+            ],
+        };
+        const map = generateDrumFills(mockState, seamlessArranger, 'Rock', 1.0, 'SEAMLESS');
+
+        expect(map[48]).toBeUndefined();
+    });
+
     it('should catch soloist accents deterministically', () => {
         const soloistSeed = {
             notes: [
@@ -115,11 +140,62 @@ describe('Drum Seeder', () => {
     });
 
     it('should select appropriate voices for sections', () => {
-        const map = generateDrumOrchestration(mockState, mockArranger, 'Rock', 0.2, 'SOFT');
+        const hookArranger = {
+            timeSignature: '4/4',
+            totalSteps: 256,
+            stepMap: [
+                { start: 0, end: 64, chord: { sectionId: 'a1', sectionLabel: 'A' } },
+                { start: 64, end: 128, chord: { sectionId: 'b1', sectionLabel: 'B' } },
+                { start: 128, end: 192, chord: { sectionId: 'a2', sectionLabel: 'A' } },
+                { start: 192, end: 256, chord: { sectionId: 'b2', sectionLabel: 'B' } },
+            ],
+            sectionMap: [
+                { id: 'a1', start: 0, end: 64, label: 'A' },
+                { id: 'b1', start: 64, end: 128, label: 'B' },
+                { id: 'a2', start: 128, end: 192, label: 'A' },
+                { id: 'b2', start: 192, end: 256, label: 'B' },
+            ],
+        };
+        const map = generateDrumOrchestration(mockState, hookArranger, 'Rock', 0.2, 'SOFT');
         const intro = map.find((m) => m.start === 0);
 
-        // Low energy intro should probably have sidestick or no snare
-        expect(['Sidestick', 'None']).toContain(intro.snareVoice);
+        // Without an explicit intro/breakdown label in the source material,
+        // rock should keep a real backbeat even on the first macro-form pass.
+        expect(intro.snareVoice).toBe('Snare');
+    });
+
+    it('should reserve rock sidestick for explicit low-intensity intro material', () => {
+        const quietIntroArranger = {
+            timeSignature: '4/4',
+            totalSteps: 64,
+            stepMap: [{ start: 0, end: 64, chord: { sectionId: 'intro', sectionLabel: 'Intro' } }],
+            sectionMap: [{ id: 'intro', start: 0, end: 64, label: 'Intro' }],
+        };
+        const map = generateDrumOrchestration(mockState, quietIntroArranger, 'Rock', 0.2, 'QUIET');
+
+        expect(map[0].snareVoice).toBe('Sidestick');
+    });
+
+    it('should keep disco on full snare at medium verse energy', () => {
+        const hookArranger = {
+            timeSignature: '4/4',
+            totalSteps: 256,
+            stepMap: [
+                { start: 0, end: 64, chord: { sectionId: 'a1', sectionLabel: 'A' } },
+                { start: 64, end: 128, chord: { sectionId: 'b1', sectionLabel: 'B' } },
+                { start: 128, end: 192, chord: { sectionId: 'a2', sectionLabel: 'A' } },
+                { start: 192, end: 256, chord: { sectionId: 'b2', sectionLabel: 'B' } },
+            ],
+            sectionMap: [
+                { id: 'a1', start: 0, end: 64, label: 'A' },
+                { id: 'b1', start: 64, end: 128, label: 'B' },
+                { id: 'a2', start: 128, end: 192, label: 'A' },
+                { id: 'b2', start: 192, end: 256, label: 'B' },
+            ],
+        };
+        const map = generateDrumOrchestration(mockState, hookArranger, 'Disco', 0.55, 'DISCO');
+
+        expect(map[0].snareVoice).toBe('Snare');
     });
 
     it('should handle missing sections gracefully', () => {

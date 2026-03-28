@@ -130,9 +130,11 @@ export function applyGrooveOverrides(
     const barIndex = Math.floor(step / stepsPerBar);
     const prevBarIndex = Math.floor((step - 1) / stepsPerBar);
     const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
+    const seedTimelineStartStep = groove.seedTimelineStartStep || 0;
+    const timelineStep = step - seedTimelineStartStep;
 
     const orchestration = groove.orchestrationMap
-        ? binarySearchMap(groove.orchestrationMap, step)
+        ? binarySearchMap(groove.orchestrationMap, timelineStep)
         : null;
     const effectiveComplexity =
         orchestration?.motifComplexity !== undefined
@@ -214,7 +216,7 @@ export function applyGrooveOverrides(
     }
 
     // --- Phase 3: Soloist Accent Catching ---
-    const accent = groove.accentMap?.[step];
+    const accent = timelineStep >= 0 ? groove.accentMap?.[timelineStep] : null;
     if (accent) {
         if (accent.type === 'crash-catch') {
             if (inst.name === 'Kick') {

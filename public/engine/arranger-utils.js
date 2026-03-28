@@ -62,6 +62,18 @@ export function unrollArrangement(arranger, targetBars = 64) {
             roleLabel = 'Solo';
         }
 
+        const sourceLabels = Array.from(
+            new Set(
+                (arranger.stepMap || []).map((entry) => {
+                    const chord =
+                        /** @type {{ sectionLabel?: string, sectionId?: string } | undefined} */ (
+                            entry?.chord
+                        );
+                    return chord?.sectionLabel || chord?.sectionId || roleLabel;
+                }),
+            ),
+        );
+
         // Clone Step Map
         arranger.stepMap.forEach((entry) => {
             const steps = entry.end - entry.start;
@@ -82,12 +94,19 @@ export function unrollArrangement(arranger, targetBars = 64) {
             unrolledSectionMap[unrolledSectionMap.length - 1].label === roleLabel
         ) {
             unrolledSectionMap[unrolledSectionMap.length - 1].end = currentStep;
+            unrolledSectionMap[unrolledSectionMap.length - 1].sourceLabels = Array.from(
+                new Set([
+                    ...(unrolledSectionMap[unrolledSectionMap.length - 1].sourceLabels || []),
+                    ...sourceLabels,
+                ]),
+            );
         } else {
             unrolledSectionMap.push({
                 id: `v-loop-${i}`,
                 start: iterationStart,
                 end: currentStep,
                 label: roleLabel,
+                sourceLabels,
             });
         }
     }

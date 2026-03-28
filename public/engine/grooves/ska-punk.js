@@ -82,24 +82,33 @@ export function applyOverrides(context, state) {
 
     // --- 2. HI-HAT / OPEN DYNAMICS ---
     if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
+        const isOpenLane = context.inst.name === 'Open';
         shouldPlay = false;
 
-        // The Skank: Mandatory offbeat focus
+        // The Skank should feel tight and choked first.
+        // Use the Open lane as an accent, not a second mandatory voice.
         if (isOffbeat) {
-            shouldPlay = true;
-            // Offbeats are accented and crisp
-            velocity = scaleVelocity(1.3, intensity, 0.1);
-            if (intensity > 0.7 && roll(0.4)) {
-                soundName = 'Open';
+            if (!isOpenLane) {
+                shouldPlay = true;
+                soundName = 'HiHat';
+                velocity = scaleVelocity(1.3, intensity, 0.1);
+            } else if (intensity > 0.78 && activeMotif >= 1) {
+                const accentChance = beatIndex === 3 ? 0.35 : 0.18;
+                if (roll(accentChance)) {
+                    shouldPlay = true;
+                    soundName = 'Open';
+                    velocity = scaleVelocity(1.1, intensity, 0.08);
+                }
             }
-        } else if (isBeatStart && (activeMotif >= 1 || intensity > 0.6)) {
-            // Keep the eighth notes moving for punk motifs
+        } else if (!isOpenLane && isBeatStart && (activeMotif >= 1 || intensity > 0.6)) {
+            // Keep the eighth notes moving for punk motifs with closed hats.
             shouldPlay = true;
+            soundName = 'HiHat';
             velocity = scaleVelocity(0.8, intensity, 0.1);
         }
 
         // Crash on the One for section energy
-        if (isDownbeat && intensity > 0.8 && roll(0.4)) {
+        if (isOpenLane && isDownbeat && intensity > 0.8 && roll(0.4)) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.4;

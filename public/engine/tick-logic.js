@@ -418,6 +418,7 @@ export function applyWorkerTransition(state, step, conductorState) {
     }
 
     const modStep = step % arranger.totalSteps;
+    const timelineStep = step - (groove.seedTimelineStartStep || 0);
 
     if (modStep === 0 && step > 0) {
         conductorState.loopCount++;
@@ -431,8 +432,8 @@ export function applyWorkerTransition(state, step, conductorState) {
     }
 
     // --- Phase 2: Thematic Fill Memory ---
-    if (groove.fillMap?.[modStep]) {
-        const fillData = groove.fillMap[modStep];
+    if (timelineStep >= 0 && groove.fillMap?.[timelineStep]) {
+        const fillData = groove.fillMap[timelineStep];
         groove.fillSteps = fillData.steps; // @worker-mutation
         groove.fillActive = true; // @worker-mutation
         groove.fillStartStep = step; // @worker-mutation

@@ -33,20 +33,52 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(studio.locator('.workspace-group-header')).toHaveCount(0);
 
         const genreButton = studio.locator('.workspace-studio-genre-button');
-        const initialGenre = (
+        const initialGenreValue = (
             await studio.locator('.workspace-studio-genre-button-value').textContent()
         )?.trim();
+        const initialGenre = initialGenreValue?.split('·')[0].trim();
         await genreButton.click();
         const desktopGenreSurface = page.locator('.workspace-studio-surface--genre.is-open');
         await expect(desktopGenreSurface).toBeVisible();
         await expect(desktopGenreSurface.locator('.workspace-studio-genre-option')).toHaveCount(13);
+        const autoIntensityToggle = desktopGenreSurface.locator('#bandFeelAutoIntensityToggle');
+        const autoIntensitySwitch = desktopGenreSurface.locator('label.toggle-switch').first();
+        const bandIntensitySlider = desktopGenreSurface.locator('#bandFeelIntensitySlider');
+        await expect(autoIntensityToggle).toBeChecked();
+        await expect(bandIntensitySlider).toBeDisabled();
         const desktopGenreBox = await desktopGenreSurface.boundingBox();
         expect(desktopGenreBox).not.toBeNull();
         expect(desktopGenreBox.x).toBeGreaterThanOrEqual(0);
         expect(desktopGenreBox.x + desktopGenreBox.width).toBeLessThanOrEqual(1440);
         await desktopGenreSurface.getByRole('button', { name: 'Jazz' }).click();
-        await expect(studio.locator('.workspace-studio-genre-button-value')).toHaveText('Jazz');
+        await expect(studio.locator('.workspace-studio-genre-button-value')).toContainText('Jazz');
         await genreButton.click();
+        await autoIntensitySwitch.click();
+        await expect(autoIntensityToggle).not.toBeChecked();
+        await expect(bandIntensitySlider).toBeEnabled();
+        await bandIntensitySlider.evaluate((element) => {
+            element.value = '60';
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        await expect(studio.locator('.workspace-studio-genre-button-value')).toContainText('60%');
+        await expect
+            .poll(() =>
+                page.evaluate(() => {
+                    const { playback } = window.ensemble.getState();
+                    return {
+                        bandIntensity: playback.bandIntensity,
+                        autoIntensity: playback.autoIntensity,
+                    };
+                }),
+            )
+            .toEqual({
+                bandIntensity: 0.6,
+                autoIntensity: false,
+            });
+        await autoIntensitySwitch.click();
+        await expect(autoIntensityToggle).toBeChecked();
+        await expect(bandIntensitySlider).toBeDisabled();
+        await expect(studio.locator('.workspace-studio-genre-button-value')).toContainText('Auto');
         await desktopGenreSurface.getByRole('button', { name: initialGenre || 'Rock' }).click();
 
         const bassRow = studio.locator('#panel-bass');

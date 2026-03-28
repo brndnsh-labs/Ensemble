@@ -137,7 +137,14 @@ export function applyOverrides(context, state) {
             if (isBeatStart) {
                 shouldPlay = true;
                 velocity = 0.75;
-                soundName = intensity > 0.75 ? 'Open' : 'HiHat';
+                soundName = 'HiHat';
+
+                // Let the phrase lift on beat 4 at peak intensity,
+                // but avoid turning the whole train beat into an open-hat wash.
+                if (intensity > 0.82 && beatIndex === 3) {
+                    soundName = 'Open';
+                    velocity = 0.85;
+                }
             }
         }
     }

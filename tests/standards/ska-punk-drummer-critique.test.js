@@ -129,4 +129,29 @@ describe('Ska-Punk Drummer Critique', () => {
         // Punk beats are dense (2-step or double-time)
         expect(snaresPerBar).toBeGreaterThanOrEqual(2.0);
     });
+
+    it('should keep high-intensity hats mostly tight, with opens used as accents', () => {
+        const performance = simulatePerformance(32, { playback: { bandIntensity: 0.85 } });
+
+        let openHits = 0;
+        let totalHatHits = 0;
+
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                if (stepData.instruments.HiHat || stepData.instruments.Open) {
+                    totalHatHits++;
+                }
+                if (stepData.instruments.Open) {
+                    openHits++;
+                }
+            });
+        });
+
+        const openRatio = openHits / (totalHatHits || 1);
+        console.log(
+            `[Ska-Punk Critique] Open-hat ratio at high intensity: ${openRatio.toFixed(2)}`,
+        );
+
+        expect(openRatio).toBeLessThan(0.35);
+    });
 });

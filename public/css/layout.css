@@ -1818,6 +1818,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface--settings .setting-group,
+.workspace-studio-surface--band-feel .setting-group,
 .workspace-studio-surface-card {
     margin: 0;
     padding: 0.8rem;
@@ -1827,7 +1828,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     box-shadow: var(--shadow-sm);
 }
 
-.workspace-studio-surface--settings .setting-group:last-child {
+.workspace-studio-surface--settings .setting-group:last-child,
+.workspace-studio-surface--band-feel .setting-group:last-child {
     margin: 0;
     padding: 0.8rem;
     border-radius: 18px;
@@ -1835,11 +1837,13 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     background: var(--input-bg);
 }
 
-[data-theme="light"] .workspace-studio-surface--settings .setting-group:last-child {
+[data-theme="light"] .workspace-studio-surface--settings .setting-group:last-child,
+[data-theme="light"] .workspace-studio-surface--band-feel .setting-group:last-child {
     background: var(--input-bg);
 }
 
-.workspace-studio-surface--settings .setting-group-title {
+.workspace-studio-surface--settings .setting-group-title,
+.workspace-studio-surface--band-feel .setting-group-title {
     font-size: 0.68rem;
     margin-bottom: 0.55rem;
     padding-bottom: 0.3rem;
@@ -1849,7 +1853,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     border-bottom: 1px solid color-mix(in srgb, var(--studio-surface-accent), transparent 82%);
 }
 
-.workspace-studio-surface--settings .setting-row {
+.workspace-studio-surface--settings .setting-row,
+.workspace-studio-surface--band-feel .setting-row {
     margin-bottom: 0.35rem;
     min-height: 0;
     gap: 0.45rem;
@@ -1860,12 +1865,14 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     font-size: 0.76rem;
 }
 
-.workspace-studio-surface--settings .setting-info {
+.workspace-studio-surface--settings .setting-info,
+.workspace-studio-surface--band-feel .setting-info {
     min-width: 0;
     width: 100%;
 }
 
-.workspace-studio-surface--settings .setting-control {
+.workspace-studio-surface--settings .setting-control,
+.workspace-studio-surface--band-feel .setting-control {
     min-width: 0;
     flex: 1 1 auto;
     width: 100%;
@@ -1873,12 +1880,14 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     flex-wrap: wrap;
 }
 
-.workspace-studio-surface--settings .setting-value-display {
+.workspace-studio-surface--settings .setting-value-display,
+.workspace-studio-surface--band-feel .setting-value-display {
     font-size: 0.74rem;
     min-width: 2.4rem;
 }
 
-.workspace-studio-surface--settings input[type="range"] {
+.workspace-studio-surface--settings input[type="range"],
+.workspace-studio-surface--band-feel input[type="range"] {
     width: 100%;
     min-width: 9rem;
     flex: 1 1 12rem;
@@ -1890,7 +1899,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     height: 32px;
 }
 
-.workspace-studio-surface--settings .setting-control > select {
+.workspace-studio-surface--settings .setting-control > select,
+.workspace-studio-surface--band-feel .setting-control > select {
     width: 100%;
     min-width: 0;
     flex: 1 1 12rem;

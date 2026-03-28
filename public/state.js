@@ -177,7 +177,9 @@ export function getSyncState() {
             variations: groove.variations,
             measures: groove.measures,
             orchestrationMap: groove.orchestrationMap,
+            fillMap: groove.fillMap,
             accentMap: groove.accentMap,
+            seedTimelineStartStep: groove.seedTimelineStartStep,
             instruments: groove.instruments.map((/** @type {any} */ i) => ({
                 name: i.name,
                 steps: [...i.steps],

@@ -74,6 +74,7 @@ export function handleEffects(action, payload, stateMap, context = {}) {
                         orchestrationMap: drumOrchGenerated,
                         fillMap: drumFillsGenerated,
                         accentMap: drumAccentsGenerated,
+                        seedTimelineStartStep: playback.step || 0,
                     });
                 }
             } else {
@@ -82,6 +83,7 @@ export function handleEffects(action, payload, stateMap, context = {}) {
                     orchestrationMap: null,
                     fillMap: null,
                     accentMap: null,
+                    seedTimelineStartStep: 0,
                 });
             }
             togglePlay(stateMap, true, dispatch);
@@ -133,6 +135,7 @@ export function handleEffects(action, payload, stateMap, context = {}) {
                         orchestrationMap: drumOrchGenerated,
                         fillMap: drumFillsGenerated,
                         accentMap: drumAccentsGenerated,
+                        seedTimelineStartStep: stateMap.playback.step || 0,
                     });
                 }
             }

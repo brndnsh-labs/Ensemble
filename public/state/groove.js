@@ -54,6 +54,7 @@ import { ACTIONS } from '../types.js';
  * @property {Array<any>|null} orchestrationMap - Pre-calculated section orchestration map.
  * @property {Record<number, any>|null} fillMap - Pre-calculated song-wide fill map.
  * @property {Record<number, any>|null} accentMap - Pre-calculated soloist accent catching map.
+ * @property {number} seedTimelineStartStep - Absolute playback step when the current seed maps were generated.
  * @property {Array<any>|null} variations - Pre-calculated pattern variations for the current preset.
  * @property {Map<number, any>} buffer - Map of scheduled drum events.
  */
@@ -97,6 +98,7 @@ export const groove = deepSignal({
     orchestrationMap: null,
     fillMap: null,
     accentMap: null,
+    seedTimelineStartStep: 0,
     fillActive: false,
     fillSteps: {},
     buffer: new Map(),
@@ -157,6 +159,7 @@ export function grooveReducer(action, payload, playback) {
             groove.orchestrationMap = null;
             groove.fillMap = null;
             groove.accentMap = null;
+            groove.seedTimelineStartStep = 0;
             groove.lastHatGain = null;
             groove.lastRideGain = null;
             groove.lastCrashGain = null;

@@ -8,6 +8,7 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { syncWorker } from '../worker-client.js';
 import { InstrumentSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
+import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
 
@@ -76,6 +77,22 @@ function setGenre(genreName) {
     dispatch(ACTIONS.SET_GENRE_FEEL, payload);
     syncWorker(ACTIONS.SET_GENRE_FEEL, payload);
     saveCurrentState();
+}
+
+/**
+ * @param {number} bandIntensity
+ */
+function formatBandIntensity(bandIntensity) {
+    return `${Math.round(bandIntensity * 100)}%`;
+}
+
+/**
+ * @param {string} activeGenre
+ * @param {boolean} autoIntensity
+ * @param {number} bandIntensity
+ */
+function getBandFeelValue(activeGenre, autoIntensity, bandIntensity) {
+    return `${activeGenre} · ${autoIntensity ? 'Auto' : formatBandIntensity(bandIntensity)}`;
 }
 
 /**
@@ -191,7 +208,8 @@ function StudioSurface({
                 anchorElement?.getBoundingClientRect() || document.body.getBoundingClientRect();
             const viewportPadding = 16;
             const isGenreSurface = className.includes('--genre');
-            const preferredWidth = isGenreSurface ? 360 : 560;
+            const isBandFeelSurface = className.includes('--band-feel');
+            const preferredWidth = isBandFeelSurface ? 420 : isGenreSurface ? 360 : 560;
             const maxWidth = window.innerWidth - viewportPadding * 2;
             const width = Math.min(preferredWidth, maxWidth);
             const measuredHeight = surface.offsetHeight || 0;
@@ -278,16 +296,20 @@ function StudioSurface({
 /**
  * @param {{
  *   activeGenre: string,
+ *   autoIntensity: boolean,
  *   anchorElement?: HTMLElement | null,
+ *   bandIntensity: number,
  *   isCompactViewport: boolean,
  *   isOpen: boolean,
  *   onClose: () => void,
  *   onToggle: () => void
  * }} props
  */
-function StudioGenreChooser({
+function StudioBandFeelChooser({
     activeGenre,
+    autoIntensity,
     anchorElement = null,
+    bandIntensity,
     isCompactViewport,
     isOpen,
     onClose,
@@ -304,7 +326,9 @@ function StudioGenreChooser({
                 onClick={onToggle}
             >
                 <span class="workspace-studio-genre-button-label">Band feel</span>
-                <span class="workspace-studio-genre-button-value">{activeGenre}</span>
+                <span class="workspace-studio-genre-button-value">
+                    {getBandFeelValue(activeGenre, autoIntensity, bandIntensity)}
+                </span>
                 <span class="workspace-studio-genre-button-caret" aria-hidden="true">
                     ▾
                 </span>
@@ -312,42 +336,84 @@ function StudioGenreChooser({
             <StudioSurface
                 accent="chords"
                 anchorElement={anchorElement}
-                className="workspace-studio-surface--genre"
+                className="workspace-studio-surface--genre workspace-studio-surface--band-feel"
                 closeLabel="Close band feel menu"
                 isCompactViewport={isCompactViewport}
                 isOpen={isOpen}
                 kicker="Band feel"
                 onClose={onClose}
-                subtitle="Choose the groove language for the whole band."
-                title="Choose groove language"
+                subtitle="Choose the groove language and shared energy for the whole band."
+                title="Shape band feel"
             >
-                <div class="workspace-studio-genre-grid" role="list">
-                    {GENRE_NAMES.map((genreName) => {
-                        const isActive = activeGenre === genreName;
-                        return (
-                            <button
-                                key={genreName}
-                                type="button"
-                                class={`workspace-studio-genre-option ${isActive ? 'active' : ''}`}
-                                aria-pressed={isActive}
-                                onClick={() => {
-                                    setGenre(genreName);
-                                    onClose();
-                                }}
-                            >
-                                <span>{genreName}</span>
-                                {isActive && (
-                                    <span
-                                        class="workspace-studio-genre-option-mark"
-                                        aria-hidden="true"
-                                    >
-                                        ✓
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                <SettingGroup title="Genre">
+                    <div class="workspace-studio-genre-grid" role="list">
+                        {GENRE_NAMES.map((genreName) => {
+                            const isActive = activeGenre === genreName;
+                            return (
+                                <button
+                                    key={genreName}
+                                    type="button"
+                                    class={`workspace-studio-genre-option ${isActive ? 'active' : ''}`}
+                                    aria-pressed={isActive}
+                                    onClick={() => {
+                                        setGenre(genreName);
+                                        onClose();
+                                    }}
+                                >
+                                    <span>{genreName}</span>
+                                    {isActive && (
+                                        <span
+                                            class="workspace-studio-genre-option-mark"
+                                            aria-hidden="true"
+                                        >
+                                            ✓
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </SettingGroup>
+                <SettingGroup title="Energy">
+                    <SettingRow
+                        label="Auto intensity"
+                        id="bandFeelAutoIntensityToggle"
+                        description="Let the conductor shape energy over time."
+                    >
+                        <Toggle
+                            id="bandFeelAutoIntensityToggle"
+                            checked={autoIntensity}
+                            onChange={(value) => {
+                                dispatch(ACTIONS.SET_AUTO_INTENSITY, value);
+                                saveCurrentState();
+                            }}
+                        />
+                    </SettingRow>
+                    <SettingRow
+                        label="Intensity"
+                        id="bandFeelIntensitySlider"
+                        description={
+                            autoIntensity
+                                ? 'Turn off auto to set the band energy manually.'
+                                : 'Sets the shared energy for the whole band.'
+                        }
+                        valueDisplay={formatBandIntensity(bandIntensity)}
+                    >
+                        <Slider
+                            id="bandFeelIntensitySlider"
+                            min="0"
+                            max="100"
+                            step="5"
+                            value={Math.round(bandIntensity * 100)}
+                            disabled={autoIntensity}
+                            onInput={(value) => {
+                                dispatch(ACTIONS.SET_BAND_INTENSITY, parseInt(value, 10) / 100);
+                                saveCurrentState();
+                            }}
+                            ariaValueText={formatBandIntensity(bandIntensity)}
+                        />
+                    </SettingRow>
+                </SettingGroup>
             </StudioSurface>
         </div>
     );
@@ -491,16 +557,17 @@ function StudioSettingsSurface({
 }
 
 function StudioLiveMix() {
-    const { groove, bass, chords, harmony, soloist, activeGenre } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+    const { groove, bass, chords, harmony, soloist, activeGenre, autoIntensity, bandIntensity } =
+        useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
             groove: s.groove.enabled,
             bass: s.bass.enabled,
             chords: s.chords.enabled,
             harmony: s.harmony.enabled,
             soloist: s.soloist.enabled,
             activeGenre: s.groove.lastSmartGenre || s.groove.genreFeel,
-        }),
-    );
+            autoIntensity: s.playback.autoIntensity,
+            bandIntensity: s.playback.bandIntensity,
+        }));
     const [activeSurface, setActiveSurface] = useState(getClosedSurface);
     const isCompactViewport = useIsCompactStudioViewport();
     /** @type {import('preact/hooks').MutableRef<Record<string, HTMLDivElement | null>>} */
@@ -558,9 +625,11 @@ function StudioLiveMix() {
                 <div class="workspace-studio-live-mix-tools">
                     <span class="workspace-studio-active-count">{activeCount}/5 on</span>
                     <div ref={genreTriggerRef}>
-                        <StudioGenreChooser
+                        <StudioBandFeelChooser
                             activeGenre={activeGenre}
+                            autoIntensity={autoIntensity}
                             anchorElement={genreTriggerRef.current}
+                            bandIntensity={bandIntensity}
                             isCompactViewport={isCompactViewport}
                             isOpen={activeSurface.kind === 'genre'}
                             onClose={closeSurface}

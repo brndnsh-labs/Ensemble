@@ -501,6 +501,7 @@
     }
 
     .workspace-view--studio .workspace-studio-surface--settings .setting-group,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-group,
     .workspace-view--studio .workspace-studio-surface-card {
         padding: 0.7rem;
         border-radius: 16px;
@@ -510,33 +511,43 @@
         padding-bottom: 1.75rem;
     }
 
-    .workspace-view--studio .workspace-studio-surface--settings .setting-group-title {
+    .workspace-view--studio .workspace-studio-surface--settings .setting-group-title,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-group-title {
         margin-bottom: 0.45rem;
         padding-bottom: 0.3rem;
         font-size: 0.75rem;
     }
 
-    .workspace-view--studio .workspace-studio-surface--settings .setting-row {
+    .workspace-view--studio .workspace-studio-surface--settings .setting-row,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-row {
         gap: 0.5rem;
         margin-bottom: 0.45rem;
         min-height: 1.8rem;
     }
 
-    .workspace-view--studio .workspace-studio-surface--settings .setting-description {
+    .workspace-view--studio .workspace-studio-surface--settings .setting-description,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-description {
         display: none;
     }
 
-    .workspace-view--studio .workspace-studio-surface--settings .setting-info {
+    .workspace-view--studio .workspace-studio-surface--settings .setting-info,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-info {
         min-width: 0;
     }
 
-    .workspace-view--studio .workspace-studio-surface--settings .setting-control {
+    .workspace-view--studio .workspace-studio-surface--settings .setting-control,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-control {
         gap: 0.4rem;
     }
 
     .workspace-view--studio .workspace-studio-surface--settings .setting-control > select,
+    .workspace-view--studio .workspace-studio-surface--band-feel .setting-control > select,
     .workspace-view--studio
         .workspace-studio-surface--settings
+        .setting-control
+        input[type="range"],
+    .workspace-view--studio
+        .workspace-studio-surface--band-feel
         .setting-control
         input[type="range"] {
         width: clamp(92px, 36vw, 156px);

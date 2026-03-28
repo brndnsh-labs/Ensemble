@@ -19,6 +19,7 @@
         "test:e2e": "npm run build:quiet && npx playwright test",
         "test:coverage": "npx vitest run --coverage",
         "test:bench": "npx vitest run --config vitest.bench.config.js tests/bench",
+        "drums:report": "node scripts/evaluate-groove.js",
         "mix:report": "node scripts/mix-report.js",
         "size": "size-limit",
         "build:size": "npm run build && size-limit",
