@@ -219,9 +219,25 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
             return;
         }
 
+        const currentLabel = String(sectionRange.label || '').toLowerCase();
+        const nextLabel = String(nextSection.label || '').toLowerCase();
+        const energyDelta = nextOrch.energyLevel - currentOrch.energyLevel;
+        const isStructuralChorus = nextLabel.includes('chorus') || nextLabel.includes('drop');
+        const isLoopReturn = !isVirtualMacroForm && nextIndex === 0;
+        const isRoleChange = currentLabel !== nextLabel;
+
         // 1. Decide if we need a fill
-        // Probability scales with overall intensity and "creativity" setting (if passed)
-        const fillProb = 0.4 + intensity * 0.4;
+        // Keep general fill density moderate, but make important returns read more clearly.
+        let fillProb = 0.35 + intensity * 0.35;
+        if (isStructuralChorus && intensity > 0.35) {
+            fillProb = 1;
+        } else if (isLoopReturn && intensity > 0.45) {
+            fillProb = Math.max(fillProb, 0.9);
+        } else if (energyDelta > 0.1) {
+            fillProb = Math.max(fillProb, 0.72);
+        } else if (isRoleChange && intensity > 0.55) {
+            fillProb = Math.max(fillProb, 0.68);
+        }
         if (prng() > fillProb) {
             return;
         }
@@ -246,10 +262,7 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
 
         // 4. Determine "Crash Contract"
         // Only crash if energy is rising or it's a major structural return (e.g. into Chorus)
-        const energyRising = nextOrch.energyLevel > currentOrch.energyLevel;
-        const isStructuralChorus =
-            (nextSection.label || '').toLowerCase().includes('chorus') ||
-            (nextSection.label || '').toLowerCase().includes('drop');
+        const energyRising = energyDelta > 0;
         const pendingCrash = energyRising || (isStructuralChorus && nextOrch.energyLevel > 0.4);
 
         fillMap[fillStartStep] = {

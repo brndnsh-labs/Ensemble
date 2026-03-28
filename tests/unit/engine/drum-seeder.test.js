@@ -58,6 +58,14 @@ describe('Drum Seeder', () => {
         }
     });
 
+    it('should reliably mark major chorus returns with a fill at medium intensity', () => {
+        const map = generateDrumFills(mockState, mockArranger, 'Rock', 0.55, 'MEDIUM-RETURN');
+
+        // Verse 1 -> Chorus 1
+        expect(map[112]).toBeDefined();
+        expect(map[112].crash).toBe(true);
+    });
+
     it('should skip fills into seamless sections', () => {
         const seamlessArranger = {
             ...mockArranger,
