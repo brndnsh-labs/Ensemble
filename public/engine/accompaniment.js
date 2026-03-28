@@ -126,6 +126,105 @@ function recenterVoicing(midis, previousMidis = [], minMidi = 0, maxMidi = 127) 
 }
 
 /**
+ * @param {number} midi
+ * @param {{ rootMidi?: number } | null} chord
+ * @returns {number | null}
+ */
+function getChordIntervalClass(midi, chord) {
+    const rootMidi = chord?.rootMidi;
+    if (!Number.isFinite(midi) || !Number.isFinite(rootMidi)) {
+        return null;
+    }
+    const resolvedRootMidi = /** @type {number} */ (rootMidi);
+    return (((Math.round(midi) - resolvedRootMidi) % 12) + 12) % 12;
+}
+
+/**
+ * Keep guide tones first when slimming practice/rootless comping voicings.
+ * This preserves harmonic identity in bass-reserved contexts instead of
+ * dropping the lowest note blindly.
+ * @param {number[]} midis
+ * @param {{ rootMidi?: number } | null} chord
+ * @param {number} targetCount
+ * @returns {number[]}
+ */
+function selectSupportiveVoicing(midis, chord, targetCount = 3) {
+    const unique = [...new Set(midis.filter((midi) => Number.isFinite(midi)))].sort(
+        (a, b) => a - b,
+    );
+    if (unique.length <= targetCount || !chord) {
+        return unique;
+    }
+
+    /** @type {number[]} */
+    const guides = [];
+    /** @type {number[]} */
+    const colors = [];
+    /** @type {number[]} */
+    const roots = [];
+    /** @type {number[]} */
+    const fifths = [];
+    /** @type {number[]} */
+    const others = [];
+
+    unique.forEach((midi) => {
+        const intervalClass = getChordIntervalClass(midi, chord);
+        if (intervalClass === null) {
+            others.push(midi);
+            return;
+        }
+        if ([3, 4, 10, 11].includes(intervalClass)) {
+            guides.push(midi);
+            return;
+        }
+        if ([1, 2, 5, 6, 8, 9].includes(intervalClass)) {
+            colors.push(midi);
+            return;
+        }
+        if (intervalClass === 0) {
+            roots.push(midi);
+            return;
+        }
+        if (intervalClass === 7) {
+            fifths.push(midi);
+            return;
+        }
+        others.push(midi);
+    });
+
+    const ordered = [...guides, ...colors, ...roots, ...fifths, ...others];
+    /** @type {number[]} */
+    const selected = [];
+
+    for (const midi of ordered) {
+        if (!selected.includes(midi)) {
+            selected.push(midi);
+        }
+        if (selected.length >= targetCount) {
+            break;
+        }
+    }
+
+    return selected.sort((a, b) => a - b);
+}
+
+/**
+ * @param {number[]} voicing
+ * @returns {number[]}
+ */
+function getMidiVoicing(voicing) {
+    /** @type {number[]} */
+    const midis = [];
+    voicing.forEach((/** @type {number} */ freq) => {
+        const midi = getMidi(freq);
+        if (Number.isFinite(midi)) {
+            midis.push(/** @type {number} */ (midi));
+        }
+    });
+    return midis;
+}
+
+/**
  * Algorithmic Pattern Generator
  * Replaces static PIANO_CELLS table to save space and increase variety.
  * @param {import('../types.js').EnsembleState} state
@@ -140,6 +239,11 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
     const intensity = playback.bandIntensity;
     const ts = tsConfig || TIME_SIGNATURES['4/4'];
     const spb = ts.stepsPerBeat;
+    const backbeat = ts.backbeat || (ts.beats >= 4 ? [1, 3] : ts.beats >= 3 ? [1] : []);
+    const offbeatStep = Math.min(spb - 1, Math.max(1, Math.floor(spb / 2)));
+    const latePushStep = Math.min(spb - 1, Math.max(1, Math.floor(spb * 0.75)));
+    const middleBeat = ts.beats >= 4 ? 2 : Math.max(1, ts.beats - 1);
+    const finalBeat = Math.max(0, ts.beats - 1);
 
     /** @param {number} step */
     const hit = (step) => {
@@ -154,6 +258,17 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
      */
     const getBeatStep = (beatIdx, offsetSteps = 0) => {
         return beatIdx * spb + offsetSteps;
+    };
+
+    /**
+     * @param {number[]} beats
+     */
+    const addBeatHits = (beats) => {
+        beats.forEach((beatIdx) => {
+            if (beatIdx >= 0 && beatIdx < ts.beats) {
+                hit(getBeatStep(beatIdx));
+            }
+        });
     };
 
     // --- GENRE ARCHETYPES ---
@@ -248,7 +363,54 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
         return pattern;
     }
 
-    if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
+    if (genre === 'Blues') {
+        const type = Math.random();
+        const firstBackbeat = backbeat[0] ?? Math.min(1, finalBeat);
+        const secondBackbeat = backbeat[1] ?? finalBeat;
+
+        hit(0);
+
+        if (vibe === 'sparse') {
+            if (type > 0.5) {
+                hit(getBeatStep(secondBackbeat));
+            } else {
+                hit(getBeatStep(firstBackbeat, latePushStep));
+            }
+            return pattern;
+        }
+
+        if (type > 0.72) {
+            // Lean on the drummer's backbeat, then answer late in the bar.
+            addBeatHits([firstBackbeat, secondBackbeat]);
+            if (intensity > 0.45) {
+                hit(getBeatStep(secondBackbeat, latePushStep));
+            }
+        } else if (type > 0.45) {
+            // Shuffle-style anticipation: 1, late-&2, 4.
+            hit(getBeatStep(firstBackbeat, latePushStep));
+            hit(getBeatStep(secondBackbeat));
+        } else if (type > 0.2) {
+            // Strong beat-3 answer with a turnaround lift.
+            hit(getBeatStep(middleBeat));
+            hit(getBeatStep(secondBackbeat, latePushStep));
+        } else {
+            // Denser juke-joint pocket: 1, 2, late-&3.
+            hit(getBeatStep(firstBackbeat));
+            hit(getBeatStep(middleBeat, latePushStep));
+        }
+
+        if (vibe === 'active' || intensity > 0.58 || playback.complexity > 0.5) {
+            if (Math.random() < 0.5) {
+                hit(getBeatStep(middleBeat, latePushStep));
+            }
+            if (Math.random() < 0.35) {
+                hit(getBeatStep(secondBackbeat, offbeatStep));
+            }
+        }
+        return pattern;
+    }
+
+    if (genre === 'Jazz' || genre === 'Bossa') {
         const type = Math.random();
         // 8th-note swing and Bossa use the 'and' (0.5 ratio) for syncopation
         const syncRatio = 0.5;
@@ -297,6 +459,69 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
         return pattern;
     }
 
+    if (genre === 'Rock' || genre === 'Country') {
+        const type = Math.random();
+        const firstBackbeat = backbeat[0] ?? Math.min(1, finalBeat);
+        const secondBackbeat = backbeat[1] ?? finalBeat;
+
+        hit(0);
+
+        if (vibe === 'sparse') {
+            if (intensity < 0.4) {
+                addBeatHits([middleBeat]);
+                if (Math.random() < 0.35) {
+                    hit(getBeatStep(finalBeat, offbeatStep));
+                }
+            } else {
+                addBeatHits([firstBackbeat]);
+                if (ts.beats >= 4 && Math.random() < 0.45) {
+                    addBeatHits([secondBackbeat]);
+                }
+            }
+            return pattern;
+        }
+
+        if (type > 0.75) {
+            // Driving pocket: 1, 2, 3&, 4
+            addBeatHits([firstBackbeat, secondBackbeat]);
+            hit(getBeatStep(middleBeat, offbeatStep));
+        } else if (type > 0.5) {
+            // Punchy anticipation: 1, 2, &2, 4
+            addBeatHits([firstBackbeat, secondBackbeat]);
+            hit(getBeatStep(firstBackbeat, offbeatStep));
+        } else if (type > 0.25) {
+            // Grounded verse comping: 1, 3, &3, 4
+            addBeatHits([middleBeat, secondBackbeat]);
+            hit(getBeatStep(middleBeat, offbeatStep));
+        } else {
+            // Lift into the turnaround: 1, 2, 3, &4
+            addBeatHits([firstBackbeat, middleBeat]);
+            hit(getBeatStep(secondBackbeat, offbeatStep));
+        }
+
+        const shouldAddOffbeats =
+            vibe === 'active' || intensity > 0.52 || playback.complexity > 0.4;
+        if (shouldAddOffbeats) {
+            if (Math.random() < 0.45) {
+                hit(getBeatStep(middleBeat, offbeatStep));
+            }
+            if (Math.random() < 0.3) {
+                hit(getBeatStep(secondBackbeat, offbeatStep));
+            }
+        }
+
+        if (
+            (playback.complexity > 0.4 || intensity > 0.5) &&
+            ts.beats >= 4 &&
+            Math.random() > 0.55
+        ) {
+            pattern[getBeatStep(middleBeat)] = 0;
+            hit(getBeatStep(firstBackbeat, latePushStep));
+        }
+
+        return pattern;
+    }
+
     // --- ROCK / POP / DEFAULT ---
     // Downbeat focus
     hit(0); // The One
@@ -313,7 +538,6 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
     }
 
     // Pulse support
-    const backbeat = ts.backbeat || [];
     for (let b = 0; b < ts.beats; b++) {
         if (b === 0 || backbeat.includes(b)) {
             hit(getBeatStep(b));
@@ -393,7 +617,6 @@ function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = nu
         /** @type {any} */
         const smartMapping = {
             Afrobeat: 'Funk',
-            Blues: 'Jazz',
             Country: 'Rock',
         };
         if (smartMapping[genre]) {
@@ -459,7 +682,7 @@ function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = nu
     chords.rhythmicMask = mask; // @worker-mutation
 
     playback.intent.anticipation = intensity * 0.2;
-    if (genre === 'Jazz' || genre === 'Bossa') {
+    if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
         playback.intent.anticipation += 0.15;
     }
 
@@ -1037,6 +1260,12 @@ export function getAccompanimentNotes(
             ? stepInfo.isGroupStart
             : measureStep % (ts.grouping[0] * ts.stepsPerBeat) === 0;
         const intensity = playback.bandIntensity;
+        const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+        const shouldPreferGuideToneReduction =
+            chords.style === 'smart' &&
+            reserveBassSpace &&
+            chord.is7th &&
+            (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa');
 
         // --- Holistic Pocket Implementation ---
         let timingOffset = calculateTimingOffset('chords', groove.pocket, intensity);
@@ -1054,6 +1283,7 @@ export function getAccompanimentNotes(
             }
         }
 
+        const intentHits = compingState.currentCell.reduce((sum, value) => sum + value, 0);
         let durationSteps = ts.stepsPerBeat * 2; // Default 2 beats
         if (genre === 'Funk') {
             // Precise Funk durations for testing compatibility
@@ -1062,9 +1292,23 @@ export function getAccompanimentNotes(
             durationSteps = ts.stepsPerBeat * 0.25;
         } else if (genre === 'Jazz') {
             durationSteps = ts.stepsPerBeat * 1;
+        } else if (genre === 'Blues') {
+            durationSteps =
+                intentHits >= Math.max(4, ts.beats)
+                    ? ts.stepsPerBeat * 0.85
+                    : intentHits >= 3
+                      ? ts.stepsPerBeat * 1
+                      : ts.stepsPerBeat * 1.25;
         } else if (genre === 'Acoustic') {
             durationSteps = ts.stepsPerBeat * 2.5;
-        } else if (genre === 'Rock' || genre === 'Bossa') {
+        } else if (genre === 'Rock') {
+            durationSteps =
+                intentHits >= Math.max(4, ts.beats)
+                    ? ts.stepsPerBeat * 0.85
+                    : intentHits >= 3
+                      ? ts.stepsPerBeat * 1
+                      : ts.stepsPerBeat * 1.25;
+        } else if (genre === 'Bossa') {
             durationSteps = ts.stepsPerBeat * 1.5;
         }
 
@@ -1136,7 +1380,20 @@ export function getAccompanimentNotes(
             // LOW INTENSITY: Gentle Shells (2 notes)
             if (intensity < 0.4 && genre !== 'Acoustic') {
                 if (voicing.length > 2) {
-                    voicing = voicing.slice(0, 2);
+                    if (shouldPreferGuideToneReduction) {
+                        const shellMidis = selectSupportiveVoicing(
+                            getMidiVoicing(voicing),
+                            chord,
+                            2,
+                        );
+                        if (shellMidis.length >= 2) {
+                            voicing = shellMidis.map((midi) => getFrequency(midi));
+                        } else {
+                            voicing = voicing.slice(0, 2);
+                        }
+                    } else {
+                        voicing = voicing.slice(0, 2);
+                    }
                 }
             }
             // HIGH INTENSITY & COMPLEX: Shells to avoid mud
@@ -1177,11 +1434,7 @@ export function getAccompanimentNotes(
             }
 
             // Frequency Slotting: Avoid masking the bass
-            if (
-                (playback.practiceMode || bass.enabled) &&
-                !chords.pianoRoots &&
-                voicing.length > 0
-            ) {
+            if (reserveBassSpace && voicing.length > 0) {
                 // Ensure sorted for predictable slotting
                 voicing.sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
 
@@ -1209,7 +1462,20 @@ export function getAccompanimentNotes(
                 }
 
                 if (voicing.length > 3) {
-                    voicing.shift(); // Drop the lowest note (often the root) to leave space for bass
+                    if (shouldPreferGuideToneReduction) {
+                        const compactMidis = selectSupportiveVoicing(
+                            getMidiVoicing(voicing),
+                            chord,
+                            3,
+                        );
+                        if (compactMidis.length >= 3) {
+                            voicing = compactMidis.map((midi) => getFrequency(midi));
+                        } else {
+                            voicing.shift();
+                        }
+                    } else {
+                        voicing.shift(); // Drop the lowest note (often the root) to leave space for bass
+                    }
                     if ((chord.is7th || chord.quality.includes('9')) && voicing.length > 3) {
                         const rootPC = chord.rootMidi % 12;
                         const fifthPC = (rootPC + 7) % 12;

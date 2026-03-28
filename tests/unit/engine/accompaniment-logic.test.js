@@ -68,10 +68,12 @@ describe('Accompaniment Engine Logic', () => {
         compingState.lastVoicingMidis = [];
         chords.enabled = true;
         chords.style = 'smart';
+        chords.pianoRoots = true;
         groove.genreFeel = 'Rock';
         bass.enabled = false;
         playback.bandIntensity = 0.5;
         playback.complexity = 0.5;
+        playback.practiceMode = false;
     });
 
     describe('Generation & Styles', () => {
@@ -149,6 +151,91 @@ describe('Accompaniment Engine Logic', () => {
             });
             expect(notesRootless.length).toBeLessThan(notesNormal.length);
         });
+
+        it('should preserve guide tones when thinning rootless jazz turnaround dominants', () => {
+            const turnaroundDominant = {
+                rootMidi: 67,
+                freqs: [246.94, 293.66, 349.23], // B3, D4, F4 -> rootless G7
+                intervals: [4, 7, 10],
+                quality: '7',
+                is7th: true,
+                beats: 2,
+            };
+
+            groove.genreFeel = 'Jazz';
+            chords.pianoRoots = false;
+            playback.practiceMode = true;
+            playback.bandIntensity = 0.35;
+            compingState.currentCell[0] = 1;
+            compingState.lockedUntil = 100;
+
+            const notes = getAccompanimentNotes(getState(), turnaroundDominant, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).filter((note) => note.midi > 0);
+
+            const pitchClasses = notes.map((note) => note.midi % 12);
+            expect(notes).toHaveLength(2);
+            expect(pitchClasses).toContain(11); // B = 3rd of G7
+            expect(pitchClasses).toContain(5); // F = b7 of G7
+        });
+
+        it('should keep dominant guide tones when slimming rich practice voicings', () => {
+            const richTurnaroundDominant = {
+                rootMidi: 67,
+                freqs: [246.94, 349.23, 440, 659.26], // B3, F4, A4, E5
+                intervals: [4, 10, 14, 21],
+                quality: '7',
+                is7th: true,
+                beats: 2,
+            };
+
+            groove.genreFeel = 'Jazz';
+            chords.pianoRoots = false;
+            playback.practiceMode = true;
+            playback.bandIntensity = 0.65;
+            playback.complexity = 0.65;
+            compingState.currentCell[0] = 1;
+            compingState.lockedUntil = 100;
+
+            const notes = getAccompanimentNotes(getState(), richTurnaroundDominant, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).filter((note) => note.midi > 0);
+
+            const pitchClasses = notes.map((note) => note.midi % 12);
+            expect(notes).toHaveLength(3);
+            expect(pitchClasses).toContain(11); // B = 3rd of G7
+            expect(pitchClasses).toContain(5); // F = b7 of G7
+        });
+
+        it('should shorten Rock durations when the comping cell is busy', () => {
+            groove.genreFeel = 'Rock';
+            compingState.currentCell = [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+            compingState.lockedUntil = 100;
+
+            const rockNote = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).find((note) => note.midi > 0);
+
+            expect(rockNote).toBeDefined();
+            expect(rockNote?.durationSteps).toBe(3);
+        });
+
+        it('should avoid two-beat Blues holds for balanced smart comping', () => {
+            groove.genreFeel = 'Blues';
+            compingState.currentCell = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0];
+            compingState.lockedUntil = 100;
+
+            const bluesNote = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).find((note) => note.midi > 0);
+
+            expect(bluesNote).toBeDefined();
+            expect(bluesNote?.durationSteps).toBe(4);
+        });
     });
 
     describe('Procedural Pattern Generation', () => {
@@ -177,6 +264,32 @@ describe('Accompaniment Engine Logic', () => {
                 }
             }
             expect(foundCharleston).toBe(true);
+        });
+
+        it('should offer multiple balanced Rock patterns at medium settings', () => {
+            const ts44 = TIME_SIGNATURES['4/4'];
+            playback.bandIntensity = 0.55;
+            playback.complexity = 0.45;
+
+            const patterns = new Set();
+            for (let i = 0; i < 24; i++) {
+                patterns.add(
+                    generateCompingPattern(getState(), 'Rock', 'balanced', ts44, 16).join(''),
+                );
+            }
+
+            expect(patterns.size).toBeGreaterThan(1);
+        });
+
+        it('should keep balanced Blues comping anchored on the downbeat', () => {
+            const ts44 = TIME_SIGNATURES['4/4'];
+            playback.bandIntensity = 0.55;
+            playback.complexity = 0.45;
+
+            for (let i = 0; i < 12; i++) {
+                const pattern = generateCompingPattern(getState(), 'Blues', 'balanced', ts44, 16);
+                expect(pattern[0]).toBe(1);
+            }
         });
     });
 

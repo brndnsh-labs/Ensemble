@@ -160,7 +160,6 @@ function getResolvedGenre(style, genre) {
     if (style === 'smart') {
         const smartMapping = {
             Afrobeat: 'Funk',
-            Blues: 'Jazz',
             Country: 'Rock',
         };
         resolved = smartMapping[resolved] || resolved;
