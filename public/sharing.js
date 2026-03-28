@@ -45,7 +45,6 @@ function compressBandSettings(options = {}) {
             o: chords.octave,
             v: parseFloat(chords.volume.toFixed(2)),
             r: parseFloat(chords.reverb.toFixed(2)),
-            p: chords.pianoRoots ? 1 : 0,
             d: chords.density,
         },
         h: {

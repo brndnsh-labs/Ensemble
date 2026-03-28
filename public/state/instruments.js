@@ -12,7 +12,6 @@ import { groove } from './groove.js';
  * @property {number} reverb - Reverb send amount.
  * @property {number} octave - Base MIDI octave for voicing.
  * @property {string} density - Voicing density ('thin', 'standard', 'rich').
- * @property {boolean} pianoRoots - Whether the piano should play roots even if bass is enabled.
  * @property {number|null} lastActiveChordIndex - Index of the currently playing chord (UI).
  * @property {number|null} scheduledChordIndex - Index of the last scheduled chord (Internal).
  * @property {Map<number, any>} buffer - Scheduled notes buffer.
@@ -27,7 +26,6 @@ export const chords = deepSignal({
     reverb: 0.3,
     octave: 65,
     density: 'standard',
-    pianoRoots: false,
     lastActiveChordIndex: null,
     scheduledChordIndex: null,
     buffer: new Map(),
@@ -281,7 +279,6 @@ export function instrumentReducer(action, payload) {
             chords.instrument = 'Clean';
             chords.octave = 65;
             chords.density = 'standard';
-            chords.pianoRoots = false;
 
             bass.enabled = true;
             bass.volume = 0.45;
@@ -345,9 +342,6 @@ export function instrumentReducer(action, payload) {
             if (instrumentStateMap[payload.module]) {
                 instrumentStateMap[payload.module].reverb = payload.value;
             }
-            return true;
-        case ACTIONS.SET_PIANO_ROOTS:
-            chords.pianoRoots = payload;
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
             soloist.mode = payload;

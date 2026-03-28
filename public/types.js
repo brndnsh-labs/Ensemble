@@ -266,7 +266,6 @@
  * @property {ActionPayloadLoadTemplate} LOAD_TEMPLATE
  * @property {boolean} SET_METRONOME
  * @property {boolean} SET_PRESET_SETTINGS_MODE
- * @property {boolean} SET_PIANO_ROOTS
  * @property {string} SET_NOTATION
  * @property {number} SET_SESSION_TIMER
  * @property {boolean} SET_SONG_MODE
@@ -346,7 +345,6 @@ export const ACTIONS = {
     LOAD_TEMPLATE: 'LOAD_TEMPLATE',
     SET_METRONOME: 'SET_METRONOME',
     SET_PRESET_SETTINGS_MODE: 'SET_PRESET_SETTINGS_MODE',
-    SET_PIANO_ROOTS: 'SET_PIANO_ROOTS',
     SET_NOTATION: 'SET_NOTATION',
     SET_SESSION_TIMER: 'SET_SESSION_TIMER',
     SET_SONG_MODE: 'SET_SONG_MODE',

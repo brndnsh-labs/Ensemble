@@ -37,7 +37,6 @@ export function saveCurrentState() {
             density: chords.density,
             volume: chords.volume,
             reverb: chords.reverb,
-            pianoRoots: chords.pianoRoots,
         },
         bass: {
             enabled: bass.enabled,

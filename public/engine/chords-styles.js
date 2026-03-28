@@ -1,3 +1,5 @@
+import { shouldUseRootlessVoicing } from './voicing-policy.js';
+
 /**
  * @param {import('../types.js').EnsembleState} state
  * @param {string} quality
@@ -88,7 +90,7 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
         if (quality === '7alt') {
             // Must have: 3, b7 AND at least one altered extension (b9/13 or #9/20)
             const base = [4, 10];
-            const altExtensions = intensity > 0.6 ? [13, 15, 20] : [15, 20];
+            const altExtensions = intensity > 0.6 ? [13, 15, 20] : [13, 20];
             return isRich ? [4, 10, 13, 15, 18, 20] : [...base, ...altExtensions.slice(0, 2)];
         }
         if (quality === '7b9') {
@@ -136,11 +138,10 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
  * @param {boolean} is7th
  * @param {string} density
  * @param {string} genre
- * @param {boolean} bassEnabled
  * @returns {number[]}
  */
-export function getIntervals(state, quality, is7th, density, genre = 'Rock', bassEnabled = true) {
-    const { playback, groove } = state;
+export function getIntervals(state, quality, is7th, density, genre = 'Rock') {
+    const { playback } = state;
     const isRich = density === 'rich';
     const intensity = playback.bandIntensity;
 
@@ -152,13 +153,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock', bas
     const isAug = quality.includes('aug') || quality.includes('+');
 
     // 1. JAZZ & SOUL: ROOTLESS VOICINGS
-    const shouldBeRootless =
-        bassEnabled &&
-        (groove.genreFeel === 'Swing' ||
-            genre === 'Jazz' ||
-            genre === 'Neo-Soul' ||
-            genre === 'Funk' ||
-            genre === 'Blues');
+    const shouldBeRootless = shouldUseRootlessVoicing(state, quality, is7th, genre);
     if (shouldBeRootless) {
         const rootless = getRootlessVoicing(state, quality, is7th, isRich || intensity > 0.6);
         if (rootless) {

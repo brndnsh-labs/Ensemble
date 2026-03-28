@@ -160,7 +160,6 @@ function getResolvedGenre(style, genre) {
     if (style === 'smart') {
         const smartMapping = {
             Afrobeat: 'Funk',
-            Blues: 'Jazz',
             Country: 'Rock',
         };
         resolved = smartMapping[resolved] || resolved;
@@ -563,7 +562,6 @@ export function buildChordAuditArrangement(kind = 'changes', timeSignature = und
  *   style?: string;
  *   density?: string;
  *   key?: string;
- *   pianoRoots?: boolean;
  *   arrangementName?: string;
  * }} options
  */
@@ -576,7 +574,6 @@ export function bootstrapChordAudit({
     style = 'smart',
     density = 'standard',
     key = 'C',
-    pianoRoots = false,
     arrangementName = 'changes',
 }) {
     const arrangementSpec = buildChordAuditArrangement(arrangementName, timeSignature);
@@ -590,7 +587,6 @@ export function bootstrapChordAudit({
     });
     dispatch(ACTIONS.SET_STYLE, { module: 'chords', style });
     dispatch(ACTIONS.SET_DENSITY, density);
-    dispatch(ACTIONS.SET_PIANO_ROOTS, pianoRoots);
     dispatch(ACTIONS.SET_BPM, bpm);
     dispatch(ACTIONS.SET_BAND_INTENSITY, intensity);
     dispatch(ACTIONS.SET_COMPLEXITY, complexity);
@@ -1221,7 +1217,6 @@ function buildArrangementMetadata(arrangement) {
  *   key: string;
  *   scenario: string;
  *   seed: string;
- *   pianoRoots: boolean;
  *   drillDown?: boolean;
  *   full?: boolean;
  * }} options
@@ -1239,7 +1234,6 @@ export function buildChordAuditReport({
     key,
     scenario,
     seed,
-    pianoRoots,
     drillDown = false,
     full = false,
 }) {
@@ -1262,7 +1256,6 @@ export function buildChordAuditReport({
             timeSignature: capture.arrangement.timeSignature,
             scenario,
             seed,
-            pianoRoots,
             drillDown,
             full,
         },
@@ -1307,7 +1300,6 @@ export function buildChordAuditReport({
  *   key: string;
  *   scenario: string;
  *   seed: string;
- *   pianoRoots: boolean;
  *   full?: boolean;
  * }} options
  */
@@ -1324,7 +1316,6 @@ export function buildChordDeepDiveReport({
     key,
     scenario,
     seed,
-    pianoRoots,
     full = false,
 }) {
     const availableLoops = Array.from({ length: getLoopCount(capture) }, (_, index) => index);
@@ -1345,7 +1336,6 @@ export function buildChordDeepDiveReport({
             timeSignature: capture.arrangement.timeSignature,
             scenario,
             seed,
-            pianoRoots,
             full,
         },
         arrangement: buildArrangementMetadata(capture.arrangement),

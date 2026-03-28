@@ -102,13 +102,8 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         await expect(settingsSurface).toContainText('Voicing');
 
         const densitySelect = settingsSurface.locator('select#densitySelect');
-        const pianoRootsToggle = settingsSurface.locator(
-            'label.toggle-switch[for="pianoRootsCheck"]',
-        );
         await expect(densitySelect).toBeVisible();
-        await expect(pianoRootsToggle).toBeVisible();
         await expectWithinSurface(settingsSurface, densitySelect);
-        await expectWithinSurface(settingsSurface, pianoRootsToggle);
         await expect(settingsSurface.locator('input#chordVolume')).toHaveCount(0);
         await expect(settingsSurface.locator('input#chordReverb')).toHaveCount(0);
     });

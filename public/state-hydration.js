@@ -186,7 +186,6 @@ export function hydrateState() {
                 density: savedState.chords.density,
                 volume: clamp(savedState.chords.volume, 0, 1, 0.5),
                 reverb: clamp(savedState.chords.reverb, 0, 1, 0.3),
-                pianoRoots: savedState.chords.pianoRoots || false,
             });
         }
         if (savedState.bass) {
@@ -445,7 +444,6 @@ export function loadFromUrl() {
                     octave: clamp(band.c.o, 0, 127, 48),
                     volume: clamp(band.c.v, 0, 1, 0.5),
                     reverb: clamp(band.c.r, 0, 1, 0.3),
-                    pianoRoots: !!band.c.p,
                     density: clamp(band.c.d, 0, 1, 0.5),
                 });
             }

@@ -76,7 +76,6 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'themeSelect',
             'notationSelect',
             'densitySelect',
-            'pianoRootsCheck',
             'swingSlider',
             'exportMidiBtn',
             'settingsShareHubBtn',

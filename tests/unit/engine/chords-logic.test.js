@@ -8,7 +8,7 @@ vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5 },
-        chords: { density: 'standard', octave: 60, pianoRoots: true },
+        chords: { density: 'standard', octave: 60 },
         arranger: {
             timeSignature: '4/4',
             key: 'C',
@@ -141,8 +141,8 @@ describe('Chords & Voicing Logic', () => {
         it('should handle altered dominants correctly', () => {
             groove.genreFeel = 'Jazz';
             const intervals = getIntervals(getState(), '7alt', true, 'standard', 'Jazz', true);
-            // 3, b7, #9, b13 -> [4, 10, 15, 20]
-            expect(intervals).toEqual([4, 10, 15, 20]);
+            // Medium jazz altered dominant: 3, b7, b9, b13 -> [4, 10, 13, 20]
+            expect(intervals).toEqual([4, 10, 13, 20]);
         });
 
         it('should use rootless voicings for Blues dominant chords', () => {
@@ -305,8 +305,6 @@ describe('Chords & Voicing Logic', () => {
             arranger.key = 'C';
             arranger.isMinor = false;
             groove.genreFeel = 'Jazz';
-            chords.pianoRoots = false;
-
             validateProgression(getState());
 
             const slashChord = arranger.progression[0];

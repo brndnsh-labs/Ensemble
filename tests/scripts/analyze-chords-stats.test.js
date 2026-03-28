@@ -123,7 +123,6 @@ describe('Chord audit scripts', () => {
             key: 'C',
             scenario: 'default',
             seed: 'JSON_REPORT',
-            pianoRoots: false,
             drillDown: false,
             full: false,
         });
@@ -159,7 +158,6 @@ describe('Chord audit scripts', () => {
             key: 'C',
             scenario: 'soloist-busy',
             seed: 'JSON_DEEP',
-            pianoRoots: false,
             full: true,
         });
 
