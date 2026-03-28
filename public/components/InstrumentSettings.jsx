@@ -418,37 +418,35 @@ function GrooveControls({ state }) {
                 />
             </SettingRow>
 
-            <SettingGroup title="Lars Mode" className="divider-top">
-                <SettingRow label="Enabled" id="larsModeCheck">
-                    <Toggle
-                        id="larsModeCheck"
-                        checked={state.larsMode}
-                        onChange={(/** @type {any} */ val) => {
-                            dispatch(ACTIONS.SET_LARS_MODE, val);
+            <SettingRow label="Lars Mode" id="larsModeCheck">
+                <Toggle
+                    id="larsModeCheck"
+                    checked={state.larsMode}
+                    onChange={(/** @type {any} */ val) => {
+                        dispatch(ACTIONS.SET_LARS_MODE, val);
+                        saveCurrentState();
+                    }}
+                />
+            </SettingRow>
+            <div class={!state.larsMode ? 'disabled-group' : ''}>
+                <SettingRow
+                    label="Lars Intensity"
+                    id="larsIntensitySlider"
+                    valueDisplay={`${Math.round(state.larsIntensity * 100)}%`}
+                >
+                    <Slider
+                        id="larsIntensitySlider"
+                        min="0"
+                        max="100"
+                        value={Math.round(state.larsIntensity * 100)}
+                        onInput={(/** @type {any} */ val) => {
+                            dispatch(ACTIONS.SET_LARS_INTENSITY, parseInt(val, 10) / 100);
                             saveCurrentState();
                         }}
+                        ariaValueText={`${Math.round(state.larsIntensity * 100)}%`}
                     />
                 </SettingRow>
-                <div class={!state.larsMode ? 'disabled-group' : ''}>
-                    <SettingRow
-                        label="Intensity"
-                        id="larsIntensitySlider"
-                        valueDisplay={`${Math.round(state.larsIntensity * 100)}%`}
-                    >
-                        <Slider
-                            id="larsIntensitySlider"
-                            min="0"
-                            max="100"
-                            value={Math.round(state.larsIntensity * 100)}
-                            onInput={(/** @type {any} */ val) => {
-                                dispatch(ACTIONS.SET_LARS_INTENSITY, parseInt(val, 10) / 100);
-                                saveCurrentState();
-                            }}
-                            ariaValueText={`${Math.round(state.larsIntensity * 100)}%`}
-                        />
-                    </SettingRow>
-                </div>
-            </SettingGroup>
+            </div>
         </Fragment>
     );
 }

@@ -1,5 +1,6 @@
 import pkg from '@playwright/test';
 import {
+    expectNoHorizontalOverflow,
     expectScrollsToRevealTarget,
     expectSurfaceFitsViewport,
     expectWithinSurface,
@@ -31,7 +32,8 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
 
         await expect(settingsSurface).toContainText('Mixer');
         await expect(settingsSurface).toContainText('Bass');
-        await expect(settingsSurface.locator('.workspace-studio-mixer-strip')).toHaveCount(5);
+        const mixerStrips = settingsSurface.locator('.workspace-studio-mixer-strip');
+        await expect(mixerStrips).toHaveCount(5);
 
         const volume = settingsSurface.locator('input#bassVolume');
         const reverb = settingsSurface.locator('input#bassReverb');
@@ -42,6 +44,9 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         await expectWithinSurface(settingsSurface, volume);
         await expectWithinSurface(settingsSurface, reverb);
         await expectWithinSurface(settingsSurface, soloistVolume);
+        for (const strip of await mixerStrips.all()) {
+            await expectNoHorizontalOverflow(strip);
+        }
         const mixerMetrics = await surfaceBody.evaluate((el) => ({
             clientHeight: el.clientHeight,
             scrollHeight: el.scrollHeight,
@@ -218,9 +223,13 @@ test.describe('Studio settings surfaces - Mobile Scrolling @mobile', () => {
         await expectSurfaceFitsViewport(page, settingsSurface);
         await expect(surfaceBody).toBeVisible();
 
+        const mixerStrips = settingsSurface.locator('.workspace-studio-mixer-strip');
         await expect(soloistVolume).toBeVisible();
         await expectWithinSurface(settingsSurface, soloistVolume);
         await expectWithinSurface(settingsSurface, soloistReverb);
+        for (const strip of await mixerStrips.all()) {
+            await expectNoHorizontalOverflow(strip);
+        }
         const mixerMetrics = await surfaceBody.evaluate((el) => ({
             clientHeight: el.clientHeight,
             scrollHeight: el.scrollHeight,
@@ -262,10 +271,14 @@ test.describe('Studio settings surfaces - iPhone reachability @mobile', () => {
         const mixerBody = mixerSurface.locator('.workspace-studio-surface-body');
         const soloistVolume = mixerSurface.locator('input#soloistVolume');
         const soloistReverb = mixerSurface.locator('input#soloistReverb');
+        const mixerStrips = mixerSurface.locator('.workspace-studio-mixer-strip');
 
         await expect(soloistVolume).toBeVisible();
         await expectWithinSurface(mixerSurface, soloistVolume);
         await expectWithinSurface(mixerSurface, soloistReverb);
+        for (const strip of await mixerStrips.all()) {
+            await expectNoHorizontalOverflow(strip);
+        }
         const mixerMetrics = await mixerBody.evaluate((el) => ({
             clientHeight: el.clientHeight,
             scrollHeight: el.scrollHeight,

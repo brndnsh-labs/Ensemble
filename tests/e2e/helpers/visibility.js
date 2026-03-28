@@ -21,22 +21,29 @@ export async function expectWithinSurface(surface, control) {
 }
 
 export async function expectLocatorFitsViewport(page, locator, overflowTarget = locator) {
-    const viewport = page.viewportSize();
-    const box = await locator.boundingBox();
+    await expect
+        .poll(async () => {
+            const viewport = page.viewportSize();
+            const box = await locator.boundingBox();
 
-    expect(viewport).not.toBeNull();
-    expect(box).not.toBeNull();
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.y).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+            if (!viewport || !box) {
+                return false;
+            }
 
-    const overflowMetrics = await overflowTarget.evaluate((el) => ({
-        clientWidth: el.clientWidth,
-        scrollWidth: el.scrollWidth,
-    }));
+            const overflowMetrics = await overflowTarget.evaluate((el) => ({
+                clientWidth: el.clientWidth,
+                scrollWidth: el.scrollWidth,
+            }));
 
-    expect(overflowMetrics.scrollWidth).toBeLessThanOrEqual(overflowMetrics.clientWidth + 1);
+            return (
+                box.x >= 0 &&
+                box.y >= 0 &&
+                box.x + box.width <= viewport.width &&
+                box.y + box.height <= viewport.height &&
+                overflowMetrics.scrollWidth <= overflowMetrics.clientWidth + 1
+            );
+        })
+        .toBe(true);
 }
 
 export async function expectSurfaceFitsViewport(page, surface) {
@@ -45,6 +52,15 @@ export async function expectSurfaceFitsViewport(page, surface) {
         surface,
         surface.locator('.workspace-studio-surface-body'),
     );
+}
+
+export async function expectNoHorizontalOverflow(locator) {
+    const overflowMetrics = await locator.evaluate((el) => ({
+        clientWidth: el.clientWidth,
+        scrollWidth: el.scrollWidth,
+    }));
+
+    expect(overflowMetrics.scrollWidth).toBeLessThanOrEqual(overflowMetrics.clientWidth + 1);
 }
 
 export async function expectOwnsInteriorProbe(locator) {

@@ -667,81 +667,6 @@ select option {
     gap: 0.85rem;
 }
 
-.workspace-studio-active-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.workspace-studio-active-header h2 {
-    margin: 0;
-}
-
-.workspace-studio-active-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.35rem 0.75rem;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--accent-color), transparent 55%);
-    background: color-mix(in srgb, var(--accent-color), transparent 90%);
-    color: var(--accent-color);
-    font-size: 0.8rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.workspace-studio-active-chips {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-    gap: 0.65rem;
-}
-
-.workspace-studio-active-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    border-radius: 14px;
-    border: 1px solid var(--border-color);
-    background: var(--input-bg);
-    text-align: left;
-    min-width: 0;
-}
-
-.workspace-studio-active-chip.active {
-    border-color: color-mix(in srgb, var(--accent-color), transparent 40%);
-    background: color-mix(in srgb, var(--accent-color), transparent 90%);
-}
-
-.workspace-studio-active-chip-icon {
-    font-size: 1rem;
-    flex-shrink: 0;
-}
-
-.workspace-studio-active-chip-label {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-weight: 700;
-}
-
-.workspace-studio-active-chip-state {
-    flex-shrink: 0;
-    border-radius: 999px;
-    padding: 0.15rem 0.45rem;
-    background: var(--card-bg);
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-
-.workspace-studio-active-chip.active .workspace-studio-active-chip-state {
-    color: var(--accent-color);
-}
-
 .workspace-group-header {
     padding: 0.25rem 0;
 }
@@ -1932,7 +1857,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 .workspace-studio-mixer-strip-slider {
     min-width: 0;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 1.5rem minmax(0, 1fr) 2.1rem;
     gap: 0.5rem;
     align-items: center;
 }
@@ -1946,15 +1871,17 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-mixer-strip-slider-value {
-    min-width: 2.25rem;
+    min-width: 0;
     text-align: right;
     font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-muted);
 }
 
-.workspace-studio-surface--mixer-panel input[type="range"] {
+.workspace-studio-surface--mixer-panel .workspace-studio-mixer-strip input[type="range"] {
+    width: 100%;
     min-width: 0;
+    max-width: 100%;
 }
 
 .workspace-studio-surface--settings .grid-2-col {
