@@ -63,6 +63,12 @@ export async function expectNoHorizontalOverflow(locator) {
     expect(overflowMetrics.scrollWidth).toBeLessThanOrEqual(overflowMetrics.clientWidth + 1);
 }
 
+export async function expectNoVerticalOverflow(locator, tolerance = 24) {
+    await expect
+        .poll(async () => locator.evaluate((el) => el.scrollHeight - el.clientHeight))
+        .toBeLessThanOrEqual(tolerance);
+}
+
 export async function expectOwnsInteriorProbe(locator) {
     const ownsInteriorProbe = await locator.evaluate((el) => {
         const rect = el.getBoundingClientRect();

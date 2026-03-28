@@ -1,3 +1,4 @@
+import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { togglePower } from '../instrument-controller.js';
@@ -274,7 +275,7 @@ function StudioSurface({
         ? 'workspace-studio-surface--modal'
         : 'workspace-studio-surface--anchored';
 
-    return (
+    const surfaceLayer = (
         <div class="workspace-studio-surface-layer">
             <button
                 type="button"
@@ -307,6 +308,12 @@ function StudioSurface({
             </div>
         </div>
     );
+
+    if (typeof document !== 'undefined' && document.body) {
+        return createPortal(surfaceLayer, document.body);
+    }
+
+    return surfaceLayer;
 }
 
 /**

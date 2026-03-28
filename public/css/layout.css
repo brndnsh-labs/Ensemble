@@ -1606,8 +1606,11 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-studio-surface-layer {
-    position: relative;
+    position: fixed;
+    inset: 0;
     z-index: var(--z-modal);
+    isolation: isolate;
+    pointer-events: none;
 }
 
 .workspace-studio-surface {
@@ -1625,6 +1628,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
         0 0 0 1px color-mix(in srgb, var(--studio-surface-accent), transparent 88%);
     z-index: var(--z-modal);
     overflow: hidden;
+    pointer-events: auto;
 }
 
 .workspace-studio-surface--modal {
@@ -1671,6 +1675,8 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     justify-content: space-between;
     gap: 0.75rem;
     min-width: 0;
+    position: relative;
+    z-index: 1;
 }
 
 .workspace-studio-surface-header-copy {
@@ -1732,6 +1738,9 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     font-size: 1.15rem;
     line-height: 1;
     box-shadow: var(--shadow-sm);
+    color: var(--text-color);
+    position: relative;
+    z-index: 2;
 }
 
 .workspace-studio-surface-close:hover {
