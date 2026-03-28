@@ -225,6 +225,167 @@ function getMidiVoicing(voicing) {
 }
 
 /**
+ * @param {number} rootMidi
+ * @param {number[]} intervals
+ * @param {number} targetCenter
+ * @param {number} minMidi
+ * @param {number} maxMidi
+ * @returns {number[]}
+ */
+function placeIntervalsNearTarget(rootMidi, intervals, targetCenter, minMidi = 0, maxMidi = 127) {
+    /** @type {number[]} */
+    const placed = [];
+
+    intervals.forEach((interval) => {
+        let bestMidi = rootMidi + interval;
+        let bestScore = Number.POSITIVE_INFINITY;
+
+        [-24, -12, 0, 12, 24].forEach((shift) => {
+            const candidate = rootMidi + interval + shift;
+            if (candidate < minMidi || candidate > maxMidi) {
+                return;
+            }
+            const score = Math.abs(candidate - targetCenter);
+            if (score < bestScore) {
+                bestScore = score;
+                bestMidi = candidate;
+            }
+        });
+
+        placed.push(bestMidi);
+    });
+
+    return [...new Set(placed)].sort((a, b) => a - b);
+}
+
+/**
+ * @param {number[]} fromMidis
+ * @param {number[]} toMidis
+ * @returns {number}
+ */
+function getNearestVoiceLeadingCost(fromMidis, toMidis) {
+    if (fromMidis.length === 0 || toMidis.length === 0) {
+        return 0;
+    }
+
+    return fromMidis.reduce((sum, midi) => {
+        const nearest = toMidis.reduce(
+            (best, targetMidi) => Math.min(best, Math.abs(targetMidi - midi)),
+            Number.POSITIVE_INFINITY,
+        );
+        return sum + nearest;
+    }, 0);
+}
+
+/**
+ * @param {number[]} midis
+ * @param {{ rootMidi?: number; freqs?: number[] } | null} chord
+ * @returns {number}
+ */
+function countSharedPitchClasses(midis, chord) {
+    const chordMidis = getMidiVoicing(chord?.freqs || []);
+    if (midis.length === 0 || chordMidis.length === 0) {
+        return 0;
+    }
+
+    const chordPitchClasses = new Set(chordMidis.map((midi) => midi % 12));
+    return midis.reduce((sum, midi) => sum + (chordPitchClasses.has(midi % 12) ? 1 : 0), 0);
+}
+
+/**
+ * Altered dominants should still resolve like a voice-led dominant, not just a bag of sharp notes.
+ * Favor guide tones plus one or two strong colors, and avoid exposing the 3rd/#9 semitone clash
+ * unless the intensity/complexity is high enough to justify that heat.
+ * @param {{ rootMidi?: number; freqs?: number[]; quality?: string } | null} chord
+ * @param {number[]} previousMidis
+ * @param {{ rootMidi?: number; freqs?: number[]; quality?: string } | null} nextChord
+ * @param {number} minMidi
+ * @param {number} maxMidi
+ * @param {number} intensity
+ * @param {number} complexity
+ * @returns {number[]}
+ */
+function buildResolvingAlteredVoicing(
+    chord,
+    previousMidis = [],
+    nextChord = null,
+    minMidi = 0,
+    maxMidi = 127,
+    intensity = 0.5,
+    complexity = 0.5,
+) {
+    const rootMidi = chord?.rootMidi;
+    if (!Number.isFinite(rootMidi)) {
+        return [];
+    }
+
+    const resolvedRootMidi = /** @type {number} */ (rootMidi);
+    const nextMidis = getMidiVoicing(nextChord?.freqs || []);
+    const targetCenter =
+        previousMidis.length > 0
+            ? averageMidi(previousMidis)
+            : nextMidis.length > 0
+              ? averageMidi(nextMidis)
+              : resolvedRootMidi + 14;
+
+    const candidateIntervals = [
+        [4, 10, 20],
+        [4, 10, 13],
+        [4, 10, 13, 20],
+    ];
+    if (intensity > 0.72 || complexity > 0.7) {
+        candidateIntervals.push([4, 10, 13, 15, 20]);
+    }
+
+    let bestMidis = placeIntervalsNearTarget(
+        resolvedRootMidi,
+        candidateIntervals[0],
+        targetCenter,
+        minMidi,
+        maxMidi,
+    );
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    candidateIntervals.forEach((intervals) => {
+        const candidateMidis = placeIntervalsNearTarget(
+            resolvedRootMidi,
+            intervals,
+            targetCenter,
+            minMidi,
+            maxMidi,
+        );
+        if (candidateMidis.length === 0) {
+            return;
+        }
+
+        let score =
+            Math.abs(averageMidi(candidateMidis) - targetCenter) * 0.5 +
+            getNearestVoiceLeadingCost(candidateMidis, previousMidis) * 0.8 +
+            getNearestVoiceLeadingCost(candidateMidis, nextMidis) * 0.6 +
+            (candidateMidis[candidateMidis.length - 1] - candidateMidis[0]) * 0.12;
+
+        if (complexity < 0.68 && intensity < 0.78) {
+            const intervalClasses = candidateMidis
+                .map((midi) => getChordIntervalClass(midi, chord))
+                .filter((intervalClass) => intervalClass !== null);
+            if (intervalClasses.includes(3) && intervalClasses.includes(4)) {
+                score += 8;
+            }
+        }
+
+        const sharedWithNext = countSharedPitchClasses(candidateMidis, nextChord);
+        score -= sharedWithNext * 0.9;
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestMidis = candidateMidis;
+        }
+    });
+
+    return bestMidis;
+}
+
+/**
  * Algorithmic Pattern Generator
  * Replaces static PIANO_CELLS table to save space and increase variety.
  * @param {import('../types.js').EnsembleState} state
@@ -1261,6 +1422,12 @@ export function getAccompanimentNotes(
             : measureStep % (ts.grouping[0] * ts.stepsPerBeat) === 0;
         const intensity = playback.bandIntensity;
         const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+        const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
+        const previousVoicingMidis = compingState.lastVoicingMidis;
+        const nextChord =
+            chordIndex >= 0 && arranger.progression
+                ? arranger.progression[chordIndex + 1] || null
+                : null;
         const shouldPreferGuideToneReduction =
             chords.style === 'smart' &&
             reserveBassSpace &&
@@ -1332,10 +1499,17 @@ export function getAccompanimentNotes(
 
         let voicing = [...chord.freqs];
         const complexity = playback.complexity;
+        const shouldUseResolvingAlteredVoicing =
+            genre === 'Jazz' && chord.quality === '7alt' && chords.style !== 'pad';
 
         // --- NEW: Harmonic Tension Scaling ---
         // At high complexity, favor 9ths, 11ths, and 13ths (extensions)
-        if (complexity > 0.5 && chord.intervals && chord.intervals.length > 3) {
+        if (
+            complexity > 0.5 &&
+            chord.intervals &&
+            chord.intervals.length > 3 &&
+            !shouldUseResolvingAlteredVoicing
+        ) {
             // If we have extensions beyond the triad/7th, prioritize them in the voicing
             const extensions = chord.intervals.filter(
                 (/** @type {number} */ i) =>
@@ -1350,6 +1524,22 @@ export function getAccompanimentNotes(
                     }
                     return f;
                 });
+            }
+        }
+
+        if (shouldUseResolvingAlteredVoicing) {
+            const minMidi = reserveBassSpace && bassMidi ? bassMidi + 13 : 52;
+            const resolvedMidis = buildResolvingAlteredVoicing(
+                chord,
+                previousVoicingMidis,
+                nextChord,
+                minMidi,
+                84,
+                intensity,
+                complexity,
+            );
+            if (resolvedMidis.length > 0) {
+                voicing = resolvedMidis.map((midi) => getFrequency(midi));
             }
         }
 
@@ -1439,8 +1629,6 @@ export function getAccompanimentNotes(
                 voicing.sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
 
                 const lowestMidi = getMidi(voicing[0]) || 0;
-                const lastBassFreq = bass.lastFreq || 0;
-                const bassMidi = coordination.bassMidi || getMidi(lastBassFreq) || 0;
 
                 // --- Dynamic Slotting ---
                 // If the bass is high, we MUST shift up.
@@ -1496,6 +1684,24 @@ export function getAccompanimentNotes(
                     voicing[targetIdx] = getFrequency(midi + 12);
                 }
             }
+        }
+
+        if (genre === 'Jazz' && previousVoicingMidis.length > 0) {
+            const minMidi = reserveBassSpace && bassMidi ? bassMidi + 13 : 52;
+            const alignedMidis = recenterVoicing(
+                getMidiVoicing(voicing),
+                previousVoicingMidis,
+                minMidi,
+                84,
+            );
+            if (alignedMidis.length > 0) {
+                voicing = alignedMidis.map((midi) => getFrequency(midi));
+            }
+        }
+
+        const finalVoicingMidis = getMidiVoicing(voicing);
+        if (finalVoicingMidis.length > 0) {
+            compingState.lastVoicingMidis = [...finalVoicingMidis];
         }
 
         voicing.forEach((/** @type {number} */ f, i) => {

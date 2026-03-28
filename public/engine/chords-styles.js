@@ -88,7 +88,7 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
         if (quality === '7alt') {
             // Must have: 3, b7 AND at least one altered extension (b9/13 or #9/20)
             const base = [4, 10];
-            const altExtensions = intensity > 0.6 ? [13, 15, 20] : [15, 20];
+            const altExtensions = intensity > 0.6 ? [13, 15, 20] : [13, 20];
             return isRich ? [4, 10, 13, 15, 18, 20] : [...base, ...altExtensions.slice(0, 2)];
         }
         if (quality === '7b9') {

@@ -209,6 +209,76 @@ describe('Accompaniment Engine Logic', () => {
             expect(pitchClasses).toContain(5); // F = b7 of G7
         });
 
+        it('should favor smoother altered colors for Autumn Leaves style dominants', () => {
+            const preDominant = {
+                rootMidi: 57, // A
+                freqs: [261.63, 311.13, 392.0], // C4, Eb4, G4
+                intervals: [3, 10, 7],
+                quality: 'halfdim',
+                is7th: true,
+                beats: 4,
+            };
+            const alteredDominant = {
+                rootMidi: 50, // D
+                freqs: [184.99, 261.63, 349.23, 466.16], // F#3, C4, F4, Bb4 (old harsh pocket)
+                intervals: [4, 10, 15, 20],
+                quality: '7alt',
+                is7th: true,
+                beats: 4,
+            };
+            const tonicMinor = {
+                rootMidi: 55, // G
+                freqs: [233.08, 293.66, 392.0], // Bb3, D4, G4
+                intervals: [3, 7, 10],
+                quality: 'minor',
+                is7th: true,
+                beats: 4,
+            };
+
+            groove.genreFeel = 'Jazz';
+            chords.style = 'jazz';
+            chords.pianoRoots = false;
+            playback.practiceMode = true;
+            bass.enabled = false;
+            arranger.progression = [preDominant, alteredDominant, tonicMinor];
+            compingState.currentCell = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0];
+            compingState.lockedUntil = 100;
+
+            getAccompanimentNotes(getState(), preDominant, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            });
+
+            compingState.currentCell = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0];
+            const notes = getAccompanimentNotes(getState(), alteredDominant, 16, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).filter((note) => note.midi > 0);
+
+            const pitchClasses = notes.map((note) => note.midi % 12);
+            expect(pitchClasses).toContain(6); // F# = 3rd of D7
+            expect(pitchClasses).toContain(0); // C = b7 of D7
+            expect(pitchClasses.some((pitchClass) => pitchClass === 3 || pitchClass === 10)).toBe(
+                true,
+            ); // prefer b9 or b13 over exposed #9
+            expect(pitchClasses).not.toContain(5); // avoid exposed #9 (F) at medium settings
+        });
+
+        it('should store jazz voicings for continuity between chord hits', () => {
+            groove.genreFeel = 'Jazz';
+            chords.style = 'jazz';
+            chords.pianoRoots = false;
+            playback.practiceMode = true;
+            bass.enabled = false;
+
+            getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            });
+
+            expect(compingState.lastVoicingMidis.length).toBeGreaterThan(0);
+        });
+
         it('should shorten Rock durations when the comping cell is busy', () => {
             groove.genreFeel = 'Rock';
             compingState.currentCell = [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
