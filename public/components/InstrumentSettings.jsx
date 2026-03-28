@@ -9,6 +9,10 @@ import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
+/** @typedef {'groove' | 'bass' | 'chords' | 'harmony' | 'soloist'} StudioInstrumentModule */
+/** @typedef {'volume' | 'reverb'} InstrumentAudioControl */
+
+/** @param {StudioInstrumentModule} module */
 function getInstrumentState(module) {
     return useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
         const key = module === 'groove' ? 'groove' : module;
@@ -16,6 +20,7 @@ function getInstrumentState(module) {
     });
 }
 
+/** @param {StudioInstrumentModule} module */
 function getModuleName(module) {
     return module === 'groove'
         ? 'drum'
@@ -26,10 +31,12 @@ function getModuleName(module) {
             : module;
 }
 
+/** @param {StudioInstrumentModule} module */
 function hasInstrumentSpecificSettings(module) {
     return module !== 'bass';
 }
 
+/** @param {StudioInstrumentModule} module */
 function getInstrumentSpecificTitle(module) {
     return module === 'groove'
         ? 'Feel & Actions'
@@ -38,8 +45,13 @@ function getInstrumentSpecificTitle(module) {
           : 'Instrument';
 }
 
+/**
+ * @param {StudioInstrumentModule} module
+ * @param {InstrumentAudioControl} type
+ * @param {string | number} val
+ */
 function updateInstrumentAudio(module, type, val) {
-    const numVal = parseFloat(val);
+    const numVal = typeof val === 'number' ? val : parseFloat(val);
     const isReverb = type === 'reverb';
 
     dispatch(isReverb ? ACTIONS.SET_REVERB : ACTIONS.SET_VOLUME, {
@@ -66,7 +78,7 @@ function updateInstrumentAudio(module, type, val) {
 
 /**
  * @typedef {Object} InstrumentSettingsProps
- * @property {string} module
+ * @property {StudioInstrumentModule} module
  */
 
 /** @param {InstrumentSettingsProps & { title?: string, className?: string }} props */

@@ -11,7 +11,18 @@ import { SoloistControls } from './SoloistControls.jsx';
 import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
+/** @typedef {'groove' | 'bass' | 'chords' | 'harmony' | 'soloist'} StudioInstrumentModule */
+/**
+ * @typedef {Object} StudioInstrumentConfig
+ * @property {string} id
+ * @property {StudioInstrumentModule} module
+ * @property {string} label
+ * @property {string} icon
+ * @property {string} summary
+ * @property {string} accent
+ */
 
+/** @type {StudioInstrumentConfig[]} */
 const STUDIO_INSTRUMENTS = [
     {
         id: 'panel-grooves',
@@ -113,6 +124,7 @@ function getStudioState(enabled, tradeMode, module) {
     };
 }
 
+/** @param {StudioInstrumentModule} module */
 function hasStudioInstrumentControls(module) {
     return module !== 'bass';
 }
