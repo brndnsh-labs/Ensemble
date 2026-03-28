@@ -1,11 +1,10 @@
-import { Fragment } from 'preact';
 import React, { memo } from 'preact/compat';
-import { useEffect, useMemo, useRef } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
 import {
     buildLeadSheetRows,
     buildLeadSheetSections,
-    getLeadSheetDensity,
+    getLeadSheetLayoutProfile,
 } from '../lead-sheet-model.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -93,15 +92,15 @@ const ChordCardComponent = ({ chord, isActive, notation, leadSheetMelody, showSp
     return (
         <div className={classNames} ref={cardRef} onClick={handleClick}>
             {disp ? (
-                <Fragment>
+                <span className="chord-symbol">
                     <span className="root">{formatUnicodeSymbols(disp.root)}</span>
                     <span className="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
                     {disp.bass && (
                         <span className="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>
                     )}
-                </Fragment>
+                </span>
             ) : (
-                formatUnicodeSymbols(chord.absName) || '...'
+                <span className="chord-symbol">{formatUnicodeSymbols(chord.absName) || '...'}</span>
             )}
 
             {sparklineNotes.length > 0 && (
@@ -123,6 +122,20 @@ const ChordCardComponent = ({ chord, isActive, notation, leadSheetMelody, showSp
 };
 
 const ChordCard = memo(ChordCardComponent);
+
+/**
+ * @returns {{ width: number, height: number }}
+ */
+function getViewportSize() {
+    if (typeof window === 'undefined') {
+        return { width: 1280, height: 800 };
+    }
+
+    return {
+        width: window.innerWidth || 1280,
+        height: window.innerHeight || 800,
+    };
+}
 
 /**
  * @param {string} sectionId
@@ -155,8 +168,30 @@ export function ChordVisualizer() {
 
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const containerRef = useRef(null);
+    const [viewportSize, setViewportSize] = useState(getViewportSize);
     const timeSignatureConfig =
         /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const handleResize = () => {
+            setViewportSize((current) => {
+                const next = getViewportSize();
+                if (current.width === next.width && current.height === next.height) {
+                    return current;
+                }
+
+                return next;
+            });
+        };
+
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const sectionBlocks = useMemo(
         () => buildLeadSheetSections(progression, sectionsState, timeSignatureConfig),
@@ -164,10 +199,26 @@ export function ChordVisualizer() {
     );
 
     const leadSheetRows = useMemo(() => buildLeadSheetRows(sectionBlocks), [sectionBlocks]);
+    const rowIndexById = useMemo(
+        () =>
+            new Map(
+                leadSheetRows.map((/** @type {any} */ row, index) => {
+                    return [row.id, index];
+                }),
+            ),
+        [leadSheetRows],
+    );
 
     const totalMeasures = useMemo(
         () => leadSheetRows.reduce((total, row) => total + row.measures.length, 0),
         [leadSheetRows],
+    );
+    const activeRowIndex = leadSheetRows.findIndex((/** @type {any} */ row) =>
+        row.measures.some((/** @type {any} */ measure) =>
+            measure.chords.some(
+                (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
+            ),
+        ),
     );
     const activeSectionId =
         leadSheetRows.find((/** @type {any} */ row) =>
@@ -198,41 +249,85 @@ export function ChordVisualizer() {
         return groups;
     }, [leadSheetRows]);
 
-    const density = getLeadSheetDensity(totalMeasures);
+    const layoutProfile = useMemo(
+        () =>
+            getLeadSheetLayoutProfile({
+                totalMeasures,
+                rowCount: leadSheetRows.length,
+                viewportWidth: viewportSize.width,
+                viewportHeight: viewportSize.height,
+                isMaximized,
+            }),
+        [isMaximized, leadSheetRows.length, totalMeasures, viewportSize.height, viewportSize.width],
+    );
+    const density = layoutProfile.density;
     const showSparkline = isMaximized && soloistStyle === 'lead_sheet' && totalMeasures <= 16;
+    const containerStyle = {
+        '--lead-content-distribution': layoutProfile.contentDistribution,
+        '--lead-vertical-fill': layoutProfile.verticalFillScale.toFixed(2),
+        '--lead-vertical-gap-fill': layoutProfile.verticalGapScale.toFixed(2),
+        '--lead-vertical-type-fill': layoutProfile.verticalTypeScale.toFixed(2),
+    };
 
     useEffect(() => {
         const container = containerRef.current;
-        if (!container || isMaximized) {
+        if (!container || activeRowIndex < 0) {
             return;
         }
 
-        const activeCard = container.querySelector('.chord-card.active');
-        if (!activeCard) {
+        const rows = Array.from(container.querySelectorAll('.lead-sheet-row'));
+        const activeRow = rows[activeRowIndex];
+        if (!activeRow) {
             return;
         }
 
+        const lookaheadIndex = Math.min(
+            rows.length - 1,
+            activeRowIndex + layoutProfile.lookaheadRows,
+        );
+        const lookaheadRow = rows[lookaheadIndex] || activeRow;
         const containerRect = container.getBoundingClientRect();
-        const cardRect = activeCard.getBoundingClientRect();
-        const isFullyVisible =
-            cardRect.top >= containerRect.top + 12 && cardRect.bottom <= containerRect.bottom - 12;
+        const scrollPadding = layoutProfile.scrollMode === 'guided' ? 18 : 12;
+        const getOffsetTop = (/** @type {Element} */ element) =>
+            element.getBoundingClientRect().top - containerRect.top + container.scrollTop;
+        const activeTop = getOffsetTop(activeRow);
+        const lookaheadBottom = getOffsetTop(lookaheadRow) + lookaheadRow.clientHeight;
+        const visibleTop = container.scrollTop + scrollPadding;
+        const visibleBottom = container.scrollTop + container.clientHeight - scrollPadding;
+        const shouldRevealAbove = activeTop < visibleTop;
+        const shouldRevealAhead = lookaheadBottom > visibleBottom;
 
-        if (!isFullyVisible) {
-            activeCard.scrollIntoView({
-                block: 'center',
-                inline: 'nearest',
+        if ((shouldRevealAbove || shouldRevealAhead) && typeof container.scrollTo === 'function') {
+            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+            const nextScrollTop = shouldRevealAbove
+                ? Math.max(0, activeTop - scrollPadding)
+                : Math.min(maxScrollTop, lookaheadBottom - container.clientHeight + scrollPadding);
+
+            container.scrollTo({
+                top: nextScrollTop,
                 behavior: 'smooth',
             });
         }
-    }, [isMaximized, lastActiveChordIndex]);
+    }, [
+        activeRowIndex,
+        lastActiveChordIndex,
+        layoutProfile.lookaheadRows,
+        layoutProfile.scrollMode,
+    ]);
 
     return (
         <div
-            className={`display-area lead-sheet lead-sheet--${density}`}
+            className={`display-area lead-sheet lead-sheet--${density} lead-sheet--viewport-${layoutProfile.viewport} lead-sheet--scroll-${layoutProfile.scrollMode}`}
             id="chordVisualizer"
             ref={containerRef}
+            style={containerStyle}
+            data-measures-per-row={layoutProfile.measuresPerRow}
+            data-row-count={leadSheetRows.length}
+            data-scroll-mode={layoutProfile.scrollMode}
             data-total-measures={totalMeasures}
             data-density={density}
+            data-viewport={layoutProfile.viewport}
+            data-vertical-fill={layoutProfile.verticalFillMode}
         >
             {isMaximized && (
                 <button
@@ -256,6 +351,7 @@ export function ChordVisualizer() {
                         data-section-id={sectionGroup.sectionId}
                     >
                         {sectionGroup.rows.map((/** @type {any} */ row) => {
+                            const rowIndex = rowIndexById.get(row.id) ?? -1;
                             const isActiveRow = row.measures.some((/** @type {any} */ measure) =>
                                 measure.chords.some(
                                     (/** @type {any} */ chord) =>
@@ -265,6 +361,10 @@ export function ChordVisualizer() {
                             const hasSectionMarkers = row.measures.some(
                                 (/** @type {any} */ measure) => measure.isSectionStart,
                             );
+                            const isUpcomingRow =
+                                activeRowIndex >= 0 &&
+                                rowIndex > activeRowIndex &&
+                                rowIndex <= activeRowIndex + layoutProfile.lookaheadRows;
 
                             return (
                                 <div
@@ -272,8 +372,9 @@ export function ChordVisualizer() {
                                     className={`lead-sheet-row${
                                         row.isSectionStart ? ' lead-sheet-row--section-start' : ''
                                     }${isActiveRow ? ' lead-sheet-row--active' : ''}${
-                                        hasSectionMarkers ? ' lead-sheet-row--with-markers' : ''
-                                    }`}
+                                        isUpcomingRow ? ' lead-sheet-row--upcoming' : ''
+                                    }${hasSectionMarkers ? ' lead-sheet-row--with-markers' : ''}`}
+                                    data-row-index={rowIndex}
                                     data-section-id={row.sectionId}
                                 >
                                     {row.measures.map(

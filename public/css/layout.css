@@ -1067,7 +1067,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 .workspace-arranger-chords .lead-sheet-row {
-    width: min(1200px, 100%);
+    width: min(var(--lead-row-width, 1440px), 100%);
     margin-left: auto;
     margin-right: auto;
 }

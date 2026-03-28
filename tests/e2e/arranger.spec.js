@@ -26,6 +26,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         // Verify structural elements are present
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
+        await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
+        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
         await expect(visualizer.locator('.measure-box').first()).toBeVisible();
         await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
@@ -85,15 +87,47 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(firstChord).toBeVisible();
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
+        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'expanded-readable');
         await expect
             .poll(async () =>
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
             )
-            .toBeGreaterThan(16);
+            .toBeGreaterThan(18);
         await expect(visualizer).toHaveJSProperty(
             'scrollHeight',
             await visualizer.evaluate((el) => el.clientHeight),
         );
+    });
+
+    test('Short fit charts stay top-anchored instead of floating in the middle', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+
+        for (const chartName of ['Pop (Standard)', 'Giant Steps']) {
+            await page.getByRole('button', { name: 'Open arranger actions' }).click();
+            await page.locator('.workspace-library-fab').dispatchEvent('click');
+            await page.getByRole('button', { name: chartName }).click();
+
+            const visualizer = page.locator('#chordVisualizer');
+            await expect(visualizer).toBeVisible();
+
+            const spacing = await visualizer.evaluate((el) => {
+                const rect = el.getBoundingClientRect();
+                const rows = Array.from(el.querySelectorAll('.lead-sheet-row'));
+                const first = rows[0]?.getBoundingClientRect();
+                const last = rows.at(-1)?.getBoundingClientRect();
+                return {
+                    topGap: first ? first.top - rect.top : null,
+                    bottomGap: last ? rect.bottom - last.bottom : null,
+                };
+            });
+
+            expect(spacing.topGap).not.toBeNull();
+            expect(spacing.bottomGap).not.toBeNull();
+            expect(spacing.topGap).toBeLessThan(60);
+            expect(spacing.bottomGap).toBeGreaterThan(spacing.topGap + 40);
+        }
     });
 
     test('All The Things You Are stays legible in ultra-compact mode', async ({ page }) => {
@@ -116,6 +150,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await expect(visualizer).toHaveAttribute('data-total-measures', '36');
         await expect(visualizer).toHaveAttribute('data-density', 'ultra-compact');
+        await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
+        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'guided');
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(7);
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(9);
         expect(rowMeasureCounts).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 4]);

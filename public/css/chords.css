@@ -1,17 +1,26 @@
 /* --- Lead Sheet Base --- */
 .display-area {
-    --lead-row-gap: 0.34rem;
-    --lead-measure-gap: 0.24rem;
-    --lead-marker-reserve: 0.62rem;
-    --lead-marker-lane-gap: 0.12rem;
-    --lead-marker-size: 0.6rem;
-    --lead-measure-min-height: 44px;
-    --lead-chord-min-height: 36px;
-    --lead-card-padding: 0.16rem 0.12rem;
-    --lead-font-size: clamp(1.08rem, 2.32vw, 1.42rem);
-    background: var(--input-bg);
-    border-radius: var(--radius-md);
-    padding: var(--space-2);
+    --lead-content-distribution: start;
+    --lead-vertical-fill: 1;
+    --lead-vertical-gap-fill: 1;
+    --lead-vertical-type-fill: 1;
+    --lead-row-width: 1280px;
+    --lead-row-gap: 0.46rem;
+    --lead-measure-gap: 0.3rem;
+    --lead-marker-reserve: 0.72rem;
+    --lead-marker-lane-gap: 0.14rem;
+    --lead-marker-size: 0.64rem;
+    --lead-measure-min-height: 54px;
+    --lead-chord-min-height: 44px;
+    --lead-card-padding: 0.24rem 0.18rem;
+    --lead-font-size: clamp(1.16rem, 2.55vw, 1.72rem);
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--input-bg), white 3%),
+        color-mix(in srgb, var(--input-bg), black 2%)
+    );
+    border-radius: 18px;
+    padding: clamp(0.36rem, 1.1vw, 0.9rem);
     margin-bottom: var(--space-2);
     position: relative;
     overflow-x: hidden;
@@ -22,50 +31,59 @@
     border: 1px solid var(--border-color);
     box-sizing: border-box;
     display: grid;
-    gap: var(--lead-row-gap);
-    align-content: start;
+    gap: calc(var(--lead-row-gap) * var(--lead-vertical-gap-fill));
+    align-content: var(--lead-content-distribution);
+    align-items: start;
     scroll-behavior: smooth;
+    scroll-padding-block: clamp(2rem, 16vh, 7rem);
+    scroll-snap-type: y proximity;
     overscroll-behavior: contain;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .lead-sheet--compact {
-    --lead-row-gap: 0.28rem;
-    --lead-measure-gap: 0.18rem;
-    --lead-marker-reserve: 0.54rem;
+    --lead-row-gap: 0.32rem;
+    --lead-measure-gap: 0.22rem;
+    --lead-marker-reserve: 0.56rem;
     --lead-marker-lane-gap: 0.1rem;
-    --lead-marker-size: 0.54rem;
-    --lead-measure-min-height: 36px;
-    --lead-chord-min-height: 30px;
-    --lead-card-padding: 0.12rem 0.1rem;
-    --lead-font-size: clamp(0.98rem, 2.12vw, 1.16rem);
+    --lead-marker-size: 0.56rem;
+    --lead-measure-min-height: 40px;
+    --lead-chord-min-height: 34px;
+    --lead-card-padding: 0.14rem 0.12rem;
+    --lead-font-size: clamp(1rem, 2.2vw, 1.28rem);
 }
 
 .lead-sheet--ultra-compact {
-    --lead-row-gap: 0.24rem;
+    --lead-row-gap: 0.2rem;
     --lead-measure-gap: 0.16rem;
-    --lead-marker-reserve: 0.48rem;
-    --lead-marker-lane-gap: 0.08rem;
-    --lead-marker-size: 0.52rem;
-    --lead-measure-min-height: 34px;
+    --lead-marker-reserve: 0.4rem;
+    --lead-marker-lane-gap: 0.06rem;
+    --lead-marker-size: 0.5rem;
+    --lead-measure-min-height: 32px;
     --lead-chord-min-height: 28px;
     --lead-card-padding: 0.1rem 0.08rem;
-    --lead-font-size: clamp(0.88rem, 2vw, 1.06rem);
+    --lead-font-size: clamp(0.86rem, 2.05vw, 1.08rem);
 }
 
 .lead-sheet-section-group {
     display: grid;
-    gap: var(--lead-row-gap);
+    gap: calc(var(--lead-row-gap) * 0.8 * var(--lead-vertical-gap-fill));
+    align-content: start;
+    align-self: start;
     position: relative;
     isolation: isolate;
+    transition: transform var(--anim-fast) var(--anim-ease);
 }
 
 .lead-sheet-section-group--active::before {
     content: "";
     position: absolute;
-    inset: -0.12rem -0.22rem;
-    border-radius: 18px;
-    background: color-mix(in srgb, var(--accent-color), transparent 94%);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 90%);
+    inset: -0.16rem -0.18rem;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--accent-color), transparent 92%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 84%),
+        0 10px 24px rgba(0, 0, 0, 0.08);
     pointer-events: none;
     z-index: 0;
 }
@@ -79,6 +97,8 @@
     position: relative;
     align-items: start;
     isolation: isolate;
+    scroll-snap-align: start;
+    scroll-margin-block: clamp(1.6rem, 12vh, 6rem);
 }
 
 .lead-sheet-row--with-markers {
@@ -98,9 +118,14 @@
     z-index: 2;
 }
 
+.lead-sheet-row--upcoming .measure-box {
+    border-color: color-mix(in srgb, var(--accent-color), transparent 78%);
+    background: color-mix(in srgb, var(--panel-color), var(--accent-color) 4%);
+}
+
 .lead-sheet-marker-slot {
     min-width: 0;
-    min-height: var(--lead-marker-reserve);
+    min-height: calc(var(--lead-marker-reserve) * var(--lead-vertical-gap-fill));
     display: flex;
     align-items: flex-end;
     justify-content: flex-start;
@@ -114,12 +139,12 @@
     align-items: center;
     justify-content: center;
     min-width: 1.35rem;
-    padding: 0.1rem 0.32rem;
+    padding: 0.08rem 0.3rem;
     border-radius: 999px;
     border: 1px solid color-mix(in srgb, var(--accent-color), transparent 58%);
     background: color-mix(in srgb, var(--accent-color), transparent 88%);
     color: var(--text-color);
-    font-size: var(--lead-marker-size);
+    font-size: calc(var(--lead-marker-size) * var(--lead-vertical-type-fill));
     font-weight: 800;
     letter-spacing: 0.08em;
     line-height: 1;
@@ -154,33 +179,52 @@
     align-items: stretch;
     gap: 0;
     min-width: 0;
-    min-height: var(--lead-measure-min-height);
+    min-height: calc(var(--lead-measure-min-height) * var(--lead-vertical-fill));
     position: relative;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--panel-color);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--panel-color), white 4%),
+        color-mix(in srgb, var(--panel-color), black 2%)
+    );
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 1px 2px rgba(0, 0, 0, 0.05);
     z-index: 1;
-    scroll-margin-block: 16vh;
+    scroll-margin-block: clamp(2rem, 16vh, 7rem);
     transition:
         border-color var(--anim-fast) var(--anim-ease),
         box-shadow var(--anim-fast) var(--anim-ease),
         background-color var(--anim-fast) var(--anim-ease);
 }
 
+.measure-box::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 14%;
+    bottom: 14%;
+    width: 1px;
+    background: color-mix(in srgb, var(--border-color), transparent 18%);
+    pointer-events: none;
+    opacity: 0.7;
+}
+
 .measure-box--active {
     border-color: color-mix(in srgb, var(--accent-color), transparent 25%);
     box-shadow:
         inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 35%),
-        0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 75%);
+        0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 75%),
+        0 8px 22px color-mix(in srgb, var(--accent-color), transparent 90%);
     background: color-mix(in srgb, var(--panel-color), var(--accent-color) 8%);
 }
 
 .chord-card {
     flex: 1 1 0;
     min-width: 0;
-    min-height: var(--lead-chord-min-height);
+    min-height: calc(var(--lead-chord-min-height) * var(--lead-vertical-fill));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -190,9 +234,10 @@
     border: none;
     border-radius: 0;
     color: var(--text-color);
-    font-size: calc(var(--lead-font-size) * var(--font-scale, 1));
-    font-weight: 650;
-    line-height: 1.05;
+    font-size: calc(var(--lead-font-size) * var(--font-scale, 1) * var(--lead-vertical-type-fill));
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.025em;
     text-align: center;
     cursor: pointer;
     transition:
@@ -203,6 +248,15 @@
 
 .chord-card + .chord-card {
     border-left: 1px solid color-mix(in srgb, var(--border-color), transparent 18%);
+}
+
+.chord-symbol {
+    display: inline-flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.02em;
+    max-width: 100%;
+    white-space: nowrap;
 }
 
 .chord-card--with-sparkline {
@@ -225,33 +279,36 @@
 
 .root {
     display: inline-block;
+    font-weight: 760;
 }
 
 .suffix {
-    font-size: 0.62em;
-    vertical-align: super;
-    margin-left: 1px;
+    align-self: flex-start;
+    font-size: 0.58em;
+    margin-left: 0.02em;
     opacity: 0.82;
+    transform: translateY(0.04em);
 }
 
 .bass-note {
-    font-size: 0.72em;
+    align-self: flex-end;
+    font-size: 0.64em;
     opacity: 0.74;
-    margin-left: 1px;
+    margin-left: 0.06em;
     font-weight: 500;
 }
 
 /* --- Maximized View --- */
 .chord-maximized .display-area {
-    --lead-row-gap: 0.42rem;
-    --lead-measure-gap: 0.3rem;
-    --lead-marker-reserve: 0.72rem;
+    --lead-row-gap: 0.38rem;
+    --lead-measure-gap: 0.24rem;
+    --lead-marker-reserve: 0.6rem;
     --lead-marker-lane-gap: 0.14rem;
-    --lead-marker-size: 0.68rem;
-    --lead-measure-min-height: 56px;
-    --lead-chord-min-height: 48px;
-    --lead-card-padding: 0.28rem 0.22rem;
-    --lead-font-size: clamp(1.28rem, 2.7vw, 1.95rem);
+    --lead-marker-size: 0.62rem;
+    --lead-measure-min-height: 48px;
+    --lead-chord-min-height: 40px;
+    --lead-card-padding: 0.18rem 0.16rem;
+    --lead-font-size: clamp(1.18rem, 2.5vw, 1.78rem);
     position: fixed;
     top: 80px;
     left: 0;
@@ -266,19 +323,21 @@
 }
 
 .chord-maximized .lead-sheet--compact {
-    --lead-row-gap: 0.34rem;
-    --lead-measure-gap: 0.22rem;
-    --lead-measure-min-height: 46px;
-    --lead-chord-min-height: 40px;
-    --lead-font-size: clamp(1.08rem, 2.3vw, 1.5rem);
+    --lead-row-gap: 0.28rem;
+    --lead-measure-gap: 0.18rem;
+    --lead-marker-reserve: 0.48rem;
+    --lead-measure-min-height: 38px;
+    --lead-chord-min-height: 34px;
+    --lead-font-size: clamp(1.04rem, 2.1vw, 1.4rem);
 }
 
 .chord-maximized .lead-sheet--ultra-compact {
-    --lead-row-gap: 0.28rem;
-    --lead-measure-gap: 0.18rem;
-    --lead-measure-min-height: 40px;
-    --lead-chord-min-height: 34px;
-    --lead-font-size: clamp(1rem, 2.05vw, 1.26rem);
+    --lead-row-gap: 0.2rem;
+    --lead-measure-gap: 0.14rem;
+    --lead-marker-reserve: 0.38rem;
+    --lead-measure-min-height: 32px;
+    --lead-chord-min-height: 28px;
+    --lead-font-size: clamp(0.96rem, 1.9vw, 1.18rem);
 }
 
 .chord-maximize-exit-btn {
@@ -365,35 +424,38 @@
 /* --- Mobile / Small Screens --- */
 @media (max-width: 600px) {
     .display-area {
-        --lead-row-gap: 0.24rem;
-        --lead-measure-gap: 0.16rem;
-        --lead-marker-reserve: 0.5rem;
-        --lead-marker-lane-gap: 0.08rem;
-        --lead-marker-size: 0.55rem;
+        --lead-row-width: 100%;
+        --lead-row-gap: 0.18rem;
+        --lead-measure-gap: 0.1rem;
+        --lead-marker-reserve: 0.34rem;
+        --lead-marker-lane-gap: 0.04rem;
+        --lead-marker-size: 0.46rem;
         --lead-measure-min-height: 34px;
         --lead-chord-min-height: 28px;
-        --lead-card-padding: 0.1rem 0.08rem;
-        --lead-font-size: clamp(0.98rem, 4vw, 1.12rem);
-        padding: 0.28rem;
-        scroll-padding-block: 18vh;
+        --lead-card-padding: 0.08rem 0.06rem;
+        --lead-font-size: clamp(0.96rem, 4.4vw, 1.12rem);
+        padding: 0.18rem;
+        scroll-padding-block: 14vh;
     }
 
     .lead-sheet--compact {
-        --lead-marker-reserve: 0.44rem;
-        --lead-marker-lane-gap: 0.06rem;
-        --lead-measure-min-height: 32px;
-        --lead-chord-min-height: 27px;
-        --lead-font-size: clamp(0.88rem, 3.55vw, 1rem);
+        --lead-row-gap: 0.14rem;
+        --lead-measure-gap: 0.08rem;
+        --lead-marker-reserve: 0.3rem;
+        --lead-marker-lane-gap: 0.03rem;
+        --lead-measure-min-height: 30px;
+        --lead-chord-min-height: 26px;
+        --lead-font-size: clamp(0.88rem, 4vw, 1rem);
     }
 
     .lead-sheet--ultra-compact {
-        --lead-row-gap: 0.2rem;
-        --lead-measure-gap: 0.14rem;
-        --lead-marker-reserve: 0.4rem;
-        --lead-marker-lane-gap: 0.04rem;
-        --lead-measure-min-height: 30px;
-        --lead-chord-min-height: 26px;
-        --lead-font-size: clamp(0.82rem, 3.35vw, 0.92rem);
+        --lead-row-gap: 0.12rem;
+        --lead-measure-gap: 0.08rem;
+        --lead-marker-reserve: 0.22rem;
+        --lead-marker-lane-gap: 0.02rem;
+        --lead-measure-min-height: 26px;
+        --lead-chord-min-height: 24px;
+        --lead-font-size: clamp(0.8rem, 3.85vw, 0.96rem);
     }
 
     .lead-sheet-marker-slot {
@@ -401,42 +463,42 @@
     }
 
     .lead-sheet-row-marker {
-        padding: 0.08rem 0.26rem;
+        padding: 0.05rem 0.18rem;
     }
 
     .chord-maximized .display-area {
-        --lead-row-gap: 0.24rem;
-        --lead-measure-gap: 0.14rem;
-        --lead-marker-reserve: 0.42rem;
+        --lead-row-gap: 0.18rem;
+        --lead-measure-gap: 0.1rem;
+        --lead-marker-reserve: 0.3rem;
         --lead-marker-lane-gap: 0.06rem;
-        --lead-marker-size: 0.56rem;
-        --lead-measure-min-height: 36px;
-        --lead-chord-min-height: 30px;
+        --lead-marker-size: 0.48rem;
+        --lead-measure-min-height: 30px;
+        --lead-chord-min-height: 26px;
         --lead-card-padding: 0.08rem 0.06rem;
-        --lead-font-size: clamp(1.06rem, 4.9vw, 1.22rem);
+        --lead-font-size: clamp(0.98rem, 4.8vw, 1.16rem);
         top: 64px;
         height: calc(100dvh - 64px - env(safe-area-inset-bottom));
         padding: 0.24rem 0.24rem calc(0.24rem + env(safe-area-inset-bottom));
     }
 
     .chord-maximized .lead-sheet--compact {
-        --lead-row-gap: 0.2rem;
-        --lead-measure-gap: 0.12rem;
-        --lead-marker-reserve: 0.38rem;
+        --lead-row-gap: 0.14rem;
+        --lead-measure-gap: 0.08rem;
+        --lead-marker-reserve: 0.24rem;
         --lead-marker-lane-gap: 0.04rem;
-        --lead-font-size: clamp(1.02rem, 4.6vw, 1.14rem);
-        --lead-measure-min-height: 34px;
-        --lead-chord-min-height: 28px;
+        --lead-font-size: clamp(0.92rem, 4.4vw, 1.06rem);
+        --lead-measure-min-height: 28px;
+        --lead-chord-min-height: 25px;
     }
 
     .chord-maximized .lead-sheet--ultra-compact {
-        --lead-row-gap: 0.18rem;
-        --lead-measure-gap: 0.12rem;
-        --lead-marker-reserve: 0.36rem;
+        --lead-row-gap: 0.12rem;
+        --lead-measure-gap: 0.08rem;
+        --lead-marker-reserve: 0.2rem;
         --lead-marker-lane-gap: 0.04rem;
-        --lead-font-size: clamp(0.98rem, 4.3vw, 1.08rem);
-        --lead-measure-min-height: 32px;
-        --lead-chord-min-height: 27px;
+        --lead-font-size: clamp(0.86rem, 4.05vw, 0.98rem);
+        --lead-measure-min-height: 26px;
+        --lead-chord-min-height: 23px;
     }
 
     .chord-maximized .chord-maximize-exit-btn {
