@@ -9,118 +9,275 @@ import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
+function getInstrumentState(module) {
+    return useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
+        const key = module === 'groove' ? 'groove' : module;
+        return /** @type {any} */ (s)[key];
+    });
+}
+
+function getModuleName(module) {
+    return module === 'groove'
+        ? 'drum'
+        : module === 'chords'
+          ? 'chord'
+          : module === 'harmony'
+            ? 'harmony'
+            : module;
+}
+
+function hasInstrumentSpecificSettings(module) {
+    return module !== 'bass';
+}
+
+function getInstrumentSpecificTitle(module) {
+    return module === 'groove'
+        ? 'Feel & Actions'
+        : module === 'chords' || module === 'harmony'
+          ? 'Voicing'
+          : 'Instrument';
+}
+
+function updateInstrumentAudio(module, type, val) {
+    const numVal = parseFloat(val);
+    const isReverb = type === 'reverb';
+
+    dispatch(isReverb ? ACTIONS.SET_REVERB : ACTIONS.SET_VOLUME, {
+        module,
+        value: numVal,
+    });
+    saveCurrentState();
+
+    const internalName =
+        module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
+    const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
+    const multiplier = isReverb
+        ? 1.0
+        : /** @type {any} */ (MIXER_GAIN_MULTIPLIERS)[internalName] || 1.0;
+
+    const node = /** @type {any} */ (playback)[gainKey];
+    if (node && playback.audio) {
+        const target = Math.max(0.0001, numVal * multiplier);
+        node.gain.cancelScheduledValues(playback.audio.currentTime);
+        node.gain.setValueAtTime(node.gain.value, playback.audio.currentTime);
+        node.gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
+    }
+}
+
 /**
  * @typedef {Object} InstrumentSettingsProps
  * @property {string} module
  */
-/** @param {InstrumentSettingsProps} props */
-export function InstrumentSettings({ module }) {
-    const state = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
-        const key = module === 'groove' ? 'groove' : module;
-        return /** @type {any} */ (s)[key];
-    });
+
+/** @param {InstrumentSettingsProps & { title?: string, className?: string }} props */
+export function InstrumentMixerSettings({ module, title = 'Mixer', className = '' }) {
+    const state = getInstrumentState(module);
 
     if (!state) {
         return null;
     }
 
-    const moduleName =
-        module === 'groove'
-            ? 'drum'
-            : module === 'chords'
-              ? 'chord'
-              : module === 'harmony'
-                ? 'harmony'
-                : module;
-
-    // Helper to update Volume/Reverb with audio ramping
-    const updateAudio = (/** @type {string} */ type, /** @type {any} */ val) => {
-        const numVal = parseFloat(val);
-        const isReverb = type === 'reverb';
-
-        if (state) {
-            dispatch(isReverb ? ACTIONS.SET_REVERB : ACTIONS.SET_VOLUME, {
-                module,
-                value: numVal,
-            });
-            saveCurrentState();
-        }
-
-        const internalName =
-            module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
-
-        const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
-        const multiplier = isReverb
-            ? 1.0
-            : /** @type {any} */ (MIXER_GAIN_MULTIPLIERS)[internalName] || 1.0;
-
-        const node = /** @type {any} */ (playback)[gainKey];
-        if (node && playback.audio) {
-            const target = Math.max(0.0001, numVal * multiplier);
-            node.gain.cancelScheduledValues(playback.audio.currentTime);
-            node.gain.setValueAtTime(node.gain.value, playback.audio.currentTime);
-            node.gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
-        }
-    };
+    const moduleName = getModuleName(module);
 
     return (
-        <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
-            {/* Left Column: Instrument Specifics */}
-            <SettingGroup
-                title={
-                    module === 'groove'
-                        ? 'Feel & Actions'
-                        : module === 'chords' || module === 'harmony'
-                          ? 'Voicing'
-                          : 'Instrument'
-                }
+        <SettingGroup title={title} className={className}>
+            <SettingRow
+                label="Volume"
+                id={`${moduleName}Volume`}
+                valueDisplay={`${Math.round(state.volume * 100)}%`}
             >
-                {module === 'chords' && (
-                    <SettingRow label="Density" id="densitySelect">
-                        <Select
-                            id="densitySelect"
-                            value={state.density || 'standard'}
-                            onChange={(/** @type {any} */ val) => {
-                                dispatch(ACTIONS.SET_DENSITY, val);
-                                saveCurrentState();
-                            }}
-                            options={[
-                                { value: 'thin', label: 'Thin (3 notes)' },
-                                { value: 'standard', label: 'Standard (4 notes)' },
-                                { value: 'rich', label: 'Rich (5+ notes)' },
-                            ]}
-                        />
-                    </SettingRow>
-                )}
+                <Slider
+                    id={`${moduleName}Volume`}
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={state.volume}
+                    onInput={(/** @type {any} */ val) =>
+                        updateInstrumentAudio(module, 'volume', val)
+                    }
+                    ariaValueText={`${Math.round(state.volume * 100)}%`}
+                />
+            </SettingRow>
+            <SettingRow
+                label="Reverb"
+                id={`${moduleName}Reverb`}
+                valueDisplay={`${Math.round(state.reverb * 100)}%`}
+            >
+                <Slider
+                    id={`${moduleName}Reverb`}
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={state.reverb}
+                    onInput={(/** @type {any} */ val) =>
+                        updateInstrumentAudio(module, 'reverb', val)
+                    }
+                    ariaValueText={`${Math.round(state.reverb * 100)}%`}
+                />
+            </SettingRow>
+        </SettingGroup>
+    );
+}
 
-                {module === 'chords' && (
-                    <SettingRow label="Piano Roots" id="pianoRootsCheck">
-                        <Toggle
-                            id="pianoRootsCheck"
-                            checked={state.pianoRoots}
-                            onChange={(/** @type {any} */ val) => {
-                                dispatch(ACTIONS.SET_PIANO_ROOTS, val);
-                                saveCurrentState();
-                            }}
-                        />
-                    </SettingRow>
-                )}
+/**
+ * @param {InstrumentSettingsProps & { accent?: string, icon?: string, label?: string }} props
+ */
+export function InstrumentMixerStrip({ module, accent = '', icon = '', label }) {
+    const state = getInstrumentState(module);
 
-                {module === 'harmony' && (
+    if (!state) {
+        return null;
+    }
+
+    const moduleName = getModuleName(module);
+    const title = label || module;
+    const volumeDisplay = `${Math.round(state.volume * 100)}%`;
+    const reverbDisplay = `${Math.round(state.reverb * 100)}%`;
+
+    return (
+        <section
+            class={`workspace-studio-mixer-strip ${accent ? `workspace-studio-mixer-strip--${accent}` : ''}`}
+        >
+            <div class="workspace-studio-mixer-strip-heading">
+                {icon && (
+                    <span class="workspace-studio-mixer-strip-icon" aria-hidden="true">
+                        {icon}
+                    </span>
+                )}
+                <h4>{title}</h4>
+            </div>
+            <div class="workspace-studio-mixer-strip-controls">
+                <div class="workspace-studio-mixer-strip-slider">
+                    <label
+                        class="workspace-studio-mixer-strip-slider-label"
+                        htmlFor={`${moduleName}Volume`}
+                    >
+                        Vol
+                    </label>
+                    <Slider
+                        id={`${moduleName}Volume`}
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={state.volume}
+                        onInput={(/** @type {any} */ val) =>
+                            updateInstrumentAudio(module, 'volume', val)
+                        }
+                        ariaLabel={`${title} volume`}
+                        ariaValueText={volumeDisplay}
+                    />
+                    <span class="workspace-studio-mixer-strip-slider-value">{volumeDisplay}</span>
+                </div>
+                <div class="workspace-studio-mixer-strip-slider">
+                    <label
+                        class="workspace-studio-mixer-strip-slider-label"
+                        htmlFor={`${moduleName}Reverb`}
+                    >
+                        Rev
+                    </label>
+                    <Slider
+                        id={`${moduleName}Reverb`}
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={state.reverb}
+                        onInput={(/** @type {any} */ val) =>
+                            updateInstrumentAudio(module, 'reverb', val)
+                        }
+                        ariaLabel={`${title} reverb`}
+                        ariaValueText={reverbDisplay}
+                    />
+                    <span class="workspace-studio-mixer-strip-slider-value">{reverbDisplay}</span>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/**
+ * @param {InstrumentSettingsProps} props
+ */
+export function InstrumentSpecificSettings({ module }) {
+    const state = getInstrumentState(module);
+
+    if (!state || !hasInstrumentSpecificSettings(module)) {
+        return null;
+    }
+
+    return (
+        <SettingGroup title={getInstrumentSpecificTitle(module)}>
+            {module === 'chords' && (
+                <SettingRow label="Density" id="densitySelect">
+                    <Select
+                        id="densitySelect"
+                        value={state.density || 'standard'}
+                        onChange={(/** @type {any} */ val) => {
+                            dispatch(ACTIONS.SET_DENSITY, val);
+                            saveCurrentState();
+                        }}
+                        options={[
+                            { value: 'thin', label: 'Thin (3 notes)' },
+                            { value: 'standard', label: 'Standard (4 notes)' },
+                            { value: 'rich', label: 'Rich (5+ notes)' },
+                        ]}
+                    />
+                </SettingRow>
+            )}
+
+            {module === 'chords' && (
+                <SettingRow label="Piano Roots" id="pianoRootsCheck">
+                    <Toggle
+                        id="pianoRootsCheck"
+                        checked={state.pianoRoots}
+                        onChange={(/** @type {any} */ val) => {
+                            dispatch(ACTIONS.SET_PIANO_ROOTS, val);
+                            saveCurrentState();
+                        }}
+                    />
+                </SettingRow>
+            )}
+
+            {module === 'harmony' && (
+                <SettingRow
+                    label="Complexity"
+                    id="harmonyComplexity"
+                    valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                >
+                    <Slider
+                        id="harmonyComplexity"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={state.complexity || 0.5}
+                        onInput={(/** @type {any} */ val) => {
+                            dispatch(ACTIONS.SET_PARAM, {
+                                module: 'harmony',
+                                param: 'complexity',
+                                value: parseFloat(val),
+                            });
+                            saveCurrentState();
+                        }}
+                        ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                    />
+                </SettingRow>
+            )}
+
+            {module === 'soloist' && (
+                <Fragment>
                     <SettingRow
                         label="Complexity"
-                        id="harmonyComplexity"
+                        id="soloistComplexity"
                         valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
                     >
                         <Slider
-                            id="harmonyComplexity"
+                            id="soloistComplexity"
                             min="0"
                             max="1"
                             step="0.05"
-                            value={state.complexity || 0.5}
+                            value={state.complexity !== undefined ? state.complexity : 0.5}
                             onInput={(/** @type {any} */ val) => {
                                 dispatch(ACTIONS.SET_PARAM, {
-                                    module: 'harmony',
+                                    module: 'soloist',
                                     param: 'complexity',
                                     value: parseFloat(val),
                                 });
@@ -129,104 +286,57 @@ export function InstrumentSettings({ module }) {
                             ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
                         />
                     </SettingRow>
-                )}
 
-                {module === 'soloist' && (
-                    <Fragment>
-                        <SettingRow
-                            label="Complexity"
-                            id="soloistComplexity"
-                            valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                        >
-                            <Slider
-                                id="soloistComplexity"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={state.complexity !== undefined ? state.complexity : 0.5}
-                                onInput={(/** @type {any} */ val) => {
-                                    dispatch(ACTIONS.SET_PARAM, {
-                                        module: 'soloist',
-                                        param: 'complexity',
-                                        value: parseFloat(val),
-                                    });
-                                    saveCurrentState();
-                                }}
-                                ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                            />
-                        </SettingRow>
+                    <SettingRow label="Lead Sound" id="soloistPresetSelect">
+                        <Select
+                            id="soloistPresetSelect"
+                            value={state.preset || 'trumpet'}
+                            onChange={(/** @type {any} */ val) => {
+                                dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
+                                saveCurrentState();
+                            }}
+                            options={[
+                                { value: 'neo', label: 'Neo-Juno' },
+                                { value: 'vowel', label: 'Vowel Lead' },
+                                { value: 'trumpet', label: 'Trumpet' },
+                                { value: 'saxophone', label: 'Saxophone' },
+                            ]}
+                        />
+                    </SettingRow>
 
-                        <SettingRow label="Lead Sound" id="soloistPresetSelect">
-                            <Select
-                                id="soloistPresetSelect"
-                                value={state.preset || 'trumpet'}
-                                onChange={(/** @type {any} */ val) => {
-                                    dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
-                                    saveCurrentState();
-                                }}
-                                options={[
-                                    { value: 'neo', label: 'Neo-Juno' },
-                                    { value: 'vowel', label: 'Vowel Lead' },
-                                    { value: 'trumpet', label: 'Trumpet' },
-                                    { value: 'saxophone', label: 'Saxophone' },
-                                ]}
-                            />
-                        </SettingRow>
+                    <SettingRow label="Phrasing Mode" id="soloistModeSelect">
+                        <Select
+                            id="soloistModeSelect"
+                            value={state.mode || 'monophonic'}
+                            onChange={(/** @type {any} */ val) => {
+                                dispatch(ACTIONS.SET_SOLOIST_MODE, val);
+                                saveCurrentState();
+                            }}
+                            options={[
+                                { value: 'monophonic', label: 'Monophonic' },
+                                { value: 'guitar', label: 'Guitar' },
+                                { value: 'piano', label: 'Piano' },
+                            ]}
+                        />
+                    </SettingRow>
+                </Fragment>
+            )}
 
-                        <SettingRow label="Phrasing Mode" id="soloistModeSelect">
-                            <Select
-                                id="soloistModeSelect"
-                                value={state.mode || 'monophonic'}
-                                onChange={(/** @type {any} */ val) => {
-                                    dispatch(ACTIONS.SET_SOLOIST_MODE, val);
-                                    saveCurrentState();
-                                }}
-                                options={[
-                                    { value: 'monophonic', label: 'Monophonic' },
-                                    { value: 'guitar', label: 'Guitar' },
-                                    { value: 'piano', label: 'Piano' },
-                                ]}
-                            />
-                        </SettingRow>
-                    </Fragment>
-                )}
+            {module === 'groove' && <GrooveControls state={state} />}
+        </SettingGroup>
+    );
+}
 
-                {module === 'groove' && <GrooveControls state={state} />}
-            </SettingGroup>
-
-            {/* Right Column: Mixer */}
-            <SettingGroup title="Mixer" className="divider-top">
-                <SettingRow
-                    label="Volume"
-                    id={`${moduleName}Volume`}
-                    valueDisplay={`${Math.round(state.volume * 100)}%`}
-                >
-                    <Slider
-                        id={`${moduleName}Volume`}
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={state.volume}
-                        onInput={(/** @type {any} */ val) => updateAudio('volume', val)}
-                        ariaValueText={`${Math.round(state.volume * 100)}%`}
-                    />
-                </SettingRow>
-                <SettingRow
-                    label="Reverb"
-                    id={`${moduleName}Reverb`}
-                    valueDisplay={`${Math.round(state.reverb * 100)}%`}
-                >
-                    <Slider
-                        id={`${moduleName}Reverb`}
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={state.reverb}
-                        onInput={(/** @type {any} */ val) => updateAudio('reverb', val)}
-                        ariaValueText={`${Math.round(state.reverb * 100)}%`}
-                    />
-                </SettingRow>
-            </SettingGroup>
+/** @param {InstrumentSettingsProps} props */
+export function InstrumentSettings({ module }) {
+    return (
+        <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
+            <InstrumentSpecificSettings module={module} />
+            <InstrumentMixerSettings
+                module={module}
+                title="Mixer"
+                className={hasInstrumentSpecificSettings(module) ? 'divider-top' : ''}
+            />
         </div>
     );
 }

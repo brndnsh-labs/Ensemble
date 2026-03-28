@@ -414,10 +414,11 @@
         gap: 0.5rem;
     }
 
-    .workspace-view--studio .workspace-studio-active-count {
+    .workspace-view--studio .workspace-studio-mixer-button {
         align-self: flex-start;
     }
 
+    .workspace-view--studio .workspace-studio-mixer-button,
     .workspace-view--studio .workspace-studio-genre-button {
         width: auto;
         max-width: 100%;
@@ -465,12 +466,14 @@
         gap: 0.35rem;
     }
 
+    .workspace-view--studio .workspace-studio-mixer-button,
     .workspace-view--studio .workspace-studio-mix-menu-trigger,
     .workspace-view--studio .power-btn {
         height: 30px;
         font-size: 0.95rem;
     }
 
+    .workspace-view--studio .workspace-studio-mixer-button,
     .workspace-view--studio .workspace-studio-mix-menu-trigger {
         width: auto;
         padding: 0 0.65rem 0 0.72rem;
@@ -494,6 +497,37 @@
         min-height: 0;
         padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
         scroll-padding-block-end: calc(1.5rem + env(safe-area-inset-bottom));
+    }
+
+    .workspace-view--studio .workspace-studio-mixer-grid {
+        gap: 0.45rem;
+    }
+
+    .workspace-view--studio .workspace-studio-mixer-strip {
+        grid-template-columns: minmax(0, 5.4rem) minmax(0, 1fr);
+        gap: 0.55rem;
+        padding: 0.55rem 0.6rem;
+        border-radius: 14px;
+    }
+
+    .workspace-view--studio .workspace-studio-mixer-strip-icon {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 10px;
+        font-size: 0.88rem;
+    }
+
+    .workspace-view--studio .workspace-studio-mixer-strip-heading h4 {
+        font-size: 0.84rem;
+    }
+
+    .workspace-view--studio .workspace-studio-mixer-strip-slider {
+        gap: 0.35rem;
+    }
+
+    .workspace-view--studio .workspace-studio-mixer-strip-slider-label,
+    .workspace-view--studio .workspace-studio-mixer-strip-slider-value {
+        font-size: 0.66rem;
     }
 
     .workspace-view--studio .workspace-studio-genre-grid {

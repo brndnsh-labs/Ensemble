@@ -16,27 +16,37 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
     });
 
-    test('Bass settings sheet keeps mixer controls visible @desktop', async ({ page }) => {
+    test('Mixer surface keeps bass mixer controls visible @desktop', async ({ page }) => {
         const bassPanel = page.locator('#panel-bass');
-        const settingsBtn = bassPanel.getByRole('button', { name: 'Bass settings' });
+        const mixerButton = page.getByRole('button', { name: 'Open mixer' });
 
-        await expect(settingsBtn).toBeVisible();
-        await settingsBtn.click();
+        await expect(bassPanel.getByRole('button', { name: 'Bass settings' })).toHaveCount(0);
+        await expect(mixerButton).toBeVisible();
+        await mixerButton.click();
 
-        const settingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
+        const settingsSurface = page.locator('.workspace-studio-surface--mixer.is-open');
+        const surfaceBody = settingsSurface.locator('.workspace-studio-surface-body');
         await expect(settingsSurface).toBeVisible();
         await expectSurfaceFitsViewport(page, settingsSurface);
 
-        await expect(settingsSurface).toContainText('Bass settings');
-        await expect(settingsSurface).toContainText('Instrument');
         await expect(settingsSurface).toContainText('Mixer');
+        await expect(settingsSurface).toContainText('Bass');
+        await expect(settingsSurface.locator('.workspace-studio-mixer-strip')).toHaveCount(5);
 
         const volume = settingsSurface.locator('input#bassVolume');
         const reverb = settingsSurface.locator('input#bassReverb');
+        const soloistVolume = settingsSurface.locator('input#soloistVolume');
         await expect(volume).toBeVisible();
         await expect(reverb).toBeVisible();
+        await expect(soloistVolume).toBeVisible();
         await expectWithinSurface(settingsSurface, volume);
         await expectWithinSurface(settingsSurface, reverb);
+        await expectWithinSurface(settingsSurface, soloistVolume);
+        const mixerMetrics = await surfaceBody.evaluate((el) => ({
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight,
+        }));
+        expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
     });
 
     test('Drum settings sheet keeps swing and Lars controls within bounds @desktop', async ({
@@ -54,7 +64,6 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
 
         await expect(settingsSurface).toContainText('Drums settings');
         await expect(settingsSurface).toContainText('Feel & Actions');
-        await expect(settingsSurface).toContainText('Mixer');
 
         const swingSlider = settingsSurface.locator('input#swingSlider');
         const swingBase = settingsSurface.locator('select#swingBaseSelect');
@@ -70,18 +79,8 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         await expectWithinSurface(settingsSurface, swingBase);
         await expectWithinSurface(settingsSurface, creativityToggle);
         await expectWithinSurface(settingsSurface, larsIntensity);
-
-        const surfaceBody = settingsSurface.locator('.workspace-studio-surface-body');
-        await surfaceBody.evaluate((el) => {
-            el.scrollTop = el.scrollHeight;
-        });
-
-        const drumVolume = settingsSurface.locator('input#drumVolume');
-        const drumReverb = settingsSurface.locator('input#drumReverb');
-        await expect(drumVolume).toBeVisible();
-        await expect(drumReverb).toBeVisible();
-        await expectWithinSurface(settingsSurface, drumVolume);
-        await expectWithinSurface(settingsSurface, drumReverb);
+        await expect(settingsSurface.locator('input#drumVolume')).toHaveCount(0);
+        await expect(settingsSurface.locator('input#drumReverb')).toHaveCount(0);
     });
 
     test('Chords settings sheet keeps voicing and mixer controls visible @desktop', async ({
@@ -99,22 +98,17 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
 
         await expect(settingsSurface).toContainText('Chords settings');
         await expect(settingsSurface).toContainText('Voicing');
-        await expect(settingsSurface).toContainText('Mixer');
 
         const densitySelect = settingsSurface.locator('select#densitySelect');
         const pianoRootsToggle = settingsSurface.locator(
             'label.toggle-switch[for="pianoRootsCheck"]',
         );
-        const volume = settingsSurface.locator('input#chordVolume');
-        const reverb = settingsSurface.locator('input#chordReverb');
         await expect(densitySelect).toBeVisible();
         await expect(pianoRootsToggle).toBeVisible();
-        await expect(volume).toBeVisible();
-        await expect(reverb).toBeVisible();
         await expectWithinSurface(settingsSurface, densitySelect);
         await expectWithinSurface(settingsSurface, pianoRootsToggle);
-        await expectWithinSurface(settingsSurface, volume);
-        await expectWithinSurface(settingsSurface, reverb);
+        await expect(settingsSurface.locator('input#chordVolume')).toHaveCount(0);
+        await expect(settingsSurface.locator('input#chordReverb')).toHaveCount(0);
     });
 
     test('Harmony settings sheet keeps color and mixer controls visible @desktop', async ({
@@ -132,17 +126,12 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
 
         await expect(settingsSurface).toContainText('Harmony settings');
         await expect(settingsSurface).toContainText('Voicing');
-        await expect(settingsSurface).toContainText('Mixer');
 
         const complexity = settingsSurface.locator('input#harmonyComplexity');
-        const volume = settingsSurface.locator('input#harmonyVolume');
-        const reverb = settingsSurface.locator('input#harmonyReverb');
         await expect(complexity).toBeVisible();
-        await expect(volume).toBeVisible();
-        await expect(reverb).toBeVisible();
         await expectWithinSurface(settingsSurface, complexity);
-        await expectWithinSurface(settingsSurface, volume);
-        await expectWithinSurface(settingsSurface, reverb);
+        await expect(settingsSurface.locator('input#harmonyVolume')).toHaveCount(0);
+        await expect(settingsSurface.locator('input#harmonyReverb')).toHaveCount(0);
     });
 
     test('Soloist settings sheet keeps sound and phrasing controls visible @desktop', async ({
@@ -160,7 +149,6 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
 
         await expect(settingsSurface).toContainText('Soloist settings');
         await expect(settingsSurface).toContainText('Instrument');
-        await expect(settingsSurface).toContainText('Mixer');
         await expect(settingsSurface).toContainText('Trading');
 
         const presetSelect = settingsSurface.locator('select#soloistPresetSelect');
@@ -169,12 +157,11 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         await expect(presetSelect).toBeVisible();
         await expect(phrasingSelect).toBeVisible();
         await expect(tradingGroup).toBeVisible();
-        await expect(settingsSurface.locator('input#soloistVolume')).toBeVisible();
         await expectWithinSurface(settingsSurface, presetSelect);
         await expectWithinSurface(settingsSurface, phrasingSelect);
         await expectWithinSurface(settingsSurface, tradingGroup);
-        await expectWithinSurface(settingsSurface, settingsSurface.locator('input#soloistVolume'));
-        await expectWithinSurface(settingsSurface, settingsSurface.locator('input#soloistReverb'));
+        await expect(settingsSurface.locator('input#soloistVolume')).toHaveCount(0);
+        await expect(settingsSurface.locator('input#soloistReverb')).toHaveCount(0);
     });
 });
 
@@ -209,31 +196,36 @@ test.describe('Studio settings surfaces - Mobile Scrolling @mobile', () => {
         await expect(loopsButton).toHaveAttribute('aria-pressed', 'true');
     });
 
-    test('Drum settings sheet scrolls to mixer controls on short mobile', async ({ page }) => {
+    test('Mixer surface keeps all instrument controls visible on short mobile', async ({
+        page,
+    }) => {
         await page.setViewportSize({ width: 360, height: 640 });
         await page.reload();
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
         await page.click('[data-workspace-nav="studio"]');
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
 
-        const groovePanel = page.locator('#panel-grooves');
-        const settingsBtn = groovePanel.getByRole('button', { name: 'Drums settings' });
+        const mixerButton = page.getByRole('button', { name: 'Open mixer' });
+        await expect(mixerButton).toBeVisible();
+        await mixerButton.click();
 
-        await expect(settingsBtn).toBeVisible();
-        await settingsBtn.click();
-
-        const settingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
+        const settingsSurface = page.locator('.workspace-studio-surface--mixer.is-open');
         const surfaceBody = settingsSurface.locator('.workspace-studio-surface-body');
-        const drumVolume = settingsSurface.locator('input#drumVolume');
-        const drumReverb = settingsSurface.locator('input#drumReverb');
+        const soloistVolume = settingsSurface.locator('input#soloistVolume');
+        const soloistReverb = settingsSurface.locator('input#soloistReverb');
 
         await expect(settingsSurface).toBeVisible();
         await expectSurfaceFitsViewport(page, settingsSurface);
         await expect(surfaceBody).toBeVisible();
 
-        await expectScrollsToRevealTarget(page, surfaceBody, drumVolume);
-        await expectWithinSurface(settingsSurface, drumVolume);
-        await expectWithinSurface(settingsSurface, drumReverb);
+        await expect(soloistVolume).toBeVisible();
+        await expectWithinSurface(settingsSurface, soloistVolume);
+        await expectWithinSurface(settingsSurface, soloistReverb);
+        const mixerMetrics = await surfaceBody.evaluate((el) => ({
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight,
+        }));
+        expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
     });
 });
 
@@ -246,12 +238,12 @@ test.describe('Studio settings surfaces - iPhone reachability @mobile', () => {
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
     });
 
-    test('Drum and soloist sheets use full-height mobile insets and keep lower controls reachable', async ({
+    test('Mixer and soloist sheets use full-height mobile insets and keep controls reachable', async ({
         page,
     }) => {
-        const openSurface = async (buttonName) => {
-            await page.getByRole('button', { name: buttonName }).click();
-            const surface = page.locator('.workspace-studio-surface--settings.is-open');
+        const openSurface = async (triggerName, surfaceSelector) => {
+            await page.getByRole('button', { name: triggerName }).click();
+            const surface = page.locator(surfaceSelector);
             const surfaceBox = await surface.boundingBox();
             const viewport = page.viewportSize();
 
@@ -263,17 +255,28 @@ test.describe('Studio settings surfaces - iPhone reachability @mobile', () => {
             return surface;
         };
 
-        const drumsSurface = await openSurface('Drums settings');
-        const drumsBody = drumsSurface.locator('.workspace-studio-surface-body');
-        const drumVolume = drumsSurface.locator('input#drumVolume');
-        const drumReverb = drumsSurface.locator('input#drumReverb');
+        const mixerSurface = await openSurface(
+            'Open mixer',
+            '.workspace-studio-surface--mixer.is-open',
+        );
+        const mixerBody = mixerSurface.locator('.workspace-studio-surface-body');
+        const soloistVolume = mixerSurface.locator('input#soloistVolume');
+        const soloistReverb = mixerSurface.locator('input#soloistReverb');
 
-        await expectScrollsToRevealTarget(page, drumsBody, drumVolume);
-        await expectWithinSurface(drumsSurface, drumVolume);
-        await expectWithinSurface(drumsSurface, drumReverb);
-        await page.locator('button[aria-label="Close Drums settings"]').last().click();
+        await expect(soloistVolume).toBeVisible();
+        await expectWithinSurface(mixerSurface, soloistVolume);
+        await expectWithinSurface(mixerSurface, soloistReverb);
+        const mixerMetrics = await mixerBody.evaluate((el) => ({
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight,
+        }));
+        expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
+        await page.locator('button[aria-label="Close mixer"]').last().click();
 
-        const soloistSurface = await openSurface('Soloist settings');
+        const soloistSurface = await openSurface(
+            'Soloist settings',
+            '.workspace-studio-surface--settings.is-open',
+        );
         const soloistBody = soloistSurface.locator('.workspace-studio-surface-body');
         const loopsButton = soloistSurface
             .locator('.workspace-studio-surface-card--soloist .button-group')

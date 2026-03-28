@@ -31,6 +31,7 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(studio.locator('#panel-harmonies')).toBeVisible();
         await expect(studio.locator('.workspace-studio-live-mix')).toBeVisible();
         await expect(studio.locator('.workspace-studio-mix-row')).toHaveCount(5);
+        await expect(studio.getByRole('button', { name: 'Open mixer' })).toBeVisible();
         await expect(studio.locator('.workspace-studio-genre-button')).toBeVisible();
         await expect(studio.locator('.workspace-studio-genre-option')).toHaveCount(0);
         await expect(studio.locator('.workspace-instrument-state')).toHaveCount(5);
@@ -87,21 +88,27 @@ test.describe('Workspace surfaces @ui', () => {
         await desktopGenreSurface.getByRole('button', { name: initialGenre || 'Rock' }).click();
 
         const bassRow = studio.locator('#panel-bass');
-        const bassTrigger = bassRow.locator('.workspace-studio-mix-menu-trigger');
-        await expect(bassTrigger).toContainText('Controls');
-        await bassTrigger.click();
-        const desktopSettingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
+        await expect(bassRow.getByRole('button', { name: 'Bass settings' })).toHaveCount(0);
+
+        const mixerButton = studio.getByRole('button', { name: 'Open mixer' });
+        await mixerButton.click();
+        const desktopSettingsSurface = page.locator('.workspace-studio-surface--mixer.is-open');
         await expect(desktopSettingsSurface).toBeVisible();
-        const [desktopSettingsBox, bassRowBox] = await Promise.all([
+        const [desktopSettingsBox, mixerButtonBox] = await Promise.all([
             desktopSettingsSurface.boundingBox(),
-            bassRow.boundingBox(),
+            mixerButton.boundingBox(),
         ]);
         expect(desktopSettingsBox).not.toBeNull();
-        expect(bassRowBox).not.toBeNull();
+        expect(mixerButtonBox).not.toBeNull();
         expect(desktopSettingsBox.x).toBeGreaterThanOrEqual(0);
         expect(desktopSettingsBox.x + desktopSettingsBox.width).toBeLessThanOrEqual(1440);
-        expect(Math.abs(desktopSettingsBox.y - bassRowBox.y)).toBeLessThan(160);
-        await desktopSettingsSurface.getByRole('button', { name: 'Close Bass settings' }).click();
+        expect(Math.abs(desktopSettingsBox.y - mixerButtonBox.y)).toBeLessThan(160);
+        await expect(desktopSettingsSurface).toContainText('Mixer');
+        await expect(desktopSettingsSurface.locator('input#bassVolume')).toBeVisible();
+        await expect(desktopSettingsSurface.locator('.workspace-studio-mixer-strip')).toHaveCount(
+            5,
+        );
+        await desktopSettingsSurface.getByRole('button', { name: 'Close mixer' }).click();
 
         await page.setViewportSize({ width: 768, height: 1024 });
         await page.reload();
@@ -121,13 +128,18 @@ test.describe('Workspace surfaces @ui', () => {
         await openWorkspace(page, 'Studio');
 
         const header = page.locator('header');
+        const mobileMixerButton = page.getByRole('button', { name: 'Open mixer' });
         const mobileGenreButton = page.locator('.workspace-studio-genre-button');
+        await expect(mobileMixerButton).toBeVisible();
         await expect(mobileGenreButton).toBeVisible();
         const headerBox = await header.boundingBox();
+        const mobileMixerButtonBox = await mobileMixerButton.boundingBox();
         const mobileGenreButtonBox = await mobileGenreButton.boundingBox();
 
         expect(headerBox).not.toBeNull();
+        expect(mobileMixerButtonBox).not.toBeNull();
         expect(mobileGenreButtonBox).not.toBeNull();
+        expect(mobileMixerButtonBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height - 1);
         expect(mobileGenreButtonBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height - 1);
 
         await mobileGenreButton.click();
@@ -191,22 +203,32 @@ test.describe('Workspace surfaces @ui', () => {
 
             await page.locator('button[aria-label="Close band feel menu"]').last().click();
 
+            await page.getByRole('button', { name: 'Open mixer' }).click();
+            const mixerSurface = page.locator('.workspace-studio-surface--mixer.is-open');
+            const mixerBody = mixerSurface.locator('.workspace-studio-surface-body');
+            const soloistVolume = mixerSurface.locator('input#soloistVolume');
+
+            await expect(mixerSurface, `${viewport.name}: mixer should open`).toBeVisible();
+            await expectSurfaceFitsViewport(page, mixerSurface);
+            await expectOwnsInteriorProbe(mixerSurface);
+            await expect(mixerBody).toBeVisible();
+            await expect(soloistVolume).toBeVisible();
+            const mixerMetrics = await mixerBody.evaluate((el) => ({
+                clientHeight: el.clientHeight,
+                scrollHeight: el.scrollHeight,
+            }));
+            expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
+
+            await page.locator('button[aria-label="Close mixer"]').last().click();
+
             await page.getByRole('button', { name: 'Drums settings' }).click();
             const drumSurface = page.locator('.workspace-studio-surface--settings.is-open');
-            const drumBody = drumSurface.locator('.workspace-studio-surface-body');
-            const drumVolume = drumSurface.locator('input#drumVolume');
             const larsIntensity = drumSurface.locator('input#larsIntensitySlider');
 
             await expect(drumSurface, `${viewport.name}: drum settings should open`).toBeVisible();
             await expectSurfaceFitsViewport(page, drumSurface);
             await expectOwnsInteriorProbe(drumSurface);
-
-            if (viewport.expectScroll) {
-                await expectScrollsToRevealTarget(page, drumBody, drumVolume);
-            } else {
-                await expect(larsIntensity).toBeVisible();
-                await expect(drumVolume).toBeVisible();
-            }
+            await expect(larsIntensity).toBeVisible();
 
             await page.locator('button[aria-label="Close Drums settings"]').last().click();
         }

@@ -1544,6 +1544,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     flex-shrink: 0;
 }
 
+.workspace-studio-mixer-button,
 .workspace-studio-mix-menu-trigger {
     min-width: 0;
     padding: 0 0.8rem 0 0.9rem;
@@ -1551,6 +1552,32 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     border-radius: 999px;
     font-size: 0.8rem;
     font-weight: 700;
+}
+
+.workspace-studio-mixer-button {
+    display: inline-flex;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+    border-color: color-mix(in srgb, var(--cyan), transparent 55%);
+    background: color-mix(in srgb, var(--cyan), transparent 92%);
+    color: var(--cyan);
+}
+
+.workspace-studio-mixer-button:hover {
+    border-color: color-mix(in srgb, var(--cyan), transparent 35%);
+    transform: translateY(-1px);
+}
+
+.workspace-studio-mixer-button:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    border-color: color-mix(in srgb, var(--cyan), transparent 35%);
+}
+
+.workspace-studio-mixer-button.is-open {
+    border-color: color-mix(in srgb, var(--cyan), transparent 32%);
+    background: color-mix(in srgb, var(--cyan), transparent 88%);
+    box-shadow: var(--shadow-md);
 }
 
 .workspace-studio-mix-menu-trigger.is-open {
@@ -1568,10 +1595,20 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     letter-spacing: 0.02em;
 }
 
+.workspace-studio-mixer-button-label {
+    font-size: 0.76rem;
+    letter-spacing: 0.02em;
+}
+
+.workspace-studio-mixer-button-caret,
 .workspace-studio-mix-menu-caret {
     font-size: 0.95rem;
     line-height: 1;
     transition: transform 160ms ease;
+}
+
+.workspace-studio-mixer-button.is-open .workspace-studio-mixer-button-caret {
+    transform: translateY(1px);
 }
 
 .workspace-studio-mix-menu-trigger.is-open .workspace-studio-mix-menu-caret {
@@ -1699,6 +1736,10 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     --studio-surface-accent: var(--soloist-color);
 }
 
+.workspace-studio-surface--mixer {
+    --studio-surface-accent: var(--cyan);
+}
+
 .workspace-studio-surface-header {
     display: flex;
     align-items: flex-start;
@@ -1747,6 +1788,10 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     gap: 0.75rem;
     padding-right: 0.1rem;
     scrollbar-gutter: stable;
+}
+
+.workspace-studio-surface--mixer-panel .workspace-studio-surface-body {
+    gap: 0.55rem;
 }
 
 .workspace-studio-surface-close {
@@ -1813,6 +1858,105 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     font-size: 0.82rem;
 }
 
+.workspace-studio-mixer-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.workspace-studio-mixer-strip {
+    --studio-row-accent: var(--accent-color);
+    display: grid;
+    grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr);
+    gap: 0.7rem;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--studio-row-accent), transparent 72%);
+    background: color-mix(in srgb, var(--panel-color), var(--studio-row-accent) 3%);
+    box-shadow: var(--shadow-sm);
+}
+
+.workspace-studio-mixer-strip--groove {
+    --studio-row-accent: var(--yellow);
+}
+
+.workspace-studio-mixer-strip--bass {
+    --studio-row-accent: var(--success-color);
+}
+
+.workspace-studio-mixer-strip--chords {
+    --studio-row-accent: var(--accent-color);
+}
+
+.workspace-studio-mixer-strip--harmony {
+    --studio-row-accent: var(--harmony-color);
+}
+
+.workspace-studio-mixer-strip--soloist {
+    --studio-row-accent: var(--soloist-color);
+}
+
+.workspace-studio-mixer-strip-heading {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.workspace-studio-mixer-strip-heading h4 {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--studio-row-accent);
+}
+
+.workspace-studio-mixer-strip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--studio-row-accent), transparent 65%);
+    background: color-mix(in srgb, var(--studio-row-accent), transparent 88%);
+    font-size: 0.95rem;
+}
+
+.workspace-studio-mixer-strip-controls {
+    min-width: 0;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.workspace-studio-mixer-strip-slider {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.workspace-studio-mixer-strip-slider-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.workspace-studio-mixer-strip-slider-value {
+    min-width: 2.25rem;
+    text-align: right;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.workspace-studio-surface--mixer-panel input[type="range"] {
+    min-width: 0;
+}
+
 .workspace-studio-surface--settings .grid-2-col {
     grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
     gap: 0.65rem;
@@ -1830,7 +1974,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     box-shadow: var(--shadow-sm);
 }
 
-.workspace-studio-surface--settings .setting-group:last-child,
+.workspace-studio-surface--settings .grid-2-col > .setting-group:last-child,
 .workspace-studio-surface--band-feel .setting-group:last-child {
     margin: 0;
     padding: 0.8rem;
@@ -1839,7 +1983,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     background: var(--input-bg);
 }
 
-[data-theme="light"] .workspace-studio-surface--settings .setting-group:last-child,
+[data-theme="light"] .workspace-studio-surface--settings .grid-2-col > .setting-group:last-child,
 [data-theme="light"] .workspace-studio-surface--band-feel .setting-group:last-child {
     background: var(--input-bg);
 }
