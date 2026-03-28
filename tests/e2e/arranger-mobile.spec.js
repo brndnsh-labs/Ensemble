@@ -41,6 +41,7 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
 
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
+        await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
         await expect
             .poll(async () =>
                 visualizer
@@ -71,6 +72,109 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
         } else {
             expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.clientHeight + 12);
         }
+    });
+
+    test('Tall mobile view stretches fit charts vertically without centering them', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 393, height: 852 });
+        await page.click('[data-workspace-nav="arranger"]');
+        await page.click('button[aria-label="Open arranger actions"]');
+        await page.click('.workspace-library-fab');
+        await page.getByRole('button', { name: 'Giant Steps' }).click();
+
+        const visualizer = page.locator('#chordVisualizer');
+        const firstChord = visualizer.locator('.chord-card').first();
+
+        await expect(visualizer).toBeVisible();
+        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
+        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-fill');
+        await expect
+            .poll(async () =>
+                firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+            )
+            .toBeGreaterThan(15);
+        const spacing = await visualizer.evaluate((el) => {
+            const rect = el.getBoundingClientRect();
+            const rows = Array.from(el.querySelectorAll('.lead-sheet-row'));
+            const first = rows[0]?.getBoundingClientRect();
+            const last = rows.at(-1)?.getBoundingClientRect();
+            return {
+                topGap: first ? first.top - rect.top : null,
+                bottomGap: last ? rect.bottom - last.bottom : null,
+            };
+        });
+        expect(spacing.topGap).not.toBeNull();
+        expect(spacing.bottomGap).not.toBeNull();
+        expect(spacing.topGap).toBeLessThan(60);
+        expect(spacing.bottomGap).toBeGreaterThan(spacing.topGap + 40);
+        await expect(visualizer).toHaveJSProperty(
+            'scrollHeight',
+            await visualizer.evaluate((el) => el.clientHeight),
+        );
+    });
+
+    test('Long custom charts use guided internal scrolling on mobile', async ({ page }) => {
+        await page.setViewportSize({ width: 360, height: 640 });
+        await page.click('[data-workspace-nav="arranger"]');
+
+        await page.evaluate(async () => {
+            await window.ensemble.loadTools();
+            const { ACTIONS, dispatch, validateProgression } = window.ensemble;
+            const cycle = ['Imaj7', 'vim7', 'iim7', 'V7'];
+            const testSections = [
+                {
+                    id: 'long-chart',
+                    label: 'Long',
+                    value: Array.from(
+                        { length: 64 },
+                        (_, index) => cycle[index % cycle.length],
+                    ).join(' | '),
+                    repeat: 1,
+                },
+            ];
+
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: 'C' });
+            dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isMinor', value: false });
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'arranger',
+                param: 'sections',
+                value: testSections,
+            });
+            validateProgression(window.ensemble.getState());
+        });
+
+        const visualizer = page.locator('#chordVisualizer');
+        await expect(visualizer).toBeVisible();
+        await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
+        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'guided');
+        await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(16);
+
+        const beforeScrollTop = await visualizer.evaluate((el) => el.scrollTop);
+
+        await page.evaluate(() => {
+            const { ACTIONS, dispatch } = window.ensemble;
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'chords',
+                param: 'lastActiveChordIndex',
+                value: 44,
+            });
+        });
+
+        await expect
+            .poll(async () => visualizer.evaluate((el) => el.scrollTop))
+            .toBeGreaterThan(beforeScrollTop);
+        await expect(visualizer.locator('.lead-sheet-row--active')).toHaveCount(1);
+        await expect
+            .poll(async () =>
+                Number(
+                    await visualizer
+                        .locator('.lead-sheet-row--active')
+                        .first()
+                        .getAttribute('data-row-index'),
+                ),
+            )
+            .toBeGreaterThan(0);
     });
 
     test('Maximized arranger view exposes a touch close control', async ({ page }) => {

@@ -2,6 +2,256 @@ export const LEAD_SHEET_MEASURES_PER_ROW = 4;
 
 const COMPACT_MEASURE_THRESHOLD = 24;
 const ULTRA_COMPACT_MEASURE_THRESHOLD = 32;
+const LEAD_SHEET_MOBILE_MAX_WIDTH = 700;
+const LEAD_SHEET_TABLET_MAX_WIDTH = 1100;
+const SHORT_LEAD_SHEET_VIEWPORT_HEIGHT = 720;
+const LEAD_SHEET_FIT_ROW_BUDGET = {
+    comfortable: {
+        desktop: 88,
+        mobile: 68,
+        tablet: 78,
+    },
+    compact: {
+        desktop: 64,
+        mobile: 52,
+        tablet: 60,
+    },
+    'ultra-compact': {
+        desktop: 58,
+        mobile: 44,
+        tablet: 50,
+    },
+};
+
+/**
+ * @param {number} value
+ */
+function roundLeadSheetScale(value) {
+    return Math.round(value * 100) / 100;
+}
+
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ */
+function clampLeadSheetScale(value, min, max) {
+    return roundLeadSheetScale(Math.min(max, Math.max(min, value)));
+}
+
+/**
+ * @param {{
+ *   totalMeasures: number,
+ *   rowCount: number,
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   scrollMode: 'fit' | 'guided',
+ *   isShortViewport: boolean,
+ * }} options
+ * @returns {'comfortable' | 'compact' | 'ultra-compact'}
+ */
+function getLeadSheetLayoutDensity({
+    totalMeasures,
+    rowCount,
+    viewport,
+    scrollMode,
+    isShortViewport,
+}) {
+    const compactRowThreshold = viewport === 'mobile' ? 5 : 6;
+    const ultraRowThreshold =
+        scrollMode === 'guided' ? (viewport === 'mobile' ? 10 : 12) : viewport === 'mobile' ? 8 : 9;
+    const ultraMeasureThreshold = scrollMode === 'guided' ? 48 : ULTRA_COMPACT_MEASURE_THRESHOLD;
+
+    /** @type {'comfortable' | 'compact' | 'ultra-compact'} */
+    let density =
+        totalMeasures >= COMPACT_MEASURE_THRESHOLD || rowCount >= compactRowThreshold
+            ? 'compact'
+            : 'comfortable';
+
+    if (
+        totalMeasures > ultraMeasureThreshold ||
+        rowCount >= ultraRowThreshold ||
+        (isShortViewport && rowCount >= 8)
+    ) {
+        density = 'ultra-compact';
+    }
+
+    return density;
+}
+
+/**
+ * @param {{
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   rowCount: number,
+ *   scrollMode: 'fit' | 'guided',
+ *   containerWidth: number,
+ * }} options
+ */
+function getLeadSheetRowWidth({ viewport, rowCount, scrollMode, containerWidth }) {
+    if (viewport === 'mobile') {
+        return Math.max(0, Math.round(containerWidth - 6));
+    }
+
+    if (viewport === 'tablet') {
+        if (scrollMode === 'guided') {
+            return Math.round(
+                Math.min(Math.max(containerWidth * 0.98, 720), Math.min(containerWidth, 920)),
+            );
+        }
+
+        const widthScale = rowCount >= 8 ? 0.97 : rowCount >= 4 ? 0.94 : 0.9;
+        const minWidth = rowCount >= 8 ? 720 : 680;
+        const maxWidth = rowCount >= 8 ? 900 : rowCount >= 4 ? 860 : 820;
+
+        return Math.round(
+            Math.min(
+                Math.max(containerWidth * widthScale, minWidth),
+                Math.min(containerWidth, maxWidth),
+            ),
+        );
+    }
+
+    if (scrollMode === 'guided') {
+        const widthScale = rowCount >= 9 ? 0.96 : 0.97;
+        const minWidth = rowCount >= 9 ? 920 : 900;
+        const maxWidth = rowCount >= 9 ? 980 : 1000;
+
+        return Math.round(
+            Math.min(
+                Math.max(containerWidth * widthScale, minWidth),
+                Math.min(containerWidth, maxWidth),
+            ),
+        );
+    }
+
+    const widthScale = rowCount >= 8 ? 0.93 : rowCount >= 4 ? 0.89 : 0.83;
+    const minWidth = rowCount >= 8 ? 900 : rowCount >= 4 ? 820 : 760;
+    const maxWidth = rowCount >= 8 ? 960 : rowCount >= 4 ? 920 : 860;
+
+    return Math.round(
+        Math.min(
+            Math.max(containerWidth * widthScale, minWidth),
+            Math.min(containerWidth, maxWidth),
+        ),
+    );
+}
+
+/**
+ * @param {{
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   rowCount: number,
+ *   density: 'comfortable' | 'compact' | 'ultra-compact',
+ *   availableHeight: number,
+ *   isShortViewport: boolean,
+ * }} options
+ */
+function getLeadSheetFitSizing({ viewport, rowCount, density, availableHeight, isShortViewport }) {
+    const baseBudget = LEAD_SHEET_FIT_ROW_BUDGET[density][viewport];
+    const shortViewportPenalty =
+        isShortViewport && viewport === 'mobile' ? 0.12 : isShortViewport ? 0.08 : 0;
+    const fillCap =
+        viewport === 'mobile'
+            ? rowCount >= 8
+                ? 1.56
+                : rowCount >= 4
+                  ? 1.42
+                  : 1.3
+            : viewport === 'tablet'
+              ? rowCount >= 8
+                  ? 1.3
+                  : rowCount >= 4
+                    ? 1.24
+                    : 1.18
+              : rowCount >= 8
+                ? 1.22
+                : rowCount >= 4
+                  ? 1.3
+                  : 1.45;
+    const fillScale = clampLeadSheetScale(
+        availableHeight / Math.max(1, rowCount * baseBudget) - shortViewportPenalty,
+        1,
+        fillCap,
+    );
+    const gapBonus = rowCount <= 4 ? 0.04 : rowCount >= 8 ? 0.02 : 0.03;
+    const gapScale = clampLeadSheetScale(
+        1 + Math.max(0, (fillScale - 1) * (viewport === 'mobile' ? 0.22 : 0.18) + gapBonus),
+        1,
+        viewport === 'mobile' ? 1.12 : 1.18,
+    );
+    const typeBonus =
+        rowCount <= 4 ? 0.04 : rowCount >= 8 ? (viewport === 'desktop' ? 0.04 : 0.02) : 0.03;
+    const typeWeight = viewport === 'mobile' ? 0.62 : rowCount >= 8 ? 0.65 : 0.5;
+    const typeScale = clampLeadSheetScale(
+        1 + Math.max(0, (fillScale - 1) * typeWeight + typeBonus),
+        1,
+        viewport === 'mobile' ? 1.3 : rowCount >= 8 ? 1.2 : rowCount <= 2 ? 1.3 : 1.24,
+    );
+    const mode =
+        fillScale >= (viewport === 'mobile' ? 1.42 : 1.24)
+            ? 'paper-fill'
+            : fillScale >= 1.12
+              ? 'paper-fit'
+              : 'paper-balanced';
+
+    return {
+        mode,
+        verticalFillScale: fillScale,
+        verticalGapScale: gapScale,
+        verticalTypeScale: typeScale,
+    };
+}
+
+/**
+ * @param {{
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   rowCount: number,
+ *   density: 'comfortable' | 'compact' | 'ultra-compact',
+ *   isShortViewport: boolean,
+ * }} options
+ */
+function getLeadSheetGuidedSizing({ viewport, rowCount, density, isShortViewport }) {
+    if (isShortViewport) {
+        return {
+            mode: 'compact',
+            verticalFillScale: 1,
+            verticalGapScale: 1,
+            verticalTypeScale: 1,
+        };
+    }
+
+    if (viewport === 'desktop' && density === 'compact' && rowCount <= 10) {
+        return {
+            mode: 'paper-guided',
+            verticalFillScale: 1.04,
+            verticalGapScale: 1.03,
+            verticalTypeScale: 1.06,
+        };
+    }
+
+    if (viewport === 'tablet' && rowCount <= 10) {
+        return {
+            mode: 'paper-guided',
+            verticalFillScale: 1.04,
+            verticalGapScale: 1.03,
+            verticalTypeScale: 1.05,
+        };
+    }
+
+    if (viewport === 'mobile' && rowCount <= 12) {
+        return {
+            mode: 'paper-guided',
+            verticalFillScale: density === 'ultra-compact' ? 1.06 : 1.08,
+            verticalGapScale: 1.03,
+            verticalTypeScale: density === 'ultra-compact' ? 1.08 : 1.1,
+        };
+    }
+
+    return {
+        mode: 'compact',
+        verticalFillScale: 1,
+        verticalGapScale: 1,
+        verticalTypeScale: 1,
+    };
+}
 
 /**
  * @param {any[]} progression
@@ -120,6 +370,7 @@ export function buildLeadSheetRows(sectionBlocks, measuresPerRow = LEAD_SHEET_ME
 
 /**
  * @param {number} totalMeasures
+ * @returns {'comfortable' | 'compact' | 'ultra-compact'}
  */
 export function getLeadSheetDensity(totalMeasures) {
     if (totalMeasures > ULTRA_COMPACT_MEASURE_THRESHOLD) {
@@ -131,4 +382,93 @@ export function getLeadSheetDensity(totalMeasures) {
     }
 
     return 'comfortable';
+}
+
+/**
+ * @param {number} viewportWidth
+ * @returns {'mobile' | 'tablet' | 'desktop'}
+ */
+export function getLeadSheetViewport(viewportWidth) {
+    if (viewportWidth <= LEAD_SHEET_MOBILE_MAX_WIDTH) {
+        return 'mobile';
+    }
+
+    if (viewportWidth <= LEAD_SHEET_TABLET_MAX_WIDTH) {
+        return 'tablet';
+    }
+
+    return 'desktop';
+}
+
+/**
+ * @param {{
+ *   totalMeasures: number,
+ *   rowCount: number,
+ *   viewportWidth?: number,
+ *   viewportHeight?: number,
+ *   containerWidth?: number,
+ *   containerHeight?: number,
+ *   isMaximized?: boolean,
+ * }} options
+ */
+export function getLeadSheetLayoutProfile({
+    totalMeasures,
+    rowCount,
+    viewportWidth = 1280,
+    viewportHeight = 800,
+    containerWidth = viewportWidth,
+    containerHeight = viewportHeight,
+    isMaximized = false,
+}) {
+    const viewport = getLeadSheetViewport(viewportWidth);
+    const isShortViewport = viewportHeight < SHORT_LEAD_SHEET_VIEWPORT_HEIGHT;
+    const fitRowThreshold = viewport === 'desktop' ? 8 : isMaximized ? 10 : 9;
+    const scrollMode = rowCount > fitRowThreshold ? 'guided' : 'fit';
+    const rowWidth = getLeadSheetRowWidth({
+        viewport,
+        rowCount,
+        scrollMode,
+        containerWidth,
+    });
+    const density = getLeadSheetLayoutDensity({
+        totalMeasures,
+        rowCount,
+        viewport,
+        scrollMode,
+        isShortViewport,
+    });
+    const lookaheadRows =
+        scrollMode === 'guided' ? (viewport === 'desktop' && !isShortViewport ? 2 : 1) : 1;
+    const {
+        mode: verticalFillMode,
+        verticalFillScale,
+        verticalGapScale,
+        verticalTypeScale,
+    } = scrollMode === 'fit'
+        ? getLeadSheetFitSizing({
+              viewport,
+              rowCount,
+              density,
+              availableHeight: containerHeight,
+              isShortViewport,
+          })
+        : getLeadSheetGuidedSizing({
+              viewport,
+              rowCount,
+              density,
+              isShortViewport,
+          });
+
+    return {
+        density,
+        lookaheadRows,
+        measuresPerRow: LEAD_SHEET_MEASURES_PER_ROW,
+        rowWidth,
+        scrollMode,
+        viewport,
+        verticalFillMode,
+        verticalFillScale,
+        verticalGapScale,
+        verticalTypeScale,
+    };
 }
