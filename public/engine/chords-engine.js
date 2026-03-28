@@ -268,7 +268,7 @@ export function getBestInversion(
  * @returns {{ value: string, mutatedIndex: number }}
  */
 export function mutateProgression(progressionStr) {
-    if (!progressionStr || !progressionStr.trim()) {
+    if (!progressionStr?.trim()) {
         return { value: progressionStr, mutatedIndex: -1 };
     }
     const parts = progressionStr.split('|').map((p) => p.trim());

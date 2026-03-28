@@ -1158,7 +1158,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const stepToSearch = Math.min(baseStep, actualTotalSteps - 1);
             const entryForMeasure = binarySearchMap(stepMap, stepToSearch);
 
-            if (!entryForMeasure || !entryForMeasure.chord) {
+            if (!entryForMeasure?.chord) {
                 continue;
             }
             /** @type {any} */
@@ -1231,7 +1231,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 }
 
                 const stepEntry = binarySearchMap(stepMap, lookupStep);
-                if (!stepEntry || !stepEntry.chord) {
+                if (!stepEntry?.chord) {
                     return;
                 }
 

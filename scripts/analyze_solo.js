@@ -21,7 +21,7 @@ let melody = [];
 
 if (targetPartName) {
     const part = parsed.parts.find((p) => p.name === targetPartName);
-    if (!part || !part.notes || part.notes.length === 0) {
+    if (!part?.notes || part.notes.length === 0) {
         console.error(`Part not found or empty: ${targetPartName}`);
         process.exit(1);
     }

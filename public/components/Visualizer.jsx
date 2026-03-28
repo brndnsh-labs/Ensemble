@@ -232,7 +232,7 @@ export function Visualizer({ enabled, getVisualTime }) {
             }
             lastFrameTime = nowFrame;
 
-            if (!playback.audio || !playback.audio.currentTime) {
+            if (!playback.audio?.currentTime) {
                 if (!playback.isPlaying) {
                     dispatch(ACTIONS.SET_PARAM, {
                         module: 'playback',

@@ -132,7 +132,7 @@ export function dispatchMidiChordSustain(state, value, ccTime) {
  * @param {number} duration - Note duration
  */
 export function dispatchMidiChordNote(state, freq, velocity, playTime, duration) {
-    if (!state || !state.midi) {
+    if (!state?.midi) {
         return;
     }
     const midiNote = getMidi(freq);
