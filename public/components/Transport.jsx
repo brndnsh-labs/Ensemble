@@ -39,8 +39,7 @@ export function Transport() {
     }
 
     useEffect(() => {
-        /** @type {number | NodeJS.Timeout} */
-        /** @type {number | NodeJS.Timeout} */
+        /** @type {ReturnType<typeof setInterval> | undefined} */
         let interval;
         if (isPlaying && songMode && sessionTimer > 0 && sessionStartTime) {
             const updateTimer = () => {
