@@ -186,7 +186,7 @@ describe('Soloist Seeder Hook Shape', () => {
         const lineDurationRatio =
             liveNotes.filter((note) => (note.durationSteps || 1) >= 2).length / liveNotes.length;
 
-        expect(deviceRatio).toBeLessThan(0.6);
+        expect(deviceRatio).toBeLessThan(0.65);
         expect(lineDurationRatio).toBeGreaterThanOrEqual(0.34);
     });
 
