@@ -43,7 +43,6 @@ function evaluateChords(argv = process.argv.slice(2)) {
     const key = readStringOption(options, 'key', 'C');
     const scenario = readStringOption(options, 'scenario', 'default');
     const seed = readStringOption(options, 'seed', DEFAULT_SEED);
-    const pianoRoots = readBooleanOption(options, 'piano-roots', false);
     const drillDown =
         readBooleanOption(options, 'drill-down', false) ||
         readBooleanOption(options, 'deep', false);
@@ -60,7 +59,6 @@ function evaluateChords(argv = process.argv.slice(2)) {
         style,
         density,
         key,
-        pianoRoots,
         arrangementName,
     });
     const capture = simulateChordLoops({
@@ -87,7 +85,6 @@ function evaluateChords(argv = process.argv.slice(2)) {
                     key,
                     scenario,
                     seed,
-                    pianoRoots,
                     drillDown,
                     full,
                 }),

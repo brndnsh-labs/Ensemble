@@ -40,7 +40,6 @@ function deepDiveChords(argv = process.argv.slice(2)) {
     const key = readStringOption(options, 'key', 'C');
     const scenario = readStringOption(options, 'scenario', 'default');
     const seed = readStringOption(options, 'seed', DEFAULT_SEED);
-    const pianoRoots = readBooleanOption(options, 'piano-roots', false);
     const full = readBooleanOption(options, 'full', false);
     const json = readBooleanOption(options, 'json', false);
 
@@ -53,7 +52,6 @@ function deepDiveChords(argv = process.argv.slice(2)) {
         style,
         density,
         key,
-        pianoRoots,
         arrangementName,
     });
     const capture = simulateChordLoops({
@@ -80,7 +78,6 @@ function deepDiveChords(argv = process.argv.slice(2)) {
                     key,
                     scenario,
                     seed,
-                    pianoRoots,
                     full,
                 }),
                 null,

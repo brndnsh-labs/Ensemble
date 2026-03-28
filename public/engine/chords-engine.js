@@ -7,6 +7,7 @@ import {
     TIME_SIGNATURES,
 } from '../config.js';
 import { getFrequency, normalizeKey } from '../utils.js';
+import { getBassSpaceFloor } from './voicing-policy.js';
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
@@ -40,6 +41,42 @@ function getAbsoluteDisplayNoteName(
     return SHARP_FRIENDLY_KEYS.has(tonic)
         ? SHARP_NOTE_ORDER[pitchClass]
         : /** @type {any} */ (KEY_ORDER)[pitchClass];
+}
+
+/**
+ * @param {number[]} midis
+ * @param {number} pitchClass
+ * @param {number} minMidi
+ * @param {number} [maxMidi]
+ * @returns {number[]}
+ */
+function ensurePitchClassAboveFloor(midis, pitchClass, minMidi, maxMidi = 84) {
+    if (midis.some((midi) => midi % 12 === pitchClass)) {
+        return midis;
+    }
+
+    const targetCenter =
+        midis.length > 0 ? midis.reduce((sum, midi) => sum + midi, 0) / midis.length : minMidi + 12;
+    let bestMidi = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let octave = -1; octave <= 8; octave++) {
+        const candidate = pitchClass + octave * 12;
+        if (candidate < minMidi || candidate > maxMidi) {
+            continue;
+        }
+        const score = Math.abs(candidate - targetCenter);
+        if (score < bestScore) {
+            bestScore = score;
+            bestMidi = candidate;
+        }
+    }
+
+    if (!Number.isFinite(bestMidi)) {
+        return midis;
+    }
+
+    return [...midis, /** @type {number} */ (bestMidi)].sort((a, b) => a - b);
 }
 
 /**
@@ -640,7 +677,7 @@ export function getFormattedChordNames(rootName, rootNNS, rootRomanBase, quality
  * @returns {{chords: Array<any>, finalMidis: number[]}}
  */
 function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
-    const { chords, groove, bass } = state;
+    const { chords, groove } = state;
     /** @type {Array<any>} */
     const parsed = [];
     const baseOctave = Math.floor(chords.octave / 12) * 12;
@@ -735,17 +772,15 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                     }
                 }
 
-                const reserveBassSpace = state.playback.practiceMode || bass.enabled;
                 const intervals = getIntervals(
                     state,
                     quality,
                     is7th,
                     chords.density,
                     groove.genreFeel,
-                    reserveBassSpace && !chords.pianoRoots,
                 );
-                // Reduce mud: reserve space for bass by keeping piano above E3 (52), unless roots are forced
-                const pianoMin = reserveBassSpace && !chords.pianoRoots ? 52 : 43;
+                // Reduce mud: keep the comping pocket above the bass lane when that lane is active.
+                const pianoMin = getBassSpaceFloor(state);
                 const isPivot = parsed.length === 0;
                 let currentMidis = getBestInversion(
                     state,
@@ -758,6 +793,12 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                     84,
                 );
                 if (bassMidi !== null) {
+                    currentMidis = ensurePitchClassAboveFloor(
+                        currentMidis,
+                        rootMidi % 12,
+                        pianoMin,
+                        84,
+                    );
                     while (bassMidi >= currentMidis[0]) {
                         bassMidi -= 12;
                     }

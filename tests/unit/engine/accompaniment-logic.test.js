@@ -68,7 +68,6 @@ describe('Accompaniment Engine Logic', () => {
         compingState.lastVoicingMidis = [];
         chords.enabled = true;
         chords.style = 'smart';
-        chords.pianoRoots = true;
         groove.genreFeel = 'Rock';
         bass.enabled = false;
         playback.bandIntensity = 0.5;
@@ -131,9 +130,8 @@ describe('Accompaniment Engine Logic', () => {
             ).toBe(true);
         });
 
-        it('should perform rootless reduction when space is reserved and pianoRoots is false', () => {
-            const { chords, playback, bass } = getState();
-            chords.pianoRoots = true;
+        it('should perform rootless reduction for stable chords when practice spacing is active', () => {
+            const { playback, bass } = getState();
             bass.enabled = false;
             playback.practiceMode = false;
 
@@ -142,7 +140,6 @@ describe('Accompaniment Engine Logic', () => {
                 isGroupStart: true,
             });
 
-            chords.pianoRoots = false;
             playback.practiceMode = true; // This reserves the space even if bass is disabled
 
             const notesRootless = getAccompanimentNotes(getState(), mockChord, 16, 0, 0, {
@@ -163,7 +160,6 @@ describe('Accompaniment Engine Logic', () => {
             };
 
             groove.genreFeel = 'Jazz';
-            chords.pianoRoots = false;
             playback.practiceMode = true;
             playback.bandIntensity = 0.35;
             compingState.currentCell[0] = 1;
@@ -191,7 +187,6 @@ describe('Accompaniment Engine Logic', () => {
             };
 
             groove.genreFeel = 'Jazz';
-            chords.pianoRoots = false;
             playback.practiceMode = true;
             playback.bandIntensity = 0.65;
             playback.complexity = 0.65;
@@ -207,6 +202,36 @@ describe('Accompaniment Engine Logic', () => {
             expect(notes).toHaveLength(3);
             expect(pitchClasses).toContain(11); // B = 3rd of G7
             expect(pitchClasses).toContain(5); // F = b7 of G7
+        });
+
+        it('should keep half-diminished identity in practice mode', () => {
+            const halfdimChord = {
+                rootMidi: 64, // E
+                freqs: [329.63, 392.0, 466.16, 587.33], // E4, G4, Bb4, D5
+                intervals: [0, 3, 6, 10],
+                quality: 'halfdim',
+                is7th: true,
+                beats: 4,
+            };
+
+            groove.genreFeel = 'Jazz';
+            chords.style = 'jazz';
+            playback.practiceMode = true;
+            playback.bandIntensity = 0.35;
+            bass.enabled = false;
+            compingState.currentCell[0] = 1;
+            compingState.lockedUntil = 100;
+
+            const notes = getAccompanimentNotes(getState(), halfdimChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).filter((note) => note.midi > 0);
+
+            const pitchClasses = notes.map((note) => note.midi % 12);
+            expect(notes.length).toBeGreaterThanOrEqual(4);
+            expect(pitchClasses).toContain(4); // E root
+            expect(pitchClasses).toContain(10); // Bb = b5
+            expect(pitchClasses).toContain(2); // D = b7
         });
 
         it('should favor smoother altered colors for Autumn Leaves style dominants', () => {
@@ -237,7 +262,6 @@ describe('Accompaniment Engine Logic', () => {
 
             groove.genreFeel = 'Jazz';
             chords.style = 'jazz';
-            chords.pianoRoots = false;
             playback.practiceMode = true;
             bass.enabled = false;
             arranger.progression = [preDominant, alteredDominant, tonicMinor];
@@ -267,7 +291,6 @@ describe('Accompaniment Engine Logic', () => {
         it('should store jazz voicings for continuity between chord hits', () => {
             groove.genreFeel = 'Jazz';
             chords.style = 'jazz';
-            chords.pianoRoots = false;
             playback.practiceMode = true;
             bass.enabled = false;
 

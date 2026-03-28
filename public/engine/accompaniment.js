@@ -1,5 +1,10 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
+import {
+    getBassSpaceFloor,
+    shouldPreferGroundedPracticeVoicing,
+    shouldReserveBassSpace,
+} from './voicing-policy.js';
 
 /**
  * ACCOMPANIMENT.JS - Rhythmic Style Engine
@@ -1139,7 +1144,12 @@ export function getAccompanimentNotes(
         const isGhost = !isHit && Math.random() < ghostProb;
 
         if (isHit || isGhost) {
-            const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+            const reserveBassSpace = shouldReserveBassSpace(state);
+            const groundingRequired = shouldPreferGroundedPracticeVoicing(
+                state,
+                chord.quality,
+                genre,
+            );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
             let voicing = chord.freqs
                 .map((/** @type {number} */ f) => getMidi(f))
@@ -1151,8 +1161,8 @@ export function getAccompanimentNotes(
             voicing = selectCompactCluster(
                 voicing,
                 compingState.lastVoicingMidis,
-                Math.min(3, voicing.length),
-                reserveBassSpace && bassMidi ? bassMidi + 13 : 0,
+                groundingRequired ? Math.min(4, voicing.length) : Math.min(3, voicing.length),
+                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
             );
 
             if (reserveBassSpace && bassMidi) {
@@ -1285,7 +1295,12 @@ export function getAccompanimentNotes(
         const isGhost = !isHit && Math.random() < ghostProb;
 
         if (isHit || isGhost) {
-            const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+            const reserveBassSpace = shouldReserveBassSpace(state);
+            const groundingRequired = shouldPreferGroundedPracticeVoicing(
+                state,
+                chord.quality,
+                genre,
+            );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
 
             let voicing = chord.freqs
@@ -1299,13 +1314,13 @@ export function getAccompanimentNotes(
             voicing = selectCompactCluster(
                 voicing,
                 compingState.lastVoicingMidis,
-                2,
-                reserveBassSpace && bassMidi ? bassMidi + 13 : 52,
+                groundingRequired ? Math.min(4, voicing.length) : 2,
+                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
             );
             voicing = recenterVoicing(
                 voicing,
                 compingState.lastVoicingMidis,
-                reserveBassSpace && bassMidi ? bassMidi + 13 : 52,
+                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
                 84,
             );
             compingState.lastVoicingMidis = [...voicing];
@@ -1421,16 +1436,18 @@ export function getAccompanimentNotes(
             ? stepInfo.isGroupStart
             : measureStep % (ts.grouping[0] * ts.stepsPerBeat) === 0;
         const intensity = playback.bandIntensity;
-        const reserveBassSpace = (playback.practiceMode || bass.enabled) && !chords.pianoRoots;
+        const reserveBassSpace = shouldReserveBassSpace(state);
         const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
         const previousVoicingMidis = compingState.lastVoicingMidis;
         const nextChord =
             chordIndex >= 0 && arranger.progression
                 ? arranger.progression[chordIndex + 1] || null
                 : null;
+        const groundingRequired = shouldPreferGroundedPracticeVoicing(state, chord.quality, genre);
         const shouldPreferGuideToneReduction =
             chords.style === 'smart' &&
             reserveBassSpace &&
+            !groundingRequired &&
             chord.is7th &&
             (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa');
 
@@ -1568,7 +1585,13 @@ export function getAccompanimentNotes(
                 chord.quality === '7alt' || chord.quality === 'halfdim' || chord.quality === 'dim';
 
             // LOW INTENSITY: Gentle Shells (2 notes)
-            if (intensity < 0.4 && genre !== 'Acoustic') {
+            if (groundingRequired && voicing.length > 4) {
+                const groundedMidis = selectSupportiveVoicing(getMidiVoicing(voicing), chord, 4);
+                if (groundedMidis.length >= 3) {
+                    voicing = groundedMidis.map((midi) => getFrequency(midi));
+                }
+            }
+            if (!groundingRequired && intensity < 0.4 && genre !== 'Acoustic') {
                 if (voicing.length > 2) {
                     if (shouldPreferGuideToneReduction) {
                         const shellMidis = selectSupportiveVoicing(
@@ -1587,7 +1610,7 @@ export function getAccompanimentNotes(
                 }
             }
             // HIGH INTENSITY & COMPLEX: Shells to avoid mud
-            else if (genre === 'Jazz' && intensity > 0.6 && isComplex) {
+            else if (!groundingRequired && genre === 'Jazz' && intensity > 0.6 && isComplex) {
                 // Find 3rd and 7th
                 const third = chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4);
                 const seventh = chord.intervals.find(
@@ -1602,13 +1625,13 @@ export function getAccompanimentNotes(
             }
 
             // Soloist Pocket: Reduce density or drop velocity when soloist is high
-            else if (useClarity && Math.random() < 0.7) {
+            else if (!groundingRequired && useClarity && Math.random() < 0.7) {
                 if (voicing.length > 3) {
                     voicing = voicing.slice(0, 3);
                 }
             }
 
-            if (!isStructural && voicing.length > 3 && Math.random() < 0.5) {
+            if (!groundingRequired && !isStructural && voicing.length > 3 && Math.random() < 0.5) {
                 voicing = voicing.slice(0, 3);
             }
 

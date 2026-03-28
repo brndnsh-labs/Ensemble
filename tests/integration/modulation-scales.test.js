@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../public/state.js', () => {
     const mockState = {
         soloist: { tension: 0.5 },
-        chords: { density: 'standard', octave: 60, pianoRoots: true },
+        chords: { density: 'standard', octave: 60 },
         playback: { bandIntensity: 0.5, bpm: 120 },
         arranger: {
             key: 'C',

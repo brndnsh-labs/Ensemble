@@ -6,7 +6,7 @@ import { getState } from '../../../public/state.js';
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5 },
-        chords: { density: 'standard', octave: 60, pianoRoots: true },
+        chords: { density: 'standard', octave: 60 },
         arranger: { timeSignature: '4/4', key: 'C', isMinor: false, notation: 'roman' },
         groove: { genreFeel: 'Rock' },
         bass: { enabled: true },

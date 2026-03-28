@@ -8,7 +8,7 @@ vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5 },
-        chords: { density: 'standard', octave: 60, pianoRoots: true },
+        chords: { density: 'standard', octave: 60 },
         arranger: {
             timeSignature: '4/4',
             key: 'C',
@@ -305,8 +305,6 @@ describe('Chords & Voicing Logic', () => {
             arranger.key = 'C';
             arranger.isMinor = false;
             groove.genreFeel = 'Jazz';
-            chords.pianoRoots = false;
-
             validateProgression(getState());
 
             const slashChord = arranger.progression[0];

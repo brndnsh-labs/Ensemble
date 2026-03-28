@@ -1,6 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getFrequency } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
+import { shouldPreferGroundedPracticeVoicing, shouldReserveBassSpace } from './voicing-policy.js';
 import { getWorkerState } from './worker-orchestrator.js';
 
 /**
@@ -52,6 +53,52 @@ export function getSafeVoicings(intervals, rootless = false) {
         // Allow Root(0), 5th(7), 3rds(3/4), 7ths(10/11), 6ths(9)
         return [0, 7, 3, 4, 10, 11, 9].includes(iMod);
     });
+}
+
+/**
+ * @param {number[]} intervals
+ * @param {number} targetCount
+ * @returns {number[]}
+ */
+function selectGroundedIntervals(intervals, targetCount = 4) {
+    const unique = [...new Set(intervals)];
+    if (unique.length <= targetCount) {
+        return unique;
+    }
+
+    /** @type {number[]} */
+    const roots = [];
+    /** @type {number[]} */
+    const guides = [];
+    /** @type {number[]} */
+    const colors = [];
+    /** @type {number[]} */
+    const fifths = [];
+    /** @type {number[]} */
+    const others = [];
+
+    unique.forEach((interval) => {
+        const intervalClass = ((interval % 12) + 12) % 12;
+        if (intervalClass === 0) {
+            roots.push(interval);
+            return;
+        }
+        if ([3, 4, 10, 11].includes(intervalClass)) {
+            guides.push(interval);
+            return;
+        }
+        if ([1, 2, 5, 6, 8, 9].includes(intervalClass)) {
+            colors.push(interval);
+            return;
+        }
+        if (intervalClass === 7) {
+            fifths.push(interval);
+            return;
+        }
+        others.push(interval);
+    });
+
+    return [...roots, ...guides, ...colors, ...fifths, ...others].slice(0, targetCount);
 }
 
 /**
@@ -326,16 +373,20 @@ function finalizeHarmonyNotes(
         (soloist.enabled && (!soloist.isResting || soloist.notesInPhrase > 3));
 
     // --- VOICING REFINEMENT (Musical Taste) ---
-    const reserveBassSpace = playback.practiceMode || activeState.bass?.enabled || false;
+    const reserveBassSpace = shouldReserveBassSpace(activeState);
     const isCompingGenre = ['Jazz', 'Funk', 'Neo-Soul', 'Blues'].includes(feel);
+    const groundingRequired = shouldPreferGroundedPracticeVoicing(activeState, chord.quality, feel);
+    const rootlessComping = reserveBassSpace && isCompingGenre && !groundingRequired;
 
     // Apply rootless reduction if practice mode is on or bass is enabled
-    if (reserveBassSpace && isCompingGenre) {
+    if (rootlessComping) {
         intervals = getSafeVoicings(intervals, true);
+    } else if (groundingRequired) {
+        intervals = selectGroundedIntervals(intervals, 4);
     }
 
-    if (isSoloistBusy || coordination.accompanimentHit) {
-        intervals = getSafeVoicings(intervals, reserveBassSpace && isCompingGenre);
+    if (!groundingRequired && (isSoloistBusy || coordination.accompanimentHit)) {
+        intervals = getSafeVoicings(intervals, rootlessComping);
         if (
             soloist.notesInPhrase > 3 ||
             coordination.accompanimentHit ||
@@ -344,10 +395,10 @@ function finalizeHarmonyNotes(
             const guides = getGuideTones(intervals);
             if (guides.length > 0) {
                 // Higher preference for pure guide tones in Jazz/Funk
-                const useRoot = (reserveBassSpace && isCompingGenre) || feel === 'Jazz' ? [] : [0];
+                const useRoot = rootlessComping || feel === 'Jazz' ? [] : [0];
                 intervals = useRoot.concat(guides);
             } else {
-                intervals = reserveBassSpace && isCompingGenre ? [7] : [0, 7];
+                intervals = rootlessComping ? [7] : [0, 7];
             }
         }
 
@@ -355,7 +406,7 @@ function finalizeHarmonyNotes(
         if (coordination.accompanimentHit && isSoloistBusy && intervals.length > 2) {
             intervals = getGuideTones(intervals);
         }
-    } else {
+    } else if (!groundingRequired) {
         if (harmony.complexity < 0.4 || playback.bandIntensity < 0.4 || feel === 'Jazz') {
             const guides = getGuideTones(intervals);
             if (guides.length > 0) {
@@ -390,7 +441,10 @@ function finalizeHarmonyNotes(
 
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;
-    const maxDensity = isBloom ? Math.max(styleConfig.density || 2, 3) : styleConfig.density || 2;
+    const baseDensity = isBloom ? Math.max(styleConfig.density || 2, 3) : styleConfig.density || 2;
+    const maxDensity = groundingRequired
+        ? Math.max(baseDensity, Math.min(4, intervals.length))
+        : baseDensity;
     if (targetIntervals.length > maxDensity) {
         targetIntervals = targetIntervals.slice(0, maxDensity);
     }

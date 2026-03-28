@@ -236,19 +236,6 @@ export function InstrumentSpecificSettings({ module }) {
                 </SettingRow>
             )}
 
-            {module === 'chords' && (
-                <SettingRow label="Piano Roots" id="pianoRootsCheck">
-                    <Toggle
-                        id="pianoRootsCheck"
-                        checked={state.pianoRoots}
-                        onChange={(/** @type {any} */ val) => {
-                            dispatch(ACTIONS.SET_PIANO_ROOTS, val);
-                            saveCurrentState();
-                        }}
-                    />
-                </SettingRow>
-            )}
-
             {module === 'harmony' && (
                 <SettingRow
                     label="Complexity"

@@ -22,7 +22,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             enabled: true,
             instruments: [{ name: 'Kick', steps: new Array(16).fill(0) }],
         },
-        chords: { ...actual.chords, enabled: true, pianoRoots: true },
+        chords: { ...actual.chords, enabled: true },
         bass: { ...actual.bass, enabled: true },
         soloist: { ...actual.soloist, enabled: true },
         harmony: { ...actual.harmony, enabled: false },
@@ -84,7 +84,7 @@ describe('Persistence Integrity', () => {
         expect(savedData.groove).toBeDefined();
 
         // Specific checks for persistence keys
-        expect(savedData.chords).toHaveProperty('pianoRoots');
+        expect(savedData.chords).toHaveProperty('density');
         expect(savedData.groove).toHaveProperty('followPlayback');
         expect(savedData.groove).toHaveProperty('humanize');
         expect(savedData.groove).toHaveProperty('creativity');

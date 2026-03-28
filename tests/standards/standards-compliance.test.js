@@ -22,7 +22,7 @@ vi.mock('../../public/state.js', () => {
             mode: 'guitar',
             sessionSteps: 1000,
         },
-        chords: { enabled: true, octave: 60, density: 'standard', pianoRoots: true },
+        chords: { enabled: true, octave: 60, density: 'standard' },
         playback: {
             bandIntensity: 0.5,
             bpm: 120,

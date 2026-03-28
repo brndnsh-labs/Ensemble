@@ -72,11 +72,6 @@ describe('Instrument Reducer', () => {
         expect(harmony.reverb).toBe(0.2);
     });
 
-    it('should set piano roots', () => {
-        instrumentReducer(ACTIONS.SET_PIANO_ROOTS, true);
-        expect(chords.pianoRoots).toBe(true);
-    });
-
     it('should set soloist mode and preset', () => {
         instrumentReducer(ACTIONS.SET_SOLOIST_MODE, 'guitar');
         expect(soloist.mode).toBe('guitar');

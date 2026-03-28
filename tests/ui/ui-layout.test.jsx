@@ -93,7 +93,6 @@ describe('UI Layout Integrity', () => {
             'themeSelect',
             'notationSelect',
             'densitySelect',
-            'pianoRootsCheck',
             'swingSlider',
             'shareHubBtn',
             'settingsShareHubBtn',

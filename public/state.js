@@ -129,7 +129,6 @@ export function getSyncState() {
             density: chords.density,
             enabled: chords.enabled,
             volume: chords.volume,
-            pianoRoots: chords.pianoRoots,
             rhythmicMask: chords.rhythmicMask,
         },
         bass: {

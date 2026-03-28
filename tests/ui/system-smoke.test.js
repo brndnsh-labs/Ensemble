@@ -119,7 +119,6 @@ const setupMinimalDOM = () => {
             <div id="settingsOverlay" aria-hidden="true"></div>
             <button id="settingsBtn"></button>
             <select id="themeSelect"></select>
-            <input id="pianoRootsCheck" type="checkbox" />
             <button id="exportMidiBtn"></button>
             <button id="settingsShareHubBtn"></button>
             <div id="shareOverlay" aria-hidden="true"></div>

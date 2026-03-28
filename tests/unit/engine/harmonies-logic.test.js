@@ -348,6 +348,26 @@ describe('Harmony Engine Logic', () => {
             expect(requested).not.toContain(0);
         });
 
+        it('should keep half-diminished grounding tones in Jazz practice mode', () => {
+            _playback.practiceMode = true;
+            _bass.enabled = false;
+            _groove.genreFeel = 'Jazz';
+
+            const chord = {
+                rootMidi: 64,
+                intervals: [0, 3, 6, 10],
+                quality: 'halfdim',
+                sectionId: 'p2a',
+                beats: 4,
+            };
+            getHarmonyNotes(getState(), chord, null, 0, 64, 'smart', 0);
+
+            const requested = getLastRequestedIntervals();
+            expect(requested).toContain(0);
+            expect(requested).toContain(6);
+            expect(requested).toContain(10);
+        });
+
         it('should ALWAYS reserve bass register (stay above 52) given new safety rules', () => {
             _playback.practiceMode = false;
             _bass.enabled = false;

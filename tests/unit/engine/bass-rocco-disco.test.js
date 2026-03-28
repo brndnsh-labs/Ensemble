@@ -25,7 +25,7 @@ vi.mock('../../../public/state.js', () => {
             instruments: [{ name: 'Kick', steps: new Array(16).fill(0), muted: false }],
         },
         playback: { bandIntensity: 0.8, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
-        chords: { pianoRoots: true },
+        chords: {},
         harmony: { enabled: false, buffer: new Map() },
         arranger: {
             key: 'C',
