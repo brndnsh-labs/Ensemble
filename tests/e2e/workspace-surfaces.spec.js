@@ -1,5 +1,6 @@
 import pkg from '@playwright/test';
 import {
+    expectNoVerticalOverflow,
     expectOwnsInteriorProbe,
     expectScrollsToRevealTarget,
     expectSurfaceFitsViewport,
@@ -213,11 +214,7 @@ test.describe('Workspace surfaces @ui', () => {
             await expectOwnsInteriorProbe(mixerSurface);
             await expect(mixerBody).toBeVisible();
             await expect(soloistVolume).toBeVisible();
-            const mixerMetrics = await mixerBody.evaluate((el) => ({
-                clientHeight: el.clientHeight,
-                scrollHeight: el.scrollHeight,
-            }));
-            expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
+            await expectNoVerticalOverflow(mixerBody);
 
             await page.locator('button[aria-label="Close mixer"]').last().click();
 
@@ -232,6 +229,32 @@ test.describe('Workspace surfaces @ui', () => {
 
             await page.locator('button[aria-label="Close Drums settings"]').last().click();
         }
+    });
+
+    test('studio surfaces mount in a body-level overlay layer on mobile @mobile', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 393, height: 852 });
+        await page.goto('/');
+        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await openWorkspace(page, 'Studio');
+
+        const bodyOverlayLayer = page.locator('body > .workspace-studio-surface-layer');
+
+        await page.getByRole('button', { name: 'Open mixer' }).click();
+        const mixerSurface = bodyOverlayLayer.locator('.workspace-studio-surface--mixer.is-open');
+        await expect(bodyOverlayLayer).toHaveCount(1);
+        await expect(mixerSurface).toBeVisible();
+        await expectSurfaceFitsViewport(page, mixerSurface);
+        await expectOwnsInteriorProbe(mixerSurface);
+        await page.locator('button[aria-label="Close mixer"]').last().click();
+
+        await page.getByRole('button', { name: 'Drums settings' }).click();
+        const drumSurface = bodyOverlayLayer.locator('.workspace-studio-surface--settings.is-open');
+        await expect(bodyOverlayLayer).toHaveCount(1);
+        await expect(drumSurface).toBeVisible();
+        await expectSurfaceFitsViewport(page, drumSurface);
+        await expectOwnsInteriorProbe(drumSurface);
     });
 
     test('perform launches and dismisses the live modals', async ({ page }) => {

@@ -1,6 +1,7 @@
 import pkg from '@playwright/test';
 import {
     expectNoHorizontalOverflow,
+    expectNoVerticalOverflow,
     expectScrollsToRevealTarget,
     expectSurfaceFitsViewport,
     expectWithinSurface,
@@ -47,11 +48,7 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         for (const strip of await mixerStrips.all()) {
             await expectNoHorizontalOverflow(strip);
         }
-        const mixerMetrics = await surfaceBody.evaluate((el) => ({
-            clientHeight: el.clientHeight,
-            scrollHeight: el.scrollHeight,
-        }));
-        expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
+        await expectNoVerticalOverflow(surfaceBody);
     });
 
     test('Drum settings sheet keeps swing and Lars controls within bounds @desktop', async ({
@@ -230,11 +227,7 @@ test.describe('Studio settings surfaces - Mobile Scrolling @mobile', () => {
         for (const strip of await mixerStrips.all()) {
             await expectNoHorizontalOverflow(strip);
         }
-        const mixerMetrics = await surfaceBody.evaluate((el) => ({
-            clientHeight: el.clientHeight,
-            scrollHeight: el.scrollHeight,
-        }));
-        expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
+        await expectNoVerticalOverflow(surfaceBody);
     });
 });
 
@@ -279,11 +272,7 @@ test.describe('Studio settings surfaces - iPhone reachability @mobile', () => {
         for (const strip of await mixerStrips.all()) {
             await expectNoHorizontalOverflow(strip);
         }
-        const mixerMetrics = await mixerBody.evaluate((el) => ({
-            clientHeight: el.clientHeight,
-            scrollHeight: el.scrollHeight,
-        }));
-        expect(mixerMetrics.scrollHeight).toBeLessThanOrEqual(mixerMetrics.clientHeight + 24);
+        await expectNoVerticalOverflow(mixerBody);
         await page.locator('button[aria-label="Close mixer"]').last().click();
 
         const soloistSurface = await openSurface(
