@@ -1,19 +1,33 @@
 import { Fragment } from 'preact';
+import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
 import { ArrangerWorkspace } from './components/ArrangerWorkspace.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { Modals } from './components/Modals.jsx';
 import { NotificationLayer } from './components/NotificationLayer.jsx';
-import { PerformWorkspace } from './components/PerformWorkspace.jsx';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner.jsx';
-import { StudioWorkspace } from './components/StudioWorkspace.jsx';
 import { Transport } from './components/Transport.jsx';
-import { VisualsWorkspace } from './components/VisualsWorkspace.jsx';
 import { WORKSPACE_META, WorkspaceNav } from './components/WorkspaceNav.jsx';
 import { debounceSaveState } from './persistence.js';
 import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 import { useEnsembleState } from './ui-bridge.js';
+
+const StudioWorkspace = lazy(() =>
+    import('./components/StudioWorkspace.jsx').then((module) => ({
+        default: module.StudioWorkspace,
+    })),
+);
+const PerformWorkspace = lazy(() =>
+    import('./components/PerformWorkspace.jsx').then((module) => ({
+        default: module.PerformWorkspace,
+    })),
+);
+const VisualsWorkspace = lazy(() =>
+    import('./components/VisualsWorkspace.jsx').then((module) => ({
+        default: module.VisualsWorkspace,
+    })),
+);
 
 /**
  * @typedef {Object} AppProps
@@ -79,6 +93,9 @@ export function App({ getVisualTime }) {
         }
     };
 
+    const workspaceContent = renderWorkspace();
+    const isEagerWorkspace = activeWorkspace === 'arranger';
+
     return (
         <Fragment>
             <GlobalShortcuts />
@@ -87,12 +104,52 @@ export function App({ getVisualTime }) {
                 <main class="app-main-layout workspace-shell loaded" id="dashboardGrid">
                     <WorkspaceNav />
                     <div class="workspace-content">
-                        <div
-                            key={activeWorkspace}
-                            class={`workspace-stage workspace-stage--${activeWorkspace}`}
-                        >
-                            {renderWorkspace()}
-                        </div>
+                        {isEagerWorkspace ? (
+                            <div
+                                key={activeWorkspace}
+                                class={`workspace-stage workspace-stage--${activeWorkspace}`}
+                            >
+                                {workspaceContent}
+                            </div>
+                        ) : (
+                            <Suspense
+                                fallback={
+                                    <div
+                                        class={`workspace-stage workspace-stage--${activeWorkspace}`}
+                                    >
+                                        <section
+                                            class="workspace-view"
+                                            data-workspace={activeWorkspace}
+                                        >
+                                            <div class="workspace-grid">
+                                                <div class="panel dashboard-panel workspace-panel workspace-panel--hero">
+                                                    <div class="panel-header">
+                                                        <div>
+                                                            <p class="workspace-kicker">
+                                                                Loading workspace
+                                                            </p>
+                                                            <h2 class="panel-title">
+                                                                {
+                                                                    WORKSPACE_META[activeWorkspace]
+                                                                        .label
+                                                                }
+                                                            </h2>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    </div>
+                                }
+                            >
+                                <div
+                                    key={activeWorkspace}
+                                    class={`workspace-stage workspace-stage--${activeWorkspace}`}
+                                >
+                                    {workspaceContent}
+                                </div>
+                            </Suspense>
+                        )}
                     </div>
                 </main>
             </div>
