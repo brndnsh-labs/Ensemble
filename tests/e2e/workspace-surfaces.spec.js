@@ -1,4 +1,9 @@
 import pkg from '@playwright/test';
+import {
+    expectOwnsInteriorProbe,
+    expectScrollsToRevealTarget,
+    expectSurfaceFitsViewport,
+} from './helpers/visibility.js';
 
 const { expect, test } = pkg;
 
@@ -151,6 +156,60 @@ test.describe('Workspace surfaces @ui', () => {
         expect(mobileSettingsBox.x + mobileSettingsBox.width).toBeLessThanOrEqual(640);
         expect(mobileSettingsBox.y).toBeGreaterThanOrEqual(0);
         expect(mobileSettingsBox.y + mobileSettingsBox.height).toBeLessThanOrEqual(960);
+    });
+
+    test('studio band feel and drum controls stay reachable across audit viewports', async ({
+        page,
+    }) => {
+        const viewports = [
+            { name: 'desktop', width: 1440, height: 900, expectScroll: false },
+            { name: 'tablet', width: 768, height: 1024, expectScroll: false },
+            { name: 'tablet-landscape', width: 1024, height: 768, expectScroll: false },
+            { name: 'mobile-short', width: 360, height: 640, expectScroll: true },
+        ];
+
+        for (const viewport of viewports) {
+            await page.setViewportSize({ width: viewport.width, height: viewport.height });
+            await page.goto('/');
+            await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+            await openWorkspace(page, 'Studio');
+
+            await page.locator('.workspace-studio-genre-button').click();
+            const bandFeelSurface = page.locator('.workspace-studio-surface--genre.is-open');
+            const bandFeelBody = bandFeelSurface.locator('.workspace-studio-surface-body');
+            const intensitySlider = bandFeelSurface.locator('#bandFeelIntensitySlider');
+
+            await expect(bandFeelSurface, `${viewport.name}: band feel should open`).toBeVisible();
+            await expectSurfaceFitsViewport(page, bandFeelSurface);
+            await expectOwnsInteriorProbe(bandFeelSurface);
+
+            if (viewport.expectScroll) {
+                await expectScrollsToRevealTarget(page, bandFeelBody, intensitySlider);
+            } else {
+                await expect(intensitySlider).toBeVisible();
+            }
+
+            await page.locator('button[aria-label="Close band feel menu"]').last().click();
+
+            await page.getByRole('button', { name: 'Drums settings' }).click();
+            const drumSurface = page.locator('.workspace-studio-surface--settings.is-open');
+            const drumBody = drumSurface.locator('.workspace-studio-surface-body');
+            const drumVolume = drumSurface.locator('input#drumVolume');
+            const larsIntensity = drumSurface.locator('input#larsIntensitySlider');
+
+            await expect(drumSurface, `${viewport.name}: drum settings should open`).toBeVisible();
+            await expectSurfaceFitsViewport(page, drumSurface);
+            await expectOwnsInteriorProbe(drumSurface);
+
+            if (viewport.expectScroll) {
+                await expectScrollsToRevealTarget(page, drumBody, drumVolume);
+            } else {
+                await expect(larsIntensity).toBeVisible();
+                await expect(drumVolume).toBeVisible();
+            }
+
+            await page.locator('button[aria-label="Close Drums settings"]').last().click();
+        }
     });
 
     test('perform launches and dismisses the live modals', async ({ page }) => {

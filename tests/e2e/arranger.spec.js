@@ -1,5 +1,10 @@
 // cspell:ignore labelledby
 import pkg from '@playwright/test';
+import {
+    expectLocatorFitsViewport,
+    expectOwnsInteriorProbe,
+    expectWithinSurface,
+} from './helpers/visibility.js';
 
 const { expect, test } = pkg;
 
@@ -246,5 +251,35 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect
             .poll(async () => items.evaluate((el) => getComputedStyle(el).pointerEvents))
             .toBe('none');
+    });
+
+    test('Arranger action menu stays reachable across desktop, tablet, and short mobile', async ({
+        page,
+    }) => {
+        const viewports = [
+            { width: 1440, height: 900 },
+            { width: 768, height: 1024 },
+            { width: 1024, height: 768 },
+            { width: 360, height: 640 },
+        ];
+
+        for (const viewport of viewports) {
+            await page.setViewportSize(viewport);
+            await page.goto('/');
+            await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+
+            const trigger = page.getByRole('button', { name: 'Open arranger actions' });
+            await trigger.click();
+
+            const items = page.locator('.workspace-fab-items');
+            const seedInput = page.locator('#arrangerSoloistSeed');
+            const libraryButton = page.locator('.workspace-library-fab');
+
+            await expect(items).toBeVisible();
+            await expectLocatorFitsViewport(page, items);
+            await expectOwnsInteriorProbe(items);
+            await expectWithinSurface(items, libraryButton);
+            await expectWithinSurface(items, seedInput);
+        }
     });
 });

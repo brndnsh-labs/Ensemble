@@ -1735,10 +1735,12 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface-body {
     min-height: 0;
+    flex: 1 1 auto;
     width: 100%;
     overflow: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     scroll-padding-block-end: 1rem;
     display: flex;
     flex-direction: column;
@@ -1939,11 +1941,14 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 
 .workspace-studio-surface--settings .button-group {
     width: 100%;
+    min-width: 0;
     flex-wrap: wrap;
     justify-content: flex-start;
 }
 
 .workspace-studio-surface--settings .button-group-btn {
+    min-width: 0;
+    max-width: 100%;
     border-radius: 999px;
     padding: 0.3rem 0.7rem;
 }

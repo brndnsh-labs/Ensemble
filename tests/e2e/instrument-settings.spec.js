@@ -1,43 +1,11 @@
 import pkg from '@playwright/test';
+import {
+    expectScrollsToRevealTarget,
+    expectSurfaceFitsViewport,
+    expectWithinSurface,
+} from './helpers/visibility.js';
 
 const { expect, test } = pkg;
-
-async function expectWithinSurface(surface, control) {
-    const [surfaceBox, controlBox] = await Promise.all([
-        surface.boundingBox(),
-        control.boundingBox(),
-    ]);
-
-    expect(surfaceBox).not.toBeNull();
-    expect(controlBox).not.toBeNull();
-    expect(controlBox.x).toBeGreaterThanOrEqual(surfaceBox.x - 1);
-    expect(controlBox.x + controlBox.width).toBeLessThanOrEqual(
-        surfaceBox.x + surfaceBox.width + 1,
-    );
-    expect(controlBox.y).toBeGreaterThanOrEqual(surfaceBox.y - 1);
-    expect(controlBox.y + controlBox.height).toBeLessThanOrEqual(
-        surfaceBox.y + surfaceBox.height + 1,
-    );
-}
-
-async function expectSurfaceFitsViewport(page, surface) {
-    const viewport = page.viewportSize();
-    const surfaceBox = await surface.boundingBox();
-
-    expect(viewport).not.toBeNull();
-    expect(surfaceBox).not.toBeNull();
-    expect(surfaceBox.x).toBeGreaterThanOrEqual(0);
-    expect(surfaceBox.y).toBeGreaterThanOrEqual(0);
-    expect(surfaceBox.x + surfaceBox.width).toBeLessThanOrEqual(viewport.width);
-    expect(surfaceBox.y + surfaceBox.height).toBeLessThanOrEqual(viewport.height);
-
-    const bodyMetrics = await surface.locator('.workspace-studio-surface-body').evaluate((el) => ({
-        clientWidth: el.clientWidth,
-        scrollWidth: el.scrollWidth,
-    }));
-
-    expect(bodyMetrics.scrollWidth).toBeLessThanOrEqual(bodyMetrics.clientWidth + 1);
-}
 
 test.describe('Studio settings surfaces - Visual & Interaction', () => {
     test.beforeEach(async ({ page }) => {
@@ -236,26 +204,82 @@ test.describe('Studio settings surfaces - Mobile Scrolling @mobile', () => {
         await expect(settingsSurface).toBeVisible();
         await expect(surfaceBody).toBeVisible();
         await expect(tradingGroup).toHaveCount(1);
+        await expectScrollsToRevealTarget(page, surfaceBody, loopsButton);
+        await loopsButton.click();
+        await expect(loopsButton).toHaveAttribute('aria-pressed', 'true');
+    });
 
-        const metrics = await surfaceBody.evaluate((el) => ({
-            scrollHeight: el.scrollHeight,
-            clientHeight: el.clientHeight,
-            scrollTop: el.scrollTop,
-        }));
+    test('Drum settings sheet scrolls to mixer controls on short mobile', async ({ page }) => {
+        await page.setViewportSize({ width: 360, height: 640 });
+        await page.reload();
+        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.click('[data-workspace-nav="studio"]');
+        await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
 
-        expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight + 24);
+        const groovePanel = page.locator('#panel-grooves');
+        const settingsBtn = groovePanel.getByRole('button', { name: 'Drums settings' });
 
-        const bodyBox = await surfaceBody.boundingBox();
-        expect(bodyBox).not.toBeNull();
+        await expect(settingsBtn).toBeVisible();
+        await settingsBtn.click();
 
-        await page.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + bodyBox.height / 2);
-        await page.mouse.wheel(0, bodyBox.height);
+        const settingsSurface = page.locator('.workspace-studio-surface--settings.is-open');
+        const surfaceBody = settingsSurface.locator('.workspace-studio-surface-body');
+        const drumVolume = settingsSurface.locator('input#drumVolume');
+        const drumReverb = settingsSurface.locator('input#drumReverb');
 
-        await expect
-            .poll(async () => surfaceBody.evaluate((el) => el.scrollTop))
-            .toBeGreaterThan(0);
-        await loopsButton.scrollIntoViewIfNeeded();
-        await expect(loopsButton).toBeVisible();
+        await expect(settingsSurface).toBeVisible();
+        await expectSurfaceFitsViewport(page, settingsSurface);
+        await expect(surfaceBody).toBeVisible();
+
+        await expectScrollsToRevealTarget(page, surfaceBody, drumVolume);
+        await expectWithinSurface(settingsSurface, drumVolume);
+        await expectWithinSurface(settingsSurface, drumReverb);
+    });
+});
+
+test.describe('Studio settings surfaces - iPhone reachability @mobile', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.setViewportSize({ width: 393, height: 852 });
+        await page.goto('/');
+        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.click('[data-workspace-nav="studio"]');
+        await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
+    });
+
+    test('Drum and soloist sheets use full-height mobile insets and keep lower controls reachable', async ({
+        page,
+    }) => {
+        const openSurface = async (buttonName) => {
+            await page.getByRole('button', { name: buttonName }).click();
+            const surface = page.locator('.workspace-studio-surface--settings.is-open');
+            const surfaceBox = await surface.boundingBox();
+            const viewport = page.viewportSize();
+
+            expect(viewport).not.toBeNull();
+            expect(surfaceBox).not.toBeNull();
+            expect(surfaceBox.y).toBeLessThan(40);
+            expect(viewport.height - (surfaceBox.y + surfaceBox.height)).toBeLessThan(40);
+            await expectSurfaceFitsViewport(page, surface);
+            return surface;
+        };
+
+        const drumsSurface = await openSurface('Drums settings');
+        const drumsBody = drumsSurface.locator('.workspace-studio-surface-body');
+        const drumVolume = drumsSurface.locator('input#drumVolume');
+        const drumReverb = drumsSurface.locator('input#drumReverb');
+
+        await expectScrollsToRevealTarget(page, drumsBody, drumVolume);
+        await expectWithinSurface(drumsSurface, drumVolume);
+        await expectWithinSurface(drumsSurface, drumReverb);
+        await page.locator('button[aria-label="Close Drums settings"]').last().click();
+
+        const soloistSurface = await openSurface('Soloist settings');
+        const soloistBody = soloistSurface.locator('.workspace-studio-surface-body');
+        const loopsButton = soloistSurface
+            .locator('.workspace-studio-surface-card--soloist .button-group')
+            .getByRole('button', { name: 'Loops' });
+
+        await expectScrollsToRevealTarget(page, soloistBody, loopsButton);
         await loopsButton.click();
         await expect(loopsButton).toHaveAttribute('aria-pressed', 'true');
     });

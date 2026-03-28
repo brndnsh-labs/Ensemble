@@ -477,16 +477,21 @@
     }
 
     .workspace-view--studio .workspace-studio-surface--modal {
+        top: max(0.75rem, calc(env(safe-area-inset-top) + 0.5rem));
         left: 0.75rem;
         right: 0.75rem;
+        bottom: max(0.75rem, calc(env(safe-area-inset-bottom) + 0.5rem));
         width: auto;
-        max-height: min(84dvh, 42rem);
+        min-height: 0;
+        max-height: none;
         padding: 0.9rem;
-        transform: translateY(-50%);
+        padding-bottom: calc(0.9rem + env(safe-area-inset-bottom));
+        transform: none;
         animation: workspaceStudioSurfaceMobileIn 180ms ease-out;
     }
 
     .workspace-view--studio .workspace-studio-surface-body {
+        min-height: 0;
         padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
         scroll-padding-block-end: calc(1.5rem + env(safe-area-inset-bottom));
     }
@@ -561,10 +566,10 @@
 @keyframes workspaceStudioSurfaceMobileIn {
     from {
         opacity: 0;
-        transform: translateY(-46%) scale(0.985);
+        transform: translateY(12px) scale(0.985);
     }
     to {
         opacity: 1;
-        transform: translateY(-50%) scale(1);
+        transform: translateY(0) scale(1);
     }
 }
