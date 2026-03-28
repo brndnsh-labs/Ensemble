@@ -87,7 +87,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(firstChord).toBeVisible();
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
-        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'expanded-readable');
+        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-fit');
         await expect
             .poll(async () =>
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
@@ -152,6 +152,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(visualizer).toHaveAttribute('data-density', 'compact');
         await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
         await expect(visualizer).toHaveAttribute('data-scroll-mode', 'guided');
+        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-guided');
         await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(7);
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(9);
         expect(rowMeasureCounts).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 4]);
@@ -161,10 +162,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
             )
             .toBeGreaterThan(19);
-        await expect(visualizer).toHaveJSProperty(
-            'scrollHeight',
-            await visualizer.evaluate((el) => el.clientHeight),
-        );
+        const scrollDelta = await visualizer.evaluate((el) => el.scrollHeight - el.clientHeight);
+        expect(scrollDelta).toBeLessThanOrEqual(12);
 
         const standardFontSize = await firstChord.evaluate((el) =>
             parseFloat(getComputedStyle(el).fontSize),

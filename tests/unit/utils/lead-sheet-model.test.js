@@ -118,10 +118,10 @@ describe('lead-sheet-model', () => {
             measuresPerRow: 4,
             scrollMode: 'fit',
             viewport: 'mobile',
-            verticalFillMode: 'fitted',
-            verticalFillScale: 1.1,
-            verticalGapScale: 1.04,
-            verticalTypeScale: 1.1,
+            verticalFillMode: 'paper-fill',
+            verticalFillScale: 1.56,
+            verticalGapScale: 1.12,
+            verticalTypeScale: 1.3,
         });
     });
 
@@ -140,10 +140,10 @@ describe('lead-sheet-model', () => {
             measuresPerRow: 4,
             scrollMode: 'guided',
             viewport: 'desktop',
-            verticalFillMode: 'compact',
-            verticalFillScale: 1,
-            verticalGapScale: 1,
-            verticalTypeScale: 1,
+            verticalFillMode: 'paper-guided',
+            verticalFillScale: 1.04,
+            verticalGapScale: 1.03,
+            verticalTypeScale: 1.06,
         });
     });
 
@@ -182,10 +182,10 @@ describe('lead-sheet-model', () => {
             density: 'comfortable',
             scrollMode: 'fit',
             viewport: 'desktop',
-            verticalFillMode: 'generous',
-            verticalFillScale: 1.5,
-            verticalGapScale: 1.31,
-            verticalTypeScale: 1.28,
+            verticalFillMode: 'paper-fill',
+            verticalFillScale: 1.45,
+            verticalGapScale: 1.12,
+            verticalTypeScale: 1.26,
         });
     });
 
@@ -202,10 +202,10 @@ describe('lead-sheet-model', () => {
             density: 'comfortable',
             scrollMode: 'fit',
             viewport: 'desktop',
-            verticalFillMode: 'balanced',
-            verticalFillScale: 1.27,
-            verticalGapScale: 1.18,
-            verticalTypeScale: 1.18,
+            verticalFillMode: 'paper-fill',
+            verticalFillScale: 1.3,
+            verticalGapScale: 1.09,
+            verticalTypeScale: 1.19,
         });
     });
 
@@ -222,10 +222,10 @@ describe('lead-sheet-model', () => {
             density: 'compact',
             scrollMode: 'fit',
             viewport: 'desktop',
-            verticalFillMode: 'expanded-readable',
-            verticalFillScale: 1.1,
-            verticalGapScale: 1.04,
-            verticalTypeScale: 1.17,
+            verticalFillMode: 'paper-fit',
+            verticalFillScale: 1.22,
+            verticalGapScale: 1.06,
+            verticalTypeScale: 1.18,
         });
     });
 });

@@ -188,7 +188,7 @@ describe('ChordVisualizer Component', () => {
         expect(visualizer?.getAttribute('data-row-count')).toBe('8');
         expect(visualizer?.getAttribute('data-scroll-mode')).toBe('fit');
         expect(visualizer?.getAttribute('data-viewport')).toBe('mobile');
-        expect(visualizer?.getAttribute('data-vertical-fill')).toBe('fitted');
+        expect(visualizer?.getAttribute('data-vertical-fill')).toBe('paper-fill');
     });
 
     it('applies vertical fill styling for short charts that fit the viewport', () => {
@@ -217,9 +217,9 @@ describe('ChordVisualizer Component', () => {
         });
 
         const visualizer = container.querySelector('#chordVisualizer');
-        expect(visualizer?.getAttribute('data-vertical-fill')).toBe('generous');
-        expect(visualizer?.style.getPropertyValue('--lead-vertical-fill')).toBe('1.50');
-        expect(visualizer?.style.getPropertyValue('--lead-vertical-type-fill')).toBe('1.28');
+        expect(visualizer?.getAttribute('data-vertical-fill')).toBe('paper-fill');
+        expect(visualizer?.style.getPropertyValue('--lead-vertical-fill')).toBe('1.45');
+        expect(visualizer?.style.getPropertyValue('--lead-vertical-type-fill')).toBe('1.26');
     });
 
     it('should render sparklines for short maximized lead sheets', () => {

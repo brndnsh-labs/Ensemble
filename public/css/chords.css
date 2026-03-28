@@ -3,7 +3,7 @@
     --lead-vertical-fill: 1;
     --lead-vertical-gap-fill: 1;
     --lead-vertical-type-fill: 1;
-    --lead-row-width: 1280px;
+    --lead-row-width: 100%;
     --lead-row-gap: 0.46rem;
     --lead-measure-gap: 0.3rem;
     --lead-marker-reserve: 0.72rem;
@@ -85,8 +85,11 @@
 .lead-sheet-section-group {
     display: grid;
     gap: calc(var(--lead-row-gap) * 0.8 * var(--lead-vertical-gap-fill));
+    width: min(var(--lead-row-width), 100%);
+    margin-inline: auto;
     align-content: start;
     align-self: start;
+    justify-items: stretch;
     position: relative;
     isolation: isolate;
     transition: transform var(--anim-fast) var(--anim-ease);

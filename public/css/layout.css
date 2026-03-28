@@ -1066,12 +1066,6 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     margin-bottom: 0;
 }
 
-.workspace-arranger-chords .lead-sheet-row {
-    width: min(var(--lead-row-width, 1440px), 100%);
-    margin-left: auto;
-    margin-right: auto;
-}
-
 .workspace-fab-menu {
     position: relative;
     z-index: var(--z-floating);

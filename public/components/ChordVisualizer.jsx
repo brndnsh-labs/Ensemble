@@ -169,6 +169,7 @@ export function ChordVisualizer() {
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
     const containerRef = useRef(null);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
+    const [containerSize, setContainerSize] = useState({ height: 0, width: 0 });
     const timeSignatureConfig =
         /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
 
@@ -191,6 +192,38 @@ export function ChordVisualizer() {
         handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) {
+            return undefined;
+        }
+
+        const updateContainerSize = () => {
+            setContainerSize((current) => {
+                const next = {
+                    height: container.clientHeight || 0,
+                    width: container.clientWidth || 0,
+                };
+                if (current.width === next.width && current.height === next.height) {
+                    return current;
+                }
+
+                return next;
+            });
+        };
+
+        updateContainerSize();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateContainerSize);
+            return () => window.removeEventListener('resize', updateContainerSize);
+        }
+
+        const observer = new ResizeObserver(updateContainerSize);
+        observer.observe(container);
+        return () => observer.disconnect();
     }, []);
 
     const sectionBlocks = useMemo(
@@ -256,13 +289,24 @@ export function ChordVisualizer() {
                 rowCount: leadSheetRows.length,
                 viewportWidth: viewportSize.width,
                 viewportHeight: viewportSize.height,
+                containerWidth: containerSize.width || viewportSize.width,
+                containerHeight: containerSize.height || viewportSize.height,
                 isMaximized,
             }),
-        [isMaximized, leadSheetRows.length, totalMeasures, viewportSize.height, viewportSize.width],
+        [
+            containerSize.height,
+            containerSize.width,
+            isMaximized,
+            leadSheetRows.length,
+            totalMeasures,
+            viewportSize.height,
+            viewportSize.width,
+        ],
     );
     const density = layoutProfile.density;
     const showSparkline = isMaximized && soloistStyle === 'lead_sheet' && totalMeasures <= 16;
     const containerStyle = {
+        '--lead-row-width': `${layoutProfile.rowWidth}px`,
         '--lead-vertical-fill': layoutProfile.verticalFillScale.toFixed(2),
         '--lead-vertical-gap-fill': layoutProfile.verticalGapScale.toFixed(2),
         '--lead-vertical-type-fill': layoutProfile.verticalTypeScale.toFixed(2),

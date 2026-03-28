@@ -115,7 +115,8 @@
     .workspace-arranger-chords .display-area {
         height: 100%;
         max-height: none;
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: auto;
     }
 }
 

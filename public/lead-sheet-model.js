@@ -5,15 +5,22 @@ const ULTRA_COMPACT_MEASURE_THRESHOLD = 32;
 const LEAD_SHEET_MOBILE_MAX_WIDTH = 700;
 const LEAD_SHEET_TABLET_MAX_WIDTH = 1100;
 const SHORT_LEAD_SHEET_VIEWPORT_HEIGHT = 720;
-const TALL_VIEWPORT_THRESHOLD = {
-    desktop: 820,
-    mobile: 760,
-    tablet: 780,
-};
-const EXTRA_TALL_VIEWPORT_THRESHOLD = {
-    desktop: 900,
-    mobile: 830,
-    tablet: 860,
+const LEAD_SHEET_FIT_ROW_BUDGET = {
+    comfortable: {
+        desktop: 88,
+        mobile: 68,
+        tablet: 78,
+    },
+    compact: {
+        desktop: 64,
+        mobile: 52,
+        tablet: 60,
+    },
+    'ultra-compact': {
+        desktop: 58,
+        mobile: 44,
+        tablet: 50,
+    },
 };
 
 /**
@@ -21,6 +28,15 @@ const EXTRA_TALL_VIEWPORT_THRESHOLD = {
  */
 function roundLeadSheetScale(value) {
     return Math.round(value * 100) / 100;
+}
+
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ */
+function clampLeadSheetScale(value, min, max) {
+    return roundLeadSheetScale(Math.min(max, Math.max(min, value)));
 }
 
 /**
@@ -63,44 +79,169 @@ function getLeadSheetLayoutDensity({
 }
 
 /**
- * @param {'mobile' | 'tablet' | 'desktop'} viewport
- * @param {number} rowCount
- * @param {'comfortable' | 'compact' | 'ultra-compact'} density
+ * @param {{
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   rowCount: number,
+ *   scrollMode: 'fit' | 'guided',
+ *   containerWidth: number,
+ * }} options
  */
-function getLeadSheetFitFillPreset(viewport, rowCount, density) {
-    if (rowCount <= 2) {
-        return {
-            mode: 'generous',
-            verticalFillScale: viewport === 'desktop' ? 1.42 : viewport === 'tablet' ? 1.28 : 1.16,
-            verticalGapScale: viewport === 'desktop' ? 1.26 : 1.14,
-            verticalTypeScale: viewport === 'desktop' ? 1.22 : viewport === 'tablet' ? 1.14 : 1.08,
-        };
+function getLeadSheetRowWidth({ viewport, rowCount, scrollMode, containerWidth }) {
+    if (viewport === 'mobile') {
+        return Math.max(0, Math.round(containerWidth - 6));
     }
 
-    if (rowCount <= 4) {
-        return {
-            mode: 'balanced',
-            verticalFillScale: viewport === 'desktop' ? 1.2 : viewport === 'tablet' ? 1.12 : 1.06,
-            verticalGapScale: viewport === 'desktop' ? 1.14 : 1.08,
-            verticalTypeScale: viewport === 'desktop' ? 1.12 : viewport === 'tablet' ? 1.08 : 1.04,
-        };
+    if (viewport === 'tablet') {
+        if (scrollMode === 'guided') {
+            return Math.round(
+                Math.min(Math.max(containerWidth * 0.98, 720), Math.min(containerWidth, 920)),
+            );
+        }
+
+        const widthScale = rowCount >= 8 ? 0.97 : rowCount >= 4 ? 0.94 : 0.9;
+        const minWidth = rowCount >= 8 ? 720 : 680;
+        const maxWidth = rowCount >= 8 ? 900 : rowCount >= 4 ? 860 : 820;
+
+        return Math.round(
+            Math.min(
+                Math.max(containerWidth * widthScale, minWidth),
+                Math.min(containerWidth, maxWidth),
+            ),
+        );
     }
 
-    if (rowCount <= 6 && density === 'comfortable') {
-        return {
-            mode: 'balanced',
-            verticalFillScale: viewport === 'desktop' ? 1.08 : 1.03,
-            verticalGapScale: 1.04,
-            verticalTypeScale: viewport === 'desktop' ? 1.05 : 1.02,
-        };
+    if (scrollMode === 'guided') {
+        const widthScale = rowCount >= 9 ? 0.96 : 0.97;
+        const minWidth = rowCount >= 9 ? 920 : 900;
+        const maxWidth = rowCount >= 9 ? 980 : 1000;
+
+        return Math.round(
+            Math.min(
+                Math.max(containerWidth * widthScale, minWidth),
+                Math.min(containerWidth, maxWidth),
+            ),
+        );
     }
 
-    if (viewport === 'desktop' && density === 'compact' && rowCount <= 8) {
+    const widthScale = rowCount >= 8 ? 0.93 : rowCount >= 4 ? 0.89 : 0.83;
+    const minWidth = rowCount >= 8 ? 900 : rowCount >= 4 ? 820 : 760;
+    const maxWidth = rowCount >= 8 ? 960 : rowCount >= 4 ? 920 : 860;
+
+    return Math.round(
+        Math.min(
+            Math.max(containerWidth * widthScale, minWidth),
+            Math.min(containerWidth, maxWidth),
+        ),
+    );
+}
+
+/**
+ * @param {{
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   rowCount: number,
+ *   density: 'comfortable' | 'compact' | 'ultra-compact',
+ *   availableHeight: number,
+ *   isShortViewport: boolean,
+ * }} options
+ */
+function getLeadSheetFitSizing({ viewport, rowCount, density, availableHeight, isShortViewport }) {
+    const baseBudget = LEAD_SHEET_FIT_ROW_BUDGET[density][viewport];
+    const shortViewportPenalty =
+        isShortViewport && viewport === 'mobile' ? 0.12 : isShortViewport ? 0.08 : 0;
+    const fillCap =
+        viewport === 'mobile'
+            ? rowCount >= 8
+                ? 1.56
+                : rowCount >= 4
+                  ? 1.42
+                  : 1.3
+            : viewport === 'tablet'
+              ? rowCount >= 8
+                  ? 1.3
+                  : rowCount >= 4
+                    ? 1.24
+                    : 1.18
+              : rowCount >= 8
+                ? 1.22
+                : rowCount >= 4
+                  ? 1.3
+                  : 1.45;
+    const fillScale = clampLeadSheetScale(
+        availableHeight / Math.max(1, rowCount * baseBudget) - shortViewportPenalty,
+        1,
+        fillCap,
+    );
+    const gapBonus = rowCount <= 4 ? 0.04 : rowCount >= 8 ? 0.02 : 0.03;
+    const gapScale = clampLeadSheetScale(
+        1 + Math.max(0, (fillScale - 1) * (viewport === 'mobile' ? 0.22 : 0.18) + gapBonus),
+        1,
+        viewport === 'mobile' ? 1.12 : 1.18,
+    );
+    const typeBonus =
+        rowCount <= 4 ? 0.04 : rowCount >= 8 ? (viewport === 'desktop' ? 0.04 : 0.02) : 0.03;
+    const typeWeight = viewport === 'mobile' ? 0.62 : rowCount >= 8 ? 0.65 : 0.5;
+    const typeScale = clampLeadSheetScale(
+        1 + Math.max(0, (fillScale - 1) * typeWeight + typeBonus),
+        1,
+        viewport === 'mobile' ? 1.3 : rowCount >= 8 ? 1.2 : rowCount <= 2 ? 1.3 : 1.24,
+    );
+    const mode =
+        fillScale >= (viewport === 'mobile' ? 1.42 : 1.24)
+            ? 'paper-fill'
+            : fillScale >= 1.12
+              ? 'paper-fit'
+              : 'paper-balanced';
+
+    return {
+        mode,
+        verticalFillScale: fillScale,
+        verticalGapScale: gapScale,
+        verticalTypeScale: typeScale,
+    };
+}
+
+/**
+ * @param {{
+ *   viewport: 'mobile' | 'tablet' | 'desktop',
+ *   rowCount: number,
+ *   density: 'comfortable' | 'compact' | 'ultra-compact',
+ *   isShortViewport: boolean,
+ * }} options
+ */
+function getLeadSheetGuidedSizing({ viewport, rowCount, density, isShortViewport }) {
+    if (isShortViewport) {
         return {
-            mode: 'readable',
+            mode: 'compact',
             verticalFillScale: 1,
             verticalGapScale: 1,
-            verticalTypeScale: 1.08,
+            verticalTypeScale: 1,
+        };
+    }
+
+    if (viewport === 'desktop' && density === 'compact' && rowCount <= 10) {
+        return {
+            mode: 'paper-guided',
+            verticalFillScale: 1.04,
+            verticalGapScale: 1.03,
+            verticalTypeScale: 1.06,
+        };
+    }
+
+    if (viewport === 'tablet' && rowCount <= 10) {
+        return {
+            mode: 'paper-guided',
+            verticalFillScale: 1.04,
+            verticalGapScale: 1.03,
+            verticalTypeScale: 1.05,
+        };
+    }
+
+    if (viewport === 'mobile' && rowCount <= 12) {
+        return {
+            mode: 'paper-guided',
+            verticalFillScale: density === 'ultra-compact' ? 1.06 : 1.08,
+            verticalGapScale: 1.03,
+            verticalTypeScale: density === 'ultra-compact' ? 1.08 : 1.1,
         };
     }
 
@@ -109,59 +250,6 @@ function getLeadSheetFitFillPreset(viewport, rowCount, density) {
         verticalFillScale: 1,
         verticalGapScale: 1,
         verticalTypeScale: 1,
-    };
-}
-
-/**
- * @param {'mobile' | 'tablet' | 'desktop'} viewport
- * @param {number} rowCount
- * @param {number} viewportHeight
- * @param {string} verticalFillMode
- */
-function getLeadSheetTallViewportBoost(viewport, rowCount, viewportHeight, verticalFillMode) {
-    if (viewportHeight < TALL_VIEWPORT_THRESHOLD[viewport]) {
-        return null;
-    }
-
-    let fillBoost = 0;
-    let gapBoost = 0;
-    let typeBoost = 0;
-    let nextFillMode = verticalFillMode;
-
-    if (rowCount <= 2) {
-        fillBoost = viewport === 'desktop' ? 0.06 : viewport === 'tablet' ? 0.05 : 0.04;
-        gapBoost = viewport === 'desktop' ? 0.04 : 0.03;
-        typeBoost = viewport === 'desktop' ? 0.04 : 0.03;
-    } else if (rowCount <= 4) {
-        fillBoost = viewport === 'desktop' ? 0.05 : viewport === 'tablet' ? 0.04 : 0.03;
-        gapBoost = viewport === 'desktop' ? 0.03 : 0.02;
-        typeBoost = viewport === 'desktop' ? 0.04 : 0.03;
-    } else if (rowCount <= 6) {
-        fillBoost = viewport === 'desktop' ? 0.04 : 0.03;
-        gapBoost = viewport === 'desktop' ? 0.02 : 0.01;
-        typeBoost = viewport === 'desktop' ? 0.03 : 0.02;
-    } else if (rowCount <= 8) {
-        fillBoost = viewport === 'desktop' ? 0.08 : viewport === 'tablet' ? 0.06 : 0.08;
-        gapBoost = 0.03;
-        typeBoost = viewport === 'desktop' ? 0.07 : viewport === 'tablet' ? 0.05 : 0.08;
-        nextFillMode = verticalFillMode === 'readable' ? 'expanded-readable' : 'fitted';
-    }
-
-    if (viewportHeight >= EXTRA_TALL_VIEWPORT_THRESHOLD[viewport] && rowCount <= 8) {
-        fillBoost += 0.02;
-        gapBoost += 0.01;
-        typeBoost += 0.02;
-    }
-
-    if (fillBoost === 0 && gapBoost === 0 && typeBoost === 0) {
-        return null;
-    }
-
-    return {
-        fillBoost,
-        gapBoost,
-        nextFillMode,
-        typeBoost,
     };
 }
 
@@ -318,6 +406,8 @@ export function getLeadSheetViewport(viewportWidth) {
  *   rowCount: number,
  *   viewportWidth?: number,
  *   viewportHeight?: number,
+ *   containerWidth?: number,
+ *   containerHeight?: number,
  *   isMaximized?: boolean,
  * }} options
  */
@@ -326,13 +416,20 @@ export function getLeadSheetLayoutProfile({
     rowCount,
     viewportWidth = 1280,
     viewportHeight = 800,
+    containerWidth = viewportWidth,
+    containerHeight = viewportHeight,
     isMaximized = false,
 }) {
     const viewport = getLeadSheetViewport(viewportWidth);
     const isShortViewport = viewportHeight < SHORT_LEAD_SHEET_VIEWPORT_HEIGHT;
-
     const fitRowThreshold = viewport === 'desktop' ? 8 : isMaximized ? 10 : 9;
     const scrollMode = rowCount > fitRowThreshold ? 'guided' : 'fit';
+    const rowWidth = getLeadSheetRowWidth({
+        viewport,
+        rowCount,
+        scrollMode,
+        containerWidth,
+    });
     const density = getLeadSheetLayoutDensity({
         totalMeasures,
         rowCount,
@@ -342,50 +439,31 @@ export function getLeadSheetLayoutProfile({
     });
     const lookaheadRows =
         scrollMode === 'guided' ? (viewport === 'desktop' && !isShortViewport ? 2 : 1) : 1;
-    let {
+    const {
         mode: verticalFillMode,
         verticalFillScale,
         verticalGapScale,
         verticalTypeScale,
     } = scrollMode === 'fit'
-        ? getLeadSheetFitFillPreset(viewport, rowCount, density)
-        : {
-              mode: 'compact',
-              verticalFillScale: 1,
-              verticalGapScale: 1,
-              verticalTypeScale: 1,
-          };
-
-    if (scrollMode === 'fit' && !isShortViewport) {
-        const tallViewportBoost = getLeadSheetTallViewportBoost(
-            viewport,
-            rowCount,
-            viewportHeight,
-            verticalFillMode,
-        );
-
-        if (tallViewportBoost) {
-            verticalFillMode = tallViewportBoost.nextFillMode;
-            verticalFillScale = roundLeadSheetScale(
-                verticalFillScale + tallViewportBoost.fillBoost,
-            );
-            verticalGapScale = roundLeadSheetScale(verticalGapScale + tallViewportBoost.gapBoost);
-            verticalTypeScale = roundLeadSheetScale(
-                verticalTypeScale + tallViewportBoost.typeBoost,
-            );
-        }
-    }
-
-    if (isShortViewport && scrollMode === 'fit') {
-        verticalFillScale = Math.max(1, verticalFillScale - 0.08);
-        verticalGapScale = Math.max(1, verticalGapScale - 0.06);
-        verticalTypeScale = Math.max(1, verticalTypeScale - 0.05);
-    }
+        ? getLeadSheetFitSizing({
+              viewport,
+              rowCount,
+              density,
+              availableHeight: containerHeight,
+              isShortViewport,
+          })
+        : getLeadSheetGuidedSizing({
+              viewport,
+              rowCount,
+              density,
+              isShortViewport,
+          });
 
     return {
         density,
         lookaheadRows,
         measuresPerRow: LEAD_SHEET_MEASURES_PER_ROW,
+        rowWidth,
         scrollMode,
         viewport,
         verticalFillMode,

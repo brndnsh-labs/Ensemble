@@ -88,7 +88,7 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
 
         await expect(visualizer).toBeVisible();
         await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
-        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'balanced');
+        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-fill');
         await expect
             .poll(async () =>
                 firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
