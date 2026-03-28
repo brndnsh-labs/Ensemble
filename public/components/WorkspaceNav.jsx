@@ -8,19 +8,19 @@ export const WORKSPACE_META = {
         id: 'arranger',
         icon: '🎼',
         label: 'Arranger',
-        description: 'Shape chords, sections, and song flow.',
+        description: '',
     },
     studio: {
         id: 'studio',
         icon: '🎛️',
         label: 'Studio',
-        description: 'Dial in band settings and groove behavior.',
+        description: '',
     },
     perform: {
         id: 'perform',
         icon: '🎹',
         label: 'Perform',
-        description: 'Launch live solo and groove performance tools.',
+        description: '',
     },
     visuals: {
         id: 'visuals',

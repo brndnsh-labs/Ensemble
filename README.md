@@ -1,76 +1,108 @@
-# Ensemble: The Intelligent Virtual Band
+# Ensemble
 
-**Ensemble** is an ultra-lightweight, high-performance Virtual Band in your browser. It’s an intelligent "beyond-the-metronome" toolkit for musicians that generates real-time, reactive backing tracks—drums, bass, chords, harmony, and solo phrases—that adapt to your style, intensity, and genre.
+Ensemble is a browser-based virtual band and songwriting toolkit. It generates real-time drums, bass, chords, harmony, and solo lines that respond to your progression, genre, and intensity choices.
 
-Whether you're practicing a `ii-V-I` progression, sketching a new song idea, or exporting MIDI for a DAW, Ensemble provides a "pro-level" rhythm section that understands the pocket.
+It is built as a PWA, runs from the browser, and is designed for fast ideas: sketch a progression, hear the band interpret it immediately, and move between writing, performing, and visualizing without leaving the app.
 
----
+## What Ensemble does
 
-## 🚀 Why Ensemble?
+- Builds full arrangements from chord charts and song sections.
+- Adapts the band feel with smart genre presets.
+- Lets you tune the live mix per instrument in Studio.
+- Launches performance-focused surfaces for soloing and drums.
+- Provides a visualizer workspace for harmonic playback.
+- Includes audio analysis and melody-to-harmony tooling.
+- Exports and routes MIDI for DAWs and external gear.
 
-*   **Ultra-Lean & Fast**: At less than 500KB total transfer size, Ensemble is smaller than a single high-res photo. It's a full-featured PWA that loads instantly and works anywhere—even offline.
-*   **Generative, Not Static**: Unlike a standard backing track (which is just a recording), Ensemble generates every note on the fly. This means the "pocket" is alive, with micro-timing (like Dilla-style lag or Reggae lay-back) that makes it feel like a human rhythm section.
-*   **Creative Speed**: Rapidly input chord progressions using Roman Numerals, Nashville Numbers, or Absolute chord names. Dial up the intensity and hear your song idea performed instantly.
-*   **Pro Connectivity**: Seamlessly drag-and-drop your generated arrangements into any DAW via MIDI export, or connect your MIDI controller to play along with the engine.
-*   **Focused Workspaces**: Move between four purpose-built workspaces—**Arranger**, **Studio**, **Perform**, and **Visuals**—so the lead sheet, mix controls, live tools, and visualizer each have room to breathe.
+## Workspaces
 
-## 🎹 Key Features
+Ensemble is organized around four main workspaces:
 
-*   **Intensity-Aware Phrasing**: Dial the "energy" of the band up or down. Watch the drummer move from subtle cross-sticks to driving fills, and the bass transition from simple roots to complex chromatic walking lines.
-*   **Musical Coordination**: A centralized "Coordination Context" ensures the band plays together. The Bass locks to the Kick drum, and the Accompaniment engine intelligently yields sonic space when the Soloist is active.
-*   **Smart Genres**: Expert-tuned musical rules for 32+ genres (Jazz, Neo-Soul, Ska-Punk, Reggae, Funk, and more).
-*   **Audio Analysis Tools**: Analyze existing audio files or live performances with high-precision chord detection and a specialized Melody Harmonizer.
-*   **Unified Visualizer**: A multi-track harmonic monitor that superimposes instrumental performance over chord data with real-time interval analysis.
+- **Arranger**: Shape chords, sections, transposition, sharing, and progression library access.
+- **Studio**: Choose the band feel, toggle instruments, and adjust per-instrument settings.
+- **Perform**: Open focused live tools for soloist performance and the drum pad.
+- **Visuals**: Give the visualizer room to breathe while playback continues.
 
-## 🛠 Tech Stack
+## Workspace screenshots
 
-*   **UI**: **Preact (v10)** for a snappy, reactive interface with zero bloat.
-*   **Audio Engine**: Custom synthesis engines and a precision `scheduler-core.js` for rock-solid timing.
-*   **Background Processing**: Web Workers (`logic-worker.js`) handle all generative logic to ensure a glitch-free experience even on low-end devices.
-*   **Build System**: `esbuild` for ultra-fast JSX transformation and bundling.
+<p><em>A quick desktop tour of the four main workspaces.</em></p>
 
----
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/readme/arranger.png" alt="Arranger workspace" width="100%" />
+      <br /><strong>Arranger</strong>
+    </td>
+    <td align="center">
+      <img src="docs/assets/readme/studio.png" alt="Studio workspace" width="100%" />
+      <br /><strong>Studio</strong>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/readme/perform.png" alt="Perform workspace" width="100%" />
+      <br /><strong>Perform</strong>
+    </td>
+    <td align="center">
+      <img src="docs/assets/readme/visuals.png" alt="Visuals workspace" width="100%" />
+      <br /><strong>Visuals</strong>
+    </td>
+  </tr>
+</table>
 
-## 🏃 Quickstart
+## Getting started
 
-### Local Development
-Install dependencies, build the preview bundle, and serve it locally:
 ```bash
 npm install
 npm run dev
 ```
 
-### Workspace Tour
-- **Arranger**: Build and follow the lead sheet, open the progression library, share/export, and transpose quickly.
-- **Studio**: Manage the live mix, toggle instruments on or off, and choose the current band feel from one compact surface.
-- **Perform**: Launch the soloist and drum performance tools without cluttering the rest of the UI.
-- **Visuals**: Open the full-size visualizer workspace while playback continues.
+`npm run dev` builds the app and serves the generated bundle on `http://localhost:5173`. It is a preview server, not a hot-reload dev server.
 
-### Deployment
-Ensemble deploys as static files. The deployment scripts build cache-busted assets into `dist/` and sync them to the target host, which fits a simple Nginx-style container setup well.
+Once the app is running, you can:
+
+1. Open **Arranger** and enter a chord progression.
+2. Switch to **Studio** to pick a band feel and adjust the mix.
+3. Use **Perform** to launch the soloist or drum pad.
+4. Move to **Visuals** when you want the visualizer full-width.
+
+## Common commands
+
 ```bash
-npm run deploy:test   # Build and deploy to test
-npm run deploy:prod   # Build and deploy to production
+npm run build
+npm test
+npm run test:e2e
+npm run validate
 ```
 
-## 🧪 Testing
+- `npm run build` creates a production-style dry run in `dist/`.
+- `npm test` runs linting and the Vitest suite.
+- `npm run test:e2e` runs the Playwright smoke suite.
+- `npm run validate` performs the full repo validation pipeline.
 
-Ensemble uses a dual-layer testing strategy:
-1.  **Unit & Integration**: Powered by Vitest to verify musical logic and engine integrity.
-    ```bash
-    npm test
-    ```
-2.  **E2E & Visual Regression**: Powered by Playwright to verify UI layout and interaction.
-    ```bash
-    npm run test:e2e
-    ```
-3.  **Full Validation**: Runs type-checking, dependency checks, formatting, linting, mutation checks, and the full Vitest suite.
-    ```bash
-    npm run validate
-    ```
+## Documentation
 
----
+- `public/MANUAL.md` — the in-app manual, including generated reference tables.
+- `AI.md` — operational rules and state-management guidance for contributors.
+- `AI_MAP.md` — a navigation map for the codebase.
+- `docs/guides/` — deeper implementation notes and reference guides.
+- `tests/README.md` — test-suite conventions and how to run checks.
 
-## 📜 License
+## Tech stack
 
-GNU Affero General Public License v3.0 (AGPLv3). See [LICENSE](LICENSE) for details.
+- **UI**: Preact
+- **State**: deep-signal domain slices
+- **Audio and generation**: WebAudio plus worker-driven logic
+- **Build**: esbuild
+- **Testing**: Vitest and Playwright
+
+## Repository layout
+
+- `public/` — app source, controllers, engines, components, and styles
+- `tests/` — unit, integration, standards, perf, and e2e coverage
+- `docs/` — implementation guides and archived reports
+- `scripts/` — repo maintenance and analysis tooling
+
+## License
+
+GNU Affero General Public License v3.0. See [LICENSE](LICENSE) for details.
