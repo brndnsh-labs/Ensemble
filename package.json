@@ -48,7 +48,7 @@
         "vitest": "^4.1.0"
     },
     "dependencies": {
-        "@preact/signals": "^2.8.2",
+        "@preact/signals": "^2.9.0",
         "deepsignal": "^1.6.0",
         "preact": "^10.29.0"
     }
