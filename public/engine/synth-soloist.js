@@ -1,5 +1,11 @@
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
+import {
+    getSoloistVoiceLimit,
+    isSoloistGuitarMode,
+    isSoloistMonophonicMode,
+    isSoloistPianoMode,
+} from './soloist-mode-policy.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
 /**
@@ -67,7 +73,7 @@ export function playSoloNote(
     // Voice Management
     manageVoices(playTime, soloist);
 
-    const isPiano = soloist.mode === 'piano';
+    const isPiano = isSoloistPianoMode(soloist.mode);
     if (isPiano) {
         isLegato = false;
     }
@@ -216,7 +222,7 @@ function manageVoices(playTime, soloist) {
         }
     }
 
-    const VOICE_LIMIT = soloist.mode === 'piano' ? 4 : soloist.mode === 'guitar' ? 2 : 1;
+    const VOICE_LIMIT = getSoloistVoiceLimit(soloist.mode);
 
     // Check if the current note is part of the same "simultaneous" attack (polyphonic cluster)
     const isPolyphonicCluster =
@@ -291,10 +297,10 @@ function playTrumpet(
         style,
         isLegato,
         prevFreq,
-        soloist.mode === 'piano',
+        isSoloistPianoMode(soloist.mode),
     );
 
-    if (soloist.mode !== 'piano') {
+    if (!isSoloistPianoMode(soloist.mode)) {
         const { vibrato, vibGain } = createVibrato(
             state,
             ctx,
@@ -415,10 +421,10 @@ function playSaxophone(
         style,
         isLegato,
         prevFreq,
-        soloist.mode === 'piano',
+        isSoloistPianoMode(soloist.mode),
     );
 
-    if (soloist.mode !== 'piano') {
+    if (!isSoloistPianoMode(soloist.mode)) {
         const { vibrato, vibGain } = createVibrato(
             state,
             ctx,
@@ -548,10 +554,10 @@ function playNeoJuno(
         style,
         isLegato,
         prevFreq,
-        soloist.mode === 'piano',
+        isSoloistPianoMode(soloist.mode),
     );
 
-    if (soloist.mode !== 'piano') {
+    if (!isSoloistPianoMode(soloist.mode)) {
         const { vibrato, vibGain } = createVibrato(
             state,
             ctx,
@@ -649,10 +655,10 @@ function playVowel(
         style,
         isLegato,
         prevFreq,
-        soloist.mode === 'piano',
+        isSoloistPianoMode(soloist.mode),
     );
 
-    if (soloist.mode !== 'piano') {
+    if (!isSoloistPianoMode(soloist.mode)) {
         const { vibrato, vibGain } = createVibrato(
             state,
             ctx,
@@ -745,10 +751,10 @@ function playShred(
         style,
         isLegato,
         prevFreq,
-        soloist.mode === 'piano',
+        isSoloistPianoMode(soloist.mode),
     );
 
-    if (soloist.mode !== 'piano') {
+    if (!isSoloistPianoMode(soloist.mode)) {
         const { vibrato, vibGain } = createVibrato(
             state,
             ctx,
@@ -825,7 +831,7 @@ function applyPitchEnvelope(
     const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
 
     if (isLegato && Math.abs(freq - prevFreq) < freq * 0.5) {
-        const glideTime = soloist.mode === 'guitar' ? 0.03 : 0.06;
+        const glideTime = isSoloistGuitarMode(soloist.mode) ? 0.03 : 0.06;
         osc1.frequency.setValueAtTime(prevFreq, playTime);
         osc2.frequency.setValueAtTime(prevFreq, playTime);
         osc1.frequency.exponentialRampToValueAtTime(freq, playTime + glideTime);
@@ -902,10 +908,10 @@ function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = f
         depthFactor *= 1.5;
     }
 
-    if (soloist.mode === 'monophonic') {
+    if (isSoloistMonophonicMode(soloist.mode)) {
         vibSpeed -= 0.5;
         depthFactor *= 1.2;
-    } else if (soloist.mode === 'guitar') {
+    } else if (isSoloistGuitarMode(soloist.mode)) {
         vibSpeed += 0.4;
         depthFactor *= 1.5;
     }
@@ -924,7 +930,7 @@ function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = f
         time + vibDelay + (isLongNote ? 0.35 : 0.18),
     );
 
-    if ((duration > 0.15 || forceVibrato) && soloist.mode !== 'piano') {
+    if ((duration > 0.15 || forceVibrato) && !isSoloistPianoMode(soloist.mode)) {
         vibrato.start(time);
         vibrato.stop(time + duration + 0.2);
     }

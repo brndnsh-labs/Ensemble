@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { getState } from '../../../public/state.js';
 
@@ -111,6 +111,10 @@ describe('Soloist Mode Differentiation Logic', () => {
         vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable random
     });
 
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     it('should generate a single note in monophonic mode even when double stop chance is high', () => {
         state.soloist.mode = 'monophonic';
         // Mock random to trigger a double stop (if it were allowed)
@@ -163,116 +167,124 @@ describe('Soloist Mode Differentiation Logic', () => {
         expect([-3, -4, -5, -7, -8, -9]).toContain(interval);
     });
 
-    it('should generate 3-note block chords in piano mode', () => {
-        state.soloist.mode = 'piano';
-        state.playback.currentLoopCount = 3;
-        vi.spyOn(Math, 'random').mockRestore();
+    it('keeps loop-0 guitar head notes monophonic without explicit support metadata', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [{ step: 0, midi: 72, isAnchor: true, durationSteps: 4, velocity: 0.9 }],
+        };
 
-        let note = null;
-        let attempts = 0;
-        while (attempts < 1000) {
-            state.soloist.busySteps = 0;
-            note = getSoloistNote(
-                getState(),
-                currentChord,
-                null,
-                attempts * 4,
-                261.63,
-                60,
-                'scalar',
-                0,
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(false);
+        expect(note?.midi).toBe(72);
+    });
+
+    it('lets loop-0 guitar head notes realize optional support metadata as double stops', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [
                 {
-                    bypassRhythm: true,
+                    step: 0,
+                    midi: 72,
+                    isAnchor: true,
+                    durationSteps: 4,
+                    velocity: 0.9,
+                    supportHints: {
+                        role: 'anchor',
+                        sustainBias: 1.0,
+                        guitar: {
+                            allowDoubleStop: true,
+                            intervalPalette: 'tight',
+                            preferBelow: true,
+                        },
+                    },
                 },
-            );
-            if (Array.isArray(note)) {
-                break;
-            }
-            attempts++;
-        }
+            ],
+        };
 
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
         expect(Array.isArray(note)).toBe(true);
-        expect(note.length).toBeGreaterThanOrEqual(2);
-
-        // Find the maximum pitch to ensure all harmonic double-stops are built downwards
-        const maxMidi = Math.max(...note.map((n) => n.midi));
-        for (let i = 0; i < note.length; i++) {
-            if (note[i].isDoubleStop) {
-                expect(note[i].midi).toBeLessThanOrEqual(maxMidi);
-            }
-        }
+        expect(note.length).toBe(2);
+        expect(note[note.length - 1].midi).toBe(72);
+        expect(note[0].isDoubleStop).toBe(true);
+        expect(note[0].midi).toBeLessThan(72);
     });
 
-    it('should generate quartal voicings for piano in neo style', () => {
-        state.soloist.mode = 'piano';
-        state.playback.currentLoopCount = 3;
-        vi.spyOn(Math, 'random').mockRestore();
-
-        const _note = null;
-        let attempts = 0;
-        let foundQuartal = false;
-        while (attempts < 1000) {
-            state.soloist.busySteps = 0;
-            const note = getSoloistNote(
-                getState(),
-                currentChord,
-                null,
-                attempts * 4,
-                261.63,
-                60,
-                'neo', // MUST BE NEO STYLE FOR QUARTAL
-                0,
+    it('keeps guitar support notes shorter than the lead on anchor-style head voicings', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [
                 {
-                    bypassRhythm: true,
+                    step: 0,
+                    midi: 72,
+                    isAnchor: true,
+                    durationSteps: 8,
+                    velocity: 0.9,
+                    supportHints: {
+                        role: 'anchor',
+                        sustainBias: 1.0,
+                        guitar: {
+                            allowDoubleStop: true,
+                            intervalPalette: 'open',
+                            preferBelow: true,
+                        },
+                    },
                 },
-            );
-            if (Array.isArray(note)) {
-                const melody = note[note.length - 1];
-                const extra = note[0];
-                if (melody.midi - extra.midi === 5 || melody.midi - extra.midi === 7) {
-                    foundQuartal = true;
-                    break;
-                }
-            }
-            attempts++;
-        }
-        expect(foundQuartal).toBe(true);
+            ],
+        };
+
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'neo', 0);
+        expect(Array.isArray(note)).toBe(true);
+        expect(note[0].durationSteps).toBeLessThan(note[note.length - 1].durationSteps);
+        expect(note[0].durationSteps).toBeGreaterThanOrEqual(6);
     });
 
-    it('should trigger a graceNote device in piano mode', () => {
+    it('treats deprecated piano mode as monophonic on loop-0 head notes', () => {
         state.soloist.mode = 'piano';
-        state.playback.currentLoopCount = 3;
-        state.playback.bandIntensity = 0.7; // Ensure allowFlash is true
-        vi.spyOn(Math, 'random').mockRestore();
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [{ step: 0, midi: 72, isAnchor: true, durationSteps: 4, velocity: 0.9 }],
+        };
 
-        // Mock random to force device selection occasionally
-        // and force deviceType to 'graceNote' (though it's random in the array)
-        let attempts = 0;
-        let foundGraceNote = false;
-        while (attempts < 5000) {
-            state.soloist.busySteps = 0;
-            // Devices usually only happen at stepInBeat === 0
-            const note = getSoloistNote(
-                getState(),
-                currentChord,
-                null,
-                attempts * 4,
-                261.63,
-                60,
-                'smart',
-                0,
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(false);
+        expect(note?.midi).toBe(72);
+    });
+
+    it('ignores deprecated piano support metadata and keeps the lead monophonic', () => {
+        state.soloist.mode = 'piano';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [
                 {
-                    bypassRhythm: true,
+                    step: 0,
+                    midi: 72,
+                    isAnchor: true,
+                    durationSteps: 8,
+                    velocity: 0.9,
+                    supportHints: {
+                        role: 'anchor',
+                        sustainBias: 1.0,
+                        guitar: {
+                            allowDoubleStop: false,
+                            intervalPalette: 'tight',
+                            preferBelow: true,
+                        },
+                    },
                 },
-            );
-            // Devices often return a single note initially (the grace note) and buffer the rest
-            if (note && !Array.isArray(note) && state.soloist.deviceBuffer.length > 0) {
-                foundGraceNote = true;
-                break;
-            }
-            attempts++;
-        }
-        expect(foundGraceNote).toBe(true);
+            ],
+        };
+
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(false);
+        expect(note?.midi).toBe(72);
     });
 
     it('should use Hendrix-style intervals for guitar in blues style', () => {
@@ -310,5 +322,45 @@ describe('Soloist Mode Differentiation Logic', () => {
             attempts++;
         }
         expect(foundHendrixInt).toBe(true);
+    });
+
+    it('keeps guitar double stops more restrained in jazz than in blues', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 3;
+        vi.spyOn(Math, 'random').mockRestore();
+
+        const countDoubleStops = (style, iterations) => {
+            let doubleStops = 0;
+            let total = 0;
+            for (let i = 0; i < iterations; i++) {
+                state.soloist.busySteps = 0;
+                const note = getSoloistNote(
+                    getState(),
+                    currentChord,
+                    null,
+                    i * 4,
+                    261.63,
+                    60,
+                    style,
+                    0,
+                    {
+                        bypassRhythm: true,
+                    },
+                );
+                if (note) {
+                    total++;
+                    if (Array.isArray(note)) {
+                        doubleStops++;
+                    }
+                }
+            }
+            return doubleStops / total;
+        };
+
+        const jazzRatio = countDoubleStops('jazz', 1200);
+        const bluesRatio = countDoubleStops('blues', 1200);
+
+        expect(jazzRatio).toBeLessThan(0.18);
+        expect(bluesRatio).toBeGreaterThan(jazzRatio * 2);
     });
 });

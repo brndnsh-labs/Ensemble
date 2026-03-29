@@ -72,6 +72,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/voicing-policy.js` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
 | `public/engine/groove-engine.js` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
+| `public/engine/soloist-mode-policy.js` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/soloist-pitch-engine.js` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
 | `public/engine/soloist-rhythm-engine.js` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
 | `public/engine/worker-utils.js` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |

@@ -93,6 +93,34 @@ describe('Soloist Seeder Hook Shape', () => {
         expect(notesPerMeasure).toBeGreaterThanOrEqual(2.25);
     });
 
+    it('adds guitar-ready support hints while keeping the melody as the primary event', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const state = createHookSeedState(arrangement);
+        const seed = generateSessionSeed(state, state.arranger, 'rock', 0.5, 'HEAD_AUDIT');
+        const loopWindowNotes = getLoopWindowNotes(seed, arrangement);
+        const guitarReadyNotes = loopWindowNotes.filter(
+            (note) => note.supportHints?.guitar?.allowDoubleStop,
+        );
+
+        expect(guitarReadyNotes.length).toBeGreaterThan(0);
+        expect(
+            guitarReadyNotes.every(
+                (note) =>
+                    note.supportHints.guitar.preferBelow &&
+                    typeof note.supportHints.sustainBias === 'number' &&
+                    note.supportHints.role !== 'pickup',
+            ),
+        ).toBe(true);
+    });
+
+    it('does not add deprecated piano support hints to hook seed metadata', () => {
+        const arrangement = buildHookAuditArrangement('4/4');
+        const state = createHookSeedState(arrangement);
+        const seed = generateSessionSeed(state, state.arranger, 'rock', 0.5, 'HEAD_AUDIT');
+        const loopWindowNotes = getLoopWindowNotes(seed, arrangement);
+        expect(loopWindowNotes.every((note) => note.supportHints?.piano === undefined)).toBe(true);
+    });
+
     it('avoids harsh cadence landings in the default rock hook audit', () => {
         const arrangement = buildHookAuditArrangement('4/4');
         const { state } = bootstrapSoloistAudit({

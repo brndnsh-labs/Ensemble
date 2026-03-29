@@ -1,5 +1,6 @@
 import { deepSignal } from 'deepsignal';
 import { KEY_ORDER } from '../config.js';
+import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { ACTIONS } from '../types.js';
 import { arranger } from './arranger.js';
 import { groove } from './groove.js';
@@ -68,7 +69,7 @@ export const bass = deepSignal({
  * @property {number} volume - Mix volume (0.0 - 1.0).
  * @property {number} reverb - Reverb level.
  * @property {string} preset - The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone').
- * @property {string} mode - The soloist mode ('monophonic', 'guitar', 'piano').
+ * @property {string} mode - The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic).
  * @property {string} seed - Thematic seed for deterministic generation.
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
  * @property {number} hookRetentionProb - Probability of retaining a hook motif.
@@ -344,7 +345,7 @@ export function instrumentReducer(action, payload) {
             }
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
-            soloist.mode = payload;
+            soloist.mode = resolveSoloistMode(payload);
             return true;
         case ACTIONS.SET_SOLOIST_SEED:
             soloist.seed = payload;

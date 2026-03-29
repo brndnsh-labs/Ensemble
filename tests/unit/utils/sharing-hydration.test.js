@@ -151,4 +151,27 @@ describe('Sharing & Hydration Round-trip', () => {
         expect(bass.volume).toBe(0.3);
         expect(bass.style).toBe('funk');
     });
+
+    it('normalizes legacy soloist polyphonic mode to monophonic during URL hydration', () => {
+        const { soloist } = getState();
+        const legacyBandState = {
+            s: {
+                e: 1,
+                s: 'smart',
+                p: 'trumpet',
+                o: 72,
+                v: 0.5,
+                r: 0.6,
+                m: 'polyphonic',
+                sd: '',
+            },
+        };
+        const encoded = btoa(JSON.stringify(legacyBandState));
+
+        soloist.mode = 'monophonic';
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(encoded)}`));
+        loadFromUrl();
+
+        expect(soloist.mode).toBe('monophonic');
+    });
 });

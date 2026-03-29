@@ -50,6 +50,7 @@ import {
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
 import { getSoloistNote } from './soloist.js';
+import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { generateNotesForStep } from './tick-logic.js';
 
 const DRUM_VIS_PITCHES = {
@@ -779,7 +780,7 @@ function scheduleSoloist(state, chordData, step, playTime) {
     if (notes && notes.length > 0) {
         // Optimization: Avoid allocation if we only play one note (Common case)
         let notesToPlay = notes;
-        if (soloist.mode === 'monophonic' && notes.length > 1) {
+        if (isSoloistMonophonicMode(soloist.mode) && notes.length > 1) {
             notesToPlay = [notes[0]];
         }
 
@@ -832,7 +833,7 @@ function scheduleSoloist(state, chordData, step, playTime) {
                 );
 
                 // Soloist is monophonic UNLESS double stops are enabled
-                const isMono = soloist.mode === 'monophonic';
+                const isMono = isSoloistMonophonicMode(soloist.mode);
 
                 dispatchMidiSoloist(
                     state,

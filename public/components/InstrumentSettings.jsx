@@ -314,7 +314,6 @@ export function InstrumentSpecificSettings({ module }) {
                             options={[
                                 { value: 'monophonic', label: 'Monophonic' },
                                 { value: 'guitar', label: 'Guitar' },
-                                { value: 'piano', label: 'Piano' },
                             ]}
                         />
                     </SettingRow>

@@ -162,47 +162,17 @@ describe('Soloist Melodic Devices Deep Dive', () => {
     });
 
     describe('generateExtraNotes - mode variants', () => {
-        it('should handle piano mode with neo/bird style', () => {
-            ctx.soloist.mode = 'piano';
-            ctx.activeStyle = 'neo';
-            const extra = generateExtraNotes(ctx);
-            expect(extra.length).toBeGreaterThan(0);
-        });
-
-        it('should handle piano mode with multiple chord tones', () => {
-            ctx.soloist.mode = 'piano';
-            ctx.currentChord.intervals = [0, 4, 7];
-            ctx.selectedMidi = 72;
-            const extra = generateExtraNotes(ctx);
-            expect(extra.length).toBeGreaterThan(0);
-        });
-
-        it('should handle piano mode fallback when no chord tones found (Lines 448-449)', () => {
-            ctx.soloist.mode = 'piano';
-            ctx.activeStyle = 'other';
-            ctx.selectedMidi = 60;
-            // root is 60. nearby is 48-59.
-            // If intervals is [11] (maj 7th), nearby tones are (root+11)%12 = 71%12 = 11.
-            // Notes in 48-59 with %12 == 11 is 59.
-            // If we make selectedMidi = 40, nearby is 28-39.
-            // %12 of 28-39 are 4,5,6,7,8,9,10,11,0,1,2,3.
-            // Tones are 11. So 35 is found.
-            // We need to make sure NO tones are found.
-            ctx.selectedMidi = 60;
-            ctx.currentChord.intervals = [1]; // Tone is 1. Nearby 48-59 has 49.
-
-            // If we make the scale sparse...
-            ctx.currentChord.intervals = [];
-
-            const extra = generateExtraNotes(ctx);
-            expect(extra.length).toBe(1);
-            expect(extra[0].isDoubleStop).toBe(true);
-        });
-
         it('should handle country style specifically', () => {
             ctx.activeStyle = 'country';
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'line',
+                    sustainBias: 0.2,
+                },
+            };
             const extra = generateExtraNotes(ctx);
             expect(extra.length).toBe(1);
+            expect(extra[0].durationScale).toBeLessThan(0.6);
         });
 
         it('should handle guitar mode with chord tones', () => {
@@ -211,6 +181,89 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             ctx.selectedMidi = 60;
             const extra = generateExtraNotes(ctx);
             expect(extra.length).toBe(1);
+        });
+
+        it('prefers open-string-friendly support for neo guitar sustain hints', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'neo';
+            ctx.selectedMidi = 72;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'sustain',
+                    sustainBias: 0.95,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'open',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect([63, 65, 67, 68, 69]).toContain(extra[0].midi);
+            expect(extra[0].durationScale).toBeGreaterThanOrEqual(0.8);
+        });
+
+        it('keeps moving guitar support shorter than the lead note', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'rock';
+            ctx.selectedMidi = 69;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'line',
+                    sustainBias: 0.25,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'tight',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect(extra[0].durationScale).toBeLessThan(0.6);
+        });
+
+        it('keeps funk guitar accents clipped and groove-friendly', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'funk';
+            ctx.selectedMidi = 72;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'accent',
+                    sustainBias: 0.45,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'tight',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect(extra[0].durationScale).toBeLessThanOrEqual(0.58);
+            expect(extra[0].midi).toBeLessThan(72);
+        });
+
+        it('keeps bossa guitar support compact on line movement', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'bossa';
+            ctx.selectedMidi = 72;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'line',
+                    sustainBias: 0.35,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'tight',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect(72 - extra[0].midi).toBeLessThanOrEqual(7);
+            expect(extra[0].durationScale).toBeLessThan(0.6);
         });
 
         it('should handle guitar mode fallback', () => {

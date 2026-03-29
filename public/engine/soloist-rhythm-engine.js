@@ -1,4 +1,5 @@
 import { STYLE_CONFIG } from './soloist-config.js';
+import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 
 /**
  * @param {number} startStep
@@ -28,6 +29,7 @@ export function generateRhythmPlan(
     const plan = [];
     const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
+    const isMonophonicMode = isSoloistMonophonicMode(soloistState.mode);
 
     let notesInPhrase = 0;
 
@@ -67,10 +69,17 @@ export function generateRhythmPlan(
         }
     } else {
         let sustainStepsRemaining = 0;
+        let silenceSteps = stepsPerBeat;
+        let phraseCooldownSteps = 0;
 
         for (let step = startStep; step < startStep + activeSteps; step++) {
             if (sustainStepsRemaining > 0) {
                 sustainStepsRemaining--;
+                continue;
+            }
+            if (phraseCooldownSteps > 0) {
+                phraseCooldownSteps--;
+                silenceSteps++;
                 continue;
             }
 
@@ -86,6 +95,7 @@ export function generateRhythmPlan(
             const isBeatStart = currentStepInfo ? currentStepInfo.isBeatStart : stepInBeat === 0;
             const isDownbeat = currentStepInfo ? currentStepInfo.isMeasureStart : measureStep === 0;
             const isBackbeat = currentStepInfo ? currentStepInfo.isBackbeat : false;
+            const isStrongBeat = isBeatStart || isDownbeat || isBackbeat;
 
             const remainingSteps = coordination.sectionEnd - step;
             const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
@@ -173,6 +183,23 @@ export function generateRhythmPlan(
             if (notesInPhrase > 8) {
                 attackProb *= 0.8;
             }
+            if (isMonophonicMode) {
+                if (silenceSteps >= stepsPerBeat) {
+                    attackProb *= isBeatStart || isDownbeat ? 1.12 : 0.84;
+                }
+                if (!isStrongBeat && notesInPhrase >= 4) {
+                    attackProb *= 0.72;
+                }
+                if (!isDownbeat && notesInPhrase >= 6) {
+                    attackProb *= 0.52;
+                }
+                if (notesInPhrase >= 3 && isOffbeatEighth) {
+                    attackProb *= isLineStyle ? 0.88 : 0.78;
+                }
+                if (notesInPhrase >= 2 && isSixteenthSubdivision) {
+                    attackProb *= isLineStyle ? 0.72 : 0.58;
+                }
+            }
 
             // Rhythmic Simplification at Low Intensity:
             if (intensity < 0.4) {
@@ -248,7 +275,11 @@ export function generateRhythmPlan(
             }
 
             if (Math.random() <= attackProb) {
+                if (isMonophonicMode && silenceSteps >= stepsPerBeat) {
+                    notesInPhrase = 0;
+                }
                 notesInPhrase++;
+                silenceSteps = 0;
                 const isBebopStyle =
                     style === 'bird' ||
                     soloistState.phraseContext?.profile === 'bird' ||
@@ -310,6 +341,12 @@ export function generateRhythmPlan(
                     sustainStepsRemaining = sustainLength;
                 }
 
+                const shouldCreatePhraseBreath =
+                    isMonophonicMode &&
+                    isSustained &&
+                    notesInPhrase >= 4 &&
+                    (isDownbeat || isBeatStart || isFinalMeasure);
+
                 plan.push({
                     stepTarget: step,
                     velocity: Math.min(1.25, stepVelocity),
@@ -318,8 +355,15 @@ export function generateRhythmPlan(
                     isSustained,
                     vibrato: isSustained,
                 });
+                if (shouldCreatePhraseBreath) {
+                    phraseCooldownSteps = Math.max(
+                        phraseCooldownSteps,
+                        Math.max(1, stepsPerBeat / 2),
+                    );
+                    notesInPhrase = 0;
+                }
             } else {
-                // Not an attack step
+                silenceSteps++;
             }
         }
     }
@@ -367,6 +411,16 @@ export function generateRhythmPlan(
             baseDuration = gap;
         } else {
             baseDuration = Math.min(gap, 4);
+        }
+        if (isMonophonicMode) {
+            if (current.isStrongBeat) {
+                baseDuration = Math.min(
+                    gap,
+                    Math.max(baseDuration, current.isSustained ? stepsPerBeat + 1 : 3),
+                );
+            } else if (!current.isSustained) {
+                baseDuration = Math.min(baseDuration, 2);
+            }
         }
 
         // Scale final duration slightly by overall band intensity
