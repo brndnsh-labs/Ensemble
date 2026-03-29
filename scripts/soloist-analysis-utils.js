@@ -4,7 +4,7 @@ import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
 import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
-import { getStepInfo, midiToNote } from '../public/utils.js';
+import { createPRNG, getStepInfo, midiToNote } from '../public/utils.js';
 
 const QUALITY_INTERVALS = {
     maj7: [0, 4, 7, 11],
@@ -41,6 +41,23 @@ function withMutedComposerLogs(callback, muted = true) {
         return callback();
     } finally {
         console.log = originalLog;
+    }
+}
+
+/**
+ * Temporarily replaces Math.random with a seeded PRNG.
+ * @param {string} seed
+ * @param {() => any} callback
+ */
+function withSeededRandom(seed, callback) {
+    const originalRandom = Math.random;
+    const prng = createPRNG(seed);
+    Math.random = () => prng();
+
+    try {
+        return callback();
+    } finally {
+        Math.random = originalRandom;
     }
 }
 
@@ -644,6 +661,7 @@ export function bootstrapSoloistAudit({
     state.arranger.stepMap = arrangement.stepMap;
     state.arranger.sectionMap = arrangement.sectionMap;
     state.playback.currentLoopCount = 0;
+    state.soloist.analysisSeed = seed;
 
     const seedStyle = resolveSoloistStyle(style, genre);
     const sessionSeed = withMutedComposerLogs(
@@ -663,112 +681,121 @@ export function bootstrapSoloistAudit({
 }
 
 export function simulateSoloistLoops({ state, arrangement, loops = 3, style = 'smart' }) {
-    const seedLoopLength = state.soloist.sessionSeed?.loopLengthSteps || arrangement.totalSteps;
-    const stepLookup = buildSeedLookups(state.soloist.sessionSeed, seedLoopLength);
-    const events = [];
-    const stepsPerMeasure = arrangement.stepsPerMeasure;
+    const analysisSeed = state.soloist.analysisSeed || 'SOLOIST_ANALYSIS';
 
-    for (let loop = 0; loop < loops; loop++) {
-        state.playback.currentLoopCount = loop;
-        const startLoopStep = loop === 0 ? -stepsPerMeasure : 0;
+    return withSeededRandom(analysisSeed, () => {
+        const seedLoopLength = state.soloist.sessionSeed?.loopLengthSteps || arrangement.totalSteps;
+        const stepLookup = buildSeedLookups(state.soloist.sessionSeed, seedLoopLength);
+        const events = [];
+        const stepsPerMeasure = arrangement.stepsPerMeasure;
 
-        for (let loopStep = startLoopStep; loopStep < arrangement.totalSteps; loopStep++) {
-            const absoluteStep = loop * arrangement.totalSteps + loopStep;
-            const stepInLoop = normalizeStep(loopStep, arrangement.totalSteps);
-            const currentEntry = arrangement.getEntryAtStep(stepInLoop);
-            if (!currentEntry) {
-                continue;
-            }
+        for (let loop = 0; loop < loops; loop++) {
+            state.playback.currentLoopCount = loop;
+            const startLoopStep = loop === 0 ? -stepsPerMeasure : 0;
 
-            const nextEntry = arrangement.getEntryAtStep(currentEntry.end) || currentEntry;
-            const currentSection =
-                arrangement.getSectionAtStep(stepInLoop) || arrangement.sectionMap[0];
-            const currentSectionIndex = Math.max(0, arrangement.sectionMap.indexOf(currentSection));
-            const nextSection =
-                arrangement.sectionMap[(currentSectionIndex + 1) % arrangement.sectionMap.length] ||
-                currentSection;
-            const stepInfo = getStepInfo(
-                absoluteStep,
-                arrangement.ts,
-                arrangement.stepMap,
-                TIME_SIGNATURES,
-            );
-            const coordination = {
-                sectionStart: currentSection?.start ?? 0,
-                sectionEnd: currentSection?.end ?? arrangement.totalSteps,
-                bypassRhythm: false,
-                isTurnaround:
-                    stepInLoop >= (currentSection?.end ?? arrangement.totalSteps) - stepsPerMeasure,
-                stepCoordination: {
-                    isMeasureEnd:
-                        stepInfo?.isMeasureEnd ||
-                        stepInfo?.mStep === arrangement.stepsPerMeasure - 1,
-                    upcomingSectionFirstChord:
-                        arrangement.getEntryAtStep(nextSection.start)?.chord || null,
-                },
-            };
+            for (let loopStep = startLoopStep; loopStep < arrangement.totalSteps; loopStep++) {
+                const absoluteStep = loop * arrangement.totalSteps + loopStep;
+                const stepInLoop = normalizeStep(loopStep, arrangement.totalSteps);
+                const currentEntry = arrangement.getEntryAtStep(stepInLoop);
+                if (!currentEntry) {
+                    continue;
+                }
 
-            const stepInChord = stepInLoop - currentEntry.start;
-            const result = getSoloistNote(
-                state,
-                currentEntry.chord,
-                nextEntry.chord,
-                absoluteStep,
-                440,
-                0,
-                style,
-                stepInChord,
-                coordination,
-                stepInfo,
-            );
-
-            if (!result) {
-                continue;
-            }
-
-            const notes = Array.isArray(result) ? result : [result];
-            const seedPosition = normalizeStep(absoluteStep, seedLoopLength);
-            const seedCandidates =
-                loop === 0 && loopStep < 0
-                    ? stepLookup.byExactStep.get(loopStep) || []
-                    : stepLookup.byWrappedStep.get(seedPosition) || [];
-            const seedNote = seedCandidates[0] || null;
-
-            for (const note of notes) {
-                events.push({
-                    loop,
+                const nextEntry = arrangement.getEntryAtStep(currentEntry.end) || currentEntry;
+                const currentSection =
+                    arrangement.getSectionAtStep(stepInLoop) || arrangement.sectionMap[0];
+                const currentSectionIndex = Math.max(
+                    0,
+                    arrangement.sectionMap.indexOf(currentSection),
+                );
+                const nextSection =
+                    arrangement.sectionMap[
+                        (currentSectionIndex + 1) % arrangement.sectionMap.length
+                    ] || currentSection;
+                const stepInfo = getStepInfo(
                     absoluteStep,
-                    loopStep,
-                    stepInLoop,
-                    seedPosition,
-                    measureIndex: Math.floor(stepInLoop / stepsPerMeasure),
-                    measureNumber: Math.floor(stepInLoop / stepsPerMeasure) + 1,
-                    stepInMeasure: stepInLoop % stepsPerMeasure,
-                    chord: currentEntry.chord,
-                    sectionLabel: currentSection?.label || 'Main',
-                    role: state.soloist.phraseContext?.role || '-',
-                    profile: state.soloist.phraseContext?.profile || '-',
-                    note,
-                    seedNote,
-                    isSeedStep: Boolean(seedNote),
-                    seedExactMatch: Boolean(seedNote && note.midi === seedNote.midi),
-                    seedPitchClassMatch: Boolean(
-                        seedNote &&
-                            normalizeStep(note.midi, 12) === normalizeStep(seedNote.midi, 12),
-                    ),
-                });
+                    arrangement.ts,
+                    arrangement.stepMap,
+                    TIME_SIGNATURES,
+                );
+                const coordination = {
+                    sectionStart: currentSection?.start ?? 0,
+                    sectionEnd: currentSection?.end ?? arrangement.totalSteps,
+                    bypassRhythm: false,
+                    isTurnaround:
+                        stepInLoop >=
+                        (currentSection?.end ?? arrangement.totalSteps) - stepsPerMeasure,
+                    stepCoordination: {
+                        isMeasureEnd:
+                            stepInfo?.isMeasureEnd ||
+                            stepInfo?.mStep === arrangement.stepsPerMeasure - 1,
+                        upcomingSectionFirstChord:
+                            arrangement.getEntryAtStep(nextSection.start)?.chord || null,
+                    },
+                };
+
+                const stepInChord = stepInLoop - currentEntry.start;
+                const result = getSoloistNote(
+                    state,
+                    currentEntry.chord,
+                    nextEntry.chord,
+                    absoluteStep,
+                    440,
+                    0,
+                    style,
+                    stepInChord,
+                    coordination,
+                    stepInfo,
+                );
+
+                if (!result) {
+                    continue;
+                }
+
+                const notes = Array.isArray(result) ? result : [result];
+                const seedPosition = normalizeStep(absoluteStep, seedLoopLength);
+                const seedCandidates =
+                    loop === 0 && loopStep < 0
+                        ? stepLookup.byExactStep.get(loopStep) || []
+                        : stepLookup.byWrappedStep.get(seedPosition) || [];
+                const seedNote = seedCandidates[0] || null;
+
+                for (const note of notes) {
+                    events.push({
+                        loop,
+                        absoluteStep,
+                        loopStep,
+                        stepInLoop,
+                        seedPosition,
+                        measureIndex: Math.floor(stepInLoop / stepsPerMeasure),
+                        measureNumber: Math.floor(stepInLoop / stepsPerMeasure) + 1,
+                        stepInMeasure: stepInLoop % stepsPerMeasure,
+                        chord: currentEntry.chord,
+                        sectionLabel: currentSection?.label || 'Main',
+                        role: state.soloist.phraseContext?.role || '-',
+                        profile: state.soloist.phraseContext?.profile || '-',
+                        note,
+                        seedNote,
+                        isSeedStep: Boolean(seedNote),
+                        seedExactMatch: Boolean(seedNote && note.midi === seedNote.midi),
+                        seedPitchClassMatch: Boolean(
+                            seedNote &&
+                                normalizeStep(note.midi, 12) === normalizeStep(seedNote.midi, 12),
+                        ),
+                    });
+                }
             }
         }
-    }
 
-    return {
-        arrangement,
-        seed: state.soloist.sessionSeed,
-        seedLoopLength,
-        events,
-        stepsPerMeasure,
-        ts: arrangement.ts,
-    };
+        return {
+            arrangement,
+            seed: state.soloist.sessionSeed,
+            seedLoopLength,
+            events,
+            stepsPerMeasure,
+            ts: arrangement.ts,
+        };
+    });
 }
 
 export function buildPickupSummary(capture) {
