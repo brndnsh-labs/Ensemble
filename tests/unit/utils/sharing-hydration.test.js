@@ -152,7 +152,7 @@ describe('Sharing & Hydration Round-trip', () => {
         expect(bass.style).toBe('funk');
     });
 
-    it('normalizes legacy soloist polyphonic mode to piano during URL hydration', () => {
+    it('normalizes legacy soloist polyphonic mode to monophonic during URL hydration', () => {
         const { soloist } = getState();
         const legacyBandState = {
             s: {
@@ -172,6 +172,6 @@ describe('Sharing & Hydration Round-trip', () => {
         vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(encoded)}`));
         loadFromUrl();
 
-        expect(soloist.mode).toBe('piano');
+        expect(soloist.mode).toBe('monophonic');
     });
 });

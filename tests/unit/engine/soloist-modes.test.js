@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { getState } from '../../../public/state.js';
 
@@ -109,6 +109,10 @@ describe('Soloist Mode Differentiation Logic', () => {
         state.soloist.busySteps = 0;
         state.soloist.deviceBuffer = [];
         vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable random
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('should generate a single note in monophonic mode even when double stop chance is high', () => {
@@ -240,116 +244,47 @@ describe('Soloist Mode Differentiation Logic', () => {
         expect(note[0].durationSteps).toBeGreaterThanOrEqual(6);
     });
 
-    it('should generate 3-note block chords in piano mode', () => {
+    it('treats deprecated piano mode as monophonic on loop-0 head notes', () => {
         state.soloist.mode = 'piano';
-        state.playback.currentLoopCount = 3;
-        vi.spyOn(Math, 'random').mockRestore();
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [{ step: 0, midi: 72, isAnchor: true, durationSteps: 4, velocity: 0.9 }],
+        };
 
-        let note = null;
-        let attempts = 0;
-        while (attempts < 1000) {
-            state.soloist.busySteps = 0;
-            note = getSoloistNote(
-                getState(),
-                currentChord,
-                null,
-                attempts * 4,
-                261.63,
-                60,
-                'scalar',
-                0,
-                {
-                    bypassRhythm: true,
-                },
-            );
-            if (Array.isArray(note)) {
-                break;
-            }
-            attempts++;
-        }
-
-        expect(Array.isArray(note)).toBe(true);
-        expect(note.length).toBeGreaterThanOrEqual(2);
-
-        // Find the maximum pitch to ensure all harmonic double-stops are built downwards
-        const maxMidi = Math.max(...note.map((n) => n.midi));
-        for (let i = 0; i < note.length; i++) {
-            if (note[i].isDoubleStop) {
-                expect(note[i].midi).toBeLessThanOrEqual(maxMidi);
-            }
-        }
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(false);
+        expect(note?.midi).toBe(72);
     });
 
-    it('should generate quartal voicings for piano in neo style', () => {
+    it('ignores deprecated piano support metadata and keeps the lead monophonic', () => {
         state.soloist.mode = 'piano';
-        state.playback.currentLoopCount = 3;
-        vi.spyOn(Math, 'random').mockRestore();
-
-        const _note = null;
-        let attempts = 0;
-        let foundQuartal = false;
-        while (attempts < 1000) {
-            state.soloist.busySteps = 0;
-            const note = getSoloistNote(
-                getState(),
-                currentChord,
-                null,
-                attempts * 4,
-                261.63,
-                60,
-                'neo', // MUST BE NEO STYLE FOR QUARTAL
-                0,
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [
                 {
-                    bypassRhythm: true,
+                    step: 0,
+                    midi: 72,
+                    isAnchor: true,
+                    durationSteps: 8,
+                    velocity: 0.9,
+                    supportHints: {
+                        role: 'anchor',
+                        sustainBias: 1.0,
+                        guitar: {
+                            allowDoubleStop: false,
+                            intervalPalette: 'tight',
+                            preferBelow: true,
+                        },
+                    },
                 },
-            );
-            if (Array.isArray(note)) {
-                const melody = note[note.length - 1];
-                const extra = note[0];
-                if (melody.midi - extra.midi === 5 || melody.midi - extra.midi === 7) {
-                    foundQuartal = true;
-                    break;
-                }
-            }
-            attempts++;
-        }
-        expect(foundQuartal).toBe(true);
-    });
+            ],
+        };
 
-    it('should trigger a graceNote device in piano mode', () => {
-        state.soloist.mode = 'piano';
-        state.playback.currentLoopCount = 3;
-        state.playback.bandIntensity = 0.7; // Ensure allowFlash is true
-        vi.spyOn(Math, 'random').mockRestore();
-
-        // Mock random to force device selection occasionally
-        // and force deviceType to 'graceNote' (though it's random in the array)
-        let attempts = 0;
-        let foundGraceNote = false;
-        while (attempts < 5000) {
-            state.soloist.busySteps = 0;
-            // Devices usually only happen at stepInBeat === 0
-            const note = getSoloistNote(
-                getState(),
-                currentChord,
-                null,
-                attempts * 4,
-                261.63,
-                60,
-                'smart',
-                0,
-                {
-                    bypassRhythm: true,
-                },
-            );
-            // Devices often return a single note initially (the grace note) and buffer the rest
-            if (note && !Array.isArray(note) && state.soloist.deviceBuffer.length > 0) {
-                foundGraceNote = true;
-                break;
-            }
-            attempts++;
-        }
-        expect(foundGraceNote).toBe(true);
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(false);
+        expect(note?.midi).toBe(72);
     });
 
     it('should use Hendrix-style intervals for guitar in blues style', () => {

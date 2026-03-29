@@ -162,43 +162,6 @@ describe('Soloist Melodic Devices Deep Dive', () => {
     });
 
     describe('generateExtraNotes - mode variants', () => {
-        it('should handle piano mode with neo/bird style', () => {
-            ctx.soloist.mode = 'piano';
-            ctx.activeStyle = 'neo';
-            const extra = generateExtraNotes(ctx);
-            expect(extra.length).toBeGreaterThan(0);
-        });
-
-        it('should handle piano mode with multiple chord tones', () => {
-            ctx.soloist.mode = 'piano';
-            ctx.currentChord.intervals = [0, 4, 7];
-            ctx.selectedMidi = 72;
-            const extra = generateExtraNotes(ctx);
-            expect(extra.length).toBeGreaterThan(0);
-        });
-
-        it('should handle piano mode fallback when no chord tones found (Lines 448-449)', () => {
-            ctx.soloist.mode = 'piano';
-            ctx.activeStyle = 'other';
-            ctx.selectedMidi = 60;
-            // root is 60. nearby is 48-59.
-            // If intervals is [11] (maj 7th), nearby tones are (root+11)%12 = 71%12 = 11.
-            // Notes in 48-59 with %12 == 11 is 59.
-            // If we make selectedMidi = 40, nearby is 28-39.
-            // %12 of 28-39 are 4,5,6,7,8,9,10,11,0,1,2,3.
-            // Tones are 11. So 35 is found.
-            // We need to make sure NO tones are found.
-            ctx.selectedMidi = 60;
-            ctx.currentChord.intervals = [1]; // Tone is 1. Nearby 48-59 has 49.
-
-            // If we make the scale sparse...
-            ctx.currentChord.intervals = [];
-
-            const extra = generateExtraNotes(ctx);
-            expect(extra.length).toBe(1);
-            expect(extra[0].isDoubleStop).toBe(true);
-        });
-
         it('should handle country style specifically', () => {
             ctx.activeStyle = 'country';
             const extra = generateExtraNotes(ctx);

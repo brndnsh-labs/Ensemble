@@ -4,7 +4,6 @@ import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js'
 import {
     allowsSoloistPolyphony,
     isSoloistGuitarMode,
-    isSoloistPianoMode,
     resolveSoloistMode,
 } from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
@@ -98,7 +97,18 @@ export function selectPitchAndDevices(
     const seedNote = rhythmNode.seedNote || null;
     const soloistMode = resolveSoloistMode(soloistState.mode);
     const isGuitarMode = isSoloistGuitarMode(soloistMode);
-    const isPianoMode = isSoloistPianoMode(soloistMode);
+    const supportRole =
+        seedNote?.supportHints?.role ||
+        (durationSteps >= stepsPerBeat * 2 ? 'sustain' : isStrongBeat ? 'accent' : 'line');
+    const sustainBias =
+        seedNote?.supportHints?.sustainBias ??
+        (supportRole === 'accent'
+            ? 0.65
+            : supportRole === 'sustain'
+              ? 0.88
+              : supportRole === 'anchor' || supportRole === 'cadence'
+                ? 1.0
+                : 0.4);
 
     let targetChord = currentChord;
 
@@ -585,7 +595,7 @@ export function selectPitchAndDevices(
         playback,
         soloist: soloistState,
         isPolyphonic,
-        isPiano: isPianoMode,
+        isPiano: false,
         dynamicCenter: 72,
         scaleMask,
     };
@@ -667,19 +677,6 @@ export function selectPitchAndDevices(
             }
         }
 
-        if (isPianoMode) {
-            allowed = allowed.filter(
-                (d) =>
-                    d !== 'slide' &&
-                    d !== 'countryBend' &&
-                    d !== 'graceSlide' &&
-                    d !== 'chickenPick',
-            );
-            if (!allowed.includes('graceNote')) {
-                allowed.push('graceNote');
-            }
-        }
-
         const deviceType =
             allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
         if (deviceType) {
@@ -719,8 +716,6 @@ export function selectPitchAndDevices(
             config.doubleStopProb *
             (soloistState.doubleStopProb ?? 1.0) *
             (0.35 + intensity * 0.45);
-        const supportRole = seedNote?.supportHints?.role || 'line';
-        const sustainBias = seedNote?.supportHints?.sustainBias || 0;
 
         if (durationSteps >= stepsPerBeat) {
             doubleStopChance *= 1.35;
@@ -772,6 +767,8 @@ export function selectPitchAndDevices(
             effectiveIntensity: intensity,
             selectedMidi,
             seedNote,
+            supportRole,
+            sustainBias,
         });
         if (extra && extra.length > 0) {
             // Optimization: Replace spread and map with pre-allocated loop to avoid closure overhead and intermediate arrays

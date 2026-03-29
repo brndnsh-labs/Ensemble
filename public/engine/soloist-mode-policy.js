@@ -1,13 +1,14 @@
 const SOLOIST_MODE_ALIASES = {
-    polyphonic: 'piano',
+    polyphonic: 'monophonic',
+    piano: 'monophonic',
 };
 
-const CANONICAL_SOLOIST_MODES = new Set(['monophonic', 'guitar', 'piano']);
+const CANONICAL_SOLOIST_MODES = new Set(['monophonic', 'guitar']);
 
 /**
  * Normalize legacy or invalid soloist phrasing mode values.
  * @param {string | null | undefined} mode
- * @returns {'monophonic' | 'guitar' | 'piano'}
+ * @returns {'monophonic' | 'guitar'}
  */
 export function resolveSoloistMode(mode) {
     if (typeof mode !== 'string') {
@@ -18,7 +19,7 @@ export function resolveSoloistMode(mode) {
         SOLOIST_MODE_ALIASES[/** @type {keyof typeof SOLOIST_MODE_ALIASES} */ (mode)] || mode;
 
     return CANONICAL_SOLOIST_MODES.has(canonical)
-        ? /** @type {'monophonic' | 'guitar' | 'piano'} */ (canonical)
+        ? /** @type {'monophonic' | 'guitar'} */ (canonical)
         : 'monophonic';
 }
 
@@ -39,11 +40,11 @@ export function isSoloistGuitarMode(mode) {
 }
 
 /**
- * @param {string | null | undefined} mode
+ * @param {string | null | undefined} _mode
  * @returns {boolean}
  */
-export function isSoloistPianoMode(mode) {
-    return resolveSoloistMode(mode) === 'piano';
+export function isSoloistPianoMode(_mode) {
+    return false;
 }
 
 /**
@@ -60,9 +61,6 @@ export function allowsSoloistPolyphony(mode) {
  */
 export function getSoloistVoiceLimit(mode) {
     const resolved = resolveSoloistMode(mode);
-    if (resolved === 'piano') {
-        return 4;
-    }
     if (resolved === 'guitar') {
         return 2;
     }

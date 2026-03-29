@@ -159,20 +159,17 @@ describe('Soloist Synthesis', () => {
         expect(vibSpeed).toBeCloseTo(5.0, 0);
     });
 
-    it('should disable vibrato in piano mode while preserving saxophone routing', () => {
+    it('treats deprecated piano mode like monophonic routing', () => {
         soloist.mode = 'piano';
         const freq = 440;
-        const playTime = 10;
-        playSoloNote(getState(), freq, playTime, 1.0, 0.4, 0, 'blues');
+        playSoloNote(getState(), freq, 10, 1.0, 0.4, 0, 'blues');
 
         const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
-        expect(oscs.length).toBe(3); // osc1, osc2, breath LFO; no vibrato oscillator
+        expect(oscs.length).toBeGreaterThanOrEqual(4); // vibrato remains active via monophonic fallback
 
-        const formantFilter = playback.audio.createBiquadFilter.mock.results[0].value;
-        expect(formantFilter.Q.value).toBe(3.0);
-
-        const gainNode = playback.audio.createGain.mock.results[0].value;
-        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.85, 0.1);
+        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
+        const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
+        expect(vibSpeed).toBeCloseTo(5.0, 0);
     });
 
     it('should use mixed sawtooth and triangle oscillators for rich tone', () => {

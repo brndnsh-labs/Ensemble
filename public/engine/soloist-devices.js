@@ -1,8 +1,4 @@
-import {
-    isSoloistGuitarMode,
-    isSoloistPianoMode,
-    resolveSoloistMode,
-} from './soloist-mode-policy.js';
+import { isSoloistGuitarMode, resolveSoloistMode } from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -545,52 +541,10 @@ export function generateExtraNotes(ctx) {
     const extraNotes = [];
     const soloistMode = resolveSoloistMode(soloist.mode);
     const supportHint = seedNote?.supportHints?.guitar;
-    const supportRole = seedNote?.supportHints?.role || 'line';
-    const sustainBias = seedNote?.supportHints?.sustainBias || 0;
+    const supportRole = ctx.supportRole || seedNote?.supportHints?.role || 'line';
+    const sustainBias = ctx.sustainBias ?? seedNote?.supportHints?.sustainBias ?? 0;
 
-    if (isSoloistPianoMode(soloistMode)) {
-        const currentRoot = currentChord.rootMidi;
-
-        const chordMask = getChordMask(currentChord);
-
-        if ((activeStyle === 'neo' || activeStyle === 'bird') && Math.random() < 0.6) {
-            extraNotes.push({
-                midi: selectedMidi - 5,
-                velocity: (0.4 + effectiveIntensity * 0.5) * 0.8,
-                isDoubleStop: true,
-            });
-            if (Math.random() < 0.4) {
-                extraNotes.push({
-                    midi: selectedMidi - 10,
-                    velocity: (0.3 + effectiveIntensity * 0.5) * 0.7,
-                    isDoubleStop: true,
-                });
-            }
-        } else {
-            let count = 0;
-            for (let m = selectedMidi - 1; m > selectedMidi - 13 && count < 2; m--) {
-                const pc = ((m % 12) + 12) % 12;
-                const interval = (pc - (currentRoot % 12) + 12) % 12;
-                if ((chordMask >> interval) & 1) {
-                    extraNotes.push({
-                        midi: m,
-                        velocity: (0.5 + effectiveIntensity * 0.6) * 0.85,
-                        isDoubleStop: true,
-                    });
-                    count++;
-                }
-            }
-            // Fallback for piano if no chord tones found nearby
-            if (count === 0) {
-                const dsInt = [3, 4, 5, 7][Math.floor(Math.random() * 4)];
-                extraNotes.push({
-                    midi: selectedMidi - dsInt,
-                    velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
-                    isDoubleStop: true,
-                });
-            }
-        }
-    } else if (activeStyle === 'country') {
+    if (activeStyle === 'country') {
         const dsInt = [8, 9][Math.floor(Math.random() * 2)];
         extraNotes.push({
             midi: selectedMidi + dsInt,
