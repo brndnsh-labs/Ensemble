@@ -56,6 +56,7 @@ describe('Funk Groove Integrity', () => {
                 isPulse: info.isPulse,
                 isBackbeat: info.isBackbeat,
                 isGroupStart: info.isGroupStart,
+                beatIndex: info.beatIndex,
                 isOffbeat: info.isOffbeat,
                 isEOfBeat: info.isEOfBeat,
                 isAOfBeat: info.isAOfBeat,
@@ -160,14 +161,30 @@ describe('Funk Groove Integrity', () => {
             // Force math.random to trigger the turnaround
             const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.1);
 
-            const resultHat = applyGrooveOverrides(getState(), createParams(beat4And, 'HiHat'));
+            const closedLane = applyGrooveOverrides(getState(), createParams(beat4And, 'HiHat'));
+            const openLane = applyGrooveOverrides(getState(), createParams(beat4And, 'Open'));
 
-            // Should convert to an 'Open' bark
-            expect(resultHat.shouldPlay).toBe(true);
-            expect(resultHat.soundName).toBe('Open');
-            expect(resultHat.velocity).toBeGreaterThan(0.9);
+            // Should resolve to the Open lane as a short turnaround bark
+            expect(closedLane.shouldPlay).toBe(false);
+            expect(openLane.shouldPlay).toBe(true);
+            expect(openLane.soundName).toBe('Open');
+            expect(openLane.velocity).toBeGreaterThan(0.9);
+            expect(openLane.instTimeOffset).toBeLessThan(0);
 
             mockMath.mockRestore();
+        });
+
+        it('should route phrase-release barks to the open lane without doubling the 16th stream', () => {
+            getState.mockReturnValue(mockState);
+            mockState.groove.sectionSeedMap['1'] = 0.8;
+
+            const releaseStep = 14; // & of 4
+            const closedLane = applyGrooveOverrides(getState(), createParams(releaseStep, 'HiHat'));
+            const openLane = applyGrooveOverrides(getState(), createParams(releaseStep, 'Open'));
+
+            expect(closedLane.shouldPlay).toBe(false);
+            expect(openLane.shouldPlay).toBe(true);
+            expect(openLane.soundName).toBe('Open');
         });
     });
 });

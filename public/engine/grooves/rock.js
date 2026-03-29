@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    getPhraseSeed,
     INTENSITY_BANDS,
     roll,
     scaleVelocity,
@@ -80,6 +81,7 @@ export function applyOverrides(context, state) {
         drumComplexity,
         orchestration,
         sectionSeed,
+        barIndex,
         isTurnaround,
         loopStep,
     } = context;
@@ -92,61 +94,104 @@ export function applyOverrides(context, state) {
     // --- 1. HI-HAT / RIDE ---
     if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
+        const rideVoice = orchestration?.rideVoice;
+        const phraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, activeMotif + 1);
+        const liftBeat = phraseSeed < 0.45 ? 1 : 3;
+        const secondaryLiftBeat = phraseSeed > 0.72 ? 2 : phraseSeed < 0.18 ? 0 : -1;
+        const rideSection = rideVoice === 'Ride' || (!rideVoice && activeMotif === 3);
+        const openSection = rideVoice === 'Open';
+        const dropBeat =
+            !rideSection &&
+            !openSection &&
+            intensity < 0.68 &&
+            activeMotif !== 3 &&
+            phraseSeed > 0.84
+                ? 2
+                : -1;
 
         if (isTurnaround && loopStep >= halfBarStep) {
             // Drop for fills
         } else if (isEighthNote) {
             shouldPlay = true;
-            const openAccent =
-                isOffbeat &&
-                (beatIndex === 3 ||
-                    (beatIndex === 1 && intensity > 0.85 && roll(0.35, intensity)) ||
-                    (beatIndex === 0 && intensity > 0.9 && roll(0.2, intensity)));
 
-            // Orchestration Override
-            if (orchestration?.rideVoice === 'Ride') {
-                if (openAccent && intensity > 0.88 && (beatIndex === 3 || roll(0.18, intensity))) {
-                    soundName = 'Open';
-                    velocity = 1.0;
-                } else {
-                    soundName = 'Ride';
-                    velocity = isBeatStart ? 1.1 : 0.9;
-                }
-            } else if (orchestration?.rideVoice === 'Open') {
-                soundName = openAccent ? 'Open' : 'HiHat';
-                velocity = soundName === 'Open' ? 1.0 : isBeatStart ? 0.98 : 0.78;
-            } else if (orchestration?.rideVoice === 'HiHat-Closed') {
-                soundName = 'HiHat';
-                velocity = isBeatStart ? 0.95 : 0.75;
-            } else {
-                // Legacy logic fallback
-                if (activeMotif === 3 || intensity > 0.8) {
-                    if (activeMotif === 3 || sectionSeed < 0.6) {
-                        if (
-                            openAccent &&
-                            intensity > 0.88 &&
-                            (beatIndex === 3 || roll(0.18, intensity))
-                        ) {
-                            soundName = 'Open';
-                            velocity = 1.0;
-                        } else {
-                            soundName = 'Ride';
-                            velocity = isBeatStart ? 1.1 : 0.9;
-                        }
-                    } else {
-                        soundName = openAccent ? 'Open' : 'HiHat';
-                        velocity = soundName === 'Open' ? 1.0 : isBeatStart ? 1.0 : 0.8;
-                    }
-                } else if (intensity > 0.6) {
-                    soundName = roll(0.7, intensity) ? 'HiHat' : 'Open';
-                    velocity = isBeatStart ? 1.05 : 0.85;
-                } else {
-                    soundName = 'HiHat';
-                    velocity = isBeatStart ? 0.95 : 0.75;
-                }
+            const phraseEndOpen =
+                isOffbeat &&
+                beatIndex === 3 &&
+                intensity > 0.62 &&
+                ((openSection && phraseSeed > 0.25) ||
+                    intensity > 0.86 ||
+                    activeMotif === 3 ||
+                    phraseSeed > 0.56);
+            const liftOpen =
+                isOffbeat &&
+                beatIndex === liftBeat &&
+                intensity > 0.85 &&
+                (openSection || activeMotif === 3 || phraseSeed > 0.68);
+            const anthemOpen =
+                isOffbeat &&
+                beatIndex === secondaryLiftBeat &&
+                intensity > 0.92 &&
+                activeMotif === 3;
+            const openAccent = phraseEndOpen || liftOpen || anthemOpen;
+
+            if (!openAccent && isOffbeat && beatIndex === dropBeat) {
+                shouldPlay = false;
             }
 
-            velocity = scaleVelocity(velocity, intensity, 0.1);
+            if (shouldPlay) {
+                if (openAccent) {
+                    soundName = 'Open';
+                    velocity = beatIndex === 3 ? 0.92 : 0.86;
+                    instTimeOffset -= 0.0015 + intensity * 0.001;
+                } else if (rideSection) {
+                    soundName = 'Ride';
+                    velocity = isBeatStart
+                        ? isDownbeat
+                            ? 1.04
+                            : beatIndex === 2
+                              ? 0.98
+                              : 0.94
+                        : 0.78;
+
+                    if (isOffbeat && (beatIndex === liftBeat || beatIndex === 3)) {
+                        velocity += 0.08;
+                        instTimeOffset -= 0.0025 + intensity * 0.001;
+                    }
+                } else {
+                    soundName = 'HiHat';
+                    velocity = isBeatStart
+                        ? isDownbeat
+                            ? 0.96
+                            : beatIndex === 2
+                              ? 0.91
+                              : 0.88
+                        : 0.7;
+
+                    if (isOffbeat && beatIndex === liftBeat) {
+                        velocity += 0.08;
+                        instTimeOffset -= 0.002 + intensity * 0.001;
+                    } else if (isOffbeat && beatIndex === 3) {
+                        velocity += 0.05;
+                        instTimeOffset -= 0.003 + intensity * 0.0015;
+                    } else if (isBeatStart && beatIndex === 2) {
+                        instTimeOffset += 0.0015;
+                    }
+                }
+
+                if (isOffbeat && beatIndex === secondaryLiftBeat && soundName !== 'Open') {
+                    velocity += 0.04;
+                }
+
+                velocity = scaleVelocity(
+                    velocity,
+                    intensity,
+                    soundName === 'Open' ? 0.08 : soundName === 'Ride' ? 0.07 : 0.06,
+                );
+
+                const ownsArticulation =
+                    context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
+                shouldPlay = ownsArticulation;
+            }
         }
     }
     // --- 2. KICK DRUM ---

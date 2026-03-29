@@ -287,6 +287,16 @@ describe('Drum Synthesis', () => {
         expect(aggressive.decayTime).toBeLessThan(relaxed.decayTime);
     });
 
+    it('should shorten soft open-hat accents into bark-like releases', () => {
+        const bark = getCymbalVoiceConfig('Open', 0.65, 0.7);
+        const fullOpen = getCymbalVoiceConfig('Open', 1.0, 0.7);
+
+        expect(bark).not.toBeNull();
+        expect(fullOpen).not.toBeNull();
+        expect(bark.decayTime).toBeLessThan(fullOpen.decayTime);
+        expect(bark.stopTime).toBeLessThan(fullOpen.stopTime);
+    });
+
     it('should give open, ride, and crash longer natural sustain than closed hi-hat', () => {
         const hihat = getCymbalVoiceConfig('HiHat', 1.0, 0.7);
         const open = getCymbalVoiceConfig('Open', 1.0, 0.7);

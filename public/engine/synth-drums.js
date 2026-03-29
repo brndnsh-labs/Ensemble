@@ -365,23 +365,28 @@ export function getCymbalVoiceConfig(name, velocity, bandIntensity = 0.5) {
     const vel = Math.max(0.3, velocity);
     const brightnessGuard = 1 - Math.max(0, vel - 1.0) * 0.1 - Math.max(0, intensity - 0.8) * 0.08;
     const brightness = Math.max(0.76, brightnessGuard);
+    const openBarkAmount = name === 'Open' ? 1 - clamp01((vel - 0.62) / 0.1) : 0;
+    const baseDecayTime = Math.max(
+        base.minDecay,
+        base.decayBase -
+            Math.max(0, vel - 0.95) * base.decayVelocityFocus -
+            Math.max(0, intensity - 0.75) * base.decayIntensityFocus,
+    );
 
     return {
         ...base,
-        decayTime: Math.max(
-            base.minDecay,
-            base.decayBase -
-                Math.max(0, vel - 0.95) * base.decayVelocityFocus -
-                Math.max(0, intensity - 0.75) * base.decayIntensityFocus,
-        ),
+        attack: Math.max(0.004, base.attack - openBarkAmount * 0.003),
+        decayTime: Math.max(base.minDecay, baseDecayTime - openBarkAmount * 0.12),
+        stopTime: Math.max(base.minDecay, base.stopTime - openBarkAmount * 0.08),
         bandpassFreq: Math.min(
             base.bandpassCap,
-            (base.bandpassBase + vel * base.bandpassVelocity) * brightness,
+            (base.bandpassBase + vel * base.bandpassVelocity + openBarkAmount * 140) * brightness,
         ),
         highpassFreq: Math.min(
             base.highpassCap,
-            (base.highpassBase + vel * base.highpassVelocity) * brightness,
+            (base.highpassBase + vel * base.highpassVelocity + openBarkAmount * 90) * brightness,
         ),
+        q: base.q + openBarkAmount * 0.08,
     };
 }
 

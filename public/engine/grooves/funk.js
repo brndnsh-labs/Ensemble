@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    getPhraseSeed,
     INTENSITY_BANDS,
     roll,
     scaleVelocity,
@@ -67,6 +68,7 @@ export function applyOverrides(context, state) {
         drumComplexity,
         orchestration,
         sectionSeed,
+        barIndex,
         isTurnaround,
     } = context;
 
@@ -88,6 +90,23 @@ export function applyOverrides(context, state) {
         const voice = orchestration?.rideVoice;
         const rideSection = voice === 'Ride';
         const openSection = voice === 'Open';
+        const phraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, activeMotif + 3);
+        const accentBeat = phraseSeed < 0.5 ? 0 : 2;
+        const barkBeat = activeMotif === 2 ? (phraseSeed < 0.5 ? 1 : 3) : phraseSeed < 0.66 ? 1 : 3;
+        const barkUsesA = activeMotif === 3 ? phraseSeed > 0.45 : phraseSeed > 0.62;
+        const barkSubdivisionHit = barkUsesA ? isAOfBeat : isEOfBeat;
+        const phraseBark =
+            barkSubdivisionHit &&
+            beatIndex === barkBeat &&
+            (openSection || activeMotif >= 2 || intensity > 0.78 || phraseSeed > 0.72);
+        const phraseLift = isOffbeat && beatIndex === accentBeat;
+        const phraseRelease = isOffbeat && beatIndex === 3 && intensity > 0.72;
+        const dropSixteenth =
+            !rideSection &&
+            intensity < 0.62 &&
+            phraseSeed > 0.78 &&
+            ((isAOfBeat && beatIndex === 2) || (isEOfBeat && beatIndex === 3));
+        const openAccent = phraseBark || (phraseRelease && (openSection || intensity > 0.78));
 
         // 16th note shimmer (Texture)
         if (intensity > 0.5 || (useOrchestration && voice !== 'None')) {
@@ -103,41 +122,64 @@ export function applyOverrides(context, state) {
                 velocity = scaleVelocity(0.45, intensity, 0.1);
             }
 
-            if (
-                openSection &&
-                isOffbeat &&
-                (isEOfBeat || beatIndex === 3 || (isAOfBeat && intensity > 0.75)) &&
-                roll(0.55, intensity)
-            ) {
-                soundName = 'Open';
-                velocity = 1.05;
+            if (dropSixteenth && !openAccent) {
+                shouldPlay = false;
+            }
+
+            if (shouldPlay) {
+                if (openAccent) {
+                    soundName = 'Open';
+                    velocity = openSection ? 0.96 : 1.0;
+                    instTimeOffset -= barkUsesA ? 0.001 : 0.002;
+                } else if (phraseLift) {
+                    velocity += 0.08;
+                    instTimeOffset -= 0.0015;
+                } else if (isEOfBeat) {
+                    velocity += phraseSeed > 0.55 ? 0.04 : 0;
+                    instTimeOffset -= 0.001;
+                } else if (isAOfBeat) {
+                    velocity += phraseSeed < 0.35 ? 0.03 : 0;
+                    instTimeOffset += 0.001;
+                } else if (isOffbeat && beatIndex === 3) {
+                    velocity += 0.05;
+                    instTimeOffset -= 0.0015;
+                }
             }
         } else if (isBeatStart || isOffbeat) {
             shouldPlay = true;
             soundName = 'HiHat';
             velocity = isBeatStart ? 0.8 : 0.6;
-        }
 
-        // Barks (Open Hat syncopation)
-        const barkProb = (activeMotif === 2 ? 0.6 : openSection ? 0.45 : 0.2) * intensity;
-        if (isOffbeat && roll(barkProb) && voice !== 'HiHat-Closed') {
-            shouldPlay = true;
-            soundName = 'Open';
-            velocity = openSection ? 1.0 : 1.1;
+            if (phraseRelease && intensity > 0.82) {
+                shouldPlay = true;
+                soundName = 'Open';
+                velocity = 0.94;
+                instTimeOffset -= 0.0015;
+            }
         }
 
         // Turnaround Bark
-        if (isTurnaround && isOffbeat && isPulse && isBackbeat) {
+        if (isTurnaround && isOffbeat && beatIndex === 3) {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = 1.2;
-        } else if (isTurnaround && isOffbeat && !shouldPlay) {
-            // Give a chance to play on a turnaround offbeat
-            if (roll(0.4, intensity)) {
-                shouldPlay = true;
-                soundName = 'Open';
-                velocity = 1.2;
-            }
+            velocity = 1.12;
+            instTimeOffset -= 0.002;
+        } else if (isTurnaround && barkSubdivisionHit && beatIndex >= 2) {
+            shouldPlay = true;
+            soundName = 'Open';
+            velocity = 1.0;
+            instTimeOffset -= 0.0015;
+        }
+
+        if (shouldPlay) {
+            velocity = scaleVelocity(
+                velocity,
+                intensity,
+                soundName === 'Open' ? 0.05 : soundName === 'Ride' ? 0.07 : 0.05,
+            );
+            const ownsArticulation =
+                context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
+            shouldPlay = ownsArticulation;
         }
     }
     // --- Snare Pocket ---

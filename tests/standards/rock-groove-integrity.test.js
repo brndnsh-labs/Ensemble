@@ -112,5 +112,28 @@ describe('Rock Groove Integrity', () => {
 
             expect(downbeatHat.velocity).toBeGreaterThan(upbeatHat.velocity);
         });
+
+        it('should route phrase-end open hats through the open lane instead of doubling articulations', () => {
+            const highIntensityState = {
+                ...mockState,
+                playback: { ...mockState.playback, bandIntensity: 0.9 },
+            };
+            getState.mockReturnValue(highIntensityState);
+
+            const phraseEndStep = 14; // & of 4
+            const closedLane = applyGrooveOverrides(
+                getState(),
+                createParams(phraseEndStep, 'HiHat', 2),
+            );
+            const openLane = applyGrooveOverrides(
+                getState(),
+                createParams(phraseEndStep, 'Open', 0),
+            );
+
+            expect(closedLane.shouldPlay).toBe(false);
+            expect(openLane.shouldPlay).toBe(true);
+            expect(openLane.soundName).toBe('Open');
+            expect(openLane.instTimeOffset).toBeLessThan(0);
+        });
     });
 });

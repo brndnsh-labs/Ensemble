@@ -30,6 +30,25 @@ export function scaleVelocity(base, intensity, factor = 0.2) {
 }
 
 /**
+ * Derive a deterministic phrase-level seed so grooves can vary bar-to-bar without
+ * falling back to unconstrained randomness. Reusing the same phrase seed across a
+ * small bar span helps hats and cymbals read like a player shaping a phrase.
+ *
+ * @param {number} sectionSeed
+ * @param {number} barIndex
+ * @param {number} [phraseBars=2]
+ * @param {number} [salt=0]
+ * @returns {number}
+ */
+export function getPhraseSeed(sectionSeed, barIndex, phraseBars = 2, salt = 0) {
+    const normalizedSeed = Math.max(0, Math.min(0.999, sectionSeed || 0));
+    const phraseIndex = Math.floor(barIndex / Math.max(1, phraseBars));
+    const seedInt = Math.floor(normalizedSeed * 256);
+
+    return ((phraseIndex * 97 + seedInt * 53 + salt * 29) % 256) / 256;
+}
+
+/**
  * Default configuration for drum strategies.
  */
 export const DEFAULT_CONFIG = {
