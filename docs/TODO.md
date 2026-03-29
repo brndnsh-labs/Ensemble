@@ -25,5 +25,5 @@ These are the open UI/system tasks left after the hi-hat, visualizer, and flaky-
 
 ## Flaky tests
 
-- `tests/standards/blues-soloist-authenticity.test.js` can fall just below the response-resolution target in the full suite even though it passes in isolation.
-- Revisit the blues soloist response-resolution bias later rather than blocking the current layering fix on it.
+- `tests/standards/blues-soloist-authenticity.test.js` — intermittent; addressed by blues rhythm/phrase-floor and soloist config tweaks. Verified via repeated loops (20×/50× and full-suite loops) and regression passes. Status: DONE (2026-03-29).
+- Recommendation: perform human music QA on Blues/Jazz phrases to confirm musicality before closing permanently.
