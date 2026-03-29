@@ -1,6 +1,12 @@
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';
 import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
+import {
+    allowsSoloistPolyphony,
+    isSoloistGuitarMode,
+    isSoloistPianoMode,
+    resolveSoloistMode,
+} from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -90,6 +96,9 @@ export function selectPitchAndDevices(
         ? Math.round(rhythmNode.targetMidi)
         : null;
     const seedNote = rhythmNode.seedNote || null;
+    const soloistMode = resolveSoloistMode(soloistState.mode);
+    const isGuitarMode = isSoloistGuitarMode(soloistMode);
+    const isPianoMode = isSoloistPianoMode(soloistMode);
 
     let targetChord = currentChord;
 
@@ -516,10 +525,13 @@ export function selectPitchAndDevices(
         selectedMidi = lastMidi;
     }
 
-    // --- Melodic Devices ---
-    let deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const sessionSeed = soloistState.sessionSeed;
     const loopCount = playback.currentLoopCount || 0;
+    const canUseHeadGuitarSupport =
+        isGuitarMode && isHeadBypass && seedNote?.supportHints?.guitar?.allowDoubleStop === true;
+
+    // --- Melodic Devices ---
+    let deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const isLaterHeadBypass = isHeadBypass && loopCount > 0;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(activeStyle);
 
@@ -553,10 +565,13 @@ export function selectPitchAndDevices(
     }
     deviceBaseProb = Math.min(loopCount === 0 ? 0.4 : isLineStyle ? 0.58 : 0.85, deviceBaseProb);
     const isPolyphonic =
-        soloistState.mode !== 'monophonic' &&
+        allowsSoloistPolyphony(soloistMode) &&
         (soloistState.doubleStopProb ?? 1.0) > 0 &&
         config.doubleStopProb > 0 &&
-        ((playback.currentLoopCount || 0) > 0 || !sessionSeed || sessionSeed.notes.length === 0); // No double stops in the Head ONLY if seed exists
+        (loopCount > 0 ||
+            !sessionSeed ||
+            sessionSeed.notes.length === 0 ||
+            canUseHeadGuitarSupport);
 
     const deviceContextOptions = {
         state,
@@ -570,7 +585,7 @@ export function selectPitchAndDevices(
         playback,
         soloist: soloistState,
         isPolyphonic,
-        isPiano: soloistState.mode === 'piano',
+        isPiano: isPianoMode,
         dynamicCenter: 72,
         scaleMask,
     };
@@ -652,7 +667,7 @@ export function selectPitchAndDevices(
             }
         }
 
-        if (soloistState.mode === 'piano') {
+        if (isPianoMode) {
             allowed = allowed.filter(
                 (d) =>
                     d !== 'slide' &&
@@ -685,7 +700,7 @@ export function selectPitchAndDevices(
         vibrato: vibrato,
         isSustained: rhythmNode.isSustained,
         bendStartInterval:
-            soloistState.mode === 'guitar' && durationSteps >= 4 && Math.random() < 0.3
+            isGuitarMode && durationSteps >= 4 && Math.random() < 0.3
                 ? Math.random() < 0.5
                     ? -1
                     : 1
@@ -698,16 +713,51 @@ export function selectPitchAndDevices(
     };
 
     // Polyphony check (Double Stops)
-    if (
-        isPolyphonic &&
-        Math.random() < config.doubleStopProb * intensity * (soloistState.doubleStopProb ?? 1.0)
-    ) {
+    let doubleStopChance = config.doubleStopProb * intensity * (soloistState.doubleStopProb ?? 1.0);
+    if (isGuitarMode) {
+        doubleStopChance =
+            config.doubleStopProb *
+            (soloistState.doubleStopProb ?? 1.0) *
+            (0.35 + intensity * 0.45);
+
+        if (durationSteps >= stepsPerBeat) {
+            doubleStopChance *= 1.35;
+        }
+        if (isStrongBeat) {
+            doubleStopChance *= 1.15;
+        }
+        if (selectedMidi < 64) {
+            doubleStopChance *= 0.45;
+        }
+        if (!isStrongBeat && durationSteps < Math.max(2, stepsPerBeat / 2)) {
+            doubleStopChance *= 0.18;
+        }
+        if (isLineStyle) {
+            doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.45 : 0.12;
+        }
+
+        if (isHeadBypass) {
+            if (seedNote?.supportHints?.guitar?.allowDoubleStop !== true) {
+                doubleStopChance = 0;
+            } else {
+                doubleStopChance *= 0.45 + (seedNote.supportHints.sustainBias || 0.6) * 0.75;
+                if (seedNote.isAnchor) {
+                    doubleStopChance *= 1.15;
+                }
+            }
+        } else if (loopCount === 0 && sessionSeed?.notes?.length) {
+            doubleStopChance = 0;
+        }
+    }
+
+    if (isPolyphonic && Math.random() < Math.min(0.98, doubleStopChance)) {
         const extra = generateExtraNotes({
             soloist: soloistState,
             currentChord,
             activeStyle,
             effectiveIntensity: intensity,
             selectedMidi,
+            seedNote,
         });
         if (extra && extra.length > 0) {
             // Optimization: Replace spread and map with pre-allocated loop to avoid closure overhead and intermediate arrays

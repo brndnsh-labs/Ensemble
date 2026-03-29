@@ -163,6 +163,52 @@ describe('Soloist Mode Differentiation Logic', () => {
         expect([-3, -4, -5, -7, -8, -9]).toContain(interval);
     });
 
+    it('keeps loop-0 guitar head notes monophonic without explicit support metadata', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [{ step: 0, midi: 72, isAnchor: true, durationSteps: 4, velocity: 0.9 }],
+        };
+
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(false);
+        expect(note?.midi).toBe(72);
+    });
+
+    it('lets loop-0 guitar head notes realize optional support metadata as double stops', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [
+                {
+                    step: 0,
+                    midi: 72,
+                    isAnchor: true,
+                    durationSteps: 4,
+                    velocity: 0.9,
+                    supportHints: {
+                        role: 'anchor',
+                        sustainBias: 1.0,
+                        guitar: {
+                            allowDoubleStop: true,
+                            intervalPalette: 'tight',
+                            preferBelow: true,
+                        },
+                    },
+                },
+            ],
+        };
+
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'scalar', 0);
+        expect(Array.isArray(note)).toBe(true);
+        expect(note.length).toBe(2);
+        expect(note[note.length - 1].midi).toBe(72);
+        expect(note[0].isDoubleStop).toBe(true);
+        expect(note[0].midi).toBeLessThan(72);
+    });
+
     it('should generate 3-note block chords in piano mode', () => {
         state.soloist.mode = 'piano';
         state.playback.currentLoopCount = 3;

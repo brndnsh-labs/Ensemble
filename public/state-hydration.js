@@ -6,6 +6,7 @@ import {
     SOLOIST_STYLES,
 } from './data/instrument-styles.js';
 import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
+import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
 import { normalizeWorkspace } from './state/ui.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
@@ -211,11 +212,13 @@ export function hydrateState() {
                         : clamp(savedState.soloist.octave, 0, 127, 72),
                 volume: clamp(savedState.soloist.volume, 0, 1, 0.5),
                 reverb: clamp(savedState.soloist.reverb, 0, 1, 0.6),
-                mode: savedState.soloist.mode
-                    ? savedState.soloist.mode
-                    : savedState.soloist.doubleStops
-                      ? 'guitar'
-                      : 'monophonic',
+                mode: resolveSoloistMode(
+                    savedState.soloist.mode
+                        ? savedState.soloist.mode
+                        : savedState.soloist.doubleStops
+                          ? 'guitar'
+                          : 'monophonic',
+                ),
                 seed: savedState.soloist.seed || '',
                 leadSheetMelody: savedState.soloist.leadSheetMelody || [],
             });
@@ -422,9 +425,7 @@ export function loadFromUrl() {
                     octave: clamp(band.s.o, 0, 127, 72),
                     volume: clamp(band.s.v, 0, 1, 0.5),
                     reverb: clamp(band.s.r, 0, 1, 0.6),
-                    mode: ['monophonic', 'guitar', 'polyphonic'].includes(band.s.m)
-                        ? band.s.m
-                        : soloist.mode,
+                    mode: resolveSoloistMode(band.s.m || soloist.mode),
                     seed: typeof band.s.sd === 'string' ? band.s.sd : '',
                 });
             }

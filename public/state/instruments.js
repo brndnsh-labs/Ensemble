@@ -1,5 +1,6 @@
 import { deepSignal } from 'deepsignal';
 import { KEY_ORDER } from '../config.js';
+import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { ACTIONS } from '../types.js';
 import { arranger } from './arranger.js';
 import { groove } from './groove.js';
@@ -344,7 +345,7 @@ export function instrumentReducer(action, payload) {
             }
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
-            soloist.mode = payload;
+            soloist.mode = resolveSoloistMode(payload);
             return true;
         case ACTIONS.SET_SOLOIST_SEED:
             soloist.seed = payload;

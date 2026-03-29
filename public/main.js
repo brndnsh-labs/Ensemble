@@ -2,6 +2,7 @@ import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
 import { scheduler } from './engine/scheduler-core.js';
+import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
 import { initPWA } from './pwa.js';
 import { getState, subscribe } from './state.js';
@@ -72,7 +73,7 @@ function init() {
                         bass.buffer.get(n.step).push(n);
                     } else if (n.module === 'soloist') {
                         // ENFORCE MONOPHONIC: If mode is monophonic, skip additional notes for the same step
-                        if (soloist.mode === 'monophonic' && soloist.buffer.has(n.step)) {
+                        if (isSoloistMonophonicMode(soloist.mode) && soloist.buffer.has(n.step)) {
                             return;
                         }
 

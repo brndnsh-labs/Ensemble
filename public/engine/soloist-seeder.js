@@ -61,12 +61,38 @@ const PICKUP_DICTIONARY = {
  */
 
 /**
+ * @typedef {'pickup' | 'line' | 'accent' | 'anchor' | 'cadence' | 'sustain'} SeedSupportRole
+ */
+
+/**
+ * @typedef {Object} SeedGuitarSupportHint
+ * @property {boolean} allowDoubleStop - Whether guitar mode may add a supporting note here.
+ * @property {'tight' | 'open' | 'blues'} intervalPalette - Which grip family best supports the note.
+ * @property {boolean} preferBelow - Whether the supporting note should live below the melody.
+ */
+
+/**
+ * @typedef {Object} SeedSupportHints
+ * @property {SeedSupportRole} role - The melodic job of this note inside the head.
+ * @property {number} sustainBias - Higher values invite more ringing support than moving lines.
+ * @property {SeedGuitarSupportHint} guitar - Guitar-specific realization hints for this melody note.
+ */
+
+/**
+ * @typedef {Object} SeedSupportHintOverrides
+ * @property {SeedSupportRole} [role]
+ * @property {number} [sustainBias]
+ * @property {Partial<SeedGuitarSupportHint>} [guitar]
+ */
+
+/**
  * @typedef {Object} SeedNote
  * @property {number} step - Global step target within the loop.
  * @property {number} midi - MIDI note value.
  * @property {boolean} isAnchor - True if it's a structural anchor.
  * @property {number} durationSteps - Suggested duration in steps.
  * @property {number} velocity - Suggested velocity (0.0 - 1.0).
+ * @property {SeedSupportHints} [supportHints] - Optional accompaniment hints that keep the melody primary.
  */
 
 /**
@@ -75,6 +101,147 @@ const PICKUP_DICTIONARY = {
  */
 function normalizeInterval(interval) {
     return ((interval % 12) + 12) % 12;
+}
+
+/**
+ * Build optional support metadata so phrasing modes can reinforce the melody without rewriting it.
+ * @param {{
+ *   style: string,
+ *   step: number,
+ *   durationSteps: number,
+ *   isAnchor: boolean,
+ *   isPickup: boolean,
+ *   stepsPerMeasure: number,
+ *   stepsPerBeat: number,
+ * }} options
+ * @returns {SeedSupportHints}
+ */
+function buildSeedSupportHints(options) {
+    const { style, step, durationSteps, isAnchor, isPickup, stepsPerMeasure, stepsPerBeat } =
+        options;
+    const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
+    const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+    const isCadenceZone = measureStep >= Math.max(0, stepsPerMeasure - stepsPerBeat);
+    const isBeatAttack = measureStep % stepsPerBeat === 0;
+
+    /** @type {SeedSupportRole} */
+    let role = 'line';
+    if (isPickup || step < 0) {
+        role = 'pickup';
+    } else if (isAnchor && isCadenceZone) {
+        role = 'cadence';
+    } else if (isAnchor) {
+        role = 'anchor';
+    } else if (durationSteps >= stepsPerBeat * 2) {
+        role = 'sustain';
+    } else if (isBeatAttack) {
+        role = 'accent';
+    }
+
+    let sustainBias = 0.4;
+    if (role === 'pickup') {
+        sustainBias = 0.15;
+    } else if (role === 'accent') {
+        sustainBias = 0.65;
+    } else if (role === 'sustain') {
+        sustainBias = 0.88;
+    } else if (role === 'anchor' || role === 'cadence') {
+        sustainBias = 1.0;
+    }
+
+    let allowDoubleStop = false;
+    if (!isPickup && step >= 0) {
+        if (role === 'anchor' || role === 'cadence') {
+            allowDoubleStop = true;
+        } else if (!isLineStyle && (role === 'sustain' || role === 'accent')) {
+            allowDoubleStop = true;
+        } else if (style === 'blues' && durationSteps >= stepsPerBeat && isBeatAttack) {
+            allowDoubleStop = true;
+        }
+    }
+
+    /** @type {'tight' | 'open' | 'blues'} */
+    let intervalPalette = 'tight';
+    if (style === 'blues') {
+        intervalPalette = 'blues';
+    } else if (style === 'country' || role === 'sustain' || role === 'cadence') {
+        intervalPalette = 'open';
+    }
+
+    return {
+        role,
+        sustainBias,
+        guitar: {
+            allowDoubleStop,
+            intervalPalette,
+            preferBelow: true,
+        },
+    };
+}
+
+/**
+ * @param {{
+ *   style: string,
+ *   step: number,
+ *   midi: number,
+ *   isAnchor: boolean,
+ *   durationSteps: number,
+ *   velocity: number,
+ *   isPickup?: boolean,
+ *   stepsPerMeasure: number,
+ *   stepsPerBeat: number,
+ * }} options
+ * @returns {SeedNote}
+ */
+function createSeedNote(options) {
+    const {
+        style,
+        step,
+        midi,
+        isAnchor,
+        durationSteps,
+        velocity,
+        isPickup = false,
+        stepsPerMeasure,
+        stepsPerBeat,
+    } = options;
+
+    return {
+        step,
+        midi,
+        isAnchor,
+        durationSteps,
+        velocity,
+        supportHints: buildSeedSupportHints({
+            style,
+            step,
+            durationSteps,
+            isAnchor,
+            isPickup,
+            stepsPerMeasure,
+            stepsPerBeat,
+        }),
+    };
+}
+
+/**
+ * @param {SeedNote} note
+ * @param {SeedSupportHintOverrides} overrides
+ * @returns {SeedSupportHints | undefined}
+ */
+function overrideSeedSupportHints(note, overrides) {
+    if (!note.supportHints) {
+        return undefined;
+    }
+
+    return {
+        ...note.supportHints,
+        ...overrides,
+        guitar: {
+            ...note.supportHints.guitar,
+            ...(overrides.guitar || {}),
+        },
+    };
 }
 
 /**
@@ -1437,22 +1604,32 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 if (existingIdx !== -1) {
                     // Override the existing note if it's not an anchor, or just skip
                     if (motifNote.beatOffset === 0) {
-                        notes[existingIdx] = {
+                        notes[existingIdx] = createSeedNote({
+                            style,
                             step: exactStep,
                             midi: midi,
                             isAnchor: true,
                             durationSteps: duration,
                             velocity: 0.9,
-                        };
+                            isPickup: Boolean(motifNote.isPickup),
+                            stepsPerMeasure,
+                            stepsPerBeat,
+                        });
                     }
                 } else {
-                    notes.push({
-                        step: exactStep,
-                        midi: midi,
-                        isAnchor: motifNote.beatOffset === 0,
-                        durationSteps: duration,
-                        velocity: motifNote.beatOffset === 0 ? 0.9 : 0.75,
-                    });
+                    notes.push(
+                        createSeedNote({
+                            style,
+                            step: exactStep,
+                            midi: midi,
+                            isAnchor: motifNote.beatOffset === 0,
+                            durationSteps: duration,
+                            velocity: motifNote.beatOffset === 0 ? 0.9 : 0.75,
+                            isPickup: Boolean(motifNote.isPickup),
+                            stepsPerMeasure,
+                            stepsPerBeat,
+                        }),
+                    );
                 }
             });
         }
@@ -1491,12 +1668,23 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         processedNotes.push({
                             ...currentNote,
                             durationSteps: firstDuration,
+                            supportHints: overrideSeedSupportHints(currentNote, {
+                                sustainBias: Math.min(
+                                    currentNote.supportHints?.sustainBias || 1,
+                                    0.72,
+                                ),
+                            }),
                         });
                         processedNotes.push({
                             ...currentNote,
                             step: currentNote.step + firstDuration,
                             durationSteps: secondDuration,
                             isAnchor: false,
+                            supportHints: overrideSeedSupportHints(currentNote, {
+                                role: 'line',
+                                sustainBias: 0.3,
+                                guitar: { allowDoubleStop: false },
+                            }),
                         });
                         mutationApplied = true;
                     }
@@ -1507,12 +1695,22 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         processedNotes.push({
                             ...currentNote,
                             durationSteps: halfDuration,
+                            supportHints: overrideSeedSupportHints(currentNote, {
+                                role: 'line',
+                                sustainBias: 0.35,
+                                guitar: { allowDoubleStop: false },
+                            }),
                         });
                         processedNotes.push({
                             ...currentNote,
                             step: currentNote.step + halfDuration,
                             durationSteps: currentNote.durationSteps - halfDuration,
                             isAnchor: false,
+                            supportHints: overrideSeedSupportHints(currentNote, {
+                                role: 'line',
+                                sustainBias: 0.28,
+                                guitar: { allowDoubleStop: false },
+                            }),
                         });
                         mutationApplied = true;
                     }
@@ -1540,6 +1738,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     processedNotes.push({
                         ...currentNote,
                         durationSteps: splitPoint,
+                        supportHints: overrideSeedSupportHints(currentNote, {
+                            role: 'line',
+                            sustainBias: 0.3,
+                            guitar: { allowDoubleStop: false },
+                        }),
                     });
                     processedNotes.push({
                         ...currentNote,
@@ -1547,6 +1750,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         durationSteps: currentNote.durationSteps - splitPoint,
                         velocity: Math.max(0.55, (currentNote.velocity || 0.75) - 0.08),
                         isAnchor: false,
+                        supportHints: overrideSeedSupportHints(currentNote, {
+                            role: 'line',
+                            sustainBias: 0.24,
+                            guitar: { allowDoubleStop: false },
+                        }),
                     });
                     mutationApplied = true;
                 }
@@ -1568,6 +1776,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         ...currentNote,
                         step: currentNote.step - shiftAmount,
                         durationSteps: currentNote.durationSteps + shiftAmount,
+                        supportHints: overrideSeedSupportHints(currentNote, {
+                            role: currentNote.isAnchor ? 'anchor' : 'accent',
+                            sustainBias: Math.min(
+                                1,
+                                (currentNote.supportHints?.sustainBias || 0.6) + 0.08,
+                            ),
+                        }),
                     });
                     mutationApplied = true;
                 }
@@ -1633,6 +1848,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         processedNotes.push({
                             ...currentNote,
                             midi: newMidi,
+                            supportHints: overrideSeedSupportHints(currentNote, {
+                                role: 'line',
+                                sustainBias: 0.25,
+                                guitar: { allowDoubleStop: false },
+                            }),
                         });
                         mutationApplied = true;
                     }
@@ -1687,6 +1907,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                         durationSteps: pickupDuration,
                         velocity: Math.min(note.velocity, 0.75),
                         isAnchor: false,
+                        supportHints: overrideSeedSupportHints(note, {
+                            role: 'pickup',
+                            sustainBias: 0.15,
+                            guitar: { allowDoubleStop: false },
+                        }),
                     });
                 }
             }

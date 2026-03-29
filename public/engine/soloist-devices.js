@@ -1,3 +1,8 @@
+import {
+    isSoloistGuitarMode,
+    isSoloistPianoMode,
+    resolveSoloistMode,
+} from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -254,7 +259,9 @@ export function generateMelodicDevice(deviceType, ctx) {
         ];
     } else if (deviceType === 'slide') {
         const dir =
-            (soloist.mode === 'guitar' || activeStyle === 'bird') && Math.random() < 0.3 ? 1 : -1;
+            (isSoloistGuitarMode(soloist.mode) || activeStyle === 'bird') && Math.random() < 0.3
+                ? 1
+                : -1;
         deviceBuffer = [
             {
                 midi: selectedMidi,
@@ -411,14 +418,98 @@ export function generateMelodicDevice(deviceType, ctx) {
 }
 
 /**
+ * @param {{ activeStyle: string, supportHint?: any }} options
+ * @returns {number[]}
+ */
+function getGuitarIntervalPalette(options) {
+    const { activeStyle, supportHint } = options;
+    const palette = supportHint?.intervalPalette;
+
+    if (palette === 'blues' || activeStyle === 'blues') {
+        return [3, 4, 5, 6, 7];
+    }
+    if (palette === 'open' || activeStyle === 'country') {
+        return [7, 5, 9, 4, 3];
+    }
+    return [3, 4, 5, 7, 8, 9];
+}
+
+/**
+ * Choose a supportive lower voice that sounds like a guitarist reinforcing the melody,
+ * not like a generic chord-stack algorithm filling space.
+ * @param {{ currentChord: any, activeStyle: string, selectedMidi: number, supportHint?: any }} options
+ * @returns {number}
+ */
+function selectGuitarSupportMidi(options) {
+    const { currentChord, activeStyle, selectedMidi, supportHint } = options;
+    const currentRoot = currentChord.rootMidi;
+    const chordMask = getChordMask(currentChord);
+    const intervalPalette = getGuitarIntervalPalette({ activeStyle, supportHint });
+    const supportFloor = Math.max(52, selectedMidi - 12);
+
+    let bestMidi = Number.NaN;
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    for (let i = 0; i < intervalPalette.length; i++) {
+        const dsInt = intervalPalette[i];
+        const candidateMidi = selectedMidi - dsInt;
+        if (candidateMidi < supportFloor || candidateMidi >= selectedMidi) {
+            continue;
+        }
+
+        const pc = ((candidateMidi % 12) + 12) % 12;
+        const interval = (pc - (currentRoot % 12) + 12) % 12;
+        const isChordTone = Boolean((chordMask >> interval) & 1);
+
+        let score = isChordTone ? 6 : -2.5;
+
+        if (dsInt === 3 || dsInt === 4) {
+            score += activeStyle === 'blues' ? 4 : 3;
+        } else if (dsInt === 5) {
+            score += 2.5;
+        } else if (dsInt === 7) {
+            score += supportHint?.intervalPalette === 'open' ? 3.5 : 1.5;
+        } else if (dsInt >= 8) {
+            score += supportHint?.intervalPalette === 'open' ? 2 : -1;
+        }
+
+        if (activeStyle === 'neo' && (dsInt === 5 || dsInt === 7)) {
+            score += 1.5;
+        }
+        if (supportHint?.role === 'cadence' && isChordTone) {
+            score += 2;
+        }
+        if ((supportHint?.sustainBias || 0) >= 0.85 && (dsInt === 5 || dsInt === 7)) {
+            score += 1.4;
+        }
+        if (candidateMidi < 57) {
+            score -= 1;
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMidi = candidateMidi;
+        }
+    }
+
+    if (!Number.isFinite(bestMidi)) {
+        return selectedMidi - (activeStyle === 'blues' ? 5 : 4);
+    }
+
+    return bestMidi;
+}
+
+/**
  * Generates additional notes for double stops based on style and mode.
  * @param {any} ctx
  */
 export function generateExtraNotes(ctx) {
-    const { soloist, currentChord, activeStyle, effectiveIntensity, selectedMidi } = ctx;
+    const { soloist, currentChord, activeStyle, effectiveIntensity, selectedMidi, seedNote } = ctx;
     const extraNotes = [];
+    const soloistMode = resolveSoloistMode(soloist.mode);
+    const supportHint = seedNote?.supportHints?.guitar;
 
-    if (soloist.mode === 'piano') {
+    if (isSoloistPianoMode(soloistMode)) {
         const currentRoot = currentChord.rootMidi;
 
         const chordMask = getChordMask(currentChord);
@@ -467,29 +558,19 @@ export function generateExtraNotes(ctx) {
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
             isDoubleStop: true,
         });
-    } else if (soloist.mode === 'guitar') {
-        const currentRoot = currentChord.rootMidi;
-
-        const chordMask = getChordMask(currentChord);
-
-        const validIntervalsDown = [3, 4, 5, 7, 8, 9]; // minor 3rd to major 6th down
-        let foundMidi = null;
-
-        for (let i = 0; i < validIntervalsDown.length; i++) {
-            const dsInt = validIntervalsDown[i];
-            const candidateMidi = selectedMidi - dsInt;
-            const pc = ((candidateMidi % 12) + 12) % 12;
-            const interval = (pc - (currentRoot % 12) + 12) % 12;
-            if ((chordMask >> interval) & 1) {
-                foundMidi = candidateMidi;
-                break;
-            }
-        }
-
-        if (foundMidi === null) {
-            foundMidi = selectedMidi - (activeStyle === 'blues' ? 5 : 4);
-        }
-
+    } else if (isSoloistGuitarMode(soloistMode)) {
+        const foundMidi = selectGuitarSupportMidi({
+            currentChord,
+            activeStyle,
+            selectedMidi,
+            supportHint: supportHint
+                ? {
+                      ...supportHint,
+                      role: seedNote?.supportHints?.role,
+                      sustainBias: seedNote?.supportHints?.sustainBias,
+                  }
+                : null,
+        });
         extraNotes.push({
             midi: foundMidi,
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
