@@ -1,6 +1,6 @@
 import { Fragment } from 'preact';
 import { lazy, Suspense } from 'preact/compat';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import { ArrangerWorkspace } from './components/ArrangerWorkspace.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { Modals } from './components/Modals.jsx';
@@ -38,14 +38,14 @@ const VisualsWorkspace = lazy(() =>
  * @param {AppProps} props
  */
 export function App({ getVisualTime }) {
-    const { theme, isMaximized, activeWorkspace } = useEnsembleState(
+    const { theme, isMaximized, activeWorkspace, vizEnabled } = useEnsembleState(
         (/** @type {import('./types.js').EnsembleState} */ s) => ({
             theme: s.playback.theme,
             isMaximized: s.vizState.isMaximized,
             activeWorkspace: s.ui.activeWorkspace,
+            vizEnabled: s.vizState.enabled,
         }),
     );
-    const previousWorkspaceRef = useRef(activeWorkspace);
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -73,12 +73,16 @@ export function App({ getVisualTime }) {
     }, [activeWorkspace]);
 
     useEffect(() => {
-        if (activeWorkspace === 'visuals' && previousWorkspaceRef.current !== 'visuals') {
-            dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: true });
+        const shouldEnableVisualizer = activeWorkspace === 'visuals';
+        if (vizEnabled !== shouldEnableVisualizer) {
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'vizState',
+                param: 'enabled',
+                value: shouldEnableVisualizer,
+            });
             debounceSaveState();
         }
-        previousWorkspaceRef.current = activeWorkspace;
-    }, [activeWorkspace]);
+    }, [activeWorkspace, vizEnabled]);
 
     const renderWorkspace = () => {
         switch (activeWorkspace) {

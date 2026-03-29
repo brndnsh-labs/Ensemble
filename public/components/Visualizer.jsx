@@ -5,6 +5,11 @@ import { dispatch, getState, stateMap } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure } from '../utils.js';
+import {
+    resolveVisualizerTrack,
+    VISUALIZER_TRACK_ORDER,
+    VISUALIZER_TRACKS,
+} from '../visualizer-events.js';
 import { UnifiedVisualizer } from '../visualizer-proxy.js';
 
 let lastFrameTime = 0;
@@ -99,13 +104,18 @@ export function Visualizer({ enabled, getVisualTime }) {
         const viz = new UnifiedVisualizer(canvasRef.current, staticCanvasRef.current);
         const style = getComputedStyle(document.documentElement);
 
-        const resolve = (/** @type {any} */ v, /** @type {any} */ fallback) =>
+        const resolve = (/** @type {string} */ v, /** @type {string} */ fallback) =>
             style.getPropertyValue(v).trim() || fallback;
 
-        viz.addTrack('bass', 'var(--success-color)', resolve('--success-color', '#22c55e'));
-        viz.addTrack('soloist', 'var(--soloist-color)', resolve('--soloist-color', '#3b82f6'));
-        viz.addTrack('harmony', 'var(--harmony-color)', resolve('--harmony-color', '#a855f7'));
-        viz.addTrack('drums', 'var(--text-color)', resolve('--text-color', '#64748b'));
+        for (const trackId of VISUALIZER_TRACK_ORDER) {
+            const trackMeta = VISUALIZER_TRACKS[trackId];
+            viz.addTrack(
+                trackId,
+                `var(${trackMeta.cssVar})`,
+                resolve(trackMeta.cssVar, trackMeta.fallback),
+                trackMeta.label,
+            );
+        }
 
         vizRef.current = viz;
 
@@ -155,26 +165,38 @@ export function Visualizer({ enabled, getVisualTime }) {
         }
         const style = getComputedStyle(document.documentElement);
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const resolve = (/** @type {string} */ prop, /** @type {string} */ fallback) =>
+            style.getPropertyValue(prop).trim() || fallback;
 
         /** @type {Record<string, string|string[]>} */
         const themeCache = {
-            bgColor: isDark ? '#0f172a' : '#f8fafc',
-            keyWhite: isDark ? '#cbd5e1' : '#ffffff',
-            keyBlack: isDark ? '#1e293b' : '#1e293b',
-            keySeparator: isDark ? '#334155' : '#e2e8f0',
+            bgColor: resolve('--surface-sunken', isDark ? '#0f172a' : '#f8fafc'),
+            labelRailBg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(226, 232, 240, 0.92)',
+            laneBg: isDark ? 'rgba(255, 255, 255, 0.025)' : 'rgba(255, 255, 255, 0.82)',
+            laneAltBg: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(226, 232, 240, 0.72)',
+            keyWhite: isDark ? 'rgba(255, 255, 255, 0.08)' : '#ffffff',
+            keyBlack: isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(148, 163, 184, 0.42)',
+            keySeparator: resolve('--border-color', isDark ? '#334155' : '#e2e8f0'),
             gridColorMeasure: isDark ? 'rgba(56, 189, 248, 0.4)' : 'rgba(2, 132, 199, 0.3)',
             gridColorBeat: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
             playheadColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
-            outlineColor: isDark ? '#000' : '#fff',
-            labelColor: isDark ? '#64748b' : '#94a3b8',
+            outlineColor: isDark ? 'rgba(0, 0, 0, 0.85)' : '#ffffff',
+            labelColor: resolve('--text-muted', isDark ? '#64748b' : '#94a3b8'),
+            trackLabelColor: resolve('--text-color', isDark ? '#e2e8f0' : '#0f172a'),
+            noteLabelColor: resolve('--text-muted', isDark ? '#cbd5e1' : '#334155'),
             guideLineBlack: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.03)',
             guideLineWhite: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)',
-            separatorColor: isDark ? '#334155' : '#cbd5e1',
+            laneGuideColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
+            separatorColor: resolve('--border-color', isDark ? '#334155' : '#cbd5e1'),
+            chordMarkerColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.14)',
+            fillGradientTop: 'rgba(211, 54, 130, 0)',
+            fillGradientMid: isDark ? 'rgba(211, 54, 130, 0.18)' : 'rgba(211, 54, 130, 0.12)',
+            fillGradientBottom: 'rgba(211, 54, 130, 0)',
             chordColors: [
-                style.getPropertyValue('--blue').trim() || '#268bd2',
-                style.getPropertyValue('--green').trim() || '#859900',
-                style.getPropertyValue('--orange').trim() || '#cb4b16',
-                style.getPropertyValue('--magenta').trim() || '#d33682',
+                resolve('--accent-color', '#268bd2'),
+                resolve('--green', '#859900'),
+                resolve('--orange', '#cb4b16'),
+                resolve('--magenta', '#d33682'),
             ],
         };
         viz.setTheme(themeCache);
@@ -289,7 +311,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                     continue;
                 }
 
-                if (ev.type === 'drum_vis') {
+                if (ev.type === 'step') {
                     const stepMeasure = Math.floor(ev.step / spm);
                     if (
                         groove.followPlayback &&
@@ -304,7 +326,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                         param: 'lastPlayingStep',
                         value: ev.step,
                     });
-                } else if (ev.type === 'chord_vis') {
+                } else if (ev.type === 'chord') {
                     if (chords.lastActiveChordIndex !== ev.index) {
                         dispatch(ACTIONS.SET_PARAM, {
                             module: 'chords',
@@ -317,27 +339,18 @@ export function Visualizer({ enabled, getVisualTime }) {
                         ev.notes = ev.chordNotes;
                         vizRef.current.pushChord(ev);
                     }
-                } else if (ev.type === 'bass_vis') {
+                } else if (ev.type === 'note') {
                     if (enabled && playback.isDrawing && vizRef.current) {
-                        ev.noteName = ev.name;
-                        vizRef.current.pushNote('bass', ev);
+                        const trackId = resolveVisualizerTrack(ev.track);
+                        if (!trackId) {
+                            continue;
+                        }
+                        if (trackId === 'soloist') {
+                            vizRef.current.truncateNotes(trackId, ev.time);
+                        }
+                        vizRef.current.pushNote(trackId, ev);
                     }
-                } else if (ev.type === 'soloist_vis') {
-                    if (enabled && playback.isDrawing && vizRef.current) {
-                        vizRef.current.truncateNotes('soloist', ev.time);
-                        ev.noteName = ev.name;
-                        vizRef.current.pushNote('soloist', ev);
-                    }
-                } else if (ev.type === 'harmony_vis') {
-                    if (enabled && playback.isDrawing && vizRef.current) {
-                        ev.noteName = ev.name;
-                        vizRef.current.pushNote('harmony', ev);
-                    }
-                } else if (ev.type === 'drums_vis') {
-                    if (enabled && playback.isDrawing && vizRef.current) {
-                        vizRef.current.pushNote('drums', ev);
-                    }
-                } else if (ev.type === 'fill_active') {
+                } else if (ev.type === 'fill') {
                     if (
                         enabled &&
                         playback.isDrawing &&

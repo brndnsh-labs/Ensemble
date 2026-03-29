@@ -32,7 +32,7 @@ import { ACTIONS } from '../types.js';
  * @property {number} unswungNextNoteTime - The scheduler time for the next note (straight/quantized).
  * @property {number} scheduleAheadTime - Lookahead time for scheduling (in seconds).
  * @property {number} step - The global step counter.
- * @property {Array<Object>} drawQueue - Queue of visual events to be rendered.
+ * @property {Array<import('../visualizer-events.js').VisualizerQueuedEvent>} drawQueue - Queue of normalized visual events waiting to be rendered.
  * @property {boolean} isCountingIn - Whether the metronome count-in is active.
  * @property {number} countInBeat - Current beat of the count-in (0-3).
  * @property {boolean} isDrawing - Whether the visualizer loop is active.

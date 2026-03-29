@@ -46,6 +46,7 @@ self.onmessage = (/** @type {MessageEvent} */ e) => {
         name,
         color,
         resolvedColor,
+        label,
         midi,
         time,
         event,
@@ -87,7 +88,7 @@ self.onmessage = (/** @type {MessageEvent} */ e) => {
 
         case 'ADD_TRACK':
             if (engine) {
-                engine.addTrack(name, color, resolvedColor);
+                engine.addTrack(name, color, resolvedColor, label);
             }
             break;
 

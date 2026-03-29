@@ -321,6 +321,15 @@ test.describe('Workspace surfaces @ui', () => {
         const canvas = panel.locator('canvas').first();
         await expect(canvas).toBeVisible();
 
+        const legend = panel.locator('[data-testid="visualizer-legend"]');
+        await expect(legend).toBeVisible();
+        await expect(legend).toContainText('Drums');
+        await expect(legend).toContainText('Bass');
+        await expect(legend).toContainText('Chords');
+        await expect(legend).toContainText('Harmony');
+        await expect(legend).toContainText('Soloist');
+        await expect(legend).toContainText('Chord detail');
+
         const visualsBox = await visuals.boundingBox();
         const panelBox = await panel.boundingBox();
         const canvasBox = await canvas.boundingBox();

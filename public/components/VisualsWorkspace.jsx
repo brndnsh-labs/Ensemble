@@ -1,5 +1,44 @@
 import { useEnsembleState } from '../ui-bridge.js';
+import {
+    VISUALIZER_CHORD_SWATCHES,
+    VISUALIZER_TRACK_ORDER,
+    VISUALIZER_TRACKS,
+} from '../visualizer-events.js';
 import { Visualizer } from './Visualizer.jsx';
+
+function VisualizerLegend() {
+    return (
+        <div class="viz-legend" data-testid="visualizer-legend" aria-label="Visualizer legend">
+            <div class="legend-group">
+                <span class="legend-label">Instruments</span>
+                {VISUALIZER_TRACK_ORDER.map((trackId) => {
+                    const track = VISUALIZER_TRACKS[trackId];
+                    return (
+                        <span class="legend-item" key={track.id}>
+                            <span class={`legend-swatch ${track.legendClass}`} aria-hidden="true" />
+                            <span>{track.label}</span>
+                        </span>
+                    );
+                })}
+            </div>
+
+            <div class="legend-group">
+                <span class="legend-label">Chord detail</span>
+                {VISUALIZER_CHORD_SWATCHES.map((swatch) => (
+                    <span class="legend-item" key={swatch.id}>
+                        <span class={`legend-swatch ${swatch.legendClass}`} aria-hidden="true" />
+                        <span>{swatch.label}</span>
+                    </span>
+                ))}
+            </div>
+
+            <p class="legend-note">
+                Studio colors identify instruments. Chord detail colors only apply inside chord
+                overlays.
+            </p>
+        </div>
+    );
+}
 
 /**
  * @param {{ getVisualTime: () => number }} props
@@ -28,6 +67,8 @@ export function VisualsWorkspace({ getVisualTime }) {
                     <div class="viz-graph-area workspace-visualizer-area">
                         <Visualizer enabled={enabled} getVisualTime={getVisualTime} />
                     </div>
+
+                    <VisualizerLegend />
                 </div>
             </div>
         </section>
