@@ -1,3 +1,4 @@
+import { MIXER_SETTINGS_VERSION } from './state/instruments.js';
 import { getState, storage } from './state.js';
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -29,6 +30,7 @@ export function saveCurrentState() {
         autoIntensity: playback.autoIntensity,
         practiceMode: playback.practiceMode,
         masterVolume: playback.masterVolume,
+        mixerVersion: MIXER_SETTINGS_VERSION,
         chords: {
             enabled: chords.enabled,
             style: chords.style,

@@ -26,7 +26,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     };
     const mockGroove = { ...actual.groove };
     const mockSoloist = { ...actual.soloist };
-    const mockHarmony = { enabled: false, buffer: new Map() };
+    const mockHarmony = { ...actual.harmony, enabled: false, buffer: new Map() };
     const mockChords = { ...actual.chords };
     const mockBass = { ...actual.bass };
 
@@ -75,7 +75,7 @@ vi.mock('../../../public/engine/fills.js', () => ({
 }));
 
 describe('Conductor Logic', () => {
-    let arranger, playback, groove, soloist, conductor;
+    let arranger, playback, groove, soloist, conductor, chords, bass, harmony;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -84,6 +84,9 @@ describe('Conductor Logic', () => {
         playback = state.playback;
         groove = state.groove;
         soloist = state.soloist;
+        chords = state.chords;
+        bass = state.bass;
+        harmony = state.harmony;
         conductor = state.conductor;
 
         playback.autoIntensity = true;
@@ -203,19 +206,39 @@ describe('Conductor Logic', () => {
             });
         });
 
-        it('should adjust master limiter and reverb when audio context is active', () => {
+        it('should adjust master limiter without mutating instrument reverb', () => {
             playback.audio = { currentTime: 1.0 };
             playback.masterLimiter = {
                 threshold: { setTargetAtTime: vi.fn() },
                 ratio: { setTargetAtTime: vi.fn() },
                 release: { setTargetAtTime: vi.fn() },
             };
+            playback.chordsReverb = { gain: { setTargetAtTime: vi.fn() } };
+            playback.bassReverb = { gain: { setTargetAtTime: vi.fn() } };
+            playback.soloistReverb = { gain: { setTargetAtTime: vi.fn() } };
+            playback.harmoniesReverb = { gain: { setTargetAtTime: vi.fn() } };
+            playback.drumsReverb = { gain: { setTargetAtTime: vi.fn() } };
+            chords.reverb = 0.31;
+            bass.reverb = 0.07;
+            soloist.reverb = 0.64;
+            harmony.reverb = 0.42;
+            groove.reverb = 0.18;
             playback.bandIntensity = 0.8;
 
             applyConductor(getState(), dispatch);
 
             expect(playback.masterLimiter.threshold.setTargetAtTime).toHaveBeenCalled();
             expect(playback.masterLimiter.ratio.setTargetAtTime).toHaveBeenCalled();
+            expect(playback.chordsReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(playback.bassReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(playback.soloistReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(playback.harmoniesReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(playback.drumsReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(chords.reverb).toBe(0.31);
+            expect(bass.reverb).toBe(0.07);
+            expect(soloist.reverb).toBe(0.64);
+            expect(harmony.reverb).toBe(0.42);
+            expect(groove.reverb).toBe(0.18);
         });
     });
 

@@ -86,7 +86,7 @@ This document tracks specific reference recordings used to calibrate the Ensembl
 - **Status:** Performance, Mixing, and Musicality Overhaul.
 - **Action:**
     - **Performance:** Implemented high-resolution "Logic Latency" monitoring. Round-trip worker communication is now tracked, with warnings triggered if processing exceeds 50ms.
-    - **Mixing:** Automated "Intensity-Aware Mixing". Reverb sends and master compression now dynamically adapt to `bandIntensity` (see new Rules section below).
+    - **Mixing:** Master compression still adapts to `bandIntensity`, but reverb sends now stay at fixed mixer values so the space stays predictable.
     - **Soloist:** Enhanced phrasing to prioritize "Guide Tones" (3rds and 7ths) on the downbeat of section changes to improve musical flow during transitions.
 
 ### [Date: 2026-03-27]
@@ -156,9 +156,9 @@ This document tracks specific reference recordings used to calibrate the Ensembl
 To maintain professional mix clarity, the engine now modulates the signal chain based on the `ctx.bandIntensity` signal (0.0 - 1.0).
 
 ### Reverb (Space)
-- **Low Intensity (0.0 - 0.3):** Ambient focus. Reverb sends increased to **0.4 - 0.6** to create an "airy" and expansive atmosphere.
-- **High Intensity (0.7 - 1.0):** Clarity focus. Reverb sends automatically "dry out" to **0.1 - 0.3** to prevent mix mud during climaxes and complex drum fills.
-- **Bias:** Drums are kept 30% dryer than the average; Soloist is kept 20% wetter.
+- Reverb sends are now fixed by the mixer and do not follow `bandIntensity`.
+- Current defaults: **Chords 0.30**, **Bass 0.05**, **Soloist 0.60**, **Harmony 0.40**, **Drums 0.20**.
+- Use the Studio mixer sliders to shape space manually; the conductor no longer auto-wets or auto-dries the band.
 
 ### Compression (Glue)
 - **Threshold:** Scales from **-0.5dB** (low intensity) down to **-2.0dB** (high intensity) to catch peaks.

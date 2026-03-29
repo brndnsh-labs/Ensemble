@@ -5,6 +5,16 @@ import { ACTIONS } from '../types.js';
 import { arranger } from './arranger.js';
 import { groove } from './groove.js';
 
+export const MIXER_SETTINGS_VERSION = 1;
+
+export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
+    chords: 0.3,
+    bass: 0.05,
+    soloist: 0.6,
+    harmony: 0.4,
+    groove: 0.2,
+});
+
 /**
  * @typedef {Object} ChordState
  * @property {boolean} enabled - Whether the accompanist is active.
@@ -24,7 +34,7 @@ export const chords = deepSignal({
     enabled: true,
     style: 'smart',
     volume: 0.5,
-    reverb: 0.3,
+    reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
     octave: 65,
     density: 'standard',
     lastActiveChordIndex: null,
@@ -52,7 +62,7 @@ export const chords = deepSignal({
 export const bass = deepSignal({
     enabled: true,
     volume: 0.45,
-    reverb: 0.05,
+    reverb: INSTRUMENT_REVERB_DEFAULTS.bass,
     lastFreq: null,
     lastPlayedFreq: null,
     buffer: new Map(),
@@ -124,7 +134,7 @@ export const soloist = deepSignal({
     enabled: false,
     preset: 'trumpet',
     volume: 0.5,
-    reverb: 0.6,
+    reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
     lastPlayedFreq: null,
     buffer: new Map(),
     lastNoteEnd: 0,
@@ -199,7 +209,7 @@ export const soloist = deepSignal({
 export const harmony = deepSignal({
     enabled: false,
     volume: 0.4,
-    reverb: 0.4,
+    reverb: INSTRUMENT_REVERB_DEFAULTS.harmony,
     buffer: new Map(),
     octave: 60,
     style: 'smart',
@@ -276,21 +286,21 @@ export function instrumentReducer(action, payload) {
         case ACTIONS.RESET_STATE:
             chords.enabled = true;
             chords.volume = 0.5;
-            chords.reverb = 0.3;
+            chords.reverb = INSTRUMENT_REVERB_DEFAULTS.chords;
             chords.instrument = 'Clean';
             chords.octave = 65;
             chords.density = 'standard';
 
             bass.enabled = true;
             bass.volume = 0.45;
-            bass.reverb = 0.05;
+            bass.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
             bass.octave = 38;
             bass.style = 'smart';
 
             soloist.enabled = false;
             soloist.preset = 'trumpet';
             soloist.volume = 0.5;
-            soloist.reverb = 0.6;
+            soloist.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
             soloist.octave = 72;
             soloist.style = 'smart';
             soloist.mode = 'monophonic';
@@ -321,7 +331,7 @@ export function instrumentReducer(action, payload) {
 
             harmony.enabled = false;
             harmony.volume = 0.4;
-            harmony.reverb = 0.4;
+            harmony.reverb = INSTRUMENT_REVERB_DEFAULTS.harmony;
             harmony.octave = 60;
             harmony.style = 'smart';
             harmony.complexity = 0.5;

@@ -24,6 +24,7 @@ vi.mock('../../../public/state.js', () => {
         dispatch: vi.fn(),
         storage: {
             get: vi.fn(),
+            save: vi.fn(),
         },
         subscribe: vi.fn(),
     };

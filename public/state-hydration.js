@@ -7,6 +7,8 @@ import {
 } from './data/instrument-styles.js';
 import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
 import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
+import { saveCurrentState } from './persistence.js';
+import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
 import { normalizeWorkspace } from './state/ui.js';
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
@@ -123,6 +125,7 @@ export function hydrateState() {
     const { playback, chords, bass, soloist, harmony, groove, arranger, vizState, ui } = getState();
     const savedState = storage.get('currentState');
     if (savedState?.sections) {
+        const shouldResetReverb = Number(savedState.mixerVersion) !== MIXER_SETTINGS_VERSION;
         const validatedSections = validateSections(savedState.sections);
 
         let validatedKey = 'C';
@@ -186,7 +189,9 @@ export function hydrateState() {
                 octave: clamp(savedState.chords.octave, 0, 127, 48),
                 density: savedState.chords.density,
                 volume: clamp(savedState.chords.volume, 0, 1, 0.5),
-                reverb: clamp(savedState.chords.reverb, 0, 1, 0.3),
+                reverb: shouldResetReverb
+                    ? INSTRUMENT_REVERB_DEFAULTS.chords
+                    : clamp(savedState.chords.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS.chords),
             });
         }
         if (savedState.bass) {
@@ -195,7 +200,9 @@ export function hydrateState() {
                 style: savedState.bass.style || 'smart',
                 octave: clamp(savedState.bass.octave, 0, 127, 36),
                 volume: clamp(savedState.bass.volume, 0, 1, 0.45),
-                reverb: clamp(savedState.bass.reverb, 0, 1, 0.05),
+                reverb: shouldResetReverb
+                    ? INSTRUMENT_REVERB_DEFAULTS.bass
+                    : clamp(savedState.bass.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS.bass),
             });
         }
         if (savedState.soloist) {
@@ -211,7 +218,9 @@ export function hydrateState() {
                         ? 72
                         : clamp(savedState.soloist.octave, 0, 127, 72),
                 volume: clamp(savedState.soloist.volume, 0, 1, 0.5),
-                reverb: clamp(savedState.soloist.reverb, 0, 1, 0.6),
+                reverb: shouldResetReverb
+                    ? INSTRUMENT_REVERB_DEFAULTS.soloist
+                    : clamp(savedState.soloist.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS.soloist),
                 mode: resolveSoloistMode(
                     savedState.soloist.mode
                         ? savedState.soloist.mode
@@ -230,7 +239,9 @@ export function hydrateState() {
                 style: savedState.harmony.style || 'smart',
                 octave: clamp(savedState.harmony.octave, 0, 127, 60),
                 volume: clamp(savedState.harmony.volume, 0, 1, 0.4),
-                reverb: clamp(savedState.harmony.reverb, 0, 1, 0.4),
+                reverb: shouldResetReverb
+                    ? INSTRUMENT_REVERB_DEFAULTS.harmony
+                    : clamp(savedState.harmony.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS.harmony),
                 complexity: clamp(savedState.harmony.complexity, 0, 1, 0.5),
             });
         }
@@ -238,7 +249,9 @@ export function hydrateState() {
             Object.assign(groove, {
                 enabled: savedState.groove.enabled !== undefined ? savedState.groove.enabled : true,
                 volume: clamp(savedState.groove.volume, 0, 1, 0.5),
-                reverb: clamp(savedState.groove.reverb, 0, 1, 0.2),
+                reverb: shouldResetReverb
+                    ? INSTRUMENT_REVERB_DEFAULTS.groove
+                    : clamp(savedState.groove.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS.groove),
                 swing: clamp(savedState.groove.swing, 0, 100, 0),
                 swingSub: savedState.groove.swingSub,
                 measures: clamp(savedState.groove.measures, 1, 8, 1),
@@ -310,6 +323,10 @@ export function hydrateState() {
 
         if (ui) {
             ui.activeWorkspace = normalizeWorkspace(savedState.ui?.activeWorkspace); // @direct-mutation
+        }
+
+        if (shouldResetReverb) {
+            saveCurrentState();
         }
     } else {
         dispatch(ACTIONS.RESET_STATE);
@@ -417,6 +434,8 @@ export function loadFromUrl() {
     if (bndParam) {
         const band = decompressBandSettings(bndParam);
         if (band) {
+            const hasMixerVersion =
+                Number(band.mv || band.mixerVersion || 0) === MIXER_SETTINGS_VERSION;
             if (band.s) {
                 Object.assign(soloist, {
                     enabled: !!band.s.e,
@@ -424,7 +443,9 @@ export function loadFromUrl() {
                     preset: normalizeSoloistPreset(band.s.p, soloist.preset),
                     octave: clamp(band.s.o, 0, 127, 72),
                     volume: clamp(band.s.v, 0, 1, 0.5),
-                    reverb: clamp(band.s.r, 0, 1, 0.6),
+                    reverb: hasMixerVersion
+                        ? clamp(band.s.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.soloist)
+                        : INSTRUMENT_REVERB_DEFAULTS.soloist,
                     mode: resolveSoloistMode(band.s.m || soloist.mode),
                     seed: typeof band.s.sd === 'string' ? band.s.sd : '',
                 });
@@ -435,7 +456,9 @@ export function loadFromUrl() {
                     style: BASS_STYLES.some((s) => s.id === band.b.s) ? band.b.s : bass.style,
                     octave: clamp(band.b.o, 0, 127, 36),
                     volume: clamp(band.b.v, 0, 1, 0.45),
-                    reverb: clamp(band.b.r, 0, 1, 0.05),
+                    reverb: hasMixerVersion
+                        ? clamp(band.b.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.bass)
+                        : INSTRUMENT_REVERB_DEFAULTS.bass,
                 });
             }
             if (band.c) {
@@ -444,7 +467,9 @@ export function loadFromUrl() {
                     style: CHORD_STYLES.some((s) => s.id === band.c.s) ? band.c.s : chords.style,
                     octave: clamp(band.c.o, 0, 127, 48),
                     volume: clamp(band.c.v, 0, 1, 0.5),
-                    reverb: clamp(band.c.r, 0, 1, 0.3),
+                    reverb: hasMixerVersion
+                        ? clamp(band.c.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.chords)
+                        : INSTRUMENT_REVERB_DEFAULTS.chords,
                     density: clamp(band.c.d, 0, 1, 0.5),
                 });
             }
@@ -454,7 +479,9 @@ export function loadFromUrl() {
                     style: HARMONY_STYLES.some((s) => s.id === band.h.s) ? band.h.s : harmony.style,
                     octave: clamp(band.h.o, 0, 127, 60),
                     volume: clamp(band.h.v, 0, 1, 0.4),
-                    reverb: clamp(band.h.r, 0, 1, 0.4),
+                    reverb: hasMixerVersion
+                        ? clamp(band.h.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.harmony)
+                        : INSTRUMENT_REVERB_DEFAULTS.harmony,
                     complexity: clamp(band.h.c, 0, 1, 0.5),
                 });
             }
@@ -462,7 +489,9 @@ export function loadFromUrl() {
                 Object.assign(groove, {
                     enabled: !!band.g.e,
                     volume: clamp(band.g.v, 0, 1, 0.5),
-                    reverb: clamp(band.g.r, 0, 1, 0.2),
+                    reverb: hasMixerVersion
+                        ? clamp(band.g.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.groove)
+                        : INSTRUMENT_REVERB_DEFAULTS.groove,
                     swing: clamp(band.g.sw, 0, 100, 0),
                     swingSub: [4, 8, 16].includes(band.g.ss) ? band.g.ss : 8,
                     humanize: clamp(band.g.hu, 0, 100, 20),
