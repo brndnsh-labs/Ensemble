@@ -105,3 +105,9 @@ These are broader UI/system tasks to catalog next.
 - Define sane defaults per track so the mixer starts from musical, predictable values.
 - Make sure any automatic behavior is clearly intentional and easy to understand.
 - Check whether the issue is rooted in state hydration, side effects, or a mixer-control feedback loop.
+
+## 5. Flaky tests
+
+- `tests/standards/soloist-jazz-critique.test.js` occasionally fails on the notes-per-bar threshold during full validation, but it passes when rerun in isolation.
+- `tests/unit/engine/soloist-pitch-deep.test.js` has also shown occasional variance in the repetition expectation during full validation, then passes on rerun.
+- Reproduce both with the full suite before changing the assertions so we can confirm whether the issue is test variance or a real regression.
