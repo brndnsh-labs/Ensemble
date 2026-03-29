@@ -133,6 +133,25 @@ describe('VisualizerEngine Rendering Deep Dive', () => {
         expect(mockCtx.fill).toHaveBeenCalled();
     });
 
+    it('should overlay chord tones inside the soloist lane', () => {
+        engine.addTrack(MODULES.SOLOIST, '#d33682', '#d33682');
+        mockCtx.rect.mockClear();
+        mockCtx.fill.mockClear();
+
+        engine.pushChord({
+            time: 10,
+            duration: 2,
+            rootMidi: 60,
+            notes: [60, 64, 67, 71],
+            intervals: [0, 4, 7, 11],
+        });
+
+        engine.render(11, 120);
+
+        expect(mockCtx.rect).toHaveBeenCalled();
+        expect(mockCtx.fill).toHaveBeenCalled();
+    });
+
     it('should render fill highlight', () => {
         engine.isFillActive = true;
         engine.render(10, 120);

@@ -379,12 +379,12 @@ export class VisualizerEngine {
     getTrackThickness(name) {
         const lane = this.getLane(name);
         if (!lane) {
-            return 6;
+            return 4;
         }
         if (name === 'drums') {
-            return max(8, min(14, lane.innerHeight * 0.18));
+            return max(5, min(9, lane.innerHeight * 0.14));
         }
-        return max(4, min(10, lane.innerHeight * 0.11));
+        return max(3, min(7, lane.innerHeight * 0.08));
     }
 
     /**
@@ -505,6 +505,59 @@ export class VisualizerEngine {
     }
 
     /**
+     * @param {string} laneName
+     * @param {any} event
+     * @returns {Array<{ midi: number, colorIdx: number }>}
+     */
+    getChordOverlayEntries(laneName, event) {
+        const { midiMin, midiMax } = this.getTrackMidiRange(laneName);
+        const rootPc = ((event.rootMidi % 12) + 12) % 12;
+        /** @type {number[]} */
+        const notes = Array.isArray(event.notes)
+            ? event.notes
+            : Array.isArray(event.chordNotes)
+              ? event.chordNotes
+              : [];
+
+        if (laneName === 'chords' && notes.length > 0) {
+            return notes
+                .filter((midi) => midi >= midiMin && midi <= midiMax)
+                .map((midi) => ({
+                    midi,
+                    colorIdx: INTERVAL_CATEGORY[((midi % 12) - rootPc + 12) % 12],
+                }));
+        }
+
+        /** @type {number[]} */
+        const intervalSource =
+            Array.isArray(event.intervals) && event.intervals.length > 0
+                ? event.intervals
+                : notes.map((midi) => ((midi % 12) - rootPc + 12) % 12);
+        const uniqueIntervals = [
+            ...new Set(intervalSource.map((interval) => ((interval % 12) + 12) % 12)),
+        ];
+        const overlayEntries = [];
+        const seenMidis = new Set();
+        const minOctave = Math.floor(midiMin / 12) - 1;
+        const maxOctave = Math.ceil(midiMax / 12) + 1;
+
+        for (const interval of uniqueIntervals) {
+            const pc = (rootPc + interval) % 12;
+            const colorIdx = INTERVAL_CATEGORY[interval];
+            for (let octave = minOctave; octave <= maxOctave; octave++) {
+                const midi = pc + octave * 12;
+                if (midi < midiMin || midi > midiMax || seenMidis.has(midi)) {
+                    continue;
+                }
+                seenMidis.add(midi);
+                overlayEntries.push({ midi, colorIdx });
+            }
+        }
+
+        return overlayEntries.sort((a, b) => a.midi - b.midi);
+    }
+
+    /**
      * @param {number} currentTime
      * @param {number} bpm
      * @param {any} tsConfig
@@ -594,58 +647,76 @@ export class VisualizerEngine {
      * @returns {void}
      */
     drawChordLaneBackdrop(currentTime, minTime) {
-        const lane = this.getLane('chords');
-        const track = this.tracks.chords;
-        if (!lane || !track) {
-            return;
-        }
-
         const ctx = this.ctx;
-        const trackColor = track.resolvedColor || track.color || '#268bd2';
-        const markerColor =
-            this.themeCache.chordMarkerColor || this.themeCache.separatorColor || trackColor;
-        const labelColor =
-            this.themeCache.trackLabelColor || this.themeCache.labelColor || trackColor;
+        const overlayConfigs = [
+            {
+                laneName: 'chords',
+                alpha: 0.16,
+                toneHeight: 4,
+                showMarkers: true,
+                showLabels: true,
+            },
+            {
+                laneName: MODULES.SOLOIST,
+                alpha: 0.08,
+                toneHeight: 3,
+                showMarkers: false,
+                showLabels: false,
+            },
+        ];
 
-        this.forEachVisibleChordEvent(currentTime, minTime, (event, chordEnd) => {
-            const notes = event.notes || event.chordNotes || [];
-            const start = max(minTime, event.time);
-            const end = min(currentTime, chordEnd);
-            const xStart = this.getX(start, currentTime);
-            const xEnd = this.getX(end, currentTime);
-            const left = min(xStart, xEnd);
-            const width = max(2, abs(xStart - xEnd));
-            const rootPc = event.rootMidi % 12;
+        for (const config of overlayConfigs) {
+            const lane = this.getLane(config.laneName);
+            const track = this.tracks[config.laneName];
+            if (!lane || !track) {
+                continue;
+            }
 
-            if (Array.isArray(notes) && notes.length > 0) {
-                ctx.globalAlpha = 0.18;
-                for (const midi of notes) {
-                    const y = this.getLaneY('chords', midi);
-                    const interval = ((midi % 12) - rootPc + 12) % 12;
-                    const colorIdx = INTERVAL_CATEGORY[interval];
-                    ctx.fillStyle = this.categoryColors[colorIdx] || trackColor;
-                    ctx.beginPath();
-                    ctx.rect(left, y - 3, width, 6);
-                    ctx.fill();
+            const trackColor = track.resolvedColor || track.color || '#268bd2';
+            const markerColor =
+                this.themeCache.chordMarkerColor || this.themeCache.separatorColor || trackColor;
+            const labelColor =
+                this.themeCache.trackLabelColor || this.themeCache.labelColor || trackColor;
+
+            this.forEachVisibleChordEvent(currentTime, minTime, (event, chordEnd) => {
+                const start = max(minTime, event.time);
+                const end = min(currentTime, chordEnd);
+                const xStart = this.getX(start, currentTime);
+                const xEnd = this.getX(end, currentTime);
+                const left = min(xStart, xEnd);
+                const width = max(2, abs(xStart - xEnd));
+                const overlayEntries = this.getChordOverlayEntries(config.laneName, event);
+
+                if (overlayEntries.length > 0) {
+                    ctx.globalAlpha = config.alpha;
+                    for (const entry of overlayEntries) {
+                        const y = this.getLaneY(config.laneName, entry.midi);
+                        ctx.fillStyle = this.categoryColors[entry.colorIdx] || trackColor;
+                        ctx.beginPath();
+                        ctx.rect(left, y - config.toneHeight / 2, width, config.toneHeight);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1.0;
                 }
-                ctx.globalAlpha = 1.0;
-            }
 
-            ctx.strokeStyle = markerColor;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(left, lane.top);
-            ctx.lineTo(left, lane.bottom);
-            ctx.stroke();
+                if (config.showMarkers) {
+                    ctx.strokeStyle = markerColor;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(left, lane.top);
+                    ctx.lineTo(left, lane.bottom);
+                    ctx.stroke();
+                }
 
-            if (event.label && width > 28) {
-                ctx.fillStyle = labelColor;
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
-                ctx.fillText(event.label, left + 4, lane.top + 6);
-            }
-        });
+                if (config.showLabels && event.label && width > 28) {
+                    ctx.fillStyle = labelColor;
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(event.label, left + 4, lane.top + 6);
+                }
+            });
+        }
     }
 
     /**
@@ -708,7 +779,7 @@ export class VisualizerEngine {
                 this.forEachVisibleTrackEvent(name, currentTime, minTime, (event, noteEnd) => {
                     const x = this.getX(event.time, currentTime);
                     const y = this.getLaneY(name, event.midi);
-                    const size = 3 + (event.velocity || 1.0) * 4;
+                    const size = 2 + (event.velocity || 1.0) * 2.5;
                     ctx.moveTo(x, y - size);
                     ctx.lineTo(x + size, y);
                     ctx.lineTo(x, y + size);
@@ -733,7 +804,7 @@ export class VisualizerEngine {
                     const eventColor = this.getEventColor(name, event);
 
                     ctx.fillStyle = outlineColor;
-                    ctx.fillRect(left, y - thickness / 2 - 1, width, thickness + 2);
+                    ctx.fillRect(left, y - thickness / 2 - 0.5, width, thickness + 1);
                     ctx.fillStyle = eventColor;
                     ctx.fillRect(left, y - thickness / 2, width, thickness);
 
@@ -750,7 +821,7 @@ export class VisualizerEngine {
             if (hasActive) {
                 ctx.fillStyle = activeColor;
                 ctx.beginPath();
-                ctx.arc(activeX, activeY, 6, 0, PI * 2);
+                ctx.arc(activeX, activeY, 5, 0, PI * 2);
                 ctx.fill();
                 ctx.strokeStyle = outlineColor;
                 ctx.lineWidth = 2;

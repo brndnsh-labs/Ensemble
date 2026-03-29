@@ -23,7 +23,7 @@ function VisualizerLegend() {
             </div>
 
             <div class="legend-group">
-                <span class="legend-label">Chord detail</span>
+                <span class="legend-label">Chord tones</span>
                 {VISUALIZER_CHORD_SWATCHES.map((swatch) => (
                     <span class="legend-item" key={swatch.id}>
                         <span class={`legend-swatch ${swatch.legendClass}`} aria-hidden="true" />
@@ -31,11 +31,6 @@ function VisualizerLegend() {
                     </span>
                 ))}
             </div>
-
-            <p class="legend-note">
-                Studio colors identify instruments. Chord detail colors only apply inside chord
-                overlays.
-            </p>
         </div>
     );
 }
