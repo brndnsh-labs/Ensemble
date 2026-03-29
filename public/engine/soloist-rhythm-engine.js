@@ -30,6 +30,7 @@ export function generateRhythmPlan(
     const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
     const isMonophonicMode = isSoloistMonophonicMode(soloistState.mode);
+    const minPhraseNotes = Math.max(0, _config.minNotesPerPhrase || 0);
 
     let notesInPhrase = 0;
 
@@ -379,6 +380,68 @@ export function generateRhythmPlan(
             isSustained: false,
             vibrato: false,
         });
+    }
+
+    if (style === 'blues' && plan.length < minPhraseNotes && activeSteps > 0) {
+        const occupiedSteps = new Set(plan.map((node) => node.stepTarget));
+        const candidateSteps = [];
+        const minimumSpacing = Math.max(2, Math.floor(stepsPerBeat / 2));
+
+        for (let step = startStep; step < startStep + activeSteps; step++) {
+            if (occupiedSteps.has(step)) {
+                continue;
+            }
+
+            const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+            const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
+            const isBeatStart = stepInBeat === 0;
+            const isOffbeatEighth = stepInBeat === stepsPerBeat / 2;
+
+            if (!isBeatStart && !isOffbeatEighth) {
+                continue;
+            }
+
+            const tooCloseToExistingAttack = plan.some(
+                (node) => Math.abs(node.stepTarget - step) < minimumSpacing,
+            );
+            if (tooCloseToExistingAttack) {
+                continue;
+            }
+
+            const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
+            const isDownbeat = measureStep === 0;
+            const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+            const isStrongBeat = isBeatStart || isDownbeat || isBackbeat;
+
+            candidateSteps.push({
+                stepTarget: step,
+                velocity: Math.min(1.1, (0.58 + intensity * 0.34) * (isStrongBeat ? 1.08 : 0.94)),
+                isStrongBeat,
+                durationSteps: isStrongBeat ? Math.max(2, Math.floor(stepsPerBeat * 0.75)) : 1,
+                isSustained: false,
+                vibrato: false,
+                priority: isStrongBeat ? 0 : 1,
+            });
+        }
+
+        candidateSteps.sort((a, b) => a.priority - b.priority || a.stepTarget - b.stepTarget);
+
+        for (const candidate of candidateSteps) {
+            if (plan.length >= minPhraseNotes) {
+                break;
+            }
+
+            const clashesWithInsertedAttack = plan.some(
+                (node) => Math.abs(node.stepTarget - candidate.stepTarget) < minimumSpacing,
+            );
+            if (clashesWithInsertedAttack) {
+                continue;
+            }
+
+            plan.push(candidate);
+        }
+
+        plan.sort((a, b) => a.stepTarget - b.stepTarget);
     }
 
     // Default flags for mirroring or other paths

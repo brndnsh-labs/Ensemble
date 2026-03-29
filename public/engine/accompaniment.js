@@ -830,6 +830,11 @@ function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = nu
     // Replace static lookup with procedural generation
     // IMPLEMENT NO-REPEAT RULE: Keep trying until we get a different pattern (up to 3 times)
     let newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
+    if (genre === 'Jazz' && compingState.lastVoicingMidis.length === 0 && step % spm === 0) {
+        // Give the first jazz bar a voiced downbeat so the harmony has a real
+        // reference point for the continuity cache instead of starting empty.
+        newCell[0] = 1;
+    }
     if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
         newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
         if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
