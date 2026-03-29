@@ -193,11 +193,14 @@ const STYLE_OVERRIDES = {
         deviceProb: 0.4,
         allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
         sustainProb: 0.4,
-        maxSustainSteps: 12,
+        // Cap sustains below the old extreme so single cries do not starve density,
+        // but still let blues phrases ring longer than funk stabs.
+        maxSustainSteps: 10,
         vibratoIntensity: 1.2,
         commonToneWeight: 500,
         stationaryProb: 0.1,
-        rhythmicDensity: 0.6,
+        // Nudged up from 0.60 to provide a small density margin without cramping phrasing.
+        rhythmicDensity: 0.65,
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.9,
         chromaticism: 0.6,

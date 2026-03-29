@@ -101,7 +101,7 @@ export function applyGrooveOverrides(
     },
 ) {
     const { soloist, arranger } = state;
-    const arrangerState = arranger || { timeSignature: '4/4' };
+    const arrangerState = { timeSignature: '4/4', ...(arranger || {}) };
     const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
     const loopStep = step % stepsPerBar;
 
