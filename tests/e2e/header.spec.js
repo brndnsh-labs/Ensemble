@@ -19,6 +19,28 @@ test.describe('Header Visual Integrity', () => {
         await expect(title).toBeVisible();
         await expect(title).toHaveText('Ensemble');
 
+        const playBtn = page.locator('#playBtn');
+        const playBtnText = page.locator('#playBtnText');
+
+        await expect(playBtn).toBeVisible();
+        const startBox = await playBtn.boundingBox();
+        if (!startBox) {
+            throw new Error('Expected play button to have a bounding box before playback starts');
+        }
+        await playBtn.click();
+        await expect(playBtnText).toHaveText(/STOP \(\d:\d{2}\)/);
+
+        const [titleBox, playBtnBox] = await Promise.all([
+            title.boundingBox(),
+            playBtn.boundingBox(),
+        ]);
+        if (!titleBox || !playBtnBox) {
+            throw new Error('Expected mobile header controls to be measurable');
+        }
+        expect(playBtnBox.width).toBeCloseTo(startBox.width, 1);
+        expect(playBtnBox.height).toBeCloseTo(startBox.height, 1);
+        expect(titleBox.x + titleBox.width).toBeLessThan(playBtnBox.x);
+
         // 2. Verify Settings button is visible
         const settingsBtn = page.locator('#settingsBtn');
         await expect(settingsBtn).toBeVisible();

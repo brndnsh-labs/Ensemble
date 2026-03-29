@@ -113,14 +113,24 @@ header {
         justify-content: space-between;
     }
 
+    .app-title-group {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+    }
+
     h1 {
         font-size: 0.75rem;
         letter-spacing: -0.07em;
         flex-shrink: 1;
         min-width: 0;
         z-index: 1;
-        /* Removed max-width to let flexbox handle space; added padding to prevent character clipping */
+        /* Keep the title clipped inside the mobile header so transport growth cannot overlap it. */
         padding-right: 4px;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .main-controls {

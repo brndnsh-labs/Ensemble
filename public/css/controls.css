@@ -138,7 +138,9 @@
 
 @media (max-width: 600px) {
     #playBtn {
-        min-width: 64px;
+        width: 7rem;
+        padding: 0.35rem 0.25rem;
+        white-space: nowrap;
     }
 }
 
