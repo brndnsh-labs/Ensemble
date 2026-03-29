@@ -1,12 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { transposeKey } from '../arranger-controller.js';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { useEnsembleState } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
-import { KeySignatureControls } from './KeySignatureControls.jsx';
+import {
+    KeySignatureMenuControl,
+    MaximizeChordButton,
+    TimeSignatureControl,
+} from './KeySignatureControls.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
-import { SoloistSeedControl } from './SoloistControls.jsx';
+import { SoloistSeedMenuControl } from './SoloistControls.jsx';
 
 const LIBRARY_CLOSE_ANIMATION_MS = 180;
 
@@ -117,116 +119,18 @@ function LibraryModal({ isOpen, onClose }) {
 
 export function ArrangerWorkspace() {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
-    const [actionMenuStyle, setActionMenuStyle] = useState(
-        /** @type {import('preact').JSX.CSSProperties | undefined} */ (undefined),
-    );
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const menuRef = useRef(null);
-    /** @type {import('preact/hooks').MutableRef<HTMLButtonElement|null>} */
-    const triggerRef = useRef(null);
-    const isTouchLike =
-        typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-    const { isMaximized } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            isMaximized: s.vizState.isMaximized,
-        }),
-    );
 
-    useEffect(() => {
-        if (!isActionMenuOpen) {
-            return;
-        }
+    const openLibrary = () => {
+        setIsLibraryOpen(true);
+    };
 
-        const handlePointerDown = (/** @type {PointerEvent} */ event) => {
-            const target = event.target instanceof Node ? event.target : null;
+    const openEditor = () => {
+        openModal('editor');
+    };
 
-            if (!target) {
-                return;
-            }
-
-            if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
-                return;
-            }
-
-            setIsActionMenuOpen(false);
-        };
-
-        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
-            if (event.key !== 'Escape') {
-                return;
-            }
-
-            setIsActionMenuOpen(false);
-            triggerRef.current?.focus();
-        };
-
-        window.addEventListener('pointerdown', handlePointerDown, true);
-        window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('pointerdown', handlePointerDown, true);
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [isActionMenuOpen]);
-
-    useLayoutEffect(() => {
-        if (!isActionMenuOpen || isTouchLike || typeof window === 'undefined') {
-            setActionMenuStyle(undefined);
-            return;
-        }
-
-        const updateMenuPosition = () => {
-            const trigger = triggerRef.current;
-            const menu = menuRef.current;
-            if (!trigger || !menu) {
-                return;
-            }
-
-            const triggerRect = trigger.getBoundingClientRect();
-            const menuWidth = Math.min(
-                Math.max(menu.offsetWidth || 216, 216),
-                window.innerWidth - 24,
-            );
-            const menuHeight = menu.offsetHeight || 0;
-            const gap = 8;
-            const viewportPadding = 12;
-            const spaceBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding;
-            const spaceAbove = triggerRect.top - gap - viewportPadding;
-            const shouldOpenUpward = menuHeight > spaceBelow && spaceAbove > spaceBelow;
-            const maxHeight = Math.max(
-                180,
-                shouldOpenUpward ? spaceAbove : Math.max(spaceBelow, 180),
-            );
-            const left = Math.min(
-                Math.max(viewportPadding, triggerRect.right - menuWidth),
-                window.innerWidth - menuWidth - viewportPadding,
-            );
-            const top = shouldOpenUpward
-                ? Math.max(viewportPadding, triggerRect.top - Math.min(menuHeight, maxHeight) - gap)
-                : Math.min(
-                      triggerRect.bottom + gap,
-                      window.innerHeight - maxHeight - viewportPadding,
-                  );
-
-            setActionMenuStyle({
-                position: 'fixed',
-                top: `${top}px`,
-                left: `${left}px`,
-                right: 'auto',
-                bottom: 'auto',
-                width: `${menuWidth}px`,
-                maxHeight: `${maxHeight}px`,
-            });
-        };
-
-        updateMenuPosition();
-        window.addEventListener('resize', updateMenuPosition);
-        window.addEventListener('scroll', updateMenuPosition, true);
-        return () => {
-            window.removeEventListener('resize', updateMenuPosition);
-            window.removeEventListener('scroll', updateMenuPosition, true);
-        };
-    }, [isActionMenuOpen, isTouchLike]);
+    const openShare = () => {
+        openModal('share');
+    };
 
     return (
         <section class="workspace-view workspace-view--arranger" data-workspace="arranger">
@@ -246,132 +150,44 @@ export function ArrangerWorkspace() {
                                 aria-label="Arranger controls"
                             >
                                 <div class="workspace-arranger-controls-main">
-                                    <KeySignatureControls
-                                        showMaximize={false}
-                                        showTranspose={true}
-                                    />
-                                </div>
-                                <div class="workspace-arranger-controls-side">
-                                    <div
-                                        class="workspace-arranger-controls-actions"
-                                        aria-label="Arranger actions"
-                                    >
-                                        <button
-                                            id="maximizeChordBtn"
-                                            title={isMaximized ? 'Exit Maximize' : 'Maximize'}
-                                            class={`header-btn arranger-maximize-btn ${
-                                                isMaximized ? 'active' : ''
-                                            }`}
-                                            aria-label={
-                                                isMaximized ? 'Exit Maximize' : 'Maximize Chords'
-                                            }
-                                            onClick={() =>
-                                                dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS)
-                                            }
-                                        >
-                                            {isMaximized ? '✕' : '⛶'}
-                                        </button>
-                                        <div
-                                            class={`workspace-fab-menu${
-                                                isActionMenuOpen ? ' is-open' : ''
-                                            }`}
-                                            onBlurCapture={(event) => {
-                                                const relatedTarget =
-                                                    event.relatedTarget instanceof Node
-                                                        ? event.relatedTarget
-                                                        : null;
-                                                if (!event.currentTarget.contains(relatedTarget)) {
-                                                    setIsActionMenuOpen(false);
-                                                }
-                                            }}
-                                        >
-                                            <button
-                                                ref={triggerRef}
-                                                type="button"
-                                                class="header-btn workspace-actions-trigger"
-                                                aria-label="Open arranger actions"
-                                                aria-haspopup="dialog"
-                                                aria-expanded={isActionMenuOpen}
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    setIsActionMenuOpen((value) => !value);
-                                                }}
-                                            >
-                                                ⋮
-                                            </button>
-                                            <div
-                                                ref={menuRef}
-                                                class={`workspace-fab-items${
-                                                    !isTouchLike
-                                                        ? ' workspace-fab-items--fixed'
-                                                        : ''
-                                                }`}
-                                                role="dialog"
-                                                aria-label="Arranger actions"
-                                                style={actionMenuStyle}
-                                                onClick={(event) => event.stopPropagation()}
-                                            >
-                                                <button
-                                                    id="editArrangementBtn"
-                                                    class="workspace-fab-item"
-                                                    onClick={() => {
-                                                        openModal('editor');
-                                                        setIsActionMenuOpen(false);
-                                                    }}
-                                                >
-                                                    ✏️ Edit
-                                                </button>
-                                                <button
-                                                    id="shareHubBtn"
-                                                    class="workspace-fab-item"
-                                                    onClick={() => {
-                                                        openModal('share');
-                                                        setIsActionMenuOpen(false);
-                                                    }}
-                                                >
-                                                    📤 Share
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    class="workspace-fab-item workspace-library-fab"
-                                                    aria-label="Open progression library"
-                                                    onClick={() => {
-                                                        setIsLibraryOpen(true);
-                                                        setIsActionMenuOpen(false);
-                                                    }}
-                                                >
-                                                    📚 Library
-                                                </button>
-                                                <div class="menu-divider" aria-hidden="true" />
-                                                <button
-                                                    type="button"
-                                                    class="workspace-fab-item workspace-transpose-fab"
-                                                    aria-label="Transpose down"
-                                                    onClick={() => {
-                                                        transposeKey(-1);
-                                                        setIsActionMenuOpen(false);
-                                                    }}
-                                                >
-                                                    ♭ Transpose down
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    class="workspace-fab-item workspace-transpose-fab"
-                                                    aria-label="Transpose up"
-                                                    onClick={() => {
-                                                        transposeKey(1);
-                                                        setIsActionMenuOpen(false);
-                                                    }}
-                                                >
-                                                    ♯ Transpose up
-                                                </button>
-                                                <div class="menu-divider" aria-hidden="true" />
-                                                <div class="workspace-fab-item workspace-fab-item--seed">
-                                                    <SoloistSeedControl />
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div class="workspace-arranger-toolbar-cluster key-controls">
+                                        <TimeSignatureControl />
+                                        <KeySignatureMenuControl />
                                     </div>
+                                </div>
+                                <div
+                                    class="workspace-arranger-controls-actions"
+                                    aria-label="Arranger actions"
+                                >
+                                    <button
+                                        id="arrangerLibraryInlineBtn"
+                                        type="button"
+                                        title="Open progression library"
+                                        class="header-btn workspace-arranger-action-btn workspace-arranger-action-btn--primary"
+                                        onClick={openLibrary}
+                                    >
+                                        Library
+                                    </button>
+                                    <button
+                                        id="editArrangementBtn"
+                                        type="button"
+                                        title="Edit arrangement"
+                                        class="header-btn workspace-arranger-action-btn workspace-arranger-action-btn--edit"
+                                        onClick={openEditor}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        id="shareHubBtn"
+                                        type="button"
+                                        title="Share and export"
+                                        class="header-btn workspace-arranger-action-btn"
+                                        onClick={openShare}
+                                    >
+                                        Share
+                                    </button>
+                                    <SoloistSeedMenuControl buttonClassName="workspace-arranger-toolbar-trigger workspace-arranger-toolbar-trigger--seed" />
+                                    <MaximizeChordButton className="workspace-arranger-action-btn workspace-arranger-action-btn--icon arranger-maximize-btn" />
                                 </div>
                             </div>
                         </div>

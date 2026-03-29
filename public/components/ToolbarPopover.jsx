@@ -1,0 +1,205 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+
+/**
+ * @typedef {Object} ToolbarPopoverRenderContext
+ * @property {() => void} closePopover
+ * @property {boolean} isOpen
+ */
+
+/**
+ * @typedef {Object} ToolbarPopoverProps
+ * @property {string} [buttonId]
+ * @property {string} panelId
+ * @property {string} triggerAriaLabel
+ * @property {string} panelLabel
+ * @property {string} [triggerClassName]
+ * @property {string} [panelClassName]
+ * @property {'start' | 'end'} [align]
+ * @property {import('preact').ComponentChildren} triggerContent
+ * @property {import('preact').ComponentChildren | ((context: ToolbarPopoverRenderContext) => import('preact').ComponentChildren)} children
+ */
+
+/** @param {ToolbarPopoverProps} props */
+export function ToolbarPopover({
+    buttonId,
+    panelId,
+    triggerAriaLabel,
+    panelLabel,
+    triggerClassName = '',
+    panelClassName = '',
+    align = 'end',
+    triggerContent,
+    children,
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [panelStyle, setPanelStyle] = useState(
+        /** @type {import('preact').JSX.CSSProperties | undefined} */ (undefined),
+    );
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
+    const rootRef = useRef(null);
+    /** @type {import('preact/hooks').MutableRef<HTMLButtonElement|null>} */
+    const triggerRef = useRef(null);
+    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
+    const panelRef = useRef(null);
+
+    const closePopover = () => {
+        setIsOpen(false);
+    };
+
+    useEffect(() => {
+        if (panelRef.current && 'inert' in panelRef.current) {
+            panelRef.current.inert = !isOpen;
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        const handlePointerDown = (/** @type {PointerEvent} */ event) => {
+            const target = event.target instanceof Node ? event.target : null;
+            if (!target || rootRef.current?.contains(target)) {
+                return;
+            }
+
+            closePopover();
+        };
+
+        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
+            if (event.key !== 'Escape') {
+                return;
+            }
+
+            closePopover();
+            triggerRef.current?.focus();
+        };
+
+        window.addEventListener('pointerdown', handlePointerDown, true);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('pointerdown', handlePointerDown, true);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen]);
+
+    useLayoutEffect(() => {
+        if (!isOpen || typeof window === 'undefined') {
+            setPanelStyle(undefined);
+            return;
+        }
+
+        const updatePanelPosition = () => {
+            const trigger = triggerRef.current;
+            const panel = panelRef.current;
+            if (!trigger || !panel) {
+                return;
+            }
+
+            const triggerRect = trigger.getBoundingClientRect();
+            const panelWidth = Math.min(
+                Math.max(panel.offsetWidth || 232, 232),
+                window.innerWidth - 24,
+            );
+            const panelHeight = panel.offsetHeight || 0;
+            const gap = 8;
+            const viewportPadding = 12;
+            const spaceBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding;
+            const spaceAbove = triggerRect.top - gap - viewportPadding;
+            const shouldOpenUpward = panelHeight > spaceBelow && spaceAbove > spaceBelow;
+            const maxHeight = Math.max(
+                180,
+                shouldOpenUpward ? spaceAbove : Math.max(spaceBelow, 180),
+            );
+            const left =
+                align === 'start'
+                    ? Math.min(
+                          Math.max(viewportPadding, triggerRect.left),
+                          window.innerWidth - panelWidth - viewportPadding,
+                      )
+                    : Math.min(
+                          Math.max(viewportPadding, triggerRect.right - panelWidth),
+                          window.innerWidth - panelWidth - viewportPadding,
+                      );
+            const top = shouldOpenUpward
+                ? Math.max(
+                      viewportPadding,
+                      triggerRect.top - Math.min(panelHeight, maxHeight) - gap,
+                  )
+                : Math.min(
+                      triggerRect.bottom + gap,
+                      window.innerHeight - maxHeight - viewportPadding,
+                  );
+
+            setPanelStyle({
+                position: 'fixed',
+                top: `${top}px`,
+                left: `${left}px`,
+                right: 'auto',
+                bottom: 'auto',
+                width: `${panelWidth}px`,
+                maxHeight: `${maxHeight}px`,
+            });
+        };
+
+        updatePanelPosition();
+        window.addEventListener('resize', updatePanelPosition);
+        window.addEventListener('scroll', updatePanelPosition, true);
+        return () => {
+            window.removeEventListener('resize', updatePanelPosition);
+            window.removeEventListener('scroll', updatePanelPosition, true);
+        };
+    }, [align, isOpen]);
+
+    return (
+        <div
+            ref={rootRef}
+            class={`workspace-toolbar-popover${isOpen ? ' is-open' : ''}`}
+            onBlurCapture={(event) => {
+                const relatedTarget =
+                    event.relatedTarget instanceof Node ? event.relatedTarget : null;
+                if (!event.currentTarget.contains(relatedTarget)) {
+                    closePopover();
+                }
+            }}
+        >
+            <button
+                ref={triggerRef}
+                id={buttonId}
+                type="button"
+                class={[
+                    'workspace-actions-trigger',
+                    'workspace-toolbar-trigger',
+                    triggerClassName,
+                    isOpen ? 'is-open' : '',
+                ]
+                    .filter(Boolean)
+                    .join(' ')}
+                aria-label={triggerAriaLabel}
+                aria-haspopup="dialog"
+                aria-expanded={isOpen}
+                aria-controls={panelId}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setIsOpen((value) => !value);
+                }}
+            >
+                {triggerContent}
+            </button>
+            <div
+                ref={panelRef}
+                id={panelId}
+                class={['workspace-toolbar-panel', 'workspace-toolbar-panel--fixed', panelClassName]
+                    .filter(Boolean)
+                    .join(' ')}
+                role="dialog"
+                aria-label={panelLabel}
+                aria-hidden={!isOpen}
+                style={panelStyle}
+                onClick={(event) => event.stopPropagation()}
+            >
+                {typeof children === 'function' ? children({ closePopover, isOpen }) : children}
+            </div>
+        </div>
+    );
+}

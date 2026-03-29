@@ -2,12 +2,30 @@ import pkg from '@playwright/test';
 
 const { expect, test } = pkg;
 
+async function openLibraryFromArranger(page) {
+    const libraryButton = page.locator('#arrangerLibraryInlineBtn');
+    if (await libraryButton.isVisible()) {
+        await libraryButton.click();
+        return;
+    }
+
+    throw new Error('Expected the arranger library button to be visible');
+}
+
+async function openEditorFromArranger(page) {
+    const editButton = page.locator('#editArrangementBtn');
+    if (await editButton.isVisible()) {
+        await editButton.click();
+        return;
+    }
+
+    throw new Error('Expected the arranger edit button to be visible');
+}
+
 async function openEditorFromLibraryPreset(page) {
-    await page.click('button[aria-label="Open arranger actions"]');
-    await page.locator('.workspace-library-fab').dispatchEvent('click');
+    await openLibraryFromArranger(page);
     await page.getByRole('button', { name: 'All The Things You Are' }).click();
-    await page.click('button[aria-label="Open arranger actions"]');
-    await page.locator('#editArrangementBtn').dispatchEvent('click');
+    await openEditorFromArranger(page);
     await page.waitForSelector('#editorOverlay', { state: 'visible' });
     return page.locator('#editorOverlay .settings-content');
 }
@@ -118,8 +136,7 @@ test.describe('Modals Responsiveness @ui', () => {
 
     test('Share & Export Modal - Content and Consolidation', async ({ page }) => {
         // Open share modal from the dashboard
-        await page.click('button[aria-label="Open arranger actions"]');
-        await page.locator('#shareHubBtn').dispatchEvent('click');
+        await page.locator('#shareHubBtn').click();
 
         await page.waitForSelector('#shareOverlay', { state: 'visible' });
         const shareModal = page.locator('#shareOverlay .modal-content');
@@ -137,8 +154,7 @@ test.describe('Modals Responsiveness @ui', () => {
 
     test('Inspiration Hub Modal - Layout and Actions', async ({ page }) => {
         // Open editor first
-        await page.click('button[aria-label="Open arranger actions"]');
-        await page.locator('#editArrangementBtn').dispatchEvent('click');
+        await openEditorFromArranger(page);
         await page.waitForSelector('#editorOverlay', { state: 'visible' });
 
         // Open randomize menu
