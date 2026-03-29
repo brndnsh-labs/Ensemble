@@ -19,4 +19,5 @@ These are the open UI/system tasks left after the hi-hat, visualizer, and flaky-
 
 - `npm run validate` can still fail in the Vitest phase because of unrelated soloist benchmarks.
 - Recent reruns bounced between `tests/unit/engine/soloist-modes.test.js`, `tests/integration/soloist-seeder-hook-shape.test.js`, and `tests/standards/blues-soloist-authenticity.test.js`.
-- The failures were threshold-based and changed from run to run, so treat them as baseline instability rather than a reverb regression.
+- Those same three files passed when run individually and together, so the failure pattern looks suite-level and intermittent rather than a deterministic reverb regression.
+- The failures were threshold-based and changed from run to run, so treat them as baseline instability rather than a mixer bug.
