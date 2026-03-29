@@ -209,6 +209,37 @@ describe('Soloist Mode Differentiation Logic', () => {
         expect(note[0].midi).toBeLessThan(72);
     });
 
+    it('keeps guitar support notes shorter than the lead on anchor-style head voicings', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 0;
+        state.soloist.sessionSeed = {
+            loopLengthSteps: 16,
+            notes: [
+                {
+                    step: 0,
+                    midi: 72,
+                    isAnchor: true,
+                    durationSteps: 8,
+                    velocity: 0.9,
+                    supportHints: {
+                        role: 'anchor',
+                        sustainBias: 1.0,
+                        guitar: {
+                            allowDoubleStop: true,
+                            intervalPalette: 'open',
+                            preferBelow: true,
+                        },
+                    },
+                },
+            ],
+        };
+
+        const note = getSoloistNote(getState(), currentChord, null, 0, 261.63, 60, 'neo', 0);
+        expect(Array.isArray(note)).toBe(true);
+        expect(note[0].durationSteps).toBeLessThan(note[note.length - 1].durationSteps);
+        expect(note[0].durationSteps).toBeGreaterThanOrEqual(6);
+    });
+
     it('should generate 3-note block chords in piano mode', () => {
         state.soloist.mode = 'piano';
         state.playback.currentLoopCount = 3;

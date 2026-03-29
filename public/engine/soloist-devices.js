@@ -426,10 +426,16 @@ function getGuitarIntervalPalette(options) {
     const palette = supportHint?.intervalPalette;
 
     if (palette === 'blues' || activeStyle === 'blues') {
-        return [3, 4, 5, 6, 7];
+        return [3, 4, 5, 7, 6];
     }
     if (palette === 'open' || activeStyle === 'country') {
         return [7, 5, 9, 4, 3];
+    }
+    if (activeStyle === 'neo') {
+        return [5, 7, 4, 3, 9];
+    }
+    if (activeStyle === 'rock') {
+        return [4, 5, 3, 7, 8];
     }
     return [3, 4, 5, 7, 8, 9];
 }
@@ -446,6 +452,7 @@ function selectGuitarSupportMidi(options) {
     const chordMask = getChordMask(currentChord);
     const intervalPalette = getGuitarIntervalPalette({ activeStyle, supportHint });
     const supportFloor = Math.max(52, selectedMidi - 12);
+    const supportRole = supportHint?.role || 'line';
 
     let bestMidi = Number.NaN;
     let bestScore = Number.NEGATIVE_INFINITY;
@@ -476,13 +483,43 @@ function selectGuitarSupportMidi(options) {
         if (activeStyle === 'neo' && (dsInt === 5 || dsInt === 7)) {
             score += 1.5;
         }
-        if (supportHint?.role === 'cadence' && isChordTone) {
+        if (supportRole === 'cadence' && isChordTone) {
             score += 2;
         }
         if ((supportHint?.sustainBias || 0) >= 0.85 && (dsInt === 5 || dsInt === 7)) {
             score += 1.4;
         }
+        if (supportRole === 'anchor' || supportRole === 'cadence') {
+            if (dsInt === 4 || dsInt === 5) {
+                score += 1.5;
+            }
+            if (dsInt >= 8) {
+                score -= 0.75;
+            }
+        }
+        if (supportRole === 'accent') {
+            if (dsInt === 3 || dsInt === 4) {
+                score += 0.8;
+            }
+            if (dsInt === 7) {
+                score += 0.5;
+            }
+        }
+        if (supportRole === 'line') {
+            if (dsInt >= 7) {
+                score -= 1.5;
+            }
+            if (dsInt === 3 || dsInt === 4 || dsInt === 5) {
+                score += 0.8;
+            }
+        }
         if (candidateMidi < 57) {
+            score -= 1;
+        }
+        if (candidateMidi < 60 && supportRole === 'line') {
+            score -= 1.25;
+        }
+        if (selectedMidi - candidateMidi > 9 && supportRole !== 'cadence') {
             score -= 1;
         }
 
@@ -508,6 +545,8 @@ export function generateExtraNotes(ctx) {
     const extraNotes = [];
     const soloistMode = resolveSoloistMode(soloist.mode);
     const supportHint = seedNote?.supportHints?.guitar;
+    const supportRole = seedNote?.supportHints?.role || 'line';
+    const sustainBias = seedNote?.supportHints?.sustainBias || 0;
 
     if (isSoloistPianoMode(soloistMode)) {
         const currentRoot = currentChord.rootMidi;
@@ -566,15 +605,26 @@ export function generateExtraNotes(ctx) {
             supportHint: supportHint
                 ? {
                       ...supportHint,
-                      role: seedNote?.supportHints?.role,
-                      sustainBias: seedNote?.supportHints?.sustainBias,
+                      role: supportRole,
+                      sustainBias,
                   }
                 : null,
         });
+        let supportDurationScale = 0.72;
+        if (supportRole === 'pickup' || supportRole === 'line') {
+            supportDurationScale = 0.48;
+        } else if (supportRole === 'accent') {
+            supportDurationScale = 0.62;
+        } else if (supportRole === 'anchor' || supportRole === 'cadence') {
+            supportDurationScale = 0.8 + sustainBias * 0.15;
+        } else if (supportRole === 'sustain') {
+            supportDurationScale = 0.7 + sustainBias * 0.18;
+        }
         extraNotes.push({
             midi: foundMidi,
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
             isDoubleStop: true,
+            durationScale: Math.min(0.95, supportDurationScale),
         });
     } else {
         const dsInt = [5, 7, 9, 12][Math.floor(Math.random() * 4)];

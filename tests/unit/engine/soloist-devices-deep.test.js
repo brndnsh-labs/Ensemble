@@ -213,6 +213,47 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             expect(extra.length).toBe(1);
         });
 
+        it('prefers open-string-friendly support for neo guitar sustain hints', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'neo';
+            ctx.selectedMidi = 72;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'sustain',
+                    sustainBias: 0.95,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'open',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect([63, 65, 67, 68, 69]).toContain(extra[0].midi);
+            expect(extra[0].durationScale).toBeGreaterThanOrEqual(0.8);
+        });
+
+        it('keeps moving guitar support shorter than the lead note', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'rock';
+            ctx.selectedMidi = 69;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'line',
+                    sustainBias: 0.25,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'tight',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect(extra[0].durationScale).toBeLessThan(0.6);
+        });
+
         it('should handle guitar mode fallback', () => {
             ctx.soloist.mode = 'guitar';
             ctx.currentChord.intervals = [1]; // Force fallback

@@ -719,6 +719,8 @@ export function selectPitchAndDevices(
             config.doubleStopProb *
             (soloistState.doubleStopProb ?? 1.0) *
             (0.35 + intensity * 0.45);
+        const supportRole = seedNote?.supportHints?.role || 'line';
+        const sustainBias = seedNote?.supportHints?.sustainBias || 0;
 
         if (durationSteps >= stepsPerBeat) {
             doubleStopChance *= 1.35;
@@ -734,6 +736,18 @@ export function selectPitchAndDevices(
         }
         if (isLineStyle) {
             doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.45 : 0.12;
+        }
+        if (activeStyle === 'country') {
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 1.75 : 1.15;
+        } else if (supportRole === 'line') {
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 0.55 : 0.22;
+        } else if (supportRole === 'accent') {
+            doubleStopChance *= 0.9;
+        } else if (supportRole === 'anchor' || supportRole === 'cadence') {
+            doubleStopChance *= 1.2;
+        }
+        if (sustainBias >= 0.85) {
+            doubleStopChance *= 1.12;
         }
 
         if (isHeadBypass) {
@@ -763,7 +777,19 @@ export function selectPitchAndDevices(
             // Optimization: Replace spread and map with pre-allocated loop to avoid closure overhead and intermediate arrays
             const polyResult = new Array(extra.length + 1);
             for (let i = 0; i < extra.length; i++) {
-                polyResult[i] = { ...result, ...extra[i] };
+                const durationScale = extra[i].durationScale ?? 1;
+                const leadDuration = result.durationSteps || 1;
+                let supportDuration = Math.max(1, Math.round(leadDuration * durationScale));
+                if (durationScale < 1) {
+                    supportDuration = Math.min(leadDuration - 1, supportDuration);
+                }
+                supportDuration = Math.max(1, supportDuration);
+                polyResult[i] = {
+                    ...result,
+                    ...extra[i],
+                    durationSteps: supportDuration,
+                    isLegato: false,
+                };
             }
             polyResult[extra.length] = result;
 
