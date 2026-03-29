@@ -117,14 +117,22 @@ describe('Security: Hydration & Storage Resilience', () => {
                 bpm: 99999,
                 bandIntensity: 100,
                 complexity: -5,
+                chords: {
+                    volume: 999,
+                    reverb: 9,
+                },
+                bass: {
+                    volume: 2,
+                    reverb: 8,
+                },
+                soloist: { reverb: 5.5 },
+                harmony: { reverb: 7 },
                 groove: {
                     genreFeel: 'MaliciousScript',
                     measures: 1000,
                     volume: 999,
                     reverb: -10,
                 },
-                bass: { volume: 2.0 },
-                soloist: { reverb: 5.5 },
                 notation: 'literal',
             };
 
@@ -143,12 +151,22 @@ describe('Security: Hydration & Storage Resilience', () => {
             expect(state.playback.bandIntensity).toBeLessThanOrEqual(1);
             expect(state.playback.complexity).toBeGreaterThanOrEqual(0);
 
-            // Groove/Bass/Soloist clamping
+            // Mixer defaults and clamping
             expect(state.groove.measures).toBeLessThanOrEqual(8);
             expect(state.groove.volume).toBe(1.0);
-            expect(state.groove.reverb).toBe(0.0);
             expect(state.bass.volume).toBe(1.0);
-            expect(state.soloist.reverb).toBe(1.0);
+            expect(state.chords.reverb).toBe(0.3);
+            expect(state.bass.reverb).toBe(0.05);
+            expect(state.soloist.reverb).toBe(0.6);
+            expect(state.harmony.reverb).toBe(0.4);
+            expect(state.groove.reverb).toBe(0.2);
+
+            expect(stateModule.storage.save).toHaveBeenCalledWith(
+                'currentState',
+                expect.objectContaining({
+                    mixerVersion: 1,
+                }),
+            );
 
             // Genre validation
             expect(state.groove.genreFeel).not.toBe('MaliciousScript');

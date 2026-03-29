@@ -1,3 +1,4 @@
+import { MIXER_SETTINGS_VERSION } from './state/instruments.js';
 import { getState } from './state.js';
 import { showToast } from './ui.js';
 import { compressSections } from './utils.js';
@@ -20,6 +21,7 @@ function compressBandSettings(options = {}) {
     const { soloist, bass, chords, harmony, groove } = getState();
 
     const band = {
+        mv: MIXER_SETTINGS_VERSION,
         s: {
             e: (options.includeSolo !== undefined ? options.includeSolo : soloist.enabled) ? 1 : 0,
             s: soloist.style,

@@ -555,8 +555,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         const isSmoothSyncStyle = isBossaStyle || isNeoStyle;
         const isJazzStyle = ['jazz', 'bird', 'bossa'].includes(style);
         const isForwardStatement = !isJazzStyle && (index === 0 || !isDeparture);
+        // Lean the head a little denser without flattening the contour.
         const statementDensity = isForwardStatement
-            ? Math.min(0.8, rhythmicDensity + 0.08 + syncBias * 0.1)
+            ? Math.min(0.84, rhythmicDensity + 0.1 + syncBias * 0.12)
             : rhythmicDensity;
 
         /**
@@ -641,9 +642,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 if (beatsPerCell === 3) {
                     pool = RH_CELLS.WALTZ;
                 } else if (isJazzStyle) {
-                    if (dense || density > 0.72 || syncBias > 0.82) {
+                    if (dense || density > 0.68 || syncBias > 0.82) {
                         pool = [...linePool, ...hookPool, ...RH_CELLS.SYNC, ...RH_CELLS.SYNC];
-                    } else if (density >= 0.55) {
+                    } else if (density >= 0.52) {
                         pool =
                             prng() < 0.55 + syncBias * 0.25
                                 ? [...linePool, ...hookPool, ...RH_CELLS.SYNC]

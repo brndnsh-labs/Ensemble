@@ -18,7 +18,7 @@ export function analyzeFormUI(dispatch) {
  * @param {Function} dispatch
  */
 export function applyConductor(state, dispatch) {
-    const { playback, soloist, groove, chords, bass, harmony, arranger } = state;
+    const { playback, soloist, groove, arranger } = state;
     const intensity = playback.bandIntensity; // 0.0 - 1.0
     const complexity = playback.complexity; // 0.0 - 1.0
 
@@ -126,7 +126,7 @@ export function applyConductor(state, dispatch) {
 
     dispatch(ACTIONS.SET_PARAM, { module: 'bass', param: 'pocketOffset', value: targetBassPocket });
 
-    // --- 5. Intensity-Aware Mixing ---
+    // --- 5. Intensity-Aware Mix Shaping ---
     if (playback.audio) {
         const time = playback.audio.currentTime;
         const ramp = 0.5;
@@ -168,39 +168,6 @@ export function applyConductor(state, dispatch) {
             // Reverb Cleaning (Abbey Road)
             playback.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
         }
-
-        // --- Reverb-Intensity Linking ---
-        // High Intensity = Dry (0.1 - 0.3), Low Intensity = Wet (0.4 - 0.6)
-        const targetReverb = 0.6 - intensity * 0.4;
-
-        const reverbNodes = [
-            { state: chords, gain: 'chordsReverb' },
-            { state: bass, gain: 'bassReverb' },
-            { state: soloist, gain: 'soloistReverb' },
-            { state: harmony, gain: 'harmoniesReverb' },
-            { state: groove, gain: 'drumsReverb' },
-        ];
-
-        reverbNodes.forEach((node) => {
-            // Apply a slight genre-specific bias to the auto-reverb
-            let bias = 1.0;
-            if (node.gain === 'drumsReverb') {
-                bias = 0.7; // Keep drums dryer
-            } else if (node.gain === 'soloistReverb') {
-                bias = 1.2; // Keep soloist wetter
-            }
-
-            const finalReverb = Math.max(0.0001, targetReverb * bias);
-            node.state.reverb = finalReverb;
-
-            if (/** @type {any} */ (playback)[node.gain]) {
-                /** @type {any} */ (playback)[node.gain].gain.setTargetAtTime(
-                    finalReverb,
-                    time,
-                    ramp,
-                );
-            }
-        });
     }
 
     debounceSaveState();

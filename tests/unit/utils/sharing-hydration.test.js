@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
 
-const { arranger, playback, groove, chords } = getState();
+const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
 
 import { shareProgression } from '../../../public/sharing.js';
 import { loadFromUrl } from '../../../public/state-hydration.js';
@@ -91,6 +91,11 @@ describe('Sharing & Hydration Round-trip', () => {
         arranger.key = 'F';
         playback.bpm = 80;
         chords.style = 'jazz';
+        chords.reverb = 0.22;
+        bass.reverb = 0.08;
+        soloist.reverb = 0.72;
+        harmony.reverb = 0.44;
+        groove.reverb = 0.18;
         groove.genreFeel = 'Jazz';
         playback.bandIntensity = 0.4;
 
@@ -117,9 +122,77 @@ describe('Sharing & Hydration Round-trip', () => {
         expect(arranger.key).toBe('F');
         expect(playback.bpm).toBe(80);
         expect(chords.style).toBe('jazz');
+        expect(chords.reverb).toBe(0.22);
+        expect(bass.reverb).toBe(0.08);
+        expect(soloist.reverb).toBe(0.72);
+        expect(harmony.reverb).toBe(0.44);
+        expect(groove.reverb).toBe(0.18);
         expect(arranger.sections[0].label).toBe('Blues');
         expect(groove.genreFeel).toBe('Jazz'); // Verified state update directly
         expect(playback.bandIntensity).toBe(0.4);
+    });
+
+    it('should fall back to default reverb for legacy band payloads', () => {
+        const legacyBandState = {
+            s: {
+                e: 1,
+                s: 'smart',
+                p: 'trumpet',
+                o: 72,
+                v: 0.5,
+                r: 0.9,
+                m: 'monophonic',
+                sd: '',
+            },
+            b: {
+                e: 1,
+                s: 'smart',
+                o: 36,
+                v: 0.4,
+                r: 0.8,
+            },
+            c: {
+                e: 1,
+                s: 'smart',
+                o: 48,
+                v: 0.5,
+                r: 0.7,
+                d: 'standard',
+            },
+            h: {
+                e: 1,
+                s: 'smart',
+                o: 60,
+                v: 0.4,
+                r: 0.6,
+                c: 0.5,
+            },
+            g: {
+                e: 1,
+                v: 0.5,
+                r: 0.4,
+                sw: 0,
+                ss: 8,
+                hu: 20,
+            },
+        };
+
+        const encoded = btoa(JSON.stringify(legacyBandState));
+
+        soloist.reverb = 0.1;
+        bass.reverb = 0.1;
+        chords.reverb = 0.1;
+        harmony.reverb = 0.1;
+        groove.reverb = 0.1;
+
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(encoded)}`));
+        loadFromUrl();
+
+        expect(soloist.reverb).toBe(0.6);
+        expect(bass.reverb).toBe(0.05);
+        expect(chords.reverb).toBe(0.3);
+        expect(harmony.reverb).toBe(0.4);
+        expect(groove.reverb).toBe(0.2);
     });
 
     it('should hydrate high-fidelity band settings (volume, reverb) from bnd parameter', () => {
