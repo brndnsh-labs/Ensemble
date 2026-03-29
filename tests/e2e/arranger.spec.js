@@ -8,6 +8,16 @@ import {
 
 const { expect, test } = pkg;
 
+async function openLibraryFromArranger(page) {
+    const libraryButton = page.locator('#arrangerLibraryInlineBtn');
+    if (await libraryButton.isVisible()) {
+        await libraryButton.click();
+        return;
+    }
+
+    throw new Error('Expected the arranger library button to be visible');
+}
+
 test.describe('Arranger & Chord Visualizer @visual', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
@@ -22,9 +32,58 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
 
+    test('Arranger toolbar stretches across the header and promotes direct key and action controls on desktop', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+
+        const arrangerPanel = page.locator('#panel-arranger');
+        const controlsPanel = page.locator('.workspace-arranger-controls-panel');
+        const libraryButton = page.locator('#arrangerLibraryInlineBtn');
+        const editButton = page.locator('#editArrangementBtn');
+        const shareButton = page.locator('#shareHubBtn');
+        const keyButton = page.locator('#keyMenuBtn');
+        const seedButton = page.locator('#soloistSeedMenuBtn');
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+
+        await expect(controlsPanel).toBeVisible();
+        await expect(libraryButton).toBeVisible();
+        await expect(editButton).toBeVisible();
+        await expect(shareButton).toBeVisible();
+        await expect(keyButton).toBeVisible();
+        await expect(seedButton).toBeVisible();
+        await expect(page.locator('#maximizeChordBtn')).toBeVisible();
+        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
+
+        const [panelBox, controlsBox] = await Promise.all([
+            arrangerPanel.boundingBox(),
+            controlsPanel.boundingBox(),
+        ]);
+
+        expect(panelBox).not.toBeNull();
+        expect(controlsBox).not.toBeNull();
+        expect(controlsBox.width).toBeGreaterThan(panelBox.width * 0.85);
+
+        await keyButton.click();
+        await expect(page.locator('#arrangerKeyPanel')).toBeVisible();
+        await expect(page.locator('#keySelect')).toBeVisible();
+        await expect(page.locator('#relKeyBtn')).toBeVisible();
+        await expect(page.locator('#transDownBtn')).toBeVisible();
+
+        await page.mouse.click(8, 8);
+        await seedButton.click();
+        await expect(page.locator('#soloistSeedPanel')).toBeVisible();
+        await expect(page.locator('#arrangerSoloistSeed')).toBeVisible();
+
+        await page.mouse.click(8, 8);
+        await libraryButton.click();
+        await expect(modal).toBeVisible();
+        await modal.locator('.workspace-library-close').click();
+        await expect(modal).toBeHidden();
+    });
+
     test('Chord Visualizer - Continuous lead-sheet rows', async ({ page }) => {
-        await page.getByRole('button', { name: 'Open arranger actions' }).click();
-        await page.locator('.workspace-library-fab').dispatchEvent('click');
+        await openLibraryFromArranger(page);
         await page.getByRole('button', { name: 'Autumn Leaves' }).click();
 
         const visualizer = page.locator('#chordVisualizer');
@@ -55,14 +114,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.locator('#playBtn').click();
     });
 
-    test('Progression Library Modal opens from FAB', async ({ page }) => {
-        const actionTrigger = page.getByRole('button', { name: 'Open arranger actions' });
-        await actionTrigger.click();
-
-        const libraryFab = page.locator('.workspace-library-fab');
-        await expect(libraryFab).toBeVisible();
-        await libraryFab.dispatchEvent('click');
-
+    test('Progression Library Modal opens from arranger toolbar', async ({ page }) => {
+        await openLibraryFromArranger(page);
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
         await expect(modal.locator('#workspaceLibraryTitle')).toHaveText('Progression Library');
@@ -71,14 +124,14 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await modal.locator('.preset-chip').first().click();
         await expect(modal).toBeHidden();
 
-        await expect(page.getByRole('button', { name: 'Open arranger actions' })).toBeVisible();
+        await expect(page.locator('#keyMenuBtn')).toBeVisible();
+        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
     });
 
     test('Autumn Leaves stays readable without adding scroll at desktop size', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
 
-        await page.getByRole('button', { name: 'Open arranger actions' }).click();
-        await page.locator('.workspace-library-fab').dispatchEvent('click');
+        await openLibraryFromArranger(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -110,8 +163,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.setViewportSize({ width: 1440, height: 900 });
 
         for (const chartName of ['Pop (Standard)', 'Giant Steps']) {
-            await page.getByRole('button', { name: 'Open arranger actions' }).click();
-            await page.locator('.workspace-library-fab').dispatchEvent('click');
+            await openLibraryFromArranger(page);
             await page.getByRole('button', { name: chartName }).click();
 
             const visualizer = page.locator('#chordVisualizer');
@@ -138,8 +190,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('All The Things You Are stays legible in guided compact mode', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
 
-        await page.getByRole('button', { name: 'Open arranger actions' }).click();
-        await page.locator('.workspace-library-fab').dispatchEvent('click');
+        await openLibraryFromArranger(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -186,12 +237,11 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             .toBeGreaterThan(standardFontSize);
     });
 
-    test('Arranger action menu stays fully visible after loading a short preset', async ({
+    test('Arranger key and seed panels stay fully visible after loading a short preset', async ({
         page,
     }) => {
         await page.setViewportSize({ width: 1024, height: 768 });
-        await page.getByRole('button', { name: 'Open arranger actions' }).click();
-        await page.locator('.workspace-library-fab').dispatchEvent('click');
+        await openLibraryFromArranger(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -199,9 +249,10 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.getByRole('button', { name: 'Pop (Standard)' }).click();
         await expect(modal).toBeHidden();
 
-        const actionMenu = page.locator('.workspace-fab-menu');
-        const trigger = page.getByRole('button', { name: 'Open arranger actions' });
-        const items = actionMenu.locator('.workspace-fab-items');
+        const keyTrigger = page.locator('#keyMenuBtn');
+        const keyPanel = page.locator('#arrangerKeyPanel');
+        const seedTrigger = page.locator('#soloistSeedMenuBtn');
+        const seedPanel = page.locator('#soloistSeedPanel');
         const viewport = await page.evaluate(() => ({
             width: window.innerWidth,
             height: window.innerHeight,
@@ -209,51 +260,35 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await page.mouse.click(5, 5);
         await page.waitForTimeout(150);
-        await expect(actionMenu).not.toHaveClass(/is-open/);
+        await expect(keyPanel).toBeHidden();
 
-        await trigger.click();
+        await keyTrigger.click();
         await page.waitForTimeout(250);
-        await page.mouse.move(16, 16);
-        await page.waitForTimeout(250);
-
-        await expect(actionMenu).toHaveClass(/is-open/);
-        await expect(items).toBeVisible();
-        await expect(page.locator('#arrangerSoloistSeed')).toBeVisible();
-
-        const clickBox = await items.boundingBox();
-        const seedBox = await page.locator('#arrangerSoloistSeed').boundingBox();
-        const seedButtonBox = await page
-            .locator('.workspace-fab-item--seed .icon-btn')
-            .boundingBox();
-
-        expect(clickBox).not.toBeNull();
-        expect(seedBox).not.toBeNull();
-        expect(seedButtonBox).not.toBeNull();
-        expect(clickBox.x).toBeGreaterThanOrEqual(0);
-        expect(clickBox.y).toBeGreaterThanOrEqual(0);
-        expect(clickBox.x + clickBox.width).toBeLessThanOrEqual(viewport.width);
-        expect(clickBox.y + clickBox.height).toBeLessThanOrEqual(viewport.height);
-        expect(seedBox.y + seedBox.height).toBeLessThanOrEqual(clickBox.y + clickBox.height);
-        expect(seedButtonBox.y + seedButtonBox.height).toBeLessThanOrEqual(
-            clickBox.y + clickBox.height,
-        );
+        await expect(keyPanel).toBeVisible();
+        await expectLocatorFitsViewport(page, keyPanel);
+        await expectOwnsInteriorProbe(keyPanel);
+        await expectWithinSurface(keyPanel, page.locator('#keySelect'));
+        await expectWithinSurface(keyPanel, page.locator('#transUpBtn'));
 
         await page.mouse.click(5, 5);
         await page.waitForTimeout(150);
-        await expect(actionMenu).not.toHaveClass(/is-open/);
+        await expect(keyPanel).toBeHidden();
 
-        await trigger.hover();
+        await seedTrigger.click();
         await page.waitForTimeout(250);
-        await expect(actionMenu).not.toHaveClass(/is-open/);
-        await expect
-            .poll(async () => items.evaluate((el) => getComputedStyle(el).opacity))
-            .toBe('0');
-        await expect
-            .poll(async () => items.evaluate((el) => getComputedStyle(el).pointerEvents))
-            .toBe('none');
+        await expect(seedPanel).toBeVisible();
+        await expectLocatorFitsViewport(page, seedPanel);
+        await expectOwnsInteriorProbe(seedPanel);
+        await expectWithinSurface(seedPanel, page.locator('#arrangerSoloistSeed'));
+        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
+
+        const seedBox = await page.locator('#arrangerSoloistSeed').boundingBox();
+        expect(seedBox).not.toBeNull();
+        expect(seedBox.x + seedBox.width).toBeLessThanOrEqual(viewport.width);
+        expect(seedBox.y + seedBox.height).toBeLessThanOrEqual(viewport.height);
     });
 
-    test('Arranger action menu stays reachable across desktop, tablet, and short mobile', async ({
+    test('Arranger toolbar panels stay reachable across desktop, tablet, and short mobile', async ({
         page,
     }) => {
         const viewports = [
@@ -268,18 +303,26 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             await page.goto('/');
             await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
 
-            const trigger = page.getByRole('button', { name: 'Open arranger actions' });
-            await trigger.click();
+            const keyTrigger = page.locator('#keyMenuBtn');
+            const keyPanel = page.locator('#arrangerKeyPanel');
+            await keyTrigger.click();
 
-            const items = page.locator('.workspace-fab-items');
-            const seedInput = page.locator('#arrangerSoloistSeed');
-            const libraryButton = page.locator('.workspace-library-fab');
+            await expect(keyPanel).toBeVisible();
+            await expectLocatorFitsViewport(page, keyPanel);
+            await expectOwnsInteriorProbe(keyPanel);
+            await expectWithinSurface(keyPanel, page.locator('#transDownBtn'));
 
-            await expect(items).toBeVisible();
-            await expectLocatorFitsViewport(page, items);
-            await expectOwnsInteriorProbe(items);
-            await expectWithinSurface(items, libraryButton);
-            await expectWithinSurface(items, seedInput);
+            await page.mouse.click(5, 5);
+
+            const seedTrigger = page.locator('#soloistSeedMenuBtn');
+            const seedPanel = page.locator('#soloistSeedPanel');
+            await seedTrigger.click();
+
+            await expect(seedPanel).toBeVisible();
+            await expectLocatorFitsViewport(page, seedPanel);
+            await expectWithinSurface(seedPanel, page.locator('#arrangerSoloistSeed'));
+
+            await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
         }
     });
 });

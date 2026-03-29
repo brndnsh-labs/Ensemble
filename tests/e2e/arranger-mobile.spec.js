@@ -3,17 +3,62 @@ import pkg from '@playwright/test';
 
 const { expect, test } = pkg;
 
+async function openLibraryFromArranger(page) {
+    const libraryButton = page.locator('#arrangerLibraryInlineBtn');
+    await expect(libraryButton).toBeVisible();
+    await libraryButton.click();
+}
+
+async function expectPanelAttachedToTrigger(page, triggerLocator, panelLocator) {
+    const [triggerBox, panelBox, viewport] = await Promise.all([
+        triggerLocator.boundingBox(),
+        panelLocator.boundingBox(),
+        page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight })),
+    ]);
+
+    expect(triggerBox).not.toBeNull();
+    expect(panelBox).not.toBeNull();
+    const panelTop = panelBox.y;
+    const triggerBottom = triggerBox.y + triggerBox.height;
+    expect(panelTop).toBeLessThan(viewport.height * 0.6);
+    expect(panelTop - triggerBottom).toBeLessThan(48);
+    expect(panelTop - triggerBottom).toBeGreaterThanOrEqual(-12);
+}
+
 test.describe('Arranger Mobile Scaling @mobile', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
         await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
     });
 
+    test('Compact mobile toolbar keeps key, library, share, and seed as direct controls', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.click('[data-workspace-nav="arranger"]');
+
+        await expect(page.locator('#keyMenuBtn')).toBeVisible();
+        await expect(page.locator('#arrangerLibraryInlineBtn')).toBeVisible();
+        await expect(page.locator('#shareHubBtn')).toBeVisible();
+        await expect(page.locator('#soloistSeedMenuBtn')).toBeVisible();
+
+        await page.locator('#keyMenuBtn').click();
+        const keyTrigger = page.locator('#keyMenuBtn');
+        const keyPanel = page.locator('#arrangerKeyPanel');
+        await expect(keyPanel).toBeVisible();
+        await expect(page.locator('#transDownBtn')).toBeVisible();
+        await expect(page.locator('#transUpBtn')).toBeVisible();
+        await expectPanelAttachedToTrigger(page, keyTrigger, keyPanel);
+
+        await page.mouse.click(8, 8);
+        await expect(page.locator('#editArrangementBtn')).toBeVisible();
+        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
+    });
+
     test('Donna Lee renders cleanly in the mobile arranger viewport', async ({ page }) => {
         await page.setViewportSize({ width: 360, height: 640 });
         await page.click('[data-workspace-nav="arranger"]');
-        await page.click('button[aria-label="Open arranger actions"]');
-        await page.click('.workspace-library-fab');
+        await openLibraryFromArranger(page);
 
         await page.getByRole('button', { name: 'Donna Lee' }).click();
 
@@ -79,8 +124,7 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
     }) => {
         await page.setViewportSize({ width: 393, height: 852 });
         await page.click('[data-workspace-nav="arranger"]');
-        await page.click('button[aria-label="Open arranger actions"]');
-        await page.click('.workspace-library-fab');
+        await openLibraryFromArranger(page);
         await page.getByRole('button', { name: 'Giant Steps' }).click();
 
         const visualizer = page.locator('#chordVisualizer');
@@ -194,8 +238,7 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
     test('Maximized arranger view increases reading size for dense charts', async ({ page }) => {
         await page.setViewportSize({ width: 360, height: 640 });
         await page.click('[data-workspace-nav="arranger"]');
-        await page.click('button[aria-label="Open arranger actions"]');
-        await page.click('.workspace-library-fab');
+        await openLibraryFromArranger(page);
         await page.getByRole('button', { name: 'Autumn Leaves' }).click();
 
         const visualizer = page.locator('#chordVisualizer');

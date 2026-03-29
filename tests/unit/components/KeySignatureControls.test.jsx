@@ -127,9 +127,12 @@ describe('KeySignatureControls Component', () => {
         });
 
         const keySelect = container.querySelector('#keySelect');
+        const keyMenuBtn = container.querySelector('#keyMenuBtn');
         const timeSigSelect = container.querySelector('#timeSigSelect');
         const groupingToggle = container.querySelector('#groupingToggle');
 
+        expect(keyMenuBtn.textContent).toContain('Key');
+        expect(keyMenuBtn.textContent).toContain('C maj');
         expect(keySelect.value).toBe('C');
         expect(timeSigSelect.value).toBe('4/4');
         expect(groupingToggle.style.display).toBe('none');
@@ -289,7 +292,7 @@ describe('KeySignatureControls Component', () => {
         });
 
         const relKeyBtn = container.querySelector('#relKeyBtn');
-        expect(relKeyBtn.textContent).toBe('maj'); // Because isMinor = false
+        expect(relKeyBtn.textContent).toBe('Relative minor');
 
         act(() => {
             relKeyBtn.dispatchEvent(new Event('click', { bubbles: true }));
