@@ -16,7 +16,10 @@ async function openWorkspace(page, name) {
 test.describe('Workspace surfaces @ui', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
     });
 
     test('studio keeps a single live mix surface without menu clipping', async ({ page }) => {
@@ -113,7 +116,10 @@ test.describe('Workspace surfaces @ui', () => {
 
         await page.setViewportSize({ width: 768, height: 1024 });
         await page.reload();
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await openWorkspace(page, 'Studio');
 
         const tabletGroove = await page.locator('#panel-grooves').boundingBox();
@@ -125,7 +131,10 @@ test.describe('Workspace surfaces @ui', () => {
 
         await page.setViewportSize({ width: 640, height: 960 });
         await page.reload();
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await openWorkspace(page, 'Studio');
 
         const header = page.locator('header');
@@ -184,7 +193,10 @@ test.describe('Workspace surfaces @ui', () => {
         for (const viewport of viewports) {
             await page.setViewportSize({ width: viewport.width, height: viewport.height });
             await page.goto('/');
-            await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+            await page.waitForSelector('html[data-hydrated="true"]', {
+                state: 'attached',
+                timeout: 15000,
+            });
             await openWorkspace(page, 'Studio');
 
             await page.locator('.workspace-studio-genre-button').click();
@@ -231,12 +243,15 @@ test.describe('Workspace surfaces @ui', () => {
         }
     });
 
-    test('studio surfaces mount in a body-level overlay layer on mobile @mobile', async ({
+    test('studio surfaces mount in a body-level overlay layer on mobile @mobile @ipad', async ({
         page,
     }) => {
         await page.setViewportSize({ width: 393, height: 852 });
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await openWorkspace(page, 'Studio');
 
         const bodyOverlayLayer = page.locator('body > .workspace-studio-surface-layer');

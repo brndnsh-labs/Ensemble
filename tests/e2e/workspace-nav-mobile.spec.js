@@ -5,7 +5,10 @@ const { expect, test } = pkg;
 test.describe('Workspace Navigation Mobile @mobile', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
     });
 
     test('anchors the workspace nav to the bottom bar', async ({ page }) => {

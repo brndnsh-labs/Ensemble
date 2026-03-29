@@ -33,17 +33,6 @@ export default defineConfig({
         addInitScript: () => {
             document.documentElement.dataset.e2eMode = 'true';
         },
-
-        /* Standardize rendering across different environments (CI vs local) */
-        launchOptions: {
-            args: [
-                '--font-render-hinting=none',
-                '--disable-font-subpixel-positioning',
-                '--disable-lcd-text',
-                '--disable-gpu',
-                '--use-gl=swiftshader',
-            ],
-        },
     },
 
     /* Configure projects for major browsers */
@@ -53,6 +42,15 @@ export default defineConfig({
             use: {
                 ...devices['Desktop Chrome'],
                 viewport: { width: 1440, height: 900 },
+                launchOptions: {
+                    args: [
+                        '--font-render-hinting=none',
+                        '--disable-font-subpixel-positioning',
+                        '--disable-lcd-text',
+                        '--disable-gpu',
+                        '--use-gl=swiftshader',
+                    ],
+                },
             },
             // Don't run mobile-specific tests on desktop
             grepInvert: /@mobile/,
@@ -61,9 +59,26 @@ export default defineConfig({
             name: 'Mobile Chrome',
             use: {
                 ...devices['Pixel 5'],
+                launchOptions: {
+                    args: [
+                        '--font-render-hinting=none',
+                        '--disable-font-subpixel-positioning',
+                        '--disable-lcd-text',
+                        '--disable-gpu',
+                        '--use-gl=swiftshader',
+                    ],
+                },
             },
             // Only run mobile-tagged tests
             grep: /@mobile/,
+        },
+        {
+            name: 'Mobile Safari',
+            use: {
+                ...devices['iPad Mini'],
+            },
+            // Only run iPad-tagged tests
+            grep: /@ipad/,
         },
     ],
 

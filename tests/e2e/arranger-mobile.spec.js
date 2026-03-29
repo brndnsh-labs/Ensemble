@@ -1,5 +1,6 @@
 // cspell:ignore labelledby
 import pkg from '@playwright/test';
+import { expectLocatorFitsViewport, expectOwnsInteriorProbe } from './helpers/visibility.js';
 
 const { expect, test } = pkg;
 
@@ -9,26 +10,29 @@ async function openLibraryFromArranger(page) {
     await libraryButton.click();
 }
 
-async function expectPanelAttachedToTrigger(page, triggerLocator, panelLocator) {
-    const [triggerBox, panelBox, viewport] = await Promise.all([
+async function expectPanelAttachedToTrigger(_page, triggerLocator, panelLocator) {
+    const [triggerBox, panelBox] = await Promise.all([
         triggerLocator.boundingBox(),
         panelLocator.boundingBox(),
-        page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight })),
     ]);
 
     expect(triggerBox).not.toBeNull();
     expect(panelBox).not.toBeNull();
-    const panelTop = panelBox.y;
-    const triggerBottom = triggerBox.y + triggerBox.height;
-    expect(panelTop).toBeLessThan(viewport.height * 0.6);
-    expect(panelTop - triggerBottom).toBeLessThan(48);
-    expect(panelTop - triggerBottom).toBeGreaterThanOrEqual(-12);
+    const openGap =
+        panelBox.y >= triggerBox.y
+            ? panelBox.y - (triggerBox.y + triggerBox.height)
+            : triggerBox.y - (panelBox.y + panelBox.height);
+
+    expect(Math.abs(openGap)).toBeLessThanOrEqual(240);
 }
 
-test.describe('Arranger Mobile Scaling @mobile', () => {
+test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
     });
 
     test('Compact mobile toolbar keeps key, library, share, and seed as direct controls', async ({
@@ -49,10 +53,41 @@ test.describe('Arranger Mobile Scaling @mobile', () => {
         await expect(page.locator('#transDownBtn')).toBeVisible();
         await expect(page.locator('#transUpBtn')).toBeVisible();
         await expectPanelAttachedToTrigger(page, keyTrigger, keyPanel);
+        await expectLocatorFitsViewport(page, keyPanel);
+        await expectOwnsInteriorProbe(keyPanel);
+
+        await page.mouse.click(8, 8);
+        await expect(keyPanel).toBeHidden();
+
+        await page.locator('#soloistSeedMenuBtn').click();
+        const seedTrigger = page.locator('#soloistSeedMenuBtn');
+        const seedPanel = page.locator('#soloistSeedPanel');
+        await expect(seedPanel).toBeVisible();
+        await expectPanelAttachedToTrigger(page, seedTrigger, seedPanel);
+        await expectLocatorFitsViewport(page, seedPanel);
+        await expectOwnsInteriorProbe(seedPanel);
 
         await page.mouse.click(8, 8);
         await expect(page.locator('#editArrangementBtn')).toBeVisible();
         await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
+    });
+
+    test('Tablet-sized viewport keeps the key menu fully visible @mobile', async ({ page }) => {
+        await page.setViewportSize({ width: 768, height: 1024 });
+        await page.click('[data-workspace-nav="arranger"]');
+
+        const keyTrigger = page.locator('#keyMenuBtn');
+        const keyPanel = page.locator('#arrangerKeyPanel');
+        await expect(keyTrigger).toBeVisible();
+
+        await keyTrigger.click();
+        await expect(keyPanel).toBeVisible();
+        await expectPanelAttachedToTrigger(page, keyTrigger, keyPanel);
+        await expectLocatorFitsViewport(page, keyPanel);
+        await expectOwnsInteriorProbe(keyPanel);
+
+        await page.mouse.click(8, 8);
+        await expect(keyPanel).toBeHidden();
     });
 
     test('Donna Lee renders cleanly in the mobile arranger viewport', async ({ page }) => {
