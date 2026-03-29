@@ -21,7 +21,10 @@ async function openLibraryFromArranger(page) {
 test.describe('Arranger & Chord Visualizer @visual', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
     });
 
     test('Chord Visualizer - Default Layout', async ({ page }) => {
@@ -301,7 +304,10 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         for (const viewport of viewports) {
             await page.setViewportSize(viewport);
             await page.goto('/');
-            await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+            await page.waitForSelector('html[data-hydrated="true"]', {
+                state: 'attached',
+                timeout: 15000,
+            });
 
             const keyTrigger = page.locator('#keyMenuBtn');
             const keyPanel = page.locator('#arrangerKeyPanel');

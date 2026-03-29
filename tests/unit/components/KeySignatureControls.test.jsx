@@ -116,6 +116,9 @@ describe('KeySignatureControls Component', () => {
     });
 
     afterEach(() => {
+        act(() => {
+            render(null, container);
+        });
         document.body.removeChild(container);
         document.body.className = ''; // Reset body classes
         vi.clearAllMocks();
@@ -126,10 +129,10 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const keySelect = container.querySelector('#keySelect');
+        const keySelect = document.body.querySelector('#keySelect');
         const keyMenuBtn = container.querySelector('#keyMenuBtn');
         const timeSigSelect = container.querySelector('#timeSigSelect');
-        const groupingToggle = container.querySelector('#groupingToggle');
+        const groupingToggle = document.body.querySelector('#groupingToggle');
 
         expect(keyMenuBtn.textContent).toContain('Key');
         expect(keyMenuBtn.textContent).toContain('C maj');
@@ -143,7 +146,7 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const keySelect = container.querySelector('#keySelect');
+        const keySelect = document.body.querySelector('#keySelect');
 
         // Ensure Preact processes the state update
         keySelect.value = 'G';
@@ -237,10 +240,10 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const groupingToggle = container.querySelector('#groupingToggle');
+        const groupingToggle = document.body.querySelector('#groupingToggle');
         expect(groupingToggle.style.display).toBe('flex');
 
-        const groupingLabel = container.querySelector('#groupingLabel');
+        const groupingLabel = document.body.querySelector('#groupingLabel');
         expect(groupingLabel.textContent).toBe('3+2');
 
         act(() => {
@@ -275,7 +278,7 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const groupingLabel = container.querySelector('#groupingLabel');
+        const groupingLabel = document.body.querySelector('#groupingLabel');
         if (groupingLabel) {
             // Note: button might be in DOM but display:none
             await act(async () => {
@@ -291,7 +294,7 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const relKeyBtn = container.querySelector('#relKeyBtn');
+        const relKeyBtn = document.body.querySelector('#relKeyBtn');
         expect(relKeyBtn.textContent).toBe('Relative minor');
 
         act(() => {
@@ -307,8 +310,8 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const transDownBtn = container.querySelector('#transDownBtn');
-        const transUpBtn = container.querySelector('#transUpBtn');
+        const transDownBtn = document.body.querySelector('#transDownBtn');
+        const transUpBtn = document.body.querySelector('#transUpBtn');
 
         act(() => {
             transDownBtn.dispatchEvent(new Event('click', { bubbles: true }));

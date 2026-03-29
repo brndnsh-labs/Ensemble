@@ -1,3 +1,4 @@
+import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 
 /**
@@ -46,6 +47,22 @@ export function ToolbarPopover({
         setIsOpen(false);
     };
 
+    /**
+     * @param {FocusEvent} event
+     */
+    const handleFocusExit = (event) => {
+        const relatedTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+
+        if (
+            relatedTarget &&
+            (rootRef.current?.contains(relatedTarget) || panelRef.current?.contains(relatedTarget))
+        ) {
+            return;
+        }
+
+        closePopover();
+    };
+
     useEffect(() => {
         if (panelRef.current && 'inert' in panelRef.current) {
             panelRef.current.inert = !isOpen;
@@ -59,7 +76,11 @@ export function ToolbarPopover({
 
         const handlePointerDown = (/** @type {PointerEvent} */ event) => {
             const target = event.target instanceof Node ? event.target : null;
-            if (!target || rootRef.current?.contains(target)) {
+            if (
+                !target ||
+                rootRef.current?.contains(target) ||
+                panelRef.current?.contains(target)
+            ) {
                 return;
             }
 
@@ -152,54 +173,84 @@ export function ToolbarPopover({
     }, [align, isOpen]);
 
     return (
-        <div
-            ref={rootRef}
-            class={`workspace-toolbar-popover${isOpen ? ' is-open' : ''}`}
-            onBlurCapture={(event) => {
-                const relatedTarget =
-                    event.relatedTarget instanceof Node ? event.relatedTarget : null;
-                if (!event.currentTarget.contains(relatedTarget)) {
-                    closePopover();
-                }
-            }}
-        >
-            <button
-                ref={triggerRef}
-                id={buttonId}
-                type="button"
-                class={[
-                    'workspace-actions-trigger',
-                    'workspace-toolbar-trigger',
-                    triggerClassName,
-                    isOpen ? 'is-open' : '',
-                ]
-                    .filter(Boolean)
-                    .join(' ')}
-                aria-label={triggerAriaLabel}
-                aria-haspopup="dialog"
-                aria-expanded={isOpen}
-                aria-controls={panelId}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    setIsOpen((value) => !value);
-                }}
-            >
-                {triggerContent}
-            </button>
+        <>
             <div
-                ref={panelRef}
-                id={panelId}
-                class={['workspace-toolbar-panel', 'workspace-toolbar-panel--fixed', panelClassName]
-                    .filter(Boolean)
-                    .join(' ')}
-                role="dialog"
-                aria-label={panelLabel}
-                aria-hidden={!isOpen}
-                style={panelStyle}
-                onClick={(event) => event.stopPropagation()}
+                ref={rootRef}
+                class={`workspace-toolbar-popover${isOpen ? ' is-open' : ''}`}
+                onBlurCapture={handleFocusExit}
             >
-                {typeof children === 'function' ? children({ closePopover, isOpen }) : children}
+                <button
+                    ref={triggerRef}
+                    id={buttonId}
+                    type="button"
+                    class={[
+                        'workspace-actions-trigger',
+                        'workspace-toolbar-trigger',
+                        triggerClassName,
+                        isOpen ? 'is-open' : '',
+                    ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    aria-label={triggerAriaLabel}
+                    aria-haspopup="dialog"
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        setIsOpen((value) => !value);
+                    }}
+                >
+                    {triggerContent}
+                </button>
             </div>
-        </div>
+            {typeof document !== 'undefined' && document.body ? (
+                createPortal(
+                    <div
+                        ref={panelRef}
+                        id={panelId}
+                        class={[
+                            'workspace-toolbar-panel',
+                            'workspace-toolbar-panel--fixed',
+                            panelClassName,
+                            isOpen ? 'is-open' : '',
+                        ]
+                            .filter(Boolean)
+                            .join(' ')}
+                        role="dialog"
+                        aria-label={panelLabel}
+                        aria-hidden={!isOpen}
+                        style={panelStyle}
+                        onBlurCapture={handleFocusExit}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        {typeof children === 'function'
+                            ? children({ closePopover, isOpen })
+                            : children}
+                    </div>,
+                    document.body,
+                )
+            ) : (
+                <div
+                    ref={panelRef}
+                    id={panelId}
+                    class={[
+                        'workspace-toolbar-panel',
+                        'workspace-toolbar-panel--fixed',
+                        panelClassName,
+                        isOpen ? 'is-open' : '',
+                    ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    role="dialog"
+                    aria-label={panelLabel}
+                    aria-hidden={!isOpen}
+                    style={panelStyle}
+                    onBlurCapture={handleFocusExit}
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    {typeof children === 'function' ? children({ closePopover, isOpen }) : children}
+                </div>
+            )}
+        </>
     );
 }

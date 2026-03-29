@@ -13,7 +13,10 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 1024, height: 768 });
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await page.click('[data-workspace-nav="studio"]');
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
     });
@@ -166,7 +169,10 @@ test.describe('Studio settings surfaces - Mobile Scrolling @mobile', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await page.click('[data-workspace-nav="studio"]');
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
     });
@@ -198,7 +204,10 @@ test.describe('Studio settings surfaces - Mobile Scrolling @mobile', () => {
     }) => {
         await page.setViewportSize({ width: 360, height: 640 });
         await page.reload();
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await page.click('[data-workspace-nav="studio"]');
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
 
@@ -230,7 +239,10 @@ test.describe('Studio settings surfaces - iPhone reachability @mobile', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 393, height: 852 });
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
         await page.click('[data-workspace-nav="studio"]');
         await expect(page.locator('section[data-workspace="studio"]')).toBeVisible();
     });

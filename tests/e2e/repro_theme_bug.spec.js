@@ -7,7 +7,10 @@ test.describe('Theme Reproduction Bug', () => {
 
     test('Auto theme should apply light mode when system is light', async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]');
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
 
         // 1. Open settings
         await page.click('#settingsBtn');

@@ -33,7 +33,10 @@ async function openEditorFromLibraryPreset(page) {
 test.describe('Modals Responsiveness @ui', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
     });
 
     test('Settings Modal - Centering and Content', async ({ page }) => {

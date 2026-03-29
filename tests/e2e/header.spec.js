@@ -7,7 +7,10 @@ test.describe('Header Visual Integrity', () => {
         // Navigate to the app before each test
         await page.goto('/');
         // Wait for the app to be fully hydrated
-        await page.waitForSelector('html[data-hydrated="true"]', { timeout: 15000 });
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
     });
 
     test('Mobile Header - Title and Settings Icon @mobile', async ({ page }) => {

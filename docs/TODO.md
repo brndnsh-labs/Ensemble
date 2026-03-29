@@ -22,3 +22,8 @@ These are the open UI/system tasks left after the hi-hat, visualizer, and flaky-
 - Define sane defaults per track so the mixer starts from musical, predictable values.
 - Make sure any automatic behavior is clearly intentional and easy to understand.
 - Check whether the issue is rooted in state hydration, side effects, or a mixer-control feedback loop.
+
+## Flaky tests
+
+- `tests/standards/blues-soloist-authenticity.test.js` can fall just below the response-resolution target in the full suite even though it passes in isolation.
+- Revisit the blues soloist response-resolution bias later rather than blocking the current layering fix on it.
