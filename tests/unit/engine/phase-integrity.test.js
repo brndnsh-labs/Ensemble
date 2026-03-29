@@ -146,6 +146,7 @@ vi.mock('../../../public/midi-controller.js', () => ({
 
 import { scheduler } from '../../../public/engine/scheduler-core.js';
 import { getState } from '../../../public/state.js';
+import { triggerFlash } from '../../../public/ui.js';
 
 const { arranger, playback, groove } = getState();
 
@@ -176,18 +177,16 @@ describe('Phase Integrity (Audio/Visual Sync)', () => {
         scheduler(getState());
 
         // Check if Step 0 visuals are correctly timestamped
-        const flash = playback.drawQueue.find((ev) => ev.type === 'flash');
-        const drumVis = playback.drawQueue.find((ev) => ev.type === 'drum_vis');
-        const chordVis = playback.drawQueue.find((ev) => ev.type === 'chord_vis');
+        const stepMarker = playback.drawQueue.find((ev) => ev.type === 'step');
+        const chordEvent = playback.drawQueue.find((ev) => ev.type === 'chord');
 
-        expect(flash).toBeDefined();
-        expect(drumVis).toBeDefined();
-        expect(chordVis).toBeDefined();
+        expect(triggerFlash).toHaveBeenCalledWith(0.1);
+        expect(stepMarker).toBeDefined();
+        expect(chordEvent).toBeDefined();
 
         // Times must match the scheduled audio time exactly to prevent jitter
-        expect(flash.time).toBe(expectedTime);
-        expect(drumVis.time).toBe(expectedTime);
-        expect(chordVis.time).toBe(expectedTime);
+        expect(stepMarker.time).toBe(expectedTime);
+        expect(chordEvent.time).toBe(expectedTime);
     });
 
     it('should maintain perfect phase alignment even when Swing is applied', () => {
@@ -204,17 +203,17 @@ describe('Phase Integrity (Audio/Visual Sync)', () => {
 
         scheduler(getState());
 
-        const drumEvents = playback.drawQueue.filter((ev) => ev.type === 'drum_vis');
-        expect(drumEvents.length).toBeGreaterThan(1);
+        const stepEvents = playback.drawQueue.filter((ev) => ev.type === 'step');
+        expect(stepEvents.length).toBeGreaterThan(1);
 
         const sixteenth = 0.25 * (60 / playback.bpm); // 0.125s at 120bpm
         const shift = (sixteenth / 3) * (groove.swing / 100);
 
-        expect(drumEvents[0].time).toBe(startTime);
+        expect(stepEvents[0].time).toBe(startTime);
 
         // The time for step 1 should be shifted by the swing amount
         const expectedStep1Time = startTime + sixteenth + shift;
-        expect(drumEvents[1].time).toBeCloseTo(expectedStep1Time, 5);
+        expect(stepEvents[1].time).toBeCloseTo(expectedStep1Time, 5);
     });
 
     it('should clear the drawQueue when playback is stopped to prevent ghost visuals', () => {

@@ -321,6 +321,15 @@ test.describe('Workspace surfaces @ui', () => {
         const canvas = panel.locator('canvas').first();
         await expect(canvas).toBeVisible();
 
+        const legend = panel.locator('[data-testid="visualizer-legend"]');
+        await expect(legend).toBeVisible();
+        await expect(legend).toContainText('Drums');
+        await expect(legend).toContainText('Bass');
+        await expect(legend).toContainText('Chords');
+        await expect(legend).toContainText('Harmony');
+        await expect(legend).toContainText('Soloist');
+        await expect(legend).toContainText('Chord tones');
+
         const visualsBox = await visuals.boundingBox();
         const panelBox = await panel.boundingBox();
         const canvasBox = await canvas.boundingBox();
@@ -331,5 +340,30 @@ test.describe('Workspace surfaces @ui', () => {
         expect(panelBox.y - visualsBox.y).toBeLessThanOrEqual(4);
         expect(panelBox.height).toBeGreaterThan(220);
         expect(canvasBox.height).toBeGreaterThanOrEqual(148);
+    });
+
+    test('visuals stays compact on mobile without vertical clipping @mobile', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 640 });
+        await openWorkspace(page, 'Visuals');
+
+        const visuals = page.locator('section[data-workspace="visuals"]');
+        const panel = visuals.locator('#panel-visualizer');
+        const legend = panel.locator('[data-testid="visualizer-legend"]');
+        const canvas = panel.locator('canvas').first();
+
+        await expect(panel).toBeVisible();
+        await expect(legend).toBeVisible();
+        await expect(canvas).toBeVisible();
+
+        const viewport = page.viewportSize();
+        const panelBox = await panel.boundingBox();
+        const canvasBox = await canvas.boundingBox();
+
+        expect(viewport).not.toBeNull();
+        expect(panelBox).not.toBeNull();
+        expect(canvasBox).not.toBeNull();
+        expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(viewport.height);
+        expect(canvasBox.height).toBeGreaterThanOrEqual(160);
+        await expectNoVerticalOverflow(visuals, 16);
     });
 });

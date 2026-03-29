@@ -97,11 +97,17 @@ export class UnifiedVisualizer {
      * @param {string} name
      * @param {string} color
      * @param {string} resolvedColor
+     * @param {string} [label]
      */
-    addTrack(name, color, resolvedColor) {
-        this.tracks[name] = { color, resolvedColor };
+    addTrack(name, color, resolvedColor, label) {
+        this.tracks[name] = { color, resolvedColor, label: label || name };
         if (this.worker) {
-            this.worker.postMessage({ type: 'ADD_TRACK', name, color, resolvedColor }, []);
+            /** @type {{ type: string, name: string, color: string, resolvedColor: string, label?: string }} */
+            const message = { type: 'ADD_TRACK', name, color, resolvedColor };
+            if (label) {
+                message.label = label;
+            }
+            this.worker.postMessage(message, []);
         }
     }
 

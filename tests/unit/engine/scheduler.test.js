@@ -180,6 +180,7 @@ import {
     scheduler,
     togglePlay,
 } from '../../../public/engine/scheduler-core.js';
+import { triggerFlash } from '../../../public/ui.js';
 
 const { arranger, playback, vizState, groove, midi, soloist, chords, bass, harmony } = getState();
 
@@ -381,29 +382,27 @@ describe('Scheduler Core System', () => {
 
             scheduleGlobalEvent(getState(), 0, 10.0);
 
-            const soloistVis = playback.drawQueue.find((e) => e.type === 'soloist_vis');
-            const harmonyVis = playback.drawQueue.find((e) => e.type === 'harmony_vis');
+            const soloistVis = playback.drawQueue.find(
+                (e) => e.type === 'note' && e.track === 'soloist',
+            );
+            const harmonyVis = playback.drawQueue.find(
+                (e) => e.type === 'note' && e.track === 'harmony',
+            );
             expect(soloistVis).toBeDefined();
             expect(harmonyVis).toBeDefined();
         });
     });
 
     describe('Global Event Scheduling', () => {
-        it('should push visual flash events (lines 1198-1205)', () => {
+        it('should push timeline step events while visuals are enabled', () => {
             playback.visualFlash = true;
             groove.enabled = true;
             vizState.enabled = true;
 
-            // Step 0 is Measure Start (Flash intensity 0.2)
             scheduleGlobalEvent(getState(), 0, 10.0);
-            const flash0 = playback.drawQueue.find((e) => e.type === 'flash');
-            expect(flash0.intensity).toBe(0.2);
-
-            // Step 8 is Group Start in 4/4 (Flash intensity 0.15)
-            playback.drawQueue.length = 0;
-            scheduleGlobalEvent(getState(), 8, 11.0);
-            const flash8 = playback.drawQueue.find((e) => e.type === 'flash');
-            expect(flash8.intensity).toBe(0.15);
+            const step0 = playback.drawQueue.find((e) => e.type === 'step');
+            expect(step0).toMatchObject({ type: 'step', step: 0, time: 10.0 });
+            expect(triggerFlash).toHaveBeenCalledWith(0.1);
         });
 
         it('should not queue visual-only global events while visuals are disabled', () => {
@@ -413,8 +412,10 @@ describe('Scheduler Core System', () => {
 
             scheduleGlobalEvent(getState(), 0, 10.0);
 
-            expect(playback.drawQueue.find((e) => e.type === 'flash')).toBeUndefined();
-            expect(playback.drawQueue.find((e) => e.type === 'drum_vis')).toBeUndefined();
+            expect(playback.drawQueue.find((e) => e.type === 'step')).toBeUndefined();
+            expect(
+                playback.drawQueue.find((e) => e.type === 'note' && e.track === 'drums'),
+            ).toBeUndefined();
         });
         it('should emit a key-updated event when playhead crosses section threshold', () => {
             // Trigger Step 0 (Key A)
@@ -503,7 +504,7 @@ describe('Scheduler Core System', () => {
     });
 
     describe('Visual Scheduling', () => {
-        it('should not push chord_vis event while visualizer is disabled', () => {
+        it('should not push chord events while visualizer is disabled', () => {
             const chordData = {
                 stepInChord: 0,
                 chordIndex: 1,
@@ -524,7 +525,7 @@ describe('Scheduler Core System', () => {
             expect(playback.drawQueue.length).toBe(0);
         });
 
-        it('should not push chord_vis event if stepInChord is not 0', () => {
+        it('should not push chord events if stepInChord is not 0', () => {
             const chordData = {
                 stepInChord: 1,
                 chordIndex: 1,

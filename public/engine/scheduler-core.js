@@ -11,6 +11,12 @@ import {
     midiToNote,
 } from '../utils.js';
 import {
+    queueVisualizerChordEvent,
+    queueVisualizerFillEvent,
+    queueVisualizerNoteEvent,
+    queueVisualizerStepEvent,
+} from '../visualizer-events.js';
+import {
     flushWorker,
     requestBuffer,
     requestResolution,
@@ -416,9 +422,6 @@ function scheduleCountIn(state, beat, time) {
     if (!playback.audio) {
         return;
     }
-    if (vizState.enabled && playback.visualFlash) {
-        playback.drawQueue.push({ type: 'flash', time: time, intensity: 0.3, beat: 1 });
-    }
     const osc = playback.audio.createOscillator();
     const gain = playback.audio.createGain();
     osc.connect(gain);
@@ -505,13 +508,18 @@ function scheduleCountIn(state, beat, time) {
                 res.vibrato,
             );
             dispatchMidiCountInSoloist(state, res, time);
-            playback.drawQueue.push({
-                type: 'note',
-                track: 'soloist',
-                midi: res.midi,
-                time: time,
-                velocity: res.velocity,
-            });
+            if (vizState.enabled) {
+                const { name, octave } = midiToNote(res.midi);
+                queueVisualizerNoteEvent(playback, {
+                    track: 'soloist',
+                    midi: res.midi,
+                    time,
+                    velocity: res.velocity,
+                    duration,
+                    noteName: name,
+                    octave,
+                });
+            }
         });
     }
 }
@@ -637,16 +645,12 @@ function scheduleDrums(state, params, dispatch = undefined) {
 
         if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
             if (vizState.enabled) {
-                playback.drawQueue.push({
-                    type: 'fill_active',
-                    time: finalTime,
-                    active: true,
-                });
+                queueVisualizerFillEvent(playback, finalTime, true);
             }
         }
     } else if (vizState.enabled) {
         // Ensure fill visual state is cleared when fill is not active
-        playback.drawQueue.push({ type: 'fill_active', time: finalTime, active: false });
+        queueVisualizerFillEvent(playback, finalTime, false);
     }
 
     tickResult.drumHits.forEach((hit) => {
@@ -655,8 +659,8 @@ function scheduleDrums(state, params, dispatch = undefined) {
 
         if (vizState.enabled) {
             const midiNum = /** @type {any} */ (DRUM_VIS_PITCHES)[hit.soundName] || 36;
-            playback.drawQueue.push({
-                type: 'drums_vis',
+            queueVisualizerNoteEvent(playback, {
+                track: 'drums',
                 midi: midiNum,
                 time: playTime,
                 velocity: hit.velocity * conductorVel,
@@ -697,8 +701,8 @@ function scheduleDrumsFromBuffer(state, step, time) {
 
             if (vizState.enabled) {
                 const midiNum = /** @type {any} */ (DRUM_VIS_PITCHES)[name] || 36;
-                playback.drawQueue.push({
-                    type: 'drums_vis',
+                queueVisualizerNoteEvent(playback, {
+                    track: 'drums',
                     midi: midiNum,
                     time: playTime,
                     velocity: velocity * conductorVel,
@@ -743,9 +747,9 @@ function scheduleBass(state, chordData, step, time) {
                         chordNotes[i] = getMidi(/** @type {any} */ (chord.freqs[i]));
                     }
 
-                    playback.drawQueue.push({
-                        type: 'bass_vis',
-                        name,
+                    queueVisualizerNoteEvent(playback, {
+                        track: 'bass',
+                        noteName: name,
                         octave,
                         midi: midiNum,
                         time: adjustedTime,
@@ -852,9 +856,9 @@ function scheduleSoloist(state, chordData, step, playTime) {
                         chordNotes[i] = getMidi(/** @type {any} */ (chord.freqs[i]));
                     }
 
-                    playback.drawQueue.push({
-                        type: 'soloist_vis',
-                        name,
+                    queueVisualizerNoteEvent(playback, {
+                        track: 'soloist',
+                        noteName: name,
                         octave,
                         midi: midiNum,
                         time: finalTime,
@@ -891,14 +895,15 @@ export function scheduleChordVisuals(state, chordData, t) {
         // Only queue canvas events when the Visuals workspace is active.
         // Arranger highlighting is driven directly from the scheduler now.
         if (vizState.enabled) {
-            playback.drawQueue.push({
-                type: 'chord_vis',
+            queueVisualizerChordEvent(playback, {
                 time: t,
                 index: chordData.chordIndex,
                 chordNotes,
                 rootMidi: chordData.chord.rootMidi,
                 intervals: chordData.chord.intervals,
                 duration: chordData.chord.beats * (60 / playback.bpm),
+                label: chordData.chord.absName,
+                sectionId: chordData.chord.sectionId || null,
             });
         }
 
@@ -918,7 +923,7 @@ export function scheduleChordVisuals(state, chordData, t) {
  * @param {number} time - The AudioContext time to play.
  */
 function scheduleChords(state, _chordData, step, time) {
-    const { chords, playback } = state;
+    const { chords, playback, vizState } = state;
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
 
@@ -958,6 +963,8 @@ function scheduleChords(state, _chordData, step, time) {
 
             if (!muted && freq) {
                 const duration = (durationSteps || 1) * 0.25 * spb;
+                const midiNum = getMidi(freq) || 0;
+                const { name, octave } = midiToNote(midiNum);
                 playNote(state, freq, playTime, duration, {
                     vol: velocity,
                     index: 0,
@@ -965,6 +972,18 @@ function scheduleChords(state, _chordData, step, time) {
                     numVoices: numVoices,
                 });
                 dispatchMidiChordNote(state, freq, velocity, playTime, duration);
+                if (vizState.enabled) {
+                    queueVisualizerNoteEvent(playback, {
+                        track: 'chords',
+                        noteName: name,
+                        octave,
+                        midi: midiNum,
+                        time: playTime,
+                        duration,
+                        velocity,
+                        ccEvents,
+                    });
+                }
             }
         });
     }
@@ -1040,9 +1059,9 @@ function scheduleHarmonies(state, _chordData, step, time) {
 
                 if (vizState.enabled) {
                     const { name, octave } = midiToNote(m);
-                    playback.drawQueue.push({
-                        type: 'harmony_vis',
-                        name,
+                    queueVisualizerNoteEvent(playback, {
+                        track: 'harmony',
+                        noteName: name,
                         octave,
                         midi: m,
                         time: playTime,
@@ -1147,17 +1166,8 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
         playback.unswungNextNoteTime * straightness + swungTime * (1.0 - straightness);
 
     if (groove.enabled) {
-        if (vizState.enabled && stepInfo.isBeatStart && playback.visualFlash) {
-            playback.drawQueue.push({
-                type: 'flash',
-                time: swungTime,
-                intensity: stepInfo.isMeasureStart ? 0.2 : stepInfo.isGroupStart ? 0.15 : 0.1,
-                beat: stepInfo.isMeasureStart ? 1 : 0,
-            });
-        }
-
         if (vizState.enabled) {
-            playback.drawQueue.push({ type: 'drum_vis', step: drumStep, time: swungTime });
+            queueVisualizerStepEvent(playback, swungTime, drumStep);
         }
 
         const chordDataForDrums = /** @type {any} */ (getChordAtStep(state, step));

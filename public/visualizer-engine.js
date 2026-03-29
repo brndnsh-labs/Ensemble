@@ -1,28 +1,27 @@
 import { MODULES } from './constants.js';
-import { INTERVAL_CATEGORY, IS_BLACK, RingBuffer } from './visualizer-utils.js';
+import { VISUALIZER_TRACK_ORDER, VISUALIZER_TRACKS } from './visualizer-events.js';
+import { INTERVAL_CATEGORY, RingBuffer } from './visualizer-utils.js';
 
-const { min, max, floor, PI, round, ceil } = Math;
-
-/**
- * @param {number} m
- * @param {number} midY
- * @param {number} centerMidi
- * @param {number} yScale
- * @returns {number}
- */
-function getYStandalone(m, midY, centerMidi, yScale) {
-    return midY - (m - centerMidi) * yScale;
-}
+const { PI, abs, max, min } = Math;
+const DEFAULT_TRACK_RANGE = { midiMin: 48, midiMax: 84 };
 
 /**
  * @param {number} t
  * @param {number} currentTime
- * @param {number} pianoRollWidth
+ * @param {number} labelRailWidth
  * @param {number} timeScale
  * @returns {number}
  */
-function getXStandalone(t, currentTime, pianoRollWidth, timeScale) {
-    return pianoRollWidth + (currentTime - t) * timeScale;
+function getXStandalone(t, currentTime, labelRailWidth, timeScale) {
+    return labelRailWidth + (currentTime - t) * timeScale;
+}
+
+/**
+ * @param {string} name
+ * @returns {string}
+ */
+function formatTrackLabel(name) {
+    return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /**
@@ -49,9 +48,7 @@ export class VisualizerEngine {
         /** @type {Array<any>} */
         this.chordEvents = [];
         this.windowSize = 4.0;
-        this.visualRange = 60;
-        this.centerMidi = 60;
-        this.pianoRollWidth = 50;
+        this.labelRailWidth = 92;
         /** @type {Record<string, number>} */
         this.registers = { chords: 60 };
         /** @type {number|null} */
@@ -60,14 +57,6 @@ export class VisualizerEngine {
         this.themeCache = null;
         this.isFillActive = false;
 
-        this.cNotesBuffer = new Uint8Array(128);
-        /** @type {Array<Array<number>>} */
-        this.soloistBuffers = [[], [], [], []];
-        /** @type {Array<Array<number>>} */
-        this.activeChordBuffers = [[], [], [], []];
-        /** @type {Array<Array<number>>} */
-        this.guideToneBuffers = [[], [], [], []];
-
         /** @type {number} */
         this.width = 0;
         /** @type {number} */
@@ -75,11 +64,12 @@ export class VisualizerEngine {
         /** @type {number} */
         this.dpr = 1;
         /** @type {number} */
-        this.yScale = 1;
-        /** @type {number} */
-        this.midY = 0;
-        /** @type {number} */
         this.timeScale = 1;
+
+        /** @type {string[]} */
+        this.trackOrder = [...VISUALIZER_TRACK_ORDER];
+        /** @type {Record<string, any>} */
+        this.lanes = {};
     }
 
     /**
@@ -88,10 +78,15 @@ export class VisualizerEngine {
      */
     setTheme(themeCache) {
         this.themeCache = themeCache;
+        this.categoryColors = themeCache.chordColors || [
+            '#268bd2',
+            '#859900',
+            '#cb4b16',
+            '#d33682',
+        ];
         this.intervalColors = Array.from(INTERVAL_CATEGORY).map(
-            (catIndex) => this.themeCache.chordColors[catIndex],
+            (categoryIndex) => this.categoryColors[categoryIndex],
         );
-        this.categoryColors = this.themeCache.chordColors;
 
         if (this.width && this.height) {
             this.renderStaticLayer();
@@ -119,19 +114,9 @@ export class VisualizerEngine {
         this.staticCtx.resetTransform();
         this.staticCtx.scale(dpr, dpr);
 
-        this.yScale = this.height / this.visualRange;
-        this.midY = this.height / 2;
-        this.timeScale = (this.width - this.pianoRollWidth) / this.windowSize;
+        this.timeScale = max(1, (this.width - this.labelRailWidth) / this.windowSize);
 
         this.renderStaticLayer();
-    }
-
-    /**
-     * @param {number} m
-     * @returns {number}
-     */
-    getY(m) {
-        return getYStandalone(m, this.midY, this.centerMidi, this.yScale);
     }
 
     /**
@@ -140,115 +125,7 @@ export class VisualizerEngine {
      * @returns {number}
      */
     getX(t, currentTime) {
-        return getXStandalone(t, currentTime, this.pianoRollWidth, this.timeScale);
-    }
-
-    renderStaticLayer() {
-        if (!this.themeCache || !this.width || !this.height) {
-            return;
-        }
-
-        const ctx = this.staticCtx;
-        const w = this.width;
-        const h = this.height;
-        const yScale = this.yScale;
-
-        const {
-            bgColor,
-            keyWhite,
-            keyBlack,
-            keySeparator,
-            labelColor,
-            guideLineBlack,
-            guideLineWhite,
-            separatorColor,
-        } = this.themeCache;
-
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, w, h);
-
-        const topMidi = this.centerMidi + this.visualRange / 2;
-        const bottomMidi = this.centerMidi - this.visualRange / 2;
-        const startMidi = floor(bottomMidi);
-        const endMidi = ceil(topMidi);
-
-        ctx.lineWidth = 1;
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-
-        for (let m = startMidi; m <= endMidi; m++) {
-            const y = this.getY(m);
-            const noteInOctave = m % 12;
-            const isBlack = IS_BLACK[noteInOctave];
-
-            ctx.fillStyle = isBlack ? keyBlack : keyWhite;
-            ctx.fillRect(0, y - yScale / 2, this.pianoRollWidth, yScale);
-
-            if (noteInOctave === 0) {
-                ctx.fillStyle = labelColor;
-                const octave = m / 12 - 1;
-                ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
-            }
-        }
-
-        ctx.strokeStyle = keySeparator;
-        ctx.beginPath();
-        for (let m = startMidi; m <= endMidi; m++) {
-            const y = this.getY(m);
-            ctx.moveTo(0, y + yScale / 2);
-            ctx.lineTo(this.pianoRollWidth, y + yScale / 2);
-        }
-        ctx.stroke();
-
-        ctx.strokeStyle = guideLineWhite;
-        ctx.beginPath();
-        for (let m = startMidi; m <= endMidi; m++) {
-            const noteInOctave = m % 12;
-            if (!IS_BLACK[noteInOctave]) {
-                const y = this.getY(m);
-                ctx.moveTo(this.pianoRollWidth, y);
-                ctx.lineTo(w, y);
-            }
-        }
-        ctx.stroke();
-
-        ctx.strokeStyle = guideLineBlack;
-        ctx.beginPath();
-        for (let m = startMidi; m <= endMidi; m++) {
-            const noteInOctave = m % 12;
-            if (IS_BLACK[noteInOctave]) {
-                const y = this.getY(m);
-                ctx.moveTo(this.pianoRollWidth, y);
-                ctx.lineTo(w, y);
-            }
-        }
-        ctx.stroke();
-
-        ctx.strokeStyle = separatorColor;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.pianoRollWidth, 0);
-        ctx.lineTo(this.pianoRollWidth, h);
-        ctx.stroke();
-    }
-
-    /**
-     * @param {string} name
-     * @param {string} color
-     * @param {string} [resolvedColor]
-     * @returns {void}
-     */
-    addTrack(name, color, resolvedColor) {
-        this.tracks[name] = {
-            color,
-            resolvedColor: resolvedColor || color,
-            history: new RingBuffer(100),
-            currentNoteLabel: '',
-        };
-        if (!this.registers[name]) {
-            this.registers[name] = 60;
-        }
+        return getXStandalone(t, currentTime, this.labelRailWidth, this.timeScale);
     }
 
     /**
@@ -269,6 +146,153 @@ export class VisualizerEngine {
     }
 
     /**
+     * @returns {string[]}
+     */
+    getTrackOrder() {
+        return VISUALIZER_TRACK_ORDER.filter((name) => this.tracks[name]);
+    }
+
+    /**
+     * @returns {void}
+     */
+    buildLaneLayout() {
+        const order = this.getTrackOrder();
+        this.trackOrder = order.length > 0 ? order : [...VISUALIZER_TRACK_ORDER];
+
+        const count = max(this.trackOrder.length, 1);
+        const laneHeight = this.height / count;
+        /** @type {Record<string, any>} */
+        const lanes = {};
+
+        this.trackOrder.forEach((name, index) => {
+            const top = index * laneHeight;
+            const bottom = top + laneHeight;
+            const innerTop = top + 8;
+            const innerBottom = bottom - 8;
+            lanes[name] = {
+                index,
+                top,
+                bottom,
+                height: laneHeight,
+                innerTop,
+                innerBottom,
+                innerHeight: max(12, innerBottom - innerTop),
+                mid: (innerTop + innerBottom) / 2,
+            };
+        });
+
+        this.lanes = lanes;
+    }
+
+    renderStaticLayer() {
+        if (!this.themeCache || !this.width || !this.height) {
+            return;
+        }
+
+        this.buildLaneLayout();
+
+        const ctx = this.staticCtx;
+        const w = this.width;
+        const h = this.height;
+        const graphX = this.labelRailWidth;
+        const graphW = w - graphX;
+
+        const bgColor = this.themeCache.bgColor || '#0f172a';
+        const labelRailBg = this.themeCache.labelRailBg || this.themeCache.keyBlack || '#111827';
+        const laneBg = this.themeCache.laneBg || 'rgba(255, 255, 255, 0.025)';
+        const laneAltBg = this.themeCache.laneAltBg || 'rgba(255, 255, 255, 0.05)';
+        const laneGuideColor =
+            this.themeCache.laneGuideColor ||
+            this.themeCache.guideLineWhite ||
+            'rgba(255,255,255,0.04)';
+        const separatorColor = this.themeCache.separatorColor || 'rgba(148, 163, 184, 0.24)';
+        const trackLabelColor =
+            this.themeCache.trackLabelColor || this.themeCache.labelColor || '#cbd5e1';
+        const noteLabelColor =
+            this.themeCache.noteLabelColor || this.themeCache.labelColor || '#94a3b8';
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.fillStyle = labelRailBg;
+        ctx.fillRect(0, 0, graphX, h);
+
+        for (const name of this.trackOrder) {
+            const lane = this.lanes[name];
+            const track = this.tracks[name];
+            const trackColor = track?.resolvedColor || track?.color || '#ffffff';
+            const laneFill = lane.index % 2 === 0 ? laneBg : laneAltBg;
+
+            ctx.fillStyle = laneFill;
+            ctx.fillRect(graphX, lane.top, graphW, lane.height);
+
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = trackColor;
+            ctx.fillRect(0, lane.top, 5, lane.height);
+            ctx.globalAlpha = 1.0;
+
+            ctx.fillStyle = trackLabelColor;
+            ctx.font = '600 12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(track?.label || formatTrackLabel(name), 12, lane.top + 10);
+
+            ctx.fillStyle = noteLabelColor;
+            ctx.font = '10px sans-serif';
+            ctx.fillText('Timeline', 12, lane.top + 28);
+
+            ctx.strokeStyle = laneGuideColor;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(graphX, lane.innerTop + lane.innerHeight / 3);
+            ctx.lineTo(w, lane.innerTop + lane.innerHeight / 3);
+            ctx.moveTo(graphX, lane.innerTop + (lane.innerHeight * 2) / 3);
+            ctx.lineTo(w, lane.innerTop + (lane.innerHeight * 2) / 3);
+            ctx.stroke();
+
+            ctx.strokeStyle = separatorColor;
+            ctx.beginPath();
+            ctx.moveTo(0, lane.bottom);
+            ctx.lineTo(w, lane.bottom);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle = separatorColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(graphX, 0);
+        ctx.lineTo(graphX, h);
+        ctx.stroke();
+    }
+
+    /**
+     * @param {string} name
+     * @param {string} color
+     * @param {string} [resolvedColor]
+     * @param {string} [label]
+     * @returns {void}
+     */
+    addTrack(name, color, resolvedColor, label) {
+        const meta = VISUALIZER_TRACKS[/** @type {keyof typeof VISUALIZER_TRACKS} */ (name)];
+        const capacity = name === 'drums' ? 240 : name === 'chords' ? 180 : 140;
+        this.tracks[name] = {
+            color,
+            resolvedColor: resolvedColor || color,
+            label: label || formatTrackLabel(name),
+            history: new RingBuffer(capacity),
+            currentNoteLabel: '',
+            midiMin: meta?.midiMin ?? DEFAULT_TRACK_RANGE.midiMin,
+            midiMax: meta?.midiMax ?? DEFAULT_TRACK_RANGE.midiMax,
+        };
+        if (!this.registers[name]) {
+            this.registers[name] = 60;
+        }
+        if (this.width && this.height && this.themeCache) {
+            this.renderStaticLayer();
+        }
+    }
+
+    /**
      * @param {string} name
      * @param {any} event
      * @returns {void}
@@ -278,7 +302,7 @@ export class VisualizerEngine {
             return;
         }
         this.tracks[name].history.push(event);
-        if (event.noteName && event.octave) {
+        if (event.noteName && typeof event.octave === 'number') {
             this.tracks[name].currentNoteLabel = `${event.noteName}${event.octave}`;
         }
     }
@@ -312,6 +336,509 @@ export class VisualizerEngine {
     }
 
     /**
+     * @param {string} name
+     * @returns {{ midiMin: number, midiMax: number }}
+     */
+    getTrackMidiRange(name) {
+        const track = this.tracks[name];
+        return {
+            midiMin: track?.midiMin ?? DEFAULT_TRACK_RANGE.midiMin,
+            midiMax: track?.midiMax ?? DEFAULT_TRACK_RANGE.midiMax,
+        };
+    }
+
+    /**
+     * @param {string} name
+     * @returns {any}
+     */
+    getLane(name) {
+        return this.lanes[name] || null;
+    }
+
+    /**
+     * @param {string} name
+     * @param {number} midi
+     * @returns {number}
+     */
+    getLaneY(name, midi) {
+        const lane = this.getLane(name);
+        if (!lane) {
+            return 0;
+        }
+        const { midiMin, midiMax } = this.getTrackMidiRange(name);
+        const span = max(1, midiMax - midiMin);
+        const clampedMidi = max(midiMin, min(midiMax, midi));
+        const ratio = (clampedMidi - midiMin) / span;
+        return lane.innerBottom - ratio * lane.innerHeight;
+    }
+
+    /**
+     * @param {string} name
+     * @returns {number}
+     */
+    getTrackThickness(name) {
+        const lane = this.getLane(name);
+        if (!lane) {
+            return 4;
+        }
+        if (name === 'drums') {
+            return max(5, min(9, lane.innerHeight * 0.14));
+        }
+        return max(3, min(7, lane.innerHeight * 0.08));
+    }
+
+    /**
+     * @param {string} name
+     * @param {any} event
+     * @returns {string}
+     */
+    getEventColor(name, event) {
+        const track = this.tracks[name];
+        const baseColor = track?.resolvedColor || track?.color || '#ffffff';
+        const chordColors = this.categoryColors || ['#268bd2', '#859900', '#cb4b16', '#d33682'];
+
+        if (name === MODULES.SOLOIST) {
+            if (event.noteType === 'target') {
+                return chordColors[0] || baseColor;
+            }
+            if (event.noteType === 'arp') {
+                return chordColors[2] || baseColor;
+            }
+            if (event.noteType === 'altered') {
+                return chordColors[3] || baseColor;
+            }
+        }
+
+        return baseColor;
+    }
+
+    /**
+     * @param {any} event
+     * @returns {string}
+     */
+    getEventLabel(event) {
+        if (event.noteName && typeof event.octave === 'number') {
+            return `${event.noteName}${event.octave}`;
+        }
+        return '';
+    }
+
+    /**
+     * @param {RingBuffer} history
+     * @param {(event: any) => boolean | void} visit
+     * @returns {void}
+     */
+    forEachHistoryEvent(history, visit) {
+        const buffer = history.buffer;
+        const capacity = history.capacity;
+        const count = history.count;
+        const start = history.start;
+        const headLength = min(count, capacity - start);
+
+        for (let i = 0; i < headLength; i++) {
+            if (visit(buffer[start + i]) === false) {
+                return;
+            }
+        }
+
+        if (headLength >= count) {
+            return;
+        }
+
+        const tailLength = count - headLength;
+        for (let i = 0; i < tailLength; i++) {
+            if (visit(buffer[i]) === false) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * @param {string} name
+     * @param {number} currentTime
+     * @param {number} minTime
+     * @param {(event: any, noteEnd: number) => void} visit
+     * @returns {void}
+     */
+    forEachVisibleTrackEvent(name, currentTime, minTime, visit) {
+        const track = this.tracks[name];
+        if (!track) {
+            return;
+        }
+
+        this.forEachHistoryEvent(track.history, (event) => {
+            if (!event) {
+                return true;
+            }
+            if (event.time > currentTime) {
+                return false;
+            }
+
+            const defaultDuration = name === 'drums' ? 0.1 : 0.25;
+            const noteEnd = event.time + (event.duration || defaultDuration);
+            if (noteEnd < minTime) {
+                return true;
+            }
+
+            visit(event, noteEnd);
+            return true;
+        });
+    }
+
+    /**
+     * @param {number} currentTime
+     * @param {number} minTime
+     * @param {(event: any, chordEnd: number) => void} visit
+     * @returns {void}
+     */
+    forEachVisibleChordEvent(currentTime, minTime, visit) {
+        for (const event of this.chordEvents) {
+            const chordEnd = event.time + (event.duration || 2.0);
+            if (chordEnd < minTime) {
+                continue;
+            }
+            if (event.time > currentTime) {
+                break;
+            }
+            visit(event, chordEnd);
+        }
+    }
+
+    /**
+     * @param {string} laneName
+     * @param {any} event
+     * @returns {Array<{ midi: number, colorIdx: number }>}
+     */
+    getChordOverlayEntries(laneName, event) {
+        const { midiMin, midiMax } = this.getTrackMidiRange(laneName);
+        const rootPc = ((event.rootMidi % 12) + 12) % 12;
+        /** @type {number[]} */
+        const notes = Array.isArray(event.notes)
+            ? event.notes
+            : Array.isArray(event.chordNotes)
+              ? event.chordNotes
+              : [];
+
+        if (laneName === 'chords' && notes.length > 0) {
+            return notes
+                .filter((midi) => midi >= midiMin && midi <= midiMax)
+                .map((midi) => ({
+                    midi,
+                    colorIdx: INTERVAL_CATEGORY[((midi % 12) - rootPc + 12) % 12],
+                }));
+        }
+
+        /** @type {number[]} */
+        const intervalSource =
+            Array.isArray(event.intervals) && event.intervals.length > 0
+                ? event.intervals
+                : notes.map((midi) => ((midi % 12) - rootPc + 12) % 12);
+        const uniqueIntervals = [
+            ...new Set(intervalSource.map((interval) => ((interval % 12) + 12) % 12)),
+        ];
+        const overlayEntries = [];
+        const seenMidis = new Set();
+        const minOctave = Math.floor(midiMin / 12) - 1;
+        const maxOctave = Math.ceil(midiMax / 12) + 1;
+
+        for (const interval of uniqueIntervals) {
+            const pc = (rootPc + interval) % 12;
+            const colorIdx = INTERVAL_CATEGORY[interval];
+            for (let octave = minOctave; octave <= maxOctave; octave++) {
+                const midi = pc + octave * 12;
+                if (midi < midiMin || midi > midiMax || seenMidis.has(midi)) {
+                    continue;
+                }
+                seenMidis.add(midi);
+                overlayEntries.push({ midi, colorIdx });
+            }
+        }
+
+        return overlayEntries.sort((a, b) => a.midi - b.midi);
+    }
+
+    /**
+     * @param {number} currentTime
+     * @param {number} bpm
+     * @param {any} tsConfig
+     * @returns {void}
+     */
+    drawVerticalGrid(currentTime, bpm, tsConfig) {
+        if (!bpm || this.beatReferenceTime === null) {
+            return;
+        }
+
+        const ctx = this.ctx;
+        const h = this.height;
+        const minTime = currentTime - this.windowSize;
+        const ts =
+            typeof tsConfig === 'object' && tsConfig !== null
+                ? tsConfig
+                : { beats: tsConfig || 4, grouping: [tsConfig || 4], stepsPerBeat: 4 };
+        const beatsPerMeasure = ts.beats;
+        const beatLen = 60 / bpm;
+        const startBeat = Math.floor((minTime - this.beatReferenceTime) / beatLen);
+
+        ctx.lineWidth = 1;
+
+        ctx.strokeStyle = this.themeCache.gridColorMeasure || 'rgba(56, 189, 248, 0.35)';
+        ctx.beginPath();
+        for (let i = startBeat; ; i++) {
+            const t = this.beatReferenceTime + i * beatLen;
+            if (t > currentTime + 0.1) {
+                break;
+            }
+
+            if (i % beatsPerMeasure !== 0) {
+                continue;
+            }
+
+            const x = this.getX(t, currentTime);
+            if (x < this.labelRailWidth) {
+                continue;
+            }
+
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = this.themeCache.gridColorBeat || 'rgba(255, 255, 255, 0.08)';
+        ctx.beginPath();
+        for (let i = startBeat; ; i++) {
+            const t = this.beatReferenceTime + i * beatLen;
+            if (t > currentTime + 0.1) {
+                break;
+            }
+
+            const beatInMeasure = ((i % beatsPerMeasure) + beatsPerMeasure) % beatsPerMeasure;
+            if (beatInMeasure === 0) {
+                continue;
+            }
+
+            const x = this.getX(t, currentTime);
+            if (x < this.labelRailWidth) {
+                continue;
+            }
+
+            let isGroupStart = false;
+            if (ts.grouping && ts.grouping.length > 1) {
+                let accumulated = 0;
+                for (const group of ts.grouping) {
+                    if (beatInMeasure === accumulated) {
+                        isGroupStart = true;
+                        break;
+                    }
+                    accumulated += group;
+                }
+            }
+
+            ctx.globalAlpha = isGroupStart ? 0.7 : 1.0;
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.globalAlpha = 1.0;
+        }
+        ctx.stroke();
+    }
+
+    /**
+     * @param {number} currentTime
+     * @param {number} minTime
+     * @returns {void}
+     */
+    drawChordLaneBackdrop(currentTime, minTime) {
+        const ctx = this.ctx;
+        const overlayConfigs = [
+            {
+                laneName: 'chords',
+                alpha: 0.16,
+                toneHeight: 4,
+                showMarkers: true,
+                showLabels: true,
+            },
+            {
+                laneName: MODULES.SOLOIST,
+                alpha: 0.08,
+                toneHeight: 3,
+                showMarkers: false,
+                showLabels: false,
+            },
+        ];
+
+        for (const config of overlayConfigs) {
+            const lane = this.getLane(config.laneName);
+            const track = this.tracks[config.laneName];
+            if (!lane || !track) {
+                continue;
+            }
+
+            const trackColor = track.resolvedColor || track.color || '#268bd2';
+            const markerColor =
+                this.themeCache.chordMarkerColor || this.themeCache.separatorColor || trackColor;
+            const labelColor =
+                this.themeCache.trackLabelColor || this.themeCache.labelColor || trackColor;
+
+            this.forEachVisibleChordEvent(currentTime, minTime, (event, chordEnd) => {
+                const start = max(minTime, event.time);
+                const end = min(currentTime, chordEnd);
+                const xStart = this.getX(start, currentTime);
+                const xEnd = this.getX(end, currentTime);
+                const left = min(xStart, xEnd);
+                const width = max(2, abs(xStart - xEnd));
+                const overlayEntries = this.getChordOverlayEntries(config.laneName, event);
+
+                if (overlayEntries.length > 0) {
+                    ctx.globalAlpha = config.alpha;
+                    for (const entry of overlayEntries) {
+                        const y = this.getLaneY(config.laneName, entry.midi);
+                        ctx.fillStyle = this.categoryColors[entry.colorIdx] || trackColor;
+                        ctx.beginPath();
+                        ctx.rect(left, y - config.toneHeight / 2, width, config.toneHeight);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+
+                if (config.showMarkers) {
+                    ctx.strokeStyle = markerColor;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(left, lane.top);
+                    ctx.lineTo(left, lane.bottom);
+                    ctx.stroke();
+                }
+
+                if (config.showLabels && event.label && width > 28) {
+                    ctx.fillStyle = labelColor;
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(event.label, left + 4, lane.top + 6);
+                }
+            });
+        }
+    }
+
+    /**
+     * @returns {void}
+     */
+    drawFillOverlay() {
+        if (!this.isFillActive) {
+            return;
+        }
+
+        const lane = this.getLane('drums');
+        if (!lane) {
+            return;
+        }
+
+        const ctx = this.ctx;
+        const fillGradient = ctx.createLinearGradient(
+            this.labelRailWidth,
+            lane.top,
+            this.labelRailWidth,
+            lane.bottom,
+        );
+        fillGradient.addColorStop(0, this.themeCache.fillGradientTop || 'rgba(211, 54, 130, 0)');
+        fillGradient.addColorStop(
+            0.5,
+            this.themeCache.fillGradientMid || 'rgba(211, 54, 130, 0.16)',
+        );
+        fillGradient.addColorStop(1, this.themeCache.fillGradientBottom || 'rgba(211, 54, 130, 0)');
+        ctx.fillStyle = fillGradient;
+        ctx.fillRect(this.labelRailWidth, lane.top, this.width - this.labelRailWidth, lane.height);
+    }
+
+    /**
+     * @param {number} currentTime
+     * @param {number} minTime
+     * @returns {void}
+     */
+    drawTrackNotes(currentTime, minTime) {
+        const ctx = this.ctx;
+        const outlineColor = this.themeCache.outlineColor || '#ffffff';
+        const noteLabelColor =
+            this.themeCache.noteLabelColor || this.themeCache.labelColor || '#94a3b8';
+
+        for (const name of this.trackOrder) {
+            const track = this.tracks[name];
+            const lane = this.getLane(name);
+            if (!track || !lane) {
+                continue;
+            }
+
+            let activeX = 0;
+            let activeY = 0;
+            let activeColor = track.resolvedColor || track.color || '#ffffff';
+            let activeLabel = '';
+            let hasActive = false;
+
+            if (name === 'drums') {
+                ctx.fillStyle = track.resolvedColor || track.color || '#ffffff';
+                ctx.beginPath();
+                this.forEachVisibleTrackEvent(name, currentTime, minTime, (event, noteEnd) => {
+                    const x = this.getX(event.time, currentTime);
+                    const y = this.getLaneY(name, event.midi);
+                    const size = 2 + (event.velocity || 1.0) * 2.5;
+                    ctx.moveTo(x, y - size);
+                    ctx.lineTo(x + size, y);
+                    ctx.lineTo(x, y + size);
+                    ctx.lineTo(x - size, y);
+                    if (event.time <= currentTime && noteEnd >= currentTime) {
+                        hasActive = true;
+                        activeX = x;
+                        activeY = y;
+                    }
+                });
+                ctx.fill();
+            } else {
+                this.forEachVisibleTrackEvent(name, currentTime, minTime, (event, noteEnd) => {
+                    const start = max(minTime, event.time);
+                    const end = min(currentTime, noteEnd);
+                    const xStart = this.getX(start, currentTime);
+                    const xEnd = this.getX(end, currentTime);
+                    const left = min(xStart, xEnd);
+                    const width = max(2, abs(xStart - xEnd));
+                    const y = this.getLaneY(name, event.midi);
+                    const thickness = this.getTrackThickness(name);
+                    const eventColor = this.getEventColor(name, event);
+
+                    ctx.fillStyle = outlineColor;
+                    ctx.fillRect(left, y - thickness / 2 - 0.5, width, thickness + 1);
+                    ctx.fillStyle = eventColor;
+                    ctx.fillRect(left, y - thickness / 2, width, thickness);
+
+                    if (event.time <= currentTime && noteEnd >= currentTime) {
+                        hasActive = true;
+                        activeX = xEnd;
+                        activeY = y;
+                        activeColor = eventColor;
+                        activeLabel = this.getEventLabel(event);
+                    }
+                });
+            }
+
+            if (hasActive) {
+                ctx.fillStyle = activeColor;
+                ctx.beginPath();
+                ctx.arc(activeX, activeY, 5, 0, PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            if (activeLabel) {
+                ctx.fillStyle = noteLabelColor;
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(activeLabel, 12, lane.top + 44);
+            }
+        }
+    }
+
+    /**
      * @param {number} currentTime
      * @param {number} bpm
      * @param {any} tsConfig
@@ -322,715 +849,26 @@ export class VisualizerEngine {
             return;
         }
 
+        if (!this.trackOrder.length || !this.lanes[this.trackOrder[0]]) {
+            this.buildLaneLayout();
+        }
+
         const ctx = this.ctx;
-        const w = this.width;
         const h = this.height;
-        const graphW = w - this.pianoRollWidth;
         const minTime = currentTime - this.windowSize;
-        const yScale = this.yScale;
 
-        const frameXBase = this.pianoRollWidth + currentTime * this.timeScale;
-        const frameXScale = this.timeScale;
-        const frameYBase = this.midY + this.centerMidi * this.yScale;
-        const frameYScale = this.yScale;
+        ctx.drawImage(this.staticCanvas, 0, 0, this.width, this.height);
 
-        const { chordColors } = this.themeCache;
+        this.drawVerticalGrid(currentTime, bpm, tsConfig);
+        this.drawChordLaneBackdrop(currentTime, minTime);
+        this.drawFillOverlay();
+        this.drawTrackNotes(currentTime, minTime);
 
-        ctx.drawImage(this.staticCanvas, 0, 0, w, h);
-
-        const topMidi = this.centerMidi + this.visualRange / 2;
-        const bottomMidi = this.centerMidi - this.visualRange / 2;
-        const startMidi = floor(bottomMidi);
-        const endMidi = ceil(topMidi);
-
-        const minOct = floor(startMidi / 12);
-        const maxOct = ceil(endMidi / 12);
-
-        this.cNotesBuffer.fill(0);
-
-        for (let i = 0; i < 4; i++) {
-            this.activeChordBuffers[i].length = 0;
-        }
-
-        for (const ev of this.chordEvents) {
-            if (ev.time > currentTime) {
-                break;
-            }
-            if (ev.time <= currentTime && ev.time + (ev.duration || 2.0) >= currentTime) {
-                if (ev.notes) {
-                    const rootPC = ev.rootMidi % 12;
-                    for (const m of ev.notes) {
-                        if (m < startMidi || m > endMidi) {
-                            continue;
-                        }
-
-                        const interval = ((m % 12) - rootPC + 12) % 12;
-                        const y = frameYBase - m * frameYScale;
-                        const colorIdx = INTERVAL_CATEGORY[interval];
-
-                        this.activeChordBuffers[colorIdx].push(y);
-
-                        if (m % 12 === 0) {
-                            this.cNotesBuffer[m] = 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        for (let i = 0; i < 4; i++) {
-            const buffer = this.activeChordBuffers[i];
-            if (buffer.length === 0) {
-                continue;
-            }
-
-            ctx.fillStyle = this.categoryColors[i];
-            ctx.beginPath();
-            for (let j = 0; j < buffer.length; j++) {
-                ctx.rect(0, buffer[j] - yScale / 2, this.pianoRollWidth, yScale);
-            }
-            ctx.fill();
-        }
-
-        for (const name in this.tracks) {
-            const track = this.tracks[name];
-            const color = track.resolvedColor || track.color;
-            ctx.fillStyle = color;
-
-            const buffer = track.history.buffer;
-            const capacity = track.history.capacity;
-            const count = track.history.count;
-            const start = track.history.start;
-            const headLength = min(count, capacity - start);
-
-            let stop = false;
-            for (let i = 0; i < headLength; i++) {
-                const ev = buffer[start + i];
-                if (ev.time > currentTime) {
-                    stop = true;
-                    break;
-                }
-
-                if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
-                    if (ev.midi >= startMidi && ev.midi <= endMidi) {
-                        const y = this.getY(ev.midi);
-                        ctx.fillRect(0, y - yScale / 2, this.pianoRollWidth, yScale);
-
-                        if (ev.midi % 12 === 0) {
-                            this.cNotesBuffer[ev.midi] = 1;
-                        }
-                    }
-                }
-            }
-
-            if (!stop && headLength < count) {
-                const tailLength = count - headLength;
-                for (let i = 0; i < tailLength; i++) {
-                    const ev = buffer[i];
-                    if (ev.time > currentTime) {
-                        break;
-                    }
-
-                    if (ev.time <= currentTime && ev.time + (ev.duration || 0.25) >= currentTime) {
-                        if (ev.midi >= startMidi && ev.midi <= endMidi) {
-                            const y = this.getY(ev.midi);
-                            ctx.fillRect(0, y - yScale / 2, this.pianoRollWidth, yScale);
-
-                            if (ev.midi % 12 === 0) {
-                                this.cNotesBuffer[ev.midi] = 1;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-
-        const startC = ceil(startMidi / 12) * 12;
-        for (let m = startC; m <= endMidi; m += 12) {
-            if (this.cNotesBuffer[m]) {
-                const y = this.getY(m);
-                const octave = m / 12 - 1;
-                ctx.fillText(`C${octave}`, this.pianoRollWidth - 4, y);
-            }
-        }
-
-        if (bpm && this.beatReferenceTime !== null) {
-            const ts =
-                typeof tsConfig === 'object' && tsConfig !== null
-                    ? tsConfig
-                    : { beats: tsConfig || 4, grouping: [tsConfig || 4], stepsPerBeat: 4 };
-            const beatsPerMeasure = ts.beats;
-
-            const beatLen = 60 / bpm;
-            const startBeat = floor((minTime - this.beatReferenceTime) / beatLen);
-
-            ctx.lineWidth = 1;
-
-            ctx.strokeStyle = this.themeCache.gridColorMeasure;
-            ctx.beginPath();
-            for (let i = startBeat; ; i++) {
-                const t = this.beatReferenceTime + i * beatLen;
-                if (t > currentTime + 0.1) {
-                    break;
-                }
-
-                if (i % beatsPerMeasure !== 0) {
-                    continue;
-                }
-
-                const x = this.getX(t, currentTime);
-                if (x < this.pianoRollWidth) {
-                    continue;
-                }
-
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, h);
-            }
-            ctx.stroke();
-
-            ctx.beginPath();
-            for (let i = startBeat; ; i++) {
-                const t = this.beatReferenceTime + i * beatLen;
-                if (t > currentTime + 0.1) {
-                    break;
-                }
-
-                const beatInMeasure = ((i % beatsPerMeasure) + beatsPerMeasure) % beatsPerMeasure;
-                if (beatInMeasure === 0) {
-                    continue;
-                }
-
-                const x = this.getX(t, currentTime);
-                if (x < this.pianoRollWidth) {
-                    continue;
-                }
-
-                let isGroupStart = false;
-                if (ts.grouping && ts.grouping.length > 1) {
-                    let accumulated = 0;
-                    for (const g of ts.grouping) {
-                        if (beatInMeasure === accumulated) {
-                            isGroupStart = true;
-                            break;
-                        }
-                        accumulated += g;
-                    }
-                }
-
-                if (isGroupStart) {
-                    ctx.strokeStyle = this.themeCache.gridColorMeasure;
-                    ctx.globalAlpha = 0.4;
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, h);
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.globalAlpha = 1.0;
-                } else {
-                    ctx.strokeStyle = this.themeCache.gridColorBeat;
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, h);
-                }
-            }
-            ctx.stroke();
-        }
-
-        if (this.isFillActive) {
-            const yMin = this.getY(52);
-            const yMax = this.getY(36);
-            const fillGradient = ctx.createLinearGradient(
-                this.pianoRollWidth,
-                yMin,
-                this.pianoRollWidth,
-                yMax,
-            );
-            fillGradient.addColorStop(0, 'rgba(211, 54, 130, 0)');
-            fillGradient.addColorStop(0.5, 'rgba(211, 54, 130, 0.15)');
-            fillGradient.addColorStop(1, 'rgba(211, 54, 130, 0)');
-            ctx.fillStyle = fillGradient;
-            ctx.fillRect(this.pianoRollWidth, yMin, graphW, yMax - yMin);
-        }
-
-        ctx.globalAlpha = 0.1;
-
-        for (let i = 0; i < 4; i++) {
-            this.guideToneBuffers[i].length = 0;
-        }
-
-        for (const ev of this.chordEvents) {
-            const chordEnd = ev.time + (ev.duration || 2.0);
-            if (chordEnd < minTime) {
-                continue;
-            }
-            if (ev.time > currentTime) {
-                break;
-            }
-
-            if (!ev.intervals) {
-                continue;
-            }
-
-            const start = max(minTime, ev.time);
-            const end = min(currentTime, chordEnd);
-
-            const xStart = frameXBase - start * frameXScale;
-            const xEnd = frameXBase - end * frameXScale;
-            const x = xEnd;
-            const cw = xStart - xEnd;
-            const rootPC = ev.rootMidi % 12;
-
-            for (const interval of ev.intervals) {
-                const pc = (((rootPC + interval) % 12) + 12) % 12;
-                const colorIdx = INTERVAL_CATEGORY[((interval % 12) + 12) % 12];
-                const buffer = this.guideToneBuffers[colorIdx];
-
-                for (let oct = minOct; oct <= maxOct; oct++) {
-                    const m = pc + oct * 12;
-                    const y = round(frameYBase - m * frameYScale);
-                    if (y >= -10 && y <= h + 10) {
-                        buffer.push(x, y - yScale / 2, cw, yScale);
-                    }
-                }
-            }
-        }
-
-        for (let i = 0; i < 4; i++) {
-            const buffer = this.guideToneBuffers[i];
-            if (buffer.length === 0) {
-                continue;
-            }
-
-            ctx.fillStyle = this.categoryColors[i];
-            ctx.beginPath();
-            for (let j = 0; j < buffer.length; j += 4) {
-                ctx.rect(buffer[j], buffer[j + 1], buffer[j + 2], buffer[j + 3]);
-            }
-            ctx.fill();
-        }
-
-        ctx.globalAlpha = 0.5;
-
-        for (let i = 0; i < 4; i++) {
-            this.guideToneBuffers[i].length = 0;
-        }
-
-        for (const ev of this.chordEvents) {
-            const chordEnd = ev.time + (ev.duration || 2.0);
-            if (chordEnd < minTime) {
-                continue;
-            }
-            if (ev.time > currentTime) {
-                break;
-            }
-
-            if (!ev.notes) {
-                continue;
-            }
-
-            const start = max(minTime, ev.time);
-            const end = min(currentTime, chordEnd);
-
-            const xStart = frameXBase - start * frameXScale;
-            const xEnd = frameXBase - end * frameXScale;
-            const x = xEnd;
-            const cw = xStart - xEnd;
-            const rootPC = ev.rootMidi % 12;
-
-            for (const midi of ev.notes) {
-                const y = round(frameYBase - midi * frameYScale);
-                const interval = ((midi % 12) - rootPC + 12) % 12;
-                const colorIdx = INTERVAL_CATEGORY[interval];
-
-                if (y >= -10 && y <= h + 10) {
-                    this.guideToneBuffers[colorIdx].push(x, y - yScale / 2 + 2, cw, yScale - 4);
-                }
-            }
-        }
-
-        for (let i = 0; i < 4; i++) {
-            const buffer = this.guideToneBuffers[i];
-            if (buffer.length === 0) {
-                continue;
-            }
-
-            ctx.fillStyle = this.categoryColors[i];
-            ctx.beginPath();
-            for (let j = 0; j < buffer.length; j += 4) {
-                ctx.rect(buffer[j], buffer[j + 1], buffer[j + 2], buffer[j + 3]);
-            }
-            ctx.fill();
-        }
-
-        ctx.globalAlpha = 1.0;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // --- Render Info Labels (Track Note Names) ---
-        ctx.font = 'bold 1.2rem sans-serif';
-        ctx.textBaseline = 'top';
-        ctx.textAlign = 'left';
-        let labelX = this.pianoRollWidth + 10;
-
-        for (const name in this.tracks) {
-            const track = this.tracks[name];
-            const color = track.resolvedColor || track.color;
-            let activeX = -10,
-                activeY = -10,
-                isActive = false,
-                activeColor = null;
-
-            if (track.currentNoteLabel) {
-                ctx.fillStyle = color;
-                ctx.shadowBlur = 2;
-                ctx.shadowColor = '#000';
-                ctx.fillText(track.currentNoteLabel, labelX, 10);
-                ctx.shadowBlur = 0;
-                labelX += ctx.measureText(track.currentNoteLabel).width + 20;
-            }
-
-            if (name === 'drums') {
-                ctx.fillStyle = track.resolvedColor || track.color;
-                ctx.beginPath();
-
-                const buffer = track.history.buffer;
-                const capacity = track.history.capacity;
-                const count = track.history.count;
-                const start = track.history.start;
-                const headLength = min(count, capacity - start);
-                let stop = false;
-
-                for (let i = 0; i < headLength; i++) {
-                    const ev = buffer[start + i];
-                    if (ev.time > currentTime) {
-                        stop = true;
-                        break;
-                    }
-
-                    const noteEnd = ev.time + (ev.duration || 0.1);
-                    if (noteEnd < minTime) {
-                        continue;
-                    }
-
-                    const x = frameXBase - ev.time * frameXScale;
-                    const y = round(frameYBase - ev.midi * frameYScale);
-                    const intensity = ev.velocity || 1.0;
-
-                    ctx.moveTo(x, y - 6 * intensity);
-                    ctx.lineTo(x + 4 * intensity, y);
-                    ctx.lineTo(x, y + 6 * intensity);
-                    ctx.lineTo(x - 4 * intensity, y);
-                }
-
-                if (!stop && headLength < count) {
-                    const tailLength = count - headLength;
-                    for (let i = 0; i < tailLength; i++) {
-                        const ev = buffer[i];
-                        if (ev.time > currentTime) {
-                            break;
-                        }
-
-                        const noteEnd = ev.time + (ev.duration || 0.1);
-                        if (noteEnd < minTime) {
-                            continue;
-                        }
-
-                        const x = frameXBase - ev.time * frameXScale;
-                        const y = round(frameYBase - ev.midi * frameYScale);
-                        const intensity = ev.velocity || 1.0;
-
-                        ctx.moveTo(x, y - 6 * intensity);
-                        ctx.lineTo(x + 4 * intensity, y);
-                        ctx.lineTo(x, y + 6 * intensity);
-                        ctx.lineTo(x - 4 * intensity, y);
-                    }
-                }
-
-                ctx.fill();
-                continue;
-            }
-
-            const colorStandard = track.resolvedColor || track.color;
-
-            if (name === MODULES.SOLOIST) {
-                const baseWidth = 4;
-                for (let b = 0; b < 4; b++) {
-                    this.soloistBuffers[b].length = 0;
-                }
-
-                const buffer = track.history.buffer;
-                const capacity = track.history.capacity;
-                const count = track.history.count;
-                const start = track.history.start;
-                const headLength = min(count, capacity - start);
-                let stop = false;
-
-                for (let i = 0; i < headLength; i++) {
-                    const ev = buffer[start + i];
-                    if (ev.time > currentTime) {
-                        stop = true;
-                        break;
-                    }
-
-                    const noteEnd = ev.time + (ev.duration || 0.25);
-                    if (noteEnd < minTime) {
-                        continue;
-                    }
-
-                    const startT = max(minTime, ev.time);
-                    const endT = min(currentTime, noteEnd);
-                    const x1 = frameXBase - startT * frameXScale;
-                    const x2 = frameXBase - endT * frameXScale;
-                    const y = round(frameYBase - ev.midi * frameYScale);
-
-                    if (y >= -10 && y <= h + 10) {
-                        let typeCode = 0;
-                        if (ev.noteType === 'arp') {
-                            typeCode = 1;
-                        } else if (ev.noteType === 'target') {
-                            typeCode = 2;
-                        } else if (ev.noteType === 'altered') {
-                            typeCode = 3;
-                        }
-
-                        this.soloistBuffers[typeCode].push(x1, y, x2);
-
-                        if (ev.time <= currentTime && noteEnd >= currentTime) {
-                            activeX = x2;
-                            activeY = y;
-                            isActive = true;
-
-                            if (ev.noteType === 'arp') {
-                                activeColor = chordColors[2];
-                            } else if (ev.noteType === 'target') {
-                                activeColor = chordColors[0];
-                            } else if (ev.noteType === 'altered') {
-                                activeColor = chordColors[3];
-                            } else {
-                                activeColor = colorStandard;
-                            }
-                        }
-                    }
-                }
-
-                if (!stop && headLength < count) {
-                    const tailLength = count - headLength;
-                    for (let i = 0; i < tailLength; i++) {
-                        const ev = buffer[i];
-                        if (ev.time > currentTime) {
-                            break;
-                        }
-
-                        const noteEnd = ev.time + (ev.duration || 0.25);
-                        if (noteEnd < minTime) {
-                            continue;
-                        }
-
-                        const startT = max(minTime, ev.time);
-                        const endT = min(currentTime, noteEnd);
-                        const x1 = frameXBase - startT * frameXScale;
-                        const x2 = frameXBase - endT * frameXScale;
-                        const y = round(frameYBase - ev.midi * frameYScale);
-
-                        if (y >= -10 && y <= h + 10) {
-                            let typeCode = 0;
-                            if (ev.noteType === 'arp') {
-                                typeCode = 1;
-                            } else if (ev.noteType === 'target') {
-                                typeCode = 2;
-                            } else if (ev.noteType === 'altered') {
-                                typeCode = 3;
-                            }
-
-                            this.soloistBuffers[typeCode].push(x1, y, x2);
-
-                            if (ev.time <= currentTime && noteEnd >= currentTime) {
-                                activeX = x2;
-                                activeY = y;
-                                isActive = true;
-
-                                if (ev.noteType === 'arp') {
-                                    activeColor = chordColors[2];
-                                } else if (ev.noteType === 'target') {
-                                    activeColor = chordColors[0];
-                                } else if (ev.noteType === 'altered') {
-                                    activeColor = chordColors[3];
-                                } else {
-                                    activeColor = colorStandard;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                ctx.strokeStyle = this.themeCache.outlineColor;
-                ctx.lineWidth = baseWidth + 2;
-                ctx.beginPath();
-                let hasOutline = false;
-                for (let b = 0; b < 4; b++) {
-                    const buf = this.soloistBuffers[b];
-                    if (buf.length > 0) {
-                        hasOutline = true;
-                        for (let j = 0; j < buf.length; j += 3) {
-                            ctx.moveTo(buf[j], buf[j + 1]);
-                            ctx.lineTo(buf[j + 2], buf[j + 1]);
-                        }
-                    }
-                }
-                if (hasOutline) {
-                    ctx.stroke();
-                }
-
-                ctx.lineWidth = baseWidth;
-                if (this.soloistBuffers[0].length > 0) {
-                    ctx.strokeStyle = colorStandard;
-                    ctx.beginPath();
-                    const buf = this.soloistBuffers[0];
-                    for (let j = 0; j < buf.length; j += 3) {
-                        ctx.moveTo(buf[j], buf[j + 1]);
-                        ctx.lineTo(buf[j + 2], buf[j + 1]);
-                    }
-                    ctx.stroke();
-                }
-
-                if (this.soloistBuffers[2].length > 0) {
-                    ctx.strokeStyle = chordColors[0];
-                    ctx.beginPath();
-                    const buf = this.soloistBuffers[2];
-                    for (let j = 0; j < buf.length; j += 3) {
-                        ctx.moveTo(buf[j], buf[j + 1]);
-                        ctx.lineTo(buf[j + 2], buf[j + 1]);
-                    }
-                    ctx.stroke();
-                }
-
-                if (this.soloistBuffers[1].length > 0) {
-                    ctx.strokeStyle = chordColors[2];
-                    ctx.beginPath();
-                    const buf = this.soloistBuffers[1];
-                    for (let j = 0; j < buf.length; j += 3) {
-                        ctx.moveTo(buf[j], buf[j + 1]);
-                        ctx.lineTo(buf[j + 2], buf[j + 1]);
-                    }
-                    ctx.stroke();
-                }
-
-                if (this.soloistBuffers[3].length > 0) {
-                    ctx.strokeStyle = chordColors[3];
-                    ctx.beginPath();
-                    const buf = this.soloistBuffers[3];
-                    for (let j = 0; j < buf.length; j += 3) {
-                        ctx.moveTo(buf[j], buf[j + 1]);
-                        ctx.lineTo(buf[j + 2], buf[j + 1]);
-                    }
-                    ctx.stroke();
-                }
-            } else {
-                const baseWidth = 5;
-                let hasNotes = false;
-                ctx.beginPath();
-
-                const buffer = track.history.buffer;
-                const capacity = track.history.capacity;
-                const count = track.history.count;
-                const start = track.history.start;
-                const headLength = min(count, capacity - start);
-                let stop = false;
-
-                for (let i = 0; i < headLength; i++) {
-                    const ev = buffer[start + i];
-                    if (ev.time > currentTime) {
-                        stop = true;
-                        break;
-                    }
-
-                    const noteEnd = ev.time + (ev.duration || 0.25);
-                    if (noteEnd < minTime) {
-                        continue;
-                    }
-
-                    const startT = max(minTime, ev.time);
-                    const endT = min(currentTime, noteEnd);
-                    const x1 = frameXBase - startT * frameXScale;
-                    const x2 = frameXBase - endT * frameXScale;
-                    const y = round(frameYBase - ev.midi * frameYScale);
-
-                    if (y >= -10 && y <= h + 10) {
-                        ctx.moveTo(x1, y);
-                        ctx.lineTo(x2, y);
-                        hasNotes = true;
-                        if (ev.time <= currentTime && noteEnd >= currentTime) {
-                            activeX = x2;
-                            activeY = y;
-                            isActive = true;
-                            activeColor = colorStandard;
-                        }
-                    }
-                }
-
-                if (!stop && headLength < count) {
-                    const tailLength = count - headLength;
-                    for (let i = 0; i < tailLength; i++) {
-                        const ev = buffer[i];
-                        if (ev.time > currentTime) {
-                            break;
-                        }
-
-                        const noteEnd = ev.time + (ev.duration || 0.25);
-                        if (noteEnd < minTime) {
-                            continue;
-                        }
-
-                        const startT = max(minTime, ev.time);
-                        const endT = min(currentTime, noteEnd);
-                        const x1 = frameXBase - startT * frameXScale;
-                        const x2 = frameXBase - endT * frameXScale;
-                        const y = round(frameYBase - ev.midi * frameYScale);
-
-                        if (y >= -10 && y <= h + 10) {
-                            ctx.moveTo(x1, y);
-                            ctx.lineTo(x2, y);
-                            hasNotes = true;
-                            if (ev.time <= currentTime && noteEnd >= currentTime) {
-                                activeX = x2;
-                                activeY = y;
-                                isActive = true;
-                                activeColor = colorStandard;
-                            }
-                        }
-                    }
-                }
-
-                if (hasNotes) {
-                    ctx.strokeStyle = this.themeCache.outlineColor;
-                    ctx.lineWidth = baseWidth + 2;
-                    ctx.stroke();
-
-                    ctx.strokeStyle = colorStandard;
-                    ctx.lineWidth = baseWidth;
-                    ctx.stroke();
-                }
-            }
-
-            if (isActive) {
-                ctx.fillStyle = activeColor || '#fff';
-                ctx.strokeStyle = this.themeCache.outlineColor;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(activeX, activeY, 6, 0, PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
-        }
-
-        ctx.strokeStyle = this.themeCache.playheadColor;
+        ctx.strokeStyle = this.themeCache.playheadColor || 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(this.pianoRollWidth, 0);
-        ctx.lineTo(this.pianoRollWidth, h);
+        ctx.moveTo(this.labelRailWidth, 0);
+        ctx.lineTo(this.labelRailWidth, h);
         ctx.stroke();
     }
 

@@ -343,7 +343,7 @@ describe('UnifiedVisualizer Performance', () => {
         // Plus Guide Tones? If we optimize those too.
     });
 
-    it('should optimize generic track rendering by batching path commands', () => {
+    it('should render generic track history with lane bars and active-note markers', () => {
         // Setup generic track (bass)
         viz.resize(800, 600, 1);
         viz.windowSize = 20.0;
@@ -365,18 +365,9 @@ describe('UnifiedVisualizer Performance', () => {
         // All 3 notes are <= 0.5 and within window
         viz.render(0.5, 120);
 
-        // Logic check:
-        // Current implementation uses 'geom' array and strokes ONCE (outline + color).
-        // It iterates 'geom' array to build path.
-        // So we expect 3 segments * (moveTo + lineTo) = 3 calls each.
-        // PLUS 1 playhead line (moveTo + lineTo).
-        // Total = 4.
-
-        // If implementation is correct, path construction happens inside loop.
         expect(mockCtx.moveTo.mock.calls.length).toBeGreaterThan(0);
         expect(mockCtx.lineTo.mock.calls.length).toBeGreaterThan(0);
-
-        // Outline + Color strokes (2) + Active Note Circle (1) + Playhead (1) = 4 calls total
-        expect(mockCtx.stroke).toHaveBeenCalledTimes(4);
+        expect(mockCtx.fillRect).toHaveBeenCalled();
+        expect(mockCtx.stroke).toHaveBeenCalledTimes(2);
     });
 });

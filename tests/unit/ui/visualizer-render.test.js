@@ -81,7 +81,7 @@ describe('VisualizerEngine Rendering Deep Dive', () => {
         vi.restoreAllMocks();
     });
 
-    it('should render soloist notes with different types', () => {
+    it('should render soloist notes with different types inside the soloist lane', () => {
         engine.addTrack(MODULES.SOLOIST, 'blue', 'blue');
         engine.pushNote(MODULES.SOLOIST, { time: 10, midi: 60, duration: 1, noteType: 'arp' });
         engine.pushNote(MODULES.SOLOIST, {
@@ -100,9 +100,8 @@ describe('VisualizerEngine Rendering Deep Dive', () => {
 
         engine.render(14, 120);
 
-        // Verify batch paths were created for each type
-        const strokeCalls = mockCtx.stroke.mock.calls.length;
-        expect(strokeCalls).toBeGreaterThan(1);
+        expect(mockCtx.fillRect).toHaveBeenCalled();
+        expect(mockCtx.stroke).toHaveBeenCalled();
     });
 
     it('should render drum hits', () => {
@@ -118,6 +117,7 @@ describe('VisualizerEngine Rendering Deep Dive', () => {
     });
 
     it('should render guide tones for chords', () => {
+        engine.addTrack('chords', '#268bd2', '#268bd2');
         engine.pushChord({
             time: 10,
             duration: 2,
@@ -129,6 +129,25 @@ describe('VisualizerEngine Rendering Deep Dive', () => {
         engine.render(11, 120);
 
         // Guide tones are drawn with rect() batches at low alpha
+        expect(mockCtx.rect).toHaveBeenCalled();
+        expect(mockCtx.fill).toHaveBeenCalled();
+    });
+
+    it('should overlay chord tones inside the soloist lane', () => {
+        engine.addTrack(MODULES.SOLOIST, '#d33682', '#d33682');
+        mockCtx.rect.mockClear();
+        mockCtx.fill.mockClear();
+
+        engine.pushChord({
+            time: 10,
+            duration: 2,
+            rootMidi: 60,
+            notes: [60, 64, 67, 71],
+            intervals: [0, 4, 7, 11],
+        });
+
+        engine.render(11, 120);
+
         expect(mockCtx.rect).toHaveBeenCalled();
         expect(mockCtx.fill).toHaveBeenCalled();
     });

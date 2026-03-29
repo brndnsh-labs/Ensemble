@@ -7,25 +7,26 @@ import { partitionDrawQueue } from '../../../public/components/Visualizer.jsx';
 describe('partitionDrawQueue', () => {
     it('drops stale backlog and returns only due events for the current frame', () => {
         const queue = [
-            { type: 'drum_vis', time: 5 },
-            { type: 'drum_vis', time: 8 },
-            { type: 'bass_vis', time: 9 },
-            { type: 'soloist_vis', time: 11 },
+            { type: 'step', time: 5, step: 4 },
+            { type: 'step', time: 8, step: 8 },
+            { type: 'note', track: 'bass', time: 9, midi: 36 },
+            { type: 'note', track: 'soloist', time: 11, midi: 72 },
         ];
 
         const { readyEvents, remainingEvents } = partitionDrawQueue(queue, 10.0);
 
         expect(readyEvents).toEqual([
-            { type: 'drum_vis', time: 8 },
-            { type: 'bass_vis', time: 9 },
+            { type: 'step', time: 8, step: 8 },
+            { type: 'note', track: 'bass', time: 9, midi: 36 },
         ]);
-        expect(remainingEvents).toEqual([{ type: 'soloist_vis', time: 11 }]);
+        expect(remainingEvents).toEqual([{ type: 'note', track: 'soloist', time: 11, midi: 72 }]);
     });
 
     it('bounds oversized backlogs to the retained tail before processing due events', () => {
         const queue = Array.from({ length: 505 }, (_, index) => ({
-            type: 'drum_vis',
+            type: 'step',
             time: Number((100 + index * 0.005).toFixed(3)),
+            step: index,
         }));
 
         const { readyEvents, remainingEvents } = partitionDrawQueue(queue, 101.62);
@@ -39,8 +40,8 @@ describe('partitionDrawQueue', () => {
 
     it('returns the original queue reference when nothing is ready or stale', () => {
         const queue = [
-            { type: 'soloist_vis', time: 12.0 },
-            { type: 'harmony_vis', time: 12.5 },
+            { type: 'note', track: 'soloist', time: 12.0, midi: 74 },
+            { type: 'note', track: 'harmony', time: 12.5, midi: 67 },
         ];
 
         const { readyEvents, remainingEvents } = partitionDrawQueue(queue, 10.0);

@@ -76,8 +76,6 @@ export class RingBuffer {
     }
 }
 
-export const IS_BLACK = new Uint8Array([0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]);
-
 // Optimization: Map interval indices (0-11) to color categories (0-3)
 // 0=root, 1=third, 2=fifth, 3=seventh
 export const INTERVAL_CATEGORY = new Uint8Array([0, 3, 3, 1, 1, 3, 3, 2, 3, 3, 3, 3]);

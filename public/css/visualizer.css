@@ -3,11 +3,13 @@
     flex-grow: 1;
     min-height: 500px;
     position: relative;
-    background: rgba(0, 0, 0, 0.2);
+    background: color-mix(in srgb, var(--surface-sunken), var(--panel-color) 22%);
+    border: 1px solid color-mix(in srgb, var(--border-color), transparent 20%);
     border-radius: 8px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-color), transparent 92%);
 }
 
 #unifiedVizContainer {
@@ -17,20 +19,23 @@
 
 .viz-legend {
     display: flex;
-    gap: 2rem;
-    margin-top: 1rem;
+    gap: 1rem 1.5rem;
+    margin-top: 0.25rem;
     flex-wrap: wrap;
     font-size: 0.8rem;
     color: var(--text-secondary);
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.1);
+    padding: 0.75rem 0.9rem;
+    background: color-mix(in srgb, var(--panel-color), var(--surface-sunken) 50%);
+    border: 1px solid color-mix(in srgb, var(--border-color), transparent 12%);
     border-radius: 8px;
+    align-items: center;
 }
 
 .legend-group {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .legend-label {
@@ -52,10 +57,11 @@
     width: 10px;
     height: 10px;
     border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--text-color), transparent 78%);
 }
 
 .swatch-root {
-    background: var(--blue);
+    background: var(--accent-color);
 }
 .swatch-third {
     background: var(--green);
@@ -69,15 +75,59 @@
 .swatch-bass {
     background: var(--success-color);
 }
+.swatch-chords {
+    background: var(--accent-color);
+}
 .swatch-harmony {
     background: var(--harmony-color);
-    border: 1px solid var(--text-color);
 }
 .swatch-drums {
-    background: var(--text-color);
+    background: var(--yellow);
 }
 .swatch-soloist {
     background: var(--soloist-color);
+}
+
+@media (max-width: 700px) {
+    .workspace-view--visuals #panel-visualizer {
+        gap: 0.35rem;
+    }
+
+    .workspace-view--visuals #panel-visualizer .panel-header {
+        padding-bottom: 0.25rem;
+    }
+
+    .workspace-view--visuals .workspace-visualizer-area,
+    .workspace-view--visuals .viz-graph-area {
+        min-height: clamp(170px, 32dvh, 240px);
+    }
+
+    .viz-legend {
+        gap: 0.3rem 0.65rem;
+        padding: 0.45rem 0.6rem;
+        font-size: 0.7rem;
+        align-items: flex-start;
+    }
+
+    .legend-group {
+        gap: 0.35rem 0.5rem;
+        flex: 1 1 calc(50% - 0.35rem);
+        min-width: 0;
+        align-items: flex-start;
+    }
+
+    .legend-item {
+        gap: 0.24rem;
+    }
+
+    .legend-label {
+        font-size: 0.58rem;
+    }
+
+    .legend-swatch {
+        width: 7px;
+        height: 7px;
+    }
 }
 
 /* Toast */

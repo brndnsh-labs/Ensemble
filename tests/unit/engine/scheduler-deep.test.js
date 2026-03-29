@@ -5,6 +5,7 @@ import {
     togglePlay,
 } from '../../../public/engine/scheduler-core.js';
 import { ACTIONS } from '../../../public/types.js';
+import { triggerFlash } from '../../../public/ui.js';
 
 // Mock high-level dependencies
 vi.mock('../../../public/worker-client.js', () => ({
@@ -54,6 +55,10 @@ vi.mock('../../../public/engine/conductor.js', () => ({
 vi.mock('../../../public/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
     loadDrumPreset: vi.fn(),
+}));
+
+vi.mock('../../../public/ui.js', () => ({
+    triggerFlash: vi.fn(),
 }));
 
 describe('Scheduler Core Deep Dive', () => {
@@ -173,7 +178,7 @@ describe('Scheduler Core Deep Dive', () => {
     });
 
     describe('scheduleChordVisuals', () => {
-        it('should push visual events and trigger flash', () => {
+        it('should push chord events and trigger flash', () => {
             const chordData = {
                 stepInChord: 0,
                 chordIndex: 2,
@@ -183,16 +188,16 @@ describe('Scheduler Core Deep Dive', () => {
             state.vizState.enabled = true;
             state.chords.lastActiveChordIndex = null;
 
-            // We need to mock the imported triggerFlash or just check drawQueue
             scheduleChordVisuals(state, chordData, 10.0);
 
             expect(state.chords.lastActiveChordIndex).toBe(2);
             expect(state.playback.drawQueue).toHaveLength(1);
             expect(state.playback.drawQueue[0]).toMatchObject({
-                type: 'chord_vis',
+                type: 'chord',
                 index: 2,
                 rootMidi: 60,
             });
+            expect(triggerFlash).toHaveBeenCalledWith(0.1);
         });
 
         it('should still update arranger highlighting when visuals are hidden', () => {

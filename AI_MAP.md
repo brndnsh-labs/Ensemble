@@ -154,6 +154,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/platform.js` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/sharing.js` | URL-based song sharing. | `getShareURL` |
 | `public/utils.js` | General-purpose musical and math utilities. | `getFrequency` |
+| `public/visualizer-events.js` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
 | `public/visualizer-engine.js` | High-performance Canvas rendering logic. | `VisualizerEngine` |
 | `public/visualizer-proxy.js` | Main-thread bridge to visualizer worker. |
 
