@@ -35,6 +35,7 @@ const gilmourIntervals = new Set([0, 7]);
 const slashIntervals = new Set([4, 9]);
 const milesIntervals = new Set([2, 5, 9]);
 const evansIntervals = new Set([2, 5, 6, 9]);
+const alteredHookIntervals = new Set([1, 3, 6, 8]);
 
 /**
  * Primary entry point for pitch selection.
@@ -240,6 +241,10 @@ export function selectPitchAndDevices(
         activeStyle === 'funk' || activeStyle === 'reggae' || activeStyle === 'ska';
     const isHighEnergyGuitarStyle =
         activeStyle === 'metal' || activeStyle === 'shred' || activeStyle === 'scalar';
+    const stationaryScale = intent?.stationaryScale ?? 0.5;
+    const prefersStationaryHook = stationaryScale > 0.7;
+    const isJazzHookStyle = activeStyle === 'jazz' || activeStyle === 'bird';
+    const isAlteredHookQuality = targetChord.quality === '7alt' || targetChord.quality === '7#9';
 
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
@@ -259,6 +264,7 @@ export function selectPitchAndDevices(
         let weight = 1.0;
 
         const isScaleTone = (scaleMask >> interval) & 1;
+        const isChordTone = (chordMask >> interval) & 1;
         let isBlueNote = false;
         if (isBluesOrJazz && (interval === 3 || interval === 6 || interval === 10)) {
             isBlueNote = true;
@@ -272,8 +278,7 @@ export function selectPitchAndDevices(
 
         // --- Common Tone Repetition Logic (Additive phase) ---
         if (dist === 0) {
-            const isStableTone = (chordMask >> interval) & 1 || interval === 7 || interval === 2;
-            const stationaryScale = intent?.stationaryScale ?? 0.5;
+            const isStableTone = isChordTone || interval === 7 || interval === 2;
 
             if (stationaryScale > 0) {
                 // Dissonance Protection check
@@ -285,6 +290,21 @@ export function selectPitchAndDevices(
                 const boost =
                     (config.commonToneWeight || 200) * stationaryScale * (isStableTone ? 2.0 : 0.5);
                 weight += boost;
+            }
+
+            const isAlteredHookCenter =
+                prefersStationaryHook &&
+                isJazzHookStyle &&
+                isAlteredHookQuality &&
+                !isChordTone &&
+                alteredHookIntervals.has(interval) &&
+                (isStrongBeat ||
+                    supportRole === 'accent' ||
+                    supportRole === 'sustain' ||
+                    durationSteps >= stepsPerBeat);
+            if (isAlteredHookCenter) {
+                // Let altered tensions function like a bebop hook center on accented conservative phrases.
+                weight += (config.commonToneWeight || 200) * 0.2;
             }
         }
 
@@ -399,8 +419,6 @@ export function selectPitchAndDevices(
             weight += 50;
         }
 
-        const isChordTone = (chordMask >> interval) & 1;
-
         if (isChordTone) {
             weight += 150;
         }
@@ -484,7 +502,6 @@ export function selectPitchAndDevices(
         // FINAL REPETITION ADJUSTMENTS
         if (dist === 0) {
             weight *= repetitionPenalty;
-            const stationaryScale = intent?.stationaryScale ?? 0.5;
             // If intent is stationary AND it's not a penalized note, apply multiplier
             if (stationaryScale > 0.7 && repetitionPenalty >= 1.0) {
                 weight *= 1.5 + stationaryScale;

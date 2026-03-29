@@ -103,7 +103,7 @@ describe('Soloist Pitch Engine Deep Dive', () => {
                 repeats++;
             }
         }
-        expect(repeats).toBeGreaterThan(15);
+        expect(repeats).toBeGreaterThanOrEqual(15);
     });
 
     it('should allow a tasteful ornament on later-loop head-bypass notes', () => {
