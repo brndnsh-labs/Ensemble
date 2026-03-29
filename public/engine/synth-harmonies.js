@@ -6,6 +6,25 @@ import { createSimplePanner, killActiveVoices } from './synth-utils.js';
  * Optimized for Horns (stabs) and Strings (pads).
  */
 
+const HARMONY_VOICE_LIMIT_FADE = 0.02;
+
+/**
+ * Same-pitch retriggers are common in funk and horn writing. Crossfade them instead of
+ * hard-choking the old voice so repeated hits can re-articulate without zipper-like clicks.
+ *
+ * @param {string} style
+ * @returns {{fadeTime: number, attackFloor: number, suppressClick: boolean}}
+ */
+function getHarmonyRetriggerProfile(style) {
+    if (style === 'organ') {
+        return { fadeTime: 0.02, attackFloor: 0.012, suppressClick: true };
+    }
+    if (style === 'plucks' || style === 'disco' || style === 'stabs') {
+        return { fadeTime: 0.02, attackFloor: 0.012, suppressClick: false };
+    }
+    return { fadeTime: 0.03, attackFloor: 0.02, suppressClick: false };
+}
+
 /**
  * Stop any currently playing harmony notes.
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
@@ -54,25 +73,29 @@ export function playHarmonyNote(
     const now = playback.audio.currentTime;
     const playTime = Math.max(time, now);
     const feel = groove.genreFeel;
+    let retriggerProfile = null;
 
     if (!harmony.activeVoices) {
         harmony.activeVoices = []; // @direct-mutation
     }
 
-    harmony.activeVoices = harmony.activeVoices.filter(
-        // @worker-mutation
-        /** @param {any} v */ (v) => v.time + v.duration + 1.0 > playTime,
-    );
+    for (let i = harmony.activeVoices.length - 1; i >= 0; i--) {
+        const voice = harmony.activeVoices[i];
+        if (voice.time + voice.duration + 1.0 <= playTime) {
+            harmony.activeVoices.splice(i, 1); // @worker-mutation
+        }
+    }
 
     // Pitch-aware Stealing
     if (midi !== null) {
         const existing = harmony.activeVoices.find(/** @param {any} v */ (v) => v.midi === midi);
         if (existing) {
-            killActiveVoices([existing], playTime, 0.005);
-            harmony.activeVoices = harmony.activeVoices.filter(
-                // @worker-mutation
-                /** @param {any} v */ (v) => v !== existing,
-            );
+            retriggerProfile = getHarmonyRetriggerProfile(style);
+            killActiveVoices([existing], playTime, retriggerProfile.fadeTime);
+            const existingIndex = harmony.activeVoices.indexOf(existing);
+            if (existingIndex !== -1) {
+                harmony.activeVoices.splice(existingIndex, 1); // @worker-mutation
+            }
         }
     }
 
@@ -80,7 +103,7 @@ export function playHarmonyNote(
     if (harmony.activeVoices.length >= 3) {
         const oldest = harmony.activeVoices.shift();
         if (oldest) {
-            killActiveVoices([oldest], playTime, 0.01);
+            killActiveVoices([oldest], playTime, HARMONY_VOICE_LIMIT_FADE);
         }
     }
 
@@ -212,17 +235,19 @@ export function playHarmonyNote(
             voiceNodes.push(subGain);
         }
 
-        click = playback.audio.createOscillator();
-        clickGain = playback.audio.createGain();
-        click.type = 'square';
-        click.frequency.setValueAtTime(freq * 4, playTime);
-        clickGain.gain.setValueAtTime(finalVol * 0.6, playTime);
-        clickGain.gain.exponentialRampToValueAtTime(0.001, playTime + 0.04);
-        click.connect(clickGain);
-        clickGain.connect(gain);
-        click.start(playTime);
-        click.stop(playTime + 0.1);
-        voiceNodes.push(click, clickGain);
+        if (!retriggerProfile?.suppressClick) {
+            click = playback.audio.createOscillator();
+            clickGain = playback.audio.createGain();
+            click.type = 'square';
+            click.frequency.setValueAtTime(freq * 4, playTime);
+            clickGain.gain.setValueAtTime(finalVol * 0.6, playTime);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, playTime + 0.04);
+            click.connect(clickGain);
+            clickGain.connect(gain);
+            click.start(playTime);
+            click.stop(playTime + 0.1);
+            voiceNodes.push(click, clickGain);
+        }
 
         if (saturator) {
             osc1.connect(saturator);
@@ -348,7 +373,8 @@ export function playHarmonyNote(
     // Envelope
     const isFastAttack = style === 'stabs' || style === 'plucks' || style === 'organ';
     const baseAttack = isFastAttack ? 0.01 : 0.2;
-    const attack = Math.max(0.005, baseAttack - finalVol * 0.15);
+    const attackFloor = retriggerProfile?.attackFloor || 0.005;
+    const attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
     let release = 0.5;
     if (style === 'stabs') {
         release = 0.1;

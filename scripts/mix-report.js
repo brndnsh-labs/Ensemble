@@ -202,6 +202,13 @@ function formatDb(value) {
     return value.toFixed(1);
 }
 
+function formatMetric(value, digits = 3) {
+    if (!Number.isFinite(value)) {
+        return '-';
+    }
+    return value.toFixed(digits);
+}
+
 function summarizeFindings(scene) {
     const full = scene.stems.full;
     const drums = scene.stems.drums;
@@ -232,6 +239,22 @@ function summarizeFindings(scene) {
 
     if (harmony.rmsDb > -80 && harmony.probes.air > chords.probes.air * 0.9) {
         notes.push('harmony contributes meaningful top-end air');
+    }
+
+    if ((harmony.schedule?.voiceLimitPressureCount || 0) > 0) {
+        notes.push(
+            `harmony exceeds the 3-voice live cap ${harmony.schedule.voiceLimitPressureCount} times`,
+        );
+    }
+
+    if ((harmony.schedule?.sameMidiOverlapCount || 0) > 0) {
+        notes.push(
+            `harmony retriggers the same pitch before release ${harmony.schedule.sameMidiOverlapCount} times`,
+        );
+    }
+
+    if ((harmony.transients?.maxDelta || 0) > 0.08 || (harmony.transients?.spikeRate || 0) > 6) {
+        notes.push('harmony stem shows sharp waveform edges worth auditing');
     }
 
     return notes;
@@ -593,6 +616,116 @@ async function generateReport() {
                         return normalized;
                     }
 
+                    function computeTransientMetrics(samples, sampleRate) {
+                        const bounds = activeBounds(samples);
+                        const active = samples.slice(bounds.start, bounds.end);
+                        if (active.length < 4) {
+                            return {
+                                maxDelta: 0,
+                                spikeCount: 0,
+                                spikeRate: 0,
+                                threshold: 0,
+                            };
+                        }
+
+                        const rms = computeRms(active);
+                        const peak = computePeak(active);
+                        const threshold = Math.max(0.02, peak * 0.18, rms * 5);
+                        let maxDelta = 0;
+                        let spikeCount = 0;
+                        let lastSpikeIndex = -64;
+
+                        for (let i = 1; i < active.length; i++) {
+                            const delta = Math.abs(active[i] - active[i - 1]);
+                            if (delta > maxDelta) {
+                                maxDelta = delta;
+                            }
+                            if (delta >= threshold && i - lastSpikeIndex > 64) {
+                                spikeCount++;
+                                lastSpikeIndex = i;
+                            }
+                        }
+
+                        return {
+                            maxDelta,
+                            spikeCount,
+                            spikeRate: spikeCount / Math.max(0.001, active.length / sampleRate),
+                            threshold,
+                        };
+                    }
+
+                    function analyzeNoteSchedule(buffer, stepDuration, renderLeadIn) {
+                        const events = [];
+                        let maxNotesPerStep = 0;
+                        let overLimitSteps = 0;
+
+                        for (const [step, notes] of buffer.entries()) {
+                            if (!Array.isArray(notes) || notes.length === 0) {
+                                continue;
+                            }
+                            maxNotesPerStep = Math.max(maxNotesPerStep, notes.length);
+                            if (notes.length > 3) {
+                                overLimitSteps++;
+                            }
+                            for (const note of notes) {
+                                const midi = note.midi ?? null;
+                                const start =
+                                    renderLeadIn + step * stepDuration + (note.timingOffset || 0);
+                                const duration = (note.durationSteps || 1) * stepDuration;
+                                events.push({
+                                    midi,
+                                    start,
+                                    end: start + duration,
+                                });
+                            }
+                        }
+
+                        events.sort((a, b) => a.start - b.start || (a.midi || 0) - (b.midi || 0));
+
+                        let maxSimultaneousVoices = 0;
+                        let sameMidiOverlapCount = 0;
+                        let voiceLimitPressureCount = 0;
+                        let minOnsetGapMs = Infinity;
+                        let previousStart = null;
+                        /** @type {Array<{end: number, midi: number|null}>} */
+                        let active = [];
+                        const lastMidiEnd = new Map();
+
+                        for (const event of events) {
+                            if (previousStart !== null) {
+                                const gapMs = (event.start - previousStart) * 1000;
+                                if (gapMs > 0) {
+                                    minOnsetGapMs = Math.min(minOnsetGapMs, gapMs);
+                                }
+                            }
+                            previousStart = event.start;
+
+                            active = active.filter((voice) => voice.end > event.start + 1e-6);
+                            if (active.length >= 3) {
+                                voiceLimitPressureCount++;
+                            }
+                            if (event.midi !== null) {
+                                const priorEnd = lastMidiEnd.get(event.midi) || -Infinity;
+                                if (priorEnd > event.start + 1e-6) {
+                                    sameMidiOverlapCount++;
+                                }
+                                lastMidiEnd.set(event.midi, Math.max(priorEnd, event.end));
+                            }
+                            active.push({ end: event.end, midi: event.midi });
+                            maxSimultaneousVoices = Math.max(maxSimultaneousVoices, active.length);
+                        }
+
+                        return {
+                            eventCount: events.length,
+                            maxNotesPerStep,
+                            overLimitSteps,
+                            maxSimultaneousVoices,
+                            sameMidiOverlapCount,
+                            voiceLimitPressureCount,
+                            minOnsetGapMs: Number.isFinite(minOnsetGapMs) ? minOnsetGapMs : 0,
+                        };
+                    }
+
                     async function renderScene(scene, enabled, seed) {
                         await loadDrumPreset(scene.drumPreset);
                         const state = createSceneState(scene, enabled);
@@ -611,6 +744,9 @@ async function generateReport() {
                         try {
                             initAudio(state, { audioContext: offlineCtx, enableWatchdog: false });
                             fillBuffers(state);
+                            const harmonySchedule = enabled.harmony
+                                ? analyzeNoteSchedule(state.harmony.buffer, sixteenth, renderLeadIn)
+                                : null;
 
                             for (let step = 0; step < state.arranger.totalSteps; step++) {
                                 const time = renderLeadIn + step * sixteenth;
@@ -631,6 +767,8 @@ async function generateReport() {
                                 rmsDb: toDb(rms),
                                 crestDb: toDb(peak) - toDb(rms),
                                 probes: computeSpectralProbes(mono, sampleRate),
+                                transients: computeTransientMetrics(mono, sampleRate),
+                                schedule: harmonySchedule,
                             };
                         } finally {
                             Math.random = originalRandom;
@@ -672,6 +810,11 @@ async function generateReport() {
                         peakDb: formatDb(metrics.peakDb),
                         rmsDb: formatDb(metrics.rmsDb),
                         crestDb: formatDb(metrics.crestDb),
+                        maxDelta: formatMetric(metrics.transients?.maxDelta || 0, 3),
+                        spikesPerSec: formatMetric(metrics.transients?.spikeRate || 0, 1),
+                        maxVoices: metrics.schedule?.maxSimultaneousVoices ?? '-',
+                        retriggers: metrics.schedule?.sameMidiOverlapCount ?? '-',
+                        steals: metrics.schedule?.voiceLimitPressureCount ?? '-',
                         sub: metrics.probes.sub.toFixed(3),
                         lowMid: metrics.probes.lowMid.toFixed(3),
                         presence: metrics.probes.presence.toFixed(3),
