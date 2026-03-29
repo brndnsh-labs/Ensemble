@@ -1,6 +1,7 @@
 # Hi-Hat Articulation TODOs
 
-This document captures the remaining work after the Rock and Funk hi-hat checkpoint.
+This document captures the remaining work after the Rock/Funk checkpoint and the
+first non-Rock/Funk rollout pass.
 The current pass improved phrase-aware articulation while preserving the existing public
 `HiHat` / `Open` / `Ride` character.
 
@@ -10,6 +11,10 @@ The current pass improved phrase-aware articulation while preserving the existin
 - Rock open-hat synthesis now supports shorter bark-like releases for softer accents.
 - Funk hi-hat phrasing now uses phrase-seeded 16th-note contouring and turnaround barks.
 - Rock and Funk groove integrity coverage now protects the new behavior.
+- Disco now keeps its offbeat open-hat engine on the open lane while adding phrase-shaped closed support.
+- Hip Hop now uses phrase-shaped boom-bap/trap hat releases with clean open-lane routing.
+- Neo-Soul now uses more deliberate phrase-release open hats and phrase-breath shaping instead of broad random barking.
+- Disco, Hip Hop, and Neo-Soul coverage now protects the new lane-ownership behavior.
 
 ## Remaining work
 
@@ -56,16 +61,17 @@ The current pass improved phrase-aware articulation while preserving the existin
 
 ### 7. Future genre rollout
 
-- Apply the same articulation approach to the next strong candidate genre after Rock and Funk.
-- Check whether that genre wants more open-hat breath, more bark, more ride, or less movement overall.
+- Acoustic, Reggae, and Ska-Punk were reviewed after the first-wave rollout and are staying as-is for now.
+- Revisit them only if a later ear pass reveals a clear musical shortcoming rather than as a mechanical extension of the new model.
+- Check whether each remaining candidate wants more open-hat breath, more bark, more ride, or less movement overall.
 - Reuse the same internal phrasing ideas so future work stays musically consistent instead of being a one-off rewrite.
 
 ## Suggested order
 
-1. Ear pass on Rock and Funk.
+1. Ear pass on Rock, Funk, Disco, Hip Hop, and Neo-Soul.
 2. Tune thresholds and offsets by musical feel.
 3. Decide whether to extract a shared hi-hat articulation helper.
-4. Extend the model to the next genre.
+4. Revisit only the remaining genres that show a clear ear-driven need.
 
 ---
 

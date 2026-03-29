@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    getPhraseSeed,
     INTENSITY_BANDS,
     roll,
     scaleVelocity,
@@ -63,6 +64,7 @@ export function applyOverrides(context, state) {
         beatIndex,
         drumComplexity,
         sectionSeed,
+        barIndex,
         isTurnaround,
         stepsPerBar,
         loopStep,
@@ -113,37 +115,39 @@ export function applyOverrides(context, state) {
         }
     } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
+        const phraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, activeMotif + 5);
+        const supportBeat = phraseSeed > 0.6 ? 2 : 0;
+        const supportUsesA = phraseSeed > 0.52;
+        const supportSubdivisionHit = supportUsesA ? isAOfBeat : isEOfBeat;
+        const supportSubdivision =
+            (activeMotif === 1 || activeMotif === 3) &&
+            supportSubdivisionHit &&
+            (beatIndex === supportBeat || beatIndex === 3);
+        const syncopatedTexture = activeMotif === 2 && isEOfBeat && beatIndex === 1;
+        const phraseLift = isOffbeat && beatIndex === (phraseSeed < 0.5 ? 1 : 3);
 
         // Core Offbeat Open Hat (The Disco "And")
-        // Strictly enforced across all motifs for the foundation
         if (isOffbeat) {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = scaleVelocity(1.15, intensity, 0.1);
+            velocity = phraseLift ? 1.1 : 1.02;
+            instTimeOffset -= isTurnaround && beatIndex === 3 ? 0.0025 : 0.0015;
+        } else if (isBeatStart) {
+            shouldPlay = true;
+            soundName = 'HiHat';
+            velocity = beatIndex === supportBeat ? 0.76 : 0.71;
+        } else if (supportSubdivision || syncopatedTexture) {
+            shouldPlay = true;
+            soundName = 'HiHat';
+            velocity = syncopatedTexture ? 0.48 : 0.42;
+            instTimeOffset += supportUsesA ? 0.0005 : -0.0005;
         }
 
-        // Motif 1 & 3: Shimmering 16th closed hats
-        if (activeMotif === 1 || activeMotif === 3) {
-            // Fill in the quarter notes and syncopations around the open hat
-            if (!isOffbeat && (isBeatStart || isEOfBeat || isAOfBeat)) {
-                // High probability for texture, but lower velocity
-                const shimmerProb = 0.6 + intensity * 0.4;
-                if (roll(shimmerProb)) {
-                    shouldPlay = true;
-                    soundName = 'HiHat';
-                    // Texture velocity: soft hiss
-                    velocity = scaleVelocity(0.55, intensity, 0.1);
-                }
-            }
-        }
-
-        // Motif 2: Syncopated hat barks
-        if (activeMotif === 2 && !shouldPlay) {
-            if (isOffbeat && beatIndex === 3) {
-                shouldPlay = true;
-                soundName = 'Open';
-                velocity = 1.25;
-            }
+        if (isTurnaround && isOffbeat && beatIndex === 3) {
+            shouldPlay = true;
+            soundName = 'Open';
+            velocity = 1.14;
+            instTimeOffset -= 0.0025;
         }
     } else if (context.inst.name === 'Perc' || context.inst.name.includes('Cowbell')) {
         // Motif 3: Octave Cowbells
@@ -174,6 +178,12 @@ export function applyOverrides(context, state) {
         if (context.inst.name === 'Open') {
             // Ensure the open hat has that "shimmer"
             velocity *= 1.15;
+        }
+        if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
+            velocity = scaleVelocity(velocity, intensity, soundName === 'Open' ? 0.05 : 0.04);
+            const ownsArticulation =
+                context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
+            shouldPlay = ownsArticulation;
         }
     }
 

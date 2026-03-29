@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    getPhraseSeed,
     INTENSITY_BANDS,
     roll,
     scaleVelocity,
@@ -68,6 +69,7 @@ export function applyOverrides(context, state) {
         beatIndex,
         drumComplexity,
         sectionSeed,
+        barIndex,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
@@ -125,37 +127,78 @@ export function applyOverrides(context, state) {
     // --- 3. HI-HATS (The Engine) ---
     else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
+        const phraseSeed = getPhraseSeed(
+            sectionSeed,
+            barIndex,
+            activeMotif === 0 ? 4 : 2,
+            activeMotif,
+        );
+        const releaseBeat = activeMotif === 0 ? 3 : phraseSeed < 0.45 ? 2 : 3;
+        const skitterBeat = phraseSeed < 0.34 ? 1 : phraseSeed < 0.67 ? 2 : 3;
+        const skitterUsesA = activeMotif === 3 ? phraseSeed > 0.42 : phraseSeed > 0.58;
+        const phraseLift = isOffbeat && beatIndex === (phraseSeed < 0.5 ? 1 : 3);
+        const boomBapOpen =
+            activeMotif === 0 && isOffbeat && beatIndex === releaseBeat && intensity > 0.72;
+        const trapOpen =
+            activeMotif >= 1 &&
+            ((isOffbeat && beatIndex === releaseBeat && intensity > 0.68) ||
+                (activeMotif >= 2 &&
+                    skitterUsesA &&
+                    isAOfBeat &&
+                    beatIndex === 3 &&
+                    intensity > 0.8));
+        const skitterHit =
+            activeMotif >= 2 && (skitterUsesA ? isAOfBeat : isEOfBeat) && beatIndex === skitterBeat;
 
-        // Foundation: 8ths or 16ths
-        if (isBeatStart || isOffbeat) {
-            shouldPlay = true;
-            soundName = 'HiHat';
-            velocity = isBeatStart ? 0.85 : 0.65;
-        } else if (activeMotif >= 2 && intensity > 0.7 && (isEOfBeat || isAOfBeat)) {
-            // Skitters (32nd note rolls) for Motif 2 & 3
-            // Priority over simple 16th fills
-            const skitterProb = activeMotif === 2 ? 0.6 : 0.3;
-            if (roll(skitterProb)) {
+        if (activeMotif === 0) {
+            if (isBeatStart || isOffbeat) {
                 shouldPlay = true;
                 soundName = 'HiHat';
-                velocity = 0.35;
-                // Move the skitter slightly to separate it from the grid
-                instTimeOffset += (Math.random() - 0.5) * 0.005;
+                velocity = isBeatStart ? 0.82 : 0.62;
+
+                if (isOffbeat) {
+                    instTimeOffset += phraseLift ? 0.003 : 0.0015;
+                    if (phraseLift) {
+                        velocity += 0.08;
+                    }
+                }
+            } else if (isEOfBeat && beatIndex === 1 && phraseSeed > 0.72 && intensity > 0.65) {
+                shouldPlay = true;
+                soundName = 'HiHat';
+                velocity = 0.34;
+                instTimeOffset += 0.0025;
+            }
+        } else {
+            if (isBeatStart || isOffbeat || isEOfBeat || isAOfBeat) {
+                shouldPlay = true;
+                soundName = 'HiHat';
+                velocity = isBeatStart ? 0.84 : isOffbeat ? 0.64 : 0.42;
+            }
+
+            if (phraseLift && soundName === 'HiHat') {
+                velocity += 0.07;
+            }
+
+            if (skitterHit) {
+                shouldPlay = true;
+                soundName = 'HiHat';
+                velocity = activeMotif === 2 ? 0.33 : 0.37;
+                instTimeOffset += skitterUsesA ? 0.0025 : -0.001;
             }
         }
 
-        if (!shouldPlay && activeMotif >= 1 && intensity > 0.5 && (isEOfBeat || isAOfBeat)) {
-            // Fill 16ths for Trap
-            shouldPlay = true;
-            soundName = 'HiHat';
-            velocity = 0.45;
-        }
-
-        // Offbeat Barks (Open)
-        if (isOffbeat && beatIndex === 3 && intensity > 0.65 && roll(0.4)) {
+        if (boomBapOpen || trapOpen) {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = 1.05;
+            velocity = activeMotif >= 2 ? 1.02 : 0.94;
+            instTimeOffset += activeMotif === 0 ? 0.002 : 0.001;
+        }
+
+        if (shouldPlay) {
+            velocity = scaleVelocity(velocity, intensity, soundName === 'Open' ? 0.04 : 0.03);
+            const ownsArticulation =
+                context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
+            shouldPlay = ownsArticulation;
         }
     }
 

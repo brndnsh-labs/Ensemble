@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    getPhraseSeed,
     INTENSITY_BANDS,
     roll,
     scaleVelocity,
@@ -63,16 +64,25 @@ export function applyOverrides(context, state) {
         isBeatStart,
         isBackbeat,
         isOffbeat,
+        isEOfBeat,
         isAOfBeat,
         beatIndex,
         drumComplexity,
         sectionSeed,
+        barIndex,
         isTurnaround,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const phraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, activeMotif + 9);
+    const phraseLiftBeat = phraseSeed < 0.5 ? 0 : 2;
+    const releaseBeat = phraseSeed > 0.62 ? 3 : 1;
+    const releaseUsesA = activeMotif >= 2 ? phraseSeed > 0.42 : phraseSeed > 0.8;
+    const breathHit =
+        (isAOfBeat && beatIndex === 1 && phraseSeed > 0.72) ||
+        (isEOfBeat && beatIndex === 3 && phraseSeed < 0.18);
 
     // --- 1. THE EXPRESSIVE DRAG (Dilla Micro-timing) ---
     // At high intensity, we push/pull the boundaries further for that "leaning" feel.
@@ -99,26 +109,54 @@ export function applyOverrides(context, state) {
 
     // --- 3. HI-HAT DYNAMICS ---
     if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
-        // High intensity: 16th note shimmer becomes "lazy" and tiered
-        if (intensity > 0.6) {
+        shouldPlay = false;
+        const denseSixteenths = intensity > 0.58 || activeMotif >= 1;
+        const releaseAccent =
+            (isOffbeat && beatIndex === releaseBeat && intensity > 0.72) ||
+            (releaseUsesA && isAOfBeat && beatIndex === 2 && intensity > 0.82);
+
+        if (
+            (denseSixteenths && (isBeatStart || isOffbeat || isEOfBeat || isAOfBeat)) ||
+            (!denseSixteenths && (isBeatStart || isOffbeat))
+        ) {
             shouldPlay = true;
             soundName = 'HiHat';
             if (isBeatStart) {
-                velocity = scaleVelocity(0.85, intensity, 0.15);
+                velocity = 0.83;
             } else if (isOffbeat) {
-                velocity = scaleVelocity(0.7, intensity, 0.1);
+                velocity = 0.67;
             } else {
-                velocity = scaleVelocity(0.4, intensity, 0.1);
-                // Subdivisions drag even more than the main hats
-                instTimeOffset += 0.005;
+                velocity = 0.4;
+                instTimeOffset += phraseSeed > 0.55 ? 0.0035 : 0.005;
             }
         }
 
-        // Offbeat Barks
-        if (isOffbeat && roll(0.3 * intensity)) {
+        if (shouldPlay && soundName === 'HiHat') {
+            if (isOffbeat && beatIndex === phraseLiftBeat) {
+                velocity += 0.08;
+                instTimeOffset -= 0.0015;
+            } else if (isAOfBeat) {
+                velocity += phraseSeed < 0.35 ? 0.03 : 0.01;
+                instTimeOffset += 0.002;
+            }
+        }
+
+        if (breathHit && soundName === 'HiHat' && !releaseAccent) {
+            shouldPlay = false;
+        }
+
+        if (releaseAccent) {
             shouldPlay = true;
             soundName = 'Open';
-            velocity = 1.1;
+            velocity = isOffbeat ? 0.96 : 0.9;
+            instTimeOffset += 0.004;
+        }
+
+        if (shouldPlay) {
+            velocity = scaleVelocity(velocity, intensity, soundName === 'Open' ? 0.04 : 0.05);
+            const ownsArticulation =
+                context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
+            shouldPlay = ownsArticulation;
         }
     } else if (context.inst.name === 'Snare') {
         shouldPlay = false;

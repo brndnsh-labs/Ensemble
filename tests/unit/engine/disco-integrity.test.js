@@ -13,6 +13,7 @@ describe('Disco Genre Integrity', () => {
         beatIndex: 0,
         drumComplexity: 0.5,
         sectionSeed: 0.5,
+        barIndex: 0,
         stepsPerBar: 16,
         loopStep: 0,
         isTurnaround: false,
@@ -112,7 +113,8 @@ describe('Disco Genre Integrity', () => {
                 inst: { name: 'HiHat' },
                 playback: { bandIntensity: 0.8 },
                 sectionSeed: 0.4, // Forces Motif 1
-                isEOfBeat: true,
+                beatIndex: 2,
+                isAOfBeat: true,
             });
             let hits = 0;
             for (let i = 0; i < 50; i++) {
@@ -123,18 +125,23 @@ describe('Disco Genre Integrity', () => {
             expect(hits).toBeGreaterThan(0);
         });
 
-        it('should play syncopated hat barks in Motif 2 (coverage for lines 132-137)', () => {
-            const context = createBaseContext({
-                inst: { name: 'HiHat' },
+        it('should route syncopated motif-2 hat barks through the open lane', () => {
+            const openContext = createBaseContext({
+                inst: { name: 'Open' },
                 playback: { bandIntensity: 0.8 },
                 sectionSeed: 0.7, // Forces Motif 2
                 isOffbeat: true,
                 beatIndex: 3,
             });
-            const result = Disco.applyOverrides(context, createBaseState());
-            expect(result.shouldPlay).toBe(true);
-            expect(result.soundName).toBe('Open');
-            expect(result.velocity).toBeGreaterThan(1.2);
+            const closedContext = { ...openContext, inst: { name: 'HiHat' } };
+
+            const openResult = Disco.applyOverrides(openContext, createBaseState());
+            const closedResult = Disco.applyOverrides(closedContext, createBaseState());
+
+            expect(openResult.shouldPlay).toBe(true);
+            expect(openResult.soundName).toBe('Open');
+            expect(openResult.velocity).toBeGreaterThan(1.1);
+            expect(closedResult.shouldPlay).toBe(false);
         });
 
         it('should apply shimmer velocity multiplier to Open hats (line 167)', () => {

@@ -14,6 +14,7 @@ describe('HipHop Genre Integrity', () => {
         beatIndex: 0,
         drumComplexity: 0.5,
         sectionSeed: 0.5,
+        barIndex: 0,
         stepsPerBar: 16,
         loopStep: 0,
         isTurnaround: false,
@@ -142,40 +143,41 @@ describe('HipHop Genre Integrity', () => {
             });
             const result = HipHop.applyOverrides(context, createBaseState());
             expect(result.shouldPlay).toBe(true);
-            expect(result.velocity).toBe(0.45);
+            expect(result.soundName).toBe('HiHat');
+            expect(result.velocity).toBeGreaterThan(0.43);
+            expect(result.velocity).toBeLessThan(0.5);
         });
 
-        it('should play skitters in Motif 2/3 (lines 120-131)', () => {
+        it('should play phrase-selected skitters in Motif 2/3', () => {
             const context = createBaseContext({
                 inst: { name: 'HiHat' },
                 playback: { bandIntensity: 0.9 },
-                sectionSeed: 0.5, // Motif 2
-                isEOfBeat: true,
+                sectionSeed: 0.65, // Motif 2 with a phrase-selected skitter on the "a" of 3
+                beatIndex: 2,
+                isAOfBeat: true,
             });
-            let skitterHits = 0;
-            for (let i = 0; i < 100; i++) {
-                const result = HipHop.applyOverrides(context, createBaseState());
-                if (result.shouldPlay && result.velocity === 0.35) {
-                    skitterHits++;
-                }
-            }
-            expect(skitterHits).toBeGreaterThan(0);
+            const result = HipHop.applyOverrides(context, createBaseState());
+            expect(result.shouldPlay).toBe(true);
+            expect(result.soundName).toBe('HiHat');
+            expect(result.velocity).toBeLessThan(0.4);
         });
 
-        it('should play offbeat barks (lines 143-147)', () => {
-            const context = createBaseContext({
-                inst: { name: 'HiHat' },
+        it('should route phrase-release open accents through the open lane', () => {
+            const openContext = createBaseContext({
+                inst: { name: 'Open' },
                 playback: { bandIntensity: 0.8 },
+                sectionSeed: 0.5,
                 beatIndex: 3,
                 isOffbeat: true,
             });
-            let barks = 0;
-            for (let i = 0; i < 100; i++) {
-                if (HipHop.applyOverrides(context, createBaseState()).soundName === 'Open') {
-                    barks++;
-                }
-            }
-            expect(barks).toBeGreaterThan(0);
+            const closedContext = { ...openContext, inst: { name: 'HiHat' } };
+
+            const openResult = HipHop.applyOverrides(openContext, createBaseState());
+            const closedResult = HipHop.applyOverrides(closedContext, createBaseState());
+
+            expect(openResult.shouldPlay).toBe(true);
+            expect(openResult.soundName).toBe('Open');
+            expect(closedResult.shouldPlay).toBe(false);
         });
     });
 });

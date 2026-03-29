@@ -22,7 +22,7 @@ describe('Disco Groove Integrity', () => {
             instruments: [],
         },
         soloist: { enabled: false, busySteps: 0 },
-        arranger: { sectionMap: [{ start: 0, end: 64 }] }, // 4 measures
+        arranger: { timeSignature: '4/4', sectionMap: [{ start: 0, end: 64 }] }, // 4 measures
     };
 
     it('should assign valid Disco Motifs', () => {
@@ -65,7 +65,7 @@ describe('Disco Groove Integrity', () => {
             }
         });
 
-        it('should play characteristic offbeat Hi-Hats for Motif 0', () => {
+        it('should route the characteristic offbeat open hats to the open lane only', () => {
             getState.mockReturnValue(mockState);
             let barIndexMotif0 = -1;
             for (let i = 0; i < 100; i++) {
@@ -81,10 +81,24 @@ describe('Disco Groove Integrity', () => {
             // Offbeats are 2, 6, 10, 14
             const offbeats = [2, 6, 10, 14].map((s) => barIndexMotif0 * 16 + s);
             for (const step of offbeats) {
-                const result = applyGrooveOverrides(getState(), createParams(step, 'HiHat'));
-                expect(result.shouldPlay).toBe(true);
-                expect(result.soundName).toBe('Open');
+                const closedLane = applyGrooveOverrides(getState(), createParams(step, 'HiHat'));
+                const openLane = applyGrooveOverrides(getState(), createParams(step, 'Open'));
+                expect(closedLane.shouldPlay).toBe(false);
+                expect(openLane.shouldPlay).toBe(true);
+                expect(openLane.soundName).toBe('Open');
             }
+        });
+
+        it('should keep supportive closed hats on the beat without sending them to the open lane', () => {
+            getState.mockReturnValue(mockState);
+
+            const downbeat = 0;
+            const closedLane = applyGrooveOverrides(getState(), createParams(downbeat, 'HiHat'));
+            const openLane = applyGrooveOverrides(getState(), createParams(downbeat, 'Open'));
+
+            expect(closedLane.shouldPlay).toBe(true);
+            expect(closedLane.soundName).toBe('HiHat');
+            expect(openLane.shouldPlay).toBe(false);
         });
 
         it('should trigger snare fills on turnarounds', () => {

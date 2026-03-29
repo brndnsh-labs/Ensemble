@@ -20,8 +20,14 @@ describe('Neo-Soul Groove Integrity', () => {
             creativity: true,
             lastDrumPreset: 'Neo-Soul',
             instruments: [],
+            sectionSeedMap: { 1: 0.5 },
         },
         soloist: { enabled: false, busySteps: 0 },
+        arranger: {
+            timeSignature: '4/4',
+            sectionMap: [{ start: 0, end: 64 }],
+            stepMap: [{ start: 0, end: 1000, chord: { sectionId: '1' } }],
+        },
     };
 
     it('should assign valid Neo-Soul Motifs', () => {
@@ -34,15 +40,15 @@ describe('Neo-Soul Groove Integrity', () => {
     });
 
     describe('Apply Groove Overrides - Neo-Soul Patterns', () => {
-        const createParams = (step, instName, stepVal = 0) => {
+        const createParams = (state, step, instName, stepVal = 0) => {
             const ts44 = TIME_SIGNATURES['4/4'];
             const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
             return {
                 step,
                 inst: { name: instName, muted: false, steps: [] },
                 stepVal,
-                playback: mockState.playback,
-                groove: mockState.groove,
+                playback: state.playback,
+                groove: state.groove,
                 isDownbeat: info.isMeasureStart,
                 isBeatStart: info.isBeatStart,
                 isBackbeat: info.isBackbeat,
@@ -72,7 +78,10 @@ describe('Neo-Soul Groove Integrity', () => {
             }
 
             const ghostStep = barIndexMotif1 * 16 + 3; // 'e' of 1
-            const result = applyGrooveOverrides(getState(), createParams(ghostStep, 'Snare'));
+            const result = applyGrooveOverrides(
+                getState(),
+                createParams(mockState, ghostStep, 'Snare'),
+            );
             expect(result.shouldPlay).toBe(true);
             expect(result.velocity).toBeLessThan(0.5);
         });
@@ -80,8 +89,33 @@ describe('Neo-Soul Groove Integrity', () => {
         it('should drag Snare timing slightly', () => {
             getState.mockReturnValue(mockState);
             const backbeat = 4;
-            const result = applyGrooveOverrides(getState(), createParams(backbeat, 'Snare'));
+            const result = applyGrooveOverrides(
+                getState(),
+                createParams(mockState, backbeat, 'Snare'),
+            );
             expect(result.instTimeOffset).toBeGreaterThan(0);
+        });
+
+        it('should route phrase-release open hats through the open lane without doubling', () => {
+            const highIntensityState = {
+                ...mockState,
+                playback: { ...mockState.playback, bandIntensity: 0.85 },
+            };
+            getState.mockReturnValue(highIntensityState);
+
+            const releaseStep = 14; // & of 4
+            const closedLane = applyGrooveOverrides(
+                getState(),
+                createParams(highIntensityState, releaseStep, 'HiHat'),
+            );
+            const openLane = applyGrooveOverrides(
+                getState(),
+                createParams(highIntensityState, releaseStep, 'Open'),
+            );
+
+            expect(closedLane.shouldPlay).toBe(false);
+            expect(openLane.shouldPlay).toBe(true);
+            expect(openLane.soundName).toBe('Open');
         });
     });
 });
