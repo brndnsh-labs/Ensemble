@@ -545,7 +545,7 @@ const STYLE_OVERRIDES = {
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
         commonToneWeight: 150,
-        rhythmicDensity: 0.95,
+        rhythmicDensity: 1.08,
         syncopationLikelihood: 0.7,
         targetAnchoring: 0.3,
         chromaticism: 0.9,

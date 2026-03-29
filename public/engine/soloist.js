@@ -663,7 +663,7 @@ export function getSoloistNote(
             );
             soloist.restSteps = nextRestSteps; // @worker-mutation
 
-            const minimumRestSteps = activeStyle === 'bird' ? 2 : activeStyle === 'jazz' ? 3 : 4;
+            const minimumRestSteps = activeStyle === 'bird' ? 0 : activeStyle === 'jazz' ? 3 : 4;
             if (soloist.restSteps < minimumRestSteps) {
                 soloist.restSteps = minimumRestSteps; // @worker-mutation
             }
