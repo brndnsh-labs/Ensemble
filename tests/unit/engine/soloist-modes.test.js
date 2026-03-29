@@ -323,4 +323,44 @@ describe('Soloist Mode Differentiation Logic', () => {
         }
         expect(foundHendrixInt).toBe(true);
     });
+
+    it('keeps guitar double stops more restrained in jazz than in blues', () => {
+        state.soloist.mode = 'guitar';
+        state.playback.currentLoopCount = 3;
+        vi.spyOn(Math, 'random').mockRestore();
+
+        const countDoubleStops = (style, iterations) => {
+            let doubleStops = 0;
+            let total = 0;
+            for (let i = 0; i < iterations; i++) {
+                state.soloist.busySteps = 0;
+                const note = getSoloistNote(
+                    getState(),
+                    currentChord,
+                    null,
+                    i * 4,
+                    261.63,
+                    60,
+                    style,
+                    0,
+                    {
+                        bypassRhythm: true,
+                    },
+                );
+                if (note) {
+                    total++;
+                    if (Array.isArray(note)) {
+                        doubleStops++;
+                    }
+                }
+            }
+            return doubleStops / total;
+        };
+
+        const jazzRatio = countDoubleStops('jazz', 1200);
+        const bluesRatio = countDoubleStops('blues', 1200);
+
+        expect(jazzRatio).toBeLessThan(0.18);
+        expect(bluesRatio).toBeGreaterThan(jazzRatio * 2);
+    });
 });

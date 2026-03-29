@@ -4,6 +4,7 @@ import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js'
 import {
     allowsSoloistPolyphony,
     isSoloistGuitarMode,
+    isSoloistMonophonicMode,
     resolveSoloistMode,
 } from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
@@ -97,6 +98,7 @@ export function selectPitchAndDevices(
     const seedNote = rhythmNode.seedNote || null;
     const soloistMode = resolveSoloistMode(soloistState.mode);
     const isGuitarMode = isSoloistGuitarMode(soloistMode);
+    const isMonophonicMode = isSoloistMonophonicMode(soloistMode);
     const supportRole =
         seedNote?.supportHints?.role ||
         (durationSteps >= stepsPerBeat * 2 ? 'sustain' : isStrongBeat ? 'accent' : 'line');
@@ -232,6 +234,12 @@ export function selectPitchAndDevices(
         activeStyle === 'scalar';
     const isDissonantStyle =
         activeStyle === 'jazz' || activeStyle === 'bird' || activeStyle === 'blues';
+    const isJazzGuitarStyle =
+        activeStyle === 'jazz' || activeStyle === 'bird' || activeStyle === 'bossa';
+    const isGrooveGuitarStyle =
+        activeStyle === 'funk' || activeStyle === 'reggae' || activeStyle === 'ska';
+    const isHighEnergyGuitarStyle =
+        activeStyle === 'metal' || activeStyle === 'shred' || activeStyle === 'scalar';
 
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
@@ -406,6 +414,35 @@ export function selectPitchAndDevices(
             // Passing tone on weak beat/short duration
             if (!isChordTone) {
                 weight += 100; // boost scale notes that aren't chord tones
+            }
+        }
+        if (isMonophonicMode) {
+            if (supportRole === 'pickup' || supportRole === 'line') {
+                if (dist <= 2) {
+                    weight *= 1.18;
+                } else if (dist > 5) {
+                    weight *= 0.72;
+                }
+            }
+            if (
+                supportRole === 'anchor' ||
+                supportRole === 'cadence' ||
+                supportRole === 'sustain'
+            ) {
+                if (isChordTone) {
+                    weight += 180;
+                }
+                if (dist <= 4) {
+                    weight *= 1.14;
+                } else if (dist > 7) {
+                    weight *= 0.72;
+                }
+            }
+            if (
+                (isSectionDownbeat || isFinalMeasure || supportRole === 'cadence') &&
+                (isChordTone || interval === 0 || interval === 7)
+            ) {
+                weight += 120;
             }
         }
 
@@ -734,6 +771,30 @@ export function selectPitchAndDevices(
         }
         if (activeStyle === 'country') {
             doubleStopChance *= durationSteps >= stepsPerBeat ? 1.75 : 1.15;
+        } else if (isJazzGuitarStyle) {
+            doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.42 : 0.09;
+            if (supportRole === 'anchor' || supportRole === 'cadence') {
+                doubleStopChance *= 1.55;
+            } else if (supportRole === 'line') {
+                doubleStopChance *= 0.55;
+            }
+        } else if (isGrooveGuitarStyle) {
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 0.82 : 0.28;
+            if (!isStrongBeat) {
+                doubleStopChance *= 0.65;
+            }
+            if (supportRole === 'line') {
+                doubleStopChance *= 0.45;
+            }
+        } else if (isHighEnergyGuitarStyle) {
+            doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.58 : 0.18;
+            if (supportRole === 'line') {
+                doubleStopChance *= 0.38;
+            }
+        } else if (activeStyle === 'rock') {
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 1.2 : 0.92;
+        } else if (activeStyle === 'neo') {
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 1.08 : 0.68;
         } else if (supportRole === 'line') {
             doubleStopChance *= durationSteps >= stepsPerBeat ? 0.55 : 0.22;
         } else if (supportRole === 'accent') {

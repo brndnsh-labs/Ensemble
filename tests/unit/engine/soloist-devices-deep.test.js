@@ -164,8 +164,15 @@ describe('Soloist Melodic Devices Deep Dive', () => {
     describe('generateExtraNotes - mode variants', () => {
         it('should handle country style specifically', () => {
             ctx.activeStyle = 'country';
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'line',
+                    sustainBias: 0.2,
+                },
+            };
             const extra = generateExtraNotes(ctx);
             expect(extra.length).toBe(1);
+            expect(extra[0].durationScale).toBeLessThan(0.6);
         });
 
         it('should handle guitar mode with chord tones', () => {
@@ -214,6 +221,48 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             };
             const extra = generateExtraNotes(ctx);
             expect(extra).toHaveLength(1);
+            expect(extra[0].durationScale).toBeLessThan(0.6);
+        });
+
+        it('keeps funk guitar accents clipped and groove-friendly', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'funk';
+            ctx.selectedMidi = 72;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'accent',
+                    sustainBias: 0.45,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'tight',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect(extra[0].durationScale).toBeLessThanOrEqual(0.58);
+            expect(extra[0].midi).toBeLessThan(72);
+        });
+
+        it('keeps bossa guitar support compact on line movement', () => {
+            ctx.soloist.mode = 'guitar';
+            ctx.activeStyle = 'bossa';
+            ctx.selectedMidi = 72;
+            ctx.seedNote = {
+                supportHints: {
+                    role: 'line',
+                    sustainBias: 0.35,
+                    guitar: {
+                        allowDoubleStop: true,
+                        intervalPalette: 'tight',
+                        preferBelow: true,
+                    },
+                },
+            };
+            const extra = generateExtraNotes(ctx);
+            expect(extra).toHaveLength(1);
+            expect(72 - extra[0].midi).toBeLessThanOrEqual(7);
             expect(extra[0].durationScale).toBeLessThan(0.6);
         });
 
