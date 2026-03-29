@@ -157,7 +157,28 @@ describe('Harmony Synthesis', () => {
             expect(harmony.activeVoices[0].midi).toBeNull();
         });
 
-        it('should steal the same MIDI note if already playing', () => {
+        it('should crossfade same-MIDI retriggers for sustained harmony styles', () => {
+            const cancelSpy = vi.fn();
+            const setTargetSpy = vi.fn();
+            harmony.activeVoices = [
+                {
+                    time: 9,
+                    duration: 2,
+                    midi: 60,
+                    gain: {
+                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
+                    },
+                },
+            ];
+
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'horns', 60);
+
+            expect(cancelSpy).toHaveBeenCalledWith(10);
+            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.03);
+            expect(harmony.activeVoices.length).toBe(1);
+        });
+
+        it('should keep fast harmony retriggers musical without a hard 5ms choke', () => {
             const cancelSpy = vi.fn();
             const setTargetSpy = vi.fn();
             harmony.activeVoices = [
@@ -174,7 +195,7 @@ describe('Harmony Synthesis', () => {
             playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs', 60);
 
             expect(cancelSpy).toHaveBeenCalledWith(10);
-            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.005);
+            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.02);
             expect(harmony.activeVoices.length).toBe(1);
         });
 
@@ -186,7 +207,9 @@ describe('Harmony Synthesis', () => {
                     time: 9.7,
                     duration: 1,
                     midi: 60,
-                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
+                    gain: {
+                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
+                    },
                 },
                 {
                     time: 9.8,
@@ -198,15 +221,15 @@ describe('Harmony Synthesis', () => {
                     time: 9.9,
                     duration: 1,
                     midi: 64,
-                    gain: {
-                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
-                    },
+                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
                 },
             ];
 
             playHarmonyNote(getState(), 440, 10, 1.0);
 
             expect(harmony.activeVoices.length).toBe(3);
+            expect(cancelSpy).toHaveBeenCalledWith(10);
+            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.02);
         });
     });
 
