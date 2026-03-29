@@ -279,7 +279,11 @@ export function applyGrooveOverrides(
         } else if (
             (inst.name === 'HiHat' || inst.name === 'Open') &&
             isHeavySync &&
-            !config.blockAdjacentSnare
+            !config.blockAdjacentSnare &&
+            // Respect phrase-release lane ownership: when the strategy has routed this
+            // step to the Open articulation (soundName='Open', shouldPlay=false on the
+            // HiHat lane), entropy must not reclaim it as a closed-hat hit.
+            currentState.soundName !== 'Open'
         ) {
             currentState.shouldPlay = true;
             currentState.velocity = 0.2 + Math.random() * 0.2;
