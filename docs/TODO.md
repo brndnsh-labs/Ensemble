@@ -67,3 +67,35 @@ The current pass improved phrase-aware articulation while preserving the existin
 3. Decide whether to extract a shared hi-hat articulation helper.
 4. Extend the model to the next genre.
 
+---
+
+# Additional Backlog
+
+These are broader UI/system tasks to catalog next.
+
+## 1. Visualizer overhaul / rewrite
+
+- Revisit the visualizer architecture and decide whether it needs an incremental refactor or a larger rewrite.
+- Clarify the target rendering style, performance goals, and how much of the current thread/worker split should stay intact.
+- Identify which visual behaviors should remain stable so the rewrite does not break the current musical feedback loop.
+
+## 2. Arranger kebab menu auto-expand
+
+- When the arranger / lead-sheet header has enough horizontal space, surface more commonly used icons directly instead of hiding them behind the overflow menu.
+- Prioritize the library action so it is visible sooner when room allows.
+- Keep the overflow menu as the fallback for tighter layouts and lower-density displays.
+- Decide the expansion rules by available space, not by hard-coded screen assumptions, so the behavior stays responsive.
+
+## 3. Library redesign with filtering
+
+- Redesign the progression library to make browsing and discovery easier.
+- Add filtering and search so users can narrow progressions by mood, genre, complexity, or other useful tags.
+- Preserve fast access to favorite or frequently used progressions.
+- Keep the library workflow aligned with the arranger so discovery and insertion feel like one flow.
+
+## 4. Mixer reverb defaults and auto-adjustment
+
+- Stop the reverb from changing itself unexpectedly.
+- Define sane defaults per track so the mixer starts from musical, predictable values.
+- Make sure any automatic behavior is clearly intentional and easy to understand.
+- Check whether the issue is rooted in state hydration, side effects, or a mixer-control feedback loop.
