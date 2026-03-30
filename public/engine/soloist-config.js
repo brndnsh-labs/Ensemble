@@ -548,7 +548,12 @@ const STYLE_OVERRIDES = {
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
         commonToneWeight: 150,
-        rhythmicDensity: 1.08,
+        // Bird phrases stay line-forward, but bebop needs enough surface motion
+        // to stay comfortably above the critique's notes-per-bar floor.
+        rhythmicDensity: 1.14,
+        // Keep Bird from lingering on sustained tones; shorter holds create more attacks.
+        sustainProb: 0.08,
+        maxSustainSteps: 6,
         syncopationLikelihood: 0.7,
         targetAnchoring: 0.3,
         chromaticism: 0.9,
