@@ -488,6 +488,10 @@ export function generateRhythmPlan(
 
         // Scale final duration slightly by overall band intensity
         current.durationSteps = Math.max(1, Math.round(baseDuration * (0.8 + intensity * 0.4)));
+        if (style === 'blues' && current.isSustained && current.isStrongBeat) {
+            // Let blues anchors ring a touch longer so the line feels sung instead of clipped.
+            current.durationSteps += 1;
+        }
         // Ensure duration doesn't exceed gap (unless it's the last note and we allow ringing, though even then we cap it)
         if (next && current.durationSteps > gap) {
             current.durationSteps = gap;

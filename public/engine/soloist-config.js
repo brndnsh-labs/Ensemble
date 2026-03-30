@@ -183,24 +183,24 @@ const STYLE_OVERRIDES = {
         ],
     },
     blues: {
-        restBase: 0.15,
+        restBase: 0.09,
         tensionScale: 0.8,
         timingJitter: 25,
-        minNotesPerPhrase: 3,
+        // Keep the blues line from sagging into too much empty space.
+        minNotesPerPhrase: 4,
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
         targetExtensions: [9, 10],
         deviceProb: 0.4,
         allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
-        sustainProb: 0.4,
-        // Cap sustains below the old extreme so single cries do not starve density,
-        // but still let blues phrases ring longer than funk stabs.
-        maxSustainSteps: 10,
+        sustainProb: 0.22,
+        // Shorter sustains keep the phrase moving while preserving a bluesy breath.
+        maxSustainSteps: 6,
         vibratoIntensity: 1.2,
         commonToneWeight: 500,
         stationaryProb: 0.1,
-        // Nudged up from 0.60 to provide a small density margin without cramping phrasing.
-        rhythmicDensity: 0.65,
+        // Lift the attack rate enough to avoid sub-threshold dips, but keep the pocket open.
+        rhythmicDensity: 0.82,
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.9,
         chromaticism: 0.6,
@@ -548,7 +548,12 @@ const STYLE_OVERRIDES = {
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
         commonToneWeight: 150,
-        rhythmicDensity: 1.08,
+        // Bird phrases stay line-forward, but bebop needs enough surface motion
+        // to stay comfortably above the critique's notes-per-bar floor.
+        rhythmicDensity: 1.14,
+        // Keep Bird from lingering on sustained tones; shorter holds create more attacks.
+        sustainProb: 0.08,
+        maxSustainSteps: 6,
         syncopationLikelihood: 0.7,
         targetAnchoring: 0.3,
         chromaticism: 0.9,
