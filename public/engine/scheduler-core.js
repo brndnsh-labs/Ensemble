@@ -58,6 +58,7 @@ import {
 import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { generateNotesForStep } from './tick-logic.js';
+import { getChordAtStep as _getChordAtStep } from './worker-utils.js';
 
 const DRUM_VIS_PITCHES = {
     Kick: 36,
@@ -554,32 +555,29 @@ function advanceGlobalStep(state, dispatch = undefined) {
 }
 
 /**
+ * Thin adapter over the canonical {@link _getChordAtStep} from `worker-utils.js`.
+ *
+ * The canonical implementation lives in `worker-utils.js` and is the single
+ * source of truth for chord-lookup logic. This adapter bridges the
+ * `(state, step)` calling convention used inside scheduler-core to the
+ * `(step, arranger, cursor)` signature of the canonical helper, preserving
+ * the `chords.scheduledChordIndex` cursor that the scheduler maintains for
+ * O(1) amortized lookups.
+ *
+ * If you need to change chord-lookup behavior, edit `worker-utils.js`.
+ *
  * @param {import('../types.js').EnsembleState} state
  * @param {number} step
  * @returns {any}
  */
 function getChordAtStep(state, step) {
     const { arranger, chords } = state;
-    if (arranger.totalSteps === 0) {
-        return null;
+    const cursor = { index: chords.scheduledChordIndex || 0, sectionIndex: 0 };
+    const result = _getChordAtStep(step, arranger, cursor);
+    if (result) {
+        chords.scheduledChordIndex = cursor.index; // @direct-mutation
     }
-    const targetStep = step % arranger.totalSteps;
-
-    // Reset cursor if we are looping back
-    const lastStep = arranger.stepMap[chords.scheduledChordIndex || 0]?.start || 0;
-    if (targetStep < lastStep) {
-        chords.scheduledChordIndex = 0; // @direct-mutation
-    }
-
-    const startI = chords.scheduledChordIndex || 0;
-    for (let i = startI; i < arranger.stepMap.length; i++) {
-        const entry = arranger.stepMap[i];
-        if (targetStep >= entry.start && targetStep < entry.end) {
-            chords.scheduledChordIndex = i; // @direct-mutation
-            return { chord: entry.chord, stepInChord: targetStep - entry.start, chordIndex: i };
-        }
-    }
-    return null;
+    return result;
 }
 
 /**
