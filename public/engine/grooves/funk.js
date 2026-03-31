@@ -1,8 +1,9 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     getPhraseSeed,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -15,35 +16,15 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Funk.
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * Motifs: 0=Grounded pocket, 1=Ghost heavy, 2=Displaced, 3=Linear
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Grounded pocket
-    }
-
-    if (intensity < 0.7) {
-        if (seed < 0.4) {
-            return 0;
-        }
-        return 1; // Ghost heavy
-    }
-
-    // High Intensity
-    if (seed < 0.2) {
-        return 0;
-    }
-    if (seed < 0.5) {
-        return 1; // Ghost heavy
-    }
-    if (seed < 0.75) {
-        return 2; // Displaced
-    }
-    return 3; // Linear
-}
+export const getMotif = makeMotifSelector([
+    binaryTier(0.7, 0.4),
+    {
+        picks: [[0.2, 0], [0.5, 1], [0.75, 2], 3],
+    },
+]);
 
 /**
  * @param {any} context

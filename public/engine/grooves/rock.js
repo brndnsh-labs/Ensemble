@@ -1,8 +1,10 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     getPhraseSeed,
     INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -16,50 +18,19 @@ export const config = {
 
 /**
  * Rock Motifs:
- * 0: Classic Standard (Kick on 1 & 3, Snare on 2 & 4)
- * 1: Driving Double-Kick (Kick on 1, 1&, 3, 3&)
- * 2: Half-time Feel (Snare on beat 3)
- * 3: Anthem/Stadium (Feathered 4-on-the-floor, Ride/Open focus)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Classic Standard, 1: Driving Double-Kick, 2: Half-time Feel, 3: Anthem/Stadium
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0;
-    }
-
-    // Seed-based selection for variety
-    if (intensity < 0.6) {
-        if (seed < 0.6) {
-            return 0;
-        }
-        return 1; // Driving
-    }
-
-    if (intensity < INTENSITY_BANDS.HIGH) {
-        if (seed < 0.3) {
-            return 0;
-        }
-        if (seed < 0.6) {
-            return 1;
-        }
-        if (seed < 0.85) {
-            return 2; // Half-time
-        }
-        return 3; // Anthem
-    }
-
-    // High Intensity
-    if (seed < 0.2) {
-        return 1;
-    }
-    if (seed < 0.5) {
-        return 2;
-    }
-    return 3;
-}
+export const getMotif = makeMotifSelector([
+    binaryTier(0.6, 0.6),
+    {
+        maxIntensity: INTENSITY_BANDS.HIGH,
+        picks: [[0.3, 0], [0.6, 1], [0.85, 2], 3],
+    },
+    {
+        picks: [[0.2, 1], [0.5, 2], 3],
+    },
+]);
 
 /**
  * @param {any} context

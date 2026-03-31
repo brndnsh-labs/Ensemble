@@ -89,8 +89,17 @@ export function recursiveSafeSync(target, source, moduleName) {
 }
 
 /**
- * Core utility for finding the current chord based on the global step.
+ * **Canonical** chord-lookup helper – single source of truth for the codebase.
+ *
+ * Callers:
+ * - `tick-logic.js` and `midi-worker-logic.js` call this directly (worker-side).
+ * - `scheduler-core.js` calls this via a thin adapter that bridges its
+ *   `(state, step)` convention to this `(step, arranger, cursor)` signature.
+ *
  * Uses a cursor-based optimization to avoid full-map traversals.
+ * Pass a `cursor` object (`{ index, sectionIndex }`) to keep state across
+ * calls; omit it to fall back to module-level globals.
+ *
  * @param {number} step - The global step index.
  * @param {import('../state/arranger.js').ArrangerState} arranger - The arranger state (progression, stepMap, etc.).
  * @param {any} [cursor] - Optional cursor for tracking position.
@@ -111,10 +120,14 @@ export function getChordAtStep(step, arranger, cursor = null) {
         currentLastSectionIndex = 0;
         currentLastChordIndex = 0;
 
-        // Also reset global state if not using a custom cursor
+        // Persist the reset immediately so callers observe it even when the
+        // subsequent stepMap scan returns null (e.g. a gap at step 0).
         if (!cursor) {
             lastSectionIndex = 0;
             lastChordIndex = 0;
+        } else {
+            cursor.index = 0;
+            cursor.sectionIndex = 0;
         }
     }
 

@@ -1,5 +1,8 @@
 # Ensemble: Technical Context & Instructions
 
+> [!NOTE]
+> Use `AI.md` for operational rules and `AI_MAP.md` for navigation. `GEMINI.md` is the companion context file for roadmap, historical milestones, and broader technical background.
+
 ## 🚨 CRITICAL: Infrastructure Mandates
 *   **Package Manager**: This project **ONLY** uses `npm`. **NEVER** use `pnpm`, `yarn`, or `bun`.
 *   **Lockfiles**: ONLY `package-lock.json` is allowed. **DO NOT** create or commit `pnpm-lock.yaml`, `yarn.lock`, or `bun.lockb`.
@@ -71,7 +74,7 @@ The project has completed the **v2.29 Codebase Health & Standards Audit**, achie
 14. **Virtual Band Authenticity Audit (v2.6)**: COMPLETED comprehensive implementation of 32+ expert critique suites covering all genres. Refined all rhythm sections (Drums, Bass, Accompaniment) to meet pro-level benchmarks for rhythmic pocket, harmonic resolution, and stylistic phrasing. Established a **Unified Timing Grid (v2)** with weighted loping swing and genre-specific micro-timing (Dilla lag, Reggae lay-back, Punk rush).
 15. **Soloist Engine Simplification (v2.7)**: COMPLETED drastic reduction of heuristic complexity. Removed SRDC state machine and motif memory in favor of a predictable, intensity-driven phrasing model. Implemented dynamic register centering and intensity-based register ceilings for better melodic control.
 16. **Unified Rhythmic Parity (v2.8)**: COMPLETED project-wide refactor to ensure full behavioral parity between live playback and MIDI exports. Enhanced `getStepInfo` with comprehensive semantic timing flags. Generalized all drum strategies (Rock, Jazz, Latin, Reggae) to be fully meter-aware using reliable time signature configurations. Consolidated 900+ tests to verify rhythmic integrity across all formats.
-17. **Musical Coordination Contract (v2.9)**: COMPLETED implementation of interactive band logic using a centralized `CoordinationContext`. Established strict register slotting (Bass: 28-51, Chords: 52-84, Soloist: 60-90) enforced by a "Musical Firewall" middleware. Integrated rhythmic yielding where Bass locks to Kick and Chords yield density to Soloist. Verified with property-based fuzz tests.
+17. **Musical Coordination Contract (v2.9)**: COMPLETED implementation of interactive band logic using a centralized `CoordinationContext`. Established the original register-slotting contract (Bass: 28-51, Chords: 52-84, Soloist: 60-90) enforced by a "Musical Firewall" middleware; later releases expanded the bass lane to the current 5-string model. Integrated rhythmic yielding where Bass locks to Kick and Chords yield density to Soloist. Verified with property-based fuzz tests.
 18. **Lean Bundle & Architectural Refinement (v2.30)**: COMPLETED comprehensive optimization of the codebase. Reduced initial JS bundle size by 60% via lazy-loading modals. Modularized static data into `public/data/` and consolidated WebAudio boilerplate into `synth-utils.js`. Established `UIControls.jsx` shared library and purged hundreds of lines of redundant inline styles.
 19. **Core Infrastructure & Test Integrity (v2.31)**: COMPLETED major architectural remediation. Implemented **State Slices Pattern** for all domain state. Resolved circular dependencies in core state/effects using **Inversion of Control (IoC)**. Decoupled engine from global state. Reached **89% project-wide test coverage** milestone including 100% coverage for all primary controllers. Verified with 1,300+ tests.
 20. **Visualizer Refactor (v2.32)**: COMPLETED migration of the canvas rendering engine to a Preact-based component architecture. Decoupled `UnifiedVisualizer` from the global `playback` state and high-precision scheduling loop.
@@ -87,7 +90,6 @@ The project has completed the **v2.29 Codebase Health & Standards Audit**, achie
 *   **Maintainability Score**: 99/100 (Exceptional).
 *   **Test Coverage**: 89.04% (Logic & UI).
 *   **Infrastructure**: Fully consolidated Biome (Linting/Formatting), TypeScript/JSDoc (Type Safety), Size-Limit (Performance), and Dependency-Cruiser (Architecture).
-
 
 
 

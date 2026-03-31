@@ -1,8 +1,9 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     getPhraseSeed,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -17,36 +18,16 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Hip Hop.
- * 0: Classic Boom Bap (MPC Style)
- * 1: Trap Foundation (Consistent 16ths)
- * 2: Trap Skitter (Hi-hat rolls)
- * 3: Modern Hybrid (Syncopated & Busy)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Classic Boom Bap (MPC Style), 1: Trap Foundation (Consistent 16ths),
+ * 2: Trap Skitter (Hi-hat rolls), 3: Modern Hybrid (Syncopated & Busy)
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Solid Boom Bap foundation
-    }
-
-    if (intensity < 0.65) {
-        if (seed < 0.6) {
-            return 0;
-        }
-        return 1; // Trap
-    }
-
-    // High Intensity
-    if (seed < 0.3) {
-        return 1; // Trap Foundation
-    }
-    if (seed < 0.7) {
-        return 2; // Trap Skitters
-    }
-    return 3; // Hybrid
-}
+export const getMotif = makeMotifSelector([
+    binaryTier(0.65, 0.6),
+    {
+        picks: [[0.3, 1], [0.7, 2], 3],
+    },
+]);
 
 /**
  * @param {any} context

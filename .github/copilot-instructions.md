@@ -2,6 +2,8 @@
 
 Before making broad changes, skim `AI_MAP.md` for file ownership and `AI.md` / `GEMINI.md` for the repo's architectural and state-management rules. Those files contain project-specific guidance that is more important here than generic JavaScript advice.
 
+When the guides overlap: use `AI.md` for rules, `AI_MAP.md` for navigation, and `GEMINI.md` for broader context and roadmap. If any doc drifts from live code or config, prefer the code/config and then update the docs.
+
 The repository also includes a workspace Playwright MCP config at `.vscode/mcp.json`; keep it aligned with any browser automation changes so the setup remains portable across machines.
 
 ## Build, test, and lint commands
@@ -33,6 +35,7 @@ npx vitest run tests/unit/engine/worker-client.test.js -t "specific test name"
 
 npx playwright test tests/e2e/workspace-surfaces.spec.js
 npx playwright test tests/e2e/arranger-mobile.spec.js --project="Mobile Chrome"
+npx playwright test -g "@ipad" --project="Mobile Safari"
 npx playwright test -g "@mobile"
 ```
 
@@ -82,4 +85,4 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 - When musical correctness and programmer convenience conflict, favor musicality: preserve groove, phrasing, voice-leading, and authentic feel instead of "clean" math that flattens the music.
 - New or changed musical heuristics should keep explicit JSDoc and comments for intentional probabilities, offsets, and phrasing rules. This codebase treats "musical intent" as part of the implementation, not as disposable tuning noise.
 - When changing musical engines, run the relevant critique/integrity test in `tests/standards/`, not just the broad suite.
-- Playwright is split into desktop and mobile projects. Desktop excludes `@mobile`; the mobile project only runs `@mobile` tests. The Playwright config also injects `data-e2e-mode="true"` to stabilize test rendering.
+- Playwright currently uses three projects: `Desktop Chrome`, `Mobile Chrome` (`@mobile`), and `Mobile Safari` (`@ipad`). Desktop excludes `@mobile`; the phone project runs `@mobile`; the iPad project runs `@ipad`. The Playwright config also injects `data-e2e-mode="true"` to stabilize test rendering.

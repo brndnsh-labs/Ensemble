@@ -1,7 +1,9 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -15,47 +17,19 @@ export const config = {
 
 /**
  * Metal Motifs:
- * 0: Standard Heavy (Kick on 1 & 3, Snare on 2 & 4)
- * 1: Driving 8th Kick (Trash/Heavy Rock feel)
- * 2: The Gallop (16-16-8 Kick pattern)
- * 3: Double Kick 16ths (Continuous wall of sound)
- * 4: Blast Beat (16th Snare + 16th Kick synchronization)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Standard Heavy, 1: Driving 8th Kick, 2: The Gallop, 3: Double Kick 16ths, 4: Blast Beat
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Pure foundation
-    }
-
-    if (intensity < 0.65) {
-        if (seed < 0.6) {
-            return 0;
-        }
-        return 1; // Driving 8ths
-    }
-
-    if (intensity < INTENSITY_BANDS.HIGH) {
-        if (seed < 0.3) {
-            return 1;
-        }
-        if (seed < 0.7) {
-            return 2; // Gallop
-        }
-        return 3; // Double Kick 16ths
-    }
-
-    // High Intensity
-    if (seed < 0.25) {
-        return 2; // Gallop
-    }
-    if (seed < 0.6) {
-        return 3; // 16ths
-    }
-    return 4; // Blast Beat
-}
+export const getMotif = makeMotifSelector([
+    binaryTier(0.65, 0.6),
+    {
+        maxIntensity: INTENSITY_BANDS.HIGH,
+        picks: [[0.3, 1], [0.7, 2], 3],
+    },
+    {
+        picks: [[0.25, 2], [0.6, 3], 4],
+    },
+]);
 
 /**
  * @param {any} context
