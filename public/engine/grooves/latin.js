@@ -1,7 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -13,35 +13,26 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Latin / Bossa.
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Pure Bossa Nova, 1: Mid-intensity Latin, 2: Samba, 3: Partido Alto
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Pure Bossa Nova at low intensity
-    }
-
-    if (intensity < 0.6) {
-        if (seed < 0.7) {
-            return 0;
-        }
-        return 1;
-    }
-
-    // High Intensity
-    if (seed < 0.3) {
-        return 0;
-    }
-    if (seed < 0.6) {
-        return 1;
-    }
-    if (seed < 0.85) {
-        return 2; // Samba
-    }
-    return 3; // Partido Alto
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.6,
+        picks: [
+            [0.7, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        picks: [
+            [0.3, 0],
+            [0.6, 1],
+            [0.85, 2],
+            [1.0, 3],
+        ],
+    },
+]);
 
 /**
  * @param {any} context

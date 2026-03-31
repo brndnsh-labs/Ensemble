@@ -1,7 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -14,39 +14,26 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Ska-Punk.
- * 0: Classic Ska (Grounded 1/3 kick, dominant offbeat hats)
- * 1: Driving 2-Step (Fast Punk feel)
- * 2: Double-Time / Skate Punk (Maximum energy)
- * 3: D-Beat (Syncopated driving feel)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Classic Ska, 1: Driving 2-Step, 2: Double-Time/Skate Punk, 3: D-Beat
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Pure Ska foundation
-    }
-
-    if (intensity < 0.6) {
-        if (seed < 0.6) {
-            return 0;
-        }
-        return 1; // 2-Step
-    }
-
-    // High Intensity
-    if (seed < 0.2) {
-        return 0;
-    }
-    if (seed < 0.5) {
-        return 1; // 2-Step
-    }
-    if (seed < 0.8) {
-        return 2; // Double-Time
-    }
-    return 3; // D-Beat
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.6,
+        picks: [
+            [0.6, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        picks: [
+            [0.2, 0],
+            [0.5, 1],
+            [0.8, 2],
+            [1.0, 3],
+        ],
+    },
+]);
 
 /**
  * @param {any} context

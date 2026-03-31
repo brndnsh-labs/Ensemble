@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     DEFAULT_CONFIG,
     INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -12,44 +13,36 @@ export const config = {
 };
 
 /**
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * Jazz motifs: 0=Relaxed Swing, 1=Swinging, 2=Driving, 3=Bebop, 4=Hard Bop
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0;
-    }
-    if (intensity < 0.6) {
-        return seed < 0.75 ? 0 : 1;
-    }
-    if (intensity < INTENSITY_BANDS.HIGH) {
-        if (seed < 0.3) {
-            return 0;
-        }
-        if (seed < 0.6) {
-            return 1;
-        }
-        if (seed < 0.85) {
-            return 2;
-        }
-        return 3;
-    }
-    if (seed < 0.2) {
-        return 0;
-    }
-    if (seed < 0.4) {
-        return 1;
-    }
-    if (seed < 0.6) {
-        return 2;
-    }
-    if (seed < 0.8) {
-        return 3;
-    }
-    return 4;
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.6,
+        picks: [
+            [0.75, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        maxIntensity: INTENSITY_BANDS.HIGH,
+        picks: [
+            [0.3, 0],
+            [0.6, 1],
+            [0.85, 2],
+            [1.0, 3],
+        ],
+    },
+    {
+        picks: [
+            [0.2, 0],
+            [0.4, 1],
+            [0.6, 2],
+            [0.8, 3],
+            [1.0, 4],
+        ],
+    },
+]);
 
 /**
  * @param {any} context

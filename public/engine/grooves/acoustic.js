@@ -1,7 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -14,39 +14,26 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Acoustic.
- * 0: Minimal Folk/Cajon (Kick on 1, Sidestick on 3)
- * 1: Driving Folk (Kick on 1/3, Sidestick on 2/4)
- * 2: Soft Rock / Shaker-driven
- * 3: Dynamic Build (Soft Snare runs)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Minimal Folk/Cajon, 1: Driving Folk, 2: Soft Rock/Shaker-driven, 3: Dynamic Build
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Pure Cajon foundation
-    }
-
-    if (intensity < 0.65) {
-        if (seed < 0.6) {
-            return 0;
-        }
-        return 1; // Driving Folk
-    }
-
-    // High Intensity prioritization
-    if (seed < 0.2) {
-        return 0; // Maintain minimal option
-    }
-    if (seed < 0.45) {
-        return 1; // Driving Folk
-    }
-    if (seed < 0.8) {
-        return 2; // Soft Rock
-    }
-    return 3; // Dynamic Build
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.65,
+        picks: [
+            [0.6, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        picks: [
+            [0.2, 0],
+            [0.45, 1],
+            [0.8, 2],
+            [1.0, 3],
+        ],
+    },
+]);
 
 /**
  * @param {any} context

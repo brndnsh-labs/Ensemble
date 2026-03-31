@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     DEFAULT_CONFIG,
     INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -15,40 +16,33 @@ export const config = {
 
 /**
  * Motifs represent different "feels" within the Blues Shuffle universe.
- * 0: Standard tight shuffle (closed hats)
- * 1: Driving shuffle (consistent kick push on 4)
- * 2: Heavy shuffle (open hats/ride focus)
- * 3: Texas Double Shuffle (controlled snare ghosting)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Standard tight shuffle, 1: Driving shuffle, 2: Heavy shuffle, 3: Texas Double Shuffle
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0;
-    }
-    if (intensity < 0.6) {
-        return seed < 0.75 ? 0 : 1;
-    }
-    if (intensity < INTENSITY_BANDS.HIGH) {
-        if (seed < 0.5) {
-            return 0;
-        }
-        if (seed < 0.8) {
-            return 1;
-        }
-        return 2;
-    }
-    // High intensity
-    if (seed < 0.3) {
-        return 1;
-    }
-    if (seed < 0.7) {
-        return 2;
-    }
-    return 3;
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.6,
+        picks: [
+            [0.75, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        maxIntensity: INTENSITY_BANDS.HIGH,
+        picks: [
+            [0.5, 0],
+            [0.8, 1],
+            [1.0, 2],
+        ],
+    },
+    {
+        picks: [
+            [0.3, 1],
+            [0.7, 2],
+            [1.0, 3],
+        ],
+    },
+]);
 
 /**
  * @param {any} context

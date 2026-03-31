@@ -1,7 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -15,29 +15,25 @@ export const config = {
 
 /**
  * Motifs for Country:
- * 0: Traditional Two-Step (Kick on 1/3, Snare on 2/4)
- * 1: Train Beat Light (Brushes/Ghost 16ths)
- * 2: Full Heavy Train Beat
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Traditional Two-Step, 1: Train Beat Light, 2: Full Heavy Train Beat
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0;
-    }
-    if (intensity < 0.6) {
-        return seed < 0.6 ? 0 : 1;
-    }
-    if (seed < 0.3) {
-        return 0;
-    }
-    if (seed < 0.8) {
-        return 1;
-    }
-    return 2;
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.6,
+        picks: [
+            [0.6, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        picks: [
+            [0.3, 0],
+            [0.8, 1],
+            [1.0, 2],
+        ],
+    },
+]);
 
 /**
  * @param {any} context

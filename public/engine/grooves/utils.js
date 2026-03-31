@@ -61,6 +61,55 @@ export const DEFAULT_CONFIG = {
 };
 
 /**
+ * Selects a motif index from a sorted list of [seedThreshold, motifIndex] pairs.
+ * Returns the motif for the first threshold that `seed` falls below.
+ *
+ * @param {number} seed
+ * @param {[number, number][]} picks - Sorted pairs of [threshold, motifIndex]
+ * @returns {number}
+ */
+function pickBySeed(seed, picks) {
+    for (const [threshold, motif] of picks) {
+        if (seed < threshold) {
+            return motif;
+        }
+    }
+    return picks[picks.length - 1][1];
+}
+
+/**
+ * Factory that creates a deterministic motif selector from a tier configuration.
+ * Each tier maps an intensity ceiling to seed-based motif indices.
+ * The last tier (omit `maxIntensity`) acts as the high-intensity default.
+ *
+ * @example
+ * const getMotif = makeMotifSelector([
+ *   { maxIntensity: 0.6, picks: [[0.6, 0], [1.0, 1]] },
+ *   { picks: [[0.3, 0], [0.7, 1], [1.0, 2]] },
+ * ]);
+ *
+ * @param {Array<{maxIntensity?: number, picks: [number, number][]}>} tiers
+ * @param {{complexityThreshold?: number, intensityFloor?: number}} [opts]
+ * @returns {(seed: number, complexity: number, intensity?: number) => number}
+ */
+export function makeMotifSelector(tiers, opts = {}) {
+    const complexityThreshold = opts.complexityThreshold ?? 0.3;
+    const intensityFloor = opts.intensityFloor ?? INTENSITY_BANDS.LOW;
+
+    return function getMotif(seed, complexity, intensity = 1.0) {
+        if (complexity < complexityThreshold || intensity < intensityFloor) {
+            return 0;
+        }
+        for (const tier of tiers) {
+            if (tier.maxIntensity === undefined || intensity < tier.maxIntensity) {
+                return pickBySeed(seed, tier.picks);
+            }
+        }
+        return 0;
+    };
+}
+
+/**
  * Standard base logic for groove overrides.
  * Extracts context and handles early returns for muted instruments.
  *

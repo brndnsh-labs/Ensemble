@@ -1,7 +1,7 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
-    INTENSITY_BANDS,
+    makeMotifSelector,
     roll,
     scaleVelocity,
 } from './utils.js';
@@ -11,40 +11,28 @@ export const config = {
 };
 
 /**
+/**
  * Maps intensity to motif complexity for Reggae.
- * 0: True One Drop (Kick/Snare on 3 only)
- * 1: Steppers (4-on-the-floor kick)
- * 2: Rockers (Syncopated Kick doubling)
- * 3: Dub/Rub-a-Dub (Busy Snare/Experimentation)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: True One Drop, 1: Steppers, 2: Rockers, 3: Dub/Rub-a-Dub
+ * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Solid One Drop
-    }
-
-    if (intensity < 0.7) {
-        if (seed < 0.6) {
-            return 0;
-        }
-        return 1; // Steppers
-    }
-
-    // High Intensity
-    if (seed < 0.1) {
-        return 0; // One Drop
-    }
-    if (seed < 0.6) {
-        return 1; // Steppers
-    }
-    if (seed < 0.85) {
-        return 2; // Rockers
-    }
-    return 3; // Dub
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.7,
+        picks: [
+            [0.6, 0],
+            [1.0, 1],
+        ],
+    },
+    {
+        picks: [
+            [0.1, 0],
+            [0.6, 1],
+            [0.85, 2],
+            [1.0, 3],
+        ],
+    },
+]);
 
 /**
  * @param {any} context
