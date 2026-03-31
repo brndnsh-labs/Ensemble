@@ -12,6 +12,7 @@ const DOCS_TO_SCAN = [
     'AI_MAP.md',
     'GEMINI.md',
     'AI.md',
+    '.github/copilot-instructions.md',
     'docs/guides/WORKER_CONTRACT.md',
     'docs/guides/ENSEMBLE_COORDINATION.md',
     'docs/guides/REFERENCE_TUNING.md',
@@ -38,6 +39,147 @@ const IGNORE_FILES = [
     'icon.svg',
 ];
 
+const PLAYWRIGHT_DOCS = ['AI.md', '.github/copilot-instructions.md'];
+const REGISTER_DOCS = [
+    'AI.md',
+    'docs/guides/WORKER_CONTRACT.md',
+    'docs/guides/ENSEMBLE_COORDINATION.md',
+];
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function readText(filePath) {
+    return fs.readFileSync(filePath, 'utf-8');
+}
+
+/**
+ * @param {string} configContent
+ * @returns {string[]}
+ */
+function extractPlaywrightProjects(configContent) {
+    return [...configContent.matchAll(/name:\s*'([^']+)'/g)].map((match) => match[1]);
+}
+
+/**
+ * @param {string} engineContent
+ * @returns {{
+ *   bassMin: number,
+ *   bassMax: number,
+ *   chordMin: number,
+ *   chordMax: number,
+ *   soloFloor: number,
+ *   soloClampMin: number,
+ *   soloClampMax: number
+ * }}
+ */
+function extractRegisterSlotting(engineContent) {
+    const slottingStart = engineContent.indexOf('export function enforceRegisterSlotting');
+    const slottingContent = slottingStart >= 0 ? engineContent.slice(slottingStart) : engineContent;
+    const bassMatch = /case 'bass':[\s\S]*?smoothOctaveClamp\(midi,\s*(\d+),\s*(\d+)/.exec(
+        slottingContent,
+    );
+    const chordMatch = /case 'chords':[\s\S]*?smoothOctaveClamp\(midi,\s*(\d+),\s*(\d+)/.exec(
+        slottingContent,
+    );
+    const soloMatch =
+        /case 'soloist':[\s\S]*?if \(midi < (\d+)\)[\s\S]*?smoothOctaveClamp\(midi,\s*(\d+),\s*(\d+)/.exec(
+            slottingContent,
+        );
+
+    if (!bassMatch || !chordMatch || !soloMatch) {
+        throw new Error('Unable to extract register slotting rules from coordination-engine.js');
+    }
+
+    return {
+        bassMin: Number(bassMatch[1]),
+        bassMax: Number(bassMatch[2]),
+        chordMin: Number(chordMatch[1]),
+        chordMax: Number(chordMatch[2]),
+        soloFloor: Number(soloMatch[1]),
+        soloClampMin: Number(soloMatch[2]),
+        soloClampMax: Number(soloMatch[3]),
+    };
+}
+
+/**
+ * @param {string} docPath
+ * @param {RegExp} pattern
+ * @param {string} message
+ * @returns {boolean}
+ */
+function ensureDocPattern(docPath, pattern, message) {
+    const content = readText(docPath);
+    const normalizedContent = content.replace(/\s+/g, ' ');
+    if (pattern.test(content) || pattern.test(normalizedContent)) {
+        return false;
+    }
+    console.error(`❌ [${docPath}] ${message}`);
+    return true;
+}
+
+function validatePlaywrightProjectDocs() {
+    let hasError = false;
+    const projects = extractPlaywrightProjects(readText('playwright.config.js'));
+
+    for (const docPath of PLAYWRIGHT_DOCS) {
+        const content = readText(docPath);
+
+        for (const project of projects) {
+            if (!content.includes(project)) {
+                console.error(`❌ [${docPath}] Missing Playwright project reference: ${project}`);
+                hasError = true;
+            }
+        }
+
+        if (projects.includes('Mobile Chrome') && !content.includes('@mobile')) {
+            console.error(`❌ [${docPath}] Missing @mobile tag guidance for Mobile Chrome.`);
+            hasError = true;
+        }
+
+        if (projects.includes('Mobile Safari') && !content.includes('@ipad')) {
+            console.error(`❌ [${docPath}] Missing @ipad tag guidance for Mobile Safari.`);
+            hasError = true;
+        }
+    }
+
+    return hasError;
+}
+
+function validateRegisterSlottingDocs() {
+    let hasError = false;
+    const slotting = extractRegisterSlotting(readText('public/engine/coordination-engine.js'));
+    const rangeSep = '(?:[–-]|to)';
+
+    for (const docPath of REGISTER_DOCS) {
+        hasError =
+            ensureDocPattern(
+                docPath,
+                new RegExp(`Bass[^\\n]*${slotting.bassMin}\\s*${rangeSep}\\s*${slotting.bassMax}`),
+                `Missing live bass slot ${slotting.bassMin}-${slotting.bassMax}.`,
+            ) || hasError;
+        hasError =
+            ensureDocPattern(
+                docPath,
+                new RegExp(
+                    `Chords(?:\\/Harmony)?[^\\n]*${slotting.chordMin}\\s*${rangeSep}\\s*${slotting.chordMax}`,
+                ),
+                `Missing live chord slot ${slotting.chordMin}-${slotting.chordMax}.`,
+            ) || hasError;
+        hasError =
+            ensureDocPattern(
+                docPath,
+                new RegExp(
+                    `Soloist(?=[^\\n]*${slotting.soloFloor})(?=[^\\n]*${slotting.soloClampMin}\\s*${rangeSep}\\s*${slotting.soloClampMax})`,
+                ),
+                `Missing live soloist clamp behavior (${slotting.soloFloor} floor, ${slotting.soloClampMin}-${slotting.soloClampMax} priority lane).`,
+            ) || hasError;
+    }
+
+    return hasError;
+}
+
 function validateDocs() {
     let hasError = false;
     const aiMapPath = 'AI_MAP.md';
@@ -57,14 +199,14 @@ function validateDocs() {
             continue;
         }
 
-        const content = fs.readFileSync(doc, 'utf-8');
+        const content = readText(doc);
 
         const pathRegex = /`([^`]+\.[a-z0-9]+)`|`([^`]+\/)`/g;
         let match = pathRegex.exec(content);
         const checkedInDoc = new Set();
 
         while (match !== null) {
-            const rawPath = match[1] || match[3];
+            const rawPath = match[1] || match[2];
             if (!rawPath || rawPath.startsWith('http') || rawPath.startsWith('{{')) {
                 match = pathRegex.exec(content);
                 continue;
@@ -87,7 +229,7 @@ function validateDocs() {
             }
 
             const validRoot =
-                /^(public|docs|tests|scripts|package\.json|GEMINI\.md|AI\.md|AI_MAP\.md|tests\/)/;
+                /^(\.github|public|docs|tests|scripts|package\.json|GEMINI\.md|AI\.md|AI_MAP\.md|playwright\.config\.js|tests\/)/;
             if (!validRoot.test(cleanPath)) {
                 match = pathRegex.exec(content);
                 continue;
@@ -138,6 +280,11 @@ function validateDocs() {
             }
         }
     }
+
+    console.log('🔍 Phase 3: Checking Semantic Drift...');
+
+    hasError = validatePlaywrightProjectDocs() || hasError;
+    hasError = validateRegisterSlottingDocs() || hasError;
 
     if (hasError) {
         console.log('\n❌ Documentation validation FAILED.');

@@ -89,10 +89,36 @@ const PICKUP_DICTIONARY = {
  * @typedef {Object} SeedNote
  * @property {number} step - Global step target within the loop.
  * @property {number} midi - MIDI note value.
- * @property {boolean} isAnchor - True if it's a structural anchor.
+ * @property {boolean} isAnchor - True if it's a structural anchor (downbeat / phrase start).
  * @property {number} durationSteps - Suggested duration in steps.
  * @property {number} velocity - Suggested velocity (0.0 - 1.0).
  * @property {SeedSupportHints} [supportHints] - Optional accompaniment hints that keep the melody primary.
+ */
+
+/**
+ * A single note-like event inside a rhythmic cell template.
+ * "isRest: false" cells are converted to SeedNotes during motif application.
+ * @typedef {Object} MotifCellNote
+ * @property {number} beatOffset - Beat position within the measure (fractional beats, e.g. 0.5 = "and of 1").
+ * @property {boolean} isRest - When true the slot is silent; used to create space between phrases.
+ * @property {number} duration - Note length in steps.
+ */
+
+/**
+ * One section's worth of rhythmic/melodic template that gets repeated and mutated
+ * as the arrangement progresses.  The motif stores relative scale-degree offsets so
+ * it can be transposed and re-harmonized against any chord progression.
+ * @typedef {Object} MotifEntry
+ * @property {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} motif
+ *   Ordered list of motif events.  Scale-degree offsets are relative to the root of the section's
+ *   first chord; they get resolved to absolute MIDI values during the application phase.
+ * @property {number} phraseLength - Template length in measures (2 or 4).
+ * @property {string} contourType - Melodic contour archetype selected for this section
+ *   ('ASCEND' | 'DESCEND' | 'ARCH' | 'VALLEY' | 'HOOK' | 'ARPEGGIATE' | 'STATIC').
+ * @property {{ density: number, syncopationRatio: number }} metrics - Summary stats used to
+ *   detect contrast needs when generating departure sections.
+ * @property {boolean} isStationaryMotif - When true all notes stay near the anchor pitch,
+ *   producing a drone-like pedal effect.
  */
 
 /**
@@ -472,12 +498,31 @@ function polishCadenceLandings(
 
 /**
  * Generates a song-wide seed melody for the soloist.
+ * Generates the entire "Dynamic Head" (seed melody) for the current arrangement.
+ *
+ * The algorithm works in three phases:
+ *  1. **Motif generation** – for each distinct section category (verse, chorus, bridge …)
+ *     a rhythmic/melodic template (MotifEntry) is built using the Rhythm Cell Dictionary
+ *     and a probabilistically chosen melodic contour.  Sections that share the same
+ *     category reuse and mutate the same template, producing the A-A-B-A repetition
+ *     expected in a song head.
+ *  2. **Motif application** – each template event is resolved to an absolute MIDI pitch
+ *     via a multi-criteria voice-leading search that balances stepwise motion, register
+ *     anchoring, guide-tone preference, and chord-pivot awareness.
+ *  3. **Improvisational post-processing** – syllable splits, syncopated anticipations,
+ *     and neighbor/passing tones are injected stochastically to add vocal phrasing.
+ *
+ * All randomness is driven by `prng` (seeded via `seedStr`) so the output is
+ * fully deterministic for a given seed, enabling consistent replay and testing.
+ *
  * @param {import('../types.js').EnsembleState} state
  * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {string} style
- * @param {number} [_intensity]
- * @param {string} [seedStr]
+ * @param {string} style - Resolved soloist style key (e.g. 'jazz', 'scalar', 'bossa').
+ * @param {number} [_intensity] - Reserved for future intensity-aware seeding; currently unused.
+ * @param {string} [seedStr] - Optional PRNG seed string.  Omit for a random seed each call.
  * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
+ *   `notes` is sorted ascending by `step`.  `loopLengthSteps` is the total length of one
+ *   arrangement loop in scheduler steps (matches the arranger's unrolled length).
  */
 export function generateSessionSeed(state, arranger, style, _intensity, seedStr) {
     style = resolveSoloistStyle(style, state?.groove?.genreFeel);
@@ -513,7 +558,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // To ensure repetition across identical sections (e.g. AABA form),
     // we'll memorize the target note sequence for each section label.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
-    /** @type {Map<string, { motif: Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>, phraseLength: number, contourType: string, metrics: { density: number, syncopationRatio: number }, isStationaryMotif: boolean }>} */
+    /** @type {Map<string, MotifEntry>} */
     const sectionMotifs = new Map();
 
     /** @type {Map<string, number>} */
@@ -1452,6 +1497,14 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // --- NEW: Voice-Leading Scoring Logic ---
                 // If the chord has just changed, or we're in Loop 0, try to find a note in the scale
                 // that is a "Common Tone" or "Guide Tone" and is close to lastMidi.
+                // --- Voice-Leading Scoring (lower = better) ---
+                // Each candidate note is penalized for: large melodic jumps (jumpPenalty),
+                // straying far from the phrase's register anchor (anchorPenalty),
+                // deviating from the motif's intended scale degree (motifPenalty),
+                // moving in the wrong contour direction (directionPenalty + motionPenalty),
+                // sitting outside the register (floorPenalty / ceilingPenalty).
+                // Bonuses reduce the score for guide tones (3rds/7ths), pivot-chord fresh notes,
+                // chord-tone arpeggios, and short interval hops in hook contours.
                 let bestMidi = registerOctaveBase + pitchClass + octaveShift;
                 let minScore = 999;
                 const expectedDirection =

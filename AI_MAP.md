@@ -2,6 +2,14 @@
 
 This map provides a quick reference for AI agents to understand the responsibilities and key exports of the Ensemble codebase.
 
+## Guide Hierarchy
+
+- Start here when you need file ownership, entrypoints, or likely edit locations.
+- Use `AI.md` for operational rules and safety conventions.
+- Use `GEMINI.md` for product context, roadmap, and historical milestones.
+- Use `.github/copilot-instructions.md` for the concise Copilot CLI summary.
+- If guidance conflicts, prefer live code/config first, then realign the docs so `AI.md` and `AI_MAP.md` stay reliable.
+
 ## Core Architecture
 
 | Path | Responsibility | Key Exports / Symbols |
@@ -83,6 +91,14 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/midi-utils.js` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/midi-constants.js` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
+
+## Live vs Worker Responsibilities
+
+- `public/worker-client.js` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
+- `public/logic-worker.js` is the worker-side message dispatcher and reset coordinator.
+- `public/engine/worker-buffer-manager.js` and `public/engine/tick-logic.js` own lookahead note generation inside the worker.
+- `public/engine/worker-utils.js` holds shared worker-side helpers such as `getChordAtStep`.
+- `public/engine/scheduler-core.js` stays on the main thread and schedules already-generated note events into WebAudio/MIDI time.
 
 ## Synthesis Engine (WebAudio)
 

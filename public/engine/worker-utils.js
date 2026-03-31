@@ -120,10 +120,14 @@ export function getChordAtStep(step, arranger, cursor = null) {
         currentLastSectionIndex = 0;
         currentLastChordIndex = 0;
 
-        // Also reset global state if not using a custom cursor
+        // Persist the reset immediately so callers observe it even when the
+        // subsequent stepMap scan returns null (e.g. a gap at step 0).
         if (!cursor) {
             lastSectionIndex = 0;
             lastChordIndex = 0;
+        } else {
+            cursor.index = 0;
+            cursor.sectionIndex = 0;
         }
     }
 

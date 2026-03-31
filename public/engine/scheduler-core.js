@@ -564,6 +564,11 @@ function advanceGlobalStep(state, dispatch = undefined) {
  * the `chords.scheduledChordIndex` cursor that the scheduler maintains for
  * O(1) amortized lookups.
  *
+ * **Invariant**: `chords.scheduledChordIndex` is always written back from the
+ * cursor after every call, including null returns. This ensures that loop-back
+ * resets (cursor reset to 0 inside the helper) are persisted even when no chord
+ * entry covers the requested step.
+ *
  * If you need to change chord-lookup behavior, edit `worker-utils.js`.
  *
  * @param {import('../types.js').EnsembleState} state
@@ -574,9 +579,7 @@ function getChordAtStep(state, step) {
     const { arranger, chords } = state;
     const cursor = { index: chords.scheduledChordIndex || 0, sectionIndex: 0 };
     const result = _getChordAtStep(step, arranger, cursor);
-    if (result) {
-        chords.scheduledChordIndex = cursor.index; // @direct-mutation
-    }
+    chords.scheduledChordIndex = cursor.index; // @direct-mutation — always persist, including loop-back resets
     return result;
 }
 

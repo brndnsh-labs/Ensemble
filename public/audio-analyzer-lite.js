@@ -12,6 +12,13 @@ const { min, max, floor, PI, cos, sin, abs, round, ceil, sqrt } = Math;
 // --- Static Data (Optimization: Avoid Re-allocation) ---
 const KEY_TYPES = ['major', 'minor', 'dominant', 'bluesMaj', 'bluesMin'];
 
+/**
+ * Template profiles for chord-type matching in {@link ChordAnalyzerLite#identifyChord}.
+ * Keys are semitone intervals from the chord root (0–11); values are relative energy weights.
+ * A profile only lists the *required* intervals — chromagram bins absent from the profile
+ * incur a small penalty (`score -= val * 0.5`) to penalize "wrong" notes, while missing
+ * required bins incur a larger penalty (`score -= 2.0`).
+ */
 const CHORD_PROFILES = {
     maj: { 0: 1.6, 4: 1.4, 7: 1.1 },
     m: { 0: 1.6, 3: 1.4, 7: 1.1 },
@@ -42,27 +49,31 @@ const MINOR_DIATONIC = [0, 2, 3, 5, 7, 8, 10]; // i ii° III iv v VI VII
 
 /**
  * @typedef {Object} ChromagramOptions
- * @property {number} [step]
- * @property {number} [minMidi]
- * @property {number} [maxMidi]
- * @property {boolean} [suppressHarmonics]
- * @property {boolean} [skipSharpening]
- * @property {SharedBuffers} [buffers]
- * @property {number} [startTime]
- * @property {number} [endTime]
- * @property {number} [bpm]
- * @property {Function} [onProgress]
- * @property {any} [keyBias]
- * @property {string|null} [bassNote]
- * @property {Float32Array} [bassChroma]
+ * @property {number} [step] - Down-sampling stride (default 4). Higher values are faster but less accurate.
+ * @property {number} [minMidi] - Lowest MIDI pitch to include in the analysis (default 0).
+ * @property {number} [maxMidi] - Highest MIDI pitch to include in the analysis (default 127).
+ * @property {boolean} [suppressHarmonics] - When true the full MIDI range is analyzed so overtones
+ *   can be detected and removed.  When false only `[minMidi, maxMidi]` is processed (faster).
+ * @property {boolean} [skipSharpening] - When true the post-process harmonic-sharpening pass is skipped.
+ * @property {SharedBuffers} [buffers] - Pre-allocated typed arrays to avoid per-call GC pressure.
+ * @property {number} [startTime] - Seconds from which to start analysis (default 0).
+ * @property {number} [endTime] - Seconds at which to stop analysis (default: full buffer duration).
+ * @property {number} [bpm] - Known BPM.  Supplied to skip BPM detection inside {@link identifyPulse}.
+ * @property {Function} [onProgress] - Progress callback `(percent: number) => void` (0-100).
+ * @property {any} [keyBias] - Result of {@link identifyGlobalKey} used to boost diatonic chord scores.
+ * @property {string|null} [bassNote] - Note name of the bass voice (e.g. 'G') for slash-chord detection.
+ * @property {Float32Array} [bassChroma] - Low-register chromagram (MIDI 24-47) used to reinforce
+ *   bass note evidence when the main chromagram range starts at MIDI 48.
  */
 
 /**
  * @typedef {Object} PulseData
- * @property {number} bpm
- * @property {number} beatsPerMeasure
- * @property {number} downbeatOffset
- * @property {Array<{bpm: number, score: number}>} candidates
+ * @property {number} bpm - Detected (or confirmed) tempo in BPM.
+ * @property {number} beatsPerMeasure - Detected meter numerator (2, 3, 4, or 6).
+ * @property {number} downbeatOffset - Seconds from the start of the buffer to the first downbeat.
+ *   Used by {@link analyze} to align measure boundaries before chord slicing.
+ * @property {Array<{bpm: number, score: number}>} candidates - Ranked list of BPM hypotheses
+ *   from the autocorrelation search, useful for debugging or multi-tempo recordings.
  */
 
 /**
@@ -241,6 +252,25 @@ function calculateChromagramStandalone(signal, sampleRate, options, pitchFrequen
     return sharpened;
 }
 
+/**
+ * Lightweight, pure-JS chord and pulse analyzer for the Ensemble Audio Workbench.
+ *
+ * **Algorithm overview:**
+ * 1. {@link identifyPulse} – Spectral-flux onset detection + autocorrelation BPM search +
+ *    phase scan for downbeat alignment.  Capped at 30 s of analysis for performance.
+ * 2. {@link analyze} – Global key identification (Krumhansl-Schmuckler profiles with tuning
+ *    search), then per-beat chromagram extraction with a rolling local-key tracker, finally
+ *    {@link identifyChord} applied beat-by-beat with diatonic bias and slash-chord detection.
+ *
+ * **Assumptions / constraints:**
+ * - Input is expected to be a mono (or left-channel) `AudioBuffer`.
+ * - `pitchFrequencies` covers MIDI 24–96; analysis below MIDI 24 or above MIDI 96 is not
+ *   supported without reinitializing `this.pitchFrequencies`.
+ * - The analyzer is designed for typical song recordings (30 s – 5 min).  Very short clips
+ *   (< 2 beats) may produce unreliable pulse and chord results.
+ * - Reuse a single `ChordAnalyzerLite` instance across multiple calls to share the
+ *   pre-computed `pitchFrequencies` table and avoid repeated allocations.
+ */
 export class ChordAnalyzerLite {
     constructor() {
         /** @type {string[]} */
@@ -383,8 +413,16 @@ export class ChordAnalyzerLite {
 
     /**
      * Analyzes an AudioBuffer and returns detected chords and pulse metadata.
+     *
+     * Processing is async and yields to the main thread every 10 beats (via `yieldToMain`)
+     * so the UI remains responsive during analysis of long clips.
+     *
      * @param {AudioBuffer} audioBuffer
      * @param {ChromagramOptions} [options={}]
+     * @returns {Promise<{
+     *   chords: Array<{beat: number, chord: string | null, energy: number}>,
+     *   pulse: PulseData,
+     * }>}
      */
     async analyze(audioBuffer, options = {}) {
         // 1. Identify Pulse (BPM, Meter, Downbeat)
@@ -841,8 +879,13 @@ export class ChordAnalyzerLite {
      * Identifies the "Pulse" (BPM, Meter, and Downbeat) of the audio using
      * Spectral Flux for robust onset detection and autocorrelation.
      * Includes "Top-Down" structural snapping based on clip duration.
+     *
+     * Analysis is limited to the first 30 s of audio for performance; longer clips
+     * are assumed to have a consistent tempo and meter throughout.
+     *
      * @param {AudioBuffer} audioBuffer
      * @param {ChromagramOptions} [options={}]
+     * @returns {Promise<PulseData>}
      */
     async identifyPulse(audioBuffer, options = {}) {
         const signal = audioBuffer.getChannelData(0);
@@ -1234,7 +1277,8 @@ export class ChordAnalyzerLite {
 
     /**
      * Extracts the single strongest note from a bass-specific chromagram.
-     * @param {Float32Array} bassChroma
+     * @param {Float32Array} bassChroma - 12-bin chroma vector covering MIDI 24-47.
+     * @returns {string|null} Note name (e.g. 'G') or null if the chromagram is silent.
      */
     getStrongestBassNote(bassChroma) {
         let maxBass = 0;
@@ -1251,17 +1295,32 @@ export class ChordAnalyzerLite {
     /**
      * Calculates energy in 12 semitone bins using a bank of targeted
      * single-frequency filters with Hann windowing and Harmonic Suppression.
+     * Thin wrapper over {@link calculateChromagramStandalone} that injects
+     * `this.pitchFrequencies` (MIDI 24-96 pre-computed table).
      * @param {Float32Array} signal
      * @param {number} sampleRate
      * @param {ChromagramOptions} [options={}]
+     * @returns {Float32Array} 12-element chroma vector, values roughly 0.0 – 1.0+ (not normalized).
      */
     calculateChromagram(signal, sampleRate, options = {}) {
         return calculateChromagramStandalone(signal, sampleRate, options, this.pitchFrequencies);
     }
 
     /**
-     * @param {Float32Array} chroma
+     * Identifies the most likely chord name from a 12-bin chromagram.
+     *
+     * Scoring combines:
+     *  - Profile match against {@link CHORD_PROFILES} (required intervals boost, absent intervals penalize)
+     *  - Global key diatonic bias (`options.keyBias`)
+     *  - 7th-chord sanity check (avoids false positives from key-bias overtones)
+     *  - Simplicity bias (slight penalty for complex chord types to favour triads when scores are close)
+     *  - Slash-chord detection using `options.bassNote` and `options.bassChroma`
+     *
+     * Returns 'Rest' when total chromagram energy is below 0.05 (silence threshold).
+     *
+     * @param {Float32Array} chroma - 12-bin chromagram (e.g. output of {@link calculateChromagram}).
      * @param {ChromagramOptions} [options={}]
+     * @returns {string} Chord name string (e.g. 'Cmaj7', 'Gm', 'F/A') or 'Rest'.
      */
     identifyChord(chroma, options = {}) {
         let bestScore = -1;

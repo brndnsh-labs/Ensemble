@@ -12,6 +12,12 @@ import {
  * Standardized to return Note Objects for the Worker/Scheduler.
  */
 
+/**
+ * Module-level persistent comping state.
+ * Mutated each bar (and each section change) by {@link updateRhythmicIntent}.
+ * Survives across calls to {@link getAccompanimentNotes} to provide groove memory,
+ * voice-leading continuity, and soloist-aware density adjustment.
+ */
 export const compingState = {
     currentVibe: 'balanced',
     currentCell: new Array(16).fill(0),
@@ -392,12 +398,14 @@ function buildResolvingAlteredVoicing(
 
 /**
  * Algorithmic Pattern Generator
+ * Generates a binary rhythmic hit pattern for a single measure.
  * Replaces static PIANO_CELLS table to save space and increase variety.
  * @param {import('../types.js').EnsembleState} state
  * @param {string} genre
- * @param {string} vibe
+ * @param {string} vibe - 'sparse' | 'balanced' | 'active'
  * @param {any} tsConfig
- * @param {number} [length]
+ * @param {number} [length] - Pattern length in steps (default 16).
+ * @returns {number[]} Binary array (0 | 1) of length `length`, where 1 marks a rhythmic hit.
  */
 export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16) {
     const { playback } = state;
@@ -732,11 +740,21 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
 }
 
 /**
+ * Updates {@link compingState} (currentCell, currentVibe, rhythmicMask, intent fields)
+ * once per measure / section-change boundary.  Called every step from
+ * {@link getAccompanimentNotes} but exits early if the step is still inside
+ * the current locked window to avoid unnecessary regeneration.
+ *
+ * Side-effects:
+ *  - Writes `compingState.currentCell`, `compingState.currentVibe`, `compingState.lockedUntil`.
+ *  - Writes `chords.rhythmicMask` for cross-module coordination.
+ *  - Writes `playback.intent.*` fields used by the timing pocket.
+ *
  * @param {import('../types.js').EnsembleState} state
- * @param {number} step
- * @param {boolean} soloistBusy
- * @param {number} [spm]
- * @param {string|null} [sectionId]
+ * @param {number} step - Absolute scheduler step.
+ * @param {boolean} soloistBusy - True when the soloist is actively playing notes.
+ * @param {number} [spm] - Steps per measure (default 16).
+ * @param {string|null} [sectionId] - Current arranger section ID; triggers a groove reset on change.
  */
 function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = null) {
     const { playback, chords, groove, arranger } = state;
@@ -871,13 +889,18 @@ function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = nu
 }
 
 /**
- * @param {number} _step
- * @param {number} measureStep
- * @param {number} chordIndex
- * @param {number} intensity
+ * Generates sustain-pedal (CC 64) on/off events for the current step.
+ * Releases sustain on chord changes (with a brief "breath" before tense chords resolve)
+ * and re-engages it immediately after to allow the next harmony to bloom naturally.
+ *
+ * @param {number} _step - Absolute step (unused; kept for call-site symmetry).
+ * @param {number} measureStep - Step within the current measure.
+ * @param {number} chordIndex - Index of the current chord in the progression.
+ * @param {number} intensity - Band intensity (0.0 – 1.0).
  * @param {string} genre
  * @param {import('../types.js').StepInfo} [stepInfo]
- * @param {string|null} [currentQuality]
+ * @param {string|null} [currentQuality] - Chord quality string (e.g. '7alt', 'dim') for tension tracking.
+ * @returns {Array<{type: string, controller: number, value: number, timingOffset: number}>}
  */
 function handleSustainEvents(
     _step,
@@ -938,14 +961,28 @@ function handleSustainEvents(
 /**
  * Main entry point for generating accompaniment notes.
  * Returns an array of standardized Note Objects.
+ *
+ * Called once per scheduler step by the logic worker.  The function fans out into
+ * genre-specific lanes (Neo-Soul, Reggae, Funk, Jazz, Rock, Metal, etc.).  All lanes
+ * share the same setup: sustain CC generation, rhythmic-intent update, and soloist
+ * yielding.  Each lane returns early, so at most one lane fires per step.
+ *
  * @param {import('../types.js').EnsembleState} state
- * @param {any} chord
- * @param {number} step
- * @param {number} stepInChord
- * @param {number} measureStep
- * @param {import('../types.js').StepInfo} stepInfo
- * @param {any} [coordination]
- * @returns {Array<any>}
+ * @param {any} chord - Current chord object from the arranger progression.
+ * @param {number} step - Absolute scheduler step.
+ * @param {number} stepInChord - Step within the current chord duration.
+ * @param {number} measureStep - Step within the current measure (0 … stepsPerMeasure-1).
+ * @param {import('../types.js').StepInfo} stepInfo - Semantic timing flags for this step.
+ * @param {{
+ *   soloistBusy?: boolean,
+ *   soloistActive?: boolean,
+ *   soloistMidi?: number,
+ *   bassHit?: boolean,
+ *   bassMidi?: number,
+ *   kickHit?: boolean,
+ *   snareHit?: boolean,
+ * }} [coordination] - Optional cross-instrument coordination signals from the CoordinationContext.
+ * @returns {Array<any>} Standardized Note Objects (may include CC-only sentinel notes with `muted: true`).
  */
 export function getAccompanimentNotes(
     state,

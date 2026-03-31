@@ -2,14 +2,22 @@
 
 This document is the primary operational guide for AI agents working on the Ensemble codebase. It consolidates architectural standards, refactoring rules, and musical logic principles to ensure stable and autonomous evolution.
 
+## 0. Guide Hierarchy
+
+*   **`AI.md`**: Source of truth for operational rules, guardrails, and contributor expectations.
+*   **`AI_MAP.md`**: Navigation map for file ownership, entrypoints, and key exports.
+*   **`GEMINI.md`**: Companion context for roadmap, historical milestones, and broader technical background.
+*   **`.github/copilot-instructions.md`**: Concise GitHub Copilot CLI summary.
+*   **Conflict rule:** If any guide drifts from live code or config, prefer the live code/config and update the docs.
+
 ## 1. Mandatory Checklist
 
 > [!IMPORTANT]
 > **Before every task, verify these five pillars:**
 > 1. **State Writes:** ALWAYS use `dispatch(ACTIONS.TYPE, payload)`. NEVER mutate `state` objects directly.
 > 2. **UI Updates:** Check `public/components/` first. Use Preact components; avoid direct DOM manipulation.
-3. **Testing:** Run `npm test` (Logic) AND `npm run test:e2e` (UI) before concluding any task.
-4. **Refactoring:** `grep` the entire project for usages before moving code. Update all imports immediately.
+> 3. **Testing:** Run `npm test` (Logic) AND `npm run test:e2e` (UI) before concluding any task.
+> 4. **Refactoring:** `grep` the entire project for usages before moving code. Update all imports immediately.
 
 ---
 
@@ -64,9 +72,10 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ### C. Coordination & Register Slotting
 Always pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:
-*   **Bass:** 28–51
-*   **Chords:** 52–84
-*   **Soloist:** 60–90
+*   **Source of truth:** `public/engine/coordination-engine.js`
+*   **Bass:** 23–57
+*   **Chords/Harmony:** 52–84
+*   **Soloist:** Priority 60–90, but only clamp into that lane when a note would fall below MIDI 52.
 
 ## 4. Manual & Documentation
 
@@ -93,6 +102,7 @@ Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written ta
 
 ### B. Playwright (Functional E2E)
 *   **Mobile-First:** Use the `@mobile` tag and verify at 390x844.
+*   **Project Matrix:** Desktop Chrome, Mobile Chrome (`@mobile`), and Mobile Safari (`@ipad`).
 *   **Functional Only:** We focus on functional smoke tests (visibility, interactions, state updates) rather than pixel-perfect snapshots to avoid cross-OS flakiness.
 *   **Stabilization:** Use `data-e2e-mode="true"` to disable heavy animations during tests.
 
