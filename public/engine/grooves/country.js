@@ -1,5 +1,6 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     makeMotifSelector,
     roll,
@@ -19,19 +20,9 @@ export const config = {
  * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
+    binaryTier(0.6, 0.6),
     {
-        maxIntensity: 0.6,
-        picks: [
-            [0.6, 0],
-            [1.0, 1],
-        ],
-    },
-    {
-        picks: [
-            [0.3, 0],
-            [0.8, 1],
-            [1.0, 2],
-        ],
+        picks: [[0.3, 0], [0.8, 1], 2],
     },
 ]);
 

@@ -1,5 +1,6 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     INTENSITY_BANDS,
     makeMotifSelector,
@@ -20,27 +21,13 @@ export const config = {
  * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
-    {
-        maxIntensity: 0.6,
-        picks: [
-            [0.75, 0],
-            [1.0, 1],
-        ],
-    },
+    binaryTier(0.6, 0.75),
     {
         maxIntensity: INTENSITY_BANDS.HIGH,
-        picks: [
-            [0.5, 0],
-            [0.8, 1],
-            [1.0, 2],
-        ],
+        picks: [[0.5, 0], [0.8, 1], 2],
     },
     {
-        picks: [
-            [0.3, 1],
-            [0.7, 2],
-            [1.0, 3],
-        ],
+        picks: [[0.3, 1], [0.7, 2], 3],
     },
 ]);
 

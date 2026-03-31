@@ -1,5 +1,6 @@
 import {
     applyStandardBase,
+    binaryTier,
     DEFAULT_CONFIG,
     getPhraseSeed,
     makeMotifSelector,
@@ -22,19 +23,9 @@ export const config = {
  * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
+    binaryTier(0.65, 0.6),
     {
-        maxIntensity: 0.65,
-        picks: [
-            [0.6, 0],
-            [1.0, 1],
-        ],
-    },
-    {
-        picks: [
-            [0.3, 1],
-            [0.7, 2],
-            [1.0, 3],
-        ],
+        picks: [[0.3, 1], [0.7, 2], 3],
     },
 ]);
 
