@@ -1,23 +1,39 @@
-# Remaining Backlog
+# Roadmap
 
-These are the open UI/system tasks left after the hi-hat, visualizer, and flaky-test work was completed.
+These are the current product and audio work streams, ordered by user-facing impact.
 
-## 1. Library redesign with filtering
+## 1. Resolution balance fix
 
-- Redesign the progression library to make browsing and discovery easier.
-- Add filtering and search so users can narrow progressions by mood, genre, complexity, or other useful tags.
-- Preserve fast access to favorite or frequently used progressions.
-- Keep the library workflow aligned with the arranger so discovery and insertion feel like one flow.
+- The final resolution is too loud and should sit in the same velocity range as the rest of the arrangement.
+- Apply the normalization consistently in live playback and MIDI export.
 
-## 2. Mixer reverb defaults and auto-adjustment
+## 2. Studio workspace polish
 
-- Done: reverb no longer changes itself with band intensity.
-- The mixer now starts from fixed per-track defaults, and those values persist once the user edits them.
-- The old feedback loop was rooted in conductor-side state mutation plus persisted auto-adjusted sends.
+- Make desktop instrument cards smaller and denser.
+- Tighten the Studio controls menu layout so the per-instrument controls feel consistent.
 
-## Flaky tests
+## 3. Arranger readability pass
 
-- `npm run validate` can still fail in the Vitest phase because of unrelated soloist benchmarks.
-- Recent reruns bounced between `tests/unit/engine/soloist-modes.test.js`, `tests/integration/soloist-seeder-hook-shape.test.js`, and `tests/standards/blues-soloist-authenticity.test.js`.
-- Those same three files passed when run individually and together, so the failure pattern looks suite-level and intermittent rather than a deterministic reverb regression.
-- The failures were threshold-based and changed from run to run, so treat them as baseline instability rather than a mixer bug.
+- Let the maximized lead-sheet view stretch vertically.
+- Use the extra room to increase font size and improve legibility.
+
+## 4. Audio identity refresh
+
+- Add new soloist sounds.
+- Revisit synthesis for chords, bass, and harmony as separate design passes.
+
+## 5. Dynamic Head simplification
+
+- Look for ways to simplify the session seed / Dynamic Head logic.
+- Prefer smaller helpers and clearer flow over more branching, while preserving the seeded head behavior.
+
+## 6. Progression library discovery
+
+- Keep the library redesign moving toward better browsing and discovery.
+- Add filtering and search by mood, genre, complexity, and favorites.
+- Preserve quick access to frequently used progressions.
+
+## Notes
+
+- The Dynamic Head refactor is the riskiest item because it is tightly coupled to seeded playback and export behavior.
+- Audio synthesis changes should be checked against both live playback and export output.
