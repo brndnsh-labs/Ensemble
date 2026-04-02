@@ -143,11 +143,14 @@ import { handleResolution } from '../../../public/logic-worker.js';
 
 describe('Export and Resolution Logic Validation', () => {
     beforeEach(() => {
+        const state = getState();
         capturedMessages.length = 0;
         noteOnEvents.length = 0;
         mockNoteOn.mockClear();
         arranger.key = 'C';
         arranger.isMinor = false;
+        state.groove.genreFeel = 'Rock';
+        state.groove.creativity = false;
         harmony.enabled = true;
         const mockChord = {
             root: 'C',
@@ -294,6 +297,20 @@ describe('Export and Resolution Logic Validation', () => {
 
         // Ensure velocity is substantial but not maxed out
         expect(chordNotes[0].midiVelocity).toBeGreaterThan(60);
+    });
+
+    it('should keep the exported resolution bass note blended with the setup note', () => {
+        const state = getState();
+        state.groove.genreFeel = 'Jazz';
+
+        handleResolution(state, 0);
+
+        const noteMsg = capturedMessages.find((m) => m.type === 'notes');
+        expect(noteMsg).toBeDefined();
+
+        const bassNotes = noteMsg.notes.filter((n) => n.module === 'bass');
+        expect(bassNotes.length).toBe(2);
+        expect(bassNotes[1].midiVelocity).toBeLessThanOrEqual(bassNotes[0].midiVelocity);
     });
 
     it('should complete MIDI export including harmonies', () => {

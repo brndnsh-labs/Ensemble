@@ -127,4 +127,23 @@ describe('Resolution Logic', () => {
         // Even at 1.0 intensity, velocity should not be 1.0 because of the tamer (0.85)
         expect(notes[0].velocity).toBeLessThan(0.9);
     });
+
+    it('keeps the final cadence in the same velocity lane as the setup note', () => {
+        const arranger = { key: 'C', isMinor: false };
+        const enabled = { bass: true };
+        const groove = { genreFeel: 'Jazz' };
+
+        const notes = generateResolutionNotes(
+            { playback: { bandIntensity: 1.0 }, groove },
+            0,
+            arranger,
+            enabled,
+            120,
+            groove,
+        );
+
+        const bassNotes = notes.filter((n) => n.module === 'bass');
+        expect(bassNotes.length).toBe(2);
+        expect(bassNotes[1].midiVelocity).toBeLessThanOrEqual(bassNotes[0].midiVelocity);
+    });
 });

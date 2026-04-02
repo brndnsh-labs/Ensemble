@@ -13,19 +13,19 @@ const RESOLUTION_NORMALIZER = 0.85; // Global tamer to prevent limiter crushing
 const RESOLUTION_STAGGER = 0.015; // Max jitter in seconds for sample-accurate peak reduction
 
 const CADENCE_PROFILES = {
-    // Sharp hit on the Tonic
-    BUTTON: [{ label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 1.0 }],
+    // Single tonic landing, kept in the same lane as the band.
+    BUTTON: [{ label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 0.8 }],
 
-    // Standard V -> I resolution
+    // Standard V -> I resolution with a blended tonic landing.
     STANDARD_V_I: [
         { label: 'V', degree: 7, quality: 'major', beats: 2, baseVelocity: 0.75 },
-        { label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 1.0 },
+        { label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 0.74 },
     ],
 
-    // Jazz ii -> V -> I (Condensed)
+    // Jazz ii -> V -> I (Condensed) with a softer tonic arrival.
     JAZZ_V_I: [
         { label: 'V7', degree: 7, quality: '13', beats: 2, baseVelocity: 0.7 },
-        { label: 'I6/9', degree: 0, quality: '6', beats: 4, baseVelocity: 1.0 },
+        { label: 'I6/9', degree: 0, quality: '6', beats: 4, baseVelocity: 0.68 },
     ],
 };
 
@@ -185,7 +185,7 @@ export function generateResolutionNotes(
             if (bassMidi < 33) {
                 bassMidi += 12;
             }
-            const baseVel = isLast ? 1.0 : 0.8;
+            const baseVel = isLast ? 0.76 : 0.8;
             const vel = getFinalVel(baseVel);
             const offset = getStagger(0.005); // Tighter stagger for bass/kick lock
             notes.push({
@@ -202,7 +202,7 @@ export function generateResolutionNotes(
 
         // --- DRUMS ---
         if (enabled.groove) {
-            const kickVel = getFinalVel(1.0);
+            const kickVel = getFinalVel(isLast ? 0.86 : 1.0);
             // Kick on every change
             notes.push({
                 module: 'groove',
@@ -214,7 +214,7 @@ export function generateResolutionNotes(
             });
             if (isLast) {
                 // Final Crash
-                const crashVel = getFinalVel(1.0);
+                const crashVel = getFinalVel(0.82);
                 notes.push({
                     module: 'groove',
                     name: 'Crash',
@@ -242,7 +242,7 @@ export function generateResolutionNotes(
             // Force resolution to Tonic (0) or 5th (7) relative to resolutionKey
             const soloPC = (isLast ? 0 : 7) + keyIndex;
             const soloMidi = soloOctave + (soloPC % 12);
-            const baseVel = isLast ? 0.9 : 0.7;
+            const baseVel = isLast ? 0.68 : 0.7;
             const vel = getFinalVel(baseVel);
             notes.push({
                 midi: soloMidi,
