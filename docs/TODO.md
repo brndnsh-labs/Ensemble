@@ -4,8 +4,11 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 ## 1. Resolution balance fix
 
-- The final resolution is too loud and should sit in the same velocity range as the rest of the arrangement.
-- Apply the normalization consistently in live playback and MIDI export.
+- Status: Done (2026-04-02)
+- Summary: Final resolution velocities softened so final notes blend with preceding material in both live playback and MIDI export.
+- Commits: b6249ac — "Flatten resolution cadence: soften final-note velocities and add regression tests"
+- Tests: Regression tests added; full repo validation (npm run validate) passed.
+- Notes: Export uses precomputed n.midiVelocity; fix implemented in generateResolutionNotes so live and export match. Consider a subjective DAW check or an optional UI preference to tune resolution intensity.
 
 ## 2. Studio workspace polish
 
