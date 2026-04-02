@@ -18,6 +18,21 @@ const PRACTICE_GROUNDING_QUALITIES = new Set([
     'augmaj7',
 ]);
 
+export const TENSION_CHORD_QUALITIES = new Set([
+    'halfdim',
+    'm7b5',
+    'half-diminished',
+    'dim',
+    'diminished',
+    '7alt',
+    '7b9',
+    '7#9',
+    '7b5',
+    'aug',
+    'augmented',
+    'augmaj7',
+]);
+
 /**
  * @param {string | undefined | null} feel
  * @returns {boolean}
@@ -48,6 +63,14 @@ export function shouldPreferGroundedPracticeVoicing(state, quality, feel) {
         return false;
     }
     return PRACTICE_GROUNDING_QUALITIES.has(quality || '');
+}
+
+/**
+ * @param {string | undefined | null} quality
+ * @returns {boolean}
+ */
+export function isTensionChordQuality(quality) {
+    return TENSION_CHORD_QUALITIES.has(quality || '');
 }
 
 /**

@@ -160,6 +160,48 @@ describe('Harmony Engine Logic', () => {
 
             randomSpy.mockRestore();
         });
+
+        it('should skip standard support on tension chords when accompaniment is already hitting', () => {
+            _groove.genreFeel = 'Rock';
+            _playback.bandIntensity = 0.8;
+            _soloist.enabled = false;
+
+            const chord = {
+                rootMidi: 60,
+                intervals: [0, 4, 7, 10, 13],
+                quality: '7b9',
+                sectionId: 'tension-yield',
+                beats: 4,
+            };
+
+            const notes = getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, {
+                accompanimentHit: true,
+            });
+
+            expect(notes).toEqual([]);
+        });
+
+        it('should thin tension-chord support to compact guide-tone voicings when it plays alone', () => {
+            _groove.genreFeel = 'Rock';
+            _playback.bandIntensity = 0.8;
+            _soloist.enabled = false;
+
+            const chord = {
+                rootMidi: 60,
+                intervals: [0, 4, 7, 10, 13],
+                quality: '7b9',
+                sectionId: 'tension-thin',
+                beats: 4,
+            };
+
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+
+            const requested = getLastRequestedIntervals();
+            expect(requested).toContain(4);
+            expect(requested).toContain(10);
+            expect(requested).not.toContain(13);
+            expect(requested.length).toBeLessThanOrEqual(3);
+        });
     });
 
     describe('Rhythmic Comping', () => {
@@ -428,6 +470,41 @@ describe('Harmony Engine Logic', () => {
             const standardNotes = getHarmonyNotes(getState(), chordC, null, 4, 60, 'smart', 4);
             expect(standardNotes.length).toBe(0);
 
+            randomSpy.mockRestore();
+        });
+
+        it('should still reinforce soloist anchors on tension chords', () => {
+            _soloist.enabled = true;
+            _playback.bandIntensity = 0.8;
+            _playback.currentLoopCount = 0;
+            _soloist.sessionSeed = {
+                notes: [{ step: 0, midi: 72, isAnchor: true }],
+                loopLengthSteps: 16,
+            };
+
+            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+            const chord = {
+                rootMidi: 60,
+                intervals: [0, 4, 7, 10, 13],
+                quality: '7b9',
+                sectionId: 'anchor-tension',
+                beats: 4,
+            };
+
+            const notes = getHarmonyNotes(
+                getState(),
+                chord,
+                null,
+                0,
+                60,
+                'smart',
+                0,
+                { midi: 72 },
+                { soloistActive: true },
+            );
+
+            expect(notes.length).toBeGreaterThan(0);
+            expect(notes[0].isLatched).toBe(true);
             randomSpy.mockRestore();
         });
 

@@ -1,7 +1,11 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getFrequency } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
-import { shouldPreferGroundedPracticeVoicing, shouldReserveBassSpace } from './voicing-policy.js';
+import {
+    isTensionChordQuality,
+    shouldPreferGroundedPracticeVoicing,
+    shouldReserveBassSpace,
+} from './voicing-policy.js';
 import { getWorkerState } from './worker-orchestrator.js';
 
 /**
@@ -99,6 +103,25 @@ function selectGroundedIntervals(intervals, targetCount = 4) {
     });
 
     return [...roots, ...guides, ...colors, ...fifths, ...others].slice(0, targetCount);
+}
+
+/**
+ * Tension bars sound best when harmony behaves like a slim color layer instead of
+ * a second accompanist. Favor guide tones and keep the stack compact.
+ * @param {number[]} intervals
+ * @param {boolean} includeRoot
+ * @returns {number[]}
+ */
+function selectTensionSupportIntervals(intervals, includeRoot) {
+    const safe = getSafeVoicings(intervals, !includeRoot);
+    const guides = getGuideTones(safe);
+    const fallback = safe.filter((interval) => interval !== 7);
+
+    if (!includeRoot) {
+        return (guides.length > 0 ? guides : fallback).slice(0, 2);
+    }
+
+    return [...new Set([...(guides.length > 0 ? guides : fallback), 0])].slice(0, 3);
 }
 
 /**
@@ -376,6 +399,7 @@ function finalizeHarmonyNotes(
     const reserveBassSpace = shouldReserveBassSpace(activeState);
     const isCompingGenre = ['Jazz', 'Funk', 'Neo-Soul', 'Blues'].includes(feel);
     const groundingRequired = shouldPreferGroundedPracticeVoicing(activeState, chord.quality, feel);
+    const isTensionChord = isTensionChordQuality(chord.quality);
     const rootlessComping = reserveBassSpace && isCompingGenre && !groundingRequired;
 
     // Apply rootless reduction if practice mode is on or bass is enabled
@@ -415,6 +439,10 @@ function finalizeHarmonyNotes(
         }
     }
 
+    if (isTensionChord && !groundingRequired && !isLatched && !isBloom) {
+        intervals = selectTensionSupportIntervals(intervals, !(rootlessComping || feel === 'Jazz'));
+    }
+
     // --- REINFORCEMENT: Tutti/Shadow logic ---
     if (isLatched && anchorMidi && playback.bandIntensity > 0.8 && Math.random() < 0.5) {
         const relativeSeedInterval = (anchorMidi - chord.rootMidi + 120) % 12;
@@ -445,8 +473,16 @@ function finalizeHarmonyNotes(
     const maxDensity = groundingRequired
         ? Math.max(baseDensity, Math.min(4, intervals.length))
         : baseDensity;
-    if (targetIntervals.length > maxDensity) {
-        targetIntervals = targetIntervals.slice(0, maxDensity);
+    const tensionDensityCap =
+        isTensionChord && !groundingRequired && !isBloom
+            ? coordination.accompanimentHit && isSoloistBusy
+                ? 1
+                : 2
+            : null;
+    const densityCap =
+        tensionDensityCap === null ? maxDensity : Math.min(maxDensity, tensionDensityCap);
+    if (targetIntervals.length > densityCap) {
+        targetIntervals = targetIntervals.slice(0, densityCap);
     }
 
     // Spectral Gaps: Register Awareness
@@ -575,6 +611,7 @@ export function getHarmonyNotes(
     const ts = tsConfigs[arranger.timeSignature] || tsConfigs['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
     const measureStep = step % stepsPerMeasure;
+    const isTensionChord = isTensionChordQuality(chord.quality);
 
     // 1. STYLE SELECTION
     let activeStyle = style;
@@ -710,6 +747,14 @@ export function getHarmonyNotes(
 
     // Mode A: The Shadow (High Priority)
     behavior = playShadowMode(context);
+
+    if (
+        !behavior &&
+        isTensionChord &&
+        (coordination.accompanimentHit || coordination.soloistActive || coordination.soloistBusy)
+    ) {
+        return [];
+    }
 
     // Mode B: The Comper or The Sea (Standard Priority)
     if (!behavior) {

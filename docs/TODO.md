@@ -51,6 +51,9 @@ These are the current product and audio work streams, ordered by user-facing imp
   - schedule overlap / voice pressure
   - per-stem comparisons for drums, bass, chords, harmony, and full mix
 - Goal: explain when a performance looks structurally sound in symbolic analysis but still feels wrong once rendered through the actual audio path.
+- Progress:
+  - symbolic full-band audit shipped as `npm run ensemble:report`
+  - first behavior-tuning pass landed on tension-class bars, with harmony now yielding more often on cadence / altered-dominant pressure
 
 ## Notes
 
