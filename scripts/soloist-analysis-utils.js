@@ -24,7 +24,7 @@ function shouldSuppressLog(message) {
     return message.startsWith('[Seeder Debug]') || message.startsWith('[Composer]');
 }
 
-function withMutedComposerLogs(callback, muted = true) {
+export function withMutedComposerLogs(callback, muted = true) {
     if (!muted) {
         return callback();
     }

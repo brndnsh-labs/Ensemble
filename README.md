@@ -79,6 +79,7 @@ npm run validate
 - `npm test` runs linting and the Vitest suite.
 - `npm run test:e2e` runs the Playwright smoke suite.
 - `npm run validate` performs the full repo validation pipeline.
+- `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` emits a compact multi-seed ensemble audit as JSON.
 
 ## Documentation
 

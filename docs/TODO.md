@@ -36,6 +36,22 @@ These are the current product and audio work streams, ordered by user-facing imp
 - Add filtering and search by mood, genre, complexity, and favorites.
 - Preserve quick access to frequently used progressions.
 
+## 7. Rendered-audio ensemble audit follow-up
+
+- Pair the new symbolic `npm run ensemble:report` audit with a slower rendered-audio pass so we can catch issues that only show up once the synths, timing offsets, and mix interact.
+- Reuse `scripts/mix-report.js` rather than creating a second browser/render harness. Prefer a JSON or JSONL output mode, or extract shared render/analyze helpers if that keeps the contract cleaner.
+- Keep the rendered pass machine-readable and seed-aware:
+  - accept a small multi-seed sample
+  - focus on a compact scene/preset set rather than exhaustive sweeps
+  - let the symbolic audit shortlist interesting seeds before we pay the render cost
+- Candidate rendered metrics:
+  - RMS / crest balance
+  - transient spike rate
+  - spectral probe bands
+  - schedule overlap / voice pressure
+  - per-stem comparisons for drums, bass, chords, harmony, and full mix
+- Goal: explain when a performance looks structurally sound in symbolic analysis but still feels wrong once rendered through the actual audio path.
+
 ## Notes
 
 - The Dynamic Head refactor is the riskiest item because it is tightly coupled to seeded playback and export behavior.
