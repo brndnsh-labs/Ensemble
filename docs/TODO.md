@@ -20,8 +20,11 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 ## 3. Arranger readability pass
 
-- Let the maximized lead-sheet view stretch vertically.
-- Use the extra room to increase font size and improve legibility.
+- Status: Done (2026-04-03)
+- Summary: Maximized lead-sheet mode now reclaims the global header area, adds an in-chart start/stop + exit toolbar, and uses the extra height to enlarge chord cards and typography across representative charts.
+- Commits: 6b97050f — "Arranger readability pass: maximize arranger layout, in-chart playback toolbar" (branch `arranger-readability-pass`)
+- Tests: Full validation (`npm run validate`) passed; full Playwright E2E (`npm run test:e2e`) passed. Arranger coverage now checks maximized readability and playback access across Autumn Leaves, All The Things You Are, Pop (Standard), and Jazz Blues.
+- Notes: The layout profile now reserves space for the compact maximized controls instead of a full header, so dense charts stay guided while short charts stretch further on both desktop and mobile.
 
 ## 4. Audio identity refresh
 

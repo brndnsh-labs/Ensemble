@@ -305,7 +305,7 @@
 
     .chord-maximized .workspace-view--arranger .workspace-arranger-chords .display-area {
         max-height: none;
-        height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+        height: 100dvh;
     }
 
     .workspace-view--studio {

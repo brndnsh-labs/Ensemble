@@ -5,6 +5,7 @@ import {
     buildLeadSheetRows,
     buildLeadSheetSections,
     getLeadSheetLayoutProfile,
+    LEAD_SHEET_MAXIMIZED_CONTROL_RESERVE,
 } from '../lead-sheet-model.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -155,6 +156,7 @@ export function ChordVisualizer() {
         leadSheetMelody,
         soloistStyle,
         isMaximized,
+        isPlaying,
     } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ state) => ({
         progression: state.arranger.progression,
         timeSignature: state.arranger.timeSignature,
@@ -164,6 +166,7 @@ export function ChordVisualizer() {
         leadSheetMelody: state.soloist.leadSheetMelody,
         soloistStyle: state.soloist.style || 'smart',
         isMaximized: state.vizState.isMaximized,
+        isPlaying: state.playback?.isPlaying ?? false,
     }));
 
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
@@ -330,7 +333,11 @@ export function ChordVisualizer() {
         );
         const lookaheadRow = rows[lookaheadIndex] || activeRow;
         const containerRect = container.getBoundingClientRect();
-        const scrollPadding = layoutProfile.scrollMode === 'guided' ? 18 : 12;
+        const maximizeToolbarPadding = isMaximized
+            ? LEAD_SHEET_MAXIMIZED_CONTROL_RESERVE[layoutProfile.viewport]
+            : 0;
+        const scrollPadding =
+            (layoutProfile.scrollMode === 'guided' ? 18 : 12) + maximizeToolbarPadding;
         const getOffsetTop = (/** @type {Element} */ element) =>
             element.getBoundingClientRect().top - containerRect.top + container.scrollTop;
         const activeTop = getOffsetTop(activeRow);
@@ -353,9 +360,11 @@ export function ChordVisualizer() {
         }
     }, [
         activeRowIndex,
+        isMaximized,
         lastActiveChordIndex,
         layoutProfile.lookaheadRows,
         layoutProfile.scrollMode,
+        layoutProfile.viewport,
     ]);
 
     return (
@@ -373,14 +382,25 @@ export function ChordVisualizer() {
             data-vertical-fill={layoutProfile.verticalFillMode}
         >
             {isMaximized && (
-                <button
-                    type="button"
-                    className="chord-maximize-exit-btn"
-                    aria-label="Exit maximize"
-                    onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false)}
-                >
-                    ✕
-                </button>
+                <div className="chord-maximize-toolbar">
+                    <button
+                        id="maximizePlayBtn"
+                        type="button"
+                        className={`chord-maximize-play-btn${isPlaying ? ' playing' : ''}`}
+                        aria-label={isPlaying ? 'Stop playback' : 'Start playback'}
+                        onClick={() => dispatch(ACTIONS.TOGGLE_PLAY)}
+                    >
+                        {isPlaying ? 'STOP' : 'START'}
+                    </button>
+                    <button
+                        type="button"
+                        className="chord-maximize-exit-btn"
+                        aria-label="Exit maximize"
+                        onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false)}
+                    >
+                        ✕
+                    </button>
+                </div>
             )}
             {leadSheetSectionGroups.map((/** @type {any} */ sectionGroup) => {
                 const isActiveSection = activeSectionId === sectionGroup.sectionId;
