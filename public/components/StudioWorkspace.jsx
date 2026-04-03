@@ -226,7 +226,17 @@ function StudioSurface({
             const viewportPadding = 16;
             const isGenreSurface = className.includes('--genre');
             const isBandFeelSurface = className.includes('--band-feel');
-            const preferredWidth = isBandFeelSurface ? 420 : isGenreSurface ? 360 : 560;
+            const isMixerSurface = className.includes('--mixer-panel');
+            const isSettingsSurface = className.includes('--settings') && !isMixerSurface;
+            const preferredWidth = isBandFeelSurface
+                ? 420
+                : isGenreSurface
+                  ? 360
+                  : isMixerSurface
+                    ? 540
+                    : isSettingsSurface
+                      ? 500
+                      : 560;
             const maxWidth = window.innerWidth - viewportPadding * 2;
             const width = Math.min(preferredWidth, maxWidth);
             const measuredHeight = surface.offsetHeight || 0;

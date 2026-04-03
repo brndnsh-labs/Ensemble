@@ -41,6 +41,24 @@ test.describe('Workspace surfaces @ui', () => {
         await expect(studio.locator('.workspace-instrument-state')).toHaveCount(5);
         await expect(studio.locator('.workspace-columns')).toHaveCount(0);
         await expect(studio.locator('.workspace-group-header')).toHaveCount(0);
+        const desktopRowBoxes = await Promise.all(
+            [
+                '#panel-grooves',
+                '#panel-bass',
+                '#panel-chords',
+                '#panel-harmonies',
+                '#panel-soloist',
+            ].map((selector) => studio.locator(selector).boundingBox()),
+        );
+        const desktopRowXPositions = Array.from(
+            new Set(desktopRowBoxes.filter((box) => box !== null).map((box) => Math.round(box.x))),
+        );
+        for (const box of desktopRowBoxes) {
+            expect(box).not.toBeNull();
+            expect(box.width).toBeGreaterThan(300);
+            expect(box.width).toBeLessThan(360);
+        }
+        expect(desktopRowXPositions.length).toBe(2);
 
         const genreButton = studio.locator('.workspace-studio-genre-button');
         const initialGenreValue = (
