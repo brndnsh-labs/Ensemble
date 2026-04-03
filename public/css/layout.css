@@ -62,9 +62,7 @@ body {
 }
 
 header {
-    background: var(--panel-color);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--panel-color), var(--bg-color) 8%);
     padding: var(--space-4) var(--space-6);
     display: flex;
     justify-content: space-between;
@@ -1356,7 +1354,9 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 .workspace-library-body {
     flex: 1;
     min-height: 0;
+    position: relative;
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .workspace-library-close {

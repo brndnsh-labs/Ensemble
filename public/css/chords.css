@@ -397,10 +397,8 @@
     padding: 0.3rem;
     border: 1px solid color-mix(in srgb, var(--border-color), transparent 12%);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--panel-color), transparent 10%);
+    background: color-mix(in srgb, var(--panel-color), var(--bg-color) 10%);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
     z-index: var(--z-maximized-header);
 }
 

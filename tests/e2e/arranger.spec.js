@@ -18,6 +18,11 @@ async function openLibraryFromArranger(page) {
     throw new Error('Expected the arranger library button to be visible');
 }
 
+async function choosePresetFromLibrary(page, presetName) {
+    const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    await modal.getByRole('button', { name: presetName, exact: true }).click();
+}
+
 async function measureLeadSheetCard(page) {
     return page
         .locator('#chordVisualizer .chord-card')
@@ -102,7 +107,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
     test('Chord Visualizer - Continuous lead-sheet rows', async ({ page }) => {
         await openLibraryFromArranger(page);
-        await page.getByRole('button', { name: 'Autumn Leaves' }).click();
+        await choosePresetFromLibrary(page, 'Autumn Leaves');
 
         const visualizer = page.locator('#chordVisualizer');
         // Verify structural elements are present
@@ -137,13 +142,115 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
         await expect(modal.locator('#workspaceLibraryTitle')).toHaveText('Progression Library');
-        await expect(modal.locator('.preset-chip-grid').first()).toBeVisible();
+        await expect(modal.getByTestId('preset-library-search')).toBeVisible();
+        await expect(modal.getByTestId('preset-library-favorites-only')).toBeVisible();
+        await expect(modal.locator('.preset-library-card-grid').first()).toBeVisible();
+        await expect(modal.getByRole('button', { name: 'Jazz', exact: true })).toBeVisible();
 
-        await modal.locator('.preset-chip').first().click();
+        await modal.locator('.preset-library-card-button').first().click();
         await expect(modal).toBeHidden();
 
         await expect(page.locator('#keyMenuBtn')).toBeVisible();
         await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
+    });
+
+    test('Progression library supports search, genre filters, favorites, and recents', async ({
+        page,
+    }) => {
+        await openLibraryFromArranger(page);
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const search = modal.getByTestId('preset-library-search');
+
+        await search.fill('autumn');
+        await expect(
+            modal.getByRole('button', { name: 'Autumn Leaves', exact: true }),
+        ).toBeVisible();
+        await expect(
+            modal.getByRole('button', { name: 'Pop (Standard)', exact: true }),
+        ).toHaveCount(0);
+
+        await modal.getByTestId('preset-library-clear').click();
+        await modal.getByRole('button', { name: 'Jazz', exact: true }).click();
+        await expect(
+            modal.getByRole('button', { name: 'Autumn Leaves', exact: true }),
+        ).toBeVisible();
+        await expect(
+            modal.getByRole('button', { name: 'Pop (Standard)', exact: true }),
+        ).toHaveCount(0);
+
+        await modal.getByTestId('preset-library-clear').click();
+        await modal.getByRole('button', { name: 'Add Pop (Standard) to favorites' }).click();
+        await expect(modal).toContainText('Pinned favorites');
+        await expect(modal.locator('.preset-library-section').first()).toContainText(
+            'Pop (Standard)',
+        );
+
+        await modal.getByTestId('preset-library-favorites-only').click();
+        await expect(
+            modal.getByRole('button', { name: 'Pop (Standard)', exact: true }),
+        ).toBeVisible();
+        await expect(modal.getByRole('button', { name: 'Autumn Leaves', exact: true })).toHaveCount(
+            0,
+        );
+
+        await modal.getByTestId('preset-library-favorites-only').click();
+        await choosePresetFromLibrary(page, 'Pop (Ballad)');
+        await expect(modal).toBeHidden();
+
+        await openLibraryFromArranger(page);
+        await expect(
+            page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]'),
+        ).toContainText('Recent picks');
+        await expect(
+            page
+                .locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]')
+                .getByRole('button', { name: 'Pop (Ballad)', exact: true })
+                .first(),
+        ).toBeVisible();
+    });
+
+    test('Progression library keeps sticky controls layered above scrolling results', async ({
+        page,
+    }) => {
+        await openLibraryFromArranger(page);
+
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const toolbar = modal.getByTestId('preset-library-toolbar');
+        const body = page.locator('.workspace-library-body');
+
+        await body.evaluate((element) => {
+            element.scrollTop = 650;
+        });
+
+        const toolbarOwnsProbe = await toolbar.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.bottom - 8);
+            return Boolean(hit?.closest('[data-testid="preset-library-toolbar"]'));
+        });
+
+        expect(toolbarOwnsProbe).toBe(true);
+    });
+
+    test('Progression library keeps card widths stable when search narrows results', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await openLibraryFromArranger(page);
+
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const firstCard = modal.locator('.preset-library-card').first();
+        const search = modal.getByTestId('preset-library-search');
+
+        const beforeWidth = await firstCard.evaluate(
+            (element) => element.getBoundingClientRect().width,
+        );
+        await search.fill('autumn');
+        const afterWidth = await firstCard.evaluate(
+            (element) => element.getBoundingClientRect().width,
+        );
+
+        expect(afterWidth).toBeLessThanOrEqual(beforeWidth + 32);
+        expect(afterWidth).toBeLessThanOrEqual(320);
     });
 
     test('Autumn Leaves stays readable without adding scroll at desktop size', async ({ page }) => {
@@ -154,7 +261,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
 
-        await page.getByRole('button', { name: 'Autumn Leaves' }).click();
+        await choosePresetFromLibrary(page, 'Autumn Leaves');
         await expect(modal).toBeHidden();
 
         const visualizer = page.locator('#chordVisualizer');
@@ -182,7 +289,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         for (const chartName of ['Pop (Standard)', 'Giant Steps']) {
             await openLibraryFromArranger(page);
-            await page.getByRole('button', { name: chartName }).click();
+            await choosePresetFromLibrary(page, chartName);
 
             const visualizer = page.locator('#chordVisualizer');
             await expect(visualizer).toBeVisible();
@@ -213,7 +320,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
 
-        await page.getByRole('button', { name: 'All The Things You Are' }).click();
+        await choosePresetFromLibrary(page, 'All The Things You Are');
         await expect(modal).toBeHidden();
 
         const visualizer = page.locator('#chordVisualizer');
@@ -267,7 +374,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             'Jazz Blues',
         ]) {
             await openLibraryFromArranger(page);
-            await page.getByRole('button', { name: chartName }).click();
+            await choosePresetFromLibrary(page, chartName);
 
             const standard = await measureLeadSheetCard(page);
             await page.click('#maximizeChordBtn');
@@ -295,7 +402,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
 
-        await page.getByRole('button', { name: 'Pop (Standard)' }).click();
+        await choosePresetFromLibrary(page, 'Pop (Standard)');
         await expect(modal).toBeHidden();
 
         const keyTrigger = page.locator('#keyMenuBtn');

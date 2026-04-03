@@ -1,14 +1,119 @@
-/* --- Presets & Genre Colors --- */
-.presets-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-}
-
+/* --- Progression Library --- */
 .preset-library {
+    position: relative;
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+}
+
+.preset-library-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 18;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--panel-color), var(--bg-color) 12%);
+    box-shadow:
+        0 14px 28px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.preset-library-toolbar::after {
+    content: "";
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.08) 20%,
+        rgba(255, 255, 255, 0.22) 50%,
+        rgba(255, 255, 255, 0.08) 80%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+.preset-library-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding-top: 0.2rem;
+}
+
+.preset-library-search-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.preset-library-search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.94rem;
+}
+
+.preset-library-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+.preset-library-search-input:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    border-color: var(--accent-color);
+}
+
+.preset-library-clear-btn {
+    min-width: 0;
+    padding-inline: 0.9rem;
+}
+
+.preset-library-toolbar-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.preset-library-summary {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+}
+
+.preset-library-favorites-toggle {
+    white-space: nowrap;
+}
+
+.preset-library-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.preset-library-filter-label {
+    font-size: var(--font-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.preset-library-filter-chips {
+    flex-wrap: wrap;
 }
 
 .preset-library-section {
@@ -17,7 +122,13 @@
     gap: var(--space-3);
 }
 
-.preset-library-section h4 {
+.preset-library-section-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.preset-library-section-header h4 {
     margin: 0;
     font-size: 0.82rem;
     font-weight: 700;
@@ -26,234 +137,246 @@
     color: var(--text-muted);
 }
 
-.preset-chip-grid {
-    display: flex;
-    flex-wrap: wrap;
+.preset-library-section-header p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    line-height: 1.45;
+}
+
+.preset-library-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 17.5rem));
+    justify-content: start;
+    align-items: stretch;
     gap: var(--space-3);
 }
 
-.preset-chip-stack {
-    display: flex;
-    gap: var(--space-2);
-    align-items: stretch;
-}
-
-.preset-chip {
-    font-size: var(--font-xs);
-    padding: var(--space-2) var(--space-3);
-    background: var(--input-bg);
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    transition: all var(--anim-normal) var(--anim-ease);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
+.preset-library-card {
+    --preset-accent: var(--accent-color);
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: var(--space-1);
-    width: auto;
-    min-width: 150px;
-    max-width: 220px;
-    min-height: 0;
-    text-align: left;
-
-    /* Entrance */
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 11.25rem;
+    padding: var(--space-3);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--preset-accent);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--input-bg), var(--card-bg-hover));
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
+    transition:
+        transform var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease),
+        background-color var(--anim-fast) var(--anim-ease);
     animation: fade-in-up var(--anim-normal) var(--anim-ease) both;
 }
 
-.preset-chip-name {
-    font-size: 0.82rem;
-    font-weight: 700;
+.preset-library-card:hover,
+.preset-library-card:focus-within {
+    transform: translateY(-2px);
+    border-color: var(--preset-accent);
+    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.18);
+    background: var(--card-bg-hover);
 }
 
-.preset-chip-meta {
+.preset-library-card.active {
+    border-color: var(--preset-accent);
+    box-shadow:
+        0 0 0 1px var(--preset-accent),
+        0 18px 32px rgba(0, 0, 0, 0.2);
+}
+
+.preset-library-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.preset-library-pin-btn,
+.preset-library-delete-btn {
+    min-width: 0;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: transparent;
     color: var(--text-secondary);
     font-size: var(--font-xs);
-    line-height: 1.2;
-    text-transform: uppercase;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease);
+}
+
+.preset-library-pin-btn:hover,
+.preset-library-delete-btn:hover {
+    border-color: var(--preset-accent);
+    color: var(--text-primary);
+}
+
+.preset-library-pin-btn.active {
+    border-color: var(--preset-accent);
+    background: var(--preset-accent);
+    color: white;
+}
+
+.preset-library-pin-btn:focus-visible,
+.preset-library-delete-btn:focus-visible,
+.preset-library-card-button:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+}
+
+.preset-library-card-button {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 7rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: var(--text-color);
+    text-align: left;
+}
+
+.preset-library-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    justify-content: space-between;
+    width: 100%;
+}
+
+.preset-library-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text-primary);
+}
+
+.preset-library-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.preset-library-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
     letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
-.preset-chip.active .preset-chip-meta {
-    color: rgba(255, 255, 255, 0.88);
+.preset-library-card-preview {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    line-height: 1.45;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
 }
 
-.preset-chip-delete {
-    min-width: 0;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-lg);
-    align-self: stretch;
-}
-
-.preset-chip:hover {
-    background: var(--card-bg-hover);
+.preset-library-card[data-source="user"] .preset-library-card-preview {
     color: var(--text-color);
 }
 
-.preset-chip:focus-visible {
-    outline: 2px solid var(--focus-ring-color);
-    outline-offset: 2px;
-    border-color: var(--accent-color);
-    background: var(--card-bg-hover);
+.preset-library-empty-state {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: 1rem;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--surface-sunken);
 }
 
-.preset-chip.active {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    border-color: transparent;
-    z-index: var(--z-base);
-    background: var(--accent-color);
-    color: white;
+.preset-library-empty-state h4,
+.preset-library-empty-state p {
+    margin: 0;
 }
 
-/* Genre Color Assignments - Slightly adjusted for Solarized palette harmony */
-.preset-chip[data-category="Basic"] {
-    border-color: var(--base01);
-}
-.preset-chip[data-category="Pop/Rock"] {
-    border-color: var(--blue);
-}
-.preset-chip[data-category="Electronic"] {
-    border-color: var(--violet);
-}
-.preset-chip[data-id="Disco"] {
-    border-color: var(--violet);
-}
-.preset-chip[data-category="Soul/R&B"],
-.preset-chip[data-category="Soul/Funk"] {
-    border-color: var(--magenta);
-}
-.preset-chip[data-category="Blues"] {
-    border-color: var(--cyan);
-}
-.preset-chip[data-category="World/Latin"] {
-    border-color: var(--orange);
-}
-.preset-chip[data-category="Jazz"] {
-    border-color: var(--green);
-}
-.preset-chip[data-category="Classical/Trad"] {
-    border-color: var(--red);
-}
-.preset-chip[data-category="Theory"] {
-    border-color: var(--yellow);
-}
-.preset-chip[data-category="Country/Folk"] {
-    border-color: var(--yellow);
-}
-.preset-chip[data-category="Rock/Metal"] {
-    border-color: var(--red);
-}
-.preset-chip[data-category="Keys"] {
-    border-color: var(--blue);
-}
-.preset-chip[data-category="Synth"] {
-    border-color: var(--violet);
-}
-.preset-chip[data-category="String"] {
-    border-color: var(--orange);
-}
-.preset-chip[data-category="Experimental"] {
-    border-color: var(--violet);
-}
-.preset-chip[data-category="User"] {
-    border-color: var(--text-color);
-    opacity: 0.8;
+.preset-library-empty-state p {
+    color: var(--text-secondary);
+    line-height: 1.5;
 }
 
-/* Special Smart/Auto Styling */
-.preset-chip[data-id="smart"] {
-    border-color: var(--smart-color);
-    color: var(--smart-color);
-    background: rgba(108, 113, 196, 0.08);
-    font-weight: 600;
+.preset-library-card[data-category="Pop/Rock"] {
+    --preset-accent: var(--blue);
 }
 
-.preset-chip[data-id="smart"]:hover {
-    background: rgba(108, 113, 196, 0.15);
+.preset-library-card[data-category="Electronic"],
+.preset-library-card[data-category="Experimental"] {
+    --preset-accent: var(--violet);
 }
 
-.preset-chip.active[data-id="smart"] {
-    background: var(--smart-color);
-    color: white;
-    box-shadow: 0 0 12px rgba(108, 113, 196, 0.5);
+.preset-library-card[data-category="Soul/R&B"],
+.preset-library-card[data-category="Soul/Funk"] {
+    --preset-accent: var(--magenta);
 }
 
-.groove-tab-btn[data-tab="smart"].active {
-    color: var(--smart-color);
-    border-bottom-color: var(--smart-color);
+.preset-library-card[data-category="Blues"] {
+    --preset-accent: var(--cyan);
 }
 
-/* Auto-checkboxes and Smart elements */
-#autoIntensityCheck,
-#autoFollowCheck,
-#applyPresetSettingsCheck {
-    accent-color: var(--smart-color);
+.preset-library-card[data-category="World/Latin"],
+.preset-library-card[data-category="Custom"] {
+    --preset-accent: var(--orange);
 }
 
-.preset-chip.active[data-category="Basic"] {
-    background: var(--base01);
-    color: white;
+.preset-library-card[data-category="Jazz"] {
+    --preset-accent: var(--green);
 }
-.preset-chip.active[data-category="Pop/Rock"] {
-    background: var(--blue);
-    color: white;
+
+.preset-library-card[data-category="Classical/Trad"],
+.preset-library-card[data-category="Rock/Metal"] {
+    --preset-accent: var(--red);
 }
-.preset-chip.active[data-category="Electronic"] {
-    background: var(--violet);
-    color: white;
+
+.preset-library-card[data-category="Theory"],
+.preset-library-card[data-category="Country/Folk"] {
+    --preset-accent: var(--yellow);
 }
-.preset-chip.active[data-id="Disco"] {
-    background: var(--violet);
-    color: white;
-}
-.preset-chip.active[data-category="Soul/R&B"],
-.preset-chip.active[data-category="Soul/Funk"] {
-    background: var(--magenta);
-    color: white;
-}
-.preset-chip.active[data-category="Blues"] {
-    background: var(--cyan);
-    color: white;
-}
-.preset-chip.active[data-category="World/Latin"] {
-    background: var(--orange);
-    color: white;
-}
-.preset-chip.active[data-category="Jazz"] {
-    background: var(--green);
-    color: white;
-}
-.preset-chip.active[data-category="Classical/Trad"] {
-    background: var(--red);
-    color: white;
-}
-.preset-chip.active[data-category="Theory"] {
-    background: var(--yellow);
-    color: white;
-}
-.preset-chip.active[data-category="Country/Folk"] {
-    background: var(--yellow);
-    color: white;
-}
-.preset-chip.active[data-category="Rock/Metal"] {
-    background: var(--red);
-    color: white;
-}
-.preset-chip.active[data-category="Keys"] {
-    background: var(--blue);
-    color: white;
-}
-.preset-chip.active[data-category="Synth"] {
-    background: var(--violet);
-    color: white;
-}
-.preset-chip.active[data-category="String"] {
-    background: var(--orange);
-    color: white;
-}
-.preset-chip.active[data-category="Experimental"] {
-    background: var(--violet);
-    color: white;
+
+@media (max-width: 720px) {
+    .preset-library-toolbar {
+        gap: var(--space-2);
+        padding: 0.8rem;
+    }
+
+    .preset-library-search-row {
+        flex-wrap: wrap;
+    }
+
+    .preset-library-clear-btn {
+        width: 100%;
+    }
+
+    .preset-library-toolbar-meta {
+        align-items: stretch;
+    }
+
+    .preset-library-favorites-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .preset-library-card-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .preset-library-card {
+        min-height: 0;
+    }
 }

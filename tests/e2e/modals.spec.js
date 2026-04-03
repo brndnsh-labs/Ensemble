@@ -12,6 +12,11 @@ async function openLibraryFromArranger(page) {
     throw new Error('Expected the arranger library button to be visible');
 }
 
+async function choosePresetFromLibrary(page, presetName) {
+    const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    await modal.getByRole('button', { name: presetName, exact: true }).click();
+}
+
 async function openEditorFromArranger(page) {
     const editButton = page.locator('#editArrangementBtn');
     if (await editButton.isVisible()) {
@@ -24,7 +29,7 @@ async function openEditorFromArranger(page) {
 
 async function openEditorFromLibraryPreset(page) {
     await openLibraryFromArranger(page);
-    await page.getByRole('button', { name: 'All The Things You Are' }).click();
+    await choosePresetFromLibrary(page, 'All The Things You Are');
     await openEditorFromArranger(page);
     await page.waitForSelector('#editorOverlay', { state: 'visible' });
     return page.locator('#editorOverlay .settings-content');

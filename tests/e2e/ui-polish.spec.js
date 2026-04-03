@@ -120,7 +120,16 @@ test.describe('UI polish consistency @ui', () => {
                 selector.includes('.workspace-studio-genre-option:focus-visible'),
             ),
         ).toBe(true);
-        expect(selectors).toContain('.preset-chip:focus-visible');
+        expect(
+            selectors.some((selector) =>
+                selector.includes('.preset-library-card-button:focus-visible'),
+            ),
+        ).toBe(true);
+        expect(
+            selectors.some((selector) =>
+                selector.includes('.preset-library-pin-btn:focus-visible'),
+            ),
+        ).toBe(true);
         expect(selectors).toContain('.seed-input:focus-visible');
     });
 });

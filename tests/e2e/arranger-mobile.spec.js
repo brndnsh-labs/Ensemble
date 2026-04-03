@@ -10,6 +10,11 @@ async function openLibraryFromArranger(page) {
     await libraryButton.click();
 }
 
+async function choosePresetFromLibrary(page, presetName) {
+    const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    await modal.getByRole('button', { name: presetName, exact: true }).click();
+}
+
 async function expectPanelAttachedToTrigger(_page, triggerLocator, panelLocator) {
     const [triggerBox, panelBox] = await Promise.all([
         triggerLocator.boundingBox(),
@@ -95,9 +100,10 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.click('[data-workspace-nav="arranger"]');
         await openLibraryFromArranger(page);
 
-        await page.getByRole('button', { name: 'Donna Lee' }).click();
-
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        await expect(modal.getByTestId('preset-library-search')).toBeVisible();
+        await modal.getByTestId('preset-library-search').fill('Donna');
+        await choosePresetFromLibrary(page, 'Donna Lee');
         await expect(modal).toBeHidden();
 
         const visualizer = page.locator('#chordVisualizer');
@@ -160,7 +166,7 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.setViewportSize({ width: 393, height: 852 });
         await page.click('[data-workspace-nav="arranger"]');
         await openLibraryFromArranger(page);
-        await page.getByRole('button', { name: 'Giant Steps' }).click();
+        await choosePresetFromLibrary(page, 'Giant Steps');
 
         const visualizer = page.locator('#chordVisualizer');
         const firstChord = visualizer.locator('.chord-card').first();
@@ -281,7 +287,7 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.setViewportSize({ width: 360, height: 640 });
         await page.click('[data-workspace-nav="arranger"]');
         await openLibraryFromArranger(page);
-        await page.getByRole('button', { name: 'Autumn Leaves' }).click();
+        await choosePresetFromLibrary(page, 'Autumn Leaves');
 
         const visualizer = page.locator('#chordVisualizer');
         await expect(visualizer).toBeVisible();
