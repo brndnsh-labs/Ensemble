@@ -262,6 +262,13 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.click('#maximizeChordBtn');
 
         await expect(page.locator('body')).toHaveClass(/chord-maximized/);
+        await expect(page.locator('header')).toBeHidden();
+        await expect(page.locator('#maximizePlayBtn')).toBeVisible();
+
+        await page.locator('#maximizePlayBtn').click();
+        await expect(page.locator('#maximizePlayBtn')).toHaveText('STOP');
+        await page.locator('#maximizePlayBtn').click();
+        await expect(page.locator('#maximizePlayBtn')).toHaveText('START');
 
         const exitButton = page.locator('.chord-maximize-exit-btn');
         await expect(exitButton).toBeVisible();

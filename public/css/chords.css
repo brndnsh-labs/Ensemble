@@ -320,87 +320,142 @@
 
 /* --- Maximized View --- */
 .chord-maximized .display-area {
-    --lead-row-gap: 0.38rem;
-    --lead-measure-gap: 0.24rem;
-    --lead-marker-reserve: 0.6rem;
+    --lead-row-gap: 0.44rem;
+    --lead-measure-gap: 0.28rem;
+    --lead-marker-reserve: 0.66rem;
     --lead-marker-lane-gap: 0.14rem;
-    --lead-marker-size: 0.62rem;
-    --lead-measure-min-height: 48px;
-    --lead-chord-min-height: 40px;
-    --lead-card-padding: 0.18rem 0.16rem;
-    --lead-font-size: clamp(1.18rem, 2.5vw, 1.78rem);
+    --lead-marker-size: 0.66rem;
+    --lead-measure-min-height: 62px;
+    --lead-chord-min-height: 52px;
+    --lead-card-padding: 0.24rem 0.2rem;
+    --lead-font-size: clamp(1.24rem, 2.75vw, 1.96rem);
     position: fixed;
-    top: 80px;
-    left: 0;
+    inset: 0;
     width: 100%;
-    height: calc(100dvh - 80px);
+    height: 100dvh;
     max-height: none;
     z-index: var(--z-maximized);
     background: var(--bg-color);
-    padding: clamp(0.75rem, 2vh, 1.4rem) clamp(0.75rem, 4vw, 2rem);
+    padding: calc(0.75rem + env(safe-area-inset-top)) clamp(0.75rem, 4vw, 2rem)
+        calc(0.75rem + env(safe-area-inset-bottom));
     border-radius: 0;
     border: none;
+    margin-bottom: 0;
 }
 
 .chord-maximized .lead-sheet--compact {
-    --lead-row-gap: 0.28rem;
-    --lead-measure-gap: 0.18rem;
-    --lead-marker-reserve: 0.48rem;
-    --lead-measure-min-height: 38px;
-    --lead-chord-min-height: 34px;
-    --lead-font-size: clamp(1.04rem, 2.1vw, 1.4rem);
+    --lead-row-gap: 0.34rem;
+    --lead-measure-gap: 0.22rem;
+    --lead-marker-reserve: 0.52rem;
+    --lead-measure-min-height: 48px;
+    --lead-chord-min-height: 42px;
+    --lead-font-size: clamp(1.14rem, 2.45vw, 1.52rem);
 }
 
 .chord-maximized .lead-sheet--ultra-compact {
-    --lead-row-gap: 0.2rem;
-    --lead-measure-gap: 0.14rem;
-    --lead-marker-reserve: 0.38rem;
-    --lead-measure-min-height: 32px;
-    --lead-chord-min-height: 28px;
-    --lead-font-size: clamp(0.96rem, 1.9vw, 1.18rem);
-}
-
-.chord-maximized .lead-sheet--scroll-guided.lead-sheet--compact {
-    --lead-row-gap: 0.32rem;
-    --lead-measure-gap: 0.2rem;
-    --lead-marker-reserve: 0.52rem;
-    --lead-measure-min-height: 42px;
-    --lead-chord-min-height: 36px;
-    --lead-font-size: clamp(1.16rem, 2.45vw, 1.52rem);
-}
-
-.chord-maximized .lead-sheet--scroll-guided.lead-sheet--ultra-compact {
     --lead-row-gap: 0.24rem;
     --lead-measure-gap: 0.16rem;
     --lead-marker-reserve: 0.42rem;
-    --lead-measure-min-height: 35px;
-    --lead-chord-min-height: 30px;
-    --lead-font-size: clamp(1.04rem, 2.08vw, 1.24rem);
+    --lead-measure-min-height: 40px;
+    --lead-chord-min-height: 36px;
+    --lead-font-size: clamp(1.02rem, 2.08vw, 1.28rem);
 }
 
-.chord-maximize-exit-btn {
+.chord-maximized .lead-sheet--scroll-guided.lead-sheet--compact {
+    --lead-row-gap: 0.36rem;
+    --lead-measure-gap: 0.22rem;
+    --lead-marker-reserve: 0.56rem;
+    --lead-measure-min-height: 50px;
+    --lead-chord-min-height: 44px;
+    --lead-font-size: clamp(1.18rem, 2.55vw, 1.58rem);
+}
+
+.chord-maximized .lead-sheet--scroll-guided.lead-sheet--ultra-compact {
+    --lead-row-gap: 0.28rem;
+    --lead-measure-gap: 0.16rem;
+    --lead-marker-reserve: 0.46rem;
+    --lead-measure-min-height: 42px;
+    --lead-chord-min-height: 37px;
+    --lead-font-size: clamp(1.08rem, 2.2vw, 1.32rem);
+}
+
+.chord-maximize-toolbar {
     display: none;
 }
 
-.chord-maximized .chord-maximize-exit-btn {
+.chord-maximized .chord-maximize-toolbar {
+    position: sticky;
+    top: 0;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    width: fit-content;
+    max-width: 100%;
+    margin-left: auto;
+    margin-bottom: 0.45rem;
+    padding: 0.3rem;
+    border: 1px solid color-mix(in srgb, var(--border-color), transparent 12%);
     border-radius: 999px;
-    border: 1px solid var(--border-color);
-    background: var(--accent-color);
-    color: white;
-    font-size: 1.2rem;
-    font-weight: 700;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    background: color-mix(in srgb, var(--panel-color), transparent 10%);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     z-index: var(--z-maximized-header);
 }
 
+.chord-maximize-play-btn,
+.chord-maximize-exit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+    transition:
+        background-color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease);
+}
+
+.chord-maximize-play-btn {
+    min-width: 5.1rem;
+    padding-inline: 1rem;
+    background: color-mix(in srgb, var(--accent-color), var(--panel-color) 12%);
+    color: white;
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white, transparent 76%),
+        0 6px 16px color-mix(in srgb, var(--accent-color), transparent 78%);
+}
+
+.chord-maximize-play-btn.playing {
+    background: var(--error-color);
+    border-color: color-mix(in srgb, var(--error-color), transparent 28%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white, transparent 74%),
+        0 6px 16px color-mix(in srgb, var(--error-color), transparent 78%);
+}
+
+.chord-maximize-exit-btn {
+    width: 44px;
+    padding: 0;
+    background: color-mix(in srgb, var(--panel-color), black 2%);
+    font-size: 1.1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.chord-maximize-play-btn:hover,
+.chord-maximize-exit-btn:hover {
+    transform: translateY(-1px);
+}
+
+.chord-maximize-play-btn:focus-visible,
 .chord-maximized .chord-maximize-exit-btn:focus-visible {
     outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
@@ -429,25 +484,11 @@
 }
 
 .chord-maximized #maximizeChordBtn {
-    position: fixed;
-    top: 1.25rem;
-    right: 1.5rem;
-    width: 44px;
-    height: 44px;
-    background: var(--accent-color);
-    color: white;
-    border-radius: 50%;
-    z-index: var(--z-maximized-header);
-    font-size: 1.2rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    display: none;
 }
 
 .chord-maximized header {
-    display: flex;
-    position: fixed;
-    top: 0;
-    width: 100%;
-    z-index: var(--z-maximized-header);
+    display: none;
 }
 
 .chord-maximized #panel-visualizer,
@@ -524,60 +565,72 @@
 }
 
 .chord-maximized .lead-sheet--viewport-mobile {
-    --lead-row-gap: 0.18rem;
-    --lead-measure-gap: 0.1rem;
-    --lead-marker-reserve: 0.3rem;
-    --lead-marker-size: 0.48rem;
-    --lead-measure-min-height: 30px;
-    --lead-chord-min-height: 26px;
-    --lead-font-size: clamp(1.12rem, 5.4vw, 1.28rem);
-    top: 64px;
-    height: calc(100dvh - 64px - env(safe-area-inset-bottom));
-    padding: 0.24rem 0.24rem calc(0.24rem + env(safe-area-inset-bottom));
+    --lead-row-gap: 0.22rem;
+    --lead-measure-gap: 0.12rem;
+    --lead-marker-reserve: 0.32rem;
+    --lead-marker-size: 0.5rem;
+    --lead-measure-min-height: 34px;
+    --lead-chord-min-height: 30px;
+    --lead-font-size: clamp(1.16rem, 5.55vw, 1.36rem);
+    padding: calc(0.4rem + env(safe-area-inset-top)) 0.3rem
+        calc(0.5rem + env(safe-area-inset-bottom));
 }
 
 .chord-maximized .lead-sheet--viewport-mobile.lead-sheet--compact {
-    --lead-row-gap: 0.14rem;
+    --lead-row-gap: 0.16rem;
     --lead-measure-gap: 0.08rem;
     --lead-marker-reserve: 0.24rem;
-    --lead-font-size: clamp(1.08rem, 5.1vw, 1.2rem);
-    --lead-measure-min-height: 28px;
-    --lead-chord-min-height: 25px;
+    --lead-font-size: clamp(1.12rem, 5.2vw, 1.28rem);
+    --lead-measure-min-height: 32px;
+    --lead-chord-min-height: 28px;
 }
 
 .chord-maximized .lead-sheet--viewport-mobile.lead-sheet--ultra-compact {
     --lead-row-gap: 0.12rem;
     --lead-measure-gap: 0.08rem;
     --lead-marker-reserve: 0.2rem;
-    --lead-font-size: clamp(1.04rem, 4.95vw, 1.12rem);
-    --lead-measure-min-height: 26px;
-    --lead-chord-min-height: 23px;
+    --lead-font-size: clamp(1.06rem, 5vw, 1.18rem);
+    --lead-measure-min-height: 30px;
+    --lead-chord-min-height: 26px;
 }
 
 .chord-maximized .lead-sheet--viewport-mobile.lead-sheet--scroll-guided.lead-sheet--compact {
     --lead-row-gap: 0.16rem;
     --lead-measure-gap: 0.1rem;
     --lead-marker-reserve: 0.26rem;
-    --lead-measure-min-height: 29px;
-    --lead-chord-min-height: 26px;
-    --lead-font-size: clamp(1.12rem, 5.25vw, 1.22rem);
+    --lead-measure-min-height: 33px;
+    --lead-chord-min-height: 29px;
+    --lead-font-size: clamp(1.14rem, 5.32vw, 1.3rem);
 }
 
 .chord-maximized .lead-sheet--viewport-mobile.lead-sheet--scroll-guided.lead-sheet--ultra-compact {
     --lead-row-gap: 0.14rem;
     --lead-measure-gap: 0.08rem;
     --lead-marker-reserve: 0.22rem;
-    --lead-measure-min-height: 27px;
-    --lead-chord-min-height: 24px;
-    --lead-font-size: clamp(1.06rem, 5vw, 1.14rem);
+    --lead-measure-min-height: 31px;
+    --lead-chord-min-height: 27px;
+    --lead-font-size: clamp(1.08rem, 5.08vw, 1.2rem);
 }
 
 @media (max-width: 600px) {
-    .chord-maximized .chord-maximize-exit-btn {
-        top: 0.5rem;
-        right: 0.5rem;
-        width: 2.25rem;
-        height: 2.25rem;
+    .chord-maximized .chord-maximize-toolbar {
+        gap: 0.35rem;
+        padding: 0.24rem;
+    }
+
+    .chord-maximize-play-btn,
+    .chord-maximize-exit-btn {
+        min-height: 40px;
+    }
+
+    .chord-maximize-play-btn {
+        min-width: 4.6rem;
+        padding-inline: 0.82rem;
+        font-size: 0.82rem;
+    }
+
+    .chord-maximize-exit-btn {
+        width: 40px;
         font-size: 1rem;
     }
 }
