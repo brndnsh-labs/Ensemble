@@ -12,8 +12,11 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 ## 2. Studio workspace polish
 
-- Make desktop instrument cards smaller and denser.
-- Tighten the Studio controls menu layout so the per-instrument controls feel consistent.
+- Status: Done (2026-04-02)
+- Summary: Container-aware two-column Live Mix using a mobile-derived fixed card width (~20rem / 320px). Tightened mixer and settings surfaces for denser, consistent per-instrument controls. Playwright E2E updated to assert two-column layout.
+- Commits: 190c7db9 — "Studio workspace polish: container-aware two-column Live Mix, tightened mixer/settings surfaces, updated E2E tests"
+- Tests: Full validation (npm run validate) passed; Playwright E2E (tests/e2e/workspace-surfaces.spec.js) passed locally.
+- Notes: Uses CSS container queries; consider adding a graceful fallback for older browsers if needed.
 
 ## 3. Arranger readability pass
 
