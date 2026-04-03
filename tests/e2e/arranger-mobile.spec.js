@@ -160,6 +160,39 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         }
     });
 
+    test('Progression library uses a full-bleed compact sheet on mobile', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.click('[data-workspace-nav="arranger"]');
+        await openLibraryFromArranger(page);
+
+        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const chips = modal.locator('.preset-library-filter-chips');
+
+        await expect(modal).toBeVisible();
+
+        const viewport = await page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+        }));
+        const modalBox = await modal.boundingBox();
+        expect(modalBox).not.toBeNull();
+        expect(Math.abs(modalBox.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(modalBox.y)).toBeLessThanOrEqual(1);
+        expect(modalBox.width).toBeGreaterThanOrEqual(viewport.width - 4);
+        expect(modalBox.height).toBeGreaterThanOrEqual(viewport.height - 4);
+
+        const chipMetrics = await chips.evaluate((element) => ({
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            clientHeight: element.clientHeight,
+            scrollHeight: element.scrollHeight,
+        }));
+
+        expect(chipMetrics.scrollWidth).toBeGreaterThan(chipMetrics.clientWidth);
+        expect(chipMetrics.scrollHeight).toBeLessThanOrEqual(chipMetrics.clientHeight + 4);
+        await expect(modal.locator('.preset-library-section-header p').first()).toBeHidden();
+    });
+
     test('Tall mobile view stretches fit charts vertically without centering them', async ({
         page,
     }) => {

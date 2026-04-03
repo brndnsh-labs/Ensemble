@@ -1364,6 +1364,28 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     padding-inline: 0.75rem;
 }
 
+@media (max-width: 720px) {
+    .settings-content.workspace-library-modal {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: 100dvh;
+        padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-3)
+            calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .modal-overlay.workspace-library-overlay {
+        padding: 0;
+    }
+
+    .workspace-library-header {
+        margin-bottom: 0.75rem;
+    }
+}
+
 .workspace-studio-live-mix {
     --studio-mix-grid-gap: 0.8rem;
     --studio-mix-card-width: 20rem;

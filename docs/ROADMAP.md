@@ -39,10 +39,10 @@ These are the current product and audio work streams, ordered by user-facing imp
 ## 6. Progression library discovery
 
 - Status: Done (2026-04-03)
-- Summary: The arranger Progression Library is now search-first, with genre filters, pinned favorites, recent picks, richer preset cards, and opaque sticky shelves for cross-browser legibility across built-in and user presets.
+- Summary: The arranger Progression Library is now search-first, with genre filters, pinned favorites, recent picks, richer preset cards, opaque sticky shelves for cross-browser legibility, and a compact full-bleed mobile sheet across built-in and user presets.
 - Commits: Implemented on branch `arranger-library-redesign-plan` and ready to merge.
 - Tests: Full validation (`npm run validate`) passed; full Playwright E2E (`npm run test:e2e`) passed. PresetLibrary unit coverage and arranger desktop/mobile E2E now exercise search, genre filters, favorites, and recents.
-- Notes: Explicit mood/complexity tagging was intentionally deferred, but the library view model and UI affordances are ready for that later metadata pass without reworking the current discovery flow.
+- Notes: Explicit mood/complexity tagging was intentionally deferred, but the library view model and UI affordances are ready for that later metadata pass without reworking the current discovery flow. The mobile modal now trades frosted-glass chrome for a denser, scroll-efficient layout.
 
 ## 7. Rendered-audio ensemble audit follow-up
 
