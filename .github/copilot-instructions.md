@@ -1,8 +1,8 @@
 # Copilot instructions for Ensemble
 
-Before making broad changes, skim `AI_MAP.md` for file ownership and `AI.md` / `GEMINI.md` for the repo's architectural and state-management rules. Those files contain project-specific guidance that is more important here than generic JavaScript advice.
+Before making broad changes, skim `AI_MAP.md` for file ownership and `AI.md` for the repo's architectural and state-management rules. Those files contain project-specific guidance that is more important here than generic JavaScript advice.
 
-When the guides overlap: use `AI.md` for rules, `AI_MAP.md` for navigation, and `GEMINI.md` for broader context and roadmap. If any doc drifts from live code or config, prefer the code/config and then update the docs.
+When the guides overlap: use `AI.md` for rules and `AI_MAP.md` for navigation. If any doc drifts from live code or config, prefer the code/config and then update the docs.
 
 The repository also includes a workspace Playwright MCP config at `.vscode/mcp.json`; keep it aligned with any browser automation changes so the setup remains portable across machines.
 

@@ -9,13 +9,20 @@ import path from 'node:path';
  */
 
 const DOCS_TO_SCAN = [
+    'README.md',
     'AI_MAP.md',
-    'GEMINI.md',
     'AI.md',
     '.github/copilot-instructions.md',
+    '.github/CONTRIBUTING.md',
+    '.github/SECURITY.md',
+    '.github/CODE_OF_CONDUCT.md',
+    'docs/README.md',
+    'docs/ROADMAP.md',
     'docs/guides/WORKER_CONTRACT.md',
     'docs/guides/ENSEMBLE_COORDINATION.md',
     'docs/guides/REFERENCE_TUNING.md',
+    'docs/guides/PERFORMANCE_GUIDELINES.md',
+    'tests/README.md',
 ];
 
 const CORE_DIRECTORIES = [
@@ -37,6 +44,26 @@ const IGNORE_FILES = [
     'sw.js',
     'styles.css',
     'icon.svg',
+];
+
+const VALID_BARE_LINKS = new Set([
+    'README.md',
+    'AI.md',
+    'AI_MAP.md',
+    'package.json',
+    'package-lock.json',
+    'playwright.config.js',
+]);
+
+const VALID_LINK_PREFIXES = [
+    '.github/',
+    '.vscode/',
+    'docs/',
+    'guides/',
+    'archive/',
+    'public/',
+    'tests/',
+    'scripts/',
 ];
 
 const PLAYWRIGHT_DOCS = ['AI.md', '.github/copilot-instructions.md'];
@@ -117,6 +144,14 @@ function ensureDocPattern(docPath, pattern, message) {
     }
     console.error(`❌ [${docPath}] ${message}`);
     return true;
+}
+
+/**
+ * @param {string} rawPath
+ * @returns {string | null}
+ */
+function resolveDocLink(rawPath) {
+    return rawPath.trim().split('#')[0].split('?')[0].replace(/\/$/, '');
 }
 
 function validatePlaywrightProjectDocs() {
@@ -207,33 +242,24 @@ function validateDocs() {
 
         while (match !== null) {
             const rawPath = match[1] || match[2];
-            if (!rawPath || rawPath.startsWith('http') || rawPath.startsWith('{{')) {
+            const cleanPath = rawPath ? resolveDocLink(rawPath) : null;
+            if (
+                !cleanPath ||
+                cleanPath.startsWith('http') ||
+                cleanPath.startsWith('{{') ||
+                (!cleanPath.includes('/') && !VALID_BARE_LINKS.has(cleanPath)) ||
+                (cleanPath.includes('/') &&
+                    !VALID_LINK_PREFIXES.some((prefix) => cleanPath.startsWith(prefix)))
+            ) {
                 match = pathRegex.exec(content);
                 continue;
             }
-
-            const cleanPath = rawPath.trim().replace(/\/$/, '');
 
             if (checkedInDoc.has(cleanPath)) {
                 match = pathRegex.exec(content);
                 continue;
             }
             checkedInDoc.add(cleanPath);
-
-            if (
-                cleanPath.includes('--') ||
-                (cleanPath.toUpperCase() === cleanPath && cleanPath.includes('_'))
-            ) {
-                match = pathRegex.exec(content);
-                continue;
-            }
-
-            const validRoot =
-                /^(\.github|public|docs|tests|scripts|package\.json|GEMINI\.md|AI\.md|AI_MAP\.md|playwright\.config\.js|tests\/)/;
-            if (!validRoot.test(cleanPath)) {
-                match = pathRegex.exec(content);
-                continue;
-            }
 
             if (!fs.existsSync(cleanPath)) {
                 console.error(`❌ [${doc}] Broken link: \`${rawPath}\` does not exist on disk.`);

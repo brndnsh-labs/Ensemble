@@ -6,7 +6,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 - Start here when you need file ownership, entrypoints, or likely edit locations.
 - Use `AI.md` for operational rules and safety conventions.
-- Use `GEMINI.md` for product context, roadmap, and historical milestones.
+- Use `docs/README.md` for the docs index and roadmap.
 - Use `.github/copilot-instructions.md` for the concise Copilot CLI summary.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `AI.md` and `AI_MAP.md` stay reliable.
 
@@ -191,10 +191,16 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility |
 | :--- | :--- |
+| `docs/README.md` | Documentation index and repo navigation hub. |
+| `docs/ROADMAP.md` | Living roadmap and repo-organization notes. |
+| `docs/guides/PERFORMANCE_GUIDELINES.md` | Hot-loop performance notes for audio and scheduler code. |
 | `public/MANUAL.md` | User-facing guide with auto-generated tables. |
 | `public/musicxml-parser.js` | Symbolic format importer. |
 | `public/tab-parser.js` | Text-based chord/tab importer. |
 | `public/form-analysis.js` | Song section and structure detection. |
+| `.github/CONTRIBUTING.md` | Contributor workflow and validation checklist. |
+| `.github/SECURITY.md` | Private vulnerability reporting guidance. |
+| `.github/CODE_OF_CONDUCT.md` | Community behavior standards. |
 | `tests/` | Unit, Integration, and E2E test suites. |
-| `GEMINI.md` / `AI.md` | Primary architectural and operational guides. |
+| `AI.md` | Primary operational guide and architectural rules. |
 | `AI_MAP.md` | Codebase navigation (this file). |

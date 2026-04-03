@@ -6,7 +6,7 @@ This document is the primary operational guide for AI agents working on the Ense
 
 *   **`AI.md`**: Source of truth for operational rules, guardrails, and contributor expectations.
 *   **`AI_MAP.md`**: Navigation map for file ownership, entrypoints, and key exports.
-*   **`GEMINI.md`**: Companion context for roadmap, historical milestones, and broader technical background.
+*   **`docs/README.md`**: Documentation index for living guides, roadmap, and repo navigation.
 *   **`.github/copilot-instructions.md`**: Concise GitHub Copilot CLI summary.
 *   **Conflict rule:** If any guide drifts from live code or config, prefer the live code/config and update the docs.
 

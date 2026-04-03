@@ -83,11 +83,18 @@ npm run validate
 
 ## Documentation
 
-- `public/MANUAL.md` — the in-app manual, including generated reference tables.
-- `AI.md` — operational rules and state-management guidance for contributors.
-- `AI_MAP.md` — a navigation map for the codebase.
-- `docs/guides/` — deeper implementation notes and reference guides.
-- `tests/README.md` — test-suite conventions and how to run checks.
+- [`docs/README.md`](docs/README.md) — documentation index and repo navigation hub.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — current open work and repo-organization notes.
+- [`public/MANUAL.md`](public/MANUAL.md) — the in-app manual, including generated reference tables.
+- [`AI.md`](AI.md) — operational rules and state-management guidance for contributors.
+- [`AI_MAP.md`](AI_MAP.md) — a navigation map for the codebase.
+- [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — workspace-specific Copilot guidance.
+- [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) — contributor workflow and validation expectations.
+- [`.github/SECURITY.md`](.github/SECURITY.md) — private vulnerability reporting.
+- [`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md) — community standards.
+- [`docs/guides/`](docs/guides/) — deeper implementation notes and reference guides.
+- [`tests/README.md`](tests/README.md) — test-suite conventions and how to run checks.
+- [`.vscode/mcp.json`](.vscode/mcp.json) — optional VS Code Playwright MCP workspace helper.
 
 ## Tech stack
 
@@ -101,7 +108,9 @@ npm run validate
 
 - `public/` — app source, controllers, engines, components, and styles
 - `tests/` — unit, integration, standards, perf, and e2e coverage
-- `docs/` — implementation guides and archived reports
+- `docs/` — docs index, living guides, roadmap, and archived reports
+- `.github/` — contributor, security, and pull request templates
+- `.vscode/` — optional workspace helpers, including Playwright MCP
 - `scripts/` — repo maintenance and analysis tooling
 
 ## License
