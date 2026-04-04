@@ -30,6 +30,7 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 - Add new soloist sounds.
 - Revisit synthesis for chords, bass, and harmony as separate design passes.
+- Current audit note: the shared backing-bed interlock pass landed; Jazz chord body / low-mid is the next planned audit.
 
 ## 5. Dynamic Head simplification
 
@@ -54,6 +55,7 @@ These are the current product and audio work streams, ordered by user-facing imp
   - `ensemble:report` now includes a reusable `renderScene` payload plus JSONL `focus` rows so the rendered pass can reconstruct the audited scene instead of reusing the seed in an unrelated preset.
   - `mix:report` still reuses `scripts/mix-report.js` and the existing dist + browser/offline-audio harness rather than introducing a second renderer.
   - The rendered audit stays backing-band focused for per-stem comparisons across drums, bass, chords, harmony, and the full mix, while using the symbolic audit to decide which seeds are worth the slower render pass.
+  - The reporting flow enabled the broad cross-genre sweep above and should stay in place for the next genre-specific audit passes.
 
 ## Notes
 

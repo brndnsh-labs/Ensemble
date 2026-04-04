@@ -1434,7 +1434,7 @@ export function getAccompanimentNotes(
     // If backgrounds are busy, the main accompanist should find gaps.
     if (isHit && harmony.enabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {
         // Assume rhythmic mask maps up to 16 steps, gracefully wrap for different meters
-        const stepInMask = stepInfo.mStep % 16;
+        const stepInMask = (stepInfo?.mStep ?? measureStep) % 16;
         const hasHarmonyHit = (harmony.rhythmicMask >> stepInMask) & 1;
         if (hasHarmonyHit && Math.random() < 0.4 + playback.bandIntensity * 0.3) {
             // Background stab present, suppress piano hit to let it pop

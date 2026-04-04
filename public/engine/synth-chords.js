@@ -143,6 +143,10 @@ export function playNote(
         const intensity = playback.bandIntensity;
         const intensityShift = (intensity - 0.5) * 2400;
         const intensityDepthMult = 0.5 + intensity * 2.5;
+        const lowMidCut =
+            muted || numVoices < 2
+                ? 0
+                : Math.min(4, Math.max(0, numVoices - 1) * 0.8 + Math.max(0, intensity - 0.5) * 3);
         const velocityCutoff = Math.max(
             100,
             preset.filterBase + intensityShift + finalVol * preset.filterDepth * intensityDepthMult,
@@ -247,13 +251,20 @@ export function playNote(
 
         lastNode.connect(mainGain);
 
+        const bodyShape = playback.audio.createBiquadFilter();
+        bodyShape.type = 'peaking';
+        bodyShape.frequency.setValueAtTime(isPiano ? 330 : 300, startTime);
+        bodyShape.Q.setValueAtTime(0.85, startTime);
+        bodyShape.gain.setValueAtTime(-lowMidCut, startTime);
+
         const hpf = playback.audio.createBiquadFilter();
         hpf.type = 'highpass';
         hpf.frequency.setValueAtTime(150, startTime);
 
         const panner = createSimplePanner(playback.audio, -0.2, startTime);
 
-        mainGain.connect(hpf);
+        mainGain.connect(bodyShape);
+        bodyShape.connect(hpf);
         hpf.connect(panner);
         if (playback.chordsGain) {
             panner.connect(playback.chordsGain);

@@ -149,6 +149,14 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **HiHat:** Extended the shortest closed-hat decay/stop values slightly so the hat keeps a more natural residual ring without opening up.
     - **Verification:** Focused drum synthesis and the internal mix report passed after the subtle sustain nudge.
 
+### [Date: 2026-04-04] (Global Backing-Bed Interlock Pass)
+- **Status:** Cross-genre backing-bed audit follow-up.
+- **Action:**
+    - **Global harmony:** Slimmed accompaniment-overlap harmony hits into shorter, lighter support tones so backgrounds behave more like color accents than a second accompanist when the chord bed is already active.
+    - **Global chords:** Added a small dynamic low-mid body dip to the chord synth so thicker voicings shed some 300-ish Hz buildup before they hit the shared bus.
+    - **Audit result:** Rock and Neo-Soul showed cleaner backing-bed spacing in the rendered audit, while Jazz reduced overall stack pressure but still kept a darker chord body than desired; leave that as the first genre-specific follow-up rather than pushing the global pass further.
+    - **Verification:** Representative symbolic/rendered audit reruns, focused coordination/comping/harmony standards, full `npm run validate`, and full `npm run test:e2e` passed after the retune.
+
 ---
 
 ## Intensity-Aware Mixing Rules
