@@ -106,8 +106,8 @@ export const MIXER_GAIN_MULTIPLIERS = {
     master: 0.85,
     chords: 0.125, // Carries the former 50% starter fader into the hidden chord trim
     bass: 0.1575, // Preserves the previous 45% default bass balance at unity UI volume
-    soloist: 0.16, // Keeps melodic lead presence near the prior default mix
-    harmonies: 0.112, // Holds harmony as support instead of a second front line at unity
+    soloist: 0.15, // Keeps melodic lead presence slightly under the prior default mix
+    harmonies: 0.105, // Holds harmony as support while leaving drums a bit more room
     drums: 0.26, // Keeps the rhythmic anchor near the earlier default loudness
 };
 

@@ -30,7 +30,7 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 - Add new soloist sounds.
 - Revisit synthesis for chords, bass, and harmony as separate design passes.
-- Current audit note: the shared backing-bed interlock pass, the unity-default hidden-trim pass, and the Jazz chord-body / low-mid comping retune have all landed; the next audit should move on to the remaining genre-specific outliers rather than another global default-mix sweep.
+- Current audit note: the shared backing-bed interlock pass, the unity-default hidden-trim pass, the Jazz chord-body / low-mid comping retune, and a small soloist/harmony headroom nudge have all landed; the next audit should move on to the remaining genre-specific outliers rather than another global default-mix sweep.
 
 ## 5. Dynamic Head simplification
 

@@ -128,7 +128,7 @@ describe('Engine Bus Management', () => {
             state.playback.modals.performance = true;
             restoreGains(state);
             // Even though disabled, it stays unmuted for manual playing in performance view
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.16, 10.0, 0.04); // 1.0 * 0.16
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.15, 10.0, 0.04); // 1.0 * 0.15
         });
 
         it('should NOT mute drums if drumPad modal is open', () => {

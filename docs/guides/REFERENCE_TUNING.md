@@ -172,6 +172,13 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** The rendered Jazz focus rerender kept full-mix loudness flat while reducing chord low-mid energy (`0.4899 -> 0.4142`), raising chord centroid (`605.64 -> 627.68`), and cutting chord voice-limit pressure (`61.5 -> 46.5`). A follow-up Jazz-only synth brightening experiment was measured and reverted because it gave back some of that low-mid improvement.
     - **Verification:** Focused Jazz comping/piano/consistency standards plus chord synthesis and voice-exhaustion unit coverage passed before the full repo validation sweep.
 
+### [Date: 2026-04-04] (Soloist / Harmony Headroom Nudge)
+- **Status:** Small shared-mix headroom trim.
+- **Action:**
+    - **Hidden trims:** Nudged the soloist and harmony gain multipliers down a touch so the lead and support beds sit a little farther back and the drums keep a safer pocket in the shared mix.
+    - **Audit result:** This is a small balance-only move; the drum trim stayed fixed, and the broader unity baseline remains intact.
+    - **Verification:** Targeted engine mix assertions and the full validation/E2E sweep cover the new hidden gain targets.
+
 ---
 
 ## Intensity-Aware Mixing Rules

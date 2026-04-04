@@ -125,8 +125,8 @@ vi.mock('../../../public/config.js', async (importOriginal) => {
         MIXER_GAIN_MULTIPLIERS: {
             chords: 0.125,
             bass: 0.1575,
-            soloist: 0.16,
-            harmonies: 0.112,
+            soloist: 0.15,
+            harmonies: 0.105,
             drums: 0.26,
             master: 0.85,
         },
