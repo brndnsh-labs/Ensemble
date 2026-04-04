@@ -104,10 +104,10 @@ export const TIME_SIGNATURES = {
 
 export const MIXER_GAIN_MULTIPLIERS = {
     master: 0.85,
-    chords: 0.125, // Carries the former 50% starter fader into the hidden chord trim
+    chords: 0.13, // Keeps chords slightly more forward while preserving the shared headroom budget
     bass: 0.1575, // Preserves the previous 45% default bass balance at unity UI volume
     soloist: 0.15, // Keeps melodic lead presence slightly under the prior default mix
-    harmonies: 0.105, // Holds harmony as support while leaving drums a bit more room
+    harmonies: 0.1, // Holds harmony behind the chord bed while leaving drums a bit more room
     drums: 0.26, // Keeps the rhythmic anchor near the earlier default loudness
 };
 

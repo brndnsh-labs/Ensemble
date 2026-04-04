@@ -69,10 +69,10 @@ vi.mock('../../../public/ui.js', () => ({
 vi.mock('../../../public/config.js', () => ({
     MIXER_GAIN_MULTIPLIERS: {
         master: 0.85,
-        chords: 0.125,
+        chords: 0.13,
         bass: 0.1575,
         soloist: 0.15,
-        harmonies: 0.105,
+        harmonies: 0.1,
         drums: 0.26,
     },
     TIME_SIGNATURES: {},
@@ -215,10 +215,10 @@ describe('Mix & Signal Integrity Audit', () => {
         const bassTarget = playback.bassGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(bassTarget).toBeCloseTo(0.1575, 4);
 
-        // Harmony target should be 1.0 * 0.105 = 0.105
+        // Harmony target should be 1.0 * 0.1 = 0.1
         const harmonyTarget =
             playback.harmoniesGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
-        expect(harmonyTarget).toBeCloseTo(0.105, 4);
+        expect(harmonyTarget).toBeCloseTo(0.1, 4);
     });
 
     it('should ensure the saturator uses an oversampled soft-clip curve', () => {
@@ -246,9 +246,9 @@ describe('Mix & Signal Integrity Audit', () => {
         // Recalculating expected:
         // Drums: 1.0 * 0.26 = 0.26
         // Bass: 1.0 * 0.1575 = 0.1575
-        // Chords: 1.0 * 0.125 = 0.125
+        // Chords: 1.0 * 0.13 = 0.13
         // Soloist: 1.0 * 0.15 = 0.15
-        // Harmony: 1.0 * 0.105 = 0.105
+        // Harmony: 1.0 * 0.1 = 0.1
         // Total = 0.7975
         expect(totalInstrumentGain).toBeCloseTo(0.7975, 4);
     });

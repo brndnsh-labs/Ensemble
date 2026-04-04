@@ -179,6 +179,14 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** This is a small balance-only move; the drum trim stayed fixed, and the broader unity baseline remains intact.
     - **Verification:** Targeted engine mix assertions and the full validation/E2E sweep cover the new hidden gain targets.
 
+### [Date: 2026-04-04] (Chord / Harmony Headroom-Neutral Rebalance)
+- **Status:** Shared bus-balance follow-up.
+- **Action:**
+    - **Hidden trims:** Reallocated a small amount of the shared headroom budget from harmony to chords (`chords 0.125 -> 0.13`, `harmonies 0.105 -> 0.10`) while keeping the combined instrument-gain sum unchanged.
+    - **Bus tone:** Reduced the harmony bus warmth boost from `+2 dB` to `+1 dB` at `1200 Hz` so harmony stays supportive instead of reading like the lead midrange voice when chords are already active.
+    - **Audit result:** In the live Jazz focus rerender, full-mix RMS and drum presence stayed flat (`-28.26 -> -28.25`, `0.0339 -> 0.0339`) while the chord-over-harmony RMS gap widened (`-6.41 dB -> -7.31 dB`). Funk also kept its full mix flat while reducing the harmony-over-chords RMS gap (`4.32 dB -> 3.43 dB`), and the representative five-genre sweep stayed within the existing loudness envelope.
+    - **Verification:** Targeted engine-bus / export / mix-integrity checks, Jazz harmony critique, and representative rendered rerenders passed before the final repo validation sweep.
+
 ---
 
 ## Intensity-Aware Mixing Rules

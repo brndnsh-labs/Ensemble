@@ -2,6 +2,10 @@
 
 These are the current product and audio work streams, ordered by user-facing impact.
 
+Open work items:
+- Audio identity refresh
+- Dynamic Head simplification
+
 ## 1. Resolution balance fix
 
 - Status: Done (2026-04-02)
@@ -28,14 +32,16 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 ## 4. Audio identity refresh
 
-- Add new soloist sounds.
-- Revisit synthesis for chords, bass, and harmony as separate design passes.
-- Current audit note: the shared backing-bed interlock pass, the unity-default hidden-trim pass, the Jazz chord-body / low-mid comping retune, and a small soloist/harmony headroom nudge have all landed; the next audit should move on to the remaining genre-specific outliers rather than another global default-mix sweep.
+- Status: Active
+- Completed so far: the shared backing-bed interlock pass, the unity-default hidden-trim pass, the Jazz chord-body / low-mid retune, the soloist/harmony headroom nudge, and the headroom-neutral chord/harmony rebalance.
+- Remaining: add new soloist sounds, then revisit chords/bass/harmony synthesis only if the next audit turns up a new outlier.
+- Current audit note: keep using the existing rendered/symbolic audit flow for any follow-up tuning instead of reopening the global default-mix sweep.
 
 ## 5. Dynamic Head simplification
 
-- Look for ways to simplify the session seed / Dynamic Head logic.
-- Prefer smaller helpers and clearer flow over more branching, while preserving the seeded head behavior.
+- Status: Open
+- Remaining: simplify the session seed / Dynamic Head logic.
+- Constraint: prefer smaller helpers and clearer flow over more branching, while preserving the seeded head behavior.
 
 ## 6. Progression library discovery
 
