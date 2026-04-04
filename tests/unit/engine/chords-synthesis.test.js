@@ -29,6 +29,7 @@ vi.mock('../../../public/state.js', () => {
                 type: '',
                 frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 Q: { setValueAtTime: vi.fn() },
+                gain: { setValueAtTime: vi.fn() },
                 connect: vi.fn(),
             })),
             createBufferSource: vi.fn(() => ({

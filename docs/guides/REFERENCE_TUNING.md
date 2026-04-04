@@ -165,6 +165,13 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** The first unity baseline pushed rendered full-mix RMS roughly 6-7 dB hotter across Rock, Blues, Jazz, Funk, and Neo-Soul; the hidden-trim pass brought those rendered scenes back near the prior loudness envelope without changing the symbolic audit surface. Jazz chord body / low-mid still remains the clearest next genre-specific follow-up.
     - **Verification:** Targeted reducer/hydration/engine mix tests, the unity rendered rerender sweep, full `npm run validate`, and full `npm run test:e2e` passed after the rebalance.
 
+### [Date: 2026-04-04] (Jazz Chord Body / Low-Mid Pass)
+- **Status:** Jazz-specific comping-body retune.
+- **Action:**
+    - **Jazz comping:** Shortened Jazz chord holds and shifted the default bass-respecting support voicings toward leaner 2-3 note guide-tone/color shapes so piano comping behaves more like a rootless accompanist than a thick pad.
+    - **Audit result:** The rendered Jazz focus rerender kept full-mix loudness flat while reducing chord low-mid energy (`0.4899 -> 0.4142`), raising chord centroid (`605.64 -> 627.68`), and cutting chord voice-limit pressure (`61.5 -> 46.5`). A follow-up Jazz-only synth brightening experiment was measured and reverted because it gave back some of that low-mid improvement.
+    - **Verification:** Focused Jazz comping/piano/consistency standards plus chord synthesis and voice-exhaustion unit coverage passed before the full repo validation sweep.
+
 ---
 
 ## Intensity-Aware Mixing Rules

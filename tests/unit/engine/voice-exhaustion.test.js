@@ -26,6 +26,7 @@ vi.mock('../../../public/state.js', () => {
                 connect: vi.fn(),
                 frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
                 Q: { setValueAtTime: vi.fn() },
+                gain: { setValueAtTime: vi.fn() },
                 type: 'lowpass',
             })),
             createPeriodicWave: vi.fn(() => ({})),
