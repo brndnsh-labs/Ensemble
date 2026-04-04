@@ -46,22 +46,14 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 ## 7. Rendered-audio ensemble audit follow-up
 
-- Pair the new symbolic `npm run ensemble:report` audit with a slower rendered-audio pass so we can catch issues that only show up once the synths, timing offsets, and mix interact.
-- Reuse `scripts/mix-report.js` rather than creating a second browser/render harness. Prefer a JSON or JSONL output mode, or extract shared render/analyze helpers if that keeps the contract cleaner.
-- Keep the rendered pass machine-readable and seed-aware:
-  - accept a small multi-seed sample
-  - focus on a compact scene/preset set rather than exhaustive sweeps
-  - let the symbolic audit shortlist interesting seeds before we pay the render cost
-- Candidate rendered metrics:
-  - RMS / crest balance
-  - transient spike rate
-  - spectral probe bands
-  - schedule overlap / voice pressure
-  - per-stem comparisons for drums, bass, chords, harmony, and full mix
-- Goal: explain when a performance looks structurally sound in symbolic analysis but still feels wrong once rendered through the actual audio path.
-- Progress:
-  - symbolic full-band audit shipped as `npm run ensemble:report`
-  - first behavior-tuning pass landed on tension-class bars, with harmony now yielding more often on cadence / altered-dominant pressure
+- Status: Done (2026-04-04)
+- Summary: `npm run mix:report` now emits machine-readable JSON/JSONL, supports compact multi-seed rendered sweeps with scene filters, and can rerender `ensemble:report` focus seeds through the existing Playwright/offline-audio harness.
+- Commits: Implemented on branch `rendered-audio-audit-followup`.
+- Tests: Focused reporting-script coverage now exercises symbolic/rendered contracts; full validation (`npm run validate`) and full Playwright E2E (`npm run test:e2e`) passed.
+- Notes:
+  - `ensemble:report` now includes a reusable `renderScene` payload plus JSONL `focus` rows so the rendered pass can reconstruct the audited scene instead of reusing the seed in an unrelated preset.
+  - `mix:report` still reuses `scripts/mix-report.js` and the existing dist + browser/offline-audio harness rather than introducing a second renderer.
+  - The rendered audit stays backing-band focused for per-stem comparisons across drums, bass, chords, harmony, and the full mix, while using the symbolic audit to decide which seeds are worth the slower render pass.
 
 ## Notes
 
