@@ -78,7 +78,7 @@ export const groove = deepSignal({
         { name: 'Mid Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
         { name: 'Low Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
     ],
-    volume: 0.5,
+    volume: 1.0,
     reverb: 0.2,
     measures: 1,
     currentMeasure: 0,
@@ -148,7 +148,7 @@ export function grooveReducer(action, payload, playback) {
             break;
         case ACTIONS.RESET_STATE:
             groove.enabled = true;
-            groove.volume = 0.5;
+            groove.volume = 1.0;
             groove.reverb = 0.2;
             groove.swing = 0;
             groove.swingSub = '8th';

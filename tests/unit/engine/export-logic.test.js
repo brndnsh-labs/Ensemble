@@ -123,11 +123,11 @@ vi.mock('../../../public/config.js', async (importOriginal) => {
         },
         REGGAE_RIDDIMS: {},
         MIXER_GAIN_MULTIPLIERS: {
-            chords: 0.22,
-            bass: 0.35,
-            soloist: 0.32,
-            harmonies: 0.28,
-            drums: 0.45,
+            chords: 0.125,
+            bass: 0.1575,
+            soloist: 0.16,
+            harmonies: 0.112,
+            drums: 0.26,
             master: 0.85,
         },
     };

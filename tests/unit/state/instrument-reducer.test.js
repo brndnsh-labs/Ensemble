@@ -20,7 +20,7 @@ describe('Instrument Reducer', () => {
         soloist.volume = 0.9;
         instrumentReducer(ACTIONS.RESET_STATE);
         expect(soloist.enabled).toBe(false);
-        expect(soloist.volume).toBe(0.5);
+        expect(soloist.volume).toBe(1.0);
     });
 
     it('should clear soloist buffer when performance modal opens', () => {

@@ -61,11 +61,11 @@ describe('Engine Bus Management', () => {
                 drumsGain: mockGain,
                 modals: {},
             },
-            chords: { enabled: true, volume: 0.5 },
-            bass: { enabled: true, volume: 0.5 },
-            soloist: { enabled: true, volume: 0.5 },
-            harmony: { enabled: true, volume: 0.5 },
-            groove: { enabled: true, volume: 0.5 },
+            chords: { enabled: true, volume: 1.0 },
+            bass: { enabled: true, volume: 1.0 },
+            soloist: { enabled: true, volume: 1.0 },
+            harmony: { enabled: true, volume: 1.0 },
+            groove: { enabled: true, volume: 1.0 },
             midi: { enabled: false, muteLocal: false },
         };
     });
@@ -113,7 +113,7 @@ describe('Engine Bus Management', () => {
         it('should restore gains to state levels', () => {
             restoreGains(state);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalled();
-            // mult for chords is 0.25, vol is 0.5 -> 0.125
+            // mult for chords is 0.125, vol is 1.0 -> 0.125
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.125, 10.0, 0.04);
         });
 
@@ -128,14 +128,14 @@ describe('Engine Bus Management', () => {
             state.playback.modals.performance = true;
             restoreGains(state);
             // Even though disabled, it stays unmuted for manual playing in performance view
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.16, 10.0, 0.04); // 0.5 * 0.32
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.16, 10.0, 0.04); // 1.0 * 0.16
         });
 
         it('should NOT mute drums if drumPad modal is open', () => {
             state.groove.enabled = false;
             state.playback.modals.drumPad = true;
             restoreGains(state);
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.26, 10.0, 0.04); // 0.5 * 0.52
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.26, 10.0, 0.04); // 1.0 * 0.26
         });
 
         it('should mute local audio if MIDI muteLocal is active', () => {

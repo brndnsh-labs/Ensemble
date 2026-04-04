@@ -157,6 +157,14 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** Rock and Neo-Soul showed cleaner backing-bed spacing in the rendered audit, while Jazz reduced overall stack pressure but still kept a darker chord body than desired; leave that as the first genre-specific follow-up rather than pushing the global pass further.
     - **Verification:** Representative symbolic/rendered audit reruns, focused coordination/comping/harmony standards, full `npm run validate`, and full `npm run test:e2e` passed after the retune.
 
+### [Date: 2026-04-04] (Unity-Fader Hidden-Trim Pass)
+- **Status:** Unity-default mixer reset and cross-genre loudness rebalance.
+- **Action:**
+    - **Mixer defaults:** Moved all instrument defaults to 100% and bumped the mixer-settings version so fresh sessions, persisted sessions, and shared `bnd` links all reset to the same visible baseline instead of carrying the older half-volume starter mix.
+    - **Hidden trims:** Folded the former starter-fader attenuation into `MIXER_GAIN_MULTIPLIERS` so the UI can stay at 100% while the engine preserves roughly the earlier effective loudness for chords, bass, soloist, harmony, and drums.
+    - **Audit result:** The first unity baseline pushed rendered full-mix RMS roughly 6-7 dB hotter across Rock, Blues, Jazz, Funk, and Neo-Soul; the hidden-trim pass brought those rendered scenes back near the prior loudness envelope without changing the symbolic audit surface. Jazz chord body / low-mid still remains the clearest next genre-specific follow-up.
+    - **Verification:** Targeted reducer/hydration/engine mix tests, the unity rendered rerender sweep, full `npm run validate`, and full `npm run test:e2e` passed after the rebalance.
+
 ---
 
 ## Intensity-Aware Mixing Rules

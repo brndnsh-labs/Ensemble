@@ -11,7 +11,7 @@ describe('Groove Reducer', () => {
         groove.volume = 0.9;
         groove.instruments[0].steps[0] = 1;
         grooveReducer(ACTIONS.RESET_STATE);
-        expect(groove.volume).toBe(0.5);
+        expect(groove.volume).toBe(1.0);
         expect(groove.genreFeel).toBe('Rock');
         expect(groove.instruments[0].steps[0]).toBe(0);
     });

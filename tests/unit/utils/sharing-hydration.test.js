@@ -132,7 +132,7 @@ describe('Sharing & Hydration Round-trip', () => {
         expect(playback.bandIntensity).toBe(0.4);
     });
 
-    it('should fall back to default reverb for legacy band payloads', () => {
+    it('should fall back to unity volume and default reverb for legacy band payloads', () => {
         const legacyBandState = {
             s: {
                 e: 1,
@@ -188,6 +188,11 @@ describe('Sharing & Hydration Round-trip', () => {
         vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(encoded)}`));
         loadFromUrl();
 
+        expect(soloist.volume).toBe(1.0);
+        expect(bass.volume).toBe(1.0);
+        expect(chords.volume).toBe(1.0);
+        expect(harmony.volume).toBe(1.0);
+        expect(groove.volume).toBe(1.0);
         expect(soloist.reverb).toBe(0.6);
         expect(bass.reverb).toBe(0.05);
         expect(chords.reverb).toBe(0.3);

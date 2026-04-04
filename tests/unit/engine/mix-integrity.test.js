@@ -20,11 +20,11 @@ vi.mock('../../../public/state.js', () => {
         drumsGain: null,
         isPlaying: false,
     };
-    const mockChords = { volume: 0.5, enabled: true, reverb: 0.2 };
-    const mockBass = { volume: 0.45, enabled: true, reverb: 0.05 };
-    const mockSoloist = { volume: 0.5, enabled: true, reverb: 0.6 };
-    const mockHarmony = { volume: 0.4, enabled: true, reverb: 0.4 };
-    const mockGroove = { volume: 0.5, enabled: true, reverb: 0.2, audioBuffers: { noise: {} } };
+    const mockChords = { volume: 1.0, enabled: true, reverb: 0.2 };
+    const mockBass = { volume: 1.0, enabled: true, reverb: 0.05 };
+    const mockSoloist = { volume: 1.0, enabled: true, reverb: 0.6 };
+    const mockHarmony = { volume: 1.0, enabled: true, reverb: 0.4 };
+    const mockGroove = { volume: 1.0, enabled: true, reverb: 0.2, audioBuffers: { noise: {} } };
     const mockMidi = { enabled: false, muteLocal: false };
     const mockArranger = {};
     const mockVizState = {};
@@ -69,11 +69,11 @@ vi.mock('../../../public/ui.js', () => ({
 vi.mock('../../../public/config.js', () => ({
     MIXER_GAIN_MULTIPLIERS: {
         master: 0.85,
-        chords: 0.25,
-        bass: 0.35,
-        soloist: 0.32,
-        harmonies: 0.28,
-        drums: 0.52,
+        chords: 0.125,
+        bass: 0.1575,
+        soloist: 0.16,
+        harmonies: 0.112,
+        drums: 0.26,
     },
     TIME_SIGNATURES: {},
 }));
@@ -209,14 +209,13 @@ describe('Mix & Signal Integrity Audit', () => {
         initAudio(getState());
 
         // mixer gain = state.volume * MIXER_GAIN_MULTIPLIERS[module]
-        // From config.js: bass multiplier is now 0.35. state.bass.volume is 0.45.
-        // Target should be 0.45 * 0.35 = 0.1575
+        // With unity UI defaults, the hidden trim carries the prior effective balance.
+        // Target should be 1.0 * 0.1575 = 0.1575
 
         const bassTarget = playback.bassGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(bassTarget).toBeCloseTo(0.1575, 4);
 
-        // Harmony multiplier is now 0.28. state.harmony.volume is 0.4.
-        // Target should be 0.4 * 0.28 = 0.112
+        // Harmony target should be 1.0 * 0.112 = 0.112
         const harmonyTarget =
             playback.harmoniesGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(harmonyTarget).toBeCloseTo(0.112, 4);
@@ -242,14 +241,14 @@ describe('Mix & Signal Integrity Audit', () => {
 
         const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain + harmonyGain;
 
-        // Verification: The sum should be safe (~0.8145 based on 0.5/0.52/etc volumes)
+        // Verification: The hidden trims should keep the unity-default sum safe (~0.8145)
         expect(totalInstrumentGain).toBeLessThan(1.0);
         // Recalculating expected:
-        // Drums: 0.5 * 0.52 = 0.26
-        // Bass: 0.45 * 0.35 = 0.1575
-        // Chords: 0.5 * 0.25 = 0.125
-        // Soloist: 0.5 * 0.32 = 0.16
-        // Harmony: 0.4 * 0.28 = 0.112
+        // Drums: 1.0 * 0.26 = 0.26
+        // Bass: 1.0 * 0.1575 = 0.1575
+        // Chords: 1.0 * 0.125 = 0.125
+        // Soloist: 1.0 * 0.16 = 0.16
+        // Harmony: 1.0 * 0.112 = 0.112
         // Total = 0.8145
         expect(totalInstrumentGain).toBeCloseTo(0.8145, 4);
     });
