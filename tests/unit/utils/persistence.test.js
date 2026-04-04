@@ -68,7 +68,7 @@ describe('Persistence Integrity', () => {
         expect(savedData.bpm).toBe(115);
         expect(savedData.groove.genreFeel).toBe('Bossa Nova');
         expect(savedData.sections[0].label).toBe('Verse');
-        expect(savedData.mixerVersion).toBe(1);
+        expect(savedData.mixerVersion).toBe(2);
 
         // Check drum pattern serialization
         const kickPattern = savedData.groove.pattern.find((i) => i.name === 'Kick');

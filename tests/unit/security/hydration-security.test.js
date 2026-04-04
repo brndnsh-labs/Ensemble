@@ -164,7 +164,7 @@ describe('Security: Hydration & Storage Resilience', () => {
             expect(stateModule.storage.save).toHaveBeenCalledWith(
                 'currentState',
                 expect.objectContaining({
-                    mixerVersion: 1,
+                    mixerVersion: 2,
                 }),
             );
 

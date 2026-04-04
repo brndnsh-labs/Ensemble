@@ -256,7 +256,7 @@ export function initAudio(state, options = {}) {
                 const warmth = playback.audio.createBiquadFilter();
                 warmth.type = 'peaking';
                 warmth.frequency.setValueAtTime(1200, playback.audio.currentTime);
-                warmth.gain.setValueAtTime(2, playback.audio.currentTime);
+                warmth.gain.setValueAtTime(1, playback.audio.currentTime);
 
                 const panner = playback.audio.createStereoPanner();
                 panner.pan.setValueAtTime(0.2, playback.audio.currentTime);

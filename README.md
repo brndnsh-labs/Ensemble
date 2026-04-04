@@ -80,6 +80,8 @@ npm run validate
 - `npm run test:e2e` runs the Playwright smoke suite.
 - `npm run validate` performs the full repo validation pipeline.
 - `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` emits a compact multi-seed ensemble audit as JSON.
+- `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` emits rendered-audio metrics as JSONL for a compact multi-seed scene sweep.
+- `npm run mix:report -- --json --focus-from=report.json` rerenders an `ensemble:report` focus shortlist through the actual audio path and emits machine-readable mix metrics.
 
 ## Documentation
 

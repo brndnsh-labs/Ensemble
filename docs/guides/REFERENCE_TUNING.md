@@ -149,6 +149,44 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **HiHat:** Extended the shortest closed-hat decay/stop values slightly so the hat keeps a more natural residual ring without opening up.
     - **Verification:** Focused drum synthesis and the internal mix report passed after the subtle sustain nudge.
 
+### [Date: 2026-04-04] (Global Backing-Bed Interlock Pass)
+- **Status:** Cross-genre backing-bed audit follow-up.
+- **Action:**
+    - **Global harmony:** Slimmed accompaniment-overlap harmony hits into shorter, lighter support tones so backgrounds behave more like color accents than a second accompanist when the chord bed is already active.
+    - **Global chords:** Added a small dynamic low-mid body dip to the chord synth so thicker voicings shed some 300-ish Hz buildup before they hit the shared bus.
+    - **Audit result:** Rock and Neo-Soul showed cleaner backing-bed spacing in the rendered audit, while Jazz reduced overall stack pressure but still kept a darker chord body than desired; leave that as the first genre-specific follow-up rather than pushing the global pass further.
+    - **Verification:** Representative symbolic/rendered audit reruns, focused coordination/comping/harmony standards, full `npm run validate`, and full `npm run test:e2e` passed after the retune.
+
+### [Date: 2026-04-04] (Unity-Fader Hidden-Trim Pass)
+- **Status:** Unity-default mixer reset and cross-genre loudness rebalance.
+- **Action:**
+    - **Mixer defaults:** Moved all instrument defaults to 100% and bumped the mixer-settings version so fresh sessions, persisted sessions, and shared `bnd` links all reset to the same visible baseline instead of carrying the older half-volume starter mix.
+    - **Hidden trims:** Folded the former starter-fader attenuation into `MIXER_GAIN_MULTIPLIERS` so the UI can stay at 100% while the engine preserves roughly the earlier effective loudness for chords, bass, soloist, harmony, and drums.
+    - **Audit result:** The first unity baseline pushed rendered full-mix RMS roughly 6-7 dB hotter across Rock, Blues, Jazz, Funk, and Neo-Soul; the hidden-trim pass brought those rendered scenes back near the prior loudness envelope without changing the symbolic audit surface. Jazz chord body / low-mid still remains the clearest next genre-specific follow-up.
+    - **Verification:** Targeted reducer/hydration/engine mix tests, the unity rendered rerender sweep, full `npm run validate`, and full `npm run test:e2e` passed after the rebalance.
+
+### [Date: 2026-04-04] (Jazz Chord Body / Low-Mid Pass)
+- **Status:** Jazz-specific comping-body retune.
+- **Action:**
+    - **Jazz comping:** Shortened Jazz chord holds and shifted the default bass-respecting support voicings toward leaner 2-3 note guide-tone/color shapes so piano comping behaves more like a rootless accompanist than a thick pad.
+    - **Audit result:** The rendered Jazz focus rerender kept full-mix loudness flat while reducing chord low-mid energy (`0.4899 -> 0.4142`), raising chord centroid (`605.64 -> 627.68`), and cutting chord voice-limit pressure (`61.5 -> 46.5`). A follow-up Jazz-only synth brightening experiment was measured and reverted because it gave back some of that low-mid improvement.
+    - **Verification:** Focused Jazz comping/piano/consistency standards plus chord synthesis and voice-exhaustion unit coverage passed before the full repo validation sweep.
+
+### [Date: 2026-04-04] (Soloist / Harmony Headroom Nudge)
+- **Status:** Small shared-mix headroom trim.
+- **Action:**
+    - **Hidden trims:** Nudged the soloist and harmony gain multipliers down a touch so the lead and support beds sit a little farther back and the drums keep a safer pocket in the shared mix.
+    - **Audit result:** This is a small balance-only move; the drum trim stayed fixed, and the broader unity baseline remains intact.
+    - **Verification:** Targeted engine mix assertions and the full validation/E2E sweep cover the new hidden gain targets.
+
+### [Date: 2026-04-04] (Chord / Harmony Headroom-Neutral Rebalance)
+- **Status:** Shared bus-balance follow-up.
+- **Action:**
+    - **Hidden trims:** Reallocated a small amount of the shared headroom budget from harmony to chords (`chords 0.125 -> 0.13`, `harmonies 0.105 -> 0.10`) while keeping the combined instrument-gain sum unchanged.
+    - **Bus tone:** Reduced the harmony bus warmth boost from `+2 dB` to `+1 dB` at `1200 Hz` so harmony stays supportive instead of reading like the lead midrange voice when chords are already active.
+    - **Audit result:** In the live Jazz focus rerender, full-mix RMS and drum presence stayed flat (`-28.26 -> -28.25`, `0.0339 -> 0.0339`) while the chord-over-harmony RMS gap widened (`-6.41 dB -> -7.31 dB`). Funk also kept its full mix flat while reducing the harmony-over-chords RMS gap (`4.32 dB -> 3.43 dB`), and the representative five-genre sweep stayed within the existing loudness envelope.
+    - **Verification:** Targeted engine-bus / export / mix-integrity checks, Jazz harmony critique, and representative rendered rerenders passed before the final repo validation sweep.
+
 ---
 
 ## Intensity-Aware Mixing Rules

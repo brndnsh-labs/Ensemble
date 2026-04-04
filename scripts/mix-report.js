@@ -3,7 +3,17 @@ import { readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
+import {
+    buildRenderedMixReport,
+    DEFAULT_MIX_REPORT_SCENES,
+    formatRenderedMixReport,
+    MIX_REPORT_STEMS,
+    parseEnsembleAuditInput,
+    resolveMixReportCliOptions,
+    selectMixReportScenes,
+} from './mix-report-utils.js';
 
 const REPO_ROOT = '/home/brandon/code/ensemble';
 const DIST_DIR = path.join(REPO_ROOT, 'dist');
@@ -23,119 +33,46 @@ const MIME_TYPES = {
     '.woff2': 'font/woff2',
 };
 
-const SCENES = [
-    {
-        id: 'rock-backbeat',
-        genreFeel: 'Rock',
-        drumPreset: 'Basic Rock',
-        bpm: 118,
-        intensity: 0.72,
-        complexity: 0.58,
-        key: 'C',
-        sections: [
-            {
-                id: 'rock-a',
-                label: 'Rock Groove',
-                value: 'C | G | Am | F | C | G | F | G',
-            },
-        ],
-    },
-    {
-        id: 'blues-shuffle',
-        genreFeel: 'Blues',
-        drumPreset: 'Blues Shuffle',
-        bpm: 96,
-        intensity: 0.7,
-        complexity: 0.6,
-        key: 'C',
-        sections: [
-            {
-                id: 'blues-a',
-                label: 'Blues',
-                value: 'C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | G7',
-            },
-        ],
-    },
-    {
-        id: 'jazz-ride',
-        genreFeel: 'Jazz',
-        drumPreset: 'Jazz',
-        bpm: 138,
-        intensity: 0.64,
-        complexity: 0.55,
-        key: 'C',
-        sections: [
-            {
-                id: 'jazz-a',
-                label: 'Jazz Head',
-                value: 'Dm7 | G7 | Cmaj7 | A7 | Dm7 | G7 | Cmaj7 | Cmaj7',
-            },
-        ],
-    },
-    {
-        id: 'funk-pocket',
-        genreFeel: 'Funk',
-        drumPreset: 'Funk',
-        bpm: 104,
-        intensity: 0.78,
-        complexity: 0.66,
-        key: 'E',
-        sections: [
-            {
-                id: 'funk-a',
-                label: 'Funk Vamp',
-                value: 'Em7 | Em7 | A7 | A7 | Em7 | Em7 | A7 | B7',
-            },
-        ],
-    },
-];
-
-const STEMS = [
-    {
-        id: 'full',
-        label: 'Full Mix',
-        enabled: { drums: true, bass: true, chords: true, harmony: true },
-    },
-    {
-        id: 'drums',
-        label: 'Drums',
-        enabled: { drums: true, bass: false, chords: false, harmony: false },
-    },
-    {
-        id: 'bass',
-        label: 'Bass',
-        enabled: { drums: false, bass: true, chords: false, harmony: false },
-    },
-    {
-        id: 'chords',
-        label: 'Chords',
-        enabled: { drums: false, bass: false, chords: true, harmony: false },
-    },
-    {
-        id: 'harmony',
-        label: 'Harmony',
-        enabled: { drums: false, bass: false, chords: false, harmony: true },
-    },
-];
-
-function spawnCommand(command, args, options = {}) {
-    return spawn(command, args, {
-        cwd: REPO_ROOT,
-        stdio: options.stdio || 'inherit',
-        env: { ...process.env, ...options.env },
-    });
-}
-
 function runCommand(command, args, options = {}) {
+    const { forwardToStderr = false } = options;
+    const stdio = forwardToStderr ? ['ignore', 'pipe', 'pipe'] : 'inherit';
+
     return new Promise((resolve, reject) => {
-        const child = spawnCommand(command, args, options);
+        const child = spawn(command, args, {
+            cwd: REPO_ROOT,
+            stdio,
+            env: process.env,
+        });
+        let output = '';
+
+        if (forwardToStderr) {
+            child.stdout?.on('data', (chunk) => {
+                const text = String(chunk);
+                output += text;
+                process.stderr.write(text);
+            });
+            child.stderr?.on('data', (chunk) => {
+                const text = String(chunk);
+                output += text;
+                process.stderr.write(text);
+            });
+        }
+
         child.on('error', reject);
         child.on('exit', (code) => {
             if (code === 0) {
                 resolve();
                 return;
             }
-            reject(new Error(`${command} ${args.join(' ')} exited with code ${code}`));
+
+            const details = output.trim();
+            reject(
+                new Error(
+                    details
+                        ? `${command} ${args.join(' ')} exited with code ${code}\n${details}`
+                        : `${command} ${args.join(' ')} exited with code ${code}`,
+                ),
+            );
         });
     });
 }
@@ -209,61 +146,122 @@ function formatMetric(value, digits = 3) {
     return value.toFixed(digits);
 }
 
-function summarizeFindings(scene) {
-    const full = scene.stems.full;
-    const drums = scene.stems.drums;
-    const bass = scene.stems.bass;
-    const chords = scene.stems.chords;
-    const harmony = scene.stems.harmony;
-    const notes = [];
-
-    if (drums.rmsDb < full.rmsDb - 8.5) {
-        notes.push('drums sit fairly far behind the master bed');
-    } else if (drums.rmsDb > full.rmsDb - 5) {
-        notes.push('drums are very forward in the mix');
-    } else {
-        notes.push('drums are in a healthy backing-band range');
+async function readStdin() {
+    if (process.stdin.isTTY) {
+        throw new Error('Expected piped JSON when using --focus-from=-');
     }
 
-    if (drums.probes.presence > chords.probes.presence * 1.4) {
-        notes.push('drums dominate the presence band more than chords');
-    }
-
-    if (bass.probes.sub > chords.probes.sub * 3) {
-        notes.push('bass owns the sub slot cleanly');
-    }
-
-    if (chords.probes.lowMid > bass.probes.lowMid * 1.2) {
-        notes.push('chords carry most of the low-mid harmonic body');
-    }
-
-    if (harmony.rmsDb > -80 && harmony.probes.air > chords.probes.air * 0.9) {
-        notes.push('harmony contributes meaningful top-end air');
-    }
-
-    if ((harmony.schedule?.voiceLimitPressureCount || 0) > 0) {
-        notes.push(
-            `harmony exceeds the 3-voice live cap ${harmony.schedule.voiceLimitPressureCount} times`,
-        );
-    }
-
-    if ((harmony.schedule?.sameMidiOverlapCount || 0) > 0) {
-        notes.push(
-            `harmony retriggers the same pitch before release ${harmony.schedule.sameMidiOverlapCount} times`,
-        );
-    }
-
-    if ((harmony.transients?.maxDelta || 0) > 0.08 || (harmony.transients?.spikeRate || 0) > 6) {
-        notes.push('harmony stem shows sharp waveform edges worth auditing');
-    }
-
-    return notes;
+    return new Promise((resolve, reject) => {
+        let text = '';
+        process.stdin.setEncoding('utf8');
+        process.stdin.on('data', (chunk) => {
+            text += chunk;
+        });
+        process.stdin.on('end', () => resolve(text));
+        process.stdin.on('error', reject);
+    });
 }
 
-async function generateReport() {
-    console.log('Building dist for mix analysis...');
-    await runCommand('npm', ['run', 'build:quiet']);
+async function loadFocusInput(focusFrom, focusLimit) {
+    if (!focusFrom) {
+        return null;
+    }
 
+    const sourceText =
+        focusFrom === '-'
+            ? await readStdin()
+            : await readFile(path.resolve(REPO_ROOT, focusFrom), 'utf8');
+    return {
+        path: focusFrom,
+        focusLimit,
+        ...parseEnsembleAuditInput(sourceText, { focusLimit }),
+    };
+}
+
+function resolveScenes(options, focusInput) {
+    if (options.sceneIds.length > 0) {
+        return selectMixReportScenes(DEFAULT_MIX_REPORT_SCENES, options.sceneIds);
+    }
+
+    if (focusInput?.renderScene?.sections?.length) {
+        return [
+            {
+                ...focusInput.renderScene,
+                sections: focusInput.renderScene.sections.map((section) => ({ ...section })),
+            },
+        ];
+    }
+
+    return selectMixReportScenes(DEFAULT_MIX_REPORT_SCENES);
+}
+
+function resolveSeeds(options, focusInput) {
+    if (options.seedsExplicit || !focusInput?.seeds?.length) {
+        return {
+            seeds: options.seeds,
+            source: {
+                kind: 'manual',
+                reportType: focusInput?.reportType || null,
+                path: focusInput?.path || null,
+                sceneSource: focusInput?.renderScene ? 'ensemble-audit' : 'defaults',
+                focusLimit: focusInput?.focusLimit || null,
+                focusSeeds: [],
+            },
+        };
+    }
+
+    return {
+        seeds: focusInput.seeds,
+        source: {
+            kind: 'ensemble-focus',
+            reportType: focusInput.reportType,
+            path: focusInput.path,
+            sceneSource: focusInput.renderScene ? 'ensemble-audit' : 'defaults',
+            focusLimit: focusInput.focusLimit,
+            focusSeeds: focusInput.focusSeeds,
+        },
+    };
+}
+
+function printHumanMixReport(report) {
+    console.log('\n=== Rendered Audio Audit ===');
+    for (const scene of report.scenes) {
+        console.log(
+            `\n[${scene.id}] ${scene.label} | ${scene.genreFeel} @ ${scene.bpm} BPM | intensity ${scene.intensity}`,
+        );
+
+        for (const seedRow of scene.seeds) {
+            const focusSuffix = seedRow.focus
+                ? ` | focus #${seedRow.focus.focusRank} | issueScore ${seedRow.focus.issueScore}`
+                : '';
+            console.log(`Seed: ${seedRow.seed}${focusSuffix}`);
+            console.table(
+                Object.entries(seedRow.stems).map(([stemId, metrics]) => ({
+                    stem: stemId,
+                    peakDb: formatDb(metrics.peakDb),
+                    rmsDb: formatDb(metrics.rmsDb),
+                    crestDb: formatDb(metrics.crestDb),
+                    maxDelta: formatMetric(metrics.transients?.maxDelta || 0, 3),
+                    spikesPerSec: formatMetric(metrics.transients?.spikeRate || 0, 1),
+                    maxVoices: metrics.schedule?.maxSimultaneousVoices ?? '-',
+                    retriggers: metrics.schedule?.sameMidiOverlapCount ?? '-',
+                    steals: metrics.schedule?.voiceLimitPressureCount ?? '-',
+                    sub: Number(metrics.probes?.sub || 0).toFixed(3),
+                    lowMid: Number(metrics.probes?.lowMid || 0).toFixed(3),
+                    presence: Number(metrics.probes?.presence || 0).toFixed(3),
+                    air: Number(metrics.probes?.air || 0).toFixed(3),
+                    centroidHz: Math.round(metrics.probes?.centroid || 0),
+                })),
+            );
+
+            if (seedRow.findings.length > 0) {
+                console.log(`Findings: ${seedRow.findings.join('; ')}.`);
+            }
+        }
+    }
+}
+
+async function renderSceneReports({ scenes, seeds }) {
     const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
     const baseUrl = `http://${HOST}:${port}`;
 
@@ -280,8 +278,8 @@ async function generateReport() {
                 { timeout: 20000 },
             );
 
-            const report = await page.evaluate(
-                async ({ scenes, stems }) => {
+            return await page.evaluate(
+                async ({ scenes, stems, seeds }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
                     await ensemble.loadTools();
                     const {
@@ -294,6 +292,15 @@ async function generateReport() {
                     } = ensemble;
 
                     const sampleRate = 44100;
+
+                    function hashSeed(seed) {
+                        let hash = 2166136261;
+                        for (const char of String(seed || 'MIX_AUDIT')) {
+                            hash ^= char.charCodeAt(0);
+                            hash = Math.imul(hash, 16777619);
+                        }
+                        return hash >>> 0;
+                    }
 
                     function mulberry32(seed) {
                         let t = seed >>> 0;
@@ -399,10 +406,15 @@ async function generateReport() {
                         };
                     }
 
-                    function createSceneState(scene, enabled) {
+                    function createSceneState(scene, stem) {
                         const liveState = getState();
                         const state = cloneState(liveState);
-                        state.arranger.sections = scene.sections.map((section) => ({ ...section }));
+                        state.arranger.sections = scene.sections.map((section) => ({
+                            ...section,
+                            key: section.key || scene.key,
+                            isMinor: section.isMinor ?? false,
+                            timeSignature: section.timeSignature || scene.timeSignature || '4/4',
+                        }));
                         state.arranger.key = scene.key;
                         state.arranger.timeSignature = scene.timeSignature || '4/4';
                         state.playback.bpm = scene.bpm;
@@ -420,16 +432,31 @@ async function generateReport() {
                         state.playback.modals.performance = false;
                         state.playback.modals.drumPad = false;
                         state.groove.genreFeel = scene.genreFeel;
-                        state.groove.lastSmartGenre = scene.genreFeel;
-                        state.groove.creativity = true;
+                        state.groove.lastSmartGenre =
+                            scene.requestedGenre || scene.genre || scene.genreFeel;
+                        state.groove.creativity = scene.creativity ?? true;
                         state.groove.fillActive = false;
                         state.groove.pendingCrash = false;
                         state.groove.lastDrumPreset = scene.drumPreset;
-                        state.bass.enabled = enabled.bass;
-                        state.chords.enabled = enabled.chords;
-                        state.harmony.enabled = enabled.harmony;
+                        state.chords.style = scene.chordStyle || state.chords.style;
+                        state.chords.density = scene.density || state.chords.density;
+                        state.bass.style = scene.bassStyle || state.bass.style;
+                        state.harmony.style = scene.harmonyStyle || state.harmony.style;
+                        state.soloist.style = scene.soloistStyle || state.soloist.style;
+                        state.bass.enabled = Boolean(
+                            stem.enabled.bass && (scene.includeBass ?? true),
+                        );
+                        state.chords.enabled = Boolean(
+                            stem.enabled.chords && (scene.includeChords ?? true),
+                        );
+                        state.harmony.enabled = Boolean(
+                            stem.enabled.harmony && (scene.includeHarmony ?? true),
+                        );
+                        // The rendered audit still targets backing-band stems for stable comparisons.
                         state.soloist.enabled = false;
-                        state.groove.enabled = enabled.drums;
+                        state.groove.enabled = Boolean(
+                            stem.enabled.drums && (scene.includeDrums ?? true),
+                        );
 
                         validateProgression(state);
 
@@ -484,6 +511,26 @@ async function generateReport() {
                                 }
                             }
                         }
+                    }
+
+                    function collectScheduleBuffer(state, modules) {
+                        const combined = new Map();
+                        for (const moduleName of modules) {
+                            const source = state[moduleName]?.buffer;
+                            if (!(source instanceof Map)) {
+                                continue;
+                            }
+                            for (const [step, notes] of source.entries()) {
+                                if (!Array.isArray(notes) || notes.length === 0) {
+                                    continue;
+                                }
+                                if (!combined.has(step)) {
+                                    combined.set(step, []);
+                                }
+                                combined.get(step).push(...notes);
+                            }
+                        }
+                        return combined;
                     }
 
                     function toMono(audioBuffer) {
@@ -654,7 +701,12 @@ async function generateReport() {
                         };
                     }
 
-                    function analyzeNoteSchedule(buffer, stepDuration, renderLeadIn) {
+                    function analyzeNoteSchedule(
+                        buffer,
+                        stepDuration,
+                        renderLeadIn,
+                        voiceLimit = 3,
+                    ) {
                         const events = [];
                         let maxNotesPerStep = 0;
                         let overLimitSteps = 0;
@@ -664,7 +716,7 @@ async function generateReport() {
                                 continue;
                             }
                             maxNotesPerStep = Math.max(maxNotesPerStep, notes.length);
-                            if (notes.length > 3) {
+                            if (notes.length > voiceLimit) {
                                 overLimitSteps++;
                             }
                             for (const note of notes) {
@@ -701,7 +753,7 @@ async function generateReport() {
                             previousStart = event.start;
 
                             active = active.filter((voice) => voice.end > event.start + 1e-6);
-                            if (active.length >= 3) {
+                            if (active.length >= voiceLimit) {
                                 voiceLimitPressureCount++;
                             }
                             if (event.midi !== null) {
@@ -726,9 +778,9 @@ async function generateReport() {
                         };
                     }
 
-                    async function renderScene(scene, enabled, seed) {
-                        await loadDrumPreset(scene.drumPreset);
-                        const state = createSceneState(scene, enabled);
+                    async function renderStem(scene, stem, seedLabel) {
+                        await loadDrumPreset(scene.drumPreset || 'Basic Rock');
+                        const state = createSceneState(scene, stem);
                         const sixteenth = 60 / state.playback.bpm / 4;
                         const renderLeadIn = 0.25;
                         const renderSeconds =
@@ -739,13 +791,18 @@ async function generateReport() {
                             sampleRate,
                         );
                         const originalRandom = Math.random;
-                        Math.random = mulberry32(seed);
+                        Math.random = mulberry32(hashSeed(`${scene.id}:${seedLabel}`));
 
                         try {
                             initAudio(state, { audioContext: offlineCtx, enableWatchdog: false });
                             fillBuffers(state);
-                            const harmonySchedule = enabled.harmony
-                                ? analyzeNoteSchedule(state.harmony.buffer, sixteenth, renderLeadIn)
+                            const schedule = stem.schedule
+                                ? analyzeNoteSchedule(
+                                      collectScheduleBuffer(state, stem.schedule.modules),
+                                      sixteenth,
+                                      renderLeadIn,
+                                      stem.schedule.voiceLimit,
+                                  )
                                 : null;
 
                             for (let step = 0; step < state.arranger.totalSteps; step++) {
@@ -768,7 +825,7 @@ async function generateReport() {
                                 crestDb: toDb(peak) - toDb(rms),
                                 probes: computeSpectralProbes(mono, sampleRate),
                                 transients: computeTransientMetrics(mono, sampleRate),
-                                schedule: harmonySchedule,
+                                schedule,
                             };
                         } finally {
                             Math.random = originalRandom;
@@ -776,58 +833,37 @@ async function generateReport() {
                     }
 
                     const sceneReports = [];
-                    let seedBase = 1337;
 
                     for (const scene of scenes) {
-                        const stemsById = {};
+                        const seedReports = [];
 
-                        for (const stem of stems) {
-                            stemsById[stem.id] = await renderScene(scene, stem.enabled, seedBase++);
+                        for (const seed of seeds) {
+                            const stemsById = {};
+                            for (const stem of stems) {
+                                stemsById[stem.id] = await renderStem(scene, stem, seed);
+                            }
+
+                            seedReports.push({
+                                seed,
+                                stems: stemsById,
+                            });
                         }
 
                         sceneReports.push({
                             id: scene.id,
+                            label: scene.label || scene.id,
                             genreFeel: scene.genreFeel,
                             bpm: scene.bpm,
                             intensity: scene.intensity,
-                            stems: stemsById,
+                            source: scene.source || 'default',
+                            seeds: seedReports,
                         });
                     }
 
                     return sceneReports;
                 },
-                { scenes: SCENES, stems: STEMS },
+                { scenes, stems: MIX_REPORT_STEMS, seeds },
             );
-
-            console.log('\n=== Ensemble Mix Report ===');
-            for (const scene of report) {
-                console.log(
-                    `\n[${scene.id}] ${scene.genreFeel} @ ${scene.bpm} BPM | intensity ${scene.intensity}`,
-                );
-                console.table(
-                    Object.entries(scene.stems).map(([stemId, metrics]) => ({
-                        stem: stemId,
-                        peakDb: formatDb(metrics.peakDb),
-                        rmsDb: formatDb(metrics.rmsDb),
-                        crestDb: formatDb(metrics.crestDb),
-                        maxDelta: formatMetric(metrics.transients?.maxDelta || 0, 3),
-                        spikesPerSec: formatMetric(metrics.transients?.spikeRate || 0, 1),
-                        maxVoices: metrics.schedule?.maxSimultaneousVoices ?? '-',
-                        retriggers: metrics.schedule?.sameMidiOverlapCount ?? '-',
-                        steals: metrics.schedule?.voiceLimitPressureCount ?? '-',
-                        sub: metrics.probes.sub.toFixed(3),
-                        lowMid: metrics.probes.lowMid.toFixed(3),
-                        presence: metrics.probes.presence.toFixed(3),
-                        air: metrics.probes.air.toFixed(3),
-                        centroidHz: Math.round(metrics.probes.centroid),
-                    })),
-                );
-
-                const findings = summarizeFindings(scene);
-                if (findings.length > 0) {
-                    console.log(`Findings: ${findings.join('; ')}.`);
-                }
-            }
         } finally {
             await browser.close();
         }
@@ -844,7 +880,50 @@ async function generateReport() {
     }
 }
 
-generateReport().catch((error) => {
-    console.error('\nMix report failed:', error);
-    process.exitCode = 1;
-});
+export async function generateMixReport(argv = process.argv.slice(2)) {
+    const cliOptions = resolveMixReportCliOptions(argv);
+    const machineReadable = cliOptions.json || cliOptions.jsonl;
+    const log = machineReadable ? process.stderr : process.stdout;
+    const focusInput = await loadFocusInput(cliOptions.focusFrom, cliOptions.focusLimit);
+    const scenes = resolveScenes(cliOptions, focusInput);
+    const { seeds, source } = resolveSeeds(cliOptions, focusInput);
+
+    if (!cliOptions.noBuild) {
+        log.write('Building dist for mix analysis...\n');
+        await runCommand('npm', ['run', 'build:quiet'], {
+            forwardToStderr: machineReadable,
+        });
+    }
+
+    const sceneRuns = await renderSceneReports({ scenes, seeds });
+    const report = buildRenderedMixReport({
+        sceneRuns,
+        options: {
+            seeds,
+            sceneIds: scenes.map((scene) => scene.id),
+            focusFrom: cliOptions.focusFrom,
+            focusLimit: focusInput ? cliOptions.focusLimit : null,
+        },
+        source,
+    });
+
+    if (machineReadable) {
+        process.stdout.write(
+            `${formatRenderedMixReport(report, {
+                jsonl: cliOptions.jsonl,
+                pretty: cliOptions.pretty,
+            })}\n`,
+        );
+    } else {
+        printHumanMixReport(report);
+    }
+
+    return report;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    generateMixReport().catch((error) => {
+        console.error('\nMix report failed:', error);
+        process.exitCode = 1;
+    });
+}

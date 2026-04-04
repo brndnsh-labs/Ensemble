@@ -385,7 +385,15 @@ function finalizeHarmonyNotes(
     octave,
 ) {
     const { playback, harmony, groove, soloist, chords } = activeState;
-    const { duration, isLatched, isBloom, isResponse, isGhost, anchorMidi } = behavior;
+    const {
+        duration: baseDuration,
+        isLatched,
+        isBloom,
+        isResponse,
+        isGhost,
+        anchorMidi,
+    } = behavior;
+    let duration = baseDuration;
 
     /** @type {number[]} */
     let intervals = chord.intervals && chord.intervals.length > 0 ? chord.intervals : [0, 4, 7];
@@ -394,6 +402,7 @@ function finalizeHarmonyNotes(
     const isSoloistBusy =
         coordination.soloistBusy ||
         (soloist.enabled && (!soloist.isResting || soloist.notesInPhrase > 3));
+    const accompanimentCrowding = coordination.accompanimentHit && !isLatched && !isBloom;
 
     // --- VOICING REFINEMENT (Musical Taste) ---
     const reserveBassSpace = shouldReserveBassSpace(activeState);
@@ -479,10 +488,23 @@ function finalizeHarmonyNotes(
                 ? 1
                 : 2
             : null;
-    const densityCap =
-        tensionDensityCap === null ? maxDensity : Math.min(maxDensity, tensionDensityCap);
+    const accompanimentDensityCap =
+        accompanimentCrowding && !groundingRequired
+            ? playback.bandIntensity > 0.62 || feel === 'Jazz' || feel === 'Blues'
+                ? 1
+                : 2
+            : null;
+    const densityCap = [maxDensity, tensionDensityCap, accompanimentDensityCap]
+        .filter((cap) => Number.isFinite(cap))
+        .reduce((minCap, cap) => Math.min(minCap, /** @type {number} */ (cap)), maxDensity);
     if (targetIntervals.length > densityCap) {
         targetIntervals = targetIntervals.slice(0, densityCap);
+    }
+    if (accompanimentCrowding) {
+        duration = Math.max(
+            0.1,
+            duration * (playback.bandIntensity > 0.65 || feel === 'Jazz' ? 0.78 : 0.86),
+        );
     }
 
     // Spectral Gaps: Register Awareness
@@ -534,6 +556,9 @@ function finalizeHarmonyNotes(
         }
         if (isBloom || isLatched) {
             baseVol *= 1.8; // Boost highlights to clear test thresholds
+        }
+        if (accompanimentCrowding) {
+            baseVol *= 0.9;
         }
 
         const stagger = (i - (currentMidis.length - 1) / 2) * 0.005;

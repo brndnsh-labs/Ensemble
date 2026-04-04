@@ -25,6 +25,16 @@ function roundValue(value, digits = 3) {
     return Math.round(value * factor) / factor;
 }
 
+function slugifyValue(value) {
+    return (
+        String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'scene'
+    );
+}
+
 function standardDeviation(values) {
     if (values.length <= 1) {
         return 0;
@@ -123,6 +133,44 @@ function buildArrangementMetadata(arrangement) {
             label: section.label,
             measureStart: Math.floor(section.start / arrangement.stepsPerMeasure) + 1,
             measureEnd: Math.ceil(section.end / arrangement.stepsPerMeasure),
+        })),
+    };
+}
+
+export function buildEnsembleRenderScene({ options, profile, arrangementSpec }) {
+    const arrangementName = arrangementSpec?.name || options.arrangementName || 'arrangement';
+    const requestedGenre = profile?.genre || options.genre;
+    const feel = profile?.genreFeel || requestedGenre || 'Ensemble';
+
+    return {
+        id: `ensemble-${slugifyValue(requestedGenre)}-${slugifyValue(arrangementName)}`,
+        label: `${feel} ${arrangementName}`,
+        source: 'ensemble-audit',
+        genreFeel: feel,
+        requestedGenre,
+        drumPreset: profile?.drumPreset || null,
+        chordStyle: profile?.chordStyle || null,
+        bassStyle: profile?.bassStyle || null,
+        soloistStyle: profile?.soloistStyle || null,
+        harmonyStyle: profile?.harmonyStyle || null,
+        density: profile?.density || options.density || 'standard',
+        creativity: profile?.creativity ?? true,
+        includeBass: profile?.includeBass ?? true,
+        includeChords: profile?.includeChords ?? true,
+        includeSoloist: profile?.includeSoloist ?? true,
+        includeHarmony: profile?.includeHarmony ?? true,
+        includeDrums: profile?.includeDrums ?? true,
+        bpm: options.bpm,
+        intensity: options.intensity,
+        complexity: options.complexity ?? options.intensity,
+        key: options.key,
+        timeSignature: options.timeSignature,
+        sections: (arrangementSpec?.sections || []).map((section) => ({
+            ...section,
+            key: section.key || options.key,
+            isMinor: section.isMinor ?? arrangementSpec?.isMinor ?? false,
+            timeSignature:
+                section.timeSignature || arrangementSpec?.timeSignature || options.timeSignature,
         })),
     };
 }
@@ -298,7 +346,7 @@ export async function bootstrapEnsembleAudit({
         harmonyStyle,
     });
 
-    const { state, arrangement } = bootstrapChordAudit({
+    const { state, arrangement, spec } = bootstrapChordAudit({
         genre: profile.feel,
         bpm,
         intensity,
@@ -379,6 +427,7 @@ export async function bootstrapEnsembleAudit({
     return {
         state,
         arrangement,
+        arrangementSpec: spec,
         profile: {
             genre,
             genreFeel: profile.feel,
@@ -412,6 +461,7 @@ export async function bootstrapEnsembleAudit({
  *   includeSoloist?: boolean;
  *   includeHarmony?: boolean;
  *   includeDrums?: boolean;
+ *   renderScene?: any;
  * }} options
  */
 export function simulateEnsembleLoops({
@@ -425,6 +475,7 @@ export function simulateEnsembleLoops({
     includeSoloist = true,
     includeHarmony = true,
     includeDrums = true,
+    renderScene = null,
 }) {
     return withSeededRandom(seed, () => {
         const steps = [];
@@ -499,6 +550,7 @@ export function simulateEnsembleLoops({
             profile,
             seed,
             loops,
+            renderScene,
             steps,
         };
     });
@@ -783,6 +835,7 @@ export function buildEnsembleAuditReport({ captures, options, full = false }) {
         },
         profile: captures[0]?.profile || null,
         arrangement: captures[0] ? buildArrangementMetadata(captures[0].arrangement) : null,
+        renderScene: captures[0]?.renderScene || null,
         aggregate: buildEnsembleAggregateSummary(seedSummaries),
         seeds: seedSummaries,
         focusSeeds: buildFocusSeeds(seedSummaries),
@@ -879,6 +932,20 @@ export async function runEnsembleSweep({
                 includeSoloist,
                 includeHarmony,
                 includeDrums,
+                renderScene: buildEnsembleRenderScene({
+                    options: {
+                        genre,
+                        bpm,
+                        intensity,
+                        complexity,
+                        arrangementName,
+                        timeSignature,
+                        key,
+                        density,
+                    },
+                    profile: bootstrap.profile,
+                    arrangementSpec: bootstrap.arrangementSpec,
+                }),
             }),
         );
     }
@@ -903,6 +970,7 @@ export function formatEnsembleAuditOutput(report, options = {}) {
             options: report.options,
             profile: report.profile,
             arrangement: report.arrangement,
+            renderScene: report.renderScene,
             aggregate: report.aggregate,
         }),
     ];
@@ -913,6 +981,16 @@ export function formatEnsembleAuditOutput(report, options = {}) {
                 kind: 'seed',
                 reportType: report.reportType,
                 ...seedRow,
+            }),
+        );
+    });
+
+    report.focusSeeds.forEach((focusRow) => {
+        lines.push(
+            JSON.stringify({
+                kind: 'focus',
+                reportType: report.reportType,
+                ...focusRow,
             }),
         );
     });

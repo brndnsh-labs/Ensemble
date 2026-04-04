@@ -4,6 +4,7 @@ import { ACTIONS } from '../../public/types.js';
 import {
     bootstrapEnsembleAudit,
     buildEnsembleAuditReport,
+    buildEnsembleRenderScene,
     formatEnsembleAuditOutput,
     normalizeSeedList,
     runEnsembleSweep,
@@ -59,6 +60,13 @@ describe('Ensemble audit scripts', () => {
         expect(report.aggregate.bassStepsPerMeasure).toBeGreaterThan(0);
         expect(report.aggregate.chordStepsPerMeasure).toBeGreaterThan(0);
         expect(report.aggregate.soloistStepsPerMeasure).toBeGreaterThan(0);
+        expect(report.renderScene).toMatchObject({
+            source: 'ensemble-audit',
+            genreFeel: 'Jazz',
+            requestedGenre: 'Jazz',
+            drumPreset: 'Jazz',
+        });
+        expect(report.renderScene.sections[0]).toHaveProperty('value');
         expect(report.seeds[0].timingOffsetMs).toHaveProperty('drums');
         expect(report.seeds[0].maxPitchedVoices).toBeGreaterThan(0);
         expect(report.measures).toHaveLength(0);
@@ -82,6 +90,20 @@ describe('Ensemble audit scripts', () => {
             profile: bootstrap.profile,
             seed: 'FULL_MODE',
             loops: 1,
+            renderScene: buildEnsembleRenderScene({
+                options: {
+                    genre: 'Funk',
+                    bpm: 104,
+                    intensity: 0.74,
+                    complexity: 0.7,
+                    arrangementName: 'vamp',
+                    timeSignature: '4/4',
+                    key: 'E',
+                    density: 'standard',
+                },
+                profile: bootstrap.profile,
+                arrangementSpec: bootstrap.arrangementSpec,
+            }),
         });
         const report = buildEnsembleAuditReport({
             captures: [capture],
@@ -108,6 +130,12 @@ describe('Ensemble audit scripts', () => {
 
         expect(lines[0].kind).toBe('aggregate');
         expect(lines.some((line) => line.kind === 'seed')).toBe(true);
+        expect(lines.some((line) => line.kind === 'focus')).toBe(true);
         expect(lines.some((line) => line.kind === 'measure')).toBe(true);
+        expect(lines[0].renderScene).toMatchObject({
+            source: 'ensemble-audit',
+            genreFeel: 'Funk',
+            requestedGenre: 'Funk',
+        });
     });
 });

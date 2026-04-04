@@ -1434,7 +1434,7 @@ export function getAccompanimentNotes(
     // If backgrounds are busy, the main accompanist should find gaps.
     if (isHit && harmony.enabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {
         // Assume rhythmic mask maps up to 16 steps, gracefully wrap for different meters
-        const stepInMask = stepInfo.mStep % 16;
+        const stepInMask = (stepInfo?.mStep ?? measureStep) % 16;
         const hasHarmonyHit = (harmony.rhythmicMask >> stepInMask) & 1;
         if (hasHarmonyHit && Math.random() < 0.4 + playback.bandIntensity * 0.3) {
             // Background stab present, suppress piano hit to let it pop
@@ -1517,7 +1517,7 @@ export function getAccompanimentNotes(
         } else if (genre === 'Disco' || genre === 'Ska') {
             durationSteps = ts.stepsPerBeat * 0.25;
         } else if (genre === 'Jazz') {
-            durationSteps = ts.stepsPerBeat * 1;
+            durationSteps = isStructural ? ts.stepsPerBeat * 0.9 : ts.stepsPerBeat * 0.75;
         } else if (genre === 'Blues') {
             durationSteps =
                 intentHits >= Math.max(4, ts.beats)
@@ -1663,6 +1663,20 @@ export function getAccompanimentNotes(
                         getFrequency(chord.rootMidi + third),
                         getFrequency(chord.rootMidi + seventh),
                     ];
+                }
+            }
+            // DEFAULT JAZZ: Favor compact guide-tone / color voicings above the bass lane.
+            else if (!groundingRequired && genre === 'Jazz' && reserveBassSpace) {
+                const shouldLeanToShells =
+                    !isStructural && (useClarity || intensity > 0.58 || voicing.length > 4);
+                const targetJazzVoices = shouldLeanToShells ? 2 : 3;
+                const jazzMidis = selectSupportiveVoicing(
+                    getMidiVoicing(voicing),
+                    chord,
+                    targetJazzVoices,
+                );
+                if (jazzMidis.length >= targetJazzVoices) {
+                    voicing = jazzMidis.map((midi) => getFrequency(midi));
                 }
             }
 
