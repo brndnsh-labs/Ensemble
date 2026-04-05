@@ -177,6 +177,10 @@ function formatNoteToken(noteLike, stepInMeasure, stepsPerBeat) {
     if (noteLike.isAnchor) {
         tags.push('*');
     }
+    const tripletPlacement = noteLike.tripletPlacement || noteLike.seedNote?.tripletPlacement;
+    if (tripletPlacement) {
+        tags.push(tripletPlacement);
+    }
     if (noteLike.device) {
         tags.push(noteLike.device);
     }
@@ -308,6 +312,9 @@ export function buildPerformanceMetrics(capture, loop = 0) {
     const attacks = getLoopAttackEvents(capture, loop);
     const durations = attacks.map((event) => event.note.durationSteps || 1);
     const midis = attacks.map((event) => event.note.midi);
+    const tripletAttacks = attacks.filter(
+        (event) => event.note.tripletPlacement || event.seedNote?.tripletPlacement,
+    ).length;
     const intervals = [];
 
     for (let index = 1; index < attacks.length; index++) {
@@ -361,6 +368,7 @@ export function buildPerformanceMetrics(capture, loop = 0) {
               measureRows.length
             : 0,
         anchorExactRate: totalAnchors > 0 ? exactAnchors / totalAnchors : 1,
+        tripletAttackShare: attacks.length ? tripletAttacks / attacks.length : 0,
     };
 }
 
@@ -442,6 +450,7 @@ export function buildSeedSweepSummary(rows, focusCount = 5) {
             richContourShare: average(rows.map((row) => row.richContourShare)),
             stableCadenceShare: average(rows.map((row) => row.stableCadenceShare)),
             anchorExactRate: average(rows.map((row) => row.anchorExactRate)),
+            tripletAttackShare: average(rows.map((row) => row.tripletAttackShare || 0)),
         },
     };
 }
@@ -1159,6 +1168,7 @@ export function logSeedSweepSummary(summary) {
             'Attacks/M': row.notesPerMeasure.toFixed(2),
             '1-beat %': formatPercent(row.oneBeatShare),
             '<1 beat %': formatPercent(row.subBeatShare),
+            'Triplet %': formatPercent(row.tripletAttackShare || 0),
             'Step %': formatPercent(row.stepShare),
             'Skip %': formatPercent(row.skipShare),
             'Leap %': formatPercent(row.leapShare),
@@ -1174,6 +1184,7 @@ export function logSeedSweepSummary(summary) {
             'Attacks/M': summary.aggregate.notesPerMeasure.toFixed(2),
             '1-beat %': formatPercent(summary.aggregate.oneBeatShare),
             '<1 beat %': formatPercent(summary.aggregate.subBeatShare),
+            'Triplet %': formatPercent(summary.aggregate.tripletAttackShare || 0),
             '>1 beat %': formatPercent(summary.aggregate.longShare),
             'Avg interval': summary.aggregate.avgInterval.toFixed(2),
             'Step %': formatPercent(summary.aggregate.stepShare),
@@ -1194,6 +1205,7 @@ export function logSeedSweepSummary(summary) {
                 Seed: row.seed,
                 Score: row.monotonyScore.toFixed(3),
                 '1-beat %': formatPercent(row.oneBeatShare),
+                'Triplet %': formatPercent(row.tripletAttackShare || 0),
                 'Step %': formatPercent(row.stepShare),
                 'Leap %': formatPercent(row.leapShare),
                 'Rich contour %': formatPercent(row.richContourShare),

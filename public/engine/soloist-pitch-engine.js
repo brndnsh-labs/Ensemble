@@ -97,6 +97,8 @@ export function selectPitchAndDevices(
         ? Math.round(rhythmNode.targetMidi)
         : null;
     const seedNote = rhythmNode.seedNote || null;
+    const sessionSeed = soloistState.sessionSeed;
+    const loopCount = playback.currentLoopCount || 0;
     const soloistMode = resolveSoloistMode(soloistState.mode);
     const isGuitarMode = isSoloistGuitarMode(soloistMode);
     const isMonophonicMode = isSoloistMonophonicMode(soloistMode);
@@ -137,6 +139,23 @@ export function selectPitchAndDevices(
             durationSteps >= stepsPerBeat ||
             (seedNote?.durationSteps || 0) >= stepsPerBeat,
     );
+    const headMeasureHasTripletSeed = Boolean(
+        isHeadBypass &&
+            loopCount === 0 &&
+            sessionSeed?.notes?.some((note) => {
+                if (!note.tripletPlacement || sessionSeed.loopLengthSteps <= 0) {
+                    return false;
+                }
+                const stepInLoop =
+                    ((step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
+                    sessionSeed.loopLengthSteps;
+                const measureStart = stepInLoop - (stepInLoop % stepsPerMeasure);
+                const noteStep =
+                    ((note.step % sessionSeed.loopLengthSteps) + sessionSeed.loopLengthSteps) %
+                    sessionSeed.loopLengthSteps;
+                return noteStep >= measureStart && noteStep < measureStart + stepsPerMeasure;
+            }),
+    );
 
     // Helper to finalize note (formerly inline in getSoloistNote)
     const finalizeNote = (/** @type {any} */ res) => {
@@ -153,7 +172,8 @@ export function selectPitchAndDevices(
                 ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12; // @worker-mutation
         }
 
-        let timingOffset = calculateTimingOffset('soloist', groove.pocket, intensity);
+        let timingOffset = isHeadBypass ? seedNote?.timingOffset || 0 : 0;
+        timingOffset += calculateTimingOffset('soloist', groove.pocket, intensity);
 
         // --- Greats Profiles: Timing ---
         if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
@@ -190,6 +210,9 @@ export function selectPitchAndDevices(
         }
 
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
+        if (isHeadBypass && seedNote?.tripletPlacement && !primary.tripletPlacement) {
+            primary.tripletPlacement = seedNote.tripletPlacement;
+        }
 
         if (!primary.isDoubleStop) {
             soloistState.lastFreq = getFrequency(primary.midi); // @worker-mutation
@@ -589,8 +612,6 @@ export function selectPitchAndDevices(
         selectedMidi = lastMidi;
     }
 
-    const sessionSeed = soloistState.sessionSeed;
-    const loopCount = playback.currentLoopCount || 0;
     const canUseHeadGuitarSupport =
         isGuitarMode && isHeadBypass && seedNote?.supportHints?.guitar?.allowDoubleStop === true;
 
@@ -658,6 +679,7 @@ export function selectPitchAndDevices(
     if (
         activeStyle === 'blues' &&
         /** @type {any} */ (coordination).isTurnaround &&
+        !headMeasureHasTripletSeed &&
         Math.random() < 0.6
     ) {
         const res = applyDeviceBuffer('bluesTurnaround', deviceContextOptions);

@@ -1,5 +1,14 @@
 import { SMART_GENRES } from '../data/smart-genres.js';
 
+const DEFAULT_SEED_TRIPLETS = {
+    enabled: false,
+    cellBias: 0,
+    pickupBias: 0,
+    mutationBias: 0,
+    cadenceBias: 0,
+    timingStrength: 0,
+};
+
 const DEFAULT_STYLE_CONFIG = {
     genreGravityOffset: 0,
     restBase: 0.1,
@@ -21,6 +30,7 @@ const DEFAULT_STYLE_CONFIG = {
     syncopationLikelihood: 0.2,
     targetAnchoring: 0.8,
     chromaticism: 0.1,
+    seedTriplets: DEFAULT_SEED_TRIPLETS,
     contourSkeletons: [
         [
             {
@@ -204,6 +214,14 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.9,
         chromaticism: 0.6,
+        seedTriplets: {
+            enabled: true,
+            cellBias: 0.72,
+            pickupBias: 0.84,
+            mutationBias: 0.58,
+            cadenceBias: 0.48,
+            timingStrength: 1.0,
+        },
         contourSkeletons: [
             [
                 {
@@ -501,6 +519,14 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.85,
         targetAnchoring: 0.5,
         chromaticism: 0.7,
+        seedTriplets: {
+            enabled: true,
+            cellBias: 0.56,
+            pickupBias: 0.62,
+            mutationBias: 0.36,
+            cadenceBias: 0.28,
+            timingStrength: 0.78,
+        },
         contourSkeletons: [
             [
                 {
@@ -557,6 +583,14 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.7,
         targetAnchoring: 0.3,
         chromaticism: 0.9,
+        seedTriplets: {
+            enabled: true,
+            cellBias: 0.68,
+            pickupBias: 0.74,
+            mutationBias: 0.44,
+            cadenceBias: 0.24,
+            timingStrength: 0.82,
+        },
         contourSkeletons: [
             [
                 {
@@ -1043,9 +1077,14 @@ const STYLE_OVERRIDES = {
 
 export const STYLE_CONFIG = /** @type {any} */ (
     Object.keys(STYLE_OVERRIDES).reduce((acc, key) => {
+        const styleOverride = /** @type {any} */ (STYLE_OVERRIDES)[key];
         /** @type {any} */ (acc)[key] = {
             ...DEFAULT_STYLE_CONFIG,
-            .../** @type {any} */ (STYLE_OVERRIDES)[key],
+            ...styleOverride,
+            seedTriplets: {
+                ...DEFAULT_SEED_TRIPLETS,
+                ...(styleOverride.seedTriplets || {}),
+            },
         };
         return acc;
     }, {})

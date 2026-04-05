@@ -4,7 +4,7 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 Open work items:
 - Audio identity refresh
-- Dynamic Head simplification
+- Dynamic Head triplet support
 
 ## 1. Resolution balance fix
 
@@ -37,11 +37,12 @@ Open work items:
 - Remaining: add new soloist sounds, then revisit chords/bass/harmony synthesis only if the next audit turns up a new outlier.
 - Current audit note: keep using the existing rendered/symbolic audit flow for any follow-up tuning instead of reopening the global default-mix sweep.
 
-## 5. Dynamic Head simplification
+## 5. Dynamic Head triplet support
 
-- Status: Open
-- Remaining: simplify the session seed / Dynamic Head logic.
-- Constraint: prefer smaller helpers and clearer flow over more branching, while preserving the seeded head behavior.
+- Status: Active
+- Completed so far: style-gated triplet seed vocabulary, seed timing carry-through, and triplet audit visibility now let Jazz/Bird and Blues 4/4 heads speak in ternary motion without changing the global scheduler grid.
+- Remaining: extend later-loop improvisation so it answers triplet heads more conversationally, then consider softer laid-back timing passes for Neo-Soul and Bossa as a separate feel pass.
+- Constraint: keep triplet motion vocal and seeded, without blurring Rock or collapsing compound meters into simple-meter triplet tagging.
 
 ## 6. Progression library discovery
 
@@ -65,5 +66,5 @@ Open work items:
 
 ## Notes
 
-- The Dynamic Head refactor is the riskiest item because it is tightly coupled to seeded playback and export behavior.
+- Dynamic Head rhythm work is still the riskiest item because it is tightly coupled to seeded playback and export behavior.
 - Audio synthesis changes should be checked against both live playback and export output.

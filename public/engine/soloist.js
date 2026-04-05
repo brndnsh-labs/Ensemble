@@ -129,6 +129,37 @@ export function getSoloistNote(
               return wrappedNoteStep === stepInLoop;
           })
         : [];
+    /**
+     * @param {number} currentSeedStep
+     * @returns {{ gap: number, nextSeedNote: any }}
+     */
+    const getNextSeedStepInfo = (currentSeedStep) => {
+        if (!headSessionSeed?.notes?.length) {
+            return {
+                gap: Number.POSITIVE_INFINITY,
+                nextSeedNote: null,
+            };
+        }
+
+        const loopLength = headSessionSeed.loopLengthSteps;
+        const normalizedCurrent = ((currentSeedStep % loopLength) + loopLength) % loopLength;
+        let minGap = loopLength;
+        let nextSeedNote = null;
+
+        for (const seedNote of headSessionSeed.notes) {
+            const normalizedStep = ((seedNote.step % loopLength) + loopLength) % loopLength;
+            let diff = normalizedStep - normalizedCurrent;
+            if (diff <= 0) {
+                diff += loopLength;
+            }
+            if (diff < minGap) {
+                minGap = diff;
+                nextSeedNote = seedNote;
+            }
+        }
+
+        return { gap: minGap, nextSeedNote };
+    };
 
     // We only force strict head playback on loop 0, AND if there is actually a seed to play.
     const isStrictHeadPlayback = loopCount === 0 && hasSessionSeed;
@@ -342,7 +373,16 @@ export function getSoloistNote(
             if (Math.random() < survivalProb) {
                 // Duration protection: Mark soloist as busy for the duration of the note minus 1.
                 // This ensures we hold the note but don't block the immediately adjacent step.
-                soloist.busySteps = Math.max(0, Math.ceil(headNote.durationSteps || 1) - 1); // @worker-mutation
+                const durationBusySteps = Math.max(0, Math.ceil(headNote.durationSteps || 1) - 1);
+                const nextSeedInfo = getNextSeedStepInfo(headNote.step);
+                const shouldCapBusyToSpacing = Boolean(
+                    headNote.tripletPlacement || nextSeedInfo.nextSeedNote?.tripletPlacement,
+                );
+                const spacingBusySteps =
+                    shouldCapBusyToSpacing && Number.isFinite(nextSeedInfo.gap)
+                        ? Math.max(0, nextSeedInfo.gap - 1)
+                        : durationBusySteps;
+                soloist.busySteps = Math.min(durationBusySteps, spacingBusySteps); // @worker-mutation
 
                 logDebug(
                     `[Head/Themed Performance] Playing seeded note: MIDI ${headNote.midi}. (Prob: ${survivalProb.toFixed(2)}, isAnchor: ${headNote.isAnchor})`,

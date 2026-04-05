@@ -135,4 +135,41 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         expect(args[9].deviceBuffer.length).toBeGreaterThan(0);
         randomSpy.mockRestore();
     });
+
+    it('should preserve triplet timing metadata on head-bypass notes', () => {
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        args[0] = 12;
+        args[1] = {
+            velocity: 0.8,
+            durationSteps: 2,
+            isStrongBeat: true,
+            isHeadBypass: true,
+            targetMidi: 67,
+            seedNote: {
+                midi: 67,
+                durationSteps: 2,
+                isAnchor: false,
+                timingOffset: 0.021,
+                tripletPlacement: 't1',
+            },
+        };
+        args[4] = 'scalar';
+        args[5] = 1;
+        args[8] = { currentLoopCount: 0 };
+        args[9] = {
+            mode: 'monophonic',
+            tension: 0.5,
+            lastMidiPlayed: 65,
+            deviceBuffer: [],
+        };
+        args[10] = { pocket: null };
+
+        const result = selectPitchAndDevices(getState(), ...args);
+
+        expect(result).toBeDefined();
+        expect(result.tripletPlacement).toBe('t1');
+        expect(result.timingOffset).toBeCloseTo(0.021, 6);
+        randomSpy.mockRestore();
+    });
 });

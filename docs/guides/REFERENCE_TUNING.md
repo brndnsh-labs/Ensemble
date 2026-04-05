@@ -187,6 +187,14 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** In the live Jazz focus rerender, full-mix RMS and drum presence stayed flat (`-28.26 -> -28.25`, `0.0339 -> 0.0339`) while the chord-over-harmony RMS gap widened (`-6.41 dB -> -7.31 dB`). Funk also kept its full mix flat while reducing the harmony-over-chords RMS gap (`4.32 dB -> 3.43 dB`), and the representative five-genre sweep stayed within the existing loudness envelope.
     - **Verification:** Targeted engine-bus / export / mix-integrity checks, Jazz harmony critique, and representative rendered rerenders passed before the final repo validation sweep.
 
+### [Date: 2026-04-05] (Dynamic Head Triplet Support)
+- **Status:** Dynamic Head phrasing expansion.
+- **Action:**
+    - **Seeder/playback:** Added style-gated triplet cadence cells plus seed-authored `timingOffset` / `tripletPlacement` carry-through so Jazz/Bird and Blues heads can phrase true 4/4 triplets without rewriting the scheduler grid.
+    - **Blues guardrail:** Suppressed loop-0 `bluesTurnaround` devices when the authored head measure already contains triplet material, letting the written cadence speak before later-loop embellishment takes over.
+    - **Audit result:** Fixed-seed sweeps now show audible triplet motion in 4/4 hooks (Jazz/Bird ~7% aggregate triplet attacks, Blues ~5%) while Rock stays at 0% and Blues 6/8 remains untagged.
+    - **Verification:** Focused soloist hook/time-signature/unit/critique coverage and full `npm run validate` passed during the triplet pass.
+
 ---
 
 ## Intensity-Aware Mixing Rules

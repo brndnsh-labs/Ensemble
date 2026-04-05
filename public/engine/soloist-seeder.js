@@ -31,6 +31,17 @@ const RH_CELLS = {
         [0.5, 1, 1.5, 2.5, 3, 3.5], // Pickup-leaning line
         [0, 1, 1.5, 2, 2.5, 3, 3.5], // Hooky quarter + 8th tail
     ],
+    TRIPLET: [
+        [0, 2 / 3, 4 / 3, 2, 8 / 3, 10 / 3], // Rolling 8th-note triplets
+        [0, 1 / 3, 2 / 3, 2, 7 / 3, 8 / 3], // Downbeat burst with a later answer
+        [0, 1, 5 / 3, 7 / 3, 3], // Anchor + triplet tail
+        [1 / 3, 1, 5 / 3, 7 / 3, 3, 11 / 3], // Late-start triplet line
+    ],
+    TRIPLET_TAIL: [
+        [0, 1, 2, 3, 10 / 3, 11 / 3], // Quarter-note frame with a beat-4 triplet turn
+        [0, 1, 2, 8 / 3, 10 / 3, 11 / 3], // Pickup into the final triplet burst
+        [0, 1, 5 / 3, 7 / 3, 3, 10 / 3, 11 / 3], // Mid-bar lift into a closing triplet tail
+    ],
     // 3/4 Cells
     WALTZ: [
         [0, 1, 2], // Straight
@@ -92,6 +103,8 @@ const PICKUP_DICTIONARY = {
  * @property {boolean} isAnchor - True if it's a structural anchor (downbeat / phrase start).
  * @property {number} durationSteps - Suggested duration in steps.
  * @property {number} velocity - Suggested velocity (0.0 - 1.0).
+ * @property {number} [timingOffset] - Optional micro-timing offset in seconds for off-grid phrasing.
+ * @property {'t1' | 't2'} [tripletPlacement] - Optional triplet slot tag for audits and playback.
  * @property {SeedSupportHints} [supportHints] - Optional accompaniment hints that keep the melody primary.
  */
 
@@ -127,6 +140,94 @@ const PICKUP_DICTIONARY = {
  */
 function normalizeInterval(interval) {
     return ((interval % 12) + 12) % 12;
+}
+
+const TRIPLET_POSITION_TOLERANCE = 0.05;
+
+/**
+ * @param {number} value
+ * @returns {number}
+ */
+function roundSeedRhythmValue(value) {
+    return Math.round(value * 1000) / 1000;
+}
+
+/**
+ * @param {number} beatOffset
+ * @returns {'t1' | 't2' | undefined}
+ */
+function getTripletPlacementTag(beatOffset) {
+    const beatFraction = ((beatOffset % 1) + 1) % 1;
+    if (Math.abs(beatFraction - 1 / 3) <= TRIPLET_POSITION_TOLERANCE) {
+        return 't1';
+    }
+    if (Math.abs(beatFraction - 2 / 3) <= TRIPLET_POSITION_TOLERANCE) {
+        return 't2';
+    }
+    return undefined;
+}
+
+/**
+ * @param {number} beatOffset
+ * @param {number} stepsPerBeat
+ * @param {number} bpm
+ * @param {number} timingStrength
+ * @returns {{ stepOffset: number, timingOffset: number, tripletPlacement: 't1' | 't2' | undefined }}
+ */
+function buildSeedTimingPlacement(beatOffset, stepsPerBeat, bpm, timingStrength) {
+    const rawStep = beatOffset * stepsPerBeat;
+    const stepOffset = Math.round(rawStep);
+    const tripletPlacement = getTripletPlacementTag(beatOffset);
+
+    if (!tripletPlacement || timingStrength <= 0) {
+        return { stepOffset, timingOffset: 0, tripletPlacement: undefined };
+    }
+
+    const secondsPerStep = 60 / Math.max(40, bpm || 100) / stepsPerBeat;
+    const timingOffset = roundSeedRhythmValue(
+        (rawStep - stepOffset) * secondsPerStep * timingStrength,
+    );
+    return { stepOffset, timingOffset, tripletPlacement };
+}
+
+/**
+ * @template T
+ * @param {T[]} pool
+ * @param {number} repeats
+ * @returns {T[]}
+ */
+function repeatCellPool(pool, repeats) {
+    /** @type {T[]} */
+    const repeated = [];
+    for (let i = 0; i < repeats; i++) {
+        repeated.push(...pool);
+    }
+    return repeated;
+}
+
+/**
+ * @param {number[]} pattern
+ * @param {number} beatsPerCell
+ * @param {number} stepsPerBeat
+ * @returns {MotifCellNote[]}
+ */
+function buildPatternCell(pattern, beatsPerCell, stepsPerBeat) {
+    return pattern.map((beatOffset, idx) => {
+        const nextOffset = pattern[idx + 1] ?? beatsPerCell;
+        return {
+            beatOffset,
+            duration: (nextOffset - beatOffset) * stepsPerBeat,
+            isRest: false,
+        };
+    });
+}
+
+/**
+ * @param {SeedNote | undefined | null} note
+ * @returns {boolean}
+ */
+function isTripletSeedNote(note) {
+    return Boolean(note?.tripletPlacement);
 }
 
 /**
@@ -213,6 +314,8 @@ function buildSeedSupportHints(options) {
  *   isAnchor: boolean,
  *   durationSteps: number,
  *   velocity: number,
+ *   timingOffset?: number,
+ *   tripletPlacement?: 't1' | 't2',
  *   isPickup?: boolean,
  *   stepsPerMeasure: number,
  *   stepsPerBeat: number,
@@ -227,12 +330,15 @@ function createSeedNote(options) {
         isAnchor,
         durationSteps,
         velocity,
+        timingOffset = 0,
+        tripletPlacement = undefined,
         isPickup = false,
         stepsPerMeasure,
         stepsPerBeat,
     } = options;
 
-    return {
+    /** @type {SeedNote} */
+    const note = {
         step,
         midi,
         isAnchor,
@@ -248,6 +354,15 @@ function createSeedNote(options) {
             stepsPerBeat,
         }),
     };
+
+    if (timingOffset) {
+        note.timingOffset = timingOffset;
+    }
+    if (tripletPlacement) {
+        note.tripletPlacement = tripletPlacement;
+    }
+
+    return note;
 }
 
 /**
@@ -541,6 +656,17 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
+    const styleConfig = /** @type {any} */ (STYLE_CONFIG[style] || STYLE_CONFIG.scalar);
+    const tripletProfile = styleConfig.seedTriplets || {};
+    const tripletEnabled = Boolean(
+        tripletProfile.enabled && !tsConfig.isCompound && tsConfig.beats === 4 && stepsPerBeat >= 4,
+    );
+    const tripletCellBias = tripletEnabled ? tripletProfile.cellBias || 0 : 0;
+    const tripletPickupBias = tripletEnabled ? tripletProfile.pickupBias || 0 : 0;
+    const tripletMutationBias = tripletEnabled ? tripletProfile.mutationBias || 0 : 0;
+    const tripletCadenceBias = tripletEnabled ? tripletProfile.cadenceBias || 0 : 0;
+    const tripletTimingStrength = tripletEnabled ? tripletProfile.timingStrength || 0 : 0;
+    const playbackBpm = state?.playback?.bpm || 100;
 
     /** @type {SeedNote[]} */
     const notes = [];
@@ -591,7 +717,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         const iteration = sectionIterationCount.get(category) || 0;
         sectionIterationCount.set(category, iteration + 1);
 
-        const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+        const config = styleConfig;
         const registerProfile = getSoloistRegisterProfile(style);
         const rhythmicDensity = config.rhythmicDensity || 0.5;
         const syncBias = config.syncopationLikelihood || 0.2;
@@ -716,6 +842,24 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             : [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
                 } else if (density > 0.7 || dense || prng() < 0.3) {
                     pool = [...RH_CELLS.BASIC, ...RH_CELLS.SYNC];
+                }
+
+                if (tripletEnabled) {
+                    const tripletChance = Math.min(
+                        0.95,
+                        tripletCellBias +
+                            syncBias * 0.12 +
+                            (dense ? 0.12 : 0) +
+                            (density > 0.6 ? 0.08 : 0) +
+                            tripletCadenceBias * 0.08,
+                    );
+                    if (prng() < tripletChance) {
+                        const repeats = Math.max(
+                            1,
+                            Math.round(1 + tripletCellBias * 4 + tripletCadenceBias * 2),
+                        );
+                        pool = [...pool, ...repeatCellPool(RH_CELLS.TRIPLET, repeats)];
+                    }
                 }
 
                 const selectedPattern = pool[Math.floor(prng() * pool.length)];
@@ -972,6 +1116,46 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     }
                 }
 
+                const isPhraseEndingMeasure = measure === phraseLength - 1;
+                const hasTripletOffsets = currentCell.some((note) =>
+                    Boolean(getTripletPlacementTag(note.beatOffset)),
+                );
+                if (
+                    tripletEnabled &&
+                    !isStationaryMotif &&
+                    !forceSparse &&
+                    cellType !== 'Rest' &&
+                    isPhraseEndingMeasure &&
+                    !hasTripletOffsets
+                ) {
+                    const cadenceTripletChance = Math.min(
+                        0.88,
+                        0.18 +
+                            tripletCadenceBias * 0.42 +
+                            tripletCellBias * 0.2 +
+                            (forceDense || statementDensity > 0.68 ? 0.06 : 0) +
+                            (contourType === 'HOOK' || contourType === 'ARPEGGIATE' ? 0.08 : 0),
+                    );
+                    if (prng() < cadenceTripletChance) {
+                        const cadencePool =
+                            contourType === 'HOOK' || contourType === 'ARPEGGIATE'
+                                ? [
+                                      ...RH_CELLS.TRIPLET_TAIL,
+                                      RH_CELLS.TRIPLET[2],
+                                      RH_CELLS.TRIPLET[3],
+                                  ]
+                                : [...RH_CELLS.TRIPLET_TAIL, ...RH_CELLS.TRIPLET];
+                        const cadencePattern =
+                            cadencePool[Math.floor(prng() * cadencePool.length)] ||
+                            RH_CELLS.TRIPLET_TAIL[0];
+                        currentCell = buildPatternCell(
+                            cadencePattern,
+                            tsConfig.beats,
+                            stepsPerBeat,
+                        );
+                    }
+                }
+
                 // --- Melodic Sequencing Logic ---
                 // If we've seen this cell type before, reuse its relative intervals (offsets)
                 const previousOffsets = cellMemory.get(cellType);
@@ -1190,7 +1374,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const r = prng();
             if (r < 0.2) {
                 // Enhanced Rhythmic Displacement: Shift motif by 16th, 8th, or anticipate
-                const shiftAmount = prng() > 0.5 ? 0.5 : prng() > 0.5 ? 0.25 : -0.5;
+                const shiftAmount =
+                    tripletEnabled && prng() < tripletMutationBias
+                        ? prng() > 0.5
+                            ? 1 / 3
+                            : -1 / 3
+                        : prng() > 0.5
+                          ? 0.5
+                          : prng() > 0.5
+                            ? 0.25
+                            : -0.5;
                 motif.forEach((n) => {
                     n.beatOffset += shiftAmount;
                 });
@@ -1199,12 +1392,23 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 const longNotes = motif.filter((n) => n.duration >= stepsPerBeat && !n.isRest);
                 if (longNotes.length > 0) {
                     const target = longNotes[Math.floor(prng() * longNotes.length)];
-                    const halfDur = target.duration / 2;
-                    target.duration = halfDur;
+                    const originalDuration = target.duration;
+                    const useTripletSplit =
+                        tripletEnabled &&
+                        prng() < tripletMutationBias &&
+                        originalDuration >= stepsPerBeat * 1.5;
+                    const firstDuration = useTripletSplit
+                        ? roundSeedRhythmValue(originalDuration / 3)
+                        : originalDuration / 2;
+                    const secondDuration = roundSeedRhythmValue(originalDuration - firstDuration);
+                    target.duration = firstDuration;
                     // Insert the second note
                     const newNote = {
                         ...target,
-                        beatOffset: target.beatOffset + halfDur / stepsPerBeat,
+                        beatOffset: roundSeedRhythmValue(
+                            target.beatOffset + firstDuration / stepsPerBeat,
+                        ),
+                        duration: secondDuration,
                         scaleDegreeOffset: target.scaleDegreeOffset + (prng() > 0.5 ? 1 : -1),
                     };
                     const idx = motif.indexOf(target);
@@ -1335,11 +1539,22 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // --- Sectional Entrance (Anacrusis) ---
                 // Only trigger at the start of a structural block (and avoid sparse sections)
                 if (prng() > 0.3 && !isStationaryMotif) {
-                    const pickupValues = Object.values(PICKUP_DICTIONARY);
-                    const pickupKeys = Object.keys(PICKUP_DICTIONARY);
-                    const pIdx = Math.floor(prng() * pickupValues.length);
-                    const pPattern = pickupValues[pIdx];
-                    const pKey = pickupKeys[pIdx];
+                    /** @type {Array<[string, number[]]>} */
+                    const pickupEntries = Object.entries(PICKUP_DICTIONARY);
+                    if (tripletEnabled) {
+                        /** @type {Array<[string, number[]]>} */
+                        const tripletPickupEntries = [
+                            ['TRIPLET_RUN', PICKUP_DICTIONARY.TRIPLET_RUN],
+                        ];
+                        pickupEntries.push(
+                            ...repeatCellPool(
+                                tripletPickupEntries,
+                                Math.max(1, Math.round(1 + tripletPickupBias * 4)),
+                            ),
+                        );
+                    }
+                    const [pKey, pPattern] =
+                        pickupEntries[Math.floor(prng() * pickupEntries.length)] || [];
 
                     // Find the target degree we are leading into
                     const firstNote = activeMotif.find((n) => !n.isRest && n.beatOffset >= 0);
@@ -1427,7 +1642,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     return;
                 }
 
-                const exactStep = baseStep + Math.round(motifNote.beatOffset * stepsPerBeat);
+                const timingPlacement = buildSeedTimingPlacement(
+                    motifNote.beatOffset,
+                    stepsPerBeat,
+                    playbackBpm,
+                    tripletTimingStrength,
+                );
+                const exactStep = baseStep + timingPlacement.stepOffset;
 
                 // Wrap the step for the chord lookup so pick-ups to measure 0 look at the end of the song
                 let lookupStep = exactStep;
@@ -1648,9 +1869,13 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 prevScalePitches = currentScalePitches;
 
                 // Adjust duration if it overlaps with the next section or end of song
-                let duration = Math.round(motifNote.duration);
+                const hasFractionalDuration =
+                    Math.abs(motifNote.duration - Math.round(motifNote.duration)) > 0.05;
+                let duration = hasFractionalDuration
+                    ? roundSeedRhythmValue(motifNote.duration)
+                    : Math.round(motifNote.duration);
                 if (exactStep + duration > actualTotalSteps) {
-                    duration = actualTotalSteps - exactStep;
+                    duration = roundSeedRhythmValue(actualTotalSteps - exactStep);
                 }
 
                 // Prevent multiple notes from stacking exactly on the same step (causes polyphony/choking bugs)
@@ -1665,6 +1890,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             isAnchor: true,
                             durationSteps: duration,
                             velocity: 0.9,
+                            timingOffset: timingPlacement.timingOffset,
+                            tripletPlacement: timingPlacement.tripletPlacement,
                             isPickup: Boolean(motifNote.isPickup),
                             stepsPerMeasure,
                             stepsPerBeat,
@@ -1679,6 +1906,8 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                             isAnchor: motifNote.beatOffset === 0,
                             durationSteps: duration,
                             velocity: motifNote.beatOffset === 0 ? 0.9 : 0.75,
+                            timingOffset: timingPlacement.timingOffset,
+                            tripletPlacement: timingPlacement.tripletPlacement,
                             isPickup: Boolean(motifNote.isPickup),
                             stepsPerMeasure,
                             stepsPerBeat,
@@ -1703,6 +1932,12 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     for (let i = 0; i < notes.length; i++) {
         const currentNote = notes[i];
         const nextNote = notes[i + 1];
+        const tripletProtected =
+            isTripletSeedNote(currentNote) ||
+            isTripletSeedNote(nextNote) ||
+            Math.abs(
+                (currentNote.durationSteps || 0) - Math.round(currentNote.durationSteps || 0),
+            ) > 0.05;
 
         // We only apply flair probabilistically
         if (prng() < flairProb) {
@@ -1711,7 +1946,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
             // Device 1: Syllable Splits (Repeated Notes)
             // Break up long sustained notes into two notes of the same pitch
-            if (!mutationApplied && currentNote.durationSteps >= stepsPerBeat * 2) {
+            if (
+                !mutationApplied &&
+                !tripletProtected &&
+                currentNote.durationSteps >= stepsPerBeat * 2
+            ) {
                 if (r < 0.4) {
                     // Split a long note into a dotted-quarter and an eighth (or similar based on meter)
                     const splitPoint = stepsPerBeat * 1.5;
@@ -1775,6 +2014,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             // This keeps high-sync heads from defaulting to too many square quarter-note attacks.
             if (
                 !mutationApplied &&
+                !tripletProtected &&
                 subdivisionProb > 0 &&
                 currentNote.durationSteps === stepsPerBeat &&
                 stepsPerBeat >= 2
@@ -1816,7 +2056,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
             // Device 2: Syncopated Anticipations (Pushes)
             // If the note lands squarely on a beat, push it early by half a beat and tie it
-            if (!mutationApplied && currentNote.step % stepsPerBeat === 0) {
+            if (!mutationApplied && !tripletProtected && currentNote.step % stepsPerBeat === 0) {
                 // Only push if there's room before this note (i.e. it doesn't overlap the previous note)
                 const prevNote = processedNotes[processedNotes.length - 1];
                 const shiftAmount = stepsPerBeat * 0.5; // eighth note push
@@ -1923,7 +2163,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
     // Reinforce sparse late-entry statement bars with a lead-in attack so
     // non-jazz heads speak earlier in the measure instead of waiting until beat 4.
-    if (!['jazz', 'bird', 'bossa'].includes(style)) {
+    if (!['jazz', 'bird', 'bossa'].includes(style) && !tripletEnabled) {
         /** @type {SeedNote[]} */
         const reinforcedNotes = [];
         const sortedSeedNotes = [...processedNotes].sort((a, b) => a.step - b.step);
