@@ -4,7 +4,7 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 Open work items:
 - Audio identity refresh
-- Dynamic Head triplet support
+- Dynamic Head follow-through
 
 ## 1. Resolution balance fix
 
@@ -37,12 +37,12 @@ Open work items:
 - Remaining: add new soloist sounds, then revisit chords/bass/harmony synthesis only if the next audit turns up a new outlier.
 - Current audit note: keep using the existing rendered/symbolic audit flow for any follow-up tuning instead of reopening the global default-mix sweep.
 
-## 5. Dynamic Head triplet support
+## 5. Dynamic Head follow-through
 
 - Status: Active
-- Completed so far: style-gated triplet seed vocabulary, seed timing carry-through, and triplet audit visibility now let Jazz/Bird and Blues 4/4 heads speak in ternary motion without changing the global scheduler grid.
-- Remaining: extend later-loop improvisation so it answers triplet heads more conversationally, then consider softer laid-back timing passes for Neo-Soul and Bossa as a separate feel pass.
-- Constraint: keep triplet motion vocal and seeded, without blurring Rock or collapsing compound meters into simple-meter triplet tagging.
+- Completed so far: style-gated triplet seed vocabulary, seed timing carry-through, later-loop motivic-response memory, and response-aware head-bypass guidance now let Jazz/Bird and Blues 4/4 heads speak in ternary motion and answer themselves more conversationally without changing the global scheduler grid.
+- Remaining: add longer-range phrase recall across repeated sections, then consider softer laid-back response passes for Neo-Soul and Bossa instead of pushing the hook-focused paraphrase engine harder.
+- Constraint: keep the soloist sounding like a musical conversation rather than a copied pattern, without blurring Rock or collapsing compound meters into simple-meter triplet tagging.
 
 ## 6. Progression library discovery
 
@@ -66,5 +66,5 @@ Open work items:
 
 ## Notes
 
-- Dynamic Head rhythm work is still the riskiest item because it is tightly coupled to seeded playback and export behavior.
+- Dynamic Head follow-through work is still the riskiest item because it is tightly coupled to seeded playback and export behavior.
 - Audio synthesis changes should be checked against both live playback and export output.

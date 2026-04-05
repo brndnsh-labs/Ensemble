@@ -195,6 +195,15 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** Fixed-seed sweeps now show audible triplet motion in 4/4 hooks (Jazz/Bird ~7% aggregate triplet attacks, Blues ~5%) while Rock stays at 0% and Blues 6/8 remains untagged.
     - **Verification:** Focused soloist hook/time-signature/unit/critique coverage and full `npm run validate` passed during the triplet pass.
 
+### [Date: 2026-04-05] (Dynamic Head Motivic Response)
+- **Status:** Later-loop response shaping.
+- **Action:**
+    - **Phrase memory:** Expanded `phraseContext` into a compact motivic-response seam that stores phrase signatures, response mode, anchor/cadence pitch classes, and triplet/timing carry from what actually sounded.
+    - **Runtime guidance:** Reworked later-loop rhythm answers around transform-based paraphrase/development plans and pushed the same response hints through later-loop head-bypass notes, so loop-1 paraphrases stay tied to the head instead of getting overwritten by generic device logic.
+    - **Blues/Jazz guardrail:** Response-guided later-loop head moments now damp device use and suppress turnaround-heavy rewrites when the phrase should still read as a paraphrase.
+    - **Audit result:** Fixed-seed hook sweeps now show measurable loop-to-loop reuse instead of loop-0-only reporting: Jazz holds ~68% loop-1 rhythm reuse / ~65% later-loop cadence stability, Blues keeps ~54% loop-1 rhythm reuse with ~75% loop-1 anchor exactness, Rock stays hook-forward at ~71% loop-1 rhythm reuse with 0% triplet carry, and Neo-Soul remains softer at ~44% loop-1 rhythm reuse.
+    - **Verification:** New motivic-response integration coverage plus focused soloist unit suites and full `npm run validate` passed after the pass stabilized.
+
 ---
 
 ## Intensity-Aware Mixing Rules

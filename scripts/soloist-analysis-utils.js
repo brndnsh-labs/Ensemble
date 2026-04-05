@@ -372,6 +372,131 @@ export function buildPerformanceMetrics(capture, loop = 0) {
     };
 }
 
+function getResponseAttackTokens(events) {
+    const tokens = [];
+    const seen = new Set();
+    for (const event of events) {
+        const tripletPlacement =
+            event.note.tripletPlacement || event.seedNote?.tripletPlacement || '-';
+        const token = `${event.stepInMeasure}:${tripletPlacement}`;
+        if (seen.has(token)) {
+            continue;
+        }
+        seen.add(token);
+        tokens.push(token);
+    }
+    return tokens;
+}
+
+function getContourFamily(contour) {
+    if (contour === 'rest') {
+        return 'rest';
+    }
+    if (contour === 'ascend') {
+        return 'rise';
+    }
+    if (contour === 'descend') {
+        return 'fall';
+    }
+    if (['arch', 'valley', 'mixed'].includes(contour)) {
+        return 'shaped';
+    }
+    return contour;
+}
+
+function getContourEchoScore(sourceContour, targetContour) {
+    if (sourceContour === targetContour) {
+        return 1;
+    }
+    return getContourFamily(sourceContour) === getContourFamily(targetContour) ? 0.55 : 0;
+}
+
+export function buildLoopResponseMetrics(capture, sourceLoop = 0, targetLoop = 1) {
+    const sourceRows = buildMeasureAudit(capture, sourceLoop);
+    const targetRows = buildMeasureAudit(capture, targetLoop);
+    const rhythmScores = [];
+    const contourScores = [];
+    const cadenceScores = [];
+    const tripletScores = [];
+    const targetPerformance = buildPerformanceMetrics(capture, targetLoop);
+
+    for (let measureIndex = 0; measureIndex < capture.arrangement.measuresPerLoop; measureIndex++) {
+        const sourceEvents = getMeasureEvents(capture, sourceLoop, measureIndex);
+        const targetEvents = getMeasureEvents(capture, targetLoop, measureIndex);
+        const sourceTokens = getResponseAttackTokens(sourceEvents);
+        const targetTokens = getResponseAttackTokens(targetEvents);
+        const targetTokenSet = new Set(targetTokens);
+        const overlapCount = sourceTokens.filter((token) => targetTokenSet.has(token)).length;
+        rhythmScores.push(
+            sourceTokens.length > 0
+                ? overlapCount / sourceTokens.length
+                : targetTokens.length === 0
+                  ? 1
+                  : 0,
+        );
+        contourScores.push(
+            getContourEchoScore(
+                sourceRows[measureIndex]?.contour || 'rest',
+                targetRows[measureIndex]?.contour || 'rest',
+            ),
+        );
+        cadenceScores.push(
+            sourceRows[measureIndex]?.cadenceFlavor === targetRows[measureIndex]?.cadenceFlavor
+                ? 1
+                : 0,
+        );
+
+        const sourceTriplet = sourceEvents.some(
+            (event) => event.note.tripletPlacement || event.seedNote?.tripletPlacement,
+        );
+        if (sourceTriplet) {
+            const targetTriplet = targetEvents.some(
+                (event) => event.note.tripletPlacement || event.seedNote?.tripletPlacement,
+            );
+            tripletScores.push(targetTriplet ? 1 : 0);
+        }
+    }
+
+    return {
+        loop: targetLoop,
+        responseRhythmReuseShare: average(rhythmScores),
+        responseContourEchoShare: average(contourScores),
+        responseCadenceStability: average(cadenceScores),
+        tripletCarryShare: average(tripletScores),
+        anchorExactRate: targetPerformance.anchorExactRate,
+    };
+}
+
+export function buildAggregateResponseMetrics(capture, sourceLoop = 0, targetLoops = []) {
+    const effectiveLoops = targetLoops.filter((loop) =>
+        capture.events.some((event) => event.loop === loop && event.loopStep >= 0),
+    );
+    const loopMetrics = effectiveLoops.map((loop) =>
+        buildLoopResponseMetrics(capture, sourceLoop, loop),
+    );
+    const loop1 = loopMetrics.find((row) => row.loop === 1) || null;
+    const laterRows = loopMetrics.filter((row) => row.loop > 1);
+    const aggregateLaterRows = laterRows.length > 0 ? laterRows : loop1 ? [loop1] : [];
+
+    return {
+        loop1RhythmReuseShare: loop1?.responseRhythmReuseShare || 0,
+        loop1ContourEchoShare: loop1?.responseContourEchoShare || 0,
+        loop1CadenceStability: loop1?.responseCadenceStability || 0,
+        loop1AnchorExactRate: loop1?.anchorExactRate || 0,
+        laterLoopRhythmReuseShare: average(
+            aggregateLaterRows.map((row) => row.responseRhythmReuseShare),
+        ),
+        laterLoopContourEchoShare: average(
+            aggregateLaterRows.map((row) => row.responseContourEchoShare),
+        ),
+        laterLoopCadenceStability: average(
+            aggregateLaterRows.map((row) => row.responseCadenceStability),
+        ),
+        laterLoopTripletCarryShare: average(aggregateLaterRows.map((row) => row.tripletCarryShare)),
+        laterLoopAnchorExactRate: average(aggregateLaterRows.map((row) => row.anchorExactRate)),
+    };
+}
+
 export function buildSeedSweep({
     genre,
     bpm,
@@ -406,6 +531,11 @@ export function buildSeedSweep({
             loops: Math.max(1, loops),
             style,
         });
+        const responseMetrics = buildAggregateResponseMetrics(
+            capture,
+            0,
+            Array.from({ length: Math.max(0, loops - 1) }, (_, index) => index + 1),
+        );
 
         sweepRows.push({
             genre,
@@ -417,6 +547,7 @@ export function buildSeedSweep({
             sessionSeedNotes: sessionSeed?.notes.length || 0,
             measuresPerLoop: auditArrangement.measuresPerLoop,
             ...buildPerformanceMetrics(capture, 0),
+            ...responseMetrics,
         });
     }
 
@@ -451,6 +582,23 @@ export function buildSeedSweepSummary(rows, focusCount = 5) {
             stableCadenceShare: average(rows.map((row) => row.stableCadenceShare)),
             anchorExactRate: average(rows.map((row) => row.anchorExactRate)),
             tripletAttackShare: average(rows.map((row) => row.tripletAttackShare || 0)),
+            loop1RhythmReuseShare: average(rows.map((row) => row.loop1RhythmReuseShare || 0)),
+            loop1ContourEchoShare: average(rows.map((row) => row.loop1ContourEchoShare || 0)),
+            loop1CadenceStability: average(rows.map((row) => row.loop1CadenceStability || 0)),
+            loop1AnchorExactRate: average(rows.map((row) => row.loop1AnchorExactRate || 0)),
+            laterLoopRhythmReuseShare: average(
+                rows.map((row) => row.laterLoopRhythmReuseShare || 0),
+            ),
+            laterLoopContourEchoShare: average(
+                rows.map((row) => row.laterLoopContourEchoShare || 0),
+            ),
+            laterLoopCadenceStability: average(
+                rows.map((row) => row.laterLoopCadenceStability || 0),
+            ),
+            laterLoopTripletCarryShare: average(
+                rows.map((row) => row.laterLoopTripletCarryShare || 0),
+            ),
+            laterLoopAnchorExactRate: average(rows.map((row) => row.laterLoopAnchorExactRate || 0)),
         },
     };
 }
@@ -928,6 +1076,7 @@ export function buildLoopComparison(capture) {
         const seedNotes = getSeedWindowNotes(capture, loop, 0, capture.arrangement.totalSteps);
         const anchorNotes = seedNotes.filter((note) => note.isAnchor);
         const measureRows = buildMeasureAudit(capture, loop);
+        const responseMetrics = loop > 0 ? buildLoopResponseMetrics(capture, 0, loop) : null;
         const exactMatches = countMatches(
             seedNotes,
             events,
@@ -969,6 +1118,18 @@ export function buildLoopComparison(capture) {
             Devices: events.filter((event) => event.note.device).length,
             'Stable cadences': `${measureRows.filter((row) => row.cadenceFlavor === 'stable').length}/${measureRows.length}`,
             'Pulse hits': `${pulseHits}/${events.length || 1}`,
+            'Rhythm reuse': responseMetrics
+                ? formatPercent(responseMetrics.responseRhythmReuseShare)
+                : '-',
+            'Contour echo': responseMetrics
+                ? formatPercent(responseMetrics.responseContourEchoShare)
+                : '-',
+            'Cadence echo': responseMetrics
+                ? formatPercent(responseMetrics.responseCadenceStability)
+                : '-',
+            'Triplet carry': responseMetrics
+                ? formatPercent(responseMetrics.tripletCarryShare)
+                : '-',
         });
     }
 
@@ -1175,6 +1336,11 @@ export function logSeedSweepSummary(summary) {
             'Rich contour %': formatPercent(row.richContourShare),
             Range: row.range.toFixed(1),
             'Anchor exact %': formatPercent(row.anchorExactRate),
+            'L1 rhythm %': formatPercent(row.loop1RhythmReuseShare || 0),
+            'L1 contour %': formatPercent(row.loop1ContourEchoShare || 0),
+            'L+ rhythm %': formatPercent(row.laterLoopRhythmReuseShare || 0),
+            'L+ cadence %': formatPercent(row.laterLoopCadenceStability || 0),
+            'L+ triplet %': formatPercent(row.laterLoopTripletCarryShare || 0),
         })),
     );
 
@@ -1195,6 +1361,12 @@ export function logSeedSweepSummary(summary) {
             'Rich contour %': formatPercent(summary.aggregate.richContourShare),
             'Stable cadence %': formatPercent(summary.aggregate.stableCadenceShare),
             'Anchor exact %': formatPercent(summary.aggregate.anchorExactRate),
+            'L1 rhythm %': formatPercent(summary.aggregate.loop1RhythmReuseShare || 0),
+            'L1 contour %': formatPercent(summary.aggregate.loop1ContourEchoShare || 0),
+            'L1 cadence %': formatPercent(summary.aggregate.loop1CadenceStability || 0),
+            'L+ rhythm %': formatPercent(summary.aggregate.laterLoopRhythmReuseShare || 0),
+            'L+ cadence %': formatPercent(summary.aggregate.laterLoopCadenceStability || 0),
+            'L+ triplet %': formatPercent(summary.aggregate.laterLoopTripletCarryShare || 0),
         },
     ]);
 
@@ -1210,6 +1382,9 @@ export function logSeedSweepSummary(summary) {
                 'Leap %': formatPercent(row.leapShare),
                 'Rich contour %': formatPercent(row.richContourShare),
                 Range: row.range.toFixed(1),
+                'L1 rhythm %': formatPercent(row.loop1RhythmReuseShare || 0),
+                'L+ rhythm %': formatPercent(row.laterLoopRhythmReuseShare || 0),
+                'L+ cadence %': formatPercent(row.laterLoopCadenceStability || 0),
             })),
         );
     }

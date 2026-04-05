@@ -158,6 +158,9 @@ export const soloist = deepSignal({
         skeleton: [],
         lastInterval: null,
         profile: 'srv', // 'srv', 'monk', 'armstrong', 'miles'
+        signature: null,
+        responseSignature: null,
+        responseMode: 'free',
     },
     busySteps: 0,
     transitionState: null,
@@ -328,6 +331,9 @@ export function instrumentReducer(action, payload) {
             soloist.phraseContext.skeleton = [];
             soloist.phraseContext.lastInterval = null;
             soloist.phraseContext.profile = 'srv';
+            soloist.phraseContext.signature = null;
+            soloist.phraseContext.responseSignature = null;
+            soloist.phraseContext.responseMode = 'free';
 
             harmony.enabled = false;
             harmony.volume = 1.0;

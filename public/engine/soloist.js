@@ -9,6 +9,16 @@ import {
 import { selectPitchAndDevices } from './soloist-pitch-engine.js';
 import { generateRhythmPlan } from './soloist-rhythm-engine.js';
 
+const MOTIVIC_RESPONSE_STYLES = new Set([
+    'blues',
+    'jazz',
+    'bird',
+    'rock',
+    'scalar',
+    'neo',
+    'bossa',
+]);
+
 /**
  * Resets the internal generative state of the soloist.
  * Called when the transport is flushed or reset.
@@ -29,6 +39,344 @@ export function resetSoloistState(state) {
     soloist.sharedHookBuffer = []; // @worker-mutation
     soloist.lickDictionary = []; // @worker-mutation
     soloist.recentNotes = []; // @worker-mutation
+    soloist.phraseStartStep = null; // @worker-mutation
+    if (soloist.phraseContext) {
+        soloist.phraseContext.role = 'call'; // @worker-mutation
+        soloist.phraseContext.skeleton = []; // @worker-mutation
+        soloist.phraseContext.lastInterval = null; // @worker-mutation
+        soloist.phraseContext.signature = null; // @worker-mutation
+        soloist.phraseContext.responseSignature = null; // @worker-mutation
+        soloist.phraseContext.responseMode = 'free'; // @worker-mutation
+    }
+}
+
+/**
+ * @param {number} step
+ * @param {number} loopLength
+ */
+function normalizeLoopStep(step, loopLength) {
+    if (!Number.isFinite(loopLength) || loopLength <= 0) {
+        return step;
+    }
+    return ((step % loopLength) + loopLength) % loopLength;
+}
+
+/**
+ * @param {Array<any>} noteEvents
+ * @param {number|null} phraseStartStep
+ * @param {number} sourceLoop
+ * @param {'performed' | 'seed'} sourceKind
+ * @returns {any}
+ */
+function buildPhraseSignatureFromEvents(
+    noteEvents,
+    phraseStartStep,
+    sourceLoop,
+    sourceKind = 'performed',
+) {
+    const orderedEvents = [...noteEvents]
+        .filter((event) => Number.isFinite(event?.midi) && Number.isFinite(event?.step))
+        .sort((a, b) => a.step - b.step || a.midi - b.midi);
+    if (orderedEvents.length === 0) {
+        return null;
+    }
+
+    const startStep =
+        Number.isFinite(phraseStartStep) && phraseStartStep !== null
+            ? phraseStartStep
+            : orderedEvents[0].step;
+    /** @type {any[]} */
+    const notes = [];
+
+    for (const event of orderedEvents) {
+        const pitchClass = normalizeLoopStep(event.midi, 12);
+        const stepOffset = Math.max(0, event.step - startStep);
+        const previous = notes[notes.length - 1] || null;
+        if (
+            previous &&
+            previous.stepOffset === stepOffset &&
+            previous.pitchClass === pitchClass &&
+            previous.midi === event.midi
+        ) {
+            continue;
+        }
+        notes.push({
+            stepOffset,
+            durationSteps: Math.max(1, Math.round(event.durationSteps || 1)),
+            pitchClass,
+            midi: Math.round(event.midi),
+            velocity: event.velocity ?? 0.8,
+            isStrongBeat: Boolean(event.isStrongBeat),
+            tripletPlacement: event.tripletPlacement || null,
+            timingOffset: Number.isFinite(event.timingOffset) ? event.timingOffset : 0,
+            direction:
+                previous && Number.isFinite(previous.midi)
+                    ? Math.sign(Math.round(event.midi) - previous.midi)
+                    : 0,
+            isAnchor: Boolean(event.isAnchor),
+        });
+    }
+
+    if (notes.length === 0) {
+        return null;
+    }
+
+    const finalNote = notes[notes.length - 1];
+    const anchorPitchClasses = [
+        ...new Set(
+            notes
+                .filter(
+                    (note, index) =>
+                        note.isAnchor ||
+                        note.isStrongBeat ||
+                        index === 0 ||
+                        index === notes.length - 1,
+                )
+                .map((note) => note.pitchClass),
+        ),
+    ].slice(0, 4);
+
+    return {
+        sourceKind,
+        sourceLoop,
+        spanSteps: finalNote.stepOffset + finalNote.durationSteps,
+        entryPitchClass: notes[0].pitchClass,
+        cadencePitchClass: finalNote.pitchClass,
+        anchorPitchClasses,
+        tripletCarry: notes.some((note) => Boolean(note.tripletPlacement)),
+        notes,
+    };
+}
+
+/**
+ * @param {any} sessionSeed
+ * @param {number} step
+ * @param {number} activeSteps
+ * @param {number} stepsPerMeasure
+ * @param {number} stepsPerBeat
+ * @param {number} loopCount
+ * @returns {any}
+ */
+function buildSeedPhraseSignature(
+    sessionSeed,
+    step,
+    activeSteps,
+    stepsPerMeasure,
+    stepsPerBeat,
+    loopCount,
+) {
+    const loopLength = sessionSeed?.loopLengthSteps || 0;
+    if (!loopLength || !sessionSeed?.notes?.length) {
+        return null;
+    }
+
+    const stepInLoop = normalizeLoopStep(step, loopLength);
+    const windowLength = Math.max(
+        stepsPerMeasure,
+        Math.min(loopLength, activeSteps > 0 ? activeSteps : stepsPerMeasure * 2),
+    );
+    const orderedNotes = sessionSeed.notes
+        .filter((/** @type {any} */ note) => Number.isFinite(note?.step) && note.step >= 0)
+        .map((/** @type {any} */ note) => ({
+            ...note,
+            relativeStep: normalizeLoopStep(note.step - stepInLoop, loopLength),
+            measureStep: normalizeLoopStep(note.step, loopLength) % stepsPerMeasure,
+        }))
+        .sort(
+            (/** @type {any} */ a, /** @type {any} */ b) =>
+                a.relativeStep - b.relativeStep || a.midi - b.midi,
+        );
+    const windowNotes = orderedNotes.filter(
+        (/** @type {any} */ note) => note.relativeStep < windowLength,
+    );
+    const sourceNotes = (windowNotes.length > 0 ? windowNotes : orderedNotes.slice(0, 8)).slice(
+        0,
+        8,
+    );
+    if (sourceNotes.length === 0) {
+        return null;
+    }
+
+    const rebaseStart = sourceNotes[0].relativeStep;
+    return buildPhraseSignatureFromEvents(
+        sourceNotes.map((/** @type {any} */ note) => ({
+            step: note.relativeStep - rebaseStart,
+            durationSteps: note.durationSteps || 1,
+            midi: note.midi,
+            velocity: note.velocity || 0.8,
+            isStrongBeat: note.measureStep % stepsPerBeat === 0 || note.measureStep === 0,
+            tripletPlacement: note.tripletPlacement || null,
+            timingOffset: note.timingOffset || 0,
+            isAnchor: Boolean(note.isAnchor),
+        })),
+        0,
+        Math.max(0, loopCount - 1),
+        'seed',
+    );
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {number} loopCount
+ */
+function commitTrackedPhraseSignature(soloist, loopCount) {
+    if (!Array.isArray(soloist.recentNotes) || soloist.recentNotes.length === 0) {
+        return;
+    }
+
+    const signature = buildPhraseSignatureFromEvents(
+        soloist.recentNotes,
+        soloist.phraseStartStep,
+        loopCount,
+        'performed',
+    );
+    if (soloist.phraseContext && signature) {
+        soloist.phraseContext.signature = signature; // @worker-mutation
+    }
+    soloist.recentNotes = []; // @worker-mutation
+    soloist.phraseStartStep = null; // @worker-mutation
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {number} step
+ * @param {any} result
+ * @param {any} sourceNode
+ * @param {number} loopCount
+ * @param {number} stepsPerBeat
+ * @param {number} stepsPerMeasure
+ */
+function trackPhraseNote(
+    soloist,
+    step,
+    result,
+    sourceNode,
+    loopCount,
+    stepsPerBeat,
+    stepsPerMeasure,
+) {
+    if (!result || !sourceNode) {
+        return;
+    }
+
+    const results = Array.isArray(result) ? result : [result];
+    const primary = results[results.length - 1];
+    if (!primary || !Number.isFinite(primary.midi)) {
+        return;
+    }
+
+    if (!Array.isArray(soloist.recentNotes)) {
+        soloist.recentNotes = []; // @worker-mutation
+    }
+    if (!Number.isFinite(soloist.phraseStartStep) || soloist.phraseStartStep === null) {
+        soloist.phraseStartStep = step; // @worker-mutation
+    }
+
+    const lastTracked = soloist.recentNotes[soloist.recentNotes.length - 1] || null;
+    if (lastTracked) {
+        const gap = step - (lastTracked.step + Math.max(1, lastTracked.durationSteps || 1));
+        const phraseSpan = step - (soloist.phraseStartStep ?? step);
+        if (gap >= stepsPerBeat || phraseSpan >= stepsPerMeasure * 2) {
+            commitTrackedPhraseSignature(soloist, loopCount);
+            soloist.phraseStartStep = step; // @worker-mutation
+        }
+    }
+
+    soloist.recentNotes.push({
+        step,
+        durationSteps: Math.max(
+            1,
+            Math.round(primary.durationSteps || sourceNode.durationSteps || 1),
+        ),
+        midi: Math.round(primary.midi),
+        velocity: primary.velocity ?? sourceNode.velocity ?? 0.8,
+        isStrongBeat: Boolean(sourceNode.isStrongBeat),
+        tripletPlacement:
+            primary.tripletPlacement ||
+            sourceNode.tripletPlacement ||
+            sourceNode.seedNote?.tripletPlacement ||
+            null,
+        timingOffset:
+            primary.timingOffset ||
+            sourceNode.timingOffset ||
+            sourceNode.seedNote?.timingOffset ||
+            0,
+        isAnchor: Boolean(
+            sourceNode.seedNote?.isAnchor ||
+                sourceNode.responseCadenceTarget ||
+                sourceNode.responseEntryTarget,
+        ),
+    }); // @worker-mutation
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {string} activeStyle
+ * @param {any} sessionSeed
+ * @param {number} step
+ * @param {number} activeSteps
+ * @param {number} loopCount
+ * @param {number} stepsPerMeasure
+ * @param {number} stepsPerBeat
+ */
+function preparePhraseResponseContext(
+    soloist,
+    activeStyle,
+    sessionSeed,
+    step,
+    activeSteps,
+    loopCount,
+    stepsPerMeasure,
+    stepsPerBeat,
+) {
+    if (!soloist.phraseContext) {
+        return;
+    }
+
+    commitTrackedPhraseSignature(soloist, loopCount);
+
+    const styleConfig = /** @type {any} */ (STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar);
+    const responseConfig = styleConfig.motivicResponse || null;
+    const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
+    const canUseMotivicResponse = Boolean(
+        responseConfig?.enabled && MOTIVIC_RESPONSE_STYLES.has(activeStyle) && hasDynamicHeadSeed,
+    );
+
+    let nextRole = 'call';
+    if (canUseMotivicResponse) {
+        const wasCall = (soloist.phraseContext.role || 'call') === 'call';
+        const responseProb = loopCount <= 1 ? (wasCall ? 0.88 : 0.28) : wasCall ? 0.7 : 0.24;
+        nextRole = Math.random() < responseProb ? 'response' : 'call';
+    } else if (['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle)) {
+        const wasCall = (soloist.phraseContext.role || 'call') === 'call';
+        const responseProb = wasCall ? 0.7 : 0.2;
+        nextRole = Math.random() < responseProb ? 'response' : 'call';
+    }
+
+    soloist.phraseContext.role = nextRole; // @worker-mutation
+    soloist.phraseContext.responseMode =
+        nextRole === 'response' ? (loopCount <= 1 ? 'paraphrase' : 'development') : 'free'; // @worker-mutation
+
+    const lastSignature = soloist.phraseContext.signature;
+    let responseSignature = null;
+    if (nextRole === 'response' && canUseMotivicResponse) {
+        responseSignature =
+            (loopCount > 1 && lastSignature?.notes?.length ? lastSignature : null) ||
+            buildSeedPhraseSignature(
+                sessionSeed,
+                step,
+                activeSteps,
+                stepsPerMeasure,
+                stepsPerBeat,
+                loopCount,
+            ) ||
+            lastSignature ||
+            null;
+    }
+
+    soloist.phraseContext.responseSignature = responseSignature; // @worker-mutation
+    soloist.recentNotes = []; // @worker-mutation
+    soloist.phraseStartStep = step; // @worker-mutation
 }
 
 /**
@@ -415,11 +763,19 @@ export function getSoloistNote(
                     isHeadBypass: true,
                     targetMidi: targetMidi,
                     seedNote: headNote, // Pass the original seed note for context
+                    responsePitchClass: normalizeLoopStep(headNote.midi, 12),
+                    responseDirection: nextSeedInfo.nextSeedNote
+                        ? Math.sign(nextSeedInfo.nextSeedNote.midi - headNote.midi)
+                        : 0,
+                    responseEntryTarget: headNote.isAnchor || measureStep === 0,
+                    responseCadenceTarget:
+                        headNote.isAnchor || measureStep >= stepsPerMeasure - stepsPerBeat,
+                    responseMode: isFirstRestatementLoop ? 'paraphrase' : 'development',
                 };
 
                 soloist.lastAttackStep = step; // @worker-mutation
 
-                return selectPitchAndDevices(
+                const result = selectPitchAndDevices(
                     state,
                     step,
                     pseudoRhythmNode,
@@ -437,6 +793,16 @@ export function getSoloistNote(
                     stepsPerBeat,
                     intentBehavior,
                 );
+                trackPhraseNote(
+                    soloist,
+                    step,
+                    result,
+                    pseudoRhythmNode,
+                    loopCount,
+                    stepsPerBeat,
+                    stepsPerMeasure,
+                );
+                return result;
             } else {
                 logDebug(
                     `[Head/Themed Performance] Gated/Skipped seeded note for phrasing. (Prob: ${survivalProb.toFixed(2)})`,
@@ -630,24 +996,16 @@ export function getSoloistNote(
                     `Waking up for ~${soloist.activeSteps} steps${isStrictHeadPlayback ? ' (Head Mode)' : ''}. Generating new rhythm plan.`,
                 );
 
-                // --- Call & Response Framework ---
-                if (['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle)) {
-                    const wasCall = (soloist.phraseContext?.role || 'call') === 'call';
-                    const responseProb = wasCall ? 0.7 : 0.2;
-                    const nextRole = Math.random() < responseProb ? 'response' : 'call';
-
-                    logDebug(
-                        `C&R transition: ${soloist.phraseContext?.role} -> ${nextRole} (prob: ${responseProb})`,
-                    );
-
-                    if (soloist.phraseContext) {
-                        soloist.phraseContext.role = nextRole; // @worker-mutation
-                    }
-                } else {
-                    if (soloist.phraseContext) {
-                        soloist.phraseContext.role = 'call'; // @worker-mutation
-                    }
-                }
+                preparePhraseResponseContext(
+                    soloist,
+                    activeStyle,
+                    soloist.sessionSeed,
+                    step,
+                    soloist.activeSteps || 0,
+                    loopCount,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                );
 
                 // GENERATE RHYTHM PLAN FOR THE PHRASE
                 const nextRhythmPlan = generateRhythmPlan(
@@ -718,6 +1076,7 @@ export function getSoloistNote(
                 `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.restSteps} steps. (Fatigue: ${fatigueMultiplier.toFixed(2)})`,
             );
             // Clear rhythm plan just in case
+            commitTrackedPhraseSignature(soloist, loopCount);
             soloist.rhythmPlan = []; // @worker-mutation
             return null;
         }
@@ -737,6 +1096,16 @@ export function getSoloistNote(
                 soloist.activeSteps && soloist.activeSteps > 0
                     ? soloist.activeSteps
                     : Math.floor(baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5));
+            preparePhraseResponseContext(
+                soloist,
+                activeStyle,
+                soloist.sessionSeed,
+                step,
+                planSteps,
+                loopCount,
+                stepsPerMeasure,
+                stepsPerBeat,
+            );
             const nextRhythmPlan = generateRhythmPlan(
                 step,
                 planSteps,
@@ -767,7 +1136,7 @@ export function getSoloistNote(
 
             soloist.lastAttackStep = step; // @worker-mutation
 
-            return selectPitchAndDevices(
+            const result = selectPitchAndDevices(
                 state,
                 step,
                 rhythmNode,
@@ -785,6 +1154,16 @@ export function getSoloistNote(
                 stepsPerBeat,
                 intentBehavior,
             );
+            trackPhraseNote(
+                soloist,
+                step,
+                result,
+                rhythmNode,
+                loopCount,
+                stepsPerBeat,
+                stepsPerMeasure,
+            );
+            return result;
         }
     }
 

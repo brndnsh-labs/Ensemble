@@ -104,7 +104,15 @@ export function selectPitchAndDevices(
     const isMonophonicMode = isSoloistMonophonicMode(soloistMode);
     const supportRole =
         seedNote?.supportHints?.role ||
-        (durationSteps >= stepsPerBeat * 2 ? 'sustain' : isStrongBeat ? 'accent' : 'line');
+        (rhythmNode.responseCadenceTarget
+            ? 'cadence'
+            : rhythmNode.responseEntryTarget
+              ? 'anchor'
+              : durationSteps >= stepsPerBeat * 2
+                ? 'sustain'
+                : isStrongBeat
+                  ? 'accent'
+                  : 'line');
     const sustainBias =
         seedNote?.supportHints?.sustainBias ??
         (supportRole === 'accent'
@@ -172,7 +180,9 @@ export function selectPitchAndDevices(
                 ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12; // @worker-mutation
         }
 
-        let timingOffset = isHeadBypass ? seedNote?.timingOffset || 0 : 0;
+        let timingOffset = isHeadBypass
+            ? seedNote?.timingOffset || 0
+            : rhythmNode.timingOffset || 0;
         timingOffset += calculateTimingOffset('soloist', groove.pocket, intensity);
 
         // --- Greats Profiles: Timing ---
@@ -210,8 +220,11 @@ export function selectPitchAndDevices(
         }
 
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
-        if (isHeadBypass && seedNote?.tripletPlacement && !primary.tripletPlacement) {
-            primary.tripletPlacement = seedNote.tripletPlacement;
+        const carriedTripletPlacement = isHeadBypass
+            ? seedNote?.tripletPlacement
+            : rhythmNode.tripletPlacement;
+        if (carriedTripletPlacement && !primary.tripletPlacement) {
+            primary.tripletPlacement = carriedTripletPlacement;
         }
 
         if (!primary.isDoubleStop) {
@@ -268,6 +281,36 @@ export function selectPitchAndDevices(
     const prefersStationaryHook = stationaryScale > 0.7;
     const isJazzHookStyle = activeStyle === 'jazz' || activeStyle === 'bird';
     const isAlteredHookQuality = targetChord.quality === '7alt' || targetChord.quality === '7#9';
+    const responseConfig = config.motivicResponse || null;
+    const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
+    const responseSignature = soloistState.phraseContext?.responseSignature || null;
+    const responseMode =
+        rhythmNode.responseMode ||
+        soloistState.phraseContext?.responseMode ||
+        (isHeadBypass && loopCount > 0 ? (loopCount === 1 ? 'paraphrase' : 'development') : 'free');
+    const responsePitchClass = Number.isInteger(rhythmNode.responsePitchClass)
+        ? rhythmNode.responsePitchClass
+        : null;
+    const responseDirection = Number.isFinite(rhythmNode.responseDirection)
+        ? rhythmNode.responseDirection
+        : 0;
+    const isResponseEntryTarget = Boolean(rhythmNode.responseEntryTarget);
+    const isResponseCadenceTarget = Boolean(rhythmNode.responseCadenceTarget);
+    const isMotivicHeadBypass = Boolean(
+        hasDynamicHeadSeed &&
+            responseConfig?.enabled &&
+            isHeadBypass &&
+            loopCount > 0 &&
+            (responsePitchClass !== null || isResponseEntryTarget || isResponseCadenceTarget),
+    );
+    const isResponseGuided = Boolean(
+        hasDynamicHeadSeed &&
+            responseConfig?.enabled &&
+            (responsePitchClass !== null || isResponseEntryTarget || isResponseCadenceTarget) &&
+            ((soloistState.phraseContext?.role === 'response' &&
+                responseSignature?.notes?.length) ||
+                isMotivicHeadBypass),
+    );
 
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
@@ -432,6 +475,36 @@ export function selectPitchAndDevices(
             }
             if (interval === soloistState.phraseContext.lastInterval) {
                 weight *= 0.5; // Avoid stagnation
+            }
+        }
+
+        if (isResponseGuided) {
+            const responseReuseScale = responseMode === 'paraphrase' ? 1 : 0.78;
+            if (responsePitchClass !== null && pc === responsePitchClass) {
+                weight += 160 + (responseConfig.pitchReuse || 0) * 320 * responseReuseScale;
+                if (dist <= 5) {
+                    weight *= 1.18;
+                }
+            }
+            if (responseSignature?.anchorPitchClasses?.includes(pc)) {
+                weight += 80 + (responseConfig.contourReuse || 0) * 120;
+            }
+            if (isResponseEntryTarget && responseSignature?.entryPitchClass === pc) {
+                weight += 140 + (responseConfig.pitchReuse || 0) * 180;
+            }
+            if (isResponseCadenceTarget && responseSignature?.cadencePitchClass === pc) {
+                weight += 180 + (responseConfig.cadenceWeight || 0) * 220;
+            }
+            if (isResponseCadenceTarget && !(isChordTone || interval === 0 || interval === 7)) {
+                weight *= 0.88;
+            }
+            if (responseDirection !== 0) {
+                const motionDirection = Math.sign(m - lastMidi);
+                if (motionDirection === responseDirection) {
+                    weight *= 1 + (responseConfig.contourReuse || 0) * 0.22;
+                } else if (motionDirection !== 0) {
+                    weight *= 1 - (responseConfig.contourReuse || 0) * 0.14;
+                }
             }
         }
 
@@ -619,6 +692,7 @@ export function selectPitchAndDevices(
     let deviceBaseProb = config.deviceProb * (0.5 + intensity);
     const isLaterHeadBypass = isHeadBypass && loopCount > 0;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(activeStyle);
+    const isResponseGuidedPhrase = isResponseGuided && (!isHeadBypass || loopCount > 0);
 
     // Progressive Ornamentation: Increase device probability by 20% per loop
     deviceBaseProb *= 1.0 + loopCount * 0.2;
@@ -647,6 +721,16 @@ export function selectPitchAndDevices(
     }
     if (seedNote?.isAnchor) {
         deviceBaseProb *= 0.35;
+    }
+    if (isResponseGuidedPhrase) {
+        const deviceDamp =
+            responseMode === 'paraphrase'
+                ? responseConfig?.deviceDamp || 0.5
+                : Math.min(0.88, (responseConfig?.deviceDamp || 0.5) + 0.14);
+        deviceBaseProb *= deviceDamp;
+        if (isResponseEntryTarget || isResponseCadenceTarget || responsePitchClass !== null) {
+            deviceBaseProb *= 0.68;
+        }
     }
     deviceBaseProb = Math.min(loopCount === 0 ? 0.4 : isLineStyle ? 0.58 : 0.85, deviceBaseProb);
     const isPolyphonic =
@@ -680,6 +764,7 @@ export function selectPitchAndDevices(
         activeStyle === 'blues' &&
         /** @type {any} */ (coordination).isTurnaround &&
         !headMeasureHasTripletSeed &&
+        !isResponseGuidedPhrase &&
         Math.random() < 0.6
     ) {
         const res = applyDeviceBuffer('bluesTurnaround', deviceContextOptions);
@@ -810,6 +895,13 @@ export function selectPitchAndDevices(
         }
         if (activeStyle === 'country') {
             doubleStopChance *= durationSteps >= stepsPerBeat ? 1.75 : 1.15;
+        } else if (activeStyle === 'blues') {
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 2.65 : 1.9;
+            if (supportRole === 'line' || supportRole === 'accent') {
+                doubleStopChance *= 1.42;
+            } else if (supportRole === 'anchor' || supportRole === 'cadence') {
+                doubleStopChance *= 1.7;
+            }
         } else if (isJazzGuitarStyle) {
             doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.42 : 0.09;
             if (supportRole === 'anchor' || supportRole === 'cadence') {

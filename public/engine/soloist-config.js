@@ -9,6 +9,19 @@ const DEFAULT_SEED_TRIPLETS = {
     timingStrength: 0,
 };
 
+const DEFAULT_MOTIVIC_RESPONSE = {
+    enabled: false,
+    rhythmReuse: 0.68,
+    pitchReuse: 0.42,
+    contourReuse: 0.36,
+    cadenceWeight: 0.55,
+    tripletCarry: 0.35,
+    deviceDamp: 0.72,
+    delayBias: 0.18,
+    echoBias: 0.16,
+    compressionBias: 0.12,
+};
+
 const DEFAULT_STYLE_CONFIG = {
     genreGravityOffset: 0,
     restBase: 0.1,
@@ -31,6 +44,7 @@ const DEFAULT_STYLE_CONFIG = {
     targetAnchoring: 0.8,
     chromaticism: 0.1,
     seedTriplets: DEFAULT_SEED_TRIPLETS,
+    motivicResponse: DEFAULT_MOTIVIC_RESPONSE,
     contourSkeletons: [
         [
             {
@@ -78,7 +92,20 @@ const DEFAULT_STYLE_CONFIG = {
 };
 
 const STYLE_OVERRIDES = {
-    scalar: {},
+    scalar: {
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.74,
+            pitchReuse: 0.48,
+            contourReuse: 0.4,
+            cadenceWeight: 0.6,
+            tripletCarry: 0.4,
+            deviceDamp: 0.68,
+            delayBias: 0.16,
+            echoBias: 0.14,
+            compressionBias: 0.1,
+        },
+    },
     rock: {
         doubleStopProb: 0.1,
         allowedDevices: ['run', 'slide', 'guitarDouble', 'bluesCurl'],
@@ -87,6 +114,18 @@ const STYLE_OVERRIDES = {
         commonToneWeight: 300,
         stationaryProb: 0.15,
         syncopationLikelihood: 0.3,
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.7,
+            pitchReuse: 0.44,
+            contourReuse: 0.32,
+            cadenceWeight: 0.58,
+            tripletCarry: 0.18,
+            deviceDamp: 0.62,
+            delayBias: 0.14,
+            echoBias: 0.18,
+            compressionBias: 0.08,
+        },
         contourSkeletons: [
             [
                 {
@@ -214,6 +253,18 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.9,
         chromaticism: 0.6,
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.88,
+            pitchReuse: 0.62,
+            contourReuse: 0.46,
+            cadenceWeight: 0.82,
+            tripletCarry: 0.78,
+            deviceDamp: 0.38,
+            delayBias: 0.12,
+            echoBias: 0.12,
+            compressionBias: 0.1,
+        },
         seedTriplets: {
             enabled: true,
             cellBias: 0.72,
@@ -286,6 +337,18 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.9,
         targetAnchoring: 0.6,
         chromaticism: 0.4,
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.64,
+            pitchReuse: 0.46,
+            contourReuse: 0.38,
+            cadenceWeight: 0.52,
+            tripletCarry: 0.22,
+            deviceDamp: 0.74,
+            delayBias: 0.3,
+            echoBias: 0.22,
+            compressionBias: 0.1,
+        },
         contourSkeletons: [
             [
                 {
@@ -519,6 +582,18 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.85,
         targetAnchoring: 0.5,
         chromaticism: 0.7,
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.84,
+            pitchReuse: 0.56,
+            contourReuse: 0.52,
+            cadenceWeight: 0.74,
+            tripletCarry: 0.74,
+            deviceDamp: 0.46,
+            delayBias: 0.18,
+            echoBias: 0.16,
+            compressionBias: 0.22,
+        },
         seedTriplets: {
             enabled: true,
             cellBias: 0.56,
@@ -583,6 +658,18 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.7,
         targetAnchoring: 0.3,
         chromaticism: 0.9,
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.8,
+            pitchReuse: 0.52,
+            contourReuse: 0.58,
+            cadenceWeight: 0.68,
+            tripletCarry: 0.7,
+            deviceDamp: 0.5,
+            delayBias: 0.22,
+            echoBias: 0.2,
+            compressionBias: 0.24,
+        },
         seedTriplets: {
             enabled: true,
             cellBias: 0.68,
@@ -719,6 +806,18 @@ const STYLE_OVERRIDES = {
         syncopationLikelihood: 0.8,
         targetAnchoring: 0.7,
         chromaticism: 0.5,
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.66,
+            pitchReuse: 0.44,
+            contourReuse: 0.34,
+            cadenceWeight: 0.56,
+            tripletCarry: 0.2,
+            deviceDamp: 0.76,
+            delayBias: 0.24,
+            echoBias: 0.2,
+            compressionBias: 0.1,
+        },
         contourSkeletons: [
             [
                 {
@@ -1084,6 +1183,10 @@ export const STYLE_CONFIG = /** @type {any} */ (
             seedTriplets: {
                 ...DEFAULT_SEED_TRIPLETS,
                 ...(styleOverride.seedTriplets || {}),
+            },
+            motivicResponse: {
+                ...DEFAULT_MOTIVIC_RESPONSE,
+                ...(styleOverride.motivicResponse || {}),
             },
         };
         return acc;
