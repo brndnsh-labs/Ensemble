@@ -40,8 +40,8 @@ Open work items:
 ## 5. Dynamic Head follow-through
 
 - Status: Active
-- Completed so far: style-gated triplet seed vocabulary, seed timing carry-through, later-loop motivic-response memory, and response-aware head-bypass guidance now let Jazz/Bird and Blues 4/4 heads speak in ternary motion and answer themselves more conversationally without changing the global scheduler grid.
-- Remaining: add longer-range phrase recall across repeated sections, then consider softer laid-back response passes for Neo-Soul and Bossa instead of pushing the hook-focused paraphrase engine harder.
+- Completed so far: style-gated triplet seed vocabulary, seed timing carry-through, later-loop motivic-response memory, response-aware head-bypass guidance, and per-loop repeated-section recall now let Jazz/Bird and Blues 4/4 heads speak in ternary motion, while Neo-Soul and Bossa reuse section memory more softly instead of snapping into the same hook-forward paraphrase lane.
+- Remaining: extend the same recall idea across longer cross-loop form arcs and teach devices/ornaments to reinforce stored motifs instead of only being damped away from them.
 - Constraint: keep the soloist sounding like a musical conversation rather than a copied pattern, without blurring Rock or collapsing compound meters into simple-meter triplet tagging.
 
 ## 6. Progression library discovery

@@ -4,9 +4,10 @@ import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 /**
  * @param {any} responseConfig
  * @param {'paraphrase' | 'development' | 'free'} responseMode
+ * @param {'section' | 'recent' | 'seed' | 'free'} responseSource
  * @returns {'exact' | 'delay' | 'echo' | 'compress'}
  */
-function pickResponseTransform(responseConfig, responseMode) {
+function pickResponseTransform(responseConfig, responseMode, responseSource = 'recent') {
     const options =
         responseMode === 'development'
             ? [
@@ -21,6 +22,13 @@ function pickResponseTransform(responseConfig, responseMode) {
                   ['echo', 0.35 + (responseConfig?.echoBias || 0)],
                   ['compress', 0.25 + (responseConfig?.compressionBias || 0)],
               ];
+    const spaceBias = Math.max(0, Math.min(0.75, responseConfig?.spaceBias || 0));
+    if (responseSource === 'section' && spaceBias > 0) {
+        options[0][1] *= Math.max(0.35, 1 - spaceBias * 0.5);
+        options[1][1] += spaceBias * 0.35;
+        options[2][1] += spaceBias * 0.45;
+        options[3][1] += spaceBias * 0.18;
+    }
     const totalWeight = options.reduce((sum, [, weight]) => sum + weight, 0);
     let roll = Math.random() * totalWeight;
     for (const [name, weight] of options) {
@@ -59,6 +67,7 @@ function getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat) {
  * @param {any} signature
  * @param {any} responseConfig
  * @param {'paraphrase' | 'development' | 'free'} responseMode
+ * @param {'section' | 'recent' | 'seed' | 'free'} responseSource
  * @returns {any[]}
  */
 function buildResponsePlanFromSignature(
@@ -70,16 +79,35 @@ function buildResponsePlanFromSignature(
     signature,
     responseConfig,
     responseMode,
+    responseSource,
 ) {
     if (!signature?.notes?.length) {
         return [];
     }
 
-    const transform = pickResponseTransform(responseConfig, responseMode);
+    const transform = pickResponseTransform(responseConfig, responseMode, responseSource);
     const delaySteps = Math.max(1, Math.floor(stepsPerBeat / 2));
-    const responseNotes = signature.notes
-        .slice(0, 8)
+    const maxResponseNotes = Math.max(2, Math.round(responseConfig?.maxResponseNotes || 8));
+    const spaceBias = Math.max(0, Math.min(0.75, responseConfig?.spaceBias || 0));
+    const sourceNotes = signature.notes.slice(0, maxResponseNotes);
+    const responseNotes = sourceNotes
         .map((/** @type {any} */ sourceNote, /** @type {number} */ index) => {
+            const isStructural =
+                index === 0 ||
+                index === sourceNotes.length - 1 ||
+                sourceNote.isAnchor ||
+                sourceNote.isStrongBeat ||
+                Boolean(sourceNote.tripletPlacement);
+            const skipProb =
+                !isStructural && spaceBias > 0
+                    ? responseSource === 'section'
+                        ? spaceBias
+                        : spaceBias * 0.6
+                    : 0;
+            if (skipProb > 0 && Math.random() < skipProb) {
+                return null;
+            }
+
             let stepOffset = Math.max(0, Math.round(sourceNote.stepOffset || 0));
             if (transform === 'delay') {
                 stepOffset += delaySteps;
@@ -135,6 +163,7 @@ function buildResponsePlanFromSignature(
             responseDirection: responseNote.sourceNote.direction || 0,
             responseEntryTarget: index === 0,
             responseCadenceTarget: index === responseNotes.length - 1,
+            responseSource,
         };
         if (!existing || nextNode.responseCadenceTarget || nextNode.isStrongBeat) {
             deduped.set(stepTarget, nextNode);
@@ -178,6 +207,7 @@ export function generateRhythmPlan(
     const minPhraseNotes = Math.max(0, _config.minNotesPerPhrase || 0);
     const responseSignature = soloistState.phraseContext?.responseSignature;
     const responseMode = soloistState.phraseContext?.responseMode || 'free';
+    const responseSource = soloistState.phraseContext?.responseSource || 'free';
 
     let notesInPhrase = 0;
 
@@ -198,6 +228,7 @@ export function generateRhythmPlan(
                 responseSignature,
                 responseConfig,
                 responseMode,
+                responseSource,
             ),
         );
     } else if (

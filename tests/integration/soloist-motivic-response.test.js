@@ -43,12 +43,16 @@ describe('Soloist Motivic Response', () => {
         const blues = buildMotivicSummary('Blues', arrangement);
         const rock = buildMotivicSummary('Rock', arrangement);
         const neo = buildMotivicSummary('Neo-Soul', arrangement, FIXED_NEO_SEEDS);
+        const bossa = buildMotivicSummary('Bossa', arrangement, FIXED_NEO_SEEDS);
 
         expect(jazz.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.62);
         expect(jazz.aggregate.laterLoopRhythmReuseShare).toBeGreaterThanOrEqual(0.6);
         expect(jazz.aggregate.laterLoopCadenceStability).toBeGreaterThanOrEqual(0.58);
         expect(jazz.aggregate.laterLoopAnchorExactRate).toBeGreaterThanOrEqual(0.75);
         expect(jazz.aggregate.laterLoopTripletCarryShare).toBeGreaterThanOrEqual(0.35);
+        expect(jazz.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.68);
+        expect(jazz.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.65);
+        expect(jazz.aggregate.laterLoopSectionCadenceStability).toBeGreaterThanOrEqual(0.72);
 
         expect(blues.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.5);
         expect(blues.aggregate.loop1AnchorExactRate).toBeGreaterThanOrEqual(0.7);
@@ -60,6 +64,8 @@ describe('Soloist Motivic Response', () => {
         expect(rock.aggregate.loop1ContourEchoShare).toBeGreaterThanOrEqual(0.35);
         expect(rock.aggregate.laterLoopAnchorExactRate).toBeGreaterThanOrEqual(0.82);
         expect(rock.aggregate.laterLoopTripletCarryShare).toBe(0);
+        expect(rock.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.78);
+        expect(rock.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.84);
 
         expect(neo.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.35);
         expect(neo.aggregate.loop1RhythmReuseShare).toBeLessThanOrEqual(0.6);
@@ -67,7 +73,20 @@ describe('Soloist Motivic Response', () => {
         expect(neo.aggregate.laterLoopRhythmReuseShare).toBeLessThan(
             jazz.aggregate.laterLoopRhythmReuseShare,
         );
-    }, 20_000);
+        expect(neo.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.85);
+        expect(neo.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.75);
+        expect(neo.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThan(
+            neo.aggregate.loop1RhythmReuseShare + 0.25,
+        );
+
+        expect(bossa.aggregate.loop1RhythmReuseShare).toBeLessThanOrEqual(0.5);
+        expect(bossa.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.72);
+        expect(bossa.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.75);
+        expect(bossa.aggregate.laterLoopSectionCadenceStability).toBeGreaterThanOrEqual(0.65);
+        expect(bossa.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThan(
+            bossa.aggregate.loop1RhythmReuseShare + 0.2,
+        );
+    }, 25_000);
 
     it('keeps the audit head seed anchored and triplet-aware on later loops', () => {
         const arrangement = buildHookAuditArrangement('4/4');

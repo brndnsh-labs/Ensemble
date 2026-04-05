@@ -40,6 +40,11 @@ export function resetSoloistState(state) {
     soloist.lickDictionary = []; // @worker-mutation
     soloist.recentNotes = []; // @worker-mutation
     soloist.phraseStartStep = null; // @worker-mutation
+    soloist.phraseLoopCount = null; // @worker-mutation
+    soloist.phraseSectionLabel = null; // @worker-mutation
+    soloist.phraseSectionOccurrence = 0; // @worker-mutation
+    soloist.sectionRecall = {}; // @worker-mutation
+    soloist.sectionRecallLoop = null; // @worker-mutation
     if (soloist.phraseContext) {
         soloist.phraseContext.role = 'call'; // @worker-mutation
         soloist.phraseContext.skeleton = []; // @worker-mutation
@@ -47,6 +52,9 @@ export function resetSoloistState(state) {
         soloist.phraseContext.signature = null; // @worker-mutation
         soloist.phraseContext.responseSignature = null; // @worker-mutation
         soloist.phraseContext.responseMode = 'free'; // @worker-mutation
+        soloist.phraseContext.responseSource = 'free'; // @worker-mutation
+        soloist.phraseContext.sectionLabel = null; // @worker-mutation
+        soloist.phraseContext.sectionOccurrence = 0; // @worker-mutation
     }
 }
 
@@ -59,6 +67,101 @@ function normalizeLoopStep(step, loopLength) {
         return step;
     }
     return ((step % loopLength) + loopLength) % loopLength;
+}
+
+/**
+ * @param {any} arranger
+ * @param {number} step
+ */
+function getSectionContext(arranger, step) {
+    const sectionMap = arranger?.sectionMap;
+    if (!Array.isArray(sectionMap) || sectionMap.length === 0) {
+        return {
+            label: 'Main',
+            occurrence: 1,
+            totalOccurrences: 1,
+            isRestatement: false,
+        };
+    }
+
+    const totalFormSteps =
+        Number.isFinite(arranger?.totalSteps) && arranger.totalSteps > 0
+            ? arranger.totalSteps
+            : sectionMap[sectionMap.length - 1]?.end || 1;
+    const stepInForm = normalizeLoopStep(step, totalFormSteps);
+    const currentSection =
+        sectionMap.find(
+            (/** @type {{ start?: number, end?: number }} */ section) =>
+                stepInForm >= (section.start || 0) && stepInForm < (section.end || 0),
+        ) || sectionMap[0];
+    const label = currentSection?.label || 'Main';
+    let occurrence = 0;
+    let totalOccurrences = 0;
+
+    for (const section of sectionMap) {
+        if ((section?.label || 'Main') !== label) {
+            continue;
+        }
+        totalOccurrences++;
+        if (section === currentSection) {
+            occurrence = totalOccurrences;
+        }
+    }
+
+    return {
+        label,
+        occurrence: occurrence || 1,
+        totalOccurrences: totalOccurrences || 1,
+        isRestatement: (occurrence || 1) > 1,
+    };
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {number} loopCount
+ */
+function ensureSectionRecallLoop(soloist, loopCount) {
+    if (
+        !soloist.sectionRecall ||
+        typeof soloist.sectionRecall !== 'object' ||
+        Array.isArray(soloist.sectionRecall)
+    ) {
+        soloist.sectionRecall = {}; // @worker-mutation
+    }
+    if (!Number.isFinite(soloist.sectionRecallLoop) || soloist.sectionRecallLoop !== loopCount) {
+        soloist.sectionRecall = {}; // @worker-mutation
+        soloist.sectionRecallLoop = loopCount; // @worker-mutation
+    }
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {number} loopCount
+ * @param {any} signature
+ */
+function storeSectionRecallSignature(soloist, loopCount, signature) {
+    if (!signature?.notes?.length || !soloist.phraseSectionLabel) {
+        return;
+    }
+
+    ensureSectionRecallLoop(soloist, loopCount);
+
+    const label = soloist.phraseSectionLabel;
+    const occurrence = Math.max(1, soloist.phraseSectionOccurrence || 1);
+    signature.sectionLabel = label;
+    signature.sectionOccurrence = occurrence;
+
+    const existingEntry =
+        soloist.sectionRecall && typeof soloist.sectionRecall[label] === 'object'
+            ? soloist.sectionRecall[label]
+            : {};
+    if (!existingEntry.firstSignature || occurrence <= 1) {
+        existingEntry.firstSignature = signature;
+        existingEntry.firstOccurrence = occurrence;
+    }
+    existingEntry.latestSignature = signature;
+    existingEntry.latestOccurrence = occurrence;
+    soloist.sectionRecall[label] = existingEntry; // @worker-mutation
 }
 
 /**
@@ -224,17 +327,27 @@ function commitTrackedPhraseSignature(soloist, loopCount) {
         return;
     }
 
+    const sourceLoop = Number.isFinite(soloist.phraseLoopCount)
+        ? Number(soloist.phraseLoopCount)
+        : loopCount;
+
     const signature = buildPhraseSignatureFromEvents(
         soloist.recentNotes,
         soloist.phraseStartStep,
-        loopCount,
+        sourceLoop,
         'performed',
     );
     if (soloist.phraseContext && signature) {
+        signature.sectionLabel = soloist.phraseSectionLabel || null;
+        signature.sectionOccurrence = Math.max(1, soloist.phraseSectionOccurrence || 1);
         soloist.phraseContext.signature = signature; // @worker-mutation
     }
+    storeSectionRecallSignature(soloist, sourceLoop, signature);
     soloist.recentNotes = []; // @worker-mutation
     soloist.phraseStartStep = null; // @worker-mutation
+    soloist.phraseLoopCount = null; // @worker-mutation
+    soloist.phraseSectionLabel = null; // @worker-mutation
+    soloist.phraseSectionOccurrence = 0; // @worker-mutation
 }
 
 /**
@@ -270,6 +383,11 @@ function trackPhraseNote(
     }
     if (!Number.isFinite(soloist.phraseStartStep) || soloist.phraseStartStep === null) {
         soloist.phraseStartStep = step; // @worker-mutation
+        soloist.phraseLoopCount = loopCount; // @worker-mutation
+    }
+    if (sourceNode.sectionLabel && !soloist.phraseSectionLabel) {
+        soloist.phraseSectionLabel = sourceNode.sectionLabel; // @worker-mutation
+        soloist.phraseSectionOccurrence = Math.max(1, sourceNode.sectionOccurrence || 1); // @worker-mutation
     }
 
     const lastTracked = soloist.recentNotes[soloist.recentNotes.length - 1] || null;
@@ -279,6 +397,11 @@ function trackPhraseNote(
         if (gap >= stepsPerBeat || phraseSpan >= stepsPerMeasure * 2) {
             commitTrackedPhraseSignature(soloist, loopCount);
             soloist.phraseStartStep = step; // @worker-mutation
+            soloist.phraseLoopCount = loopCount; // @worker-mutation
+            if (sourceNode.sectionLabel) {
+                soloist.phraseSectionLabel = sourceNode.sectionLabel; // @worker-mutation
+                soloist.phraseSectionOccurrence = Math.max(1, sourceNode.sectionOccurrence || 1); // @worker-mutation
+            }
         }
     }
 
@@ -318,6 +441,7 @@ function trackPhraseNote(
  * @param {number} loopCount
  * @param {number} stepsPerMeasure
  * @param {number} stepsPerBeat
+ * @param {any} arranger
  */
 function preparePhraseResponseContext(
     soloist,
@@ -328,12 +452,14 @@ function preparePhraseResponseContext(
     loopCount,
     stepsPerMeasure,
     stepsPerBeat,
+    arranger,
 ) {
     if (!soloist.phraseContext) {
         return;
     }
 
     commitTrackedPhraseSignature(soloist, loopCount);
+    ensureSectionRecallLoop(soloist, loopCount);
 
     const styleConfig = /** @type {any} */ (STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar);
     const responseConfig = styleConfig.motivicResponse || null;
@@ -341,6 +467,16 @@ function preparePhraseResponseContext(
     const canUseMotivicResponse = Boolean(
         responseConfig?.enabled && MOTIVIC_RESPONSE_STYLES.has(activeStyle) && hasDynamicHeadSeed,
     );
+    const sectionContext = getSectionContext(arranger, step);
+    const sectionEntry =
+        sectionContext.isRestatement &&
+        soloist.sectionRecall &&
+        typeof soloist.sectionRecall[sectionContext.label] === 'object'
+            ? soloist.sectionRecall[sectionContext.label]
+            : null;
+    const sectionSignature = sectionEntry?.firstSignature?.notes?.length
+        ? sectionEntry.firstSignature
+        : null;
 
     let nextRole = 'call';
     if (canUseMotivicResponse) {
@@ -356,12 +492,47 @@ function preparePhraseResponseContext(
     soloist.phraseContext.role = nextRole; // @worker-mutation
     soloist.phraseContext.responseMode =
         nextRole === 'response' ? (loopCount <= 1 ? 'paraphrase' : 'development') : 'free'; // @worker-mutation
+    soloist.phraseContext.sectionLabel = sectionContext.label; // @worker-mutation
+    soloist.phraseContext.sectionOccurrence = sectionContext.occurrence; // @worker-mutation
 
     const lastSignature = soloist.phraseContext.signature;
     let responseSignature = null;
+    let responseSource = 'free';
     if (nextRole === 'response' && canUseMotivicResponse) {
+        const seedSignature = buildSeedPhraseSignature(
+            sessionSeed,
+            step,
+            activeSteps,
+            stepsPerMeasure,
+            stepsPerBeat,
+            loopCount,
+        );
+        const shouldPreferSectionRecall = Boolean(
+            sectionSignature &&
+                sectionContext.isRestatement &&
+                Math.random() < (responseConfig.sectionRecall || 0),
+        );
+        if (shouldPreferSectionRecall) {
+            responseSignature = sectionSignature;
+            responseSource = 'section';
+        } else if (loopCount > 1 && lastSignature?.notes?.length) {
+            responseSignature = lastSignature;
+            responseSource = 'recent';
+        } else if (seedSignature?.notes?.length) {
+            responseSignature = seedSignature;
+            responseSource = 'seed';
+        } else if (sectionSignature) {
+            responseSignature = sectionSignature;
+            responseSource = 'section';
+        } else if (lastSignature?.notes?.length) {
+            responseSignature = lastSignature;
+            responseSource = 'recent';
+        }
+    } else if (nextRole === 'response' && sectionSignature) {
+        responseSignature = sectionSignature;
+        responseSource = 'section';
+    } else if (nextRole === 'response') {
         responseSignature =
-            (loopCount > 1 && lastSignature?.notes?.length ? lastSignature : null) ||
             buildSeedPhraseSignature(
                 sessionSeed,
                 step,
@@ -372,11 +543,16 @@ function preparePhraseResponseContext(
             ) ||
             lastSignature ||
             null;
+        responseSource = responseSignature?.sourceKind === 'seed' ? 'seed' : 'recent';
     }
 
     soloist.phraseContext.responseSignature = responseSignature; // @worker-mutation
+    soloist.phraseContext.responseSource = responseSignature ? responseSource : 'free'; // @worker-mutation
     soloist.recentNotes = []; // @worker-mutation
     soloist.phraseStartStep = step; // @worker-mutation
+    soloist.phraseLoopCount = loopCount; // @worker-mutation
+    soloist.phraseSectionLabel = sectionContext.label; // @worker-mutation
+    soloist.phraseSectionOccurrence = sectionContext.occurrence; // @worker-mutation
 }
 
 /**
@@ -665,12 +841,26 @@ export function getSoloistNote(
             const sectionMap = arranger?.sectionMap || [
                 { start: 0, end: stepsPerMeasure * 8, label: 'Default' },
             ];
+            const headFormSteps =
+                Number.isFinite(arranger?.totalSteps) && arranger.totalSteps > 0
+                    ? arranger.totalSteps
+                    : sectionMap[sectionMap.length - 1]?.end || stepsPerMeasure * 8;
+            const headStepInForm = normalizeLoopStep(step, headFormSteps);
             const currentSection =
-                sectionMap.find((s) => step >= s.start && step < s.end) || sectionMap[0];
-            const measuresInSection = Math.floor((step - currentSection.start) / stepsPerMeasure);
+                sectionMap.find((s) => headStepInForm >= s.start && headStepInForm < s.end) ||
+                sectionMap[0];
+            const measuresInSection = Math.floor(
+                (headStepInForm - currentSection.start) / stepsPerMeasure,
+            );
             const sectionTotalMeasures = Math.floor(
                 (currentSection.end - currentSection.start) / stepsPerMeasure,
             );
+            const sectionContext = getSectionContext(arranger, step);
+            const sectionRecallSource =
+                sectionContext.isRestatement &&
+                soloist.sectionRecall?.[sectionContext.label]?.firstSignature?.notes?.length
+                    ? 'section'
+                    : soloist.phraseContext?.responseSource || 'free';
             const isMacroRestZone =
                 sectionTotalMeasures > 4 && measuresInSection >= sectionTotalMeasures - 2;
 
@@ -771,6 +961,9 @@ export function getSoloistNote(
                     responseCadenceTarget:
                         headNote.isAnchor || measureStep >= stepsPerMeasure - stepsPerBeat,
                     responseMode: isFirstRestatementLoop ? 'paraphrase' : 'development',
+                    responseSource: sectionRecallSource,
+                    sectionLabel: sectionContext.label,
+                    sectionOccurrence: sectionContext.occurrence,
                 };
 
                 soloist.lastAttackStep = step; // @worker-mutation
@@ -1005,6 +1198,7 @@ export function getSoloistNote(
                     loopCount,
                     stepsPerMeasure,
                     stepsPerBeat,
+                    arranger,
                 );
 
                 // GENERATE RHYTHM PLAN FOR THE PHRASE
@@ -1105,6 +1299,7 @@ export function getSoloistNote(
                 loopCount,
                 stepsPerMeasure,
                 stepsPerBeat,
+                arranger,
             );
             const nextRhythmPlan = generateRhythmPlan(
                 step,

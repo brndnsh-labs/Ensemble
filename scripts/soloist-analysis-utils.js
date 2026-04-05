@@ -497,6 +497,108 @@ export function buildAggregateResponseMetrics(capture, sourceLoop = 0, targetLoo
     };
 }
 
+export function buildSectionRecallMetrics(capture, loop = 0) {
+    const measureRows = buildMeasureAudit(capture, loop);
+    const loopEvents = getLoopEvents(capture, loop);
+    const grouped = new Map();
+    const occurrenceMap = new Map();
+
+    for (const section of capture.arrangement.sectionMap) {
+        const occurrence = (occurrenceMap.get(section.label) || 0) + 1;
+        occurrenceMap.set(section.label, occurrence);
+        const sectionMeasures = capture.arrangement.measurePlan.filter(
+            (measure) => measure.start >= section.start && measure.end <= section.end,
+        );
+        const sectionEvents = loopEvents.filter(
+            (event) => event.stepInLoop >= section.start && event.stepInLoop < section.end,
+        );
+        const sectionSeedNotes = getSeedWindowNotes(
+            capture,
+            loop,
+            section.start,
+            section.end - section.start,
+        );
+        const anchorNotes = sectionSeedNotes.filter((note) => note.isAnchor);
+        const anchorExact = countMatches(
+            anchorNotes,
+            sectionEvents,
+            (seedNote, event) =>
+                seedNote.step === event.seedPosition && seedNote.midi === event.note.midi,
+        );
+        const lastMeasure = sectionMeasures[sectionMeasures.length - 1];
+        const cadenceFlavor = measureRows[lastMeasure?.measureIndex || 0]?.cadenceFlavor || 'rest';
+        const row = {
+            label: section.label,
+            occurrence,
+            tokens: getResponseAttackTokens(sectionEvents),
+            cadenceFlavor,
+            anchorExactRate:
+                anchorNotes.length > 0 ? anchorExact / Math.max(1, anchorNotes.length) : 1,
+        };
+        const bucket = grouped.get(section.label) || [];
+        bucket.push(row);
+        grouped.set(section.label, bucket);
+    }
+
+    const rhythmScores = [];
+    const cadenceScores = [];
+    const anchorScores = [];
+
+    for (const rows of grouped.values()) {
+        if (rows.length < 2) {
+            continue;
+        }
+        const baseline = rows[0];
+        for (const row of rows.slice(1)) {
+            const targetTokenSet = new Set(row.tokens);
+            const overlapCount = baseline.tokens.filter((token) =>
+                targetTokenSet.has(token),
+            ).length;
+            rhythmScores.push(
+                baseline.tokens.length > 0
+                    ? overlapCount / baseline.tokens.length
+                    : row.tokens.length === 0
+                      ? 1
+                      : 0,
+            );
+            cadenceScores.push(baseline.cadenceFlavor === row.cadenceFlavor ? 1 : 0);
+            anchorScores.push(row.anchorExactRate);
+        }
+    }
+
+    return {
+        loop,
+        sectionRhythmRecallShare: average(rhythmScores),
+        sectionCadenceStability: average(cadenceScores),
+        sectionAnchorExactRate: average(anchorScores),
+    };
+}
+
+export function buildAggregateSectionRecallMetrics(capture, targetLoops = []) {
+    const effectiveLoops = targetLoops.filter((loop) =>
+        capture.events.some((event) => event.loop === loop && event.loopStep >= 0),
+    );
+    const loopMetrics = effectiveLoops.map((loop) => buildSectionRecallMetrics(capture, loop));
+    const loop1 = loopMetrics.find((row) => row.loop === 1) || null;
+    const laterRows = loopMetrics.filter((row) => row.loop > 1);
+    const aggregateLaterRows = laterRows.length > 0 ? laterRows : loop1 ? [loop1] : [];
+
+    return {
+        loop1SectionRhythmRecallShare: loop1?.sectionRhythmRecallShare || 0,
+        loop1SectionCadenceStability: loop1?.sectionCadenceStability || 0,
+        loop1SectionAnchorExactRate: loop1?.sectionAnchorExactRate || 0,
+        laterLoopSectionRhythmRecallShare: average(
+            aggregateLaterRows.map((row) => row.sectionRhythmRecallShare),
+        ),
+        laterLoopSectionCadenceStability: average(
+            aggregateLaterRows.map((row) => row.sectionCadenceStability),
+        ),
+        laterLoopSectionAnchorExactRate: average(
+            aggregateLaterRows.map((row) => row.sectionAnchorExactRate),
+        ),
+    };
+}
+
 export function buildSeedSweep({
     genre,
     bpm,
@@ -536,6 +638,10 @@ export function buildSeedSweep({
             0,
             Array.from({ length: Math.max(0, loops - 1) }, (_, index) => index + 1),
         );
+        const sectionMetrics = buildAggregateSectionRecallMetrics(
+            capture,
+            Array.from({ length: Math.max(0, loops - 1) }, (_, index) => index + 1),
+        );
 
         sweepRows.push({
             genre,
@@ -548,6 +654,7 @@ export function buildSeedSweep({
             measuresPerLoop: auditArrangement.measuresPerLoop,
             ...buildPerformanceMetrics(capture, 0),
             ...responseMetrics,
+            ...sectionMetrics,
         });
     }
 
@@ -599,6 +706,18 @@ export function buildSeedSweepSummary(rows, focusCount = 5) {
                 rows.map((row) => row.laterLoopTripletCarryShare || 0),
             ),
             laterLoopAnchorExactRate: average(rows.map((row) => row.laterLoopAnchorExactRate || 0)),
+            loop1SectionRhythmRecallShare: average(
+                rows.map((row) => row.loop1SectionRhythmRecallShare || 0),
+            ),
+            loop1SectionCadenceStability: average(
+                rows.map((row) => row.loop1SectionCadenceStability || 0),
+            ),
+            laterLoopSectionRhythmRecallShare: average(
+                rows.map((row) => row.laterLoopSectionRhythmRecallShare || 0),
+            ),
+            laterLoopSectionCadenceStability: average(
+                rows.map((row) => row.laterLoopSectionCadenceStability || 0),
+            ),
         },
     };
 }
@@ -1140,6 +1259,8 @@ export function buildSectionSummary(capture, loop) {
     const occurrenceMap = new Map();
     const measureRows = buildMeasureAudit(capture, loop);
     const rows = [];
+    const baselineByLabel = new Map();
+    const loopEvents = getLoopEvents(capture, loop);
 
     for (const section of capture.arrangement.sectionMap) {
         const occurrence = (occurrenceMap.get(section.label) || 0) + 1;
@@ -1147,7 +1268,7 @@ export function buildSectionSummary(capture, loop) {
         const sectionMeasures = capture.arrangement.measurePlan.filter(
             (measure) => measure.start >= section.start && measure.end <= section.end,
         );
-        const sectionEvents = getLoopEvents(capture, loop).filter(
+        const sectionEvents = loopEvents.filter(
             (event) => event.stepInLoop >= section.start && event.stepInLoop < section.end,
         );
         const sectionSeedNotes = getSeedWindowNotes(
@@ -1165,6 +1286,29 @@ export function buildSectionSummary(capture, loop) {
         );
         const lastMeasure = sectionMeasures[sectionMeasures.length - 1];
         const cadenceRow = measureRows[lastMeasure?.measureIndex || 0];
+        const sectionTokens = getResponseAttackTokens(sectionEvents);
+        const baseline = baselineByLabel.get(section.label) || null;
+        const targetTokenSet = new Set(sectionTokens);
+        const rhythmEcho = baseline
+            ? baseline.tokens.length > 0
+                ? baseline.tokens.filter((token) => targetTokenSet.has(token)).length /
+                  baseline.tokens.length
+                : sectionTokens.length === 0
+                  ? 1
+                  : 0
+            : null;
+        const cadenceEcho = baseline
+            ? baseline.cadenceFlavor === cadenceRow?.cadenceFlavor
+                ? 1
+                : 0
+            : null;
+
+        if (!baseline) {
+            baselineByLabel.set(section.label, {
+                tokens: sectionTokens,
+                cadenceFlavor: cadenceRow?.cadenceFlavor || 'rest',
+            });
+        }
 
         rows.push({
             label: section.label,
@@ -1173,9 +1317,13 @@ export function buildSectionSummary(capture, loop) {
             Measures: `${Math.floor(section.start / capture.stepsPerMeasure) + 1}-${Math.ceil(section.end / capture.stepsPerMeasure)}`,
             'Notes/M': (sectionEvents.length / Math.max(1, sectionMeasures.length)).toFixed(1),
             'Anchor exact': `${anchorExact}/${anchorNotes.length}`,
+            'Rhythm echo': baseline ? formatPercent(rhythmEcho) : '-',
+            'Cadence echo': baseline ? (cadenceEcho ? 'yes' : 'no') : '-',
             Cadence: cadenceRow?.cadence || 'rest',
             seedAnchorExact: anchorExact,
             seedAnchorCount: anchorNotes.length,
+            sectionRhythmRecall: rhythmEcho,
+            sectionCadenceRecall: cadenceEcho,
         });
     }
 
@@ -1198,7 +1346,10 @@ export function buildRestatementNotes(sectionRows) {
         const baseline = rows[0];
         const comparisons = rows
             .slice(1)
-            .map((row) => `${row.Section} ${row['Anchor exact']} cadence ${row.Cadence}`)
+            .map(
+                (row) =>
+                    `${row.Section} ${row['Anchor exact']} rhythm ${row['Rhythm echo']} cadence ${row.Cadence}`,
+            )
             .join(' | ');
         lines.push(
             `${label} restatement -> ${baseline.Section} baseline ${baseline['Anchor exact']}; ${comparisons}`,
@@ -1338,7 +1489,9 @@ export function logSeedSweepSummary(summary) {
             'Anchor exact %': formatPercent(row.anchorExactRate),
             'L1 rhythm %': formatPercent(row.loop1RhythmReuseShare || 0),
             'L1 contour %': formatPercent(row.loop1ContourEchoShare || 0),
+            'L1 section %': formatPercent(row.loop1SectionRhythmRecallShare || 0),
             'L+ rhythm %': formatPercent(row.laterLoopRhythmReuseShare || 0),
+            'L+ section %': formatPercent(row.laterLoopSectionRhythmRecallShare || 0),
             'L+ cadence %': formatPercent(row.laterLoopCadenceStability || 0),
             'L+ triplet %': formatPercent(row.laterLoopTripletCarryShare || 0),
         })),
@@ -1364,8 +1517,11 @@ export function logSeedSweepSummary(summary) {
             'L1 rhythm %': formatPercent(summary.aggregate.loop1RhythmReuseShare || 0),
             'L1 contour %': formatPercent(summary.aggregate.loop1ContourEchoShare || 0),
             'L1 cadence %': formatPercent(summary.aggregate.loop1CadenceStability || 0),
+            'L1 section %': formatPercent(summary.aggregate.loop1SectionRhythmRecallShare || 0),
             'L+ rhythm %': formatPercent(summary.aggregate.laterLoopRhythmReuseShare || 0),
+            'L+ section %': formatPercent(summary.aggregate.laterLoopSectionRhythmRecallShare || 0),
             'L+ cadence %': formatPercent(summary.aggregate.laterLoopCadenceStability || 0),
+            'L+ sec cad %': formatPercent(summary.aggregate.laterLoopSectionCadenceStability || 0),
             'L+ triplet %': formatPercent(summary.aggregate.laterLoopTripletCarryShare || 0),
         },
     ]);
@@ -1383,7 +1539,9 @@ export function logSeedSweepSummary(summary) {
                 'Rich contour %': formatPercent(row.richContourShare),
                 Range: row.range.toFixed(1),
                 'L1 rhythm %': formatPercent(row.loop1RhythmReuseShare || 0),
+                'L1 section %': formatPercent(row.loop1SectionRhythmRecallShare || 0),
                 'L+ rhythm %': formatPercent(row.laterLoopRhythmReuseShare || 0),
+                'L+ section %': formatPercent(row.laterLoopSectionRhythmRecallShare || 0),
                 'L+ cadence %': formatPercent(row.laterLoopCadenceStability || 0),
             })),
         );

@@ -288,6 +288,8 @@ export function selectPitchAndDevices(
         rhythmNode.responseMode ||
         soloistState.phraseContext?.responseMode ||
         (isHeadBypass && loopCount > 0 ? (loopCount === 1 ? 'paraphrase' : 'development') : 'free');
+    const responseSource =
+        rhythmNode.responseSource || soloistState.phraseContext?.responseSource || 'free';
     const responsePitchClass = Number.isInteger(rhythmNode.responsePitchClass)
         ? rhythmNode.responsePitchClass
         : null;
@@ -728,6 +730,9 @@ export function selectPitchAndDevices(
                 ? responseConfig?.deviceDamp || 0.5
                 : Math.min(0.88, (responseConfig?.deviceDamp || 0.5) + 0.14);
         deviceBaseProb *= deviceDamp;
+        if (responseSource === 'section') {
+            deviceBaseProb *= 1 - Math.min(0.22, (responseConfig?.spaceBias || 0) * 0.4);
+        }
         if (isResponseEntryTarget || isResponseCadenceTarget || responsePitchClass !== null) {
             deviceBaseProb *= 0.68;
         }
@@ -896,18 +901,18 @@ export function selectPitchAndDevices(
         if (activeStyle === 'country') {
             doubleStopChance *= durationSteps >= stepsPerBeat ? 1.75 : 1.15;
         } else if (activeStyle === 'blues') {
-            doubleStopChance *= durationSteps >= stepsPerBeat ? 2.65 : 1.9;
+            doubleStopChance *= durationSteps >= stepsPerBeat ? 2.9 : 2.05;
             if (supportRole === 'line' || supportRole === 'accent') {
-                doubleStopChance *= 1.42;
+                doubleStopChance *= 1.5;
             } else if (supportRole === 'anchor' || supportRole === 'cadence') {
-                doubleStopChance *= 1.7;
+                doubleStopChance *= 1.8;
             }
         } else if (isJazzGuitarStyle) {
-            doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.42 : 0.09;
+            doubleStopChance *= durationSteps >= stepsPerBeat * 1.5 ? 0.4 : 0.08;
             if (supportRole === 'anchor' || supportRole === 'cadence') {
-                doubleStopChance *= 1.55;
+                doubleStopChance *= 1.48;
             } else if (supportRole === 'line') {
-                doubleStopChance *= 0.55;
+                doubleStopChance *= 0.5;
             }
         } else if (isGrooveGuitarStyle) {
             doubleStopChance *= durationSteps >= stepsPerBeat ? 0.82 : 0.28;

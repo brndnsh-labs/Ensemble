@@ -116,6 +116,11 @@ export const bass = deepSignal({
  * @property {Array<any>} lickDictionary - Dictionary of loaded licks.
  * @property {Array<any>} recentNotes - Recently played notes.
  * @property {number|null} phraseStartStep - Step when the current phrase started.
+ * @property {number|null} phraseLoopCount - Loop index captured for the active phrase.
+ * @property {string|null} phraseSectionLabel - Section label captured for the active phrase.
+ * @property {number} phraseSectionOccurrence - Section occurrence captured for the active phrase.
+ * @property {Record<string, any>} sectionRecall - Per-loop section signatures keyed by section label.
+ * @property {number|null} sectionRecallLoop - Loop number currently represented in sectionRecall.
  * @property {any} phraseContext - Context data for the current phrase.
  * @property {number} doubleStopProb - Probability of playing double stops.
  * @property {Array<any>} activeVoices - Active polyphonic voices.
@@ -153,6 +158,11 @@ export const soloist = deepSignal({
     lickDictionary: [],
     recentNotes: [],
     phraseStartStep: null,
+    phraseLoopCount: null,
+    phraseSectionLabel: null,
+    phraseSectionOccurrence: 0,
+    sectionRecall: {},
+    sectionRecallLoop: null,
     phraseContext: {
         role: 'call',
         skeleton: [],
@@ -161,6 +171,9 @@ export const soloist = deepSignal({
         signature: null,
         responseSignature: null,
         responseMode: 'free',
+        responseSource: 'free',
+        sectionLabel: null,
+        sectionOccurrence: 0,
     },
     busySteps: 0,
     transitionState: null,
@@ -327,6 +340,13 @@ export function instrumentReducer(action, payload) {
             soloist.embellishmentBuffer = [];
             soloist.hookBuffer = [];
             soloist.sharedHookBuffer = [];
+            soloist.recentNotes = [];
+            soloist.phraseStartStep = null;
+            soloist.phraseLoopCount = null;
+            soloist.phraseSectionLabel = null;
+            soloist.phraseSectionOccurrence = 0;
+            soloist.sectionRecall = {};
+            soloist.sectionRecallLoop = null;
             soloist.phraseContext.role = 'call';
             soloist.phraseContext.skeleton = [];
             soloist.phraseContext.lastInterval = null;
@@ -334,6 +354,9 @@ export function instrumentReducer(action, payload) {
             soloist.phraseContext.signature = null;
             soloist.phraseContext.responseSignature = null;
             soloist.phraseContext.responseMode = 'free';
+            soloist.phraseContext.responseSource = 'free';
+            soloist.phraseContext.sectionLabel = null;
+            soloist.phraseContext.sectionOccurrence = 0;
 
             harmony.enabled = false;
             harmony.volume = 1.0;

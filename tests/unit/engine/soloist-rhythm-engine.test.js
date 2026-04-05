@@ -85,6 +85,7 @@ describe('Soloist rhythm engine phrasing modes', () => {
         soloistState.phraseContext = {
             role: 'response',
             responseMode: 'paraphrase',
+            responseSource: 'recent',
             responseSignature: {
                 notes: [
                     {
@@ -126,7 +127,53 @@ describe('Soloist rhythm engine phrasing modes', () => {
         expect(plan[0].timingOffset).toBeCloseTo(0.02, 6);
         expect(plan[0].responsePitchClass).toBe(0);
         expect(plan[0].responseEntryTarget).toBe(true);
+        expect(plan[0].responseSource).toBe('recent');
         expect(plan[1].responsePitchClass).toBe(4);
         expect(plan[1].responseCadenceTarget).toBe(true);
+    });
+
+    it('lets section-recall responses leave more interior space for neo phrases', () => {
+        const randomSpy = vi
+            .spyOn(Math, 'random')
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0.2)
+            .mockReturnValueOnce(0.9);
+        const soloistState = createSoloistState('monophonic');
+        soloistState.sessionSeed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
+        soloistState.phraseContext = {
+            role: 'response',
+            responseMode: 'paraphrase',
+            responseSource: 'section',
+            responseSignature: {
+                notes: [
+                    { stepOffset: 0, durationSteps: 2, velocity: 0.8, pitchClass: 0, direction: 1 },
+                    { stepOffset: 2, durationSteps: 1, velocity: 0.7, pitchClass: 2, direction: 1 },
+                    { stepOffset: 4, durationSteps: 1, velocity: 0.7, pitchClass: 4, direction: 1 },
+                    {
+                        stepOffset: 8,
+                        durationSteps: 2,
+                        velocity: 0.8,
+                        pitchClass: 7,
+                        direction: -1,
+                    },
+                ],
+            },
+        };
+
+        const plan = generateRhythmPlan(
+            32,
+            16,
+            'neo',
+            0.55,
+            16,
+            4,
+            coordination,
+            256,
+            soloistState,
+        );
+        randomSpy.mockRestore();
+
+        expect(plan.map((node) => node.stepTarget)).toEqual([32, 36, 40]);
+        expect(plan.every((node) => node.responseSource === 'section')).toBe(true);
     });
 });

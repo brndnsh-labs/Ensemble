@@ -204,6 +204,15 @@ This document tracks specific reference recordings used to calibrate the Ensembl
     - **Audit result:** Fixed-seed hook sweeps now show measurable loop-to-loop reuse instead of loop-0-only reporting: Jazz holds ~68% loop-1 rhythm reuse / ~65% later-loop cadence stability, Blues keeps ~54% loop-1 rhythm reuse with ~75% loop-1 anchor exactness, Rock stays hook-forward at ~71% loop-1 rhythm reuse with 0% triplet carry, and Neo-Soul remains softer at ~44% loop-1 rhythm reuse.
     - **Verification:** New motivic-response integration coverage plus focused soloist unit suites and full `npm run validate` passed after the pass stabilized.
 
+### [Date: 2026-04-05] (Dynamic Head Section Recall)
+- **Status:** Repeated-section follow-through.
+- **Action:**
+    - **Section memory:** Added per-loop section recall so repeated labels such as `A2` / `A3` can reuse the first `A` phrase of that loop instead of only answering the immediately previous phrase.
+    - **Runtime guidance:** Response selection now prefers same-label section memory when a section restates, while Neo-Soul and Bossa use higher `spaceBias` / lower `maxResponseNotes` settings so the recall stays airy rather than collapsing into rigid copy-paste paraphrase.
+    - **Audit seam:** Extended the soloist audit helpers with repeated-section recall metrics and restatement summaries, so the sweeps now report both loop-to-loop reuse and same-section recall.
+    - **Audit result:** Fixed-seed hook sweeps now show strong repeated-section recall on top of the earlier loop metrics: Jazz lands around ~74% loop-1 section recall / ~70% later-loop section recall, Rock around ~81% / ~89%, while Neo-Soul (~97% / ~81%) and Bossa (~79% / ~82%) keep section identity clearer than their broader loop-to-loop rhythm reuse.
+    - **Verification:** Focused rhythm-engine, soloist, and motivic-response suites passed before the final full `npm run validate` sweep.
+
 ---
 
 ## Intensity-Aware Mixing Rules

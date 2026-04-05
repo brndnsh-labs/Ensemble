@@ -20,6 +20,9 @@ const DEFAULT_MOTIVIC_RESPONSE = {
     delayBias: 0.18,
     echoBias: 0.16,
     compressionBias: 0.12,
+    sectionRecall: 0.72,
+    maxResponseNotes: 8,
+    spaceBias: 0,
 };
 
 const DEFAULT_STYLE_CONFIG = {
@@ -104,6 +107,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.16,
             echoBias: 0.14,
             compressionBias: 0.1,
+            sectionRecall: 0.76,
+            maxResponseNotes: 7,
+            spaceBias: 0.12,
         },
     },
     rock: {
@@ -125,6 +131,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.14,
             echoBias: 0.18,
             compressionBias: 0.08,
+            sectionRecall: 0.78,
+            maxResponseNotes: 7,
+            spaceBias: 0.14,
         },
         contourSkeletons: [
             [
@@ -264,6 +273,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.12,
             echoBias: 0.12,
             compressionBias: 0.1,
+            sectionRecall: 0.84,
+            maxResponseNotes: 8,
+            spaceBias: 0.06,
         },
         seedTriplets: {
             enabled: true,
@@ -348,6 +360,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.3,
             echoBias: 0.22,
             compressionBias: 0.1,
+            sectionRecall: 0.78,
+            maxResponseNotes: 6,
+            spaceBias: 0.36,
         },
         contourSkeletons: [
             [
@@ -593,6 +608,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.18,
             echoBias: 0.16,
             compressionBias: 0.22,
+            sectionRecall: 0.86,
+            maxResponseNotes: 8,
+            spaceBias: 0.08,
         },
         seedTriplets: {
             enabled: true,
@@ -669,6 +687,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.22,
             echoBias: 0.2,
             compressionBias: 0.24,
+            sectionRecall: 0.84,
+            maxResponseNotes: 8,
+            spaceBias: 0.06,
         },
         seedTriplets: {
             enabled: true,
@@ -817,6 +838,9 @@ const STYLE_OVERRIDES = {
             delayBias: 0.24,
             echoBias: 0.2,
             compressionBias: 0.1,
+            sectionRecall: 0.86,
+            maxResponseNotes: 5,
+            spaceBias: 0.42,
         },
         contourSkeletons: [
             [
