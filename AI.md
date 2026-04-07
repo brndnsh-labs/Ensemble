@@ -70,7 +70,16 @@ This document is the primary operational guide for AI agents working on the Ense
     *   `Loop 2+ (Exploratory)`: Transition to full generative performance. **Progressive Ornamentation** increases device probability (+20% per loop). "Fatigue Decay" shortens breaths (rests), and "Common Tone Reward" logic allows the soloist to intelligently "stick" to stable notes during chord changes for professional "pedal point" effects.
 *   **Motifs:** Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js`.
 
-### C. Coordination & Register Slotting
+### C. Naming, Canonicalization & Aliases
+*   **One canonical name per concept:** Every musical concept, style, label, or preset must have one canonical internal name. UI labels may be friendlier or more descriptive, but state keys, config keys, persisted payloads, and code paths should normalize to the canonical form.
+*   **Aliases belong to the owner:** Keep compatibility aliases in one place near the data or config that owns the concept. Do not scatter alias checks across components, tests, docs, and controllers.
+*   **Search before rename:** Before changing a name, grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
+*   **Preserve compatibility:** If a rename touches saved sessions, share URLs, presets, or other serialized surfaces, keep a compatibility shim until old inputs are deliberately migrated.
+*   **Split labels from logic:** Keep display labels in the UI/data layer and behavior keys in the engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
+*   **Style-family inventory:** For musical cleanup work, build a small alias matrix before broad edits. Known examples from this repo include `Rock`/`Shred` and `Neo-Soul`/`Neo`; add any newly discovered aliases to the same map instead of creating one-off fixes.
+*   **Doc targets:** Use `docs/ROADMAP.md` for the active cleanup item, `docs/guides/REFERENCE_TUNING.md` for concrete examples from tuning work, and `AI_MAP.md` only for navigation.
+
+### D. Coordination & Register Slotting
 Always pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:
 *   **Source of truth:** `public/engine/coordination-engine.js`
 *   **Bass:** 23–57

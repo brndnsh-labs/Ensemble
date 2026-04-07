@@ -4,6 +4,7 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 Open work items:
 - Audio identity refresh
+- Naming conventions cleanup
 
 ## 1. Resolution balance fix
 
@@ -63,6 +64,31 @@ Open work items:
   - `mix:report` still reuses `scripts/mix-report.js` and the existing dist + browser/offline-audio harness rather than introducing a second renderer.
   - The rendered audit stays backing-band focused for per-stem comparisons across drums, bass, chords, harmony, and the full mix, while using the symbolic audit to decide which seeds are worth the slower render pass.
   - The reporting flow enabled the broad cross-genre sweep above and should stay in place for the next genre-specific audit passes.
+
+## 8. Naming conventions cleanup
+
+- Status: Active
+- Summary: Standardize canonical names across code, docs, tests, configs, and persisted surfaces so one concept has one internal key and a documented alias map.
+- Why now: The recent Dynamic Head work exposed how much time alias pairs and mixed naming burn in tuning and audit work. `Rock`/`Shred` and `Neo-Soul`/`Neo` are the obvious examples, but the cleanup should inventory the whole repo before renaming anything.
+- Scope:
+  - Build a naming inventory across `public/`, `tests/`, `scripts/`, `docs/`, and `.github/`.
+  - Decide canonical internal names vs user-facing labels for genres, styles, instrument labels, preset IDs, and audit/report terminology.
+  - Centralize alias resolution in the owning config or normalization helper instead of scattering string checks through components and tests.
+  - Update persistence/share/hydration surfaces together so old links and saved sessions keep working.
+  - Align docs (`AI.md`, `docs/guides/REFERENCE_TUNING.md`, and this roadmap entry) with the canonical vocabulary used in code.
+- Guardrails:
+  - Do not change musical behavior as a side effect of renaming.
+  - Preserve compatibility shims until old inputs are explicitly migrated.
+  - Keep display labels readable; only make them canonical when the runtime keys need to change.
+- References:
+  - `AI.md` -> "Naming, Canonicalization & Aliases"
+  - `docs/guides/REFERENCE_TUNING.md` -> concrete tuning examples and alias lessons
+  - `AI_MAP.md` -> navigation only, not naming authority
+- Completion criteria:
+  - A single canonical vocabulary is documented and used in runtime keys.
+  - Alias handling lives in one place per domain.
+  - Regression tests cover canonical and alias inputs.
+  - Legacy labels are removed from active code paths, while compatibility remains where needed.
 
 ## Notes
 
