@@ -102,12 +102,46 @@ vi.mock('../../../public/utils.js', () => ({
 describe('Soloist Mode Differentiation Logic', () => {
     const state = getState();
     const currentChord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 }; // Cmaj7
+    const createPhraseContext = () => ({
+        role: 'call',
+        skeleton: [],
+        lastInterval: null,
+        profile: 'srv',
+        signature: null,
+        responseSignature: null,
+        responseMode: 'free',
+        responseSource: 'free',
+        sectionLabel: null,
+        sectionOccurrence: 0,
+    });
+
+    const resetModeTestState = () => {
+        state.playback.currentLoopCount = 0;
+        state.soloist.mode = 'monophonic';
+        state.soloist.busySteps = 0;
+        state.soloist.currentPhraseSteps = 0;
+        state.soloist.notesInPhrase = 0;
+        state.soloist.qaState = 'Question';
+        state.soloist.isResting = false;
+        state.soloist.motifBuffer = [];
+        state.soloist.pitchHistory = [];
+        state.soloist.deviceBuffer = [];
+        state.soloist.embellishmentBuffer = [];
+        state.soloist.rhythmPlan = [];
+        state.soloist.sessionSeed = null;
+        state.soloist.lastAttackStep = -100;
+        state.soloist.lastMidiPlayed = 72;
+        state.soloist.phraseContext = createPhraseContext();
+        state.soloist.phraseCount = 0;
+        state.soloist.activeSteps = 0;
+        state.soloist.restSteps = 0;
+        state.soloist.phrasingState = 'active';
+        state.soloist.isYielding = false;
+        state.soloist.transitionState = null;
+    };
 
     beforeEach(() => {
-        state.soloist.mode = 'monophonic';
-        state.soloist.isResting = false;
-        state.soloist.busySteps = 0;
-        state.soloist.deviceBuffer = [];
+        resetModeTestState();
         vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable random
     });
 
@@ -325,40 +359,54 @@ describe('Soloist Mode Differentiation Logic', () => {
     });
 
     it('keeps guitar double stops more restrained in jazz than in blues', () => {
-        state.soloist.mode = 'guitar';
-        state.playback.currentLoopCount = 3;
-        vi.spyOn(Math, 'random').mockRestore();
+        // Sample the same strong-beat guitar attack each time so only the style policy changes.
+        let randomState = 0;
+        vi.spyOn(Math, 'random').mockImplementation(() => {
+            randomState = (randomState * 1664525 + 1013904223) >>> 0;
+            return randomState / 4294967296;
+        });
 
-        const countDoubleStops = (style, iterations) => {
-            let doubleStops = 0;
-            let total = 0;
-            for (let i = 0; i < iterations; i++) {
-                state.soloist.busySteps = 0;
-                const note = getSoloistNote(
-                    getState(),
-                    currentChord,
-                    null,
-                    i * 4,
-                    261.63,
-                    60,
-                    style,
-                    0,
-                    {
-                        bypassRhythm: true,
-                    },
-                );
-                if (note) {
-                    total++;
-                    if (Array.isArray(note)) {
-                        doubleStops++;
-                    }
-                }
-            }
-            return doubleStops / total;
+        const sampleGuitarAttack = (style) => {
+            resetModeTestState();
+            state.soloist.mode = 'guitar';
+            state.playback.currentLoopCount = 3;
+            state.soloist.activeSteps = 8;
+            state.soloist.rhythmPlan = [
+                {
+                    stepTarget: 4,
+                    durationSteps: 4,
+                    velocity: 0.85,
+                    isStrongBeat: true,
+                    vibrato: 0,
+                },
+            ];
+
+            return getSoloistNote(getState(), currentChord, null, 4, 261.63, 60, style, 0, {
+                sectionStart: 0,
+                sectionEnd: 64,
+                bypassRhythm: false,
+            });
         };
 
-        const jazzRatio = countDoubleStops('jazz', 1200);
-        const bluesRatio = countDoubleStops('blues', 1200);
+        const countDoubleStops = (style, iterations) => {
+            randomState = 0x12345678;
+            let doubleStops = 0;
+            for (let i = 0; i < iterations; i++) {
+                const note = sampleGuitarAttack(style);
+                if (!note) {
+                    throw new Error(
+                        `Expected sampled ${style} guitar attack ${i} to produce a note`,
+                    );
+                }
+                if (Array.isArray(note)) {
+                    doubleStops++;
+                }
+            }
+            return doubleStops / iterations;
+        };
+
+        const jazzRatio = countDoubleStops('jazz', 400);
+        const bluesRatio = countDoubleStops('blues', 400);
 
         expect(jazzRatio).toBeLessThan(0.18);
         expect(bluesRatio).toBeGreaterThan(jazzRatio * 2);
