@@ -121,6 +121,7 @@ export const bass = deepSignal({
  * @property {number} phraseSectionOccurrence - Section occurrence captured for the active phrase.
  * @property {Record<string, any>} sectionRecall - Per-loop section signatures keyed by section label.
  * @property {number|null} sectionRecallLoop - Loop number currently represented in sectionRecall.
+ * @property {Record<string, any>} formArcRecall - Cross-loop section signatures keyed by section label.
  * @property {any} phraseContext - Context data for the current phrase.
  * @property {number} doubleStopProb - Probability of playing double stops.
  * @property {Array<any>} activeVoices - Active polyphonic voices.
@@ -163,6 +164,7 @@ export const soloist = deepSignal({
     phraseSectionOccurrence: 0,
     sectionRecall: {},
     sectionRecallLoop: null,
+    formArcRecall: {},
     phraseContext: {
         role: 'call',
         skeleton: [],
@@ -347,6 +349,7 @@ export function instrumentReducer(action, payload) {
             soloist.phraseSectionOccurrence = 0;
             soloist.sectionRecall = {};
             soloist.sectionRecallLoop = null;
+            soloist.formArcRecall = {};
             soloist.phraseContext.role = 'call';
             soloist.phraseContext.skeleton = [];
             soloist.phraseContext.lastInterval = null;

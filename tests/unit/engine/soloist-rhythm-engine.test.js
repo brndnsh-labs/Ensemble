@@ -176,4 +176,90 @@ describe('Soloist rhythm engine phrasing modes', () => {
         expect(plan.map((node) => node.stepTarget)).toEqual([32, 36, 40]);
         expect(plan.every((node) => node.responseSource === 'section')).toBe(true);
     });
+
+    it('treats form recall as a softer spaced response than same-loop section recall', () => {
+        const buildState = (responseSource) => {
+            const soloistState = createSoloistState('monophonic');
+            soloistState.sessionSeed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
+            soloistState.phraseContext = {
+                role: 'response',
+                responseMode: 'paraphrase',
+                responseSource,
+                responseSignature: {
+                    notes: [
+                        {
+                            stepOffset: 0,
+                            durationSteps: 2,
+                            velocity: 0.8,
+                            pitchClass: 0,
+                            direction: 1,
+                        },
+                        {
+                            stepOffset: 2,
+                            durationSteps: 1,
+                            velocity: 0.7,
+                            pitchClass: 2,
+                            direction: 1,
+                        },
+                        {
+                            stepOffset: 4,
+                            durationSteps: 1,
+                            velocity: 0.7,
+                            pitchClass: 4,
+                            direction: 1,
+                        },
+                        {
+                            stepOffset: 8,
+                            durationSteps: 2,
+                            velocity: 0.8,
+                            pitchClass: 7,
+                            direction: -1,
+                        },
+                    ],
+                },
+            };
+            return soloistState;
+        };
+
+        const sectionRandomSpy = vi
+            .spyOn(Math, 'random')
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0.3)
+            .mockReturnValueOnce(0.3)
+            .mockReturnValueOnce(0.9);
+        const sectionPlan = generateRhythmPlan(
+            32,
+            16,
+            'neo',
+            0.55,
+            16,
+            4,
+            coordination,
+            256,
+            buildState('section'),
+        );
+        sectionRandomSpy.mockRestore();
+
+        const formRandomSpy = vi
+            .spyOn(Math, 'random')
+            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(0.3)
+            .mockReturnValueOnce(0.3)
+            .mockReturnValueOnce(0.9);
+        const formPlan = generateRhythmPlan(
+            32,
+            16,
+            'neo',
+            0.55,
+            16,
+            4,
+            coordination,
+            256,
+            buildState('form'),
+        );
+        formRandomSpy.mockRestore();
+
+        expect(formPlan.length).toBeGreaterThan(sectionPlan.length);
+        expect(formPlan.every((node) => node.responseSource === 'form')).toBe(true);
+    });
 });

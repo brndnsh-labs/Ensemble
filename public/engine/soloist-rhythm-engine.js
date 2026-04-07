@@ -4,7 +4,7 @@ import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 /**
  * @param {any} responseConfig
  * @param {'paraphrase' | 'development' | 'free'} responseMode
- * @param {'section' | 'recent' | 'seed' | 'free'} responseSource
+ * @param {'section' | 'form' | 'recent' | 'seed' | 'free'} responseSource
  * @returns {'exact' | 'delay' | 'echo' | 'compress'}
  */
 function pickResponseTransform(responseConfig, responseMode, responseSource = 'recent') {
@@ -23,11 +23,13 @@ function pickResponseTransform(responseConfig, responseMode, responseSource = 'r
                   ['compress', 0.25 + (responseConfig?.compressionBias || 0)],
               ];
     const spaceBias = Math.max(0, Math.min(0.75, responseConfig?.spaceBias || 0));
-    if (responseSource === 'section' && spaceBias > 0) {
-        options[0][1] *= Math.max(0.35, 1 - spaceBias * 0.5);
-        options[1][1] += spaceBias * 0.35;
-        options[2][1] += spaceBias * 0.45;
-        options[3][1] += spaceBias * 0.18;
+    const recallSpaceScale =
+        responseSource === 'section' ? 1 : responseSource === 'form' ? 0.78 : 0;
+    if (recallSpaceScale > 0 && spaceBias > 0) {
+        options[0][1] *= Math.max(0.35, 1 - spaceBias * 0.5 * recallSpaceScale);
+        options[1][1] += spaceBias * 0.35 * recallSpaceScale;
+        options[2][1] += spaceBias * 0.45 * recallSpaceScale;
+        options[3][1] += spaceBias * 0.18 * recallSpaceScale;
     }
     const totalWeight = options.reduce((sum, [, weight]) => sum + weight, 0);
     let roll = Math.random() * totalWeight;
@@ -67,7 +69,7 @@ function getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat) {
  * @param {any} signature
  * @param {any} responseConfig
  * @param {'paraphrase' | 'development' | 'free'} responseMode
- * @param {'section' | 'recent' | 'seed' | 'free'} responseSource
+ * @param {'section' | 'form' | 'recent' | 'seed' | 'free'} responseSource
  * @returns {any[]}
  */
 function buildResponsePlanFromSignature(
@@ -102,7 +104,9 @@ function buildResponsePlanFromSignature(
                 !isStructural && spaceBias > 0
                     ? responseSource === 'section'
                         ? spaceBias
-                        : spaceBias * 0.6
+                        : responseSource === 'form'
+                          ? spaceBias * 0.78
+                          : spaceBias * 0.6
                     : 0;
             if (skipProb > 0 && Math.random() < skipProb) {
                 return null;

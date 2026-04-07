@@ -4,7 +4,6 @@ These are the current product and audio work streams, ordered by user-facing imp
 
 Open work items:
 - Audio identity refresh
-- Dynamic Head follow-through
 
 ## 1. Resolution balance fix
 
@@ -39,10 +38,11 @@ Open work items:
 
 ## 5. Dynamic Head follow-through
 
-- Status: Active
-- Completed so far: style-gated triplet seed vocabulary, seed timing carry-through, later-loop motivic-response memory, response-aware head-bypass guidance, and per-loop repeated-section recall now let Jazz/Bird and Blues 4/4 heads speak in ternary motion, while Neo-Soul and Bossa reuse section memory more softly instead of snapping into the same hook-forward paraphrase lane.
-- Remaining: extend the same recall idea across longer cross-loop form arcs and teach devices/ornaments to reinforce stored motifs instead of only being damped away from them.
-- Constraint: keep the soloist sounding like a musical conversation rather than a copied pattern, without blurring Rock or collapsing compound meters into simple-meter triplet tagging.
+- Status: Done (2026-04-07)
+- Summary: Added cross-loop form-arc recall, style-aware `'form'` response handling, motif-reinforcing later-loop devices, and audit coverage that keeps Rock/Shred straight while letting Jazz/Bird/Blues/Neo-Soul/Bossa converse across longer arcs.
+- Commits: Implemented on branch `dynamic-head-follow-through`.
+- Tests: Focused Dynamic Head integration suite, soloist rhythm/device unit tests, and relevant soloist standards/authenticity suites passed; `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- Notes: Rock/Shred remains the regression-protected control lane. The audit helpers now score structural phrase skeletons and last-sounding section cadences so decorative aftershocks do not skew musical readouts.
 
 ## 6. Progression library discovery
 
@@ -66,5 +66,5 @@ Open work items:
 
 ## Notes
 
-- Dynamic Head follow-through work is still the riskiest item because it is tightly coupled to seeded playback and export behavior.
+- Audio identity refresh work is still the riskiest item because it is tightly coupled to the rendered mix and instrument synthesis.
 - Audio synthesis changes should be checked against both live playback and export output.

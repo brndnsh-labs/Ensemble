@@ -48,10 +48,49 @@ export function generateMelodicDevice(deviceType, ctx) {
         isPiano,
         dynamicCenter,
         scaleMask,
+        responseSignature,
+        responseSource = 'free',
+        responseMode = 'free',
+        responseDirection = 0,
+        responseEntryTarget = false,
+        responseCadenceTarget = false,
     } = ctx;
 
     const devBaseVel = 0.5 + effectiveIntensity * 0.6;
     let deviceBuffer = [];
+    const canUseMotifShape = ['blues', 'jazz', 'bird', 'neo', 'bossa', 'scalar'].includes(
+        activeStyle,
+    );
+    const shouldFollowMotifShape =
+        canUseMotifShape &&
+        (responseSource !== 'free' ||
+            responseDirection !== 0 ||
+            responseCadenceTarget ||
+            responseEntryTarget);
+    const motifApproach = shouldFollowMotifShape
+        ? responseDirection > 0
+            ? -1
+            : responseDirection < 0
+              ? 1
+              : responseCadenceTarget
+                ? 1
+                : -1
+        : -1;
+    const motifSlideDirection = shouldFollowMotifShape
+        ? responseDirection !== 0
+            ? responseDirection
+            : responseCadenceTarget
+              ? -1
+              : responseEntryTarget
+                ? 1
+                : 0
+        : 0;
+    const prefersCompactAnswer =
+        shouldFollowMotifShape &&
+        (responseSource === 'section' ||
+            responseSource === 'form' ||
+            responseMode === 'paraphrase');
+    const carriesTripletMemory = shouldFollowMotifShape && Boolean(responseSignature?.tripletCarry);
 
     if (deviceType === 'bluesLick') {
         const root = targetChord.rootMidi;
@@ -138,9 +177,10 @@ export function generateMelodicDevice(deviceType, ctx) {
             });
         }
     } else if (deviceType === 'graceNote') {
+        const graceInterval = motifApproach;
         deviceBuffer = [
             {
-                midi: selectedMidi - 1,
+                midi: selectedMidi + graceInterval,
                 velocity: devBaseVel * 0.8,
                 durationSteps: 1,
                 style: activeStyle,
@@ -148,7 +188,7 @@ export function generateMelodicDevice(deviceType, ctx) {
             {
                 midi: selectedMidi,
                 velocity: devBaseVel * 1.1,
-                durationSteps: 2,
+                durationSteps: carriesTripletMemory && prefersCompactAnswer ? 1 : 2,
                 style: activeStyle,
             },
         ];
@@ -222,7 +262,7 @@ export function generateMelodicDevice(deviceType, ctx) {
             return null;
         }
         const rootMidi = targetChord.rootMidi;
-        let curr = selectedMidi + 3;
+        let curr = selectedMidi + (responseDirection < 0 ? 1 : 3);
         for (let i = 0; i < 4; i++) {
             let n = curr - 1;
             while (!((scaleMask >> ((n - rootMidi + 120) % 12)) & 1) && n > curr - 5) {
@@ -237,31 +277,61 @@ export function generateMelodicDevice(deviceType, ctx) {
             curr = n;
         }
     } else if (deviceType === 'run' || deviceType === 'enclosure') {
-        deviceBuffer = [
-            {
-                midi: selectedMidi + (deviceType === 'run' ? -2 : 1),
-                velocity: devBaseVel * 0.9,
-                durationSteps: 1,
-                style: activeStyle,
-            },
-            {
-                midi: selectedMidi - 1,
-                velocity: devBaseVel * 1.1,
-                durationSteps: 1,
-                style: activeStyle,
-            },
-            {
-                midi: selectedMidi,
-                velocity: devBaseVel * 1.2,
-                durationSteps: 1,
-                style: activeStyle,
-            },
-        ];
+        const upperNeighbor = selectedMidi + 1;
+        const lowerNeighbor = selectedMidi - 1;
+        if (deviceType === 'run') {
+            deviceBuffer = [
+                {
+                    midi: selectedMidi + motifApproach * 2,
+                    velocity: devBaseVel * 0.9,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
+                {
+                    midi: selectedMidi + motifApproach,
+                    velocity: devBaseVel * 1.1,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
+                {
+                    midi: selectedMidi,
+                    velocity: devBaseVel * 1.2,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
+            ];
+        } else {
+            const firstNeighbor = motifApproach > 0 ? upperNeighbor : lowerNeighbor;
+            const secondNeighbor = motifApproach > 0 ? lowerNeighbor : upperNeighbor;
+            deviceBuffer = [
+                {
+                    midi: firstNeighbor,
+                    velocity: devBaseVel * 0.9,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
+                {
+                    midi: secondNeighbor,
+                    velocity: devBaseVel * 1.1,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
+                {
+                    midi: selectedMidi,
+                    velocity: devBaseVel * 1.2,
+                    durationSteps: 1,
+                    style: activeStyle,
+                },
+            ];
+        }
     } else if (deviceType === 'slide') {
         const dir =
-            (isSoloistGuitarMode(soloist.mode) || activeStyle === 'bird') && Math.random() < 0.3
-                ? 1
-                : -1;
+            motifSlideDirection !== 0
+                ? motifSlideDirection
+                : (isSoloistGuitarMode(soloist.mode) || activeStyle === 'bird') &&
+                    Math.random() < 0.3
+                  ? 1
+                  : -1;
         deviceBuffer = [
             {
                 midi: selectedMidi,
@@ -314,15 +384,17 @@ export function generateMelodicDevice(deviceType, ctx) {
         ];
     } else if (deviceType === 'chromaticEnclosure') {
         // Enclosure: One above, one below, target
+        const firstNeighbor = motifApproach > 0 ? selectedMidi + 1 : selectedMidi - 1;
+        const secondNeighbor = motifApproach > 0 ? selectedMidi - 1 : selectedMidi + 1;
         deviceBuffer = [
             {
-                midi: selectedMidi + 1,
+                midi: firstNeighbor,
                 durationSteps: 1,
                 velocity: devBaseVel * 0.8,
                 style: activeStyle,
             },
             {
-                midi: selectedMidi - 1,
+                midi: secondNeighbor,
                 durationSteps: 1,
                 velocity: devBaseVel * 0.8,
                 style: activeStyle,

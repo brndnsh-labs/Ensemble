@@ -38,6 +38,124 @@ const evansIntervals = new Set([2, 5, 6, 9]);
 const alteredHookIntervals = new Set([1, 3, 6, 8]);
 
 /**
+ * @param {string[]} devices
+ * @param {string | null | undefined} device
+ */
+function pushUniqueDevice(devices, device) {
+    if (device && !devices.includes(device)) {
+        devices.push(device);
+    }
+}
+
+/**
+ * Bias later-loop devices toward phrase commentary instead of generic flourish.
+ * @param {{
+ *   activeStyle: string,
+ *   responseMode: string,
+ *   responseSource: string,
+ *   responseDirection: number,
+ *   responseSignature: any,
+ *   isResponseEntryTarget: boolean,
+ *   isResponseCadenceTarget: boolean,
+ *   intensity: number,
+ *   isLineStyle: boolean,
+ *   supportRole: string,
+ *   seedNote: any
+ * }} options
+ * @returns {string[]}
+ */
+function buildMotifDevicePriorities(options) {
+    const {
+        activeStyle,
+        responseMode,
+        responseSource,
+        responseDirection,
+        responseSignature,
+        isResponseEntryTarget,
+        isResponseCadenceTarget,
+        intensity,
+        isLineStyle,
+        supportRole,
+        seedNote,
+    } = options;
+    /** @type {string[]} */
+    const priorities = [];
+    if (activeStyle === 'rock' || activeStyle === 'shred') {
+        return priorities;
+    }
+    const isLongArcRecall = responseSource === 'section' || responseSource === 'form';
+    const hasTripletCarry = Boolean(responseSignature?.tripletCarry || seedNote?.tripletPlacement);
+    const isCadenceComment = isResponseCadenceTarget || supportRole === 'cadence';
+    const isEntryComment = isResponseEntryTarget || supportRole === 'anchor';
+
+    if (isCadenceComment) {
+        if (activeStyle === 'blues') {
+            pushUniqueDevice(priorities, 'bluesCurl');
+            pushUniqueDevice(priorities, 'slide');
+        } else if (activeStyle === 'neo') {
+            pushUniqueDevice(priorities, 'quartal');
+            pushUniqueDevice(priorities, 'graceNote');
+        } else if (activeStyle === 'bossa') {
+            pushUniqueDevice(priorities, 'enclosure');
+            pushUniqueDevice(priorities, 'slide');
+        } else if (activeStyle === 'rock' || activeStyle === 'scalar') {
+            pushUniqueDevice(priorities, 'slide');
+            pushUniqueDevice(priorities, 'graceNote');
+        } else {
+            pushUniqueDevice(priorities, 'enclosure');
+            pushUniqueDevice(priorities, 'chromaticEnclosure');
+        }
+    }
+
+    if (hasTripletCarry && isLineStyle) {
+        pushUniqueDevice(priorities, 'enclosure');
+        pushUniqueDevice(priorities, 'run');
+        if (activeStyle === 'jazz') {
+            pushUniqueDevice(priorities, 'bebopScale');
+        }
+    }
+
+    if (isEntryComment && !isCadenceComment) {
+        if (activeStyle === 'neo') {
+            pushUniqueDevice(priorities, 'graceNote');
+            pushUniqueDevice(priorities, 'quartal');
+        } else if (isLineStyle) {
+            pushUniqueDevice(priorities, 'graceNote');
+            pushUniqueDevice(priorities, 'enclosure');
+        } else {
+            pushUniqueDevice(priorities, 'graceNote');
+            pushUniqueDevice(priorities, 'slide');
+        }
+    }
+
+    if (responseMode === 'development' && !isCadenceComment) {
+        if (isLineStyle) {
+            pushUniqueDevice(priorities, 'run');
+        }
+        if (activeStyle === 'neo') {
+            pushUniqueDevice(priorities, 'quartal');
+        }
+        if (activeStyle === 'blues') {
+            pushUniqueDevice(priorities, 'slide');
+        }
+        if (
+            activeStyle === 'bird' &&
+            intensity > 0.82 &&
+            !isLongArcRecall &&
+            responseDirection !== 0
+        ) {
+            pushUniqueDevice(priorities, 'birdFlurry');
+        }
+    }
+
+    if (responseDirection < 0 && isLineStyle) {
+        pushUniqueDevice(priorities, 'chromaticFall');
+    }
+
+    return priorities;
+}
+
+/**
  * Primary entry point for pitch selection.
  * @param {import('../types.js').EnsembleState} state
  * @param {number} step
@@ -313,6 +431,7 @@ export function selectPitchAndDevices(
                 responseSignature?.notes?.length) ||
                 isMotivicHeadBypass),
     );
+    const isRecallSource = responseSource === 'section' || responseSource === 'form';
 
     const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
     const isCallResponse =
@@ -718,11 +837,21 @@ export function selectPitchAndDevices(
               : 3.1;
         deviceBaseProb *= thematicBoost;
     }
+    if (activeStyle === 'neo' && isLaterHeadBypass && !isResponseGuidedPhrase) {
+        deviceBaseProb *= 0.58;
+    }
     if (loopCount > 1 && !isHeadBypass) {
         deviceBaseProb *= isLineStyle ? 0.95 + intensity * 0.2 : 1.15 + intensity * 0.35;
     }
     if (seedNote?.isAnchor) {
         deviceBaseProb *= 0.35;
+    }
+    if (
+        (activeStyle === 'rock' || activeStyle === 'shred') &&
+        loopCount > 0 &&
+        seedNote?.isAnchor
+    ) {
+        deviceBaseProb = 0;
     }
     if (isResponseGuidedPhrase) {
         const deviceDamp =
@@ -732,6 +861,8 @@ export function selectPitchAndDevices(
         deviceBaseProb *= deviceDamp;
         if (responseSource === 'section') {
             deviceBaseProb *= 1 - Math.min(0.22, (responseConfig?.spaceBias || 0) * 0.4);
+        } else if (responseSource === 'form') {
+            deviceBaseProb *= 1 - Math.min(0.16, (responseConfig?.spaceBias || 0) * 0.28);
         }
         if (isResponseEntryTarget || isResponseCadenceTarget || responsePitchClass !== null) {
             deviceBaseProb *= 0.68;
@@ -762,6 +893,15 @@ export function selectPitchAndDevices(
         isPiano: false,
         dynamicCenter: 72,
         scaleMask,
+        seedNote,
+        supportRole,
+        sustainBias,
+        responseSignature,
+        responseSource,
+        responseMode,
+        responseDirection,
+        responseEntryTarget: isResponseEntryTarget,
+        responseCadenceTarget: isResponseCadenceTarget,
     };
 
     // --- Structural Awareness: Turnaround Handling ---
@@ -818,6 +958,21 @@ export function selectPitchAndDevices(
                     device !== 'run' && device !== 'birdFlurry' && device !== 'sheetsOfSound',
             );
         }
+        const allowHeavyRecallDevice =
+            responseMode === 'development' &&
+            intensity > 0.82 &&
+            (activeStyle === 'bird' || activeStyle === 'jazz') &&
+            !isRecallSource;
+        if (isResponseGuidedPhrase && (responseMode === 'paraphrase' || isRecallSource)) {
+            allowed = allowed.filter(
+                (device) =>
+                    allowHeavyRecallDevice ||
+                    (device !== 'birdFlurry' && device !== 'sheetsOfSound'),
+            );
+        }
+        if (isResponseGuidedPhrase && (isResponseCadenceTarget || supportRole === 'cadence')) {
+            allowed = allowed.filter((device) => device !== 'quartalStack');
+        }
 
         // --- Greats Profiles: Device Priority ---
         if (
@@ -841,6 +996,26 @@ export function selectPitchAndDevices(
             } else if (profile === 'gilmour' && /** @type {any} */ (durationSteps) >= 4) {
                 allowed = ['slide', ...allowed];
             }
+        }
+        if (isResponseGuidedPhrase || (isLaterHeadBypass && loopCount > 0)) {
+            const motifPriorities = buildMotifDevicePriorities({
+                activeStyle,
+                responseMode,
+                responseSource,
+                responseDirection,
+                responseSignature,
+                isResponseEntryTarget,
+                isResponseCadenceTarget,
+                intensity,
+                isLineStyle,
+                supportRole,
+                seedNote,
+            });
+            /** @type {string[]} */
+            const prioritized = [];
+            motifPriorities.forEach((device) => pushUniqueDevice(prioritized, device));
+            allowed.forEach((device) => pushUniqueDevice(prioritized, device));
+            allowed = prioritized;
         }
 
         const deviceType =

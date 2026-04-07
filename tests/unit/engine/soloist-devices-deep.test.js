@@ -120,12 +120,36 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             expect(enc.length).toBe(3);
         });
 
+        it('mirrors descending form-response contour in a run device', () => {
+            ctx.selectedMidi = 64;
+            const run = generateMelodicDevice('run', {
+                ...ctx,
+                activeStyle: 'jazz',
+                responseSource: 'form',
+                responseMode: 'development',
+                responseDirection: -1,
+            });
+            expect(run.map((note) => note.midi)).toEqual([66, 65, 64]);
+        });
+
         it('should handle slide with variants', () => {
             ctx.soloist.mode = 'guitar';
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
             const slide = generateMelodicDevice('slide', ctx);
             expect(slide.length).toBe(1);
             randomSpy.mockRestore();
+        });
+
+        it('approaches form-response cadence notes from above with grace-note commentary', () => {
+            const device = generateMelodicDevice('graceNote', {
+                ...ctx,
+                activeStyle: 'jazz',
+                responseSource: 'form',
+                responseCadenceTarget: true,
+                responseDirection: -1,
+            });
+            expect(device[0].midi).toBe(61);
+            expect(device[1].midi).toBe(60);
         });
 
         it('should handle quartal', () => {

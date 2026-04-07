@@ -53,12 +53,14 @@ describe('Soloist Motivic Response', () => {
         expect(jazz.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.68);
         expect(jazz.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.65);
         expect(jazz.aggregate.laterLoopSectionCadenceStability).toBeGreaterThanOrEqual(0.72);
+        expect(jazz.aggregate.laterLoopFormResponseShare).toBeGreaterThanOrEqual(0.08);
 
         expect(blues.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.5);
         expect(blues.aggregate.loop1AnchorExactRate).toBeGreaterThanOrEqual(0.7);
         expect(blues.aggregate.laterLoopCadenceStability).toBeGreaterThanOrEqual(0.45);
         expect(blues.aggregate.laterLoopAnchorExactRate).toBeGreaterThanOrEqual(0.78);
         expect(blues.aggregate.laterLoopTripletCarryShare).toBeGreaterThanOrEqual(0.45);
+        expect(blues.aggregate.laterLoopFormResponseShare).toBeGreaterThanOrEqual(0.08);
 
         expect(rock.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.67);
         expect(rock.aggregate.loop1ContourEchoShare).toBeGreaterThanOrEqual(0.35);
@@ -66,6 +68,7 @@ describe('Soloist Motivic Response', () => {
         expect(rock.aggregate.laterLoopTripletCarryShare).toBe(0);
         expect(rock.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.78);
         expect(rock.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.84);
+        expect(rock.aggregate.laterLoopFormResponseShare).toBe(0);
 
         expect(neo.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.35);
         expect(neo.aggregate.loop1RhythmReuseShare).toBeLessThanOrEqual(0.6);
@@ -78,6 +81,7 @@ describe('Soloist Motivic Response', () => {
         expect(neo.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThan(
             neo.aggregate.loop1RhythmReuseShare + 0.25,
         );
+        expect(neo.aggregate.laterLoopFormResponseShare).toBeGreaterThanOrEqual(0.04);
 
         expect(bossa.aggregate.loop1RhythmReuseShare).toBeLessThanOrEqual(0.5);
         expect(bossa.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.72);
@@ -86,6 +90,7 @@ describe('Soloist Motivic Response', () => {
         expect(bossa.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThan(
             bossa.aggregate.loop1RhythmReuseShare + 0.2,
         );
+        expect(bossa.aggregate.laterLoopFormResponseShare).toBeGreaterThanOrEqual(0.04);
     }, 25_000);
 
     it('keeps the audit head seed anchored and triplet-aware on later loops', () => {

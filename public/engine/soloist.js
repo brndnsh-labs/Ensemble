@@ -45,6 +45,7 @@ export function resetSoloistState(state) {
     soloist.phraseSectionOccurrence = 0; // @worker-mutation
     soloist.sectionRecall = {}; // @worker-mutation
     soloist.sectionRecallLoop = null; // @worker-mutation
+    soloist.formArcRecall = {}; // @worker-mutation
     if (soloist.phraseContext) {
         soloist.phraseContext.role = 'call'; // @worker-mutation
         soloist.phraseContext.skeleton = []; // @worker-mutation
@@ -136,6 +137,19 @@ function ensureSectionRecallLoop(soloist, loopCount) {
 
 /**
  * @param {import('../state/instruments.js').SoloistState} soloist
+ */
+function ensureFormArcRecall(soloist) {
+    if (
+        !soloist.formArcRecall ||
+        typeof soloist.formArcRecall !== 'object' ||
+        Array.isArray(soloist.formArcRecall)
+    ) {
+        soloist.formArcRecall = {}; // @worker-mutation
+    }
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
  * @param {number} loopCount
  * @param {any} signature
  */
@@ -162,6 +176,117 @@ function storeSectionRecallSignature(soloist, loopCount, signature) {
     existingEntry.latestSignature = signature;
     existingEntry.latestOccurrence = occurrence;
     soloist.sectionRecall[label] = existingEntry; // @worker-mutation
+}
+
+/**
+ * Preserve section signatures across chorus changes so later loops can answer with longer-form memory.
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {number} sourceLoop
+ * @param {any} signature
+ */
+function storeFormArcRecallSignature(soloist, sourceLoop, signature) {
+    if (!signature?.notes?.length || !soloist.phraseSectionLabel) {
+        return;
+    }
+
+    ensureFormArcRecall(soloist);
+
+    const label = soloist.phraseSectionLabel;
+    const occurrence = Math.max(1, soloist.phraseSectionOccurrence || 1);
+    const loop = Number.isFinite(sourceLoop) ? sourceLoop : 0;
+    const existingEntry =
+        soloist.formArcRecall && typeof soloist.formArcRecall[label] === 'object'
+            ? soloist.formArcRecall[label]
+            : {};
+    const byOccurrence =
+        existingEntry.byOccurrence &&
+        typeof existingEntry.byOccurrence === 'object' &&
+        !Array.isArray(existingEntry.byOccurrence)
+            ? existingEntry.byOccurrence
+            : {};
+    const occurrenceKey = String(occurrence);
+    const occurrenceEntry =
+        byOccurrence[occurrenceKey] && typeof byOccurrence[occurrenceKey] === 'object'
+            ? byOccurrence[occurrenceKey]
+            : {};
+
+    if (!occurrenceEntry.firstSignature || !Number.isFinite(occurrenceEntry.firstLoop)) {
+        occurrenceEntry.firstSignature = signature;
+        occurrenceEntry.firstLoop = loop;
+    }
+    occurrenceEntry.latestSignature = signature;
+    occurrenceEntry.latestLoop = loop;
+    byOccurrence[occurrenceKey] = occurrenceEntry;
+    existingEntry.byOccurrence = byOccurrence;
+
+    if (!existingEntry.firstSignature || !Number.isFinite(existingEntry.firstLoop)) {
+        existingEntry.firstSignature = signature;
+        existingEntry.firstLoop = loop;
+        existingEntry.firstOccurrence = occurrence;
+    }
+    existingEntry.latestSignature = signature;
+    existingEntry.latestLoop = loop;
+    existingEntry.latestOccurrence = occurrence;
+    soloist.formArcRecall[label] = existingEntry; // @worker-mutation
+}
+
+/**
+ * @param {import('../state/instruments.js').SoloistState} soloist
+ * @param {{ label: string, occurrence: number }} sectionContext
+ * @param {number} loopCount
+ * @returns {{ signature: any, source: 'form', sameOccurrence: boolean } | null}
+ */
+function getFormArcRecallCandidate(soloist, sectionContext, loopCount) {
+    if (!Number.isFinite(loopCount) || loopCount <= 0) {
+        return null;
+    }
+
+    ensureFormArcRecall(soloist);
+
+    const labelEntry =
+        soloist.formArcRecall && typeof soloist.formArcRecall[sectionContext.label] === 'object'
+            ? soloist.formArcRecall[sectionContext.label]
+            : null;
+    if (!labelEntry) {
+        return null;
+    }
+
+    const occurrenceKey = String(Math.max(1, sectionContext.occurrence || 1));
+    const occurrenceEntry =
+        labelEntry.byOccurrence && typeof labelEntry.byOccurrence[occurrenceKey] === 'object'
+            ? labelEntry.byOccurrence[occurrenceKey]
+            : null;
+
+    if (occurrenceEntry?.latestSignature?.notes?.length && occurrenceEntry.latestLoop < loopCount) {
+        return {
+            signature: occurrenceEntry.latestSignature,
+            source: 'form',
+            sameOccurrence: true,
+        };
+    }
+    if (occurrenceEntry?.firstSignature?.notes?.length && occurrenceEntry.firstLoop < loopCount) {
+        return {
+            signature: occurrenceEntry.firstSignature,
+            source: 'form',
+            sameOccurrence: true,
+        };
+    }
+    if (labelEntry.latestSignature?.notes?.length && labelEntry.latestLoop < loopCount) {
+        return {
+            signature: labelEntry.latestSignature,
+            source: 'form',
+            sameOccurrence: false,
+        };
+    }
+    if (labelEntry.firstSignature?.notes?.length && labelEntry.firstLoop < loopCount) {
+        return {
+            signature: labelEntry.firstSignature,
+            source: 'form',
+            sameOccurrence: false,
+        };
+    }
+
+    return null;
 }
 
 /**
@@ -343,6 +468,7 @@ function commitTrackedPhraseSignature(soloist, loopCount) {
         soloist.phraseContext.signature = signature; // @worker-mutation
     }
     storeSectionRecallSignature(soloist, sourceLoop, signature);
+    storeFormArcRecallSignature(soloist, sourceLoop, signature);
     soloist.recentNotes = []; // @worker-mutation
     soloist.phraseStartStep = null; // @worker-mutation
     soloist.phraseLoopCount = null; // @worker-mutation
@@ -477,6 +603,7 @@ function preparePhraseResponseContext(
     const sectionSignature = sectionEntry?.firstSignature?.notes?.length
         ? sectionEntry.firstSignature
         : null;
+    const formArcCandidate = getFormArcRecallCandidate(soloist, sectionContext, loopCount);
 
     let nextRole = 'call';
     if (canUseMotivicResponse) {
@@ -496,6 +623,7 @@ function preparePhraseResponseContext(
     soloist.phraseContext.sectionOccurrence = sectionContext.occurrence; // @worker-mutation
 
     const lastSignature = soloist.phraseContext.signature;
+    const formArcSignature = formArcCandidate?.signature || null;
     let responseSignature = null;
     let responseSource = 'free';
     if (nextRole === 'response' && canUseMotivicResponse) {
@@ -512,18 +640,42 @@ function preparePhraseResponseContext(
                 sectionContext.isRestatement &&
                 Math.random() < (responseConfig.sectionRecall || 0),
         );
+        const canUseFormArcRecall = Boolean(
+            formArcSignature?.notes?.length &&
+                loopCount > 1 &&
+                (responseConfig.formArcRecall || 0) > 0,
+        );
+        const shouldPreferFormArcRecall = Boolean(
+            canUseFormArcRecall &&
+                Math.random() <
+                    Math.min(
+                        0.96,
+                        (responseConfig.formArcRecall || 0) *
+                            (formArcCandidate?.sameOccurrence ? 1 : 0.78) *
+                            (sectionContext.isRestatement ? 1.08 : 0.94),
+                    ),
+        );
         if (shouldPreferSectionRecall) {
             responseSignature = sectionSignature;
             responseSource = 'section';
+        } else if (shouldPreferFormArcRecall) {
+            responseSignature = formArcSignature;
+            responseSource = 'form';
         } else if (loopCount > 1 && lastSignature?.notes?.length) {
             responseSignature = lastSignature;
             responseSource = 'recent';
+        } else if (canUseFormArcRecall) {
+            responseSignature = formArcSignature;
+            responseSource = 'form';
         } else if (seedSignature?.notes?.length) {
             responseSignature = seedSignature;
             responseSource = 'seed';
         } else if (sectionSignature) {
             responseSignature = sectionSignature;
             responseSource = 'section';
+        } else if (formArcSignature?.notes?.length) {
+            responseSignature = formArcSignature;
+            responseSource = 'form';
         } else if (lastSignature?.notes?.length) {
             responseSignature = lastSignature;
             responseSource = 'recent';
@@ -531,6 +683,13 @@ function preparePhraseResponseContext(
     } else if (nextRole === 'response' && sectionSignature) {
         responseSignature = sectionSignature;
         responseSource = 'section';
+    } else if (
+        nextRole === 'response' &&
+        formArcSignature?.notes?.length &&
+        (responseConfig?.formArcRecall || 0) > 0
+    ) {
+        responseSignature = formArcSignature;
+        responseSource = 'form';
     } else if (nextRole === 'response') {
         responseSignature =
             buildSeedPhraseSignature(
@@ -543,7 +702,12 @@ function preparePhraseResponseContext(
             ) ||
             lastSignature ||
             null;
-        responseSource = responseSignature?.sourceKind === 'seed' ? 'seed' : 'recent';
+        responseSource =
+            responseSignature?.sourceKind === 'seed'
+                ? 'seed'
+                : responseSignature?.sourceKind === 'performed'
+                  ? 'recent'
+                  : 'free';
     }
 
     soloist.phraseContext.responseSignature = responseSignature; // @worker-mutation

@@ -372,10 +372,20 @@ export function buildPerformanceMetrics(capture, loop = 0) {
     };
 }
 
-function getResponseAttackTokens(events) {
+function getResponseAttackTokens(events, stepsPerBeat = 4) {
     const tokens = [];
     const seen = new Set();
+    const structuralSubdivision =
+        stepsPerBeat % 2 === 0 ? Math.max(1, stepsPerBeat / 2) : Math.max(1, stepsPerBeat);
     for (const event of events) {
+        const isStructuralDeviceAttack =
+            !event.note.device ||
+            Boolean(event.seedNote) ||
+            Boolean(event.note.tripletPlacement) ||
+            event.stepInMeasure % structuralSubdivision === 0;
+        if (!isStructuralDeviceAttack) {
+            continue;
+        }
         const tripletPlacement =
             event.note.tripletPlacement || event.seedNote?.tripletPlacement || '-';
         const token = `${event.stepInMeasure}:${tripletPlacement}`;
@@ -423,8 +433,8 @@ export function buildLoopResponseMetrics(capture, sourceLoop = 0, targetLoop = 1
     for (let measureIndex = 0; measureIndex < capture.arrangement.measuresPerLoop; measureIndex++) {
         const sourceEvents = getMeasureEvents(capture, sourceLoop, measureIndex);
         const targetEvents = getMeasureEvents(capture, targetLoop, measureIndex);
-        const sourceTokens = getResponseAttackTokens(sourceEvents);
-        const targetTokens = getResponseAttackTokens(targetEvents);
+        const sourceTokens = getResponseAttackTokens(sourceEvents, capture.ts.stepsPerBeat);
+        const targetTokens = getResponseAttackTokens(targetEvents, capture.ts.stepsPerBeat);
         const targetTokenSet = new Set(targetTokens);
         const overlapCount = sourceTokens.filter((token) => targetTokenSet.has(token)).length;
         rhythmScores.push(
@@ -526,11 +536,14 @@ export function buildSectionRecallMetrics(capture, loop = 0) {
                 seedNote.step === event.seedPosition && seedNote.midi === event.note.midi,
         );
         const lastMeasure = sectionMeasures[sectionMeasures.length - 1];
-        const cadenceFlavor = measureRows[lastMeasure?.measureIndex || 0]?.cadenceFlavor || 'rest';
+        const lastSectionEvent = sectionEvents[sectionEvents.length - 1] || null;
+        const cadenceFlavor = lastSectionEvent
+            ? classifyCadence(lastSectionEvent.note, lastSectionEvent.chord).flavor
+            : measureRows[lastMeasure?.measureIndex || 0]?.cadenceFlavor || 'rest';
         const row = {
             label: section.label,
             occurrence,
-            tokens: getResponseAttackTokens(sectionEvents),
+            tokens: getResponseAttackTokens(sectionEvents, capture.ts.stepsPerBeat),
             cadenceFlavor,
             anchorExactRate:
                 anchorNotes.length > 0 ? anchorExact / Math.max(1, anchorNotes.length) : 1,
@@ -599,6 +612,34 @@ export function buildAggregateSectionRecallMetrics(capture, targetLoops = []) {
     };
 }
 
+export function buildAggregateFormArcMetrics(capture, targetLoops = []) {
+    const effectiveLoops = targetLoops.filter((loop) =>
+        capture.events.some((event) => event.loop === loop && event.loopStep >= 0),
+    );
+    const loopMetrics = effectiveLoops.map((loop) => {
+        const loopEvents = getLoopEvents(capture, loop);
+        const responseEvents = loopEvents.filter((event) => event.role === 'response');
+        const formEvents = responseEvents.filter((event) => event.responseSource === 'form');
+        const formDeviceEvents = formEvents.filter((event) => event.note.device);
+        return {
+            loop,
+            formResponseShare: responseEvents.length
+                ? formEvents.length / responseEvents.length
+                : 0,
+            formDeviceShare: formEvents.length ? formDeviceEvents.length / formEvents.length : 0,
+        };
+    });
+    const loop1 = loopMetrics.find((row) => row.loop === 1) || null;
+    const laterRows = loopMetrics.filter((row) => row.loop > 1);
+    const aggregateLaterRows = laterRows.length > 0 ? laterRows : loop1 ? [loop1] : [];
+
+    return {
+        loop1FormResponseShare: loop1?.formResponseShare || 0,
+        laterLoopFormResponseShare: average(aggregateLaterRows.map((row) => row.formResponseShare)),
+        laterLoopFormDeviceShare: average(aggregateLaterRows.map((row) => row.formDeviceShare)),
+    };
+}
+
 export function buildSeedSweep({
     genre,
     bpm,
@@ -642,6 +683,10 @@ export function buildSeedSweep({
             capture,
             Array.from({ length: Math.max(0, loops - 1) }, (_, index) => index + 1),
         );
+        const formArcMetrics = buildAggregateFormArcMetrics(
+            capture,
+            Array.from({ length: Math.max(0, loops - 1) }, (_, index) => index + 1),
+        );
 
         sweepRows.push({
             genre,
@@ -655,6 +700,7 @@ export function buildSeedSweep({
             ...buildPerformanceMetrics(capture, 0),
             ...responseMetrics,
             ...sectionMetrics,
+            ...formArcMetrics,
         });
     }
 
@@ -718,6 +764,11 @@ export function buildSeedSweepSummary(rows, focusCount = 5) {
             laterLoopSectionCadenceStability: average(
                 rows.map((row) => row.laterLoopSectionCadenceStability || 0),
             ),
+            loop1FormResponseShare: average(rows.map((row) => row.loop1FormResponseShare || 0)),
+            laterLoopFormResponseShare: average(
+                rows.map((row) => row.laterLoopFormResponseShare || 0),
+            ),
+            laterLoopFormDeviceShare: average(rows.map((row) => row.laterLoopFormDeviceShare || 0)),
         },
     };
 }
@@ -1050,6 +1101,8 @@ export function simulateSoloistLoops({ state, arrangement, loops = 3, style = 's
                         sectionLabel: currentSection?.label || 'Main',
                         role: state.soloist.phraseContext?.role || '-',
                         profile: state.soloist.phraseContext?.profile || '-',
+                        responseMode: state.soloist.phraseContext?.responseMode || 'free',
+                        responseSource: state.soloist.phraseContext?.responseSource || 'free',
                         note,
                         seedNote,
                         isSeedStep: Boolean(seedNote),
