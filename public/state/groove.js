@@ -34,8 +34,6 @@ import { ACTIONS } from '../types.js';
  * @property {string} seed - Thematic seed for deterministic generation.
  * @property {any} audioBuffers - Cache for decoded drum samples.
  * @property {string} genreFeel - Active genre for procedural nuances ('Rock', 'Jazz', 'Funk').
- * @property {boolean} larsMode - Whether "Lars Mode" (tempo drift) is active.
- * @property {number} larsIntensity - Intensity of tempo drift (0.0 - 1.0).
  * @property {boolean} fillActive - Whether a drum fill is currently being played.
  * @property {Object} fillSteps - Transient storage for the generated fill pattern.
  * @property {GainNode|null} lastHatGain - Last gain node for the hi-hat.
@@ -90,8 +88,6 @@ export const groove = deepSignal({
     seed: '',
     audioBuffers: {},
     genreFeel: 'Rock',
-    larsMode: false,
-    larsIntensity: 0.5,
     lastSmartGenre: 'Rock',
     pendingGenreFeel: null,
     genreSwitchCountdown: null,
@@ -207,12 +203,6 @@ export function grooveReducer(action, payload, playback) {
                 return true;
             }
             return false;
-        case ACTIONS.SET_LARS_MODE:
-            groove.larsMode = !!payload;
-            return true;
-        case ACTIONS.SET_LARS_INTENSITY:
-            groove.larsIntensity = Math.max(0, Math.min(1, payload));
-            return true;
         case ACTIONS.SET_GROOVE_SEED:
             if (!groove.sectionSeedMap) {
                 groove.sectionSeedMap = {};

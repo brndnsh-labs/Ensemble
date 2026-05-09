@@ -1550,10 +1550,6 @@ function getGenreMappedSoloistStyle(genreFeel) {
  * @returns {string}
  */
 export function resolveSoloistStyle(style, genreFeel) {
-    if (style === 'lead_sheet') {
-        return 'lead_sheet';
-    }
-
     if (!style || style === 'smart') {
         const smartStyle = getSmartGenreSoloistStyle(genreFeel);
         if (smartStyle && smartStyle !== 'smart') {

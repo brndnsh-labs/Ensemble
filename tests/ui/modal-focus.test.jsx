@@ -83,8 +83,6 @@ describe('Modal Accessibility Focus', () => {
             <button id="editArrangementBtn"></button>
             <input id="masterVolume">
             <input id="bpmInput">
-            <input type="radio" name="analyzerMode" value="chords" checked>
-            <input type="radio" name="analyzerMode" value="melody">
         `;
 
         render(<Transport />, document.getElementById('transportContainer'));

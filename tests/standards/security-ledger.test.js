@@ -31,8 +31,6 @@ describe('Security Ledger Verification: DOM Injection', () => {
         return (
             !f.includes('public/dist/') &&
             !f.includes('test-dist/') &&
-            !f.includes('audio-analyzer-lite.js') &&
-            !f.includes('musicxml-parser.js') &&
             !f.includes('ManualModal.jsx')
         );
     });
@@ -62,7 +60,6 @@ describe('Security Ledger Verification: DOM Injection', () => {
             'public/components/ChordVisualizer.jsx',
             'public/components/SectionCard.jsx',
             'public/components/NotificationLayer.jsx',
-            'public/components/AnalyzerModal.jsx',
         ];
 
         filesToCheck.forEach((file) => {

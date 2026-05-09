@@ -229,7 +229,6 @@ export function hydrateState() {
                           : 'monophonic',
                 ),
                 seed: savedState.soloist.seed || '',
-                leadSheetMelody: savedState.soloist.leadSheetMelody || [],
             });
         }
         if (savedState.harmony) {
@@ -267,8 +266,6 @@ export function hydrateState() {
                     savedState.groove.genreFeel && GENRE_FEELS.includes(savedState.groove.genreFeel)
                         ? savedState.groove.genreFeel
                         : 'Rock',
-                larsMode: savedState.groove.larsMode || false,
-                larsIntensity: clamp(savedState.groove.larsIntensity, 0, 1, 0.5),
                 lastSmartGenre:
                     savedState.groove.lastSmartGenre ||
                     GENRE_NAMES.find(

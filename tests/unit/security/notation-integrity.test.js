@@ -1,9 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
 import * as stateModule from '../../../public/state.js';
 import { hydrateState, loadFromUrl } from '../../../public/state-hydration.js';
-import { ACTIONS } from '../../../public/types.js';
 
 // Mock dependencies
 vi.mock('../../../public/state.js', () => {
@@ -104,22 +102,6 @@ describe('Notation Integrity: Regression Prevention', () => {
             hydrateState();
             const state = stateModule.getState();
             expect(state.arranger.notation).toBe('name');
-        });
-    });
-
-    describe('Reducer Integrity', () => {
-        it('sets a valid notation when importing MusicXML', () => {
-            const payload = {
-                hasChords: true,
-                sections: [{ id: 'new', value: 'C | G' }],
-                leadSheetMelody: [],
-            };
-
-            arrangerReducer(ACTIONS.IMPORT_MUSICXML, payload);
-
-            // Should be 'name' or another valid UI notation, definitely NOT 'literal'
-            expect(arranger.notation).toBe('name');
-            expect(['roman', 'name', 'nns']).toContain(arranger.notation);
         });
     });
 });

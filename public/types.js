@@ -15,7 +15,6 @@
  * @property {boolean} settings - Settings modal visibility.
  * @property {boolean} editor - Song editor modal visibility.
  * @property {boolean} share - Share modal visibility.
- * @property {boolean} analyzer - Audio analyzer modal visibility.
  * @property {boolean} generateSong - Song generator modal visibility.
  * @property {boolean} performance - Performance mode modal visibility.
  * @property {boolean} manual - User manual modal visibility.
@@ -107,14 +106,6 @@
  */
 
 /**
- * @typedef {Object} ActionPayloadImportMusicXML
- * @property {boolean} hasChords
- * @property {Array<import('./state/arranger.js').Section>} [sections]
- * @property {string} [xmlKey]
- * @property {Array<any>} [leadSheetMelody]
- */
-
-/**
  * @typedef {Object} ActionPayloadLoadTemplate
  * @property {Array<import('./state/arranger.js').Section>} sections
  * @property {boolean} [isMinor]
@@ -198,7 +189,6 @@
  * @typedef {Object} ActionPayloadUpdateConductorState
  * @property {number} [targetIntensity]
  * @property {number} [stepSize]
- * @property {number} [larsBpmOffset]
  * @property {Object|null} [form]
  * @property {number} [loopCount]
  * @property {number} [formIteration]
@@ -218,8 +208,6 @@
 
 /**
  * @typedef {Object} ActionPayloadMap
- * @property {ActionPayloadImportMusicXML} IMPORT_MUSICXML
- * @property {undefined} CLEAR_LEAD_SHEET
  * @property {ActionPayloadSetParam} SET_PARAM
  * @property {number} SET_BAND_INTENSITY
  * @property {number} SET_COMPLEXITY
@@ -246,8 +234,6 @@
  * @property {number} SET_SWING
  * @property {string} SET_SWING_SUB
  * @property {number} SET_HUMANIZE
- * @property {boolean} SET_LARS_MODE
- * @property {number} SET_LARS_INTENSITY
  * @property {ActionPayloadSetGenreFeel} SET_GENRE_FEEL
  * @property {number | null} SET_GENRE_COUNTDOWN
  * @property {number | string} SET_ACTIVE_MEASURE
@@ -290,8 +276,6 @@
  */
 
 export const ACTIONS = {
-    IMPORT_MUSICXML: 'IMPORT_MUSICXML',
-    CLEAR_LEAD_SHEET: 'CLEAR_LEAD_SHEET',
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
@@ -323,8 +307,6 @@ export const ACTIONS = {
     SET_SWING: 'SET_SWING',
     SET_SWING_SUB: 'SET_SWING_SUB',
     SET_HUMANIZE: 'SET_HUMANIZE',
-    SET_LARS_MODE: 'SET_LARS_MODE',
-    SET_LARS_INTENSITY: 'SET_LARS_INTENSITY',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
     SET_GENRE_COUNTDOWN: 'SET_GENRE_COUNTDOWN',
     SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',

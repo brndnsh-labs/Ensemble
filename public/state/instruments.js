@@ -1,8 +1,6 @@
 import { deepSignal } from 'deepsignal';
-import { KEY_ORDER } from '../config.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { ACTIONS } from '../types.js';
-import { arranger } from './arranger.js';
 import { groove } from './groove.js';
 
 export const MIXER_SETTINGS_VERSION = 2;
@@ -84,7 +82,6 @@ export const bass = deepSignal({
  * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
  * @property {number} hookRetentionProb - Probability of retaining a hook motif.
  * @property {{notes: Array<any>, loopLengthSteps: number}|null} sessionSeed - Seed melody for the current session.
- * @property {Array<any>} leadSheetMelody - Imported melody array.
  * @property {Array<any>} rhythmPlan - Planned rhythmic phrase.
  * @property {Array<any>} deviceBuffer - Buffer for melodic embellishments.
  * @property {Array<any>} embellishmentBuffer - Buffer for melodic embellishments.
@@ -198,7 +195,6 @@ export const soloist = deepSignal({
     isWaitingForEntry: false,
     isYielding: false,
     motifTracking: false,
-    leadSheetMelody: [],
     sessionSeed: null,
     phrasingIntensity: 0.5,
     phraseCount: 0,
@@ -276,31 +272,6 @@ export function instrumentReducer(action, payload) {
                 return true;
             }
             return false;
-        case ACTIONS.IMPORT_MUSICXML: {
-            const currentKey = arranger.key;
-            const xmlKey = payload.xmlKey || 'C';
-
-            let transposedMelody = payload.leadSheetMelody;
-            const currentIdx = KEY_ORDER.indexOf(currentKey);
-            const xmlIdx = KEY_ORDER.indexOf(xmlKey);
-
-            if (currentIdx !== -1 && xmlIdx !== -1 && currentIdx !== xmlIdx) {
-                const interval = currentIdx - xmlIdx;
-                transposedMelody = payload.leadSheetMelody.map((/** @type {any} */ n) => ({
-                    ...n,
-                    midi: n.midi + interval,
-                }));
-            }
-
-            soloist.leadSheetMelody = transposedMelody;
-            soloist.style = 'lead_sheet';
-            soloist.enabled = true;
-            break;
-        }
-        case ACTIONS.CLEAR_LEAD_SHEET:
-            soloist.leadSheetMelody = [];
-            soloist.style = soloist.lastSmartStyle || 'smart';
-            break;
         case ACTIONS.RESET_STATE:
             chords.enabled = true;
             chords.volume = 1.0;

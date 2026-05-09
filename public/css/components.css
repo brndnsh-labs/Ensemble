@@ -82,12 +82,6 @@
     border: 0;
 }
 
-/* Accessibility Focus States */
-.analyzer-drop-zone:focus-within {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
 /* Setting Groups & Rows (Consolidated UI) */
 .setting-group {
     margin-bottom: var(--space-6);

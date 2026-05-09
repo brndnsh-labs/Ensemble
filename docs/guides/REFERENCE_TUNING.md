@@ -78,7 +78,6 @@ This document tracks specific reference recordings used to calibrate the Ensembl
 - **Status:** Melody Harmonizer & Audio Workbench.
 - **Action:**
     - **Harmonizer:** Implemented a symbolic "Loop-Back Training" system (`HarmonizerTrainer`). The engine now builds a note-likelihood matrix by querying the Soloist's scale logic for every chord quality. This ensures harmonized progressions align with the band's repertoire.
-    - **Audio Analysis:** Added monophonic pitch extraction to `audio-analyzer-lite.js` with frequency decimation for performance.
     - **UI Integration:** Consolidated analysis tools into a unified "Audio Workbench" modal with a mode-toggle interface.
     - **Verification:** 743 tests passing (added unit tests for Harmonizer scoring logic and diatonic integrity).
 

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { arranger } from '../../../public/state/arranger.js';
 import {
     bass,
     chords,
@@ -12,7 +11,6 @@ import { ACTIONS } from '../../../public/types.js';
 describe('Instrument Reducer', () => {
     beforeEach(() => {
         instrumentReducer(ACTIONS.RESET_STATE);
-        arranger.key = 'C';
     });
 
     it('should reset all instruments to default values', () => {
@@ -31,25 +29,6 @@ describe('Instrument Reducer', () => {
         // Should return false for other modals
         const result = instrumentReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
         expect(result).toBe(false);
-    });
-
-    it('should handle MusicXML import with transposition', () => {
-        arranger.key = 'G';
-        const payload = {
-            xmlKey: 'C',
-            leadSheetMelody: [{ step: 0, midi: 60 }],
-        };
-        instrumentReducer(ACTIONS.IMPORT_MUSICXML, payload);
-        expect(soloist.style).toBe('lead_sheet');
-        expect(soloist.leadSheetMelody[0].midi).toBe(67);
-    });
-
-    it('should clear lead sheet', () => {
-        soloist.leadSheetMelody = [{ midi: 60 }];
-        soloist.lastSmartStyle = 'blues';
-        instrumentReducer(ACTIONS.CLEAR_LEAD_SHEET);
-        expect(soloist.leadSheetMelody.length).toBe(0);
-        expect(soloist.style).toBe('blues');
     });
 
     it('should set style for modules', () => {

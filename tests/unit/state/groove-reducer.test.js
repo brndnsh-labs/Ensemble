@@ -43,13 +43,6 @@ describe('Groove Reducer', () => {
         expect(result).toBe(false);
     });
 
-    it('should set Lars mode', () => {
-        grooveReducer(ACTIONS.SET_LARS_MODE, true);
-        expect(groove.larsMode).toBe(true);
-        grooveReducer(ACTIONS.SET_LARS_INTENSITY, 0.9);
-        expect(groove.larsIntensity).toBe(0.9);
-    });
-
     it('should set creativity and countdown', () => {
         grooveReducer(ACTIONS.SET_PARAM, { module: 'groove', param: 'creativity', value: true });
         expect(groove.creativity).toBe(true);
@@ -110,8 +103,6 @@ describe('Groove Reducer', () => {
                 swingSub: '16th',
                 lastDrumPreset: 'Jazz Kit',
                 genreFeel: 'Jazz',
-                larsMode: true,
-                larsIntensity: 0.2,
                 lastSmartGenre: 'Jazz',
                 pendingGenreFeel: { feel: 'Funk' },
                 genreSwitchCountdown: 2,

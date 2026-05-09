@@ -111,8 +111,6 @@ describe('InstrumentSettings Component', () => {
                     reverb: 0.3,
                     humanize: 40,
                     creativity: false,
-                    larsMode: false,
-                    larsIntensity: 0.5,
                     swing: 30,
                     swingSub: '8th',
                 },
@@ -146,12 +144,6 @@ describe('InstrumentSettings Component', () => {
 
         expect(humanizeSlider.hasAttribute('aria-valuetext')).toBe(true);
         expect(humanizeSlider.getAttribute('aria-valuetext')).toBe('40%');
-
-        const larsSlider = container.querySelector('#larsIntensitySlider');
-        expect(larsSlider).not.toBeNull();
-        expect(larsSlider.hasAttribute('aria-valuetext')).toBe(true);
-        // larsIntensity is 0.5, so 50%
-        expect(larsSlider.getAttribute('aria-valuetext')).toBe('50%');
     });
 
     it('should render and dispatch the Creativity toggle for groove module', () => {
@@ -163,8 +155,6 @@ describe('InstrumentSettings Component', () => {
                     reverb: 0.3,
                     humanize: 40,
                     creativity: false,
-                    larsMode: false,
-                    larsIntensity: 0.5,
                     swing: 30,
                     swingSub: '8th',
                 },

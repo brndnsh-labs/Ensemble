@@ -68,7 +68,6 @@ describe('ChordVisualizer Component', () => {
                     lastActiveChordIndex: 0,
                 },
                 soloist: {
-                    leadSheetMelody: [],
                     style: 'scalar',
                 },
                 vizState: {
@@ -220,42 +219,5 @@ describe('ChordVisualizer Component', () => {
         expect(visualizer?.getAttribute('data-vertical-fill')).toBe('paper-fill');
         expect(visualizer?.style.getPropertyValue('--lead-vertical-fill')).toBe('1.45');
         expect(visualizer?.style.getPropertyValue('--lead-vertical-type-fill')).toBe('1.26');
-    });
-
-    it('should render sparklines for short maximized lead sheets', () => {
-        setupState({
-            soloist: {
-                leadSheetMelody: [
-                    { globalStep: 0, midi: 60 },
-                    { globalStep: 2, midi: 64 },
-                ],
-                style: 'lead_sheet',
-            },
-            arranger: {
-                progression: [
-                    {
-                        sectionId: 's1',
-                        sectionLabel: 'Verse',
-                        beats: 4,
-                        absName: 'C',
-                        globalIndex: 0,
-                    },
-                ],
-                timeSignature: '4/4',
-                sections: [{ id: 's1', label: 'Verse', seamless: false }],
-                notation: 'absolute',
-            },
-            vizState: {
-                isMaximized: true,
-            },
-        });
-
-        act(() => {
-            render(<ChordVisualizer />, container);
-        });
-
-        const sparklines = container.querySelectorAll('.sparkline-container');
-        expect(sparklines.length).toBe(1);
-        expect(sparklines[0].querySelectorAll('.sparkline-bar').length).toBe(2);
     });
 });

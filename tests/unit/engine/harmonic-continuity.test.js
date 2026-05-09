@@ -57,7 +57,6 @@ vi.mock('../../../public/state.js', () => {
     const mockConductor = {
         targetIntensity: 0.35,
         stepSize: 0.0005,
-        larsBpmOffset: 0,
         form: null,
         loopCount: 0,
         formIteration: 0,
@@ -106,7 +105,6 @@ vi.mock('../../../public/engine/engine.js', () => ({
 vi.mock('../../../public/engine/conductor.js', () => ({
     updateAutoConductor: vi.fn(),
     checkSectionTransition: vi.fn(),
-    updateLarsTempo: vi.fn(),
 }));
 
 // Mock ui

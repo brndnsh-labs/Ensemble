@@ -146,7 +146,6 @@ export function getSyncState() {
             volume: soloist.volume,
             mode: soloist.mode,
             sessionSteps: soloist.sessionSteps,
-            leadSheetMelody: soloist.leadSheetMelody,
             seed: soloist.seed,
             sessionSeed: soloist.sessionSeed,
             phrasingIntensity: soloist.phrasingIntensity,

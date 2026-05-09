@@ -17,14 +17,12 @@ import { formatUnicodeSymbols } from '../utils.js';
  * @property {any} chord
  * @property {boolean} isActive
  * @property {string} notation
- * @property {any[]} [leadSheetMelody]
- * @property {boolean} showSparkline
  */
 
 /**
  * @param {ChordCardProps} props
  */
-const ChordCardComponent = ({ chord, isActive, notation, leadSheetMelody, showSparkline }) => {
+const ChordCardComponent = ({ chord, isActive, notation }) => {
     const disp = chord.display ? chord.display[notation] : null;
 
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
@@ -65,24 +63,8 @@ const ChordCardComponent = ({ chord, isActive, notation, leadSheetMelody, showSp
         }
     };
 
-    const sparklineNotes = useMemo(() => {
-        if (!showSparkline || !leadSheetMelody || leadSheetMelody.length === 0) {
-            return [];
-        }
-
-        if (chord.start === undefined) {
-            return [];
-        }
-
-        return leadSheetMelody.filter(
-            (/** @type {any} */ note) =>
-                note.globalStep >= chord.start && note.globalStep < chord.end,
-        );
-    }, [chord.end, chord.start, leadSheetMelody, showSparkline]);
-
     const classNames = [
         'chord-card',
-        sparklineNotes.length > 0 ? 'chord-card--with-sparkline' : '',
         chord.isMinor ? 'minor' : '',
         chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
         isActive ? 'active' : '',
@@ -102,21 +84,6 @@ const ChordCardComponent = ({ chord, isActive, notation, leadSheetMelody, showSp
                 </span>
             ) : (
                 <span className="chord-symbol">{formatUnicodeSymbols(chord.absName) || '...'}</span>
-            )}
-
-            {sparklineNotes.length > 0 && (
-                <div className="sparkline-container">
-                    {sparklineNotes.map((/** @type {any} */ note, /** @type {any} */ index) => {
-                        const height = Math.min(100, Math.max(15, ((note.midi - 48) / 36) * 100));
-                        return (
-                            <div
-                                key={index}
-                                className="sparkline-bar"
-                                style={`height: ${height}%`}
-                            />
-                        );
-                    })}
-                </div>
             )}
         </div>
     );
@@ -153,8 +120,6 @@ export function ChordVisualizer() {
         lastActiveChordIndex,
         sectionsState,
         notation,
-        leadSheetMelody,
-        soloistStyle,
         isMaximized,
         isPlaying,
     } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ state) => ({
@@ -163,8 +128,6 @@ export function ChordVisualizer() {
         lastActiveChordIndex: state.chords.lastActiveChordIndex,
         sectionsState: state.arranger.sections,
         notation: state.arranger.notation || 'roman',
-        leadSheetMelody: state.soloist.leadSheetMelody,
-        soloistStyle: state.soloist.style || 'smart',
         isMaximized: state.vizState.isMaximized,
         isPlaying: state.playback?.isPlaying ?? false,
     }));
@@ -307,7 +270,6 @@ export function ChordVisualizer() {
         ],
     );
     const density = layoutProfile.density;
-    const showSparkline = isMaximized && soloistStyle === 'lead_sheet' && totalMeasures <= 16;
     const containerStyle = {
         '--lead-row-width': `${layoutProfile.rowWidth}px`,
         '--lead-vertical-fill': layoutProfile.verticalFillScale.toFixed(2),
@@ -509,8 +471,6 @@ export function ChordVisualizer() {
                                                                     lastActiveChordIndex
                                                                 }
                                                                 notation={notation}
-                                                                leadSheetMelody={leadSheetMelody}
-                                                                showSparkline={showSparkline}
                                                             />
                                                         ),
                                                     )}
