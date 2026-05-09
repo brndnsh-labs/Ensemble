@@ -169,15 +169,6 @@ export function EditorModal(_props) {
         );
     };
 
-    const handleAnalyze = () => {
-        setIsMenuOpen(false);
-        if (/** @type {any} */ (window).resetAnalyzer) {
-            /** @type {any} */ (window).resetAnalyzer();
-        }
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'analyzer', open: true });
-    };
-
     const handleMutate = () => {
         setIsMenuOpen(false);
         const targetId = arranger.lastInteractedSectionId;
@@ -431,14 +422,6 @@ export function EditorModal(_props) {
                                         }}
                                     >
                                         📥 <span>Import XML</span>
-                                    </button>
-                                    <button
-                                        id="analyzeAudioBtn"
-                                        title="Analyze Audio / Harmonize Melody"
-                                        aria-label="Analyze (Audio / Harmonize Melody)"
-                                        onClick={handleAnalyze}
-                                    >
-                                        👂 <span>Analyze</span>
                                     </button>
                                     <button
                                         id="mutateBtn"

@@ -185,7 +185,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/constants.js` | Global visual and UI state constants. |
 | `public/history.js` | Session history and undo/redo logic. |
 | `public/visualizer-utils.js` | Shared canvas math and drawing utilities. |
-| `public/audio-analyzer-lite.js` | Real-time waveform and frequency detection. |
 
 ## Documentation, Parsing & Testing
 

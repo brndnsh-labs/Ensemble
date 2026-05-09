@@ -15,7 +15,6 @@
  * @property {boolean} settings - Settings modal visibility.
  * @property {boolean} editor - Song editor modal visibility.
  * @property {boolean} share - Share modal visibility.
- * @property {boolean} analyzer - Audio analyzer modal visibility.
  * @property {boolean} generateSong - Song generator modal visibility.
  * @property {boolean} performance - Performance mode modal visibility.
  * @property {boolean} manual - User manual modal visibility.

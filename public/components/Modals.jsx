@@ -3,9 +3,6 @@ import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
-const AnalyzerModal = lazy(() =>
-    import('./AnalyzerModal.jsx').then((m) => ({ default: m.AnalyzerModal })),
-);
 const EditorModal = lazy(() =>
     import('./EditorModal.jsx').then((m) => ({ default: m.EditorModal })),
 );
@@ -76,7 +73,6 @@ export function Modals() {
         editorOpen,
         generateSongOpen,
         shareOpen,
-        analyzerOpen,
         performanceOpen,
         manualOpen,
         drumPadOpen,
@@ -85,7 +81,6 @@ export function Modals() {
         editorOpen: s.playback.modals.editor,
         generateSongOpen: s.playback.modals.generateSong,
         shareOpen: s.playback.modals.share,
-        analyzerOpen: s.playback.modals.analyzer,
         performanceOpen: s.playback.modals.performance,
         manualOpen: s.playback.modals.manual,
         drumPadOpen: s.playback.modals.drumPad,
@@ -97,7 +92,6 @@ export function Modals() {
             editorOpen ||
             generateSongOpen ||
             shareOpen ||
-            analyzerOpen ||
             performanceOpen ||
             manualOpen ||
             drumPadOpen;
@@ -111,7 +105,6 @@ export function Modals() {
         editorOpen,
         generateSongOpen,
         shareOpen,
-        analyzerOpen,
         performanceOpen,
         manualOpen,
         drumPadOpen,
@@ -123,7 +116,6 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
             <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
             <AnimatedModalWrapper isOpen={shareOpen} component={ShareModal} />
-            <AnimatedModalWrapper isOpen={analyzerOpen} component={AnalyzerModal} />
             <AnimatedModalWrapper isOpen={performanceOpen} component={PerformanceModal} />
             <AnimatedModalWrapper isOpen={manualOpen} component={ManualModal} />
             <AnimatedModalWrapper isOpen={drumPadOpen} component={DrumPadModal} />

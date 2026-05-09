@@ -48,7 +48,6 @@ If you want to take over the rhythm section or just troubleshoot the kit:
 Use the **Arranger** tools to bridge your ideas with the AI.
 - **Progression Library:** Open the Arranger actions menu and use **Library** when you want a quick starting point or a standard form to practice over.
 - **Inspiration Hub:** From the editor, open **Inspiration Hub** to generate full song forms or seed a new arrangement from existing material.
-- **Melody Harmonizer / Analyzer:** Use the analyzer tools when you want to capture a melodic idea and turn it into harmonic material inside the arranger.
 
 ### "I want to record into my DAW"
 Ensemble can act as a high-precision MIDI controller for Logic, Ableton, or hardware synths.

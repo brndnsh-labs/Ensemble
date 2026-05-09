@@ -166,8 +166,6 @@ const setupMinimalDOM = () => {
             <button id="closeSettingsBtn"></button>
             <div id="bpmControlGroup"></div>
             <button id="clearDrumsBtn"></button>
-            <div id="analyzerOverlay" aria-hidden="true"></div>
-            <div id="analyzerProgressBar"></div>
             <button id="liveListenBtn"></button>
             <div id="liveChordDisplay"></div>
             <button id="captureLiveHistoryBtn"></button>
