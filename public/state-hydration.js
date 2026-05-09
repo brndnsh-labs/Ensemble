@@ -229,7 +229,6 @@ export function hydrateState() {
                           : 'monophonic',
                 ),
                 seed: savedState.soloist.seed || '',
-                leadSheetMelody: savedState.soloist.leadSheetMelody || [],
             });
         }
         if (savedState.harmony) {

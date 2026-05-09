@@ -164,7 +164,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/midi-controller.js` | WebMIDI bridging and DAW sync. |
 | `public/midi-export.js` | Main-thread MIDI file triggers. |
 | `public/song-generator.js` | Algorithmic song structure generation. |
-| `public/melody-harmonizer.js` | Monophonic analysis for chord generation. |
 | `public/lead-sheet-model.js` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/persistence.js` | LocalStorage session saving. |
 | `public/platform.js` | Browser hacks (WakeLock, Audio Unlock). |
@@ -194,8 +193,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `docs/ROADMAP.md` | Living roadmap and repo-organization notes. |
 | `docs/guides/PERFORMANCE_GUIDELINES.md` | Hot-loop performance notes for audio and scheduler code. |
 | `public/MANUAL.md` | User-facing guide with auto-generated tables. |
-| `public/musicxml-parser.js` | Symbolic format importer. |
-| `public/tab-parser.js` | Text-based chord/tab importer. |
 | `public/form-analysis.js` | Song section and structure detection. |
 | `.github/CONTRIBUTING.md` | Contributor workflow and validation checklist. |
 | `.github/SECURITY.md` | Private vulnerability reporting guidance. |

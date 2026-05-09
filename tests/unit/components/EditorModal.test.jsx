@@ -69,9 +69,6 @@ describe('EditorModal Component', () => {
                 playback: {
                     modals: { editor: true },
                 },
-                soloist: {
-                    leadSheetMelody: [],
-                },
                 arranger: {
                     key: 'C',
                     sections: [
@@ -83,7 +80,6 @@ describe('EditorModal Component', () => {
                             seamless: false,
                         },
                     ],
-                    totalSteps: 16,
                 },
                 ...overrides,
             };
@@ -121,7 +117,6 @@ describe('EditorModal Component', () => {
         expect(container.querySelector('#arrangerActionMenu').classList.contains('open')).toBe(
             true,
         );
-        expect(container.textContent).toContain('Import Tab');
 
         await act(async () => {
             triggerBtn.click();
@@ -130,27 +125,6 @@ describe('EditorModal Component', () => {
         expect(container.querySelector('#arrangerActionMenu').classList.contains('open')).toBe(
             false,
         );
-    });
-
-    it('should transition to import mode when clicking Import Tab in the menu', async () => {
-        setupOpenState();
-
-        act(() => {
-            render(<EditorModal />, container);
-        });
-
-        // Open menu
-        await act(async () => {
-            container.querySelector('#arrangerActionTrigger').click();
-        });
-
-        const importBtn = container.querySelector('#importTabBtn');
-        await act(async () => {
-            importBtn.click();
-        });
-
-        expect(container.textContent).toContain('Import Tab');
-        expect(container.querySelector('#tabPasteArea')).not.toBeNull();
     });
 
     it('should dispatch close action when clicking Done', () => {

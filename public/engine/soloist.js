@@ -928,32 +928,6 @@ export function getSoloistNote(
         return res;
     };
 
-    // --- 0. Lead Sheet Melody ---
-    if (activeStyle === 'lead_sheet') {
-        if (soloist.leadSheetMelody && soloist.leadSheetMelody.length > 0) {
-            const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
-            const stepInFormRelative = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
-            const note = soloist.leadSheetMelody.find(
-                (/** @type {any} */ n) => n.globalStep === stepInFormRelative,
-            );
-
-            if (note) {
-                const res = {
-                    midi: note.midi,
-                    durationSteps: note.durationSteps,
-                    velocity: 0.8,
-                    style: activeStyle,
-                };
-                soloist.busySteps = Math.max(0, (res.durationSteps || 1) - 1); // @worker-mutation
-                return finalizeNote(res);
-            }
-            if ((soloist.busySteps || 0) > 0) {
-                soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
-                return null;
-            }
-        }
-    }
-
     // --- 1. Busy/Device Handling ---
     if (soloist.embellishmentBuffer && soloist.embellishmentBuffer.length > 0) {
         const embNote = soloist.embellishmentBuffer.shift();

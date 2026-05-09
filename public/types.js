@@ -106,14 +106,6 @@
  */
 
 /**
- * @typedef {Object} ActionPayloadImportMusicXML
- * @property {boolean} hasChords
- * @property {Array<import('./state/arranger.js').Section>} [sections]
- * @property {string} [xmlKey]
- * @property {Array<any>} [leadSheetMelody]
- */
-
-/**
  * @typedef {Object} ActionPayloadLoadTemplate
  * @property {Array<import('./state/arranger.js').Section>} sections
  * @property {boolean} [isMinor]
@@ -216,8 +208,6 @@
 
 /**
  * @typedef {Object} ActionPayloadMap
- * @property {ActionPayloadImportMusicXML} IMPORT_MUSICXML
- * @property {undefined} CLEAR_LEAD_SHEET
  * @property {ActionPayloadSetParam} SET_PARAM
  * @property {number} SET_BAND_INTENSITY
  * @property {number} SET_COMPLEXITY
@@ -286,8 +276,6 @@
  */
 
 export const ACTIONS = {
-    IMPORT_MUSICXML: 'IMPORT_MUSICXML',
-    CLEAR_LEAD_SHEET: 'CLEAR_LEAD_SHEET',
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',

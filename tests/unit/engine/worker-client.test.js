@@ -253,7 +253,6 @@ describe('Worker Client', () => {
                 'SET_SWING_SUB',
                 'SET_SOLOIST_MODE',
                 'SET_BPM',
-                'IMPORT_MUSICXML',
                 'SET_SESSION_TIMER',
                 'TOGGLE_PLAY',
                 'ARRANGER_UPDATE',

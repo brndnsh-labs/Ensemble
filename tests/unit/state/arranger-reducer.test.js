@@ -30,21 +30,6 @@ describe('Arranger Reducer', () => {
         expect(arranger.sections).toEqual(newSections);
     });
 
-    it('should handle MusicXML import', () => {
-        const payload = {
-            hasChords: true,
-            sections: [{ id: 'xml1', label: 'A', value: 'Cmaj7' }],
-        };
-        arrangerReducer(ACTIONS.IMPORT_MUSICXML, payload);
-        expect(arranger.sections).toEqual(payload.sections);
-        expect(arranger.isDirty).toBe(true);
-        expect(arranger.notation).toBe('name');
-
-        // Silent update if no chords
-        arrangerReducer(ACTIONS.IMPORT_MUSICXML, { hasChords: false });
-        expect(arranger.isDirty).toBe(true);
-    });
-
     describe('setArrangerParam', () => {
         it('should update all supported parameters', () => {
             const params = {

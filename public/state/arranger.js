@@ -69,15 +69,6 @@ export function arrangerReducer(action, payload) {
                 return true;
             }
             break;
-        case ACTIONS.IMPORT_MUSICXML:
-            if (payload.hasChords) {
-                arranger.sections = payload.sections;
-                arranger.isDirty = true;
-                arranger.notation = 'name';
-            } else {
-                arranger.isDirty = true;
-            }
-            break;
         case ACTIONS.RESET_STATE:
             arranger.sections = [
                 {
