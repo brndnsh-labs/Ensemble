@@ -1,0 +1,30 @@
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "npm run format",
+                        "statusMessage": "Formatting...",
+                        "timeout": 30
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "npm run typecheck",
+                        "statusMessage": "Type checking...",
+                        "timeout": 60
+                    }
+                ]
+            }
+        ]
+    }
+}

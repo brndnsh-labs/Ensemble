@@ -1,7 +1,8 @@
 # UI redesign — chart-first single surface
 
-*Status: Plan. Not yet started.*
 *Last updated: 2026-05-09.*
+
+**Progress tracking:** [`UI_REDESIGN_STATUS.md`](UI_REDESIGN_STATUS.md) — check this first to find the next chunk to work on.
 
 ## Goal
 
@@ -183,18 +184,36 @@ Each chunk is sized for one Sonnet session: target ≤ ~600 lines of diff, end w
 - `/?surface=chart` shows a legible, interactive chart at all three breakpoints.
 - No regressions in the legacy shell.
 
-#### Chunk 2.2 — TopBar action cluster
+#### Chunk 2.2a — TopBar: Transport + Key/Time cluster
 
 **Edit:**
-- `public/components/ChartSurface.jsx` — replace TopBar placeholder with the action cluster:
-  - Always visible: `Transport`, Key & Time menu, Edit, Share, Visualizer toggle (🌈), Library.
-  - Overflow ⋯: Generate Song, Settings, Manual, SoloistSeed.
-- New `KeyTimeMenu` wrapper (or place inline) that anchors `KeySignatureMenuControl` + `TimeSignatureControl` behind one trigger.
-- The Library trigger reuses `PresetLibrary`. It can render in a portal-anchored surface or reuse the existing `LibraryModal` from `ArrangerWorkspace.jsx` (lift to a shared component).
+- `public/components/ChartSurface.jsx` — replace TopBar placeholder with `Transport` and a `KeyTimeMenu` wrapper that anchors `KeySignatureMenuControl` + `TimeSignatureControl` behind one trigger. Both are already exported from `public/components/KeySignatureControls.jsx`.
 
 **DoD:**
-- Every modal / menu opens from the new TopBar at all breakpoints.
+- Transport and Key/Time menu are functional in the TopBar at all breakpoints.
+- `npm run validate` green.
+
+#### Chunk 2.2b — TopBar: Edit, Share, Library
+
+**Edit:**
+- `public/components/ChartSurface.jsx` — add Edit (opens `EditorModal`) and Share (opens `ShareModal`) buttons.
+- Lift `LibraryModal` out of `ArrangerWorkspace.jsx` (currently an inline wrapper ~90 lines at line 25 wrapping `PresetLibrary`) into `public/components/LibraryModal.jsx`. Wire the TopBar Library trigger to it.
+- Both shells import `LibraryModal` from the new shared location during the transition.
+
+**DoD:**
+- Edit, Share, and Library all open from the new TopBar.
+- `ArrangerWorkspace` still works (uses the lifted component).
+- `npm run validate` green.
+
+#### Chunk 2.2c — TopBar: Overflow menu + Visualizer toggle
+
+**Edit:**
+- `public/components/ChartSurface.jsx` — add Overflow ⋯ menu (Generate Song, Settings, Manual, SoloistSeed) and the Visualizer toggle (🌈, wired to `vizState.enabled`; full overlay deferred to Chunk 3.1 — a placeholder toggle is fine here).
+
+**DoD:**
+- Every modal/menu is reachable from the new TopBar at all breakpoints.
 - Closing returns focus to the trigger (existing pattern in Studio popovers).
+- `npm run validate` green.
 
 #### Chunk 2.3 — Instrument rail mount
 
