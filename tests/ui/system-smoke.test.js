@@ -162,14 +162,9 @@ const setupMinimalDOM = () => {
             <input id="midiDrumsOctave" />
             <input id="midiVelocitySlider" />
             <div id="midiVelocityValue"></div>
-            <input id="larsModeCheck" type="checkbox" />
-            <input id="larsIntensitySlider" />
-            <div id="larsIntensityValue"></div>
-            <div id="larsIntensityContainer"></div>
             <input id="applyPresetSettingsCheck" type="checkbox" />
             <button id="closeSettingsBtn"></button>
             <div id="bpmControlGroup"></div>
-            <div id="larsIndicator"></div>
             <button id="clearDrumsBtn"></button>
             <div id="analyzerOverlay" aria-hidden="true"></div>
             <div id="analyzerProgressBar"></div>

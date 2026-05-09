@@ -989,17 +989,6 @@ input[type="range"] {
     accent-color: var(--accent-color);
 }
 
-/* --- Lars Mode Indicators --- */
-.lars-active .control-label {
-    animation: lars-pulse 2s infinite ease-in-out;
-}
-
-@media (max-width: 600px) {
-    .lars-active .control-label {
-        display: none; /* Keep hidden on mobile to save space */
-    }
-}
-
 /* --- MIDI Connection UI --- */
 #midiControls input[type="number"] {
     background: var(--input-bg);

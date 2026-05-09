@@ -198,7 +198,6 @@
  * @typedef {Object} ActionPayloadUpdateConductorState
  * @property {number} [targetIntensity]
  * @property {number} [stepSize]
- * @property {number} [larsBpmOffset]
  * @property {Object|null} [form]
  * @property {number} [loopCount]
  * @property {number} [formIteration]
@@ -246,8 +245,6 @@
  * @property {number} SET_SWING
  * @property {string} SET_SWING_SUB
  * @property {number} SET_HUMANIZE
- * @property {boolean} SET_LARS_MODE
- * @property {number} SET_LARS_INTENSITY
  * @property {ActionPayloadSetGenreFeel} SET_GENRE_FEEL
  * @property {number | null} SET_GENRE_COUNTDOWN
  * @property {number | string} SET_ACTIVE_MEASURE
@@ -323,8 +320,6 @@ export const ACTIONS = {
     SET_SWING: 'SET_SWING',
     SET_SWING_SUB: 'SET_SWING_SUB',
     SET_HUMANIZE: 'SET_HUMANIZE',
-    SET_LARS_MODE: 'SET_LARS_MODE',
-    SET_LARS_INTENSITY: 'SET_LARS_INTENSITY',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
     SET_GENRE_COUNTDOWN: 'SET_GENRE_COUNTDOWN',
     SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',

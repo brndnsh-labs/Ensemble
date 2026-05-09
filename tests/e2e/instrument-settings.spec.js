@@ -75,15 +75,12 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         const creativityToggle = settingsSurface.locator(
             'label.toggle-switch[for="creativityCheck"]',
         );
-        const larsIntensity = settingsSurface.locator('input#larsIntensitySlider');
         await expect(swingSlider).toBeVisible();
         await expect(swingBase).toBeVisible();
         await expect(creativityToggle).toBeVisible();
-        await expect(larsIntensity).toBeVisible();
         await expectWithinSurface(settingsSurface, swingSlider);
         await expectWithinSurface(settingsSurface, swingBase);
         await expectWithinSurface(settingsSurface, creativityToggle);
-        await expectWithinSurface(settingsSurface, larsIntensity);
         await expect(settingsSurface.locator('input#drumVolume')).toHaveCount(0);
         await expect(settingsSurface.locator('input#drumReverb')).toHaveCount(0);
     });

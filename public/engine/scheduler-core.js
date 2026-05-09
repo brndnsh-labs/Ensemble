@@ -24,7 +24,7 @@ import {
     stopWorker,
     syncWorker,
 } from '../worker-client.js';
-import { checkSectionTransition, updateAutoConductor, updateLarsTempo } from './conductor.js';
+import { checkSectionTransition, updateAutoConductor } from './conductor.js';
 import {
     initAudio,
     killAllNotes,
@@ -219,9 +219,9 @@ function triggerResolution(state, time, dispatch) {
  * @param {Function} [dispatch]
  */
 function scheduleResolution(state, time, dispatch = undefined) {
-    const { playback, bass, soloist, chords, harmony, groove, conductor } = state;
+    const { playback, bass, soloist, chords, harmony, groove } = state;
     // Schedule the final resolution measure (Tonic chord, Kick+Crash, etc.)
-    const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
+    const effectiveBpm = playback.bpm;
     const spb = 60.0 / effectiveBpm;
     const measureDuration = 8 * spb; // Ring out for 2 bars (approx 5-6s)
 
@@ -352,7 +352,7 @@ export function scheduler(state, dispatch = undefined) {
                 }
 
                 scheduleGlobalEvent(state, playback.step, playback.nextNoteTime, dispatch);
-                advanceGlobalStep(state, dispatch);
+                advanceGlobalStep(state);
             }
         }
     } finally {
@@ -398,8 +398,8 @@ function applyPendingGenre(state) {
  * @param {import('../types.js').EnsembleState} state
  */
 function advanceCountIn(state) {
-    const { playback, arranger, conductor } = state;
-    const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
+    const { playback, arranger } = state;
+    const effectiveBpm = playback.bpm;
     const beatDuration = 60.0 / effectiveBpm;
     playback.nextNoteTime += beatDuration;
     playback.unswungNextNoteTime += beatDuration;
@@ -527,14 +527,10 @@ function scheduleCountIn(state, beat, time) {
 
 /**
  * @param {import('../types.js').EnsembleState} state
- * @param {Function} [dispatch]
  */
-function advanceGlobalStep(state, dispatch = undefined) {
-    const { playback, groove, arranger, conductor } = state;
-    if (dispatch) {
-        updateLarsTempo(state, playback.step, dispatch);
-    }
-    const effectiveBpm = playback.bpm + (conductor.larsBpmOffset || 0);
+function advanceGlobalStep(state) {
+    const { playback, groove, arranger } = state;
+    const effectiveBpm = playback.bpm;
     const sixteenth = 0.25 * (60.0 / effectiveBpm);
 
     /** @type {any} */

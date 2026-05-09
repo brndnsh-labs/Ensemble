@@ -74,8 +74,6 @@ export function saveCurrentState() {
             humanize: groove.humanize,
             lastDrumPreset: groove.lastDrumPreset,
             genreFeel: groove.genreFeel,
-            larsMode: groove.larsMode,
-            larsIntensity: groove.larsIntensity,
             lastSmartGenre: groove.lastSmartGenre,
             creativity: groove.creativity,
             sectionSeedMap: groove.sectionSeedMap,

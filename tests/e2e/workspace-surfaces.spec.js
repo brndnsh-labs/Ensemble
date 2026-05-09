@@ -250,12 +250,10 @@ test.describe('Workspace surfaces @ui', () => {
 
             await page.getByRole('button', { name: 'Drums settings' }).click();
             const drumSurface = page.locator('.workspace-studio-surface--settings.is-open');
-            const larsIntensity = drumSurface.locator('input#larsIntensitySlider');
 
             await expect(drumSurface, `${viewport.name}: drum settings should open`).toBeVisible();
             await expectSurfaceFitsViewport(page, drumSurface);
             await expectOwnsInteriorProbe(drumSurface);
-            await expect(larsIntensity).toBeVisible();
 
             await page.locator('button[aria-label="Close Drums settings"]').last().click();
         }
