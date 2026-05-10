@@ -1,0 +1,42 @@
+.chart-surface {
+    display: grid;
+    grid-template-areas:
+        "topbar topbar"
+        "chart  rail";
+    grid-template-columns: 1fr 240px;
+    grid-template-rows: auto 1fr;
+    height: 100dvh;
+}
+
+.chart-surface__topbar {
+    grid-area: topbar;
+}
+
+.chart-surface__chart {
+    grid-area: chart;
+    overflow: auto;
+}
+
+.chart-surface__rail {
+    grid-area: rail;
+    overflow: auto;
+}
+
+@media (max-width: 1023px) {
+    .chart-surface {
+        grid-template-areas:
+            "topbar"
+            "chart"
+            "rail";
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+    }
+}
+
+@media (max-width: 639px) {
+    .chart-surface__rail {
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+    }
+}

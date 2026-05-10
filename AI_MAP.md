@@ -21,6 +21,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.js` | Shared UI component prop definitions. | `SelectOption` |
 | `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
+| `public/ui-surface.js` | Feature flag: reads URL param + localStorage to select `'chart'` or `'legacy'` shell. | `getActiveSurface` |
 | `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.js` | Main-thread orchestrator for worker messaging. | `workerClient` |
 
@@ -128,7 +129,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Containers** | `public/App.jsx` | Root workspace shell, header, and active surface rendering. |
 | **Navigation** | `public/components/WorkspaceNav.jsx` | Top-level workspace switcher for Arranger, Studio, and Visuals. |
 | **Workspaces** | `public/components/ArrangerWorkspace.jsx` | Lead-sheet workspace with arranger actions and progression library access. |
-| **Workspaces** | `public/components/StudioWorkspace.jsx` | Live-mix workspace with band feel chooser and compact instrument controls. |
+| **Workspaces** | `public/components/StudioWorkspace.jsx` | Thin wrapper rendering `InstrumentRail orientation="vertical"` inside the studio section. |
+| **Workspaces** | `public/components/InstrumentRail.jsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
+| **Workspaces** | `public/components/ChartSurface.jsx` | New chart-first shell skeleton (activated via `?surface=chart`). Three slot regions: TopBar, Chart, Rail. |
 | **Workspaces** | `public/components/VisualsWorkspace.jsx` | Visualizer workspace shell. |
 | **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |

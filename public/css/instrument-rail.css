@@ -1,0 +1,12 @@
+.instrument-rail--horizontal {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+}
+
+.instrument-rail--horizontal .workspace-studio-live-mix-header,
+.instrument-rail--horizontal .workspace-studio-live-mix-rows {
+    display: contents; /* placeholder — real layout in Chunk 2.3 */
+}

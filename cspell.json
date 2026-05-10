@@ -178,7 +178,8 @@
         "crackier",
         "networkidle",
         "goertzel",
-        "coeff"
+        "coeff",
+        "topbar"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

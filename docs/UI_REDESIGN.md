@@ -138,6 +138,8 @@ Each chunk is sized for one Sonnet session: target ≤ ~600 lines of diff, end w
 
 ### Phase 1 — Shell scaffolding
 
+**Preview:** append `?surface=chart` to the dev URL to activate the new shell. The choice sticks in `localStorage`; use `?surface=legacy` to revert.
+
 #### Chunk 1.1 — `ChartSurface` skeleton + flag
 
 **Add:**
