@@ -56,11 +56,39 @@ test.describe('ChartSurface @ui', () => {
             await expect(rail).toHaveClass(/instrument-rail--vertical/);
         });
 
-        test('renders horizontal rail on narrow mobile viewport @mobile', async ({ page }) => {
+        test('renders bottom action bar on narrow mobile viewport @mobile', async ({ page }) => {
             await page.setViewportSize({ width: 390, height: 844 });
-            const rail = page.locator('.instrument-rail');
-            await expect(rail).toBeVisible();
-            await expect(rail).toHaveClass(/instrument-rail--horizontal/);
+            await expect(page.locator('.mobile-action-bar')).toBeVisible();
+            await expect(page.locator('.chart-surface__rail')).toHaveCount(0);
+        });
+
+        test('mobile topbar hides Library/Edit/Share/Viz buttons @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            const topbar = page.locator('.chart-surface__topbar');
+            await expect(topbar.locator('.chart-surface__share-btn')).toHaveCount(0);
+            await expect(topbar.locator('.chart-surface__viz-btn')).toHaveCount(0);
+            // Library/Edit no longer in topbar; reachable via overflow
+            await expect(topbar.getByRole('button', { name: 'Library' })).toHaveCount(0);
+            await expect(topbar.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+            // Overflow trigger is still there
+            await expect(page.locator('.chart-surface__overflow-btn')).toBeVisible();
+        });
+
+        test('Mix action opens a sheet containing instrument rows @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            const mixBtn = page.locator('.mobile-action-bar__btn', { hasText: 'Mix' });
+            await mixBtn.click();
+
+            const sheet = page.locator('.mobile-mix-sheet');
+            await expect(sheet).toBeVisible();
+            await expect(sheet.locator('.workspace-studio-mix-row')).toHaveCount(5);
+            await expect(
+                sheet.locator('.workspace-studio-mixer-button-label', { hasText: 'Mixer' }),
+            ).toBeVisible();
+
+            // Closes via the sheet's close button
+            await sheet.locator('.workspace-studio-surface-close').click();
+            await expect(sheet).toBeHidden();
         });
     });
 
@@ -106,6 +134,7 @@ test.describe('ChartSurface @ui', () => {
             page,
         }) => {
             await page.setViewportSize({ width: 390, height: 844 });
+            await page.locator('.chart-surface__overflow-btn').click();
             await page.getByRole('button', { name: 'Edit' }).click();
 
             const editor = page.locator('#editorOverlay');
@@ -118,6 +147,7 @@ test.describe('ChartSurface @ui', () => {
 
         test('editor modal fills viewport on mobile @mobile', async ({ page }) => {
             await page.setViewportSize({ width: 390, height: 844 });
+            await page.locator('.chart-surface__overflow-btn').click();
             await page.getByRole('button', { name: 'Edit' }).click();
 
             const content = page.locator('#editorOverlay .settings-content');
@@ -158,7 +188,7 @@ test.describe('ChartSurface @ui', () => {
 
         test('Share button is visible at mobile breakpoint @mobile', async ({ page }) => {
             await page.setViewportSize({ width: 390, height: 844 });
-            const shareBtn = page.getByRole('button', { name: 'Share' });
+            const shareBtn = page.locator('.mobile-action-bar__btn', { hasText: 'Share' });
             await expect(shareBtn).toBeVisible();
         });
     });

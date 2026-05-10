@@ -146,7 +146,7 @@ function hasStudioInstrumentControls(module) {
  *   children: import('../ui-types.js').ComponentChildren
  * }} props
  */
-function StudioSurface({
+export function StudioSurface({
     accent,
     anchorElement = null,
     className = '',

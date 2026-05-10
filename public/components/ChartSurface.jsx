@@ -6,11 +6,13 @@ import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
 import { LibraryModal } from './LibraryModal.jsx';
+import { MobileActionBar } from './MobileActionBar.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { Transport } from './Transport.jsx';
 import { VisualizerOverlay } from './VisualizerOverlay.jsx';
 
 const NARROW_MQ = '(max-width: 1023px)';
+const MOBILE_MQ = '(max-width: 640px)';
 
 /**
  * @param {{ getVisualTime: () => number }} props
@@ -26,6 +28,7 @@ export function ChartSurface({ getVisualTime }) {
         return !!(p.get('s') || p.get('prog'));
     });
     const isNarrow = useMediaQuery(NARROW_MQ);
+    const isMobile = useMediaQuery(MOBILE_MQ);
 
     const openModal = (/** @type {keyof import('../types.js').ModalsState} */ modal) =>
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
@@ -55,27 +58,39 @@ export function ChartSurface({ getVisualTime }) {
                             </button>
                         </div>
                     )}
-                    <button type="button" class="header-btn" onClick={() => setIsLibraryOpen(true)}>
-                        Library
-                    </button>
-                    <button type="button" class="header-btn" onClick={() => openModal('editor')}>
-                        Edit
-                    </button>
-                    <button
-                        type="button"
-                        class="header-btn header-btn--primary chart-surface__share-btn"
-                        onClick={() => openModal('share')}
-                    >
-                        Share
-                    </button>
-                    <button
-                        type="button"
-                        class={`header-btn header-btn--icon chart-surface__viz-btn${isVizOpen ? ' active' : ''}`}
-                        aria-label="Open visualizer"
-                        onClick={() => setIsVizOpen(true)}
-                    >
-                        🌈
-                    </button>
+                    {!isMobile && (
+                        <>
+                            <button
+                                type="button"
+                                class="header-btn"
+                                onClick={() => setIsLibraryOpen(true)}
+                            >
+                                Library
+                            </button>
+                            <button
+                                type="button"
+                                class="header-btn"
+                                onClick={() => openModal('editor')}
+                            >
+                                Edit
+                            </button>
+                            <button
+                                type="button"
+                                class="header-btn header-btn--primary chart-surface__share-btn"
+                                onClick={() => openModal('share')}
+                            >
+                                Share
+                            </button>
+                            <button
+                                type="button"
+                                class={`header-btn header-btn--icon chart-surface__viz-btn${isVizOpen ? ' active' : ''}`}
+                                aria-label="Open visualizer"
+                                onClick={() => setIsVizOpen(true)}
+                            >
+                                🌈
+                            </button>
+                        </>
+                    )}
                     <ToolbarPopover
                         panelId="chartOverflowPanel"
                         triggerAriaLabel="More options"
@@ -85,6 +100,30 @@ export function ChartSurface({ getVisualTime }) {
                     >
                         {({ closePopover }) => (
                             <div class="chart-surface__overflow-menu">
+                                {isMobile && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            class="workspace-toolbar-panel__action"
+                                            onClick={() => {
+                                                setIsLibraryOpen(true);
+                                                closePopover();
+                                            }}
+                                        >
+                                            Library
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="workspace-toolbar-panel__action"
+                                            onClick={() => {
+                                                openModal('editor');
+                                                closePopover();
+                                            }}
+                                        >
+                                            Edit
+                                        </button>
+                                    </>
+                                )}
                                 <button
                                     type="button"
                                     class="workspace-toolbar-panel__action"
@@ -123,9 +162,14 @@ export function ChartSurface({ getVisualTime }) {
             <div class="chart-surface__chart">
                 <ChordVisualizer />
             </div>
-            <div class="chart-surface__rail">
-                <InstrumentRail orientation={isNarrow ? 'horizontal' : 'vertical'} />
-            </div>
+            {!isMobile && (
+                <div class="chart-surface__rail">
+                    <InstrumentRail orientation={isNarrow ? 'horizontal' : 'vertical'} />
+                </div>
+            )}
+            {isMobile && (
+                <MobileActionBar isVizOpen={isVizOpen} onOpenViz={() => setIsVizOpen(true)} />
+            )}
             <LibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} />
             {isVizOpen && <VisualizerOverlay getVisualTime={getVisualTime} onClose={closeViz} />}
         </div>

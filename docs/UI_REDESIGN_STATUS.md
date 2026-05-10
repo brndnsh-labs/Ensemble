@@ -14,7 +14,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 
 ## Current position
 
-**Next chunk:** none — phase 6 polish complete. Optional follow-up: 6.5B (section navigator) deferred.
+**Next chunk:** none — phase 7 mobile redesign complete. Optional follow-ups: 6.5B (section navigator) deferred.
 
 ---
 
@@ -50,6 +50,11 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | 6.5A | Vertical-center chart | done | 2026-05-10 | Chart `display-area` uses `align-content: safe center` inside chart-surface so short charts no longer dump all whitespace at the bottom |
 | 6.5B | Section navigator | deferred | | Punted — discussed inline in 6.5; bring back when sections become a real first-class concept |
 | 6.6 | iPad touch sweep | done | 2026-05-10 | `.header-btn` and `.header-btn--icon` get 44×44 min on `(pointer: coarse)`; chart-surface @ipad Playwright suite green |
+| **Phase 7** | Mobile redesign — bottom action bar | | | |
+| 7.1 | Bottom action bar shell + wiring | done | 2026-05-10 | New MobileActionBar at ≤640px with three buttons (Mix · Share · Viz). Mix opens a sheet rendering the existing InstrumentRail inside StudioSurface modal mode. Share dispatches share modal; Viz toggles overlay |
+| 7.2 | Mix sheet content | done | 2026-05-10 | Mix sheet reuses InstrumentRail vertically inside StudioSurface — gives access to Mixer, Band feel, and per-instrument Controls (all of which portal as nested sheets). Sheet header replaces rail title to avoid duplication |
+| 7.3 | Trim mobile topbar | done | 2026-05-10 | Library/Edit/Share/🌈 hidden from topbar at ≤640px. Library + Edit fold into ⋯ overflow on mobile; Share + Viz live in the bottom bar. Topbar collapses to Transport · key/time · ⋯ |
+| 7.4 | Mobile layout cleanup | done | 2026-05-10 | InstrumentRail removed from grid at ≤640px (no orphan horizontal strip). Topbar becomes deterministic 2-row grid (Transport+⋯ row, then key/time row). Safe-area-inset on bar + chart padding |
 
 ---
 

@@ -98,6 +98,131 @@
     }
 }
 
+/* Mobile (≤640px): bottom action bar replaces the horizontal rail strip,
+   and the topbar collapses to a deterministic two-row layout instead of
+   flex-wrapping into three lopsided rows. */
+@media (max-width: 640px) {
+    .chart-surface {
+        grid-template-areas:
+            "topbar"
+            "chart";
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+
+    .chart-surface__chart {
+        padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .chart-surface__topbar {
+        display: grid;
+        grid-template-areas:
+            "play   output"
+            "shape  shape";
+        grid-template-columns: 1fr auto;
+        row-gap: var(--space-1);
+        column-gap: var(--space-2);
+    }
+
+    .chart-surface__zone--play {
+        grid-area: play;
+    }
+
+    .chart-surface__zone--shape {
+        grid-area: shape;
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+
+    .chart-surface__zone--output {
+        grid-area: output;
+    }
+}
+
+.mobile-action-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-sidebar);
+    display: none;
+    align-items: stretch;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2) calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
+    background: var(--panel-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 640px) {
+    .mobile-action-bar {
+        display: flex;
+    }
+}
+
+.mobile-action-bar__btn {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 56px;
+    padding: var(--space-1);
+    background: transparent;
+    border: 0;
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease);
+}
+
+.mobile-action-bar__btn:hover {
+    color: var(--text-primary);
+}
+
+.mobile-action-bar__btn.is-active {
+    color: var(--accent-color);
+    background: color-mix(in srgb, var(--accent-color), transparent 88%);
+}
+
+.mobile-action-bar__icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.mobile-action-bar__label {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+/* Mix sheet should fill the viewport on mobile, anchored to the bottom */
+.mobile-mix-sheet.workspace-studio-surface--modal {
+    width: min(100vw, 32rem);
+    max-height: 88dvh;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + var(--space-2));
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* The InstrumentRail rendered inside the Mix sheet doesn't need its own
+   panel chrome or duplicate title — the sheet header carries that role. */
+.mobile-mix-sheet .instrument-rail {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+.mobile-mix-sheet .workspace-studio-live-mix-header > div:first-child {
+    display: none;
+}
+
 .viz-overlay {
     position: fixed;
     inset: 0;
