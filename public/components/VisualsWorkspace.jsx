@@ -6,7 +6,7 @@ import {
 } from '../visualizer-events.js';
 import { Visualizer } from './Visualizer.jsx';
 
-function VisualizerLegend() {
+export function VisualizerLegend() {
     return (
         <div class="viz-legend" data-testid="visualizer-legend" aria-label="Visualizer legend">
             <div class="legend-group">

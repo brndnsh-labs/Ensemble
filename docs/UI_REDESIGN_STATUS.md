@@ -14,7 +14,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 
 ## Current position
 
-**Next chunk:** 3.1 — On-demand visualizer overlay
+**Next chunk:** 4.1 — Flip default surface to `chart`
 
 ---
 
@@ -34,7 +34,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | 2.2c | TopBar: Overflow menu + Visualizer toggle | done | 2026-05-09 | SoloistSeed top-level to avoid nested popovers; overflow has Generate Song, Settings, Manual |
 | 2.3 | Instrument rail mount | done | 2026-05-09 | matchMedia hook drives orientation; horizontal strip CSS replaces placeholder |
 | **Phase 3** | | | | |
-| 3.1 | On-demand visualizer overlay | not-started | | |
+| 3.1 | On-demand visualizer overlay | done | 2026-05-09 | VisualizerLegend exported from VisualsWorkspace; App.jsx vizState sync effect guarded for chart surface |
 | **Phase 4** | | | | |
 | 4.1 | Flip default surface to `chart` | not-started | | |
 | 4.2 | Delete legacy shell | not-started | | |

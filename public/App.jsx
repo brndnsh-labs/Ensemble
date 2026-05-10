@@ -71,6 +71,9 @@ export function App({ getVisualTime }) {
     }, [activeWorkspace]);
 
     useEffect(() => {
+        if (activeSurface === 'chart') {
+            return;
+        }
         const shouldEnableVisualizer = activeWorkspace === 'visuals';
         if (vizEnabled !== shouldEnableVisualizer) {
             dispatch(ACTIONS.SET_PARAM, {
@@ -80,7 +83,7 @@ export function App({ getVisualTime }) {
             });
             debounceSaveState();
         }
-    }, [activeWorkspace, vizEnabled]);
+    }, [activeSurface, activeWorkspace, vizEnabled]);
 
     const renderWorkspace = () => {
         switch (activeWorkspace) {
@@ -100,7 +103,7 @@ export function App({ getVisualTime }) {
         <Fragment>
             <GlobalShortcuts />
             {activeSurface === 'chart' ? (
-                <ChartSurface />
+                <ChartSurface getVisualTime={getVisualTime} />
             ) : (
                 <div class="app-container">
                     <Header activeWorkspace={activeWorkspace} />

@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { useEnsembleState } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
@@ -9,11 +8,16 @@ import { LibraryModal } from './LibraryModal.jsx';
 import { SoloistSeedMenuControl } from './SoloistControls.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { Transport } from './Transport.jsx';
+import { VisualizerOverlay } from './VisualizerOverlay.jsx';
 
 const NARROW_MQ = '(max-width: 1023px)';
 
-export function ChartSurface() {
+/**
+ * @param {{ getVisualTime: () => number }} props
+ */
+export function ChartSurface({ getVisualTime }) {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [isVizOpen, setIsVizOpen] = useState(false);
     const [isNarrow, setIsNarrow] = useState(() =>
         typeof window !== 'undefined' ? window.matchMedia(NARROW_MQ).matches : false,
     );
@@ -24,17 +28,11 @@ export function ChartSurface() {
         mq.addEventListener('change', update);
         return () => mq.removeEventListener('change', update);
     }, []);
-    const { vizEnabled } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            vizEnabled: s.vizState.enabled,
-        }),
-    );
 
     const openModal = (/** @type {keyof import('../types.js').ModalsState} */ modal) =>
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
 
-    const toggleViz = () =>
-        dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: !vizEnabled });
+    const closeViz = useCallback(() => setIsVizOpen(false), []);
 
     return (
         <div class="chart-surface">
@@ -57,9 +55,9 @@ export function ChartSurface() {
                     <SoloistSeedMenuControl buttonClassName="workspace-arranger-toolbar-trigger workspace-arranger-toolbar-trigger--seed" />
                     <button
                         type="button"
-                        class={`header-btn chart-surface__viz-btn${vizEnabled ? ' active' : ''}`}
-                        aria-label="Toggle visualizer"
-                        onClick={toggleViz}
+                        class={`header-btn chart-surface__viz-btn${isVizOpen ? ' active' : ''}`}
+                        aria-label="Open visualizer"
+                        onClick={() => setIsVizOpen(true)}
                     >
                         🌈
                     </button>
@@ -114,6 +112,7 @@ export function ChartSurface() {
                 <InstrumentRail orientation={isNarrow ? 'horizontal' : 'vertical'} />
             </div>
             <LibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} />
+            {isVizOpen && <VisualizerOverlay getVisualTime={getVisualTime} onClose={closeViz} />}
         </div>
     );
 }
