@@ -267,10 +267,6 @@ export function instrumentReducer(action, payload) {
             break;
         }
         case ACTIONS.SET_MODAL_OPEN:
-            if (payload.modal === 'performance' && payload.open) {
-                soloist.buffer.clear();
-                return true;
-            }
             return false;
         case ACTIONS.RESET_STATE:
             chords.enabled = true;

@@ -288,33 +288,6 @@ test.describe('Workspace surfaces @ui', () => {
         await expectOwnsInteriorProbe(drumSurface);
     });
 
-    test('perform launches and dismisses the live modals', async ({ page }) => {
-        await openWorkspace(page, 'Perform');
-
-        const perform = page.locator('[data-workspace="perform"]');
-        await expect(perform.locator('.workspace-panel-copy')).toHaveCount(0);
-        await expect(perform.getByRole('button', { name: 'Open Performance Mode' })).toBeVisible();
-        await expect(perform.getByRole('button', { name: 'Open Drum Pad' })).toBeVisible();
-
-        await perform.getByRole('button', { name: 'Open Performance Mode' }).click();
-        const performanceModal = page.locator('.PerformanceSurfaceModal');
-        await expect(performanceModal).toBeVisible();
-        await expect(performanceModal.locator('h2')).toContainText('Soloist Performance Mode');
-
-        await performanceModal.locator('button[aria-label="Close"]').first().click();
-        await expect(performanceModal).toBeHidden();
-
-        await perform.getByRole('button', { name: 'Open Drum Pad' }).click();
-        const drumPadModal = page.locator('.PerformanceSurfaceModal').filter({
-            hasText: 'Drum Performance Mode',
-        });
-        await expect(drumPadModal).toBeVisible();
-        await expect(drumPadModal.locator('h2')).toContainText('Drum Performance Mode');
-
-        await drumPadModal.locator('button[aria-label="Close"]').first().click();
-        await expect(drumPadModal).toBeHidden();
-    });
-
     test('switching to visuals after extended playback stays responsive', async ({ page }) => {
         await openWorkspace(page, 'Arranger');
         await page.locator('#bpmInput').fill('240');

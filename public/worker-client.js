@@ -198,11 +198,6 @@ export function syncWorker(action, payload) {
 
     // Delta Sync
     switch (action) {
-        case 'SET_MODAL_OPEN':
-            if (payload.modal === 'performance') {
-                data.playback = { modals: { performance: !!payload.open } };
-            }
-            break;
         case 'SET_BAND_INTENSITY':
             data.playback = { bandIntensity: playback.bandIntensity };
             break;

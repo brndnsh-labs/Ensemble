@@ -21,12 +21,7 @@ describe('Instrument Reducer', () => {
         expect(soloist.volume).toBe(1.0);
     });
 
-    it('should clear soloist buffer when performance modal opens', () => {
-        soloist.buffer.set(1, {});
-        instrumentReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
-        expect(soloist.buffer.size).toBe(0);
-
-        // Should return false for other modals
+    it('should return false for SET_MODAL_OPEN', () => {
         const result = instrumentReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
         expect(result).toBe(false);
     });

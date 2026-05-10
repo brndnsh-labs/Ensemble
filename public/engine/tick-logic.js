@@ -245,9 +245,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
 
     // 2. Soloist Generation (High Priority)
     let soloResult = null;
-    const isPerformanceModalOpen = playback.modals?.performance;
-
-    if (includeSoloist && !isPerformanceModalOpen) {
+    if (includeSoloist) {
         if (chordData) {
             const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
             const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);

@@ -166,13 +166,7 @@ export function initAudio(state, options = {}) {
             const gainNode = playback.audio.createGain();
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
-            let isMuted = !m.state.enabled;
-            if (m.state === soloist && playback.modals?.performance) {
-                isMuted = false;
-            }
-            if (m.name === 'drums' && playback.modals?.drumPad) {
-                isMuted = false;
-            }
+            const isMuted = !m.state.enabled;
 
             const targetGain =
                 !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
@@ -420,13 +414,7 @@ export function restoreGains(state) {
         if (m.node && playback.audio) {
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
-            let isMuted = !m.state.enabled;
-            if (m.state === soloist && playback.modals?.performance) {
-                isMuted = false;
-            }
-            if (m.name === 'drums' && playback.modals?.drumPad) {
-                isMuted = false;
-            }
+            const isMuted = !m.state.enabled;
 
             const target = !isMuted && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
             m.node.gain.cancelScheduledValues(t);

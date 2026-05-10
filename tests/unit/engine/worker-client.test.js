@@ -243,7 +243,6 @@ describe('Worker Client', () => {
                 'UPDATE_HB',
                 'UPDATE_SB',
                 'SET_GENRE_FEEL',
-                'SET_MODAL_OPEN',
                 'SET_COMPLEXITY',
                 'SET_AUTO_INTENSITY',
                 'UPDATE_CONDUCTOR_DECISION',
@@ -262,9 +261,6 @@ describe('Worker Client', () => {
                 mockPostMessage.mockClear();
                 // We provide generic payloads that satisfy the switch logic
                 let payload = {};
-                if (action === 'SET_MODAL_OPEN') {
-                    payload = { modal: 'performance', open: true };
-                }
                 if (['SET_STYLE', 'SET_VOLUME'].includes(action)) {
                     payload = { module: 'soloist', style: 'rock', value: 1 };
                 }

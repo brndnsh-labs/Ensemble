@@ -16,9 +16,7 @@
  * @property {boolean} editor - Song editor modal visibility.
  * @property {boolean} share - Share modal visibility.
  * @property {boolean} generateSong - Song generator modal visibility.
- * @property {boolean} performance - Performance mode modal visibility.
  * @property {boolean} manual - User manual modal visibility.
- * @property {boolean} drumPad - Drum pad modal visibility.
  */
 
 /**

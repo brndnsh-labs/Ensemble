@@ -155,9 +155,7 @@ export const playback = deepSignal({
         editor: false,
         share: false,
         generateSong: false,
-        performance: false,
         manual: false,
-        drumPad: false,
     },
 });
 

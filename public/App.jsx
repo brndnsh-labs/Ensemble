@@ -18,11 +18,6 @@ const StudioWorkspace = lazy(() =>
         default: module.StudioWorkspace,
     })),
 );
-const PerformWorkspace = lazy(() =>
-    import('./components/PerformWorkspace.jsx').then((module) => ({
-        default: module.PerformWorkspace,
-    })),
-);
 const VisualsWorkspace = lazy(() =>
     import('./components/VisualsWorkspace.jsx').then((module) => ({
         default: module.VisualsWorkspace,
@@ -88,8 +83,6 @@ export function App({ getVisualTime }) {
         switch (activeWorkspace) {
             case 'studio':
                 return <StudioWorkspace />;
-            case 'perform':
-                return <PerformWorkspace />;
             case 'visuals':
                 return <VisualsWorkspace getVisualTime={getVisualTime} />;
             default:

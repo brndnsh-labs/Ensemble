@@ -10,15 +10,9 @@ const ShareModal = lazy(() => import('./ShareModal.jsx').then((m) => ({ default:
 const GenerateSongModal = lazy(() =>
     import('./GenerateSongModal.jsx').then((m) => ({ default: m.GenerateSongModal })),
 );
-const PerformanceModal = lazy(() =>
-    import('./PerformanceModal.jsx').then((m) => ({ default: m.PerformanceModal })),
-);
 const Settings = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.Settings })));
 const ManualModal = lazy(() =>
     import('./ManualModal.jsx').then((m) => ({ default: m.ManualModal })),
-);
-const DrumPadModal = lazy(() =>
-    import('./DrumPadModal.jsx').then((m) => ({ default: m.DrumPadModal })),
 );
 
 /**
@@ -68,47 +62,24 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
  */
 export function Modals() {
     // Get modal visibility state from global store
-    const {
-        settingsOpen,
-        editorOpen,
-        generateSongOpen,
-        shareOpen,
-        performanceOpen,
-        manualOpen,
-        drumPadOpen,
-    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
-        settingsOpen: s.playback.modals.settings,
-        editorOpen: s.playback.modals.editor,
-        generateSongOpen: s.playback.modals.generateSong,
-        shareOpen: s.playback.modals.share,
-        performanceOpen: s.playback.modals.performance,
-        manualOpen: s.playback.modals.manual,
-        drumPadOpen: s.playback.modals.drumPad,
-    }));
+    const { settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen } = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+            settingsOpen: s.playback.modals.settings,
+            editorOpen: s.playback.modals.editor,
+            generateSongOpen: s.playback.modals.generateSong,
+            shareOpen: s.playback.modals.share,
+            manualOpen: s.playback.modals.manual,
+        }),
+    );
 
     useEffect(() => {
-        const anyOpen =
-            settingsOpen ||
-            editorOpen ||
-            generateSongOpen ||
-            shareOpen ||
-            performanceOpen ||
-            manualOpen ||
-            drumPadOpen;
+        const anyOpen = settingsOpen || editorOpen || generateSongOpen || shareOpen || manualOpen;
         if (anyOpen) {
             document.body.classList.add('modal-open');
         } else {
             document.body.classList.remove('modal-open');
         }
-    }, [
-        settingsOpen,
-        editorOpen,
-        generateSongOpen,
-        shareOpen,
-        performanceOpen,
-        manualOpen,
-        drumPadOpen,
-    ]);
+    }, [settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen]);
 
     return (
         <Fragment>
@@ -116,9 +87,7 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
             <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
             <AnimatedModalWrapper isOpen={shareOpen} component={ShareModal} />
-            <AnimatedModalWrapper isOpen={performanceOpen} component={PerformanceModal} />
             <AnimatedModalWrapper isOpen={manualOpen} component={ManualModal} />
-            <AnimatedModalWrapper isOpen={drumPadOpen} component={DrumPadModal} />
         </Fragment>
     );
 }

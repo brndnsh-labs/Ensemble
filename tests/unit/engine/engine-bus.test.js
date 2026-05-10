@@ -123,21 +123,6 @@ describe('Engine Bus Management', () => {
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
         });
 
-        it('should NOT mute soloist if performance modal is open', () => {
-            state.soloist.enabled = false;
-            state.playback.modals.performance = true;
-            restoreGains(state);
-            // Even though disabled, it stays unmuted for manual playing in performance view
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.15, 10.0, 0.04); // 1.0 * 0.15
-        });
-
-        it('should NOT mute drums if drumPad modal is open', () => {
-            state.groove.enabled = false;
-            state.playback.modals.drumPad = true;
-            restoreGains(state);
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.26, 10.0, 0.04); // 1.0 * 0.26
-        });
-
         it('should mute local audio if MIDI muteLocal is active', () => {
             state.midi.enabled = true;
             state.midi.muteLocal = true;

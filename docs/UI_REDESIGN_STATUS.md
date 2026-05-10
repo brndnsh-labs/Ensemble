@@ -14,7 +14,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 
 ## Current position
 
-**Next chunk:** 0.1 — Remove Perform and its modals
+**Next chunk:** 1.1 — `ChartSurface` skeleton + flag
 
 ---
 
@@ -23,9 +23,9 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | Chunk | Title | Status | Date | Notes |
 |---|---|---|---|---|
 | **Phase 0** | | | | |
-| 0.1 | Remove Perform and its modals | next-up | | |
+| 0.1 | Remove Perform and its modals | done | 2026-05-09 | |
 | **Phase 1** | | | | |
-| 1.1 | `ChartSurface` skeleton + flag | not-started | | |
+| 1.1 | `ChartSurface` skeleton + flag | next-up | | |
 | 1.2 | Extract `InstrumentRail` from Studio | not-started | | |
 | **Phase 2** | | | | |
 | 2.1 | Chart slot | not-started | | |

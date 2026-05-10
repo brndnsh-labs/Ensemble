@@ -10,18 +10,6 @@ export const SHORTCUT_CONFIG = [
         category: 'Transport',
     },
     {
-        key: 'S',
-        action: 'Soloist Performance',
-        description: 'Open the Soloist Performance modal.',
-        category: 'Performance',
-    },
-    {
-        key: 'D',
-        action: 'Drum Performance',
-        description: 'Open the Drum Pad Performance modal.',
-        category: 'Performance',
-    },
-    {
         key: 'E',
         action: 'Arrangement Editor',
         description: 'Open the chord progression editor.',

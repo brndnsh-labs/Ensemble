@@ -18,7 +18,7 @@ vi.mock('../../public/state.js', () => {
     const mockState = {
         playback: {
             viz: {},
-            modals: { editor: false, settings: false, performance: false, drumPad: false },
+            modals: { editor: false, settings: false },
         },
         dispatch: vi.fn(),
     };

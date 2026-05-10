@@ -126,10 +126,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
 | **Containers** | `public/App.jsx` | Root workspace shell, header, and active surface rendering. |
-| **Navigation** | `public/components/WorkspaceNav.jsx` | Top-level workspace switcher for Arranger, Studio, Perform, and Visuals. |
+| **Navigation** | `public/components/WorkspaceNav.jsx` | Top-level workspace switcher for Arranger, Studio, and Visuals. |
 | **Workspaces** | `public/components/ArrangerWorkspace.jsx` | Lead-sheet workspace with arranger actions and progression library access. |
 | **Workspaces** | `public/components/StudioWorkspace.jsx` | Live-mix workspace with band feel chooser and compact instrument controls. |
-| **Workspaces** | `public/components/PerformWorkspace.jsx` | Launch surface for manual performance tools. |
 | **Workspaces** | `public/components/VisualsWorkspace.jsx` | Visualizer workspace shell. |
 | **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |

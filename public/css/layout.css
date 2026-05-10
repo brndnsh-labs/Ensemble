@@ -477,10 +477,6 @@ select option {
     --workspace-accent: var(--violet);
 }
 
-.workspace-stage--perform {
-    --workspace-accent: var(--soloist-color);
-}
-
 .workspace-stage--visuals {
     --workspace-accent: var(--cyan);
 }
@@ -631,11 +627,6 @@ select option {
 .workspace-status-grid {
     display: grid;
     gap: 1rem;
-}
-
-.workspace-grid--perform {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
 }
 
 .workspace-grid--visuals {
@@ -2280,8 +2271,7 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
 }
 
 @media (max-width: 1200px) {
-    .workspace-columns,
-    .workspace-grid--perform {
+    .workspace-columns {
         grid-template-columns: minmax(0, 1fr);
     }
 

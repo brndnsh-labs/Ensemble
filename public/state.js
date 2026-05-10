@@ -104,7 +104,7 @@ export function getSyncState() {
             practiceMode: playback.practiceMode,
             sessionTimer: playback.sessionTimer,
             sessionStartTime: playback.sessionStartTime,
-            modals: { performance: playback.modals?.performance || false },
+            modals: {},
             intent: playback.intent,
             conductorVelocity: playback.conductorVelocity,
             lyricalBias: playback.lyricalBias,

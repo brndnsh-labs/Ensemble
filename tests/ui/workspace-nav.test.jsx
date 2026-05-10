@@ -57,7 +57,7 @@ describe('Workspace navigation shell', () => {
         render(<WorkspaceNav />, document.getElementById('root'));
         await new Promise((resolve) => setTimeout(resolve, 0));
 
-        expect(document.querySelectorAll('.workspace-nav-btn')).toHaveLength(4);
+        expect(document.querySelectorAll('.workspace-nav-btn')).toHaveLength(3);
         expect(document.querySelectorAll('.workspace-nav-description')).toHaveLength(0);
     });
 });

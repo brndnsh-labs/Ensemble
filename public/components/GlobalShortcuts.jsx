@@ -40,42 +40,6 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
-            // 'S': Open Soloist Performance Mode
-            if (
-                e.key.toLowerCase() === 's' &&
-                !isTyping &&
-                !anyModalOpen &&
-                !e.metaKey &&
-                !e.ctrlKey
-            ) {
-                e.preventDefault();
-                if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                }
-                dispatch(ACTIONS.INIT_AUDIO);
-                setTimeout(() => {
-                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'performance', open: true });
-                }, 0);
-            }
-
-            // 'D': Open Drum Pad Performance Mode
-            if (
-                e.key.toLowerCase() === 'd' &&
-                !isTyping &&
-                !anyModalOpen &&
-                !e.metaKey &&
-                !e.ctrlKey
-            ) {
-                e.preventDefault();
-                if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                }
-                dispatch(ACTIONS.INIT_AUDIO);
-                setTimeout(() => {
-                    dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'drumPad', open: true });
-                }, 0);
-            }
-
             // Escape: Close Modal / Unmaximize
             if (e.key === 'Escape') {
                 e.preventDefault();

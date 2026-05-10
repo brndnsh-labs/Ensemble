@@ -16,12 +16,6 @@ export const WORKSPACE_META = {
         label: 'Studio',
         description: '',
     },
-    perform: {
-        id: 'perform',
-        icon: '🎹',
-        label: 'Perform',
-        description: '',
-    },
     visuals: {
         id: 'visuals',
         icon: '🌈',
@@ -31,7 +25,7 @@ export const WORKSPACE_META = {
 };
 
 /** @type {import('../state/ui.js').WorkspaceId[]} */
-const WORKSPACE_ORDER = ['arranger', 'studio', 'perform', 'visuals'];
+const WORKSPACE_ORDER = ['arranger', 'studio', 'visuals'];
 
 /**
  * @param {import('../state/ui.js').WorkspaceId} workspace

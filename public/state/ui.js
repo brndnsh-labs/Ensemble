@@ -2,7 +2,7 @@ import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
 /**
- * @typedef {'arranger' | 'studio' | 'perform' | 'visuals'} WorkspaceId
+ * @typedef {'arranger' | 'studio' | 'visuals'} WorkspaceId
  */
 
 /**
@@ -10,7 +10,7 @@ import { ACTIONS } from '../types.js';
  * @property {WorkspaceId} activeWorkspace - Currently active top-level workspace.
  */
 
-export const WORKSPACES = /** @type {const} */ (['arranger', 'studio', 'perform', 'visuals']);
+export const WORKSPACES = /** @type {const} */ (['arranger', 'studio', 'visuals']);
 
 export const DEFAULT_WORKSPACE = 'arranger';
 
