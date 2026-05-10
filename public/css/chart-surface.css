@@ -10,16 +10,54 @@
 
 .chart-surface__topbar {
     grid-area: topbar;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-color);
+    flex-wrap: wrap;
+}
+
+.chart-surface__keytime {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.chart-surface__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.chart-surface__overflow-menu {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-1);
+    gap: var(--space-1);
 }
 
 .chart-surface__chart {
     grid-area: chart;
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.chart-surface__chart .display-area {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    margin-bottom: 0;
 }
 
 .chart-surface__rail {
     grid-area: rail;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
 }
 
 @media (max-width: 1023px) {

@@ -179,7 +179,8 @@
         "networkidle",
         "goertzel",
         "coeff",
-        "topbar"
+        "topbar",
+        "keytime"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

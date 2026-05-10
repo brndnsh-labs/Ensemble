@@ -1171,6 +1171,26 @@ main.app-main-layout.workspace-shell .workspace-view--arranger #panel-arranger {
     color: var(--text-secondary);
 }
 
+.workspace-toolbar-panel__action {
+    display: block;
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-color);
+    font-size: var(--font-base);
+    cursor: pointer;
+}
+
+.workspace-toolbar-panel__action:hover,
+.workspace-toolbar-panel__action:focus-visible {
+    background: var(--accent-color);
+    color: white;
+    outline: none;
+}
+
 .workspace-toolbar-panel__row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

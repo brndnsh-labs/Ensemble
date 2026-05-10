@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
@@ -7,114 +7,14 @@ import {
     MaximizeChordButton,
     TimeSignatureControl,
 } from './KeySignatureControls.jsx';
-import { PresetLibrary } from './PresetLibrary.jsx';
+import { LibraryModal } from './LibraryModal.jsx';
 import { SoloistSeedMenuControl } from './SoloistControls.jsx';
-
-const LIBRARY_CLOSE_ANIMATION_MS = 180;
 
 /**
  * @param {keyof import('../types.js').ModalsState} modal
  */
 function openModal(modal) {
     dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
-}
-
-/**
- * @param {{ isOpen: boolean; onClose: () => void }} props
- */
-function LibraryModal({ isOpen, onClose }) {
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const overlayRef = useRef(null);
-    const closeTimerRef = useRef(/** @type {number | null} */ (null));
-    const [isRendered, setIsRendered] = useState(isOpen);
-    const [isClosing, setIsClosing] = useState(false);
-
-    useEffect(() => {
-        if (!isOpen) {
-            if (!isRendered) {
-                return;
-            }
-
-            setIsClosing(true);
-            closeTimerRef.current = window.setTimeout(() => {
-                setIsRendered(false);
-                setIsClosing(false);
-            }, LIBRARY_CLOSE_ANIMATION_MS);
-            return () => {
-                if (closeTimerRef.current !== null) {
-                    window.clearTimeout(closeTimerRef.current);
-                    closeTimerRef.current = null;
-                }
-            };
-        }
-
-        if (closeTimerRef.current !== null) {
-            window.clearTimeout(closeTimerRef.current);
-            closeTimerRef.current = null;
-        }
-        setIsRendered(true);
-        setIsClosing(false);
-        overlayRef.current?.focus();
-        const handleKeyDown = (/** @type {KeyboardEvent} */ e) => {
-            if (e.key === 'Escape') {
-                onClose();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, isRendered, onClose]);
-
-    useEffect(
-        () => () => {
-            if (closeTimerRef.current !== null) {
-                window.clearTimeout(closeTimerRef.current);
-            }
-        },
-        [],
-    );
-
-    if (!isRendered && !isOpen) {
-        return null;
-    }
-
-    return (
-        <div
-            ref={overlayRef}
-            class={`modal-overlay workspace-library-overlay${isOpen ? ' active' : ''}${
-                isClosing ? ' closing' : ''
-            }`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="workspaceLibraryTitle"
-            tabIndex={-1}
-            onClick={onClose}
-        >
-            <div
-                class={`settings-content workspace-library-modal${isClosing ? ' closing' : ''}`}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div class="panel-header workspace-library-header">
-                    <div>
-                        <p class="workspace-kicker">Recall</p>
-                        <h2 id="workspaceLibraryTitle" class="panel-title">
-                            Progression Library
-                        </h2>
-                    </div>
-                    <button
-                        type="button"
-                        class="secondary-btn workspace-library-close"
-                        onClick={onClose}
-                    >
-                        Close
-                    </button>
-                </div>
-                <div class="workspace-library-body">
-                    <PresetLibrary onSelect={onClose} />
-                </div>
-            </div>
-        </div>
-    );
 }
 
 export function ArrangerWorkspace() {

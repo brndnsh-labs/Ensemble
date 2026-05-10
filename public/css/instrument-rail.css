@@ -1,12 +1,89 @@
 .instrument-rail--horizontal {
     display: flex;
     flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
+    align-items: stretch;
+    overflow: hidden;
+    padding: 0;
+    gap: 0;
+    border-radius: 0;
 }
 
-.instrument-rail--horizontal .workspace-studio-live-mix-header,
+/* Compact left-side header: just the Mixer + Band Feel triggers, no title */
+.instrument-rail--horizontal .workspace-studio-live-mix-header {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border-right: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.instrument-rail--horizontal .workspace-studio-live-mix-header > div:first-child {
+    display: none;
+}
+
+.instrument-rail--horizontal .workspace-studio-live-mix-tools {
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+/* Horizontally scrolling row strip */
 .instrument-rail--horizontal .workspace-studio-live-mix-rows {
-    display: contents; /* placeholder — real layout in Chunk 2.3 */
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    align-items: stretch;
+}
+
+/* Each instrument becomes a compact channel-strip column */
+.instrument-rail--horizontal .workspace-studio-mix-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    min-width: 72px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.instrument-rail--horizontal .workspace-studio-mix-row-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+/* Hide summary description — no room in strip */
+.instrument-rail--horizontal .workspace-studio-mix-row-copy p {
+    display: none;
+}
+
+.instrument-rail--horizontal .workspace-studio-mix-row-heading {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+}
+
+.instrument-rail--horizontal .workspace-studio-mix-row-heading h3 {
+    font-size: 0.72rem;
+}
+
+/* Hide On/Off/Queued badge — power button carries the status visually */
+.instrument-rail--horizontal .workspace-instrument-state {
+    display: none;
+}
+
+/* Stack controls + power vertically in the strip */
+.instrument-rail--horizontal .workspace-studio-mix-row-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
 }

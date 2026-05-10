@@ -14,7 +14,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 
 ## Current position
 
-**Next chunk:** 2.1 — Chart slot
+**Next chunk:** 3.1 — On-demand visualizer overlay
 
 ---
 
@@ -28,11 +28,11 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | 1.1 | `ChartSurface` skeleton + flag | done | 2026-05-09 | |
 | 1.2 | Extract `InstrumentRail` from Studio | done | 2026-05-09 | |
 | **Phase 2** | | | | |
-| 2.1 | Chart slot | not-started | | |
-| 2.2a | TopBar: Transport + Key/Time cluster | not-started | | |
-| 2.2b | TopBar: Edit, Share, Library | not-started | | |
-| 2.2c | TopBar: Overflow menu + Visualizer toggle | not-started | | |
-| 2.3 | Instrument rail mount | not-started | | |
+| 2.1 | Chart slot | done | 2026-05-09 | |
+| 2.2a | TopBar: Transport + Key/Time cluster | done | 2026-05-09 | Mounted Transport + TimeSignatureControl + KeySignatureMenuControl directly; no new wrapper needed |
+| 2.2b | TopBar: Edit, Share, Library | done | 2026-05-09 | LibraryModal lifted to shared component; ArrangerWorkspace imports from it |
+| 2.2c | TopBar: Overflow menu + Visualizer toggle | done | 2026-05-09 | SoloistSeed top-level to avoid nested popovers; overflow has Generate Song, Settings, Manual |
+| 2.3 | Instrument rail mount | done | 2026-05-09 | matchMedia hook drives orientation; horizontal strip CSS replaces placeholder |
 | **Phase 3** | | | | |
 | 3.1 | On-demand visualizer overlay | not-started | | |
 | **Phase 4** | | | | |
@@ -53,7 +53,7 @@ Record anything discovered at a phase boundary that affects the next phase — u
 |---|---|---|
 | 0 | | |
 | 1 | | |
-| 2 | | |
+| 2 | 2026-05-09 | Full feature parity achieved in chart surface. LibraryModal lifted to shared component. Horizontal rail strip functional; popover anchoring relies on existing ToolbarPopover fixed-position logic (recheck in 3.1). |
 | 3 | | |
 | 4 | | |
 
