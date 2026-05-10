@@ -68,7 +68,7 @@ const STUDIO_INSTRUMENTS = [
 ];
 
 /**
- * @returns {{ kind: null | 'genre' | 'mixer' | 'settings', module: string | null }}
+ * @returns {{ kind: null | 'genre' | 'settings', module: string | null }}
  */
 function getClosedSurface() {
     return {
@@ -325,30 +325,32 @@ function StudioBandFeelChooser({
             <button
                 type="button"
                 class={`workspace-studio-genre-button ${isOpen ? 'is-open' : ''}`}
-                aria-label="Choose band feel"
+                aria-label="Choose genre"
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}
                 onClick={onToggle}
             >
-                <span class="workspace-studio-genre-button-label">Band feel</span>
-                <span class="workspace-studio-genre-button-value">
-                    {getBandFeelValue(activeGenre, autoIntensity, bandIntensity)}
-                </span>
-                <span class="workspace-studio-genre-button-caret" aria-hidden="true">
-                    ▾
+                <span class="workspace-studio-genre-button-label">Genre</span>
+                <span class="workspace-studio-genre-button-right">
+                    <span class="workspace-studio-genre-button-value">
+                        {getBandFeelValue(activeGenre, autoIntensity, bandIntensity)}
+                    </span>
+                    <span class="workspace-studio-genre-button-caret" aria-hidden="true">
+                        ▾
+                    </span>
                 </span>
             </button>
             <StudioSurface
                 accent="chords"
                 anchorElement={anchorElement}
                 className="workspace-studio-surface--genre workspace-studio-surface--band-feel"
-                closeLabel="Close band feel menu"
+                closeLabel="Close genre"
                 isCompactViewport={isCompactViewport}
                 isOpen={isOpen}
-                kicker="Band feel"
+                kicker="Genre"
                 onClose={onClose}
                 subtitle="Choose the groove language and shared energy for the whole band."
-                title="Shape band feel"
+                title="Choose genre"
             >
                 <SettingGroup title="Genre">
                     <div class="workspace-studio-genre-grid" role="list">
@@ -435,16 +437,10 @@ function StudioBandFeelChooser({
  * }} props
  */
 function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, showSettings, triggerRef }) {
-    const { enabled, tradeMode } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => {
-            const modState = /** @type {any} */ (s)[instrument.module];
-            return {
-                enabled: modState.enabled,
-                tradeMode: modState.tradeMode,
-            };
-        },
+    const enabled = useEnsembleState(
+        (/** @type {import('../types.js').EnsembleState} */ s) =>
+            /** @type {any} */ (s)[instrument.module].enabled,
     );
-    const { stateLabel, stateClass } = getStudioState(enabled, tradeMode, instrument.module);
     const powerClass = `power-btn ${enabled ? 'active' : ''}`;
 
     return (
@@ -459,11 +455,7 @@ function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, showSettin
                     {instrument.icon}
                 </span>
                 <div class="workspace-studio-mix-row-copy">
-                    <div class="workspace-studio-mix-row-heading">
-                        <h3>{instrument.label}</h3>
-                        <span class={`workspace-instrument-state ${stateClass}`}>{stateLabel}</span>
-                    </div>
-                    <p>{instrument.summary}</p>
+                    <h3>{instrument.label}</h3>
                 </div>
             </div>
             <div class="workspace-studio-mix-row-actions">
@@ -471,16 +463,13 @@ function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, showSettin
                     <button
                         type="button"
                         ref={triggerRef}
-                        class={`workspace-actions-trigger workspace-studio-mix-menu-trigger ${isOpen ? 'is-open' : ''}`}
+                        class={`workspace-studio-mix-menu-trigger ${isOpen ? 'is-open' : ''}`}
                         aria-label={`${instrument.label} settings`}
                         aria-haspopup="dialog"
                         aria-expanded={isOpen}
                         onClick={onToggleSettings}
                     >
-                        <span class="workspace-studio-mix-menu-label">Controls</span>
-                        <span class="workspace-studio-mix-menu-caret" aria-hidden="true">
-                            ›
-                        </span>
+                        ⚙
                     </button>
                 )}
                 <button
@@ -497,48 +486,42 @@ function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, showSettin
     );
 }
 
-/**
- * @param {{
- *   activeCount: number,
- *   anchorElement?: HTMLElement | null,
- *   isCompactViewport: boolean,
- *   isOpen: boolean,
- *   onClose: () => void
- * }} props
- */
-function StudioMixerSurface({
-    activeCount,
-    anchorElement = null,
-    isCompactViewport,
-    isOpen,
-    onClose,
-}) {
+/** @param {{ activeCount: number }} props */
+function StudioMixerAccordion({ activeCount }) {
+    const [isOpen, setIsOpen] = useState(false);
+
     return (
-        <StudioSurface
-            accent="mixer"
-            anchorElement={anchorElement}
-            className="workspace-studio-surface--settings workspace-studio-surface--mixer-panel"
-            closeLabel="Close mixer"
-            isCompactViewport={isCompactViewport}
-            isOpen={isOpen}
-            kicker="Studio mixer"
-            meta={<span class="workspace-studio-active-count">{activeCount}/5 on</span>}
-            onClose={onClose}
-            subtitle="Quick volume and reverb moves for the whole band."
-            title="Mixer"
-        >
-            <div class="workspace-studio-mixer-grid">
-                {STUDIO_INSTRUMENTS.map((instrument) => (
-                    <InstrumentMixerStrip
-                        key={instrument.module}
-                        accent={instrument.accent}
-                        icon={instrument.icon}
-                        label={instrument.label}
-                        module={instrument.module}
-                    />
-                ))}
-            </div>
-        </StudioSurface>
+        <div class={`workspace-studio-mixer-accordion ${isOpen ? 'is-open' : ''}`}>
+            <button
+                type="button"
+                class="workspace-studio-mixer-accordion-trigger"
+                aria-expanded={isOpen}
+                onClick={() => setIsOpen((o) => !o)}
+            >
+                <span>Mixer</span>
+                <span class="workspace-studio-active-count" aria-hidden="true">
+                    {activeCount}/{STUDIO_INSTRUMENTS.length} on
+                </span>
+                <span class="workspace-studio-mixer-accordion-caret" aria-hidden="true">
+                    ▾
+                </span>
+            </button>
+            {isOpen && (
+                <div class="workspace-studio-mixer-accordion-body">
+                    <div class="workspace-studio-mixer-grid">
+                        {STUDIO_INSTRUMENTS.map((instrument) => (
+                            <InstrumentMixerStrip
+                                key={instrument.module}
+                                accent={instrument.accent}
+                                icon={instrument.icon}
+                                label={instrument.label}
+                                module={instrument.module}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -632,8 +615,6 @@ export function InstrumentRail({ orientation = 'vertical' }) {
     const settingsTriggerRef = useRef({});
     /** @type {import('preact/hooks').MutableRef<HTMLDivElement | null>} */
     const genreTriggerRef = useRef(null);
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement | null>} */
-    const mixerTriggerRef = useRef(null);
 
     const activeCount = [groove, bass, chords, harmony, soloist].filter(Boolean).length;
     const activeInstrument =
@@ -645,11 +626,9 @@ export function InstrumentRail({ orientation = 'vertical' }) {
         const focusTarget =
             activeSurface.kind === 'genre'
                 ? genreTriggerRef.current
-                : activeSurface.kind === 'mixer'
-                  ? mixerTriggerRef.current
-                  : activeSurface.module
-                    ? settingsTriggerRef.current[activeSurface.module]
-                    : null;
+                : activeSurface.module
+                  ? settingsTriggerRef.current[activeSurface.module]
+                  : null;
 
         setActiveSurface(getClosedSurface());
 
@@ -661,12 +640,6 @@ export function InstrumentRail({ orientation = 'vertical' }) {
     const toggleGenreSurface = () => {
         setActiveSurface((current) =>
             current.kind === 'genre' ? getClosedSurface() : { kind: 'genre', module: null },
-        );
-    };
-
-    const toggleMixerSurface = () => {
-        setActiveSurface((current) =>
-            current.kind === 'mixer' ? getClosedSurface() : { kind: 'mixer', module: null },
         );
     };
 
@@ -686,39 +659,20 @@ export function InstrumentRail({ orientation = 'vertical' }) {
             class={`panel dashboard-panel workspace-panel workspace-studio-live-mix instrument-rail instrument-rail--${orientation}`}
         >
             <div class="workspace-studio-live-mix-header">
-                <div>
-                    <p class="workspace-kicker">Studio</p>
-                    <h2 id="studioWorkspaceTitle">Live mix</h2>
-                </div>
-                <div class="workspace-studio-live-mix-tools">
-                    <div ref={mixerTriggerRef}>
-                        <button
-                            type="button"
-                            class={`workspace-actions-trigger workspace-studio-mixer-button ${activeSurface.kind === 'mixer' ? 'is-open' : ''}`}
-                            aria-label="Open mixer"
-                            aria-haspopup="dialog"
-                            aria-expanded={activeSurface.kind === 'mixer'}
-                            onClick={toggleMixerSurface}
-                        >
-                            <span class="workspace-studio-mixer-button-label">Mixer</span>
-                            <span class="workspace-studio-mixer-button-caret" aria-hidden="true">
-                                ▾
-                            </span>
-                        </button>
-                    </div>
-                    <div ref={genreTriggerRef}>
-                        <StudioBandFeelChooser
-                            activeGenre={activeGenre}
-                            autoIntensity={autoIntensity}
-                            anchorElement={genreTriggerRef.current}
-                            bandIntensity={bandIntensity}
-                            isCompactViewport={isCompactViewport}
-                            isOpen={activeSurface.kind === 'genre'}
-                            onClose={closeSurface}
-                            onToggle={toggleGenreSurface}
-                        />
-                    </div>
-                </div>
+                <p class="workspace-kicker">Studio</p>
+                <h2 id="studioWorkspaceTitle">Live mix</h2>
+            </div>
+            <div class="workspace-studio-panel-genre" ref={genreTriggerRef}>
+                <StudioBandFeelChooser
+                    activeGenre={activeGenre}
+                    autoIntensity={autoIntensity}
+                    anchorElement={genreTriggerRef.current}
+                    bandIntensity={bandIntensity}
+                    isCompactViewport={isCompactViewport}
+                    isOpen={activeSurface.kind === 'genre'}
+                    onClose={closeSurface}
+                    onToggle={toggleGenreSurface}
+                />
             </div>
             <div class="workspace-studio-live-mix-rows">
                 {STUDIO_INSTRUMENTS.map((instrument) => (
@@ -750,13 +704,7 @@ export function InstrumentRail({ orientation = 'vertical' }) {
                     />
                 ))}
             </div>
-            <StudioMixerSurface
-                activeCount={activeCount}
-                anchorElement={mixerTriggerRef.current}
-                isCompactViewport={isCompactViewport}
-                isOpen={activeSurface.kind === 'mixer'}
-                onClose={closeSurface}
-            />
+            <StudioMixerAccordion activeCount={activeCount} />
             <StudioSettingsSurface
                 anchorElement={
                     activeSurface.module ? rowElementsRef.current[activeSurface.module] : null

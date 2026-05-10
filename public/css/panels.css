@@ -94,9 +94,10 @@
 
 .time-sig-group select {
     width: 100%;
-    padding: var(--space-1) var(--space-2);
+    padding: 0 var(--space-2);
     height: 32px;
     font-size: var(--font-sm);
+    border-radius: var(--radius-md);
 }
 
 @media (max-width: 600px) {
