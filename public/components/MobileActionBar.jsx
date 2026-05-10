@@ -15,10 +15,6 @@ import { InstrumentRail, StudioSurface } from './InstrumentRail.jsx';
 export function MobileActionBar({ isVizOpen, onOpenViz }) {
     const [isMixOpen, setIsMixOpen] = useState(false);
 
-    const openShare = () => {
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'share', open: true });
-    };
-
     return (
         <>
             <nav class="mobile-action-bar" aria-label="Quick actions">
@@ -38,7 +34,7 @@ export function MobileActionBar({ isVizOpen, onOpenViz }) {
                     type="button"
                     class="mobile-action-bar__btn"
                     aria-haspopup="dialog"
-                    onClick={openShare}
+                    onClick={() => dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'share', open: true })}
                 >
                     <span class="mobile-action-bar__icon" aria-hidden="true">
                         📤
