@@ -14,6 +14,6 @@ export function getActiveSurface() {
         localStorage.setItem('uiSurface', param);
     }
     const stored = localStorage.getItem('uiSurface');
-    _cached = stored === 'chart' ? 'chart' : 'legacy';
+    _cached = stored === 'legacy' ? 'legacy' : 'chart';
     return _cached;
 }
