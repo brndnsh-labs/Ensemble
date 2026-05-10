@@ -251,10 +251,6 @@
         min-width: min(10.75rem, 100%);
     }
 
-    .workspace-view--arranger .workspace-arranger-toolbar-trigger--seed {
-        padding-inline: 0.58rem;
-    }
-
     .workspace-view--arranger .workspace-toolbar-trigger-copy {
         gap: 0.28rem;
     }

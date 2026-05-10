@@ -197,6 +197,22 @@
         0 0 0 1px color-mix(in srgb, var(--studio-row-accent), transparent 72%);
 }
 
+/* Off rows fade so the active rows pop visually. Keep label/power readable
+   so the row remains scannable and tappable. */
+.workspace-studio-mix-row:not(.is-active):not(.is-menu-open) {
+    border-color: var(--border-color);
+    background: color-mix(in srgb, var(--panel-color), transparent 10%);
+}
+
+.workspace-studio-mix-row:not(.is-active):not(.is-menu-open) .workspace-studio-mix-row-icon {
+    opacity: 0.5;
+    filter: grayscale(0.6);
+}
+
+.workspace-studio-mix-row:not(.is-active):not(.is-menu-open) .workspace-studio-mix-row-heading h3 {
+    color: var(--text-muted);
+}
+
 .workspace-studio-mix-row.is-menu-open {
     z-index: calc(var(--z-panel-header) + 2);
     border-color: color-mix(in srgb, var(--studio-row-accent), transparent 30%);

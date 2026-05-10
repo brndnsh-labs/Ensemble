@@ -2,7 +2,6 @@ import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { ButtonGroup } from './UIControls.jsx';
 
 export function SoloistControls() {
@@ -19,7 +18,6 @@ export function SoloistControls() {
 
     return (
         <div class="smart-tab-layout">
-            {/* Trading Controls */}
             <div class="flex-between">
                 <label class="smart-tab-label panel-title">Trading</label>
                 <ButtonGroup
@@ -32,6 +30,7 @@ export function SoloistControls() {
                     ]}
                 />
             </div>
+            <SoloistSeedControl />
         </div>
     );
 }
@@ -80,30 +79,5 @@ export function SoloistSeedControl() {
                 </button>
             </div>
         </div>
-    );
-}
-
-export function SoloistSeedMenuControl({ buttonClassName = '' } = {}) {
-    return (
-        <ToolbarPopover
-            buttonId="soloistSeedMenuBtn"
-            panelId="soloistSeedPanel"
-            triggerAriaLabel="Open soloist seed controls"
-            panelLabel="Soloist seed controls"
-            triggerClassName={buttonClassName}
-            panelClassName="workspace-toolbar-panel--seed"
-            triggerContent={
-                <>
-                    <span class="workspace-toolbar-trigger-copy">
-                        <span class="workspace-toolbar-trigger-label">Seed</span>
-                    </span>
-                    <span class="workspace-toolbar-trigger-caret" aria-hidden="true">
-                        ▾
-                    </span>
-                </>
-            }
-        >
-            <SoloistSeedControl />
-        </ToolbarPopover>
     );
 }

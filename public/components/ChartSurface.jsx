@@ -6,7 +6,6 @@ import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
 import { LibraryModal } from './LibraryModal.jsx';
-import { SoloistSeedMenuControl } from './SoloistControls.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { Transport } from './Transport.jsx';
 import { VisualizerOverlay } from './VisualizerOverlay.jsx';
@@ -36,12 +35,14 @@ export function ChartSurface({ getVisualTime }) {
     return (
         <div class="chart-surface">
             <div class="chart-surface__topbar">
-                <Transport />
-                <div class="chart-surface__keytime">
+                <div class="chart-surface__zone chart-surface__zone--play">
+                    <Transport />
+                </div>
+                <div class="chart-surface__zone chart-surface__zone--shape">
                     <TimeSignatureControl />
                     <KeySignatureMenuControl />
                 </div>
-                <div class="chart-surface__actions">
+                <div class="chart-surface__zone chart-surface__zone--output">
                     {isSharedUrl && (
                         <div class="chart-surface__shared-pill" role="note">
                             <span>Shared with you</span>
@@ -60,13 +61,16 @@ export function ChartSurface({ getVisualTime }) {
                     <button type="button" class="header-btn" onClick={() => openModal('editor')}>
                         Edit
                     </button>
-                    <button type="button" class="header-btn" onClick={() => openModal('share')}>
-                        Share
-                    </button>
-                    <SoloistSeedMenuControl buttonClassName="workspace-arranger-toolbar-trigger workspace-arranger-toolbar-trigger--seed" />
                     <button
                         type="button"
-                        class={`header-btn chart-surface__viz-btn${isVizOpen ? ' active' : ''}`}
+                        class="header-btn header-btn--primary chart-surface__share-btn"
+                        onClick={() => openModal('share')}
+                    >
+                        Share
+                    </button>
+                    <button
+                        type="button"
+                        class={`header-btn header-btn--icon chart-surface__viz-btn${isVizOpen ? ' active' : ''}`}
                         aria-label="Open visualizer"
                         onClick={() => setIsVizOpen(true)}
                     >
@@ -76,7 +80,7 @@ export function ChartSurface({ getVisualTime }) {
                         panelId="chartOverflowPanel"
                         triggerAriaLabel="More options"
                         panelLabel="More options"
-                        triggerClassName="header-btn chart-surface__overflow-btn"
+                        triggerClassName="header-btn header-btn--icon chart-surface__overflow-btn"
                         triggerContent="⋯"
                     >
                         {({ closePopover }) => (

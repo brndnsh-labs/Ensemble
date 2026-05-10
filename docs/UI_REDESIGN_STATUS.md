@@ -14,7 +14,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 
 ## Current position
 
-**Next chunk:** 5.1 — Editor mobile UX
+**Next chunk:** none — phase 6 polish complete. Optional follow-up: 6.5B (section navigator) deferred.
 
 ---
 
@@ -42,6 +42,14 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | 5.1 | Editor mobile UX | done | 2026-05-10 | Editor already full-bleed at < 900px; added .symbol-row sticky strip on coarse-pointer devices with 44px tap targets |
 | 5.2 | Sharing prominence | done | 2026-05-10 | Toast now shows truncated URL; "Shared with you" pill in topbar on ?s= / ?prog= load, dismissible |
 | 5.3 | Responsive + a11y sweep | done | 2026-05-10 | Stale mockIds removed from a11y test; new dialog/alert assertions added; Playwright @mobile/@ipad coverage added |
+| **Phase 6** | Polish | | | |
+| 6.1 | Fix rail clipping | done | 2026-05-10 | Rail 240px → 320px; vertical-rail kicker hidden; per-row summary text hidden in vertical rail so Controls/power buttons fit |
+| 6.2 | Topbar three zones + move Seed | done | 2026-05-10 | Topbar restructured into Play/Shape/Output zones with dividers ≥1024px; SoloistSeedControl moved into Soloist rail panel (alongside Trading) |
+| 6.3 | Promote Share, demote 🌈/⋯ | done | 2026-05-10 | Added `header-btn--primary` (filled accent) and `header-btn--icon` (square) modifiers; Share is now visually heaviest; 🌈 and ⋯ read as utility |
+| 6.4 | Stronger off-state on rail rows | done | 2026-05-10 | Rows without is-active fade to neutral background, icon dims and loses saturation, h3 drops to text-muted; active rows pop |
+| 6.5A | Vertical-center chart | done | 2026-05-10 | Chart `display-area` uses `align-content: safe center` inside chart-surface so short charts no longer dump all whitespace at the bottom |
+| 6.5B | Section navigator | deferred | | Punted — discussed inline in 6.5; bring back when sections become a real first-class concept |
+| 6.6 | iPad touch sweep | done | 2026-05-10 | `.header-btn` and `.header-btn--icon` get 44×44 min on `(pointer: coarse)`; chart-surface @ipad Playwright suite green |
 
 ---
 
