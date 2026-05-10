@@ -1146,6 +1146,35 @@ input[type="range"] {
     border-color: var(--accent-color);
 }
 
+.symbol-row {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.4rem;
+    padding: 0.4rem 0.25rem;
+    background: var(--panel-color);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    scrollbar-width: none;
+}
+
+.symbol-row::-webkit-scrollbar {
+    display: none;
+}
+
+.symbol-row .symbol-btn {
+    flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+    .symbol-btn {
+        min-height: 44px;
+        min-width: 44px;
+        font-size: 1rem;
+    }
+}
+
 .section-prog-input {
     width: 100%;
     background: var(--input-bg);

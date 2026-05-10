@@ -80,7 +80,7 @@ test.describe('ChartSurface @ui', () => {
     test.describe('Overflow menu', () => {
         test('opens and exposes Generate Song, Settings, and Manual actions', async ({ page }) => {
             await page.setViewportSize({ width: 1366, height: 900 });
-            await page.locator('[aria-label="More options"]').click();
+            await page.getByRole('button', { name: 'More options' }).click();
 
             const panel = page.locator('#chartOverflowPanel');
             await expect(panel).toBeVisible();
@@ -91,13 +91,90 @@ test.describe('ChartSurface @ui', () => {
 
         test('Settings button opens the settings modal', async ({ page }) => {
             await page.setViewportSize({ width: 1366, height: 900 });
-            await page.locator('[aria-label="More options"]').click();
+            await page.getByRole('button', { name: 'More options' }).click();
             await page
                 .locator('#chartOverflowPanel')
                 .getByRole('button', { name: 'Settings' })
                 .click();
 
-            await expect(page.locator('[role="dialog"]')).toBeVisible();
+            await expect(page.locator('#settingsOverlay')).toBeVisible();
+        });
+    });
+
+    test.describe('Editor mobile UX @mobile', () => {
+        test('shows sticky symbol row above textarea in editor on touch viewport @mobile', async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.getByRole('button', { name: 'Edit' }).click();
+
+            const editor = page.locator('#editorOverlay');
+            await expect(editor).toBeVisible();
+
+            // Symbol row should be visible (touch device = coarse pointer via emulation)
+            const symbolRow = editor.locator('.symbol-row').first();
+            await expect(symbolRow).toBeVisible();
+        });
+
+        test('editor modal fills viewport on mobile @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            await page.getByRole('button', { name: 'Edit' }).click();
+
+            const content = page.locator('#editorOverlay .settings-content');
+            await expect(content).toBeVisible();
+            const box = await content.boundingBox();
+            expect(box).not.toBeNull();
+            // Full-bleed: content should span nearly the full viewport width (allows for scrollbar)
+            expect(box.width).toBeGreaterThanOrEqual(360);
+        });
+    });
+
+    test.describe('Sharing prominence', () => {
+        test('shows "Shared with you" pill when URL has a chart payload', async ({ page }) => {
+            // A minimal valid ?s= payload (base64 of a section array)
+            const s = btoa(JSON.stringify([{ id: 'x', label: 'A', value: 'C Am F G' }]));
+            await page.goto(`/?s=${encodeURIComponent(s)}`);
+            await page.waitForSelector('html[data-hydrated="true"]', {
+                state: 'attached',
+                timeout: 15000,
+            });
+
+            const pill = page.locator('.chart-surface__shared-pill');
+            await expect(pill).toBeVisible();
+            await expect(pill).toContainText('Shared with you');
+        });
+
+        test('dismisses "Shared with you" pill on button click', async ({ page }) => {
+            const s = btoa(JSON.stringify([{ id: 'x', label: 'A', value: 'C Am F G' }]));
+            await page.goto(`/?s=${encodeURIComponent(s)}`);
+            await page.waitForSelector('html[data-hydrated="true"]', {
+                state: 'attached',
+                timeout: 15000,
+            });
+
+            await page.locator('[aria-label="Dismiss shared notice"]').click();
+            await expect(page.locator('.chart-surface__shared-pill')).toHaveCount(0);
+        });
+
+        test('Share button is visible at mobile breakpoint @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            const shareBtn = page.getByRole('button', { name: 'Share' });
+            await expect(shareBtn).toBeVisible();
+        });
+    });
+
+    test.describe('Responsive layout', () => {
+        test('topbar and chart are visible at 375px @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 375, height: 667 });
+            await expect(page.locator('.chart-surface__topbar')).toBeVisible();
+            await expect(page.locator('.chart-surface__chart')).toBeVisible();
+        });
+
+        test('renders horizontal rail on tablet breakpoint @ipad', async ({ page }) => {
+            await page.setViewportSize({ width: 768, height: 1024 });
+            const rail = page.locator('.instrument-rail');
+            await expect(rail).toBeVisible();
+            await expect(rail).toHaveClass(/instrument-rail--horizontal/);
         });
     });
 });

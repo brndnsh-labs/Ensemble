@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { getState, dispatch as internalDispatch } from './state.js';
 
 /**
@@ -18,6 +18,27 @@ export function useEnsembleState(selector) {
 
     const currentState = getState();
     return selectorRef.current(currentState);
+}
+
+/**
+ * Reactive hook for CSS media queries. Returns the current match state and
+ * re-renders when the query result changes (e.g. window resize, orientation change).
+ * @param {string} query - CSS media query string, e.g. `'(max-width: 1023px)'`
+ * @returns {boolean}
+ */
+export function useMediaQuery(query) {
+    const [matches, setMatches] = useState(() =>
+        typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+    );
+
+    useEffect(() => {
+        const mq = window.matchMedia(query);
+        const update = () => setMatches(mq.matches);
+        mq.addEventListener('change', update);
+        return () => mq.removeEventListener('change', update);
+    }, [query]);
+
+    return matches;
 }
 
 /**

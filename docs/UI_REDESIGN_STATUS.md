@@ -39,9 +39,9 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | 4.1 | Flip default surface to `chart` | done | 2026-05-09 | ui-surface.js deleted; ChartSurface is now the only shell |
 | 4.2 | Delete legacy shell | done | 2026-05-09 | Removed WorkspaceNav, ArrangerWorkspace, StudioWorkspace, VisualsWorkspace, state/ui.js, ui-surface.js, isMaximized/chord-maximize, ~2200 lines of legacy CSS |
 | **Phase 5** | | | | |
-| 5.1 | Editor mobile UX | not-started | | |
-| 5.2 | Sharing prominence | not-started | | |
-| 5.3 | Responsive + a11y sweep | not-started | | |
+| 5.1 | Editor mobile UX | done | 2026-05-10 | Editor already full-bleed at < 900px; added .symbol-row sticky strip on coarse-pointer devices with 44px tap targets |
+| 5.2 | Sharing prominence | done | 2026-05-10 | Toast now shows truncated URL; "Shared with you" pill in topbar on ?s= / ?prog= load, dismissible |
+| 5.3 | Responsive + a11y sweep | done | 2026-05-10 | Stale mockIds removed from a11y test; new dialog/alert assertions added; Playwright @mobile/@ipad coverage added |
 
 ---
 

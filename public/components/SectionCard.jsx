@@ -3,7 +3,7 @@ import { useEffect, useImperativeHandle, useRef, useState } from 'preact/hooks';
 import { onSectionDelete, onSectionDuplicate, onSectionUpdate } from '../arranger-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import { ACTIONS } from '../types.js';
-import { useDispatch, useEnsembleState } from '../ui-bridge.js';
+import { useDispatch, useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { SymbolMenu } from './SymbolMenu.jsx';
 
@@ -26,6 +26,7 @@ export const SectionCard = forwardRef(
     (/** @type {SectionCardProps} */ { section, index, totalSections }, ref) => {
         const dispatch = useDispatch();
         const [isMenuOpen, setIsMenuOpen] = useState(false);
+        const isTouch = useMediaQuery('(pointer: coarse)');
         /** @type {import('preact/hooks').MutableRef<HTMLTextAreaElement|null>} */
         const textareaRef = useRef(null);
         /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
@@ -312,27 +313,32 @@ export const SectionCard = forwardRef(
                                 ⎘
                             </button>
 
-                            <div style="position: relative; display: inline-block;" ref={menuRef}>
-                                <button
-                                    class="section-kebab-btn"
-                                    title="Insert Symbol"
-                                    aria-label={`Actions for ${section.label || 'Section'}`}
-                                    aria-expanded={isMenuOpen}
-                                    aria-haspopup="true"
-                                    onClick={(/** @type {any} */ e) => {
-                                        e.stopPropagation();
-                                        setIsMenuOpen(!isMenuOpen);
-                                    }}
+                            {!isTouch && (
+                                <div
+                                    style="position: relative; display: inline-block;"
+                                    ref={menuRef}
                                 >
-                                    ⋮
-                                </button>
-                                {isMenuOpen && (
-                                    <SymbolMenu
-                                        onSelect={insertSymbol}
-                                        onClose={() => setIsMenuOpen(false)}
-                                    />
-                                )}
-                            </div>
+                                    <button
+                                        class="section-kebab-btn"
+                                        title="Insert Symbol"
+                                        aria-label={`Actions for ${section.label || 'Section'}`}
+                                        aria-expanded={isMenuOpen}
+                                        aria-haspopup="true"
+                                        onClick={(/** @type {any} */ e) => {
+                                            e.stopPropagation();
+                                            setIsMenuOpen(!isMenuOpen);
+                                        }}
+                                    >
+                                        ⋮
+                                    </button>
+                                    {isMenuOpen && (
+                                        <SymbolMenu
+                                            onSelect={insertSymbol}
+                                            onClose={() => setIsMenuOpen(false)}
+                                        />
+                                    )}
+                                </div>
+                            )}
 
                             <button
                                 class="section-delete-btn"
@@ -345,6 +351,8 @@ export const SectionCard = forwardRef(
                         </div>
                     </div>
                 </div>
+
+                {isTouch && <SymbolMenu variant="row" onSelect={insertSymbol} />}
 
                 <textarea
                     ref={textareaRef}

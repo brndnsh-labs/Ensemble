@@ -5,7 +5,7 @@ import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { useEnsembleState } from '../ui-bridge.js';
+import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { syncWorker } from '../worker-client.js';
 import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
@@ -128,34 +128,6 @@ function getStudioState(enabled, tradeMode, module) {
 /** @param {StudioInstrumentModule} module */
 function hasStudioInstrumentControls(module) {
     return module !== 'bass';
-}
-
-function useIsCompactStudioViewport() {
-    const [isCompact, setIsCompact] = useState(() =>
-        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-            ? window.matchMedia(STUDIO_SURFACE_BREAKPOINT).matches
-            : false,
-    );
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-            return undefined;
-        }
-
-        const mediaQuery = window.matchMedia(STUDIO_SURFACE_BREAKPOINT);
-        const update = () => setIsCompact(mediaQuery.matches);
-
-        update();
-        if (typeof mediaQuery.addEventListener === 'function') {
-            mediaQuery.addEventListener('change', update);
-            return () => mediaQuery.removeEventListener('change', update);
-        }
-
-        mediaQuery.addListener(update);
-        return () => mediaQuery.removeListener(update);
-    }, []);
-
-    return isCompact;
 }
 
 /**
@@ -653,7 +625,7 @@ export function InstrumentRail({ orientation = 'vertical' }) {
             bandIntensity: s.playback.bandIntensity,
         }));
     const [activeSurface, setActiveSurface] = useState(getClosedSurface);
-    const isCompactViewport = useIsCompactStudioViewport();
+    const isCompactViewport = useMediaQuery(STUDIO_SURFACE_BREAKPOINT);
     /** @type {import('preact/hooks').MutableRef<Record<string, HTMLDivElement | null>>} */
     const rowElementsRef = useRef({});
     /** @type {import('preact/hooks').MutableRef<Record<string, HTMLButtonElement | null>>} */

@@ -110,3 +110,26 @@
     flex: 1;
     min-height: 0;
 }
+
+.chart-surface__shared-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: var(--accent-color);
+    color: white;
+    font-size: 0.75rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.chart-surface__shared-pill button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 0.1rem;
+    font-size: 0.9rem;
+    line-height: 1;
+}

@@ -13,6 +13,7 @@ const mockDispatch = vi.fn();
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
     useDispatch: () => mockDispatch,
+    useMediaQuery: () => false,
 }));
 
 vi.mock('../../../public/state.js', () => {

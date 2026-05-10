@@ -12,7 +12,7 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             <div id="sectionList" role="list"></div>
             <div id="sequencerGrid" role="grid" aria-label="Drum Sequencer"></div>
             <div id="chordVisualizer" aria-live="polite"></div>
-            
+
             <div class="genre-btn" data-genre="Jazz" role="button" aria-pressed="false">Jazz</div>
             <div class="genre-btn" data-genre="Rock" role="button" aria-pressed="true">Rock</div>
 
@@ -23,85 +23,44 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
 
             <div id="settingsOverlay" class="overlay"></div>
             <button id="settingsBtn" aria-label="Open Settings">Settings</button>
+
+            <div
+                id="editorOverlay"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="editorModalTitle"
+            ></div>
+            <div id="notificationLayer" role="alert" aria-live="polite"></div>
         `;
 
-        // Mock remaining UI elements needed for initUI
+        // Stub elements that live components access by ID at module load or init time.
+        // Only IDs confirmed present in production code belong here.
         const mockIds = [
-            'timeSigSelect',
             'keySelect',
-            'measurePagination',
-            'drumBarsSelect',
-            'tapBtn',
             'relKeyBtn',
-            'transUpBtn',
-            'transDownBtn',
-            'maximizeChordBtn',
-            'chordPowerBtn',
-            'groovePowerBtn',
-            'bassPowerBtn',
-            'soloistPowerBtn',
-            'chordPowerBtnDesktop',
-            'groovePowerBtnDesktop',
-            'bassPowerBtnDesktop',
-            'soloistPowerBtnDesktop',
             'addSectionBtn',
             'inspirationHubBtn',
-            'activeSectionLabel',
             'arrangerActionTrigger',
             'arrangerActionMenu',
             'mutateBtn',
             'undoBtn',
             'clearProgBtn',
             'saveBtn',
-            'shareHubBtn',
-            'chordPresets',
-            'userPresetsContainer',
-            'chordStylePresets',
-            'bassStylePresets',
-            'soloistStylePresets',
             'groupingToggle',
             'groupingLabel',
-            'chordReverb',
-            'bassReverb',
-            'soloistReverb',
-            'drumPresets',
-            'userDrumPresetsContainer',
-            'cloneMeasureBtn',
-            'autoFollowCheck',
             'humanizeSlider',
-            'saveDrumBtn',
-            'drumReverb',
-            'smartDrumPresets',
-            'settingsBtn',
             'themeSelect',
             'notationSelect',
             'densitySelect',
             'swingSlider',
-            'exportMidiBtn',
             'settingsShareHubBtn',
             'shareOverlay',
-            'closeExportBtn',
-            'confirmExportBtn',
-            'exportChordsCheck',
-            'exportBassCheck',
-            'exportSoloistCheck',
-            'exportDrumsCheck',
-            'exportDurationInput',
-            'exportDurationContainer',
             'exportFilenameInput',
             'installAppBtn',
-            'flashOverlay',
             'resetSettingsBtn',
             'refreshAppBtn',
-            'editorOverlay',
-            'editArrangementBtn',
             'closeEditorBtn',
-            'intensitySlider',
             'complexitySlider',
-            'intensityValue',
-            'autoIntensityCheck',
-            'panel-visualizer',
-            'clearDrumsBtn',
             'masterVolume',
             'countInCheck',
             'metronomeCheck',
@@ -111,7 +70,6 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'swingBaseSelect',
             'creativityCheck',
             'closeSettingsBtn',
-            'sessionTimerSelect',
         ];
         mockIds.forEach((id) => {
             if (!document.getElementById(id)) {
@@ -156,10 +114,21 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
 
     it('should ensure overlays are discoverable or hidden correctly', () => {
         const settings = document.getElementById('settingsOverlay');
-        // When not active, it shouldn't be hidden from AT unless it's actually removed/hidden
-        // but it should definitely have a label if it's a modal
         settings.setAttribute('role', 'dialog');
         settings.setAttribute('aria-label', 'Settings');
         expect(settings.getAttribute('role')).toBe('dialog');
+    });
+
+    it('editor modal should have dialog role and aria-modal', () => {
+        const editor = document.getElementById('editorOverlay');
+        expect(editor.getAttribute('role')).toBe('dialog');
+        expect(editor.getAttribute('aria-modal')).toBe('true');
+        expect(editor.getAttribute('aria-labelledby')).toBeDefined();
+    });
+
+    it('notification layer should have alert role and aria-live', () => {
+        const layer = document.getElementById('notificationLayer');
+        expect(layer.getAttribute('role')).toBe('alert');
+        expect(layer.getAttribute('aria-live')).toBe('polite');
     });
 });

@@ -84,8 +84,9 @@ export function ShareModal(_props) {
             navigator.clipboard
                 .writeText(url)
                 .then(() => {
+                    const display = url.length > 60 ? `${url.slice(0, 57)}…` : url;
                     dispatch(ACTIONS.SHOW_TOAST, {
-                        message: 'Share link copied to clipboard!',
+                        message: `Copied: ${display}`,
                         type: 'success',
                     });
                 })

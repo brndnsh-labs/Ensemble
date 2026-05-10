@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
+import { useMediaQuery } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
@@ -18,16 +19,14 @@ const NARROW_MQ = '(max-width: 1023px)';
 export function ChartSurface({ getVisualTime }) {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isVizOpen, setIsVizOpen] = useState(false);
-    const [isNarrow, setIsNarrow] = useState(() =>
-        typeof window !== 'undefined' ? window.matchMedia(NARROW_MQ).matches : false,
-    );
-
-    useEffect(() => {
-        const mq = window.matchMedia(NARROW_MQ);
-        const update = () => setIsNarrow((prev) => (mq.matches !== prev ? mq.matches : prev));
-        mq.addEventListener('change', update);
-        return () => mq.removeEventListener('change', update);
-    }, []);
+    const [isSharedUrl, setIsSharedUrl] = useState(() => {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+        const p = new URLSearchParams(window.location.search);
+        return !!(p.get('s') || p.get('prog'));
+    });
+    const isNarrow = useMediaQuery(NARROW_MQ);
 
     const openModal = (/** @type {keyof import('../types.js').ModalsState} */ modal) =>
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
@@ -43,6 +42,18 @@ export function ChartSurface({ getVisualTime }) {
                     <KeySignatureMenuControl />
                 </div>
                 <div class="chart-surface__actions">
+                    {isSharedUrl && (
+                        <div class="chart-surface__shared-pill" role="note">
+                            <span>Shared with you</span>
+                            <button
+                                type="button"
+                                aria-label="Dismiss shared notice"
+                                onClick={() => setIsSharedUrl(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
                     <button type="button" class="header-btn" onClick={() => setIsLibraryOpen(true)}>
                         Library
                     </button>
