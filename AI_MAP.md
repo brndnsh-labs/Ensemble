@@ -21,7 +21,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.js` | Shared UI component prop definitions. | `SelectOption` |
 | `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
-| `public/ui-surface.js` | Feature flag: reads URL param + localStorage to select `'chart'` or `'legacy'` shell. | `getActiveSurface` |
 | `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.js` | Main-thread orchestrator for worker messaging. | `workerClient` |
 
@@ -34,7 +33,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/groove.js` | Genre, intensity, and drum kit selection. | `groove` |
 | `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
-| `public/state/ui.js` | Top-level UI workspace navigation state. | `ui`, `normalizeWorkspace` |
 | `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.js` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
@@ -126,13 +124,10 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
-| **Containers** | `public/App.jsx` | Root workspace shell, header, and active surface rendering. |
-| **Navigation** | `public/components/WorkspaceNav.jsx` | Top-level workspace switcher for Arranger, Studio, and Visuals. |
-| **Workspaces** | `public/components/ArrangerWorkspace.jsx` | Lead-sheet workspace with arranger actions and progression library access. |
-| **Workspaces** | `public/components/StudioWorkspace.jsx` | Thin wrapper rendering `InstrumentRail orientation="vertical"` inside the studio section. |
+| **Containers** | `public/App.jsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, and notification layers. |
+| **Surface** | `public/components/ChartSurface.jsx` | Chart-first single surface. Three slot regions: TopBar (transport + key/time + actions), Chart (ChordVisualizer), Rail (InstrumentRail). Visualizer overlay is gated behind the 🌈 button. |
 | **Workspaces** | `public/components/InstrumentRail.jsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
-| **Workspaces** | `public/components/ChartSurface.jsx` | New chart-first shell skeleton (activated via `?surface=chart`). Three slot regions: TopBar, Chart, Rail. |
-| **Workspaces** | `public/components/VisualsWorkspace.jsx` | Visualizer workspace shell. |
+| **Visuals** | `public/components/VisualizerOverlay.jsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
 | **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
 | **Logic Views** | `public/components/Arranger.jsx` | Arranger editor surface used by the editor modal and related flows. |
@@ -153,7 +148,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/instruments.js` | Bass, Chords, Soloist, and Harmony settings. |
 | `public/state/conductor.js` | Auto-intensity target, tempo drift, and form tracking. |
 | `public/state/midi.js` | MIDI device and channel configuration. |
-| `public/state/ui.js` | Top-level workspace selection for the app shell. |
 | `public/state/visualizer.js` | Visualizer rendering and flash state. |
 
 ## High-Level Controllers & Integration

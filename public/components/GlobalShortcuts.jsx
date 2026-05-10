@@ -40,15 +40,9 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
             }
 
-            // Escape: Close Modal / Unmaximize
+            // Escape: Close Modal
             if (e.key === 'Escape') {
                 e.preventDefault();
-                const { vizState } = getState();
-                if (vizState.isMaximized) {
-                    dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false);
-                }
-
-                // Close any open modals
                 Object.keys(playback.modals).forEach((/** @type {any} */ key) => {
                     if (/** @type {any} */ (playback.modals)[key]) {
                         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });

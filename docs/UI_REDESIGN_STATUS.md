@@ -14,7 +14,7 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 
 ## Current position
 
-**Next chunk:** 4.1 — Flip default surface to `chart`
+**Next chunk:** 5.1 — Editor mobile UX
 
 ---
 
@@ -34,10 +34,10 @@ Statuses: `done` · `in-progress` · `next-up` · `blocked` · `not-started` · 
 | 2.2c | TopBar: Overflow menu + Visualizer toggle | done | 2026-05-09 | SoloistSeed top-level to avoid nested popovers; overflow has Generate Song, Settings, Manual |
 | 2.3 | Instrument rail mount | done | 2026-05-09 | matchMedia hook drives orientation; horizontal strip CSS replaces placeholder |
 | **Phase 3** | | | | |
-| 3.1 | On-demand visualizer overlay | done | 2026-05-09 | VisualizerLegend exported from VisualsWorkspace; App.jsx vizState sync effect guarded for chart surface |
+| 3.1 | On-demand visualizer overlay | done | 2026-05-09 | VisualizerLegend embedded in VisualizerOverlay.jsx; createPortal into body |
 | **Phase 4** | | | | |
-| 4.1 | Flip default surface to `chart` | not-started | | |
-| 4.2 | Delete legacy shell | not-started | | |
+| 4.1 | Flip default surface to `chart` | done | 2026-05-09 | ui-surface.js deleted; ChartSurface is now the only shell |
+| 4.2 | Delete legacy shell | done | 2026-05-09 | Removed WorkspaceNav, ArrangerWorkspace, StudioWorkspace, VisualsWorkspace, state/ui.js, ui-surface.js, isMaximized/chord-maximize, ~2200 lines of legacy CSS |
 | **Phase 5** | | | | |
 | 5.1 | Editor mobile UX | not-started | | |
 | 5.2 | Sharing prominence | not-started | | |

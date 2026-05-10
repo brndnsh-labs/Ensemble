@@ -66,7 +66,7 @@ Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the P
 - Clock sync is message-based; the worker interpolates time locally.
 
 ### UI (`public/components/`, `public/App.jsx`)
-Currently four workspaces: Arranger, Studio, Perform, Visuals. **Active direction:** these are being replaced by a single chart-first surface where the chart is always visible and controls radiate outward from it. New UI work should move toward that model rather than extending the workspace tabs.
+Single chart-first surface (`ChartSurface`): the chord chart is always visible, with transport and key/time controls in a topbar, the instrument rail always accessible along one edge, and a 🌈 button that opens a full-screen visualizer overlay. There are no workspace tabs. New UI work should follow this model — controls radiate outward from the chart rather than living in separate navigable views.
 
 ### Data / Config split
 - UI metadata (menus, categories): `public/data/instrument-styles.js`

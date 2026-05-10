@@ -5,11 +5,7 @@ const ULTRA_COMPACT_MEASURE_THRESHOLD = 32;
 const LEAD_SHEET_MOBILE_MAX_WIDTH = 700;
 const LEAD_SHEET_TABLET_MAX_WIDTH = 1100;
 const SHORT_LEAD_SHEET_VIEWPORT_HEIGHT = 720;
-export const LEAD_SHEET_MAXIMIZED_CONTROL_RESERVE = {
-    desktop: 56,
-    mobile: 48,
-    tablet: 52,
-};
+
 const LEAD_SHEET_FIT_ROW_BUDGET = {
     comfortable: {
         desktop: 88,
@@ -413,7 +409,6 @@ export function getLeadSheetViewport(viewportWidth) {
  *   viewportHeight?: number,
  *   containerWidth?: number,
  *   containerHeight?: number,
- *   isMaximized?: boolean,
  * }} options
  */
 export function getLeadSheetLayoutProfile({
@@ -423,15 +418,11 @@ export function getLeadSheetLayoutProfile({
     viewportHeight = 800,
     containerWidth = viewportWidth,
     containerHeight = viewportHeight,
-    isMaximized = false,
 }) {
     const viewport = getLeadSheetViewport(viewportWidth);
     const isShortViewport = viewportHeight < SHORT_LEAD_SHEET_VIEWPORT_HEIGHT;
-    const availableHeight = Math.max(
-        0,
-        containerHeight - (isMaximized ? LEAD_SHEET_MAXIMIZED_CONTROL_RESERVE[viewport] : 0),
-    );
-    const fitRowThreshold = viewport === 'desktop' ? 8 : isMaximized ? 10 : 9;
+    const availableHeight = Math.max(0, containerHeight);
+    const fitRowThreshold = viewport === 'desktop' ? 8 : 9;
     const scrollMode = rowCount > fitRowThreshold ? 'guided' : 'fit';
     const rowWidth = getLeadSheetRowWidth({
         viewport,

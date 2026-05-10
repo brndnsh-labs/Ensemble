@@ -3,19 +3,6 @@ import { vizReducer, vizState } from '../../../public/state/visualizer.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Visualizer State Reducer', () => {
-    it('should toggle maximized chords state', () => {
-        vizState.isMaximized = false;
-        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS);
-        expect(vizState.isMaximized).toBe(true);
-        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS);
-        expect(vizState.isMaximized).toBe(false);
-
-        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, true);
-        expect(vizState.isMaximized).toBe(true);
-        vizReducer(ACTIONS.TOGGLE_MAXIMIZED_CHORDS, false);
-        expect(vizState.isMaximized).toBe(false);
-    });
-
     it('should handle generic SET_PARAM action', () => {
         vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param: 'showGrid', value: true });
         expect(vizState.showGrid).toBe(true);

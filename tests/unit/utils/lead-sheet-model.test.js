@@ -110,7 +110,6 @@ describe('lead-sheet-model', () => {
                 rowCount: 8,
                 viewportWidth: 390,
                 viewportHeight: 844,
-                isMaximized: false,
             }),
         ).toMatchObject({
             density: 'ultra-compact',
@@ -132,7 +131,6 @@ describe('lead-sheet-model', () => {
                 rowCount: 9,
                 viewportWidth: 1440,
                 viewportHeight: 900,
-                isMaximized: false,
             }),
         ).toMatchObject({
             density: 'compact',
@@ -154,7 +152,6 @@ describe('lead-sheet-model', () => {
                 rowCount: 12,
                 viewportWidth: 1440,
                 viewportHeight: 900,
-                isMaximized: false,
             }),
         ).toMatchObject({
             density: 'ultra-compact',
@@ -176,7 +173,6 @@ describe('lead-sheet-model', () => {
                 rowCount: 2,
                 viewportWidth: 1440,
                 viewportHeight: 900,
-                isMaximized: false,
             }),
         ).toMatchObject({
             density: 'comfortable',
@@ -196,7 +192,6 @@ describe('lead-sheet-model', () => {
                 rowCount: 4,
                 viewportWidth: 1440,
                 viewportHeight: 900,
-                isMaximized: false,
             }),
         ).toMatchObject({
             density: 'comfortable',
@@ -216,7 +211,6 @@ describe('lead-sheet-model', () => {
                 rowCount: 8,
                 viewportWidth: 1440,
                 viewportHeight: 900,
-                isMaximized: false,
             }),
         ).toMatchObject({
             density: 'compact',

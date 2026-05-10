@@ -101,9 +101,7 @@ describe('KeySignatureControls Component', () => {
                 groove: {
                     lastDrumPreset: null,
                 },
-                vizState: {
-                    isMaximized: false,
-                },
+                vizState: {},
             };
             return selector(state);
         });
@@ -199,7 +197,7 @@ describe('KeySignatureControls Component', () => {
             return selector({
                 arranger: { key: 'C', timeSignature: '4/4', isMinor: false, grouping: null },
                 groove: { lastDrumPreset: 'Jazz Kit' },
-                vizState: { isMaximized: false },
+                vizState: {},
             });
         });
 
@@ -229,7 +227,7 @@ describe('KeySignatureControls Component', () => {
             return selector({
                 arranger: { key: 'C', timeSignature: '5/4', isMinor: false, grouping: [3, 2] },
                 groove: { lastDrumPreset: null },
-                vizState: { isMaximized: false },
+                vizState: {},
             });
         });
 
@@ -270,7 +268,7 @@ describe('KeySignatureControls Component', () => {
             return selector({
                 arranger: { key: 'C', timeSignature: '4/4', isMinor: false, grouping: null },
                 groove: { lastDrumPreset: null },
-                vizState: { isMaximized: false },
+                vizState: {},
             });
         });
 
@@ -326,19 +324,5 @@ describe('KeySignatureControls Component', () => {
 
         expect(transposeKey).toHaveBeenCalledWith(1);
         expect(mockDispatch).toHaveBeenCalledWith('TRANSPOSE');
-    });
-
-    it('toggles chord maximization', () => {
-        act(() => {
-            render(<KeySignatureControls />, container);
-        });
-
-        const maxBtn = container.querySelector('#maximizeChordBtn');
-
-        act(() => {
-            maxBtn.dispatchEvent(new Event('click', { bubbles: true }));
-        });
-
-        expect(mockDispatch).toHaveBeenCalledWith('TOGGLE_MAXIMIZED_CHORDS');
     });
 });

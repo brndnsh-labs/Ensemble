@@ -5,7 +5,6 @@ import { bass, chords, harmony, instrumentReducer, soloist } from './state/instr
 import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
-import { ui, uiReducer } from './state/ui.js';
 import { vizReducer, vizState } from './state/visualizer.js';
 import { ACTIONS } from './types.js';
 
@@ -72,7 +71,6 @@ export const stateMap = {
     vizState,
     midi,
     conductor,
-    ui,
 };
 
 /**
@@ -219,8 +217,6 @@ export {
     playback,
     playbackReducer,
     soloist,
-    ui,
-    uiReducer,
     vizReducer,
     vizState,
 };
@@ -281,7 +277,6 @@ export function dispatch(action, payload) {
     grooveReducer(action, payload, playback);
     midiReducer(action, payload);
     vizReducer(action, payload);
-    uiReducer(action, payload);
 
     // Notify listeners
     listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));

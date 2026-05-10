@@ -303,11 +303,6 @@
         scroll-margin-block: 12vh;
     }
 
-    .chord-maximized .workspace-view--arranger .workspace-arranger-chords .display-area {
-        max-height: none;
-        height: 100dvh;
-    }
-
     .workspace-view--studio {
         gap: 0.75rem;
     }

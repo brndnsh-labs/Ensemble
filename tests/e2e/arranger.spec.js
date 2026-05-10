@@ -23,21 +23,6 @@ async function choosePresetFromLibrary(page, presetName) {
     await modal.getByRole('button', { name: presetName, exact: true }).click();
 }
 
-async function measureLeadSheetCard(page) {
-    return page
-        .locator('#chordVisualizer .chord-card')
-        .first()
-        .evaluate((el) => {
-            const rect = el.getBoundingClientRect();
-            const visualizer = document.querySelector('#chordVisualizer');
-            return {
-                fontSize: parseFloat(getComputedStyle(el).fontSize),
-                cardHeight: rect.height,
-                visualizerHeight: visualizer?.clientHeight ?? 0,
-            };
-        });
-}
-
 test.describe('Arranger & Chord Visualizer @visual', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');
@@ -345,52 +330,6 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             .toBeGreaterThan(19);
         const scrollDelta = await visualizer.evaluate((el) => el.scrollHeight - el.clientHeight);
         expect(scrollDelta).toBeLessThanOrEqual(12);
-
-        const standardFontSize = await firstChord.evaluate((el) =>
-            parseFloat(getComputedStyle(el).fontSize),
-        );
-
-        await page.click('#maximizeChordBtn');
-        await expect(page.locator('body')).toHaveClass(/chord-maximized/);
-        await expect
-            .poll(async () =>
-                visualizer
-                    .locator('.chord-card')
-                    .first()
-                    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
-            )
-            .toBeGreaterThan(standardFontSize);
-    });
-
-    test('Maximized arranger view reclaims the header and stretches representative charts', async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 1440, height: 900 });
-
-        for (const chartName of [
-            'Autumn Leaves',
-            'All The Things You Are',
-            'Pop (Standard)',
-            'Jazz Blues',
-        ]) {
-            await openLibraryFromArranger(page);
-            await choosePresetFromLibrary(page, chartName);
-
-            const standard = await measureLeadSheetCard(page);
-            await page.click('#maximizeChordBtn');
-
-            await expect(page.locator('body')).toHaveClass(/chord-maximized/);
-            await expect(page.locator('header')).toBeHidden();
-            await expect(page.locator('#maximizePlayBtn')).toBeVisible();
-
-            const maximized = await measureLeadSheetCard(page);
-            expect(maximized.visualizerHeight).toBeGreaterThan(standard.visualizerHeight + 60);
-            expect(maximized.fontSize).toBeGreaterThan(standard.fontSize);
-            expect(maximized.cardHeight).toBeGreaterThan(standard.cardHeight);
-
-            await page.locator('.chord-maximize-exit-btn').click();
-            await expect(page.locator('body')).not.toHaveClass(/chord-maximized/);
-        }
     });
 
     test('Arranger key and seed panels stay fully visible after loading a short preset', async ({

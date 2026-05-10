@@ -9,7 +9,7 @@ import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
 import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
 import { saveCurrentState } from './persistence.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
-import { normalizeWorkspace } from './state/ui.js';
+
 import { dispatch, getState, storage } from './state.js';
 import { ACTIONS } from './types.js';
 import {
@@ -122,7 +122,7 @@ function validateSections(sections) {
 }
 
 export function hydrateState() {
-    const { playback, chords, bass, soloist, harmony, groove, arranger, vizState, ui } = getState();
+    const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
     const savedState = storage.get('currentState');
     if (savedState?.sections) {
         const shouldResetMixer = Number(savedState.mixerVersion) !== MIXER_SETTINGS_VERSION;
@@ -316,10 +316,6 @@ export function hydrateState() {
                         ? savedState.midi.velocitySensitivity
                         : 1.0,
             });
-        }
-
-        if (ui) {
-            ui.activeWorkspace = normalizeWorkspace(savedState.ui?.activeWorkspace); // @direct-mutation
         }
 
         if (shouldResetMixer) {

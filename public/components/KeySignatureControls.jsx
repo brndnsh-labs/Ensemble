@@ -2,7 +2,6 @@ import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../arrang
 import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
-import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
@@ -30,7 +29,6 @@ const TIME_SIGNATURE_OPTIONS = ['4/4', '3/4', '2/4', '5/4', '6/8', '7/8', '7/4',
 
 /**
  * @typedef {Object} KeySignatureControlsProps
- * @property {boolean} [showMaximize]
  * @property {boolean} [showTranspose]
  */
 
@@ -100,28 +98,6 @@ function cycleGrouping(timeSignature, dispatch) {
         saveCurrentState();
         dispatch('GROUPING_CHANGE');
     });
-}
-
-export function MaximizeChordButton({ className = '' } = {}) {
-    const dispatch = useDispatch();
-    const { isMaximized } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            isMaximized: s.vizState.isMaximized,
-        }),
-    );
-
-    return (
-        <button
-            id="maximizeChordBtn"
-            type="button"
-            title={isMaximized ? 'Exit Maximize' : 'Maximize'}
-            class={['header-btn', className, isMaximized ? 'active' : ''].filter(Boolean).join(' ')}
-            aria-label={isMaximized ? 'Exit Maximize' : 'Maximize Chords'}
-            onClick={() => dispatch(ACTIONS.TOGGLE_MAXIMIZED_CHORDS)}
-        >
-            {isMaximized ? '✕' : '⛶'}
-        </button>
-    );
 }
 
 export function TimeSignatureControl() {
@@ -286,12 +262,11 @@ export function KeySignatureMenuControl({ showTranspose = true } = {}) {
 }
 
 /** @param {KeySignatureControlsProps} [props] */
-export function KeySignatureControls({ showMaximize = true, showTranspose = true } = {}) {
+export function KeySignatureControls({ showTranspose = true } = {}) {
     return (
         <div class="key-controls">
             <TimeSignatureControl />
             <KeySignatureMenuControl showTranspose={showTranspose} />
-            {showMaximize && <MaximizeChordButton />}
         </div>
     );
 }

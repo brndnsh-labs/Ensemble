@@ -31,7 +31,6 @@
  * @property {import('./state/conductor.js').ConductorState} conductor - Macro-arc and intensity drift state.
  * @property {import('./state/visualizer.js').VisualizerState} vizState - Visualizer rendering state.
  * @property {import('./state/midi.js').MidiState} midi - WebMIDI routing and local muting state.
- * @property {import('./state/ui.js').UiState} ui - Top-level UI workspace state.
  */
 
 /**
@@ -218,7 +217,6 @@
  * @property {number} [TRIGGER_FLASH]
  * @property {boolean} SET_UPDATE_AVAILABLE
  * @property {ActionPayloadSetModalOpen} SET_MODAL_OPEN
- * @property {boolean} [TOGGLE_MAXIMIZED_CHORDS]
  * @property {undefined} TOGGLE_PLAY
  * @property {number | string} SET_BPM
  * @property {ActionPayloadSetStyle} SET_STYLE
@@ -287,7 +285,6 @@ export const ACTIONS = {
     TRIGGER_FLASH: 'TRIGGER_FLASH',
     SET_UPDATE_AVAILABLE: 'SET_UPDATE_AVAILABLE',
     SET_MODAL_OPEN: 'SET_MODAL_OPEN',
-    TOGGLE_MAXIMIZED_CHORDS: 'TOGGLE_MAXIMIZED_CHORDS',
     TOGGLE_PLAY: 'TOGGLE_PLAY',
     SET_BPM: 'SET_BPM',
 

@@ -70,9 +70,7 @@ describe('ChordVisualizer Component', () => {
                 soloist: {
                     style: 'scalar',
                 },
-                vizState: {
-                    isMaximized: false,
-                },
+                vizState: {},
                 ...overrides,
             };
             return selector(state);
