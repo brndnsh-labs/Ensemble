@@ -114,11 +114,11 @@ export function initAudio(state, options = {}) {
             playback.saturator.oversample = '4x';
 
             playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
-            playback.masterLimiter.threshold.setValueAtTime(-1.5, playback.audio.currentTime);
-            playback.masterLimiter.knee.setValueAtTime(30, playback.audio.currentTime);
-            playback.masterLimiter.ratio.setValueAtTime(12, playback.audio.currentTime);
-            playback.masterLimiter.attack.setValueAtTime(0.002, playback.audio.currentTime);
-            playback.masterLimiter.release.setValueAtTime(0.08, playback.audio.currentTime);
+            playback.masterLimiter.threshold.setValueAtTime(-2.0, playback.audio.currentTime);
+            playback.masterLimiter.knee.setValueAtTime(3, playback.audio.currentTime);
+            playback.masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
+            playback.masterLimiter.attack.setValueAtTime(0.001, playback.audio.currentTime);
+            playback.masterLimiter.release.setValueAtTime(0.15, playback.audio.currentTime);
         }
 
         if (
@@ -262,7 +262,20 @@ export function initAudio(state, options = {}) {
                 playback.harmoniesEQ = busEQ; // @direct-mutation
                 playback.harmoniesPanner = panner; // @direct-mutation
             } else if (m.name === 'drums') {
-                gainNode.connect(playback.masterGain);
+                const drumsHP = playback.audio.createBiquadFilter();
+                drumsHP.type = 'highpass';
+                drumsHP.frequency.setValueAtTime(40, playback.audio.currentTime);
+
+                const drumsAir = playback.audio.createBiquadFilter();
+                drumsAir.type = 'peaking';
+                drumsAir.frequency.setValueAtTime(5000, playback.audio.currentTime);
+                drumsAir.Q.setValueAtTime(1.2, playback.audio.currentTime);
+                drumsAir.gain.setValueAtTime(2, playback.audio.currentTime);
+
+                gainNode.connect(drumsHP);
+                drumsHP.connect(drumsAir);
+                drumsAir.connect(playback.masterGain);
+                playback.drumsEQ = drumsHP; // @direct-mutation
             }
 
             /** @type {any} */ (playback)[`${m.name}Gain`] = gainNode;

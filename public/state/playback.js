@@ -14,6 +14,7 @@ import { ACTIONS } from '../types.js';
  * @property {BiquadFilterNode|null} chordsEQ - EQ for chords (HP/Notch).
  * @property {StereoPannerNode|null} chordsPanner - Stereo panner for chords.
  * @property {GainNode|null} drumsGain - The gain node for drums.
+ * @property {BiquadFilterNode|null} drumsEQ - HP/air EQ for drums bus.
  * @property {GainNode|null} drumsReverb - Reverb send for drums.
  * @property {GainNode|null} bassGain - The gain node for bass.
  * @property {GainNode|null} bassReverb - Reverb send for bass.
@@ -88,6 +89,7 @@ export const playback = deepSignal({
     chordsPanner: null,
     drumsReverb: null,
     drumsGain: null,
+    drumsEQ: null,
     bassReverb: null,
     bassGain: null,
     bassSidechain: null,
