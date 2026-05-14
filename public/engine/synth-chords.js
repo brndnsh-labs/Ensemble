@@ -162,7 +162,7 @@ export function playNote(
                 {
                     volume: finalVol * 0.15,
                     filterType: 'bandpass',
-                    freq: 1200 + finalVol * 800,
+                    freq: Math.max(800, Math.min(4000, 800 + (freq / 440) * 600 + finalVol * 500)),
                     Q: 1.5,
                     attack: 0.001,
                     decay: 0.01,
@@ -175,9 +175,21 @@ export function playNote(
         const osc = playback.audio.createOscillator();
         const mainGain = playback.audio.createGain();
         const filter = playback.audio.createBiquadFilter();
+        /** @type {OscillatorNode|null} */
+        let unisonOsc = null;
+        /** @type {GainNode|null} */
+        let unisonGain = null;
 
         if (isPiano && pianoWave) {
             osc.setPeriodicWave(pianoWave);
+            unisonOsc = playback.audio.createOscillator();
+            unisonGain = playback.audio.createGain();
+            unisonOsc.setPeriodicWave(pianoWave);
+            unisonOsc.frequency.setValueAtTime(freq, startTime);
+            unisonOsc.detune.setValueAtTime(6 + Math.random() * 4, startTime);
+            unisonGain.gain.setValueAtTime(0.6, startTime);
+            unisonOsc.connect(unisonGain);
+            unisonGain.connect(filter);
         } else {
             osc.type = preset.fundamental || 'sine';
         }
@@ -209,6 +221,13 @@ export function playNote(
             } catch {
                 /* ignore */
             }
+            if (unisonOsc) {
+                try {
+                    unisonOsc.stop(t + 0.5);
+                } catch {
+                    /* ignore */
+                }
+            }
         };
 
         if (playback.sustainActive && !muted) {
@@ -226,11 +245,13 @@ export function playNote(
 
         osc.connect(filter);
 
+        /** @type {WaveShaperNode|null} */
+        let shaper = null;
         /** @type {AudioNode} */
         let lastNode = filter;
-        if (intensity >= 0.8 && !muted) {
-            const shaper = playback.audio.createWaveShaper();
-            const drive = 1.0 + (intensity - 0.8) * 10.0;
+        if (!muted) {
+            shaper = playback.audio.createWaveShaper();
+            const drive = Math.max(0.001, (intensity - 0.5) * 4.0);
 
             if (!cachedShaperCurve || Math.abs(drive - cachedShaperDrive) > 0.01) {
                 const n_samples = 44100;
@@ -271,11 +292,27 @@ export function playNote(
         }
 
         osc.start(startTime);
+        if (unisonOsc) {
+            unisonOsc.start(startTime);
+        }
         if (!playback.sustainActive || muted) {
-            osc.stop(startTime + (muted ? 0.1 : duration + 1.0));
+            const stopAt = startTime + (muted ? 0.1 : duration + 1.0);
+            osc.stop(stopAt);
+            if (unisonOsc) {
+                unisonOsc.stop(stopAt);
+            }
         }
 
-        osc.onended = () => safeDisconnect([osc, filter, mainGain, hpf, panner]);
+        osc.onended = () =>
+            safeDisconnect([
+                osc,
+                filter,
+                mainGain,
+                hpf,
+                panner,
+                ...(unisonOsc && unisonGain ? [unisonOsc, unisonGain] : []),
+                ...(shaper ? [shaper] : []),
+            ]);
     } catch (err) {
         console.error('playNote error:', err);
     }

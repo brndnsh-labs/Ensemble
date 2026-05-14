@@ -301,7 +301,7 @@ function playTrumpet(
     );
 
     if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain } = createVibrato(
+        const { vibrato, vibGain, depthModNodes } = createVibrato(
             state,
             ctx,
             freq,
@@ -313,7 +313,7 @@ function playTrumpet(
         vibrato.connect(vibGain);
         vibGain.connect(/** @type {any} */ (osc1.frequency));
         vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
+        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
     const filter = ctx.createBiquadFilter();
@@ -425,7 +425,7 @@ function playSaxophone(
     );
 
     if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain } = createVibrato(
+        const { vibrato, vibGain, depthModNodes } = createVibrato(
             state,
             ctx,
             freq,
@@ -437,7 +437,7 @@ function playSaxophone(
         vibrato.connect(vibGain);
         vibGain.connect(/** @type {any} */ (osc1.frequency));
         vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
+        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
     const f1 = ctx.createBiquadFilter();
@@ -477,6 +477,26 @@ function playSaxophone(
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
+
+    const noiseBuffer = state.groove?.audioBuffers?.noise;
+    if (noiseBuffer) {
+        const breathNoise = ctx.createBufferSource();
+        breathNoise.buffer = noiseBuffer;
+        breathNoise.loop = true;
+        const breathHP = ctx.createBiquadFilter();
+        breathHP.type = 'highpass';
+        breathHP.frequency.value = 1500;
+        const breathNoiseGain = ctx.createGain();
+        breathNoiseGain.gain.setValueAtTime(0, playTime);
+        breathNoiseGain.gain.setTargetAtTime(vol * 2.9 * 0.04, playTime, attack);
+        breathNoiseGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
+        breathNoise.connect(breathHP);
+        breathHP.connect(breathNoiseGain);
+        breathNoiseGain.connect(masterGainNode);
+        voiceObj.nodes.push(breathNoise, breathHP, breathNoiseGain);
+        breathNoise.start(playTime);
+        breathNoise.stop(playTime + duration + 0.2);
+    }
 
     osc1.start(playTime);
     osc2.start(playTime);
@@ -558,7 +578,7 @@ function playNeoJuno(
     );
 
     if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain } = createVibrato(
+        const { vibrato, vibGain, depthModNodes } = createVibrato(
             state,
             ctx,
             freq,
@@ -570,7 +590,7 @@ function playNeoJuno(
         vibrato.connect(vibGain);
         vibGain.connect(/** @type {any} */ (osc1.frequency));
         vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
+        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
     const filter = ctx.createBiquadFilter();
@@ -659,7 +679,7 @@ function playVowel(
     );
 
     if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain } = createVibrato(
+        const { vibrato, vibGain, depthModNodes } = createVibrato(
             state,
             ctx,
             freq,
@@ -671,7 +691,7 @@ function playVowel(
         vibrato.connect(vibGain);
         vibGain.connect(/** @type {any} */ (osc1.frequency));
         vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
+        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
     const filter = ctx.createBiquadFilter();
@@ -755,7 +775,7 @@ function playShred(
     );
 
     if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain } = createVibrato(
+        const { vibrato, vibGain, depthModNodes } = createVibrato(
             state,
             ctx,
             freq,
@@ -767,7 +787,7 @@ function playShred(
         vibrato.connect(vibGain);
         vibGain.connect(/** @type {any} */ (osc1.frequency));
         vibGain.connect(/** @type {any} */ (osc2.frequency));
-        voiceObj.nodes.push(vibrato, vibGain);
+        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
     const filter = ctx.createBiquadFilter();
@@ -856,7 +876,7 @@ function applyPitchEnvelope(
  * @param {number} duration
  * @param {string} style
  * @param {boolean} [forceVibrato=false]
- * @returns {{vibrato: OscillatorNode, vibGain: GainNode}}
+ * @returns {{vibrato: OscillatorNode, vibGain: GainNode, depthModNodes: AudioNode[]}}
  */
 function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = false) {
     const { soloist, playback } = state;
@@ -930,10 +950,20 @@ function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = f
         time + vibDelay + (isLongNote ? 0.35 : 0.18),
     );
 
+    const depthMod = ctx.createOscillator();
+    depthMod.type = 'sine';
+    depthMod.frequency.setValueAtTime(0.12, time);
+    const depthModGain = ctx.createGain();
+    depthModGain.gain.setValueAtTime(finalVibDepth * 0.2, time);
+    depthMod.connect(depthModGain);
+    depthModGain.connect(/** @type {any} */ (vibGain.gain));
+
     if ((duration > 0.15 || forceVibrato) && !isSoloistPianoMode(soloist.mode)) {
         vibrato.start(time);
         vibrato.stop(time + duration + 0.2);
+        depthMod.start(time + vibDelay);
+        depthMod.stop(time + duration + 0.2);
     }
 
-    return { vibrato, vibGain };
+    return { vibrato, vibGain, depthModNodes: [depthMod, depthModGain] };
 }

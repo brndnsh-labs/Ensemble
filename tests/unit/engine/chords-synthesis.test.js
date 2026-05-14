@@ -172,12 +172,16 @@ describe('Chord Synthesis', () => {
         expect(playback.heldNotes.size).toBe(0);
     });
 
-    it('should apply wave shaping at high intensities', () => {
+    it('should always apply wave shaping on non-muted notes', () => {
         playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
-        expect(playback.audio.createWaveShaper).not.toHaveBeenCalled();
+        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(1);
 
         playback.bandIntensity = 0.9;
         playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
-        expect(playback.audio.createWaveShaper).toHaveBeenCalled();
+        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(2);
+
+        // Muted notes skip the shaper
+        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano', muted: true });
+        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(2);
     });
 });

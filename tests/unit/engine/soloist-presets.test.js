@@ -118,8 +118,8 @@ describe('Soloist Presets', () => {
         soloist.preset = 'neo';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        // 2 Oscs + 2 LFOs + 1 Vibrato = 5 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(5);
+        // 2 Oscs + 2 LFOs + 1 Vibrato + 1 DepthMod = 6 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(6);
         expect(soloist.activeVoices.length).toBe(1);
     });
 
@@ -127,8 +127,8 @@ describe('Soloist Presets', () => {
         soloist.preset = 'vowel';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        // 2 Oscs + 1 Vibrato = 3 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 2 Oscs + 1 Vibrato + 1 DepthMod = 4 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
         // 1 Bandpass filter (in current implementation)
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
 
@@ -140,8 +140,8 @@ describe('Soloist Presets', () => {
         soloist.preset = 'trumpet';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        // 2 Oscs + 1 Vibrato = 3 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 2 Oscs + 1 Vibrato + 1 DepthMod = 4 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
         // 1 Lowpass + 1 Peaking + 1 Highshelf = 3 filters
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
         expect(soloist.activeVoices.length).toBe(1);
@@ -151,8 +151,8 @@ describe('Soloist Presets', () => {
         soloist.preset = 'saxophone';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        // 2 Oscs + 1 Breath LFO + 1 Vibrato = 4 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
+        // 2 Oscs + 1 Breath LFO + 1 Vibrato + 1 DepthMod = 5 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(5);
         // 2 Bandpass filters
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(2);
         expect(soloist.activeVoices.length).toBe(1);
@@ -162,8 +162,8 @@ describe('Soloist Presets', () => {
         soloist.preset = 'shred';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        // 2 Oscs + 1 Vibrato = 3 oscillators
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
+        // 2 Oscs + 1 Vibrato + 1 DepthMod = 4 oscillators
+        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
         // 1 Resonant filter
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
         expect(soloist.activeVoices.length).toBe(1);

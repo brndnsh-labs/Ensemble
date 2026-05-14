@@ -144,7 +144,13 @@ export function playHarmonyNote(
     let hp = null;
 
     if (style === 'organ') {
-        const leslieSpeed = 6.2;
+        const intensityForLeslie = playback.bandIntensity || 0.5;
+        const leslieSpeed =
+            intensityForLeslie < 0.4
+                ? 0.7
+                : intensityForLeslie > 0.6
+                  ? 6.2
+                  : 0.7 + ((intensityForLeslie - 0.4) / 0.2) * 5.5;
         saturator = playback.audio.createWaveShaper();
         saturator.curve = (() => {
             const n = 44100;
@@ -384,7 +390,11 @@ export function playHarmonyNote(
     }
 
     const detuneMult = 1.0 + finalVol * 0.5;
-    osc2.detune.setValueAtTime((style === 'stabs' ? 12 : 8) * detuneMult, playTime);
+    osc1.detune.setValueAtTime((Math.random() - 0.5) * 4, playTime);
+    osc2.detune.setValueAtTime(
+        (style === 'stabs' ? 12 : 8) * detuneMult + (Math.random() - 0.5) * 4,
+        playTime,
+    );
 
     gain.gain.setValueAtTime(0, playTime);
     gain.gain.linearRampToValueAtTime(finalVol, playTime + attack);
