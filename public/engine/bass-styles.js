@@ -448,7 +448,7 @@ export function getBassNoteStyle(
             if (isPushPoint && nextChord && nextChord.rootMidi !== chord.rootMidi) {
                 // Harmonic Anticipation: Play the NEXT root early
                 const nextRoot = normalizeToRange(nextChord.rootMidi);
-                return result(getFrequency(nextRoot), 0.8, 1.2, true);
+                return result(getFrequency(nextRoot), 0.8, 1.2, 1);
             }
             return result(getFrequency(baseRoot), 0.8, 1.1 + intensity * 0.1);
         }
@@ -552,7 +552,7 @@ export function getBassNoteStyle(
             const chuckProb = (isSoloistBusy ? 0.1 : 0.2) + intensity * 0.4;
             if (Math.random() < chuckProb && !isSoloistBusy) {
                 // Usually repeat root or previous note as a ghost
-                return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, true);
+                return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, 1);
             }
 
             // High complexity melodic "Double Slap" or "Hammer-on"
@@ -622,7 +622,7 @@ export function getBassNoteStyle(
                 return result(getFrequency(note), 0.7, 1.1);
             }
             // If not playing a tone, play a ghost note
-            return result(getFrequency(baseRoot), 0.6, 0.7, true);
+            return result(getFrequency(baseRoot), 0.6, 0.7, 1);
         }
 
         // 4. The "e" and "a" (16th notes) - The chug engine
@@ -685,7 +685,7 @@ export function getBassNoteStyle(
                 // Usually repeat the root or octave ghosted
                 const note = Math.random() < 0.7 ? baseRoot : baseRoot + 12;
                 const finalNote = note > absMax ? baseRoot : note;
-                return result(getFrequency(finalNote), 0.5, 0.6, true);
+                return result(getFrequency(finalNote), 0.5, 0.6, 1);
             }
         }
 
@@ -936,7 +936,7 @@ export function getBassNoteStyle(
             approach = clampAndNormalize(withOctaveJump(approach));
             const bend =
                 Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0;
-            return result(getFrequency(approach), 1, velocity, false, bend);
+            return result(getFrequency(approach), 1, velocity, 0, bend);
         } else {
             const candidates = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7];
             const valid = candidates.filter(

@@ -69,15 +69,15 @@ const CYMBAL_BUFFER_PROFILES = {
     },
     Crash: {
         key: 'crashMetal',
-        duration: 6.9,
+        duration: 9.0,
         baseFreq: 860,
         partials: [1, 1.34, 1.79, 2.27, 2.96, 3.56, 4.23, 5.02],
         metalMix: 0.38,
         noiseMix: 0.28,
         transientMix: 0.22,
-        partialDecay: 1.35,
+        partialDecay: 0.8,
         partialSpread: 0.5,
-        noiseDecay: 2.4,
+        noiseDecay: 1.0,
         smooth: 0.22,
         saturation: 0.98,
         jitter: 0.024,
@@ -157,11 +157,11 @@ const CYMBAL_RUNTIME_PROFILES = {
         q: 0.45,
         attack: 0.004,
         decayDelay: 0.16,
-        decayBase: 2.7,
+        decayBase: 3.5,
         decayVelocityFocus: 0.08,
         decayIntensityFocus: 0.05,
-        minDecay: 2.0,
-        stopTime: 7.0,
+        minDecay: 2.8,
+        stopTime: 9.0,
     },
 };
 
@@ -656,6 +656,17 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
             duration: voiceConfig.shellDuration,
         });
 
+        // 5. Click: 2–4kHz presence peak that cuts through on small speakers/earbuds
+        playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
+            volume: vol * 0.25,
+            filterType: 'bandpass',
+            freq: 2500 + velocity * 800,
+            Q: 4,
+            attack: 0.0003,
+            decay: 0.008,
+            duration: 0.05,
+        });
+
         // Connections
         beater.connect(beaterGain);
         beaterGain.connect(panner);
@@ -839,6 +850,20 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
             });
         }
 
+        // Sizzle: thin 2–4kHz presence layer that sits under the bright buffer to add
+        // metallic cut through dense mixes. Closed hat only — open/ride have their own character.
+        if (isClosedHat) {
+            playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
+                volume: vol * 0.12,
+                filterType: 'bandpass',
+                freq: 3200 + Math.random() * 400,
+                Q: 1.2,
+                attack: 0.001,
+                decay: 0.04,
+                duration: 0.06,
+            });
+        }
+
         source.start(playTime);
         source.stop(playTime + voiceConfig.stopTime * hatStopMult);
 
@@ -891,7 +916,9 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         const gain = playback.audio.createGain();
         gain.gain.setValueAtTime(0, playTime);
         gain.gain.linearRampToValueAtTime(vol, playTime + voiceConfig.attack);
-        gain.gain.setTargetAtTime(vol * 0.35, playTime + 0.015, 0.08);
+        // Slightly higher sustain floor (0.42 vs old 0.35) gives the crash body room to bloom
+        // before the long tail takes over. tc 0.06 keeps the transient crisp.
+        gain.gain.setTargetAtTime(vol * 0.42, playTime + 0.015, 0.06);
         gain.gain.setTargetAtTime(0, playTime + voiceConfig.decayDelay, voiceConfig.decayTime);
         groove.lastCrashGain = gain; // @direct-mutation
 

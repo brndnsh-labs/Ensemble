@@ -112,14 +112,12 @@ describe('Drum Synthesis', () => {
         groove.audioBuffers = { noise: {} };
     });
 
-    it('should create a 4-layer model for the Kick drum', () => {
+    it('should create a 5-layer model for the Kick drum', () => {
         playDrumSound(getState(), 'Kick', 10, 1.0);
 
-        // Layers: Beater (Osc), Skin (Noise), Knock (Osc), Shell (Osc) + Panner (Gain/StereoPanner)
+        // Layers: Beater (Osc), Skin (Noise), Knock (Osc), Shell (Osc), Click (Noise)
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
-        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
-        // It creates 4 gains and 1 panner (which is also a gain if StereoPanner is not supported, but we mocked StereoPanner)
-        // Let's not make it strict on number of gains since panner could be a gain
+        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(2);
         expect(playback.audio.createGain).toHaveBeenCalled();
     });
 
@@ -140,10 +138,8 @@ describe('Drum Synthesis', () => {
 
         playDrumSound(getState(), 'HiHat', 10, 1.0);
 
-        const source =
-            playback.audio.createBufferSource.mock.results[
-                playback.audio.createBufferSource.mock.results.length - 1
-            ].value;
+        // Index 0 = cymbal buffer source (sizzle layer adds a second BufferSource after it)
+        const source = playback.audio.createBufferSource.mock.results[0].value;
         expect(source.playbackRate.value).toBeGreaterThan(1.0);
         expect(source.playbackRate.value).toBeLessThan(1.04);
 

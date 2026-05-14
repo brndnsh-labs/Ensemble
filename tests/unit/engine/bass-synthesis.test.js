@@ -123,8 +123,9 @@ describe('Motown P-Bass Synthesis', () => {
         const filters = playback.audio.createBiquadFilter.mock.results;
         const impactFilter = filters[2].value;
 
-        // Impact filter is the 3rd filter (index 2)
-        expect(impactFilter.frequency.setValueAtTime).toHaveBeenCalledWith(600, 10);
+        // Impact filter is the 3rd filter (index 2).
+        // Freq scales with note pitch: Math.max(200, Math.min(1400, 41.2 * 1.6)) = 200
+        expect(impactFilter.frequency.setValueAtTime).toHaveBeenCalledWith(200, 10);
     });
 
     it('should add a Jamerson punch via 120Hz body EQ', () => {

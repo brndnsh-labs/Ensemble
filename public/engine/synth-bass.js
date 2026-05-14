@@ -30,9 +30,9 @@ const mixState = {
  * @param {number} time - Start time in seconds.
  * @param {number} duration - Note duration in seconds.
  * @param {number} [velocity=1.0] - Note velocity (0.0 - 1.0).
- * @param {boolean} [muted=false] - Whether the note is palm-muted.
+ * @param {number} [muteAmount=0] - Palm-mute amount 0 (open) to 1 (fully muted). Accepts legacy boolean.
  */
-export function playBassNote(state, freq, time, duration, velocity = 1.0, muted = false) {
+export function playBassNote(state, freq, time, duration, velocity = 1.0, muteAmount = 0) {
     const { playback, bass, groove } = state;
     if (!playback.audio) {
         return;
@@ -56,7 +56,7 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
             return;
         }
 
-        const tonalVol = muted ? vol * 0.15 : vol;
+        const tonalVol = vol * (1 - muteAmount * 0.85);
 
         // --- 5. Global Envelope (The "Foam Mute" Feel) ---
         const mainGain = playback.audio.createGain();
@@ -92,7 +92,11 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         const midi = 12 * Math.log2(freq / 440) + 69;
         const growlBase = 200 + midi * 5 + playback.bandIntensity * 400;
         const growlDepth = 1200 * (0.5 + playback.bandIntensity * 1.0);
-        const cutoff = muted ? 300 : growlBase + vol * growlDepth;
+        // Guard against 0 * NaN = NaN when bandIntensity is undefined (e.g. tests)
+        const cutoff =
+            muteAmount >= 1
+                ? 300
+                : 300 + (1 - muteAmount) * Math.max(0, growlBase + vol * growlDepth - 300);
 
         lp1.frequency.setValueAtTime(cutoff, startTime);
         lp2.frequency.setValueAtTime(cutoff, startTime);
@@ -104,11 +108,14 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
         growlGain.gain.setTargetAtTime(tonalVol * 0.35, startTime, 0.005);
 
         // --- 3. The Impact (Finger Thud) ---
+        // Scale bandpass center and Q with note pitch: low notes thump, high notes click.
+        const impactFreq = Math.max(200, Math.min(1400, freq * 1.6));
+        const impactQ = 1.5 + (freq / 440) * 1.5;
         playPercussiveStrike(playback.audio, groove.audioBuffers.noise, mainGain, startTime, {
             volume: vol * 0.4,
             filterType: 'bandpass',
-            freq: 600,
-            Q: 2.0,
+            freq: impactFreq,
+            Q: impactQ,
             attack: 0.001,
             decay: 0.02,
             duration: 0.1,
@@ -123,15 +130,15 @@ export function playBassNote(state, freq, time, duration, velocity = 1.0, muted 
 
         mainGain.gain.setTargetAtTime(tonalVol, startTime, 0.008);
 
-        const releaseTime = muted ? 0.015 : duration;
+        const releaseTime = duration * (1 - muteAmount) + 0.015 * muteAmount;
+        const releaseTc = 0.08 * (1 - muteAmount) + 0.01 * muteAmount;
 
-        if (!muted) {
-            mainGain.gain.setTargetAtTime(tonalVol * 0.5, startTime + 0.015, 0.06);
-            mainGain.gain.setTargetAtTime(tonalVol * 0.2, startTime + 0.08, 0.6);
-            mainGain.gain.setTargetAtTime(0, startTime + releaseTime, 0.08);
-        } else {
-            mainGain.gain.setTargetAtTime(0, startTime + releaseTime, 0.01);
+        if (muteAmount < 1) {
+            const tailScale = 1 - muteAmount * 0.7;
+            mainGain.gain.setTargetAtTime(tonalVol * 0.5 * tailScale, startTime + 0.015, 0.06);
+            mainGain.gain.setTargetAtTime(tonalVol * 0.2 * tailScale, startTime + 0.08, 0.6);
         }
+        mainGain.gain.setTargetAtTime(0, startTime + releaseTime, releaseTc);
 
         // --- Connections ---
         bodyMix.connect(saturator);

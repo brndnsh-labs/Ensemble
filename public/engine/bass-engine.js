@@ -328,14 +328,14 @@ export function getBassNote(
      * @param {number} freq
      * @param {number|null} [durationMultiplier]
      * @param {number} [velocityParam]
-     * @param {boolean} [muted]
+     * @param {number} [muted] - Palm-mute amount: 0 (open) to 1 (fully muted).
      * @param {number} [bendStartInterval]
      */
     const result = (
         /** @type {number} */ freq,
         durationMultiplier = null,
         velocityParam = 1.0,
-        muted = false,
+        muted = 0,
         bendStartInterval = 0,
     ) => {
         let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
@@ -453,7 +453,7 @@ export function getBassNote(
                     getFrequency(clampAndNormalizeMidi(note, prevMidi)),
                     dur,
                     velocity * (isGhost ? 0.6 : 0.9),
-                    isGhost,
+                    isGhost ? 1 : 0,
                 );
                 res.timingOffset += 0.01 + intensity * 0.01;
                 return res;
@@ -483,7 +483,7 @@ export function getBassNote(
             return null;
         }
         if (Math.random() < 0.3) {
-            return result(getFrequency(baseRoot), 1, 0.4, true);
+            return result(getFrequency(baseRoot), 1, 0.4, 1);
         }
     }
 
@@ -522,7 +522,7 @@ export function getBassNote(
                 getFrequency(clampAndNormalizeMidi(prevMidi || baseRoot, prevMidi)),
                 0.8,
                 velocity * 0.8,
-                true,
+                1,
             );
             res.timingOffset += 0.005;
             return res;
@@ -635,7 +635,7 @@ export function getBassNote(
                 getFrequency(approach),
                 1,
                 velocity,
-                false,
+                0,
                 Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0,
             );
         } else {
