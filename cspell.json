@@ -180,7 +180,17 @@
         "goertzel",
         "coeff",
         "topbar",
-        "keytime"
+        "keytime",
+        "soundfonts",
+        "predelay",
+        "decorrelation",
+        "highpass",
+        "bandpass",
+        "lowpass",
+        "detuning",
+        "detuned",
+        "Leslies",
+        "interp"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
