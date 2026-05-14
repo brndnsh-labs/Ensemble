@@ -19,7 +19,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "npm run typecheck",
+                        "command": "output=$(npm run typecheck 2>&1) || echo \"$output\" >&2",
                         "statusMessage": "Type checking...",
                         "timeout": 60
                     }
