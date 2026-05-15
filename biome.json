@@ -96,5 +96,17 @@
                 "useIterableCallbackReturn": "off"
             }
         }
-    }
+    },
+    "overrides": [
+        {
+            "includes": ["tests/**"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noImplicitAnyLet": "off"
+                    }
+                }
+            }
+        }
+    ]
 }
