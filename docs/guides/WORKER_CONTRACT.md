@@ -156,7 +156,7 @@ Reports an internal worker error.
 - `public/worker-client.ts` posts `WORKER_MSG.*` messages and routes `WORKER_RESP.*` back to the main thread.
 - `public/logic-worker.js` translates those messages into sync, reset, buffer-fill, resolution, and export work.
 - `public/engine/worker-buffer-manager.ts` handles lookahead fill orchestration.
-- `public/engine/tick-logic.js` generates per-step musical data and applies coordination/register slotting before notes leave the worker.
+- `public/engine/tick-logic.ts` generates per-step musical data and applies coordination/register slotting before notes leave the worker.
 - `public/engine/scheduler-core.js` is deliberately main-thread only: it consumes generated note events and schedules playback, but it is not the worker's source of truth for note generation.
 
 ## Synchronization Rules

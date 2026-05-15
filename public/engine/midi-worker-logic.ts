@@ -1,5 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm } from '../form-analysis.js';
+import type { EnsembleState, StepInfo } from '../types.js';
 import { binarySearchMap, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState } from './accompaniment.js';
@@ -22,20 +23,77 @@ import { getChordAtStep } from './worker-utils.js';
 export const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 export const PPQ = 480;
 
+export interface ExportOptions {
+    includedTracks?: string[];
+    targetDuration?: number;
+    loopMode?: string;
+    filename?: string;
+    [key: string]: any;
+}
+
+export interface ExportCursor {
+    index: number;
+    sectionIndex: number;
+}
+
+export interface ExportPrevStates {
+    chords: boolean;
+    bass: boolean;
+    soloist: boolean;
+    harmony: boolean;
+    groove: boolean;
+    intensity: number;
+    mode: any;
+    sessionSteps: any;
+    currentLoopCount: number;
+}
+
+export interface ExportConductor {
+    loopCount: number;
+    formIteration: number;
+    targetIntensity: number;
+    stepSize: number;
+    form: any;
+    loopMode: string;
+    totalLoops: number;
+}
+
 // Internal variable tracking export state for message queueing in logic-worker
 let _isExporting = false;
-export const isExporting = () => _isExporting;
-/** @type {Function | null} */
-let _onExportEnd = null;
-/** @param {Function} fn */
-export const setOnExportEnd = (fn) => (_onExportEnd = fn);
+export const isExporting = (): boolean => _isExporting;
+let _onExportEnd: (() => void) | null = null;
+export const setOnExportEnd = (fn: (() => void) | null): (() => void) | null => (_onExportEnd = fn);
 
 export class ExportProcessor {
-    /**
-     * @param {import('../types.js').EnsembleState} state
-     * @param {any} options
-     */
-    constructor(state, options) {
+    state: EnsembleState;
+    options: ExportOptions;
+    includedTracks: string[];
+    targetDuration: number;
+    loopMode: string;
+    filename: string | undefined;
+    CHUNK_MS: number;
+    ts: any;
+    totalStepsOneLoop: number;
+    stepsPerMeasure: number;
+    loopCount: number;
+    totalStepsWithoutEnding: number;
+    totalStepsExport: number;
+    exportCursor: ExportCursor;
+    exportLookaheadCursor: ExportCursor;
+    stepTimes: number[];
+    secondsPerBeat: number;
+    sixteenthSec: number;
+    metaTrack: MidiTrack;
+    chordTrack: MidiTrack;
+    bassTrack: MidiTrack;
+    soloistTrack: MidiTrack;
+    harmonyTrack: MidiTrack;
+    drumTrack: MidiTrack;
+    prevStates: ExportPrevStates;
+    exportConductor: ExportConductor;
+    globalStep: number;
+
+    constructor(state: EnsembleState, options: ExportOptions) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
         this.state = state;
         this.options = options;
@@ -54,7 +112,7 @@ export class ExportProcessor {
 
         // Initialize Export State
         this.ts =
-            /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+            (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
         this.totalStepsOneLoop = arranger.totalSteps;
         this.stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
         const loopSeconds =
@@ -76,8 +134,7 @@ export class ExportProcessor {
 
         let accumulatedSeconds = 0;
 
-        /** @type {any} */
-        const signatures = TIME_SIGNATURES;
+        const signatures: any = TIME_SIGNATURES;
 
         for (let i = 0; i < this.stepTimes.length; i++) {
             this.stepTimes[i] = accumulatedSeconds;
@@ -104,11 +161,7 @@ export class ExportProcessor {
 
         this.metaTrack.setName(0, 'Ensemble Export');
         this.metaTrack.setTempo(0, playback.bpm || 120);
-        this.metaTrack.setKeySig(
-            0,
-            /** @type {any} */ (arranger.key) || 'C',
-            arranger.isMinor || false,
-        );
+        this.metaTrack.setKeySig(0, (arranger.key as any) || 'C', arranger.isMinor || false);
         const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
         this.metaTrack.setTimeSig(0, tsNum, tsDenom);
 
@@ -177,7 +230,7 @@ export class ExportProcessor {
         this.globalStep = 0;
     }
 
-    start() {
+    start(): void {
         const { arranger } = this.state;
         if (arranger.progression.length === 0) {
             postMessage({ type: WORKER_RESP.ERROR, data: 'No progression to export' });
@@ -189,30 +242,15 @@ export class ExportProcessor {
         this.processChunk();
     }
 
-    /**
-     * @param {number} t
-     */
-    toPulses(t) {
+    toPulses(t: number): number {
         const { playback } = this.state;
         return Math.round(t * (playback.bpm / 60.0) * PPQ);
     }
 
     /**
-     * @param {MidiTrack} track
-     * @param {number} channel 0-indexed channel
-     * @param {Array<any>} notes
-     * @param {number} stepTimeS
-     * @param {string} moduleName
-     * @param {any} coordination
-     * @param {number} globalStep
-     */
-    /**
      * Writes global MIDI CC automation (Expression and Tension) to tracks.
-     * @param {number} _globalStep
-     * @param {number} stepTimeS
-     * @param {import('../types.js').StepInfo} stepInfo
      */
-    _writeAutomationToTracks(_globalStep, stepTimeS, stepInfo) {
+    _writeAutomationToTracks(_globalStep: number, stepTimeS: number, stepInfo: StepInfo): void {
         if (!stepInfo.isBeatStart) {
             return;
         }
@@ -232,16 +270,15 @@ export class ExportProcessor {
         this.soloistTrack.cc(pulse, midi.soloistChannel - 1, 1, soloistTensionCC);
     }
 
-    /**
-     * @param {MidiTrack} track
-     * @param {number} channel 0-indexed channel
-     * @param {Array<any>} notes
-     * @param {number} stepTimeS
-     * @param {string} moduleName
-     * @param {any} coordination
-     * @param {number} globalStep
-     */
-    _writeNotesToTrack(track, channel, notes, stepTimeS, moduleName, coordination, globalStep) {
+    _writeNotesToTrack(
+        track: MidiTrack,
+        channel: number,
+        notes: any[],
+        stepTimeS: number,
+        moduleName: string,
+        coordination: any,
+        globalStep: number,
+    ): void {
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, notes.length));
         const midiState = this.state.midi;
         const humanizeFactor = (this.state.groove.humanize || 0) / 100;
@@ -290,7 +327,7 @@ export class ExportProcessor {
                 const midiVel = normalizeMidiVelocity(finalVel);
 
                 if (res.ccEvents && res.ccEvents.length > 0) {
-                    res.ccEvents.forEach((/** @type {any} */ cc) =>
+                    res.ccEvents.forEach((cc: any) =>
                         track.cc(notePulse, channel, cc.controller, cc.value),
                     );
                 }
@@ -343,7 +380,7 @@ export class ExportProcessor {
             } else if (res.ccEvents && res.ccEvents.length > 0) {
                 const noteTimeS = stepTimeS + (res.timingOffset || 0);
                 const notePulse = Math.max(0, this.toPulses(noteTimeS));
-                res.ccEvents.forEach((/** @type {any} */ cc) =>
+                res.ccEvents.forEach((cc: any) =>
                     track.cc(notePulse, channel, cc.controller, cc.value),
                 );
             }
@@ -351,7 +388,7 @@ export class ExportProcessor {
         updateCoordinationContext(coordination, moduleName, notes);
     }
 
-    processChunk() {
+    processChunk(): void {
         try {
             const chunkStart = performance.now();
 
@@ -372,17 +409,14 @@ export class ExportProcessor {
         } catch (e) {
             postMessage({
                 type: WORKER_RESP.ERROR,
-                data: /** @type {Error} */ (e).message,
-                stack: /** @type {Error} */ (e).stack,
+                data: (e as Error).message,
+                stack: (e as Error).stack,
             });
             this.cleanup();
         }
     }
 
-    /**
-     * @param {number} globalStep
-     */
-    processStep(globalStep) {
+    processStep(globalStep: number): void {
         applyWorkerTransition(this.state, globalStep, this.exportConductor);
 
         const { arranger, groove, playback } = this.state;
@@ -406,7 +440,7 @@ export class ExportProcessor {
 
         const stepInfo = getStepInfo(
             globalStep,
-            /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'],
+            (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'],
             arranger.measureMap,
             TIME_SIGNATURES,
         );
@@ -427,20 +461,14 @@ export class ExportProcessor {
             if (section && section.start === modStep) {
                 this.metaTrack.marker(pulse, `--- ${section.label} ---`);
             }
-            this.metaTrack.marker(
-                pulse,
-                /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
-            );
+            this.metaTrack.marker(pulse, ((chord as any).absName || 'Chord') as string);
 
             if (this.includedTracks.includes('chords')) {
-                this.chordTrack.text(
-                    pulse,
-                    /** @type {string} */ (/** @type {any} */ (chord).absName || 'Chord'),
-                );
+                this.chordTrack.text(pulse, ((chord as any).absName || 'Chord') as string);
             }
         }
 
-        const soloistNotes = notes.filter((n) => n.module === 'soloist');
+        const soloistNotes = notes.filter((n: any) => n.module === 'soloist');
         if (soloistNotes.length > 0) {
             this._writeNotesToTrack(
                 this.soloistTrack,
@@ -453,7 +481,7 @@ export class ExportProcessor {
             );
         }
 
-        const bassNotes = notes.filter((n) => n.module === 'bass');
+        const bassNotes = notes.filter((n: any) => n.module === 'bass');
         if (bassNotes.length > 0) {
             this._writeNotesToTrack(
                 this.bassTrack,
@@ -466,7 +494,7 @@ export class ExportProcessor {
             );
         }
 
-        const chordsNotes = notes.filter((n) => n.module === 'chords');
+        const chordsNotes = notes.filter((n: any) => n.module === 'chords');
         if (chordsNotes.length > 0) {
             this._writeNotesToTrack(
                 this.chordTrack,
@@ -479,7 +507,7 @@ export class ExportProcessor {
             );
         }
 
-        const harmonyNotes = notes.filter((n) => n.module === 'harmony');
+        const harmonyNotes = notes.filter((n: any) => n.module === 'harmony');
         if (harmonyNotes.length > 0) {
             this._writeNotesToTrack(
                 this.harmonyTrack,
@@ -506,11 +534,11 @@ export class ExportProcessor {
                 }
             }
 
-            drumHits.forEach((hit) => {
-                const soundName = /** @type {any} */ (hit.soundName);
-                const instName = /** @type {any} */ (hit.inst).name;
+            drumHits.forEach((hit: any) => {
+                const soundName = hit.soundName as any;
+                const instName = (hit.inst as any).name;
                 const name = soundName || instName;
-                let midi = DRUM_MAP[soundName] || DRUM_MAP[instName];
+                let midi = (DRUM_MAP as any)[soundName] || (DRUM_MAP as any)[instName];
 
                 if (midi) {
                     midi += (this.state.midi.drumsOctave || 0) * 12;
@@ -521,35 +549,35 @@ export class ExportProcessor {
                 if (!midi) {
                     if (name.includes('Tom')) {
                         if (name.includes('High')) {
-                            midi = DRUM_MAP['High Tom'];
+                            midi = (DRUM_MAP as any)['High Tom'];
                         } else if (name.includes('Low')) {
-                            midi = DRUM_MAP['Low Tom'];
+                            midi = (DRUM_MAP as any)['Low Tom'];
                         } else {
-                            midi = DRUM_MAP['Mid Tom'];
+                            midi = (DRUM_MAP as any)['Mid Tom'];
                         }
                     } else if (name.includes('Agogo')) {
                         if (name.includes('Low')) {
-                            midi = DRUM_MAP['Low Agogo'];
+                            midi = (DRUM_MAP as any)['Low Agogo'];
                         } else {
-                            midi = DRUM_MAP['High Agogo'];
+                            midi = (DRUM_MAP as any)['High Agogo'];
                         }
                     } else if (name.includes('Bongo')) {
                         if (name.includes('Low')) {
-                            midi = DRUM_MAP['Low Bongo'];
+                            midi = (DRUM_MAP as any)['Low Bongo'];
                         } else {
-                            midi = DRUM_MAP['High Bongo'];
+                            midi = (DRUM_MAP as any)['High Bongo'];
                         }
                     } else if (name.includes('Conga')) {
                         if (name.includes('Low')) {
-                            midi = DRUM_MAP['Low Conga'];
+                            midi = (DRUM_MAP as any)['Low Conga'];
                         } else if (name.includes('Open')) {
-                            midi = DRUM_MAP['Open Conga'];
+                            midi = (DRUM_MAP as any)['Open Conga'];
                         } else if (name.includes('Mute')) {
-                            midi = DRUM_MAP['Mute Conga'];
+                            midi = (DRUM_MAP as any)['Mute Conga'];
                         } else if (name.includes('Slap')) {
-                            midi = DRUM_MAP['Slap Conga'];
+                            midi = (DRUM_MAP as any)['Slap Conga'];
                         } else {
-                            midi = DRUM_MAP['High Conga'];
+                            midi = (DRUM_MAP as any)['High Conga'];
                         }
                     }
                 }
@@ -604,7 +632,7 @@ export class ExportProcessor {
         }
     }
 
-    finish() {
+    finish(): void {
         const { arranger, playback, groove, soloist } = this.state;
         const resolutionStep = this.totalStepsWithoutEnding;
         const resTimeS = this.stepTimes[resolutionStep];
@@ -616,20 +644,20 @@ export class ExportProcessor {
             this.state,
             resolutionStep,
             arranger,
-            /** @type {any} */ ({
+            {
                 bass: this.includedTracks.includes('bass'),
                 chords: this.includedTracks.includes('chords'),
                 soloist: this.includedTracks.includes('soloist'),
                 harmony: this.includedTracks.includes('harmonies'),
                 groove: this.includedTracks.includes('drums'),
-            }),
+            } as any,
             playback.bpm,
             groove,
             soloist,
         );
 
-        resolutionNotes.forEach((/** @type {any} */ n) => {
-            let track;
+        resolutionNotes.forEach((n: any) => {
+            let track: MidiTrack | undefined;
             let channel = 0;
             if (n.module === 'bass') {
                 track = this.bassTrack;
@@ -656,8 +684,8 @@ export class ExportProcessor {
             const notePulse = this.toPulses(resTimeS + offsetS);
 
             if (n.ccEvents) {
-                n.ccEvents.forEach((/** @type {any} */ cc) => {
-                    track.cc(
+                n.ccEvents.forEach((cc: any) => {
+                    track!.cc(
                         this.toPulses(resTimeS + (cc.timingOffset || 0)),
                         channel,
                         cc.controller,
@@ -700,7 +728,7 @@ export class ExportProcessor {
 
                 track.noteOff(this.toPulses(endTimeS), channel, finalMidi);
             } else if (n.module === 'groove' && n.name) {
-                let midi = DRUM_MAP[/** @type {any} */ (n).name];
+                let midi = (DRUM_MAP as any)[n.name];
                 if (midi) {
                     midi += (this.state.midi.drumsOctave || 0) * 12;
                     midi = Math.max(0, Math.min(127, midi));
@@ -725,8 +753,8 @@ export class ExportProcessor {
         const finalPulse = this.toPulses(
             this.stepTimes[this.totalStepsExport - 1] + this.sixteenthSec,
         );
-        const finalTrackList = [this.metaTrack];
-        const trackRefs = {
+        const finalTrackList: MidiTrack[] = [this.metaTrack];
+        const trackRefs: Record<string, MidiTrack> = {
             chords: this.chordTrack,
             bass: this.bassTrack,
             soloist: this.soloistTrack,
@@ -735,8 +763,8 @@ export class ExportProcessor {
         };
         ['chords', 'bass', 'soloist', 'harmonies', 'drums'].forEach((key) => {
             if (this.includedTracks.includes(key)) {
-                /** @type {any} */ (trackRefs)[key].endOfTrack(finalPulse);
-                finalTrackList.push(/** @type {any} */ (trackRefs)[key]);
+                trackRefs[key].endOfTrack(finalPulse);
+                finalTrackList.push(trackRefs[key]);
             }
         });
         this.metaTrack.endOfTrack(finalPulse);
@@ -754,7 +782,7 @@ export class ExportProcessor {
 
         // Optimization: Pre-allocate array and avoid reduce for compiling chunks
         const tLen = finalTrackList.length;
-        const trackChunks = new Array(tLen);
+        const trackChunks: Uint8Array[] = new Array(tLen);
         let chunksTotalSize = 0;
 
         for (let i = 0; i < tLen; i++) {
@@ -777,7 +805,7 @@ export class ExportProcessor {
         postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
     }
 
-    cleanup() {
+    cleanup(): void {
         const { chords, bass, soloist, harmony, groove, playback } = this.state;
         if (this.prevStates) {
             chords.enabled = this.prevStates.chords; // @worker-mutation
@@ -800,22 +828,16 @@ export class ExportProcessor {
 
 /**
  * Handles the offline MIDI export process.
- * @param {import('../types.js').EnsembleState} state
- * @param {Object} options
  */
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {any} options
- */
-export function handleExport(state, options) {
+export function handleExport(state: EnsembleState, options: ExportOptions): void {
     try {
         const processor = new ExportProcessor(state, options);
         processor.start();
     } catch (e) {
         postMessage({
             type: WORKER_RESP.ERROR,
-            data: /** @type {Error} */ (e).message,
-            stack: /** @type {Error} */ (e).stack,
+            data: (e as Error).message,
+            stack: (e as Error).stack,
         });
     }
 }

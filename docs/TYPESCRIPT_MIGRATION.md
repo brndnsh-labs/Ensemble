@@ -287,12 +287,12 @@ Split into 6 sub-batches by dependency order (leaves first). Worker files need `
 | `public/engine/synth-soloist.ts` | 969 | ✅ | `SoloistVoice` exported; `as any` on `AudioParam` connects |
 | `public/engine/soloist-seeder.ts` | 2233 | ✅ | 10 interfaces; preserves SRDC/Dynamic Head comments verbatim |
 
-### Batch E — Hubs ⬜
+### Batch E — Hubs ✅
 
-| File | Lines | Status |
-|------|-------|--------|
-| `public/engine/tick-logic.js` | 538 | ⬜ |
-| `public/engine/midi-worker-logic.js` | 821 | ⬜ |
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/engine/tick-logic.ts` | 538 | ✅ | 5 interfaces (TickCursors, NoteResult, DrumHitInfo, GenerateNotesOptions/Result) |
+| `public/engine/midi-worker-logic.ts` | 821 | ✅ | 4 interfaces (ExportOptions, ExportCursor, ExportPrevStates, ExportConductor) |
 
 ### Batch F — Roots + service worker ⬜
 

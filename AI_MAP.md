@@ -85,17 +85,17 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/worker-utils.ts` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
 | `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
 | `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |
-| `public/engine/tick-logic.js` | Unified generative tick and transition logic. | `generateNotesForStep`, `applyWorkerTransition` |
+| `public/engine/tick-logic.ts` | Unified generative tick and transition logic. | `generateNotesForStep`, `applyWorkerTransition` |
 | `public/engine/audio-recovery.ts` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
 | `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
-| `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
+| `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/midi-constants.ts` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
 
 ## Live vs Worker Responsibilities
 
 - `public/worker-client.ts` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
 - `public/logic-worker.js` is the worker-side message dispatcher and reset coordinator.
-- `public/engine/worker-buffer-manager.ts` and `public/engine/tick-logic.js` own lookahead note generation inside the worker.
+- `public/engine/worker-buffer-manager.ts` and `public/engine/tick-logic.ts` own lookahead note generation inside the worker.
 - `public/engine/worker-utils.ts` holds shared worker-side helpers such as `getChordAtStep`.
 - `public/engine/scheduler-core.js` stays on the main thread and schedules already-generated note events into WebAudio/MIDI time.
 

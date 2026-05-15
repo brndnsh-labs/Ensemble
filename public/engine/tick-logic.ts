@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { EnsembleState } from '../types.js';
 import {
     binarySearchMap,
     getFrequency,
@@ -18,53 +19,58 @@ import { getHarmonyNotes } from './harmonies.js';
 import { getSoloistNote } from './soloist.js';
 import { getChordAtStep } from './worker-utils.js';
 
-/**
- * @typedef {Object} TickCursors
- * @property {{index: number, sectionIndex: number}} mainCursor
- * @property {{index: number, sectionIndex: number}} lookaheadCursor
- */
+export interface TickCursors {
+    mainCursor: { index: number; sectionIndex: number };
+    lookaheadCursor: { index: number; sectionIndex: number };
+}
 
-/**
- * @typedef {Object} NoteResult
- * @property {string} module
- * @property {number} step
- * @property {number} [midi]
- * @property {number} [freq]
- * @property {number} [velocity]
- * @property {number} [durationSteps]
- * @property {number} [timingOffset]
- * @property {number} [bendStartInterval]
- * @property {boolean} [isDoubleStop]
- * @property {boolean} [isLegato]
- * @property {boolean} [dry]
- * @property {any} [ccEvents]
- * @property {boolean} [muted]
- */
+export interface NoteResult {
+    module: string;
+    step: number;
+    midi?: number;
+    freq?: number;
+    velocity?: number;
+    durationSteps?: number;
+    timingOffset?: number;
+    bendStartInterval?: number;
+    isDoubleStop?: boolean;
+    isLegato?: boolean;
+    dry?: boolean;
+    ccEvents?: any;
+    muted?: boolean;
+}
 
-/**
- * @typedef {Object} DrumHitInfo
- * @property {boolean} shouldPlay
- * @property {number} velocity
- * @property {string} soundName
- * @property {number} instTimeOffset
- * @property {any} inst
- */
+export interface DrumHitInfo {
+    shouldPlay: boolean;
+    velocity: number;
+    soundName: string;
+    instTimeOffset: number;
+    inst: any;
+}
+
+export interface GenerateNotesOptions {
+    includeChords?: boolean;
+    includeBass?: boolean;
+    includeSoloist?: boolean;
+    includeHarmony?: boolean;
+    includeDrums?: boolean;
+}
+
+export interface GenerateNotesResult {
+    notes: NoteResult[];
+    coordination: any;
+    drumHits: DrumHitInfo[];
+}
 
 /**
  * Generates notes and drum hits for a single musical step.
- *
- * @param {import('../types.js').EnsembleState} state The ensemble state.
- * @param {number} step The global step to process.
- * @param {TickCursors} cursors Cursor objects to optimize step-to-chord lookups.
- * @param {Object} [options]
- * @param {boolean} [options.includeChords]
- * @param {boolean} [options.includeBass]
- * @param {boolean} [options.includeSoloist]
- * @param {boolean} [options.includeHarmony]
- * @param {boolean} [options.includeDrums]
- * @returns {{ notes: NoteResult[], coordination: any, drumHits: DrumHitInfo[] }}
  */
-export function generateNotesForStep(state, step, cursors, options = {}) {
+export function generateNotesForStep(
+    state: EnsembleState,
+    step: number,
+    cursors: TickCursors,
+    options: GenerateNotesOptions = {},
+): GenerateNotesResult {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
 
     const includeChords = options.includeChords ?? chords.enabled;
@@ -73,21 +79,18 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
     const includeHarmony = options.includeHarmony ?? harmony.enabled;
     const includeDrums = options.includeDrums ?? groove.enabled;
 
-    /** @type {NoteResult[]} */
-    const notesToMain = [];
-    /** @type {DrumHitInfo[]} */
-    const drumHits = [];
+    const notesToMain: NoteResult[] = [];
+    const drumHits: DrumHitInfo[] = [];
 
-    const ts =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
 
     const chordData = getChordAtStep(step, arranger, cursors.mainCursor);
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
     // 1. Context Assembly (Anchor: Groove)
-    const coordination = createCoordinationContext(step, /** @type {any} */ (stepInfo));
-    /** @type {any} */ (coordination).pocketOffset = calculatePocketOffset(playback, groove);
+    const coordination = createCoordinationContext(step, stepInfo as any);
+    (coordination as any).pocketOffset = calculatePocketOffset(playback, groove);
 
     if (chordData) {
         const { sectionEnd, sectionStart } = chordData;
@@ -97,8 +100,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
         // --- Structural Awareness: Turnaround Detection ---
         const sectionSteps = sectionEnd - sectionStart;
         const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
-        /** @type {any} */ (coordination).isTurnaround =
-            isLongEnough && remainingSteps <= stepsPerMeasure * 2;
+        (coordination as any).isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
         if (remainingSteps <= stepsPerMeasure) {
             const nextSectionChordData = getChordAtStep(
@@ -107,19 +109,16 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
                 cursors.lookaheadCursor,
             );
             if (nextSectionChordData?.chord) {
-                /** @type {any} */ (coordination).upcomingSectionFirstChord =
-                    nextSectionChordData.chord;
+                (coordination as any).upcomingSectionFirstChord = nextSectionChordData.chord;
             }
         }
     }
 
     // Pre-calculate Drum Hits for Coordination
     const drumStep = step % (groove.measures * stepsPerBar);
-    const sectionId = /** @type {any} */ (chordData?.chord)?.sectionId || null;
+    const sectionId = (chordData?.chord as any)?.sectionId || null;
     const seedIdx =
-        groove.sectionSeedMap && sectionId
-            ? /** @type {any} */ (groove.sectionSeedMap)[sectionId] || 0
-            : 0;
+        groove.sectionSeedMap && sectionId ? (groove.sectionSeedMap as any)[sectionId] || 0 : 0;
 
     // Use a cached variation lookup if creativity is enabled
     if (groove.creativity && groove.lastDrumPreset) {
@@ -138,9 +137,9 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
 
         if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
             if (playback.bandIntensity >= 0.1 || fillStep >= (groove.fillLength || 0) / 2) {
-                const fillNotes = /** @type {any} */ (groove.fillSteps)?.[fillStep];
+                const fillNotes = (groove.fillSteps as any)?.[fillStep];
                 if (fillNotes && fillNotes.length > 0) {
-                    fillNotes.forEach((/** @type {any} */ n) => {
+                    fillNotes.forEach((n: any) => {
                         const inst = groove.instruments.find((i) => i.name === n.name) || {
                             name: n.name,
                             muted: false,
@@ -179,12 +178,8 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
     }
 
     if (!fillPlayed) {
-        /**
-         * @param {string} instName
-         * @param {boolean} evaluateOnly
-         */
         // Variations lookup
-        const checkHit = (instName, evaluateOnly = true) => {
+        const checkHit = (instName: string, evaluateOnly: boolean = true): boolean => {
             const inst = groove.instruments.find((i) => i.name === instName);
             if (!inst || inst.muted) {
                 return false;
@@ -244,7 +239,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
     }
 
     // 2. Soloist Generation (High Priority)
-    let soloResult = null;
+    let soloResult: any = null;
     if (includeSoloist) {
         if (chordData) {
             const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
@@ -254,7 +249,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
                 chord || '',
                 nextChordData?.chord || '',
                 step,
-                /** @type {any} */ (soloist.lastFreq || null),
+                (soloist.lastFreq || null) as any,
                 soloist.octave,
                 soloist.style || '',
                 stepInChord,
@@ -276,7 +271,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
                             'soloist',
                             res.midi,
                             coordination,
-                            /** @type {any} */ (lastSoloMidi),
+                            lastSoloMidi as any,
                         );
 
                         if (!res.freq) {
@@ -305,7 +300,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
                     chord,
                     nextChordData?.chord,
                     stepInChord / ts.stepsPerBeat,
-                    /** @type {any} */ (bass.lastFreq || null),
+                    (bass.lastFreq || null) as any,
                     bass.octave,
                     bass.style,
                     chordData.chordIndex,
@@ -324,7 +319,7 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
                         'bass',
                         bassResult.midi,
                         coordination,
-                        /** @type {any} */ (lastBassMidi),
+                        lastBassMidi as any,
                     );
 
                     if (!bassResult.freq) {
@@ -405,11 +400,12 @@ export function generateNotesForStep(state, step, cursors, options = {}) {
 /**
  * Mutates state and conductorState to handle transitions, fills, intensity,
  * and harmony complexity. This ensures 1:1 parity between live engine and offline export.
- * @param {import('../types.js').EnsembleState} state
- * @param {number} step
- * @param {any} conductorState The object containing loopCount, formIteration, etc.
  */
-export function applyWorkerTransition(state, step, conductorState) {
+export function applyWorkerTransition(
+    state: EnsembleState,
+    step: number,
+    conductorState: any,
+): void {
     const { groove, playback, arranger, harmony } = state;
     if (!groove.enabled || !arranger.totalSteps) {
         return;
@@ -468,9 +464,9 @@ export function applyWorkerTransition(state, step, conductorState) {
         // Incorporate Section Energy
         let targetEnergy = 0.5;
         if (conductorState.form?.sections && entry?.chord) {
-            const currentSectionId = /** @type {any} */ (entry.chord).sectionId;
+            const currentSectionId = (entry.chord as any).sectionId;
             const currentSection = conductorState.form.sections.find(
-                (/** @type {any} */ s) => s.id === currentSectionId,
+                (s: any) => s.id === currentSectionId,
             );
             if (currentSection) {
                 const role = currentSection.role;
