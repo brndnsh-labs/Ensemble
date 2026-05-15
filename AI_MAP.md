@@ -47,9 +47,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/bass-engine.ts` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
-| `public/engine/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
+| `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/soloist-config.ts` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
-| `public/engine/soloist-devices.js` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
+| `public/engine/soloist-devices.ts` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
 | `public/engine/drum-seeder.ts` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
 | `public/engine/fills.ts` | Procedural drum fill generation. | `generateProceduralFill` |
 | `public/engine/conductor.ts` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
@@ -64,7 +64,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/bass-styles.ts` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
 | `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
 | `public/engine/soloist-config.ts` | Style definitions and influence pools. | `STYLE_CONFIG` |
-| `public/engine/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
+| `public/engine/soloist-devices.ts` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
 | `public/engine/grooves/` | Directory of 15+ genre-specific drum strategies. | `jazz.js`, `rock.js`, `funk.js`, etc. |
 
 ## Engine Core (Internal)
@@ -81,7 +81,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/groove-engine.ts` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/soloist-pitch-engine.js` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
-| `public/engine/soloist-rhythm-engine.js` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
+| `public/engine/soloist-rhythm-engine.ts` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
 | `public/engine/worker-utils.ts` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
 | `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
 | `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |

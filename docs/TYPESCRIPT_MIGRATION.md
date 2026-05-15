@@ -265,13 +265,13 @@ Split into 6 sub-batches by dependency order (leaves first). Worker files need `
 | `public/engine/synth-drums.ts` | 1147 | ✅ | 7 interfaces + 2 type aliases; local `DrumMixState` (synth-utils types are non-exported) |
 | `public/visualizer-worker.ts` | 152 | ✅ | `/// <reference lib="webworker" />`; `workerSelf as DedicatedWorkerGlobalScope` |
 
-### Batch B — Single-level deps ⬜
+### Batch B — Single-level deps ✅
 
-| File | Lines | Status |
-|------|-------|--------|
-| `public/engine/soloist-devices.js` | 749 | ⬜ |
-| `public/engine/soloist-rhythm-engine.js` | 704 | ⬜ |
-| `public/engine/harmonies.js` | 799 | ⬜ |
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/engine/soloist-devices.ts` | 749 | ✅ | 2 interfaces; ctx params kept `any` per original |
+| `public/engine/soloist-rhythm-engine.ts` | 704 | ✅ | 3 type aliases (ResponseTransform/Mode/Source) |
+| `public/engine/harmonies.ts` | 799 | ✅ | 6 local interfaces (HarmonyBehavior, HarmonyContext, etc.) |
 
 ### Batch C — soloist-pitch-engine ⬜
 

@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { EnsembleState, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
 import {
@@ -12,15 +13,71 @@ import { getWorkerState } from './worker-orchestrator.js';
  * HARMONIES.JS (v3 - Behavioral Strategy Architecture)
  */
 
+interface TimeSignatureConfig {
+    beats: number;
+    stepsPerBeat: number;
+}
+
+interface MotifCacheEntry {
+    seed: number;
+    rhythmicMask: number;
+    pattern: number[];
+}
+
+interface HarmonyBehavior {
+    type: 'reinforce' | 'comp' | 'pad';
+    duration: number;
+    isLatched?: boolean;
+    isBloom?: boolean;
+    isResponse?: boolean;
+    isGhost?: boolean;
+    anchorMidi?: number;
+}
+
+interface StyleConfig {
+    density: number;
+    rhythmicStyle: string;
+    timingJitter: number;
+    velocity: number;
+    octaveOffset: number;
+    activeStyle?: string;
+}
+
+interface HarmonyContext {
+    step: number;
+    soloist: any;
+    coordination: any;
+    playback: any;
+    chord: any;
+    feel: string;
+    ts: TimeSignatureConfig;
+    measureStep: number;
+    stepsPerMeasure: number;
+    stepInChord: number;
+    motif: MotifCacheEntry;
+}
+
+interface HarmonyNote {
+    midi: number;
+    freq: number;
+    velocity: number;
+    durationSteps: number;
+    timingOffset: number;
+    style: string | undefined;
+    isLatched: boolean;
+    isBloom: boolean;
+    isResponse: boolean;
+    isChordStart: boolean;
+}
+
 // Internal memory for motif consistency
-const motifCache = new Map();
+const motifCache = new Map<string, MotifCacheEntry>();
 let lastPlayedStep = -1;
 
 /**
  * Clears the internal motif memory.
- * @param {import('../types.js').EnsembleState|null} state
  */
-export function clearHarmonyMemory(state) {
+export function clearHarmonyMemory(state: EnsembleState | null): void {
     if (!state) {
         return;
     }
@@ -32,10 +89,8 @@ export function clearHarmonyMemory(state) {
 
 /**
  * Extracts 3rds and 7ths (Guide Tones).
- * @param {number[]} intervals
- * @returns {number[]}
  */
-export function getGuideTones(intervals) {
+export function getGuideTones(intervals: number[]): number[] {
     return intervals.filter((i) => {
         const iMod = i % 12;
         return iMod === 3 || iMod === 4 || iMod === 10 || iMod === 11;
@@ -44,11 +99,8 @@ export function getGuideTones(intervals) {
 
 /**
  * Filters intervals to avoid clashing with soloist.
- * @param {number[]} intervals
- * @param {boolean} [rootless]
- * @returns {number[]}
  */
-export function getSafeVoicings(intervals, rootless = false) {
+export function getSafeVoicings(intervals: number[], rootless = false): number[] {
     return intervals.filter((i) => {
         const iMod = i % 12;
         if (rootless && iMod === 0) {
@@ -59,27 +111,17 @@ export function getSafeVoicings(intervals, rootless = false) {
     });
 }
 
-/**
- * @param {number[]} intervals
- * @param {number} targetCount
- * @returns {number[]}
- */
-function selectGroundedIntervals(intervals, targetCount = 4) {
+function selectGroundedIntervals(intervals: number[], targetCount = 4): number[] {
     const unique = [...new Set(intervals)];
     if (unique.length <= targetCount) {
         return unique;
     }
 
-    /** @type {number[]} */
-    const roots = [];
-    /** @type {number[]} */
-    const guides = [];
-    /** @type {number[]} */
-    const colors = [];
-    /** @type {number[]} */
-    const fifths = [];
-    /** @type {number[]} */
-    const others = [];
+    const roots: number[] = [];
+    const guides: number[] = [];
+    const colors: number[] = [];
+    const fifths: number[] = [];
+    const others: number[] = [];
 
     unique.forEach((interval) => {
         const intervalClass = ((interval % 12) + 12) % 12;
@@ -108,11 +150,8 @@ function selectGroundedIntervals(intervals, targetCount = 4) {
 /**
  * Tension bars sound best when harmony behaves like a slim color layer instead of
  * a second accompanist. Favor guide tones and keep the stack compact.
- * @param {number[]} intervals
- * @param {boolean} includeRoot
- * @returns {number[]}
  */
-function selectTensionSupportIntervals(intervals, includeRoot) {
+function selectTensionSupportIntervals(intervals: number[], includeRoot: boolean): number[] {
     const safe = getSafeVoicings(intervals, !includeRoot);
     const guides = getGuideTones(safe);
     const fallback = safe.filter((interval) => interval !== 7);
@@ -126,27 +165,23 @@ function selectTensionSupportIntervals(intervals, includeRoot) {
 
 /**
  * Procedural Rhythmic Patterns.
- * @param {string} feel
- * @param {number} seed
- * @param {any} [tsConfig]
- * @returns {number[]}
  */
-export function generateCompingPattern(feel, seed, tsConfig) {
-    const ts = tsConfig || TIME_SIGNATURES['4/4'];
+export function generateCompingPattern(
+    feel: string,
+    seed: number,
+    tsConfig?: TimeSignatureConfig,
+): number[] {
+    const ts = tsConfig || (TIME_SIGNATURES as any)['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
     const length = spm * 2;
     const pattern = new Array(length).fill(0);
-    /** @returns {number} */
-    const pseudoRandom = () => {
+    const pseudoRandom = (): number => {
         seed = (seed * 9301 + 49297) % 233280;
         return seed / 233280;
     };
 
-    const getBeatStep = (
-        /** @type {number} */ bar,
-        /** @type {number} */ beatIdx,
-        offsetSteps = 0,
-    ) => bar * spm + beatIdx * ts.stepsPerBeat + offsetSteps;
+    const getBeatStep = (bar: number, beatIdx: number, offsetSteps = 0): number =>
+        bar * spm + beatIdx * ts.stepsPerBeat + offsetSteps;
 
     if (feel === 'Jazz') {
         // Bar 1: Charleston
@@ -219,10 +254,8 @@ export function generateCompingPattern(feel, seed, tsConfig) {
 /**
  * Mode 1: The Shadow (Melodic Support)
  * Strictly reinforces the soloist's seeded melody or real-time playing.
- * @param {any} context
- * @returns {any}
  */
-function playShadowMode(context) {
+function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     const { step, soloist, coordination, playback, feel } = context;
     const loopCount = playback.currentLoopCount || 0;
 
@@ -236,7 +269,7 @@ function playShadowMode(context) {
 
     // B. Shared Hook Reinforcement (Ska-Punk)
     if (feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
-        const hookMatch = soloist.sharedHookBuffer.find((/** @type {any} */ h) => h.step === step);
+        const hookMatch = soloist.sharedHookBuffer.find((h: any) => h.step === step);
         if (hookMatch) {
             return { type: 'reinforce', isLatched: true, duration: 1 };
         }
@@ -246,7 +279,7 @@ function playShadowMode(context) {
     const seed = soloist.sessionSeed;
     if (seed?.notes && seed.notes.length > 0) {
         const stepInLoop = step % seed.loopLengthSteps;
-        const seedNote = seed.notes.find((/** @type {any} */ n) => n.step === stepInLoop);
+        const seedNote = seed.notes.find((n: any) => n.step === stepInLoop);
 
         if (seedNote) {
             let reinforceProb = 0;
@@ -272,9 +305,7 @@ function playShadowMode(context) {
         // D. Hype Man (Anticipation)
         if (playback.bandIntensity > 0.4) {
             const nextStepInLoop = (step + 2) % seed.loopLengthSteps;
-            const nextSeedNote = seed.notes.find(
-                (/** @type {any} */ n) => n.step === nextStepInLoop,
-            );
+            const nextSeedNote = seed.notes.find((n: any) => n.step === nextStepInLoop);
             // Assuming 8 steps means half-measure in 4/4. Let's make it robust.
             const spm = seed.loopLengthSteps; // Actually this is loop length. If loop is 1 measure, spm=loopLength.
             // A strong downbeat or half-bar downbeat
@@ -293,10 +324,8 @@ function playShadowMode(context) {
 /**
  * Mode 2: The Comper (Rhythmic Stabs)
  * Standard procedural rhythmic comping.
- * @param {any} context
- * @returns {any}
  */
-function playComperMode(context) {
+function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
     const { step, motif, playback, coordination, ts, measureStep, soloist } = context;
 
     const isSoloistBusy = coordination.soloistBusy || (soloist.enabled && !soloist.isResting);
@@ -351,10 +380,8 @@ function playComperMode(context) {
 
 /**
  * Mode 3: The Sea (Atmospheric Pads)
- * @param {any} context
- * @returns {any}
  */
-function playSeaMode(context) {
+function playSeaMode(context: HarmonyContext): HarmonyBehavior | null {
     const { stepInChord, measureStep, ts, stepsPerMeasure, chord } = context;
 
     if (stepInChord === 0 || measureStep === 0) {
@@ -366,24 +393,16 @@ function playSeaMode(context) {
 
 /**
  * Final Note Generation logic (Voicing, Transposition, Offset).
- * @param {import('../types.js').EnsembleState} activeState
- * @param {any} chord
- * @param {number} step
- * @param {any} behavior
- * @param {any} styleConfig
- * @param {any} coordination
- * @param {number} octave
- * @returns {any[]}
  */
 function finalizeHarmonyNotes(
-    activeState,
-    chord,
-    step,
-    behavior,
-    styleConfig,
-    coordination,
-    octave,
-) {
+    activeState: EnsembleState,
+    chord: any,
+    step: number,
+    behavior: HarmonyBehavior,
+    styleConfig: StyleConfig,
+    coordination: any,
+    octave: number,
+): HarmonyNote[] {
     const { playback, harmony, groove, soloist, chords } = activeState;
     const {
         duration: baseDuration,
@@ -395,8 +414,8 @@ function finalizeHarmonyNotes(
     } = behavior;
     let duration = baseDuration;
 
-    /** @type {number[]} */
-    let intervals = chord.intervals && chord.intervals.length > 0 ? chord.intervals : [0, 4, 7];
+    let intervals: number[] =
+        chord.intervals && chord.intervals.length > 0 ? chord.intervals : [0, 4, 7];
     const feel = groove.genreFeel;
 
     const isSoloistBusy =
@@ -495,8 +514,8 @@ function finalizeHarmonyNotes(
                 : 2
             : null;
     const densityCap = [maxDensity, tensionDensityCap, accompanimentDensityCap]
-        .filter((cap) => Number.isFinite(cap))
-        .reduce((minCap, cap) => Math.min(minCap, /** @type {number} */ (cap)), maxDensity);
+        .filter((cap): cap is number => Number.isFinite(cap as number))
+        .reduce((minCap, cap) => Math.min(minCap, cap), maxDensity);
     if (targetIntervals.length > densityCap) {
         targetIntervals = targetIntervals.slice(0, densityCap);
     }
@@ -534,8 +553,8 @@ function finalizeHarmonyNotes(
     }
 
     const polyphonyComp = Math.max(0.7, 1.0 - currentMidis.length * 0.05);
-    const notes = [];
-    const finalMidisForMemory = [];
+    const notes: HarmonyNote[] = [];
+    const finalMidisForMemory: number[] = [];
 
     for (let i = 0; i < currentMidis.length; i++) {
         let midi = currentMidis[i];
@@ -592,30 +611,18 @@ function finalizeHarmonyNotes(
 
 // --- MAIN DISPATCHER ---
 
-/**
- * @param {import('../types.js').EnsembleState|null} state
- * @param {any} chord
- * @param {any} _nextChord
- * @param {number} step
- * @param {number} octave
- * @param {string} style
- * @param {number} stepInChord
- * @param {any} [_soloistResult]
- * @param {any} [coordination]
- * @param {import('../types.js').StepInfo} [_stepInfo]
- */
 export function getHarmonyNotes(
-    state,
-    chord,
-    _nextChord,
-    step,
-    octave,
-    style,
-    stepInChord,
-    _soloistResult = null,
-    coordination = {},
-    _stepInfo,
-) {
+    state: EnsembleState | null,
+    chord: any,
+    _nextChord: any,
+    step: number,
+    octave: number,
+    style: string,
+    stepInChord: number,
+    _soloistResult: any = null,
+    coordination: any = {},
+    _stepInfo?: StepInfo,
+): HarmonyNote[] {
     if (!chord) {
         return [];
     }
@@ -631,8 +638,7 @@ export function getHarmonyNotes(
     }
 
     const feel = groove.genreFeel;
-    /** @type {any} */
-    const tsConfigs = TIME_SIGNATURES;
+    const tsConfigs: any = TIME_SIGNATURES;
     const ts = tsConfigs[arranger.timeSignature] || tsConfigs['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
     const measureStep = step % stepsPerMeasure;
@@ -657,7 +663,7 @@ export function getHarmonyNotes(
         activeStyle = 'organ';
     }
 
-    const STYLE_CONFIGS = {
+    const STYLE_CONFIGS: Record<string, StyleConfig> = {
         horns: {
             density: 2,
             rhythmicStyle: 'stabs',
@@ -709,9 +715,10 @@ export function getHarmonyNotes(
         },
     };
 
-    /** @type {any} */
-    const styleConfigAny = STYLE_CONFIGS;
-    const config = { ...(styleConfigAny[activeStyle] || styleConfigAny.smart), activeStyle };
+    const config: StyleConfig = {
+        ...(STYLE_CONFIGS[activeStyle] || STYLE_CONFIGS.smart),
+        activeStyle,
+    };
     if (config.rhythmicStyle === 'auto') {
         config.rhythmicStyle = feel === 'Rock' || feel === 'Acoustic' ? 'pads' : 'stabs';
     }
@@ -724,11 +731,7 @@ export function getHarmonyNotes(
         const seed = Math.abs(
             chord.sectionId
                 ?.split('')
-                .reduce(
-                    (/** @type {number} */ a, /** @type {string} */ b) =>
-                        (a << 5) - a + b.charCodeAt(0),
-                    0,
-                ) || 0,
+                .reduce((a: number, b: string) => (a << 5) - a + b.charCodeAt(0), 0) || 0,
         );
         const pattern = generateCompingPattern(feel, seed, ts);
 
@@ -748,12 +751,12 @@ export function getHarmonyNotes(
         });
     }
 
-    const motif = motifCache.get(chord.sectionId);
+    const motif = motifCache.get(chord.sectionId)!;
     if (harmony.rhythmicMask !== motif.rhythmicMask) {
         harmony.rhythmicMask = motif.rhythmicMask; // @worker-mutation
     }
 
-    const context = {
+    const context: HarmonyContext = {
         step,
         soloist,
         coordination,
@@ -768,7 +771,7 @@ export function getHarmonyNotes(
     };
 
     // 3. MODE DISPATCHER
-    let behavior = null;
+    let behavior: HarmonyBehavior | null = null;
 
     // Mode A: The Shadow (High Priority)
     behavior = playShadowMode(context);

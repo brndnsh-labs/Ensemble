@@ -12,10 +12,8 @@ const HIGH_ENERGY_GUITAR_STYLES = new Set(['metal', 'shred', 'scalar']);
 
 /**
  * Computes a bitmask of intervals present in the current chord.
- * @param {any} currentChord
- * @returns {number}
  */
-export function getChordMask(currentChord) {
+export function getChordMask(currentChord: any): number {
     let mask = 0;
     if (currentChord?.intervals) {
         for (let i = 0; i < currentChord.intervals.length; i++) {
@@ -28,11 +26,11 @@ export function getChordMask(currentChord) {
 
 /**
  * Generates a sequence of notes for a specific melodic device.
- * @param {string} deviceType - The ID of the device to generate (e.g., 'bluesLick', 'run').
- * @param {any} ctx - Context object containing necessary state for generation.
- * @returns {any[]|null} An array of note objects for the device buffer, or null if none generated.
+ * @param deviceType - The ID of the device to generate (e.g., 'bluesLick', 'run').
+ * @param ctx - Context object containing necessary state for generation.
+ * @returns An array of note objects for the device buffer, or null if none generated.
  */
-export function generateMelodicDevice(deviceType, ctx) {
+export function generateMelodicDevice(deviceType: string, ctx: any): any[] | null {
     const {
         state,
         selectedMidi,
@@ -57,7 +55,7 @@ export function generateMelodicDevice(deviceType, ctx) {
     } = ctx;
 
     const devBaseVel = 0.5 + effectiveIntensity * 0.6;
-    let deviceBuffer = [];
+    let deviceBuffer: any[] = [];
     const canUseMotifShape = ['blues', 'jazz', 'bird', 'neo', 'bossa', 'scalar'].includes(
         activeStyle,
     );
@@ -95,8 +93,7 @@ export function generateMelodicDevice(deviceType, ctx) {
     if (deviceType === 'bluesLick') {
         const root = targetChord.rootMidi;
         const relInt = (selectedMidi - root + 120) % 12;
-        /** @type {any[]} */
-        let lick = [];
+        let lick: any[] = [];
         const duration = 2; // 8th notes
 
         if (relInt === 0) {
@@ -194,7 +191,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         ];
     } else if (deviceType === 'banjoRoll') {
         const root = targetChord.rootMidi;
-        const rollPitches = [0, 4, 7, 9].map((/** @type {any} */ i) => root + i);
+        const rollPitches = [0, 4, 7, 9].map((i: any) => root + i);
         for (let i = 0; i < 4; i++) {
             deviceBuffer.push({
                 midi: rollPitches[i % rollPitches.length],
@@ -475,7 +472,7 @@ export function generateMelodicDevice(deviceType, ctx) {
         const targetMidi = soloist.isResting ? dynamicCenter : lastMidi;
         const octaveShift = Math.round((targetMidi - startMidi) / 12) * 12;
 
-        return deviceBuffer.map((/** @type {any} */ n) => {
+        return deviceBuffer.map((n: any) => {
             const notes = Array.isArray(n) ? n : [n];
             const shifted = notes.map((note) => ({
                 ...note,
@@ -489,11 +486,12 @@ export function generateMelodicDevice(deviceType, ctx) {
     return null;
 }
 
-/**
- * @param {{ activeStyle: string, supportHint?: any }} options
- * @returns {number[]}
- */
-function getGuitarIntervalPalette(options) {
+interface GuitarIntervalPaletteOptions {
+    activeStyle: string;
+    supportHint?: any;
+}
+
+function getGuitarIntervalPalette(options: GuitarIntervalPaletteOptions): number[] {
     const { activeStyle, supportHint } = options;
     const palette = supportHint?.intervalPalette;
 
@@ -521,13 +519,18 @@ function getGuitarIntervalPalette(options) {
     return [3, 4, 5, 7, 8, 9];
 }
 
+interface GuitarSupportMidiOptions {
+    currentChord: any;
+    activeStyle: string;
+    selectedMidi: number;
+    supportHint?: any;
+}
+
 /**
  * Choose a supportive lower voice that sounds like a guitarist reinforcing the melody,
  * not like a generic chord-stack algorithm filling space.
- * @param {{ currentChord: any, activeStyle: string, selectedMidi: number, supportHint?: any }} options
- * @returns {number}
  */
-function selectGuitarSupportMidi(options) {
+function selectGuitarSupportMidi(options: GuitarSupportMidiOptions): number {
     const { currentChord, activeStyle, selectedMidi, supportHint } = options;
     const currentRoot = currentChord.rootMidi;
     const chordMask = getChordMask(currentChord);
@@ -658,9 +661,8 @@ function selectGuitarSupportMidi(options) {
 
 /**
  * Generates additional notes for double stops based on style and mode.
- * @param {any} ctx
  */
-export function generateExtraNotes(ctx) {
+export function generateExtraNotes(ctx: any) {
     const { soloist, currentChord, activeStyle, effectiveIntensity, selectedMidi, seedNote } = ctx;
     const extraNotes = [];
     const soloistMode = resolveSoloistMode(soloist.mode);

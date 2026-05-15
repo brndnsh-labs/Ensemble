@@ -1,14 +1,18 @@
+import type { SoloistState } from '../state/instruments.js';
+import type { StepInfo } from '../types.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 
-/**
- * @param {any} responseConfig
- * @param {'paraphrase' | 'development' | 'free'} responseMode
- * @param {'section' | 'form' | 'recent' | 'seed' | 'free'} responseSource
- * @returns {'exact' | 'delay' | 'echo' | 'compress'}
- */
-function pickResponseTransform(responseConfig, responseMode, responseSource = 'recent') {
-    const options =
+type ResponseTransform = 'exact' | 'delay' | 'echo' | 'compress';
+type ResponseMode = 'paraphrase' | 'development' | 'free';
+type ResponseSource = 'section' | 'form' | 'recent' | 'seed' | 'free';
+
+function pickResponseTransform(
+    responseConfig: any,
+    responseMode: ResponseMode,
+    responseSource: ResponseSource = 'recent',
+): ResponseTransform {
+    const options: Array<[ResponseTransform, number]> =
         responseMode === 'development'
             ? [
                   ['exact', 0.65],
@@ -36,18 +40,13 @@ function pickResponseTransform(responseConfig, responseMode, responseSource = 'r
     for (const [name, weight] of options) {
         roll -= weight;
         if (roll <= 0) {
-            return /** @type {'exact' | 'delay' | 'echo' | 'compress'} */ (name);
+            return name;
         }
     }
     return 'exact';
 }
 
-/**
- * @param {number} stepTarget
- * @param {number} stepsPerMeasure
- * @param {number} stepsPerBeat
- */
-function getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat) {
+function getStepStrength(stepTarget: number, stepsPerMeasure: number, stepsPerBeat: number) {
     const measureStep = ((stepTarget % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
     const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
     const isBeatStart = measureStep % stepsPerBeat === 0;
@@ -60,29 +59,17 @@ function getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat) {
     };
 }
 
-/**
- * @param {number} startStep
- * @param {number} activeSteps
- * @param {number} stepsPerMeasure
- * @param {number} stepsPerBeat
- * @param {number} intensity
- * @param {any} signature
- * @param {any} responseConfig
- * @param {'paraphrase' | 'development' | 'free'} responseMode
- * @param {'section' | 'form' | 'recent' | 'seed' | 'free'} responseSource
- * @returns {any[]}
- */
 function buildResponsePlanFromSignature(
-    startStep,
-    activeSteps,
-    stepsPerMeasure,
-    stepsPerBeat,
-    intensity,
-    signature,
-    responseConfig,
-    responseMode,
-    responseSource,
-) {
+    startStep: number,
+    activeSteps: number,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    intensity: number,
+    signature: any,
+    responseConfig: any,
+    responseMode: ResponseMode,
+    responseSource: ResponseSource,
+): any[] {
     if (!signature?.notes?.length) {
         return [];
     }
@@ -93,7 +80,7 @@ function buildResponsePlanFromSignature(
     const spaceBias = Math.max(0, Math.min(0.75, responseConfig?.spaceBias || 0));
     const sourceNotes = signature.notes.slice(0, maxResponseNotes);
     const responseNotes = sourceNotes
-        .map((/** @type {any} */ sourceNote, /** @type {number} */ index) => {
+        .map((sourceNote: any, index: number) => {
             const isStructural =
                 index === 0 ||
                 index === sourceNotes.length - 1 ||
@@ -135,14 +122,13 @@ function buildResponsePlanFromSignature(
             };
         })
         .filter(Boolean)
-        .sort((/** @type {any} */ a, /** @type {any} */ b) => a.stepOffset - b.stepOffset);
+        .sort((a: any, b: any) => a.stepOffset - b.stepOffset);
     if (responseNotes.length === 0) {
         return [];
     }
 
-    /** @type {Map<number, any>} */
-    const deduped = new Map();
-    responseNotes.forEach((/** @type {any} */ responseNote, /** @type {number} */ index) => {
+    const deduped = new Map<number, any>();
+    responseNotes.forEach((responseNote: any, index: number) => {
         const stepTarget = startStep + responseNote.stepOffset;
         const durationSteps =
             transform === 'compress' && index > 0
@@ -177,41 +163,28 @@ function buildResponsePlanFromSignature(
     return [...deduped.values()].sort((a, b) => a.stepTarget - b.stepTarget);
 }
 
-/**
- * @param {number} startStep
- * @param {number} activeSteps
- * @param {string} style
- * @param {number} intensity
- * @param {number} stepsPerMeasure
- * @param {number} stepsPerBeat
- * @param {any} coordination
- * @param {number} sessionSteps
- * @param {import('../state/instruments.js').SoloistState} soloistState
- * @param {import('../types.js').StepInfo | null} [_stepInfo=null]
- */
 export function generateRhythmPlan(
-    startStep,
-    activeSteps,
-    style,
-    intensity,
-    stepsPerMeasure,
-    stepsPerBeat,
-    coordination,
-    sessionSteps,
-    soloistState,
-    _stepInfo = null,
-) {
-    /** @type {any[]} */
-    const plan = [];
-    const _config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+    startStep: number,
+    activeSteps: number,
+    style: string,
+    intensity: number,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    coordination: any,
+    sessionSteps: number,
+    soloistState: SoloistState,
+    _stepInfo: StepInfo | null = null,
+): any[] {
+    const plan: any[] = [];
+    const _config = (STYLE_CONFIG as any)[style] || STYLE_CONFIG.scalar;
     const responseConfig = _config.motivicResponse || null;
     const hasDynamicHeadSeed = Boolean(soloistState.sessionSeed?.notes?.length);
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
     const isMonophonicMode = isSoloistMonophonicMode(soloistState.mode);
     const minPhraseNotes = Math.max(0, _config.minNotesPerPhrase || 0);
     const responseSignature = soloistState.phraseContext?.responseSignature;
-    const responseMode = soloistState.phraseContext?.responseMode || 'free';
-    const responseSource = soloistState.phraseContext?.responseSource || 'free';
+    const responseMode = (soloistState.phraseContext?.responseMode || 'free') as ResponseMode;
+    const responseSource = (soloistState.phraseContext?.responseSource || 'free') as ResponseSource;
 
     let notesInPhrase = 0;
 
@@ -416,7 +389,7 @@ export function generateRhythmPlan(
             if (sessionSeed && sessionSeed.notes.length > 0) {
                 const { notes, loopLengthSteps } = sessionSeed;
                 const stepInLoop = step % loopLengthSteps;
-                const hasSeedNote = notes.some((/** @type {any} */ n) => n.step === stepInLoop);
+                const hasSeedNote = notes.some((n: any) => n.step === stepInLoop);
                 if (hasSeedNote) {
                     attackProb += 0.4; // Strong boost for seed points
                 }
@@ -584,7 +557,7 @@ export function generateRhythmPlan(
 
     if (style === 'blues' && plan.length < minPhraseNotes && activeSteps > 0) {
         const occupiedSteps = new Set(plan.map((node) => node.stepTarget));
-        const candidateSteps = [];
+        const candidateSteps: any[] = [];
         const minimumSpacing = Math.max(2, Math.floor(stepsPerBeat / 2));
 
         for (let step = startStep; step < startStep + activeSteps; step++) {
