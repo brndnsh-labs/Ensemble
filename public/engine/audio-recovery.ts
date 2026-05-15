@@ -1,5 +1,7 @@
+import type { GlobalContext } from '../state/playback.js';
+
 /**
- * AudioRecovery.js
+ * AudioRecovery.ts
  *
  * robust "Watchdog" service that monitors the Web Audio Context for:
  * 1. Unexpected suspensions (OS interruptions, headset unplugging)
@@ -8,21 +10,15 @@
  */
 
 class AudioHealthMonitor {
-    constructor() {
-        this.checkInterval = 2000; // Check every 2s
-        this.intervalId = null;
-        this.analyser = null;
-        this.dataBuffer = null;
-        this.crashCount = 0;
-        this.isRecovering = false;
-        /** @type {any} */
-        this.onRecover = null;
-    }
+    checkInterval = 2000;
+    intervalId: ReturnType<typeof setInterval> | null = null;
+    analyser: AnalyserNode | null = null;
+    dataBuffer: Float32Array<ArrayBuffer> | null = null;
+    crashCount = 0;
+    isRecovering = false;
+    onRecover: ((playback: GlobalContext) => Promise<void>) | null = null;
 
-    /**
-     * @param {function(): import('../state/playback.js').GlobalContext} getPlaybackState
-     */
-    start(getPlaybackState) {
+    start(getPlaybackState: () => GlobalContext): void {
         if (this.intervalId) {
             return;
         }
@@ -33,18 +29,14 @@ class AudioHealthMonitor {
         console.log('[AudioWatchdog] Monitoring started.');
     }
 
-    stop() {
+    stop(): void {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
     }
 
-    /**
-     * @param {GainNode} masterNode
-     * @param {import('../state/playback.js').GlobalContext} playback
-     */
-    attachToMaster(masterNode, playback) {
+    attachToMaster(masterNode: GainNode, playback: GlobalContext): void {
         if (!playback.audio) {
             return;
         }
@@ -67,10 +59,7 @@ class AudioHealthMonitor {
         }
     }
 
-    /**
-     * @param {import('../state/playback.js').GlobalContext} playback
-     */
-    async healthCheck(playback) {
+    async healthCheck(playback: GlobalContext): Promise<void> {
         if (!playback.audio) {
             return;
         }
@@ -100,7 +89,7 @@ class AudioHealthMonitor {
 
         // 2. Check for NaN / Infinite (Blown Filters)
         if (this.analyser && isPlaying && this.dataBuffer) {
-            this.analyser.getFloatTimeDomainData(/** @type {any} */ (this.dataBuffer));
+            this.analyser.getFloatTimeDomainData(this.dataBuffer);
 
             let hasNaN = false;
 
@@ -121,10 +110,7 @@ class AudioHealthMonitor {
         }
     }
 
-    /**
-     * @param {import('../state/playback.js').GlobalContext} playback
-     */
-    async triggerDSPReset(playback) {
+    async triggerDSPReset(playback: GlobalContext): Promise<void> {
         this.isRecovering = true;
         this.crashCount++;
 
@@ -142,7 +128,7 @@ class AudioHealthMonitor {
 
         if (this.onRecover) {
             try {
-                await /** @type {any} */ (this.onRecover)(playback);
+                await this.onRecover(playback);
             } catch (e) {
                 console.error('[AudioWatchdog] DSP Reset Callback Failed', e);
             }
@@ -152,10 +138,7 @@ class AudioHealthMonitor {
         console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
     }
 
-    /**
-     * @param {import('../state/playback.js').GlobalContext} playback
-     */
-    triggerFullRestart(playback) {
+    triggerFullRestart(playback: GlobalContext): void {
         // Full page reload might be too aggressive, let's try to re-init first
         this.triggerDSPReset(playback);
     }

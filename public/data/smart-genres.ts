@@ -5,7 +5,14 @@ const GENRE_DEFAULTS = {
     harmony: 'smart',
 };
 
-const GENRE_OVERRIDES = {
+type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
+    drum?: string;
+    feel?: string;
+    bass?: string;
+    soloist?: string;
+};
+
+const GENRE_OVERRIDES: Record<string, GenreOverride> = {
     Rock: {
         sub: '8th',
         drum: 'Basic Rock',
@@ -114,11 +121,12 @@ const GENRE_OVERRIDES = {
     },
 };
 
-export const SMART_GENRES = Object.keys(GENRE_OVERRIDES).reduce((acc, key) => {
-    /** @type {any} */ (acc)[key] = {
-        ...GENRE_DEFAULTS,
-        .../** @type {any} */ (GENRE_OVERRIDES)[key],
-    };
+export type SmartGenre = typeof GENRE_DEFAULTS & GenreOverride;
+
+export const SMART_GENRES: Record<string, SmartGenre> = Object.keys(GENRE_OVERRIDES).reduce<
+    Record<string, SmartGenre>
+>((acc, key) => {
+    acc[key] = { ...GENRE_DEFAULTS, ...GENRE_OVERRIDES[key] } as SmartGenre;
     return acc;
 }, {});
 

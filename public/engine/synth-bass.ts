@@ -1,11 +1,8 @@
+import type { EnsembleState } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
 import { playPercussiveStrike, rampGain, updateDensityDucking } from './synth-utils.js';
 
-/**
- * Stop any currently playing bass note.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killBassNote(state) {
+export function killBassNote(state: EnsembleState): void {
     const { playback, bass } = state;
     if (!playback.audio) {
         return;
@@ -25,14 +22,15 @@ const mixState = {
 
 /**
  * P-Bass Synthesis: Layered physical model
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {number} freq - Frequency in Hz.
- * @param {number} time - Start time in seconds.
- * @param {number} duration - Note duration in seconds.
- * @param {number} [velocity=1.0] - Note velocity (0.0 - 1.0).
- * @param {number} [muteAmount=0] - Palm-mute amount 0 (open) to 1 (fully muted). Accepts legacy boolean.
  */
-export function playBassNote(state, freq, time, duration, velocity = 1.0, muteAmount = 0) {
+export function playBassNote(
+    state: EnsembleState,
+    freq: number,
+    time: number,
+    duration: number,
+    velocity = 1.0,
+    muteAmount = 0,
+): void {
     const { playback, bass, groove } = state;
     if (!playback.audio) {
         return;

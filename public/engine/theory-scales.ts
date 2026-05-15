@@ -1,9 +1,10 @@
 import { KEY_ORDER, resolveMappedStyle, SMART_SCALE_STYLE_MAP } from '../config.js';
+import type { EnsembleState } from '../types.js';
 
 // cspell:ignore tonicization
 
 /**
- * THEORY-SCALES.JS
+ * THEORY-SCALES.TS
  *
  * Centralized logic for musical scale theory.
  * This module provides the "correct" scale intervals for any given chord,
@@ -40,11 +41,7 @@ const SCALE_INTERVALS = {
     PHRYGIAN_DOMINANT: [0, 1, 4, 5, 7, 8, 10], // 5th mode of harmonic minor
 };
 
-/**
- * @param {any} chord
- * @returns {boolean}
- */
-function hasDominantFunction(chord) {
+function hasDominantFunction(chord: any): boolean {
     const quality = chord?.quality || 'major';
     const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
     return (
@@ -57,24 +54,15 @@ function hasDominantFunction(chord) {
     );
 }
 
-/**
- * @param {string | undefined} quality
- * @returns {boolean}
- */
-function isMinorQuality(quality) {
+function isMinorQuality(quality: string | undefined): boolean {
     return !!quality && quality.startsWith('m') && !quality.startsWith('maj');
 }
 
-/**
- * @param {any} chord
- * @param {any} nextChord
- * @returns {boolean}
- */
-function resolvesByDescendingFifth(chord, nextChord) {
+function resolvesByDescendingFifth(chord: any, nextChord: any): boolean {
     return !!nextChord && (nextChord.rootMidi - chord.rootMidi + 120) % 12 === 5;
 }
 
-const ENHARMONIC_KEY_MAP = {
+const ENHARMONIC_KEY_MAP: Record<string, string> = {
     'C#': 'Db',
     'D#': 'Eb',
     'F#': 'Gb',
@@ -82,28 +70,19 @@ const ENHARMONIC_KEY_MAP = {
     'A#': 'Bb',
 };
 
-/**
- * Resolves the active harmonic key center for a chord.
- * Section-local keys should take precedence over the global arranger key.
- *
- * @param {import('../types.js').EnsembleState} state
- * @param {any} chord
- * @returns {{ keyName: string | null, keyRootIdx: number, isMinor: boolean }}
- */
-function getKeyContext(state, chord) {
+function getKeyContext(
+    state: EnsembleState,
+    chord: any,
+): { keyName: string | null; keyRootIdx: number; isMinor: boolean } {
     const { arranger } = state;
     const rawKey = chord?.key || arranger.key;
     const isMinor = typeof chord?.keyIsMinor === 'boolean' ? chord.keyIsMinor : arranger.isMinor;
     if (!rawKey) {
-        return {
-            keyName: null,
-            keyRootIdx: -1,
-            isMinor,
-        };
+        return { keyName: null, keyRootIdx: -1, isMinor };
     }
 
     const keyName = Object.prototype.hasOwnProperty.call(ENHARMONIC_KEY_MAP, rawKey)
-        ? ENHARMONIC_KEY_MAP[/** @type {keyof typeof ENHARMONIC_KEY_MAP} */ (rawKey)]
+        ? ENHARMONIC_KEY_MAP[rawKey]
         : rawKey;
     return {
         keyName,
@@ -112,16 +91,12 @@ function getKeyContext(state, chord) {
     };
 }
 
-/**
- * Determines the most appropriate musical scale for a given chord and context.
- *
- * @param {import('../types.js').EnsembleState} state
- * @param {any} chord - The current chord object.
- * @param {any} [nextChord] - The upcoming chord object (for resolution logic).
- * @param {string} [style] - The soloist or instrument style (e.g., 'smart', 'blues').
- * @returns {number[]} An array of semitone intervals representing the selected scale.
- */
-export function getScaleForChord(state, chord, nextChord = null, style = 'smart') {
+export function getScaleForChord(
+    state: EnsembleState,
+    chord: any,
+    nextChord: any = null,
+    style = 'smart',
+): number[] {
     const { groove, soloist } = state;
     if (!chord) {
         return SCALE_INTERVALS.MAJOR;
@@ -202,10 +177,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         }
 
         // High Tension / Altered Dominants
-        if (
-            soloist.tension > 0.7 &&
-            !['rock', 'scalar', 'country'].includes(/** @type {string} */ (style))
-        ) {
+        if (soloist.tension > 0.7 && !['rock', 'scalar', 'country'].includes(style)) {
             if (style === 'funk' || style === 'blues') {
                 return SCALE_INTERVALS.BLUES;
             }
@@ -213,10 +185,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         }
 
         // Lydian Dominant detection for Jazz/Bossa
-        if (
-            keyContext.keyRootIdx !== -1 &&
-            ['jazz', 'bird', 'bossa'].includes(/** @type {string} */ (style))
-        ) {
+        if (keyContext.keyRootIdx !== -1 && ['jazz', 'bird', 'bossa'].includes(style)) {
             const intervalFromKey = (chord.rootMidi - keyContext.keyRootIdx + 120) % 12;
             if (intervalFromKey === 10 || intervalFromKey === 2) {
                 // b7 or II7
@@ -252,7 +221,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     if (isMinor) {
         // Flavor overrides: Neo-Soul/Jazz/Funk often prefer Dorian over Aeolian
         const favorDorian =
-            ['neo', 'bird', 'funk', 'bossa'].includes(/** @type {string} */ (style)) ||
+            ['neo', 'bird', 'funk', 'bossa'].includes(style) ||
             groove.genreFeel === 'Jazz' ||
             groove.genreFeel === 'Neo-Soul';
 
@@ -292,21 +261,17 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
         const keyIntervals = keyContext.isMinor
             ? SCALE_INTERVALS.NATURAL_MINOR
             : SCALE_INTERVALS.MAJOR;
-        const keyNotes = keyIntervals.map(
-            (/** @type {number} */ i) => (keyContext.keyRootIdx + i) % 12,
-        );
+        const keyNotes = keyIntervals.map((i) => (keyContext.keyRootIdx + i) % 12);
 
         const chordRootPC = chord.rootMidi % 12;
-        const chordTones = chord.intervals.map((/** @type {number} */ i) => (chordRootPC + i) % 12);
+        const chordTones = chord.intervals.map((i: number) => (chordRootPC + i) % 12);
 
-        const isDiatonic = chordTones.every((/** @type {number} */ note) =>
-            keyNotes.includes(note),
-        );
+        const isDiatonic = chordTones.every((note: number) => keyNotes.includes(note));
 
         if (isDiatonic) {
             // Build the mode
             const mode = keyNotes
-                .map((/** @type {number} */ note) => (note - chordRootPC + 12) % 12)
+                .map((note) => (note - chordRootPC + 12) % 12)
                 .sort((a, b) => a - b);
             return mode;
         }
@@ -324,7 +289,7 @@ export function getScaleForChord(state, chord, nextChord = null, style = 'smart'
     }
 
     // Jazz/Bossa/Neo prefer Lydian for non-diatonic Major chords (e.g. bIImaj7, bVImaj7) to avoid clash with Key
-    if (['bird', 'bossa', 'jazz', 'neo'].includes(/** @type {string} */ (style))) {
+    if (['bird', 'bossa', 'jazz', 'neo'].includes(style)) {
         return SCALE_INTERVALS.LYDIAN;
     }
 

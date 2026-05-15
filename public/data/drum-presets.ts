@@ -1014,11 +1014,7 @@ const PRESET_OVERRIDES = {
     },
 };
 
-/**
- * @param {any} target
- * @param {any} source
- */
-function deepMerge(target, source) {
+function deepMerge(target: any, source: any): any {
     for (const key in source) {
         if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
             if (!target[key]) {
@@ -1032,9 +1028,11 @@ function deepMerge(target, source) {
     return target;
 }
 
-export const DRUM_PRESETS = Object.keys(PRESET_OVERRIDES).reduce((acc, key) => {
+export const DRUM_PRESETS: Record<string, any> = Object.keys(PRESET_OVERRIDES).reduce<
+    Record<string, any>
+>((acc, key) => {
     // We must clone BASE_PRESET to avoid mutation
     const base = JSON.parse(JSON.stringify(BASE_PRESET));
-    /** @type {any} */ (acc)[key] = deepMerge(base, /** @type {any} */ (PRESET_OVERRIDES)[key]);
+    acc[key] = deepMerge(base, (PRESET_OVERRIDES as any)[key]);
     return acc;
 }, {});

@@ -17,11 +17,9 @@ import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 import { flushWorker, syncWorker } from './worker-client.js';
 
-/** @param {any} _scheduler */
-export function setInstrumentControllerRefs(_scheduler) {}
+export function setInstrumentControllerRefs(_scheduler: any): void {}
 
-/** @param {number} idx */
-export function switchMeasure(idx) {
+export function switchMeasure(idx: number): void {
     const { groove } = getState();
     if (groove.currentMeasure === idx) {
         return;
@@ -29,19 +27,18 @@ export function switchMeasure(idx) {
     dispatch(ACTIONS.SET_ACTIVE_MEASURE, idx);
 }
 
-/** @param {string} name */
-export async function loadDrumPreset(name) {
+export async function loadDrumPreset(name: string): Promise<void> {
     const { groove, arranger } = getState();
     const { DRUM_PRESETS } = await import('./data/drum-presets.js');
-    let p = /** @type {any} */ (DRUM_PRESETS)[name];
-    if (/** @type {any} */ (p)[arranger.timeSignature]) {
-        p = { ...p, .../** @type {any} */ (p)[arranger.timeSignature] };
+    let p: any = (DRUM_PRESETS as any)[name];
+    if (p[arranger.timeSignature]) {
+        p = { ...p, ...p[arranger.timeSignature] };
     }
     const newInstruments = groove.instruments.map((inst) => {
         const spm = getStepsPerMeasure(arranger.timeSignature);
         const pattern = p[inst.name] || new Array(spm).fill(0);
         const newSteps = new Array(128).fill(0);
-        pattern.forEach((/** @type {any} */ v, /** @type {number} */ i) => {
+        pattern.forEach((v: any, i: number) => {
             if (i < 128) {
                 newSteps[i] = v;
             }
@@ -71,10 +68,9 @@ export async function loadDrumPreset(name) {
     dispatch('DRUM_PRESET_LOADED');
 }
 
-/** @type {number[]} */
-let tapTimes = [];
-/** @param {Function} setBpmRef */
-export function handleTap(setBpmRef) {
+let tapTimes: number[] = [];
+
+export function handleTap(setBpmRef: (bpm: number) => void): void {
     const now = performance.now();
     if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) {
         tapTimes = [];
@@ -99,10 +95,7 @@ export function handleTap(setBpmRef) {
     }
 }
 
-/**
- * Flushes all local buffers and kills current sounds.
- */
-export function flushBuffers() {
+export function flushBuffers(): void {
     const { playback, bass, soloist, chords, harmony } = getState();
     // 1. Clear local buffers
     bass.buffer.clear();
@@ -131,10 +124,7 @@ export function flushBuffers() {
     restoreGains(stateMap);
 }
 
-/**
- * @param {string} type
- */
-function flushBuffer(type) {
+function flushBuffer(type: string): void {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
         if (bass.lastPlayedFreq !== null) {
@@ -174,8 +164,7 @@ function flushBuffer(type) {
     restoreGains(stateMap);
 }
 
-/** @param {string} type */
-export function togglePower(type) {
+export function togglePower(type: string): void {
     const { groove, vizState, chords, bass, soloist, harmony } = getState();
     const normalizedType = type === 'chords' ? 'chord' : type === 'harmonies' ? 'harmony' : type;
 
@@ -188,7 +177,7 @@ export function togglePower(type) {
         viz: vizState,
     };
 
-    const state = /** @type {any} */ (stateMap)[normalizedType];
+    const state = (stateMap as any)[normalizedType];
     if (!state) {
         return;
     }

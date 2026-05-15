@@ -1,28 +1,21 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { ArrangerState } from '../state/arranger.js';
 
 /**
  * Arrangement Unroller Utility
  * Transforms short loops into a virtual "Macro Form" for seeders.
  */
 
-/**
- * @typedef {Object} UnrolledArrangement
- * @property {Array<any>} stepMap
- * @property {Array<any>} sectionMap
- * @property {number} totalSteps
- * @property {number} originalSteps
- */
+export interface UnrolledArrangement {
+    stepMap: any[];
+    sectionMap: any[];
+    totalSteps: number;
+    originalSteps: number;
+}
 
-/**
- * Unrolls a short arrangement into a virtual multi-loop form.
- * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {number} [targetBars=64]
- * @returns {UnrolledArrangement}
- */
-export function unrollArrangement(arranger, targetBars = 64) {
+export function unrollArrangement(arranger: ArrangerState, targetBars = 64): UnrolledArrangement {
     const originalTotalSteps = arranger.totalSteps || 0;
-    const ts =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
     const originalBars = originalTotalSteps / stepsPerBar;
 
@@ -38,10 +31,8 @@ export function unrollArrangement(arranger, targetBars = 64) {
 
     // 2. Calculate iterations needed
     const iterations = Math.ceil(targetBars / originalBars);
-    /** @type {Array<any>} */
-    const unrolledStepMap = [];
-    /** @type {Array<any>} */
-    const unrolledSectionMap = [];
+    const unrolledStepMap: any[] = [];
+    const unrolledSectionMap: any[] = [];
     let currentStep = 0;
 
     for (let i = 0; i < iterations; i++) {
@@ -65,10 +56,9 @@ export function unrollArrangement(arranger, targetBars = 64) {
         const sourceLabels = Array.from(
             new Set(
                 (arranger.stepMap || []).map((entry) => {
-                    const chord =
-                        /** @type {{ sectionLabel?: string, sectionId?: string } | undefined} */ (
-                            entry?.chord
-                        );
+                    const chord = entry?.chord as
+                        | { sectionLabel?: string; sectionId?: string }
+                        | undefined;
                     return chord?.sectionLabel || chord?.sectionId || roleLabel;
                 }),
             ),

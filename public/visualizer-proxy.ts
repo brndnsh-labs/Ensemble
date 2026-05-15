@@ -2,20 +2,26 @@
  * UnifiedVisualizer (Proxy)
  * Main thread class that manages the VisualizerWorker.
  */
-/**
- * @typedef {Object} WorkerLike
- * @property {(message: any, transfer?: Transferable[]) => void} postMessage
- * @property {() => void} terminate
- */
+
+interface WorkerLike {
+    postMessage(message: any, transfer?: Transferable[]): void;
+    terminate(): void;
+}
+
+declare const VIZ_WORKER_PATH: string | undefined;
 
 export class UnifiedVisualizer {
-    /**
-     * @param {HTMLCanvasElement} canvas
-     * @param {HTMLCanvasElement} staticCanvas
-     */
-    constructor(canvas, staticCanvas) {
+    canvas: HTMLCanvasElement;
+    staticCanvas: HTMLCanvasElement;
+    worker: Worker | WorkerLike | null;
+    themeCache: any;
+    tracks: Record<string, any>;
+
+    constructor(canvas: HTMLCanvasElement, staticCanvas: HTMLCanvasElement) {
         this.canvas = canvas;
         this.staticCanvas = staticCanvas;
+        this.themeCache = null;
+        this.tracks = {};
 
         if (
             !canvas ||
@@ -32,11 +38,8 @@ export class UnifiedVisualizer {
 
         // In production, VIZ_WORKER_PATH is injected by esbuild --define
         const workerPath =
-            typeof VIZ_WORKER_PATH !== 'undefined'
-                ? /** @type {string} */ (VIZ_WORKER_PATH)
-                : 'visualizer-worker.js';
+            typeof VIZ_WORKER_PATH !== 'undefined' ? VIZ_WORKER_PATH : 'visualizer-worker.js';
 
-        /** @type {Worker | WorkerLike | null} */
         this.worker = new Worker(workerPath, { type: 'module' });
 
         const offscreen = canvas.transferControlToOffscreen();
@@ -50,18 +53,9 @@ export class UnifiedVisualizer {
             },
             [offscreen, staticOffscreen],
         );
-
-        /** @type {any} */
-        this.themeCache = null;
-        /** @type {Record<string, any>} */
-        this.tracks = {};
     }
 
-    /**
-     * @param {any} val
-     * @returns {any}
-     */
-    toRaw(val) {
+    toRaw(val: any): any {
         if (!val || typeof val !== 'object') {
             return val;
         }
@@ -72,38 +66,34 @@ export class UnifiedVisualizer {
         }
     }
 
-    /**
-     * @param {any} themeCache
-     */
-    setTheme(themeCache) {
+    setTheme(themeCache: any): void {
         this.themeCache = themeCache;
         if (this.worker) {
             this.worker.postMessage({ type: 'THEME', themeCache: this.toRaw(themeCache) }, []);
         }
     }
 
-    /**
-     * @param {number} width
-     * @param {number} height
-     * @param {number} dpr
-     */
-    resize(width, height, dpr = 1) {
+    resize(width: number, height: number, dpr = 1): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'RESIZE', width, height, dpr }, []);
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {string} color
-     * @param {string} resolvedColor
-     * @param {string} [label]
-     */
-    addTrack(name, color, resolvedColor, label) {
+    addTrack(name: string, color: string, resolvedColor: string, label?: string): void {
         this.tracks[name] = { color, resolvedColor, label: label || name };
         if (this.worker) {
-            /** @type {{ type: string, name: string, color: string, resolvedColor: string, label?: string }} */
-            const message = { type: 'ADD_TRACK', name, color, resolvedColor };
+            const message: {
+                type: string;
+                name: string;
+                color: string;
+                resolvedColor: string;
+                label?: string;
+            } = {
+                type: 'ADD_TRACK',
+                name,
+                color,
+                resolvedColor,
+            };
             if (label) {
                 message.label = label;
             }
@@ -111,75 +101,49 @@ export class UnifiedVisualizer {
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {any} midi
-     */
-    setRegister(name, midi) {
+    setRegister(name: string, midi: any): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'SET_REGISTER', name, midi: this.toRaw(midi) }, []);
         }
     }
 
-    /**
-     * @param {number} time
-     */
-    setBeatReference(time) {
+    setBeatReference(time: number): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'SET_BEAT_REFERENCE', time }, []);
         }
     }
 
-    /**
-     * @param {boolean} isPlaying
-     */
-    setPlaying(isPlaying) {
+    setPlaying(isPlaying: boolean): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'SET_PLAYING', isPlaying }, []);
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {any} event
-     */
-    pushNote(name, event) {
+    pushNote(name: string, event: any): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'PUSH_NOTE', name, event: this.toRaw(event) }, []);
         }
     }
 
-    /**
-     * @param {any} event
-     */
-    pushChord(event) {
+    pushChord(event: any): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'PUSH_CHORD', event: this.toRaw(event) }, []);
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {number} time
-     */
-    truncateNotes(name, time) {
+    truncateNotes(name: string, time: number): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'TRUNCATE', name, time }, []);
         }
     }
 
-    clear() {
+    clear(): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'CLEAR' }, []);
         }
     }
 
-    /**
-     * @param {number} currentTime
-     * @param {number} bpm
-     * @param {any} tsConfig
-     */
-    render(currentTime, bpm, tsConfig) {
+    render(currentTime: number, bpm: number, tsConfig: any): void {
         if (this.worker) {
             this.worker.postMessage(
                 { type: 'RENDER', currentTime, bpm, tsConfig: this.toRaw(tsConfig) },
@@ -188,17 +152,13 @@ export class UnifiedVisualizer {
         }
     }
 
-    /**
-     * @param {number} audioTime
-     * @param {number} perfTime
-     */
-    syncClock(audioTime, perfTime) {
+    syncClock(audioTime: number, perfTime: number): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'SYNC_CLOCK', audioTime, perfTime }, []);
         }
     }
 
-    destroy() {
+    destroy(): void {
         if (this.worker) {
             this.worker.terminate();
             this.worker = null;

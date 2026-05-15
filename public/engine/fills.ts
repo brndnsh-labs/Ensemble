@@ -1,24 +1,19 @@
 // Fill Generation Logic
 // Uses block-based generation and templates for natural sounding fills
 
-/**
- * @typedef {Object} FillTemplate
- * @property {number[]} steps
- * @property {string[]} instruments
- * @property {number[]} velocities
- */
+interface FillTemplate {
+    steps: number[];
+    instruments: string[];
+    velocities: number[];
+}
 
-/**
- * @typedef {Object} GenreFills
- * @property {FillTemplate[]} low
- * @property {FillTemplate[]} medium
- * @property {FillTemplate[]} high
- */
+interface GenreFills {
+    low: FillTemplate[];
+    medium: FillTemplate[];
+    high: FillTemplate[];
+}
 
-/**
- * @type {Record<string, GenreFills>}
- */
-export const FILL_TEMPLATES = {
+export const FILL_TEMPLATES: Record<string, GenreFills> = {
     Rock: {
         low: [
             // Simple snare hits on 4, 4&
@@ -237,32 +232,24 @@ export const FILL_TEMPLATES = {
     },
 };
 
-/**
- * Generates a fill based on genre and intensity.
- * @param {string} genre - 'Rock', 'Funk', or 'Jazz'
- * @param {number} intensity - 0.0 to 1.0
- * @param {number} stepsPerMeasure - Typically 16
- * @returns {Object} Map of step -> array of {name, vel}
- */
-export function generateProceduralFill(genre, intensity, stepsPerMeasure) {
+export function generateProceduralFill(
+    genre: string,
+    intensity: number,
+    stepsPerMeasure: number,
+): Record<number, { name: string; vel: number }[]> {
     return generateDeterministicFill(genre, intensity, stepsPerMeasure, Math.random);
 }
 
-/**
- * Deterministic version of fill generation.
- * @param {string} genre
- * @param {number} intensity
- * @param {number} stepsPerMeasure
- * @param {Function} prng - PRNG function returning 0-1
- * @returns {Record<number, {name: string, vel: number}[]>}
- */
-export function generateDeterministicFill(genre, intensity, stepsPerMeasure, prng) {
-    /** @type {Record<number, {name: string, vel: number}[]>} */
-    const fill = {};
+export function generateDeterministicFill(
+    genre: string,
+    intensity: number,
+    stepsPerMeasure: number,
+    prng: () => number,
+): Record<number, { name: string; vel: number }[]> {
+    const fill: Record<number, { name: string; vel: number }[]> = {};
     const templates = FILL_TEMPLATES[genre] || FILL_TEMPLATES.Rock;
 
-    /** @type {'low' | 'medium' | 'high'} */
-    let level = 'low';
+    let level: 'low' | 'medium' | 'high' = 'low';
     if (intensity > 0.4) {
         level = 'medium';
     }
@@ -283,7 +270,7 @@ export function generateDeterministicFill(genre, intensity, stepsPerMeasure, prn
     // We shift them to align with the actual stepsPerMeasure.
     const offset = stepsPerMeasure - 16;
 
-    template.steps.forEach((/** @type {number} */ stepIdx, /** @type {number} */ i) => {
+    template.steps.forEach((stepIdx, i) => {
         const inst = template.instruments[i];
         const vel = template.velocities[i];
 

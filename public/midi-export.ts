@@ -1,8 +1,7 @@
 import { showToast } from './ui.js';
 import { startExport, syncWorker } from './worker-client.js';
 
-/** @param {any} [options={}] */
-export function exportToMidi(options = {}) {
+export function exportToMidi(options: Record<string, any> = {}) {
     showToast('Starting MIDI Export...');
 
     // Validate and sanitize filename (Defense in Depth)

@@ -148,15 +148,12 @@ export const SMART_SCALE_STYLE_MAP = {
     Ska: 'rock',
 };
 
-/**
- * Resolves a mapped style from one or two genre keys.
- * @param {Record<string, string>} mapping
- * @param {string | undefined} primaryKey
- * @param {string | undefined} [secondaryKey]
- * @param {string} [fallback='rock']
- * @returns {string}
- */
-export function resolveMappedStyle(mapping, primaryKey, secondaryKey, fallback = 'rock') {
+export function resolveMappedStyle(
+    mapping: Record<string, string>,
+    primaryKey: string | undefined,
+    secondaryKey?: string | undefined,
+    fallback = 'rock',
+): string {
     if (primaryKey && Object.hasOwn(mapping, primaryKey)) {
         return mapping[primaryKey];
     }

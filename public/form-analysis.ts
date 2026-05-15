@@ -1,6 +1,6 @@
 import { getState } from './state.js';
 
-const SECTION_ENERGY_MAP = {
+const SECTION_ENERGY_MAP: Record<string, number> = {
     intro: 0.4,
     verse: 0.5,
     'pre-chorus': 0.6,
@@ -13,12 +13,7 @@ const SECTION_ENERGY_MAP = {
     breakdown: 0.3,
 };
 
-/**
- * Returns a baseline energy level (0.0 - 1.0) based on section label.
- * @param {string} label
- * @returns {number}
- */
-export function getSectionEnergy(label) {
+export function getSectionEnergy(label: string): number {
     if (!label) {
         return 0.5;
     }
@@ -31,21 +26,14 @@ export function getSectionEnergy(label) {
     return 0.5; // Default
 }
 
-/**
- * Calculates the "Harmonic Flux" (rate of change) for a specific section.
- * Higher flux implies higher energy/complexity.
- * @param {Array<any>} sectionSteps
- * @returns {number}
- */
-function calculateHarmonicFlux(sectionSteps) {
+function calculateHarmonicFlux(sectionSteps: any[]): number {
     if (!sectionSteps.length) {
         return 0;
     }
 
     // Count distinct chord changes within the step range
     let changes = 0;
-    /** @type {string | null} */
-    let lastChordId = null;
+    let lastChordId: string | null = null;
 
     sectionSteps.forEach((entry) => {
         // Simple heuristic: if the chord symbol or root changes, it's a "move"
@@ -61,9 +49,6 @@ function calculateHarmonicFlux(sectionSteps) {
     return bars > 0 ? changes / bars : 0;
 }
 
-/**
- * Analyzes the arranger's progression to detect musical form and assign functional roles.
- */
 export function analyzeForm() {
     const { arranger } = getState();
     if (!arranger.stepMap.length) {
@@ -71,14 +56,11 @@ export function analyzeForm() {
     }
 
     // 1. Group by Sections
-    /** @type {Array<any>} */
-    const sections = [];
-    /** @type {any} */
-    let currentSection = null;
+    const sections: any[] = [];
+    let currentSection: any = null;
 
     arranger.stepMap.forEach((entry) => {
-        /** @type {any} */
-        const chord = entry.chord;
+        const chord = entry.chord as any;
         if (!currentSection || chord.sectionId !== currentSection.id) {
             currentSection = {
                 id: chord.sectionId,
@@ -97,9 +79,8 @@ export function analyzeForm() {
     });
 
     // 2. Identify Patterns (Saliency)
-    const sectionSignatures = sections.map((/** @type {any} */ s) => s.chords.join('|'));
-    /** @type {Record<string, number>} */
-    const occurrenceCount = {};
+    const sectionSignatures = sections.map((s: any) => s.chords.join('|'));
+    const occurrenceCount: Record<string, number> = {};
 
     sections.forEach((s, i) => {
         const sig = sectionSignatures[i];

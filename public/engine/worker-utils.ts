@@ -1,10 +1,12 @@
+import type { ArrangerState } from '../state/arranger.js';
+
 /**
  * GENERATIVE STATE PROTECTION
  * These keys are managed locally by the worker's generative engines.
  * Overwriting them from the main thread during sync causes glitches, silence,
  * and resets in the middle of phrases.
  */
-export const WORKER_MANAGED_KEYS = {
+export const WORKER_MANAGED_KEYS: Record<string, string[]> = {
     soloist: [
         'isResting',
         'restSteps',
@@ -30,26 +32,16 @@ export const WORKER_MANAGED_KEYS = {
 export let lastChordIndex = 0;
 export let lastSectionIndex = 0;
 
-/**
- * Resets the internal cursors used for chord mapping.
- */
-export function resetCursors() {
+export function resetCursors(): void {
     lastChordIndex = 0;
     lastSectionIndex = 0;
 }
 
-/**
- * Safely merges state from the main thread while preserving worker-managed properties.
- * Handles nested objects and arrays recursively.
- * @param {any} target
- * @param {any} source
- * @param {string} moduleName
- */
-export function recursiveSafeSync(target, source, moduleName) {
+export function recursiveSafeSync(target: any, source: any, moduleName: string): void {
     if (!source || typeof source !== 'object') {
         return;
     }
-    const protectedKeys = /** @type {any} */ (WORKER_MANAGED_KEYS)[moduleName] || [];
+    const protectedKeys = WORKER_MANAGED_KEYS[moduleName] || [];
 
     for (const key in source) {
         if (protectedKeys.includes(key)) {
@@ -99,12 +91,8 @@ export function recursiveSafeSync(target, source, moduleName) {
  * Uses a cursor-based optimization to avoid full-map traversals.
  * Pass a `cursor` object (`{ index, sectionIndex }`) to keep state across
  * calls; omit it to fall back to module-level globals.
- *
- * @param {number} step - The global step index.
- * @param {import('../state/arranger.js').ArrangerState} arranger - The arranger state (progression, stepMap, etc.).
- * @param {any} [cursor] - Optional cursor for tracking position.
  */
-export function getChordAtStep(step, arranger, cursor = null) {
+export function getChordAtStep(step: number, arranger: ArrangerState, cursor: any = null) {
     if (!arranger || arranger.totalSteps === 0 || !arranger.stepMap) {
         return null;
     }
@@ -166,7 +154,6 @@ export function getChordAtStep(step, arranger, cursor = null) {
         if (targetStep >= entry.start && targetStep < entry.end) {
             currentLastChordIndex = i;
 
-            // Update the state variables
             if (cursor) {
                 cursor.index = currentLastChordIndex;
                 cursor.sectionIndex = currentLastSectionIndex;

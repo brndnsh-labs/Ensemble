@@ -1,3 +1,5 @@
+import type { EnsembleState } from '../types.js';
+
 const BASS_SPACE_FEELS = new Set([
     'Swing',
     'Jazz',
@@ -33,19 +35,11 @@ export const TENSION_CHORD_QUALITIES = new Set([
     'augmaj7',
 ]);
 
-/**
- * @param {string | undefined | null} feel
- * @returns {boolean}
- */
-export function isBassSpaceFeel(feel) {
+export function isBassSpaceFeel(feel: string | undefined | null): boolean {
     return BASS_SPACE_FEELS.has(feel || '');
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @returns {boolean}
- */
-export function shouldReserveBassSpace(state) {
+export function shouldReserveBassSpace(state: EnsembleState): boolean {
     return Boolean(state.playback.practiceMode || state.bass?.enabled);
 }
 
@@ -53,34 +47,28 @@ export function shouldReserveBassSpace(state) {
  * In practice mode we still want pro-style voicings, but some chords lose too much
  * identity if they are forced rootless. Let these chords re-admit the root while
  * still keeping the voicing above the bass lane.
- * @param {import('../types.js').EnsembleState} state
- * @param {string | undefined | null} quality
- * @param {string | undefined | null} feel
- * @returns {boolean}
  */
-export function shouldPreferGroundedPracticeVoicing(state, quality, feel) {
+export function shouldPreferGroundedPracticeVoicing(
+    state: EnsembleState,
+    quality: string | undefined | null,
+    feel: string | undefined | null,
+): boolean {
     if (!state.playback.practiceMode || !isBassSpaceFeel(feel)) {
         return false;
     }
     return PRACTICE_GROUNDING_QUALITIES.has(quality || '');
 }
 
-/**
- * @param {string | undefined | null} quality
- * @returns {boolean}
- */
-export function isTensionChordQuality(quality) {
+export function isTensionChordQuality(quality: string | undefined | null): boolean {
     return TENSION_CHORD_QUALITIES.has(quality || '');
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {string} quality
- * @param {boolean} is7th
- * @param {string | undefined | null} feel
- * @returns {boolean}
- */
-export function shouldUseRootlessVoicing(state, quality, is7th, feel) {
+export function shouldUseRootlessVoicing(
+    state: EnsembleState,
+    quality: string,
+    is7th: boolean,
+    feel: string | undefined | null,
+): boolean {
     if (!shouldReserveBassSpace(state) || !isBassSpaceFeel(feel)) {
         return false;
     }
@@ -100,10 +88,6 @@ export function shouldUseRootlessVoicing(state, quality, is7th, feel) {
     return isMinor || isDominant || isMajor7;
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @returns {number}
- */
-export function getBassSpaceFloor(state) {
+export function getBassSpaceFloor(state: EnsembleState): number {
     return shouldReserveBassSpace(state) ? 52 : 43;
 }

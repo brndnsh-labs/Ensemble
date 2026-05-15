@@ -1,10 +1,23 @@
+import type { EnsembleState } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { createSimplePanner, playPercussiveStrike, rampGain } from './synth-utils.js';
 
-/**
- * Instrument definitions for the chord engine.
- */
-export const INSTRUMENT_PRESETS = {
+interface ChordInstrumentPreset {
+    attack: number;
+    decay: number;
+    filterBase: number;
+    filterDepth: number;
+    resonance: number;
+    gainMult: number;
+    tine?: boolean;
+    fundamental?: OscillatorType;
+    harmonic?: OscillatorType;
+    fifth?: OscillatorType;
+    weights?: number[];
+    reverbMult?: number;
+}
+
+export const INSTRUMENT_PRESETS: Record<string, ChordInstrumentPreset> = {
     Warm: {
         attack: 0.03,
         decay: 0.6,
@@ -29,29 +42,21 @@ export const INSTRUMENT_PRESETS = {
     },
 };
 
-/**
- * @param {AudioContext} audioCtx
- * @returns {PeriodicWave}
- */
-function createPianoWave(audioCtx) {
+function createPianoWave(audioCtx: AudioContext): PeriodicWave {
     const real = new Float32Array([0, 1, 0.6, 0.4, 0.25, 0.15, 0.1, 0.08, 0.05, 0.03]);
     const imag = new Float32Array(real.length).fill(0);
     return audioCtx.createPeriodicWave(real, imag);
 }
 
-/** @type {PeriodicWave|null} */
-let pianoWave = null;
-/** @type {Float32Array|null} */
-let cachedShaperCurve = null;
+let pianoWave: PeriodicWave | null = null;
+let cachedShaperCurve: Float32Array<ArrayBuffer> | null = null;
 let cachedShaperDrive = -1;
 
-/**
- * Updates the sustain pedal state, precisely scheduled.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {boolean} active - Sustain state.
- * @param {number|null} [time=null] - Scheduled time.
- */
-export function updateSustain(state, active, time = null) {
+export function updateSustain(
+    state: EnsembleState,
+    active: boolean,
+    time: number | null = null,
+): void {
     const { playback } = state;
     if (!playback.audio) {
         return;
@@ -60,55 +65,48 @@ export function updateSustain(state, active, time = null) {
     playback.sustainActive = active; // @direct-mutation
 
     if (!active && playback.heldNotes) {
-        playback.heldNotes.forEach(
-            /** @param {any} note */ (note) => {
-                note.stop(scheduleTime);
-            },
-        );
+        playback.heldNotes.forEach((note: any) => {
+            note.stop(scheduleTime);
+        });
         playback.heldNotes.clear();
     }
 }
 
-/**
- * Forcefully kills all ringing piano notes (panic button).
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killAllPianoNotes(state) {
+export function killAllPianoNotes(state: EnsembleState): void {
     const { playback } = state;
     const now = playback.audio?.currentTime || 0;
     if (playback.heldNotes) {
-        playback.heldNotes.forEach(
-            /** @param {any} note */ (note) => {
-                if (typeof note.stop === 'function') {
-                    note.stop(now, true);
-                }
-            },
-        );
+        playback.heldNotes.forEach((note: any) => {
+            if (typeof note.stop === 'function') {
+                note.stop(now, true);
+            }
+        });
         playback.heldNotes.clear();
     }
     playback.sustainActive = false; // @direct-mutation
 }
 
-/**
- * Plays a musical note with advanced synthesis based on instrument presets.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {number} freq - Frequency in Hz.
- * @param {number} time - Start time in seconds.
- * @param {number} duration - Note duration in seconds.
- * @param {Object} [options={}] - Options object.
- * @param {number} [options.vol=0.1] - Output volume.
- * @param {number} [options.index=0] - Note index for staggering.
- * @param {string} [options.instrument='Piano'] - Instrument preset name.
- * @param {boolean} [options.muted=false] - Whether the note is muted.
- * @param {number} [options.numVoices=1] - Number of active voices for polyphony comp.
- */
+interface PlayNoteOptions {
+    vol?: number;
+    index?: number;
+    instrument?: string;
+    muted?: boolean;
+    numVoices?: number;
+}
+
 export function playNote(
-    state,
-    freq,
-    time,
-    duration,
-    { vol = 0.1, index = 0, instrument = 'Piano', muted = false, numVoices = 1 } = {},
-) {
+    state: EnsembleState,
+    freq: number,
+    time: number,
+    duration: number,
+    {
+        vol = 0.1,
+        index = 0,
+        instrument = 'Piano',
+        muted = false,
+        numVoices = 1,
+    }: PlayNoteOptions = {},
+): void {
     const { playback, groove } = state;
     if (!playback.audio || !Number.isFinite(freq)) {
         return;
@@ -126,8 +124,7 @@ export function playNote(
             instrument = 'Piano';
         }
 
-        const preset =
-            /** @type {any} */ (INSTRUMENT_PRESETS)[instrument] || INSTRUMENT_PRESETS.Piano;
+        const preset = INSTRUMENT_PRESETS[instrument] || INSTRUMENT_PRESETS.Piano;
         const now = playback.audio.currentTime;
         const baseTime = Math.max(time, now);
 
@@ -175,10 +172,8 @@ export function playNote(
         const osc = playback.audio.createOscillator();
         const mainGain = playback.audio.createGain();
         const filter = playback.audio.createBiquadFilter();
-        /** @type {OscillatorNode|null} */
-        let unisonOsc = null;
-        /** @type {GainNode|null} */
-        let unisonGain = null;
+        let unisonOsc: OscillatorNode | null = null;
+        let unisonGain: GainNode | null = null;
 
         if (isPiano && pianoWave) {
             osc.setPeriodicWave(pianoWave);
@@ -209,11 +204,7 @@ export function playNote(
             preset.attack,
         );
 
-        /**
-         * @param {number} t
-         * @param {boolean} [isPanic=false]
-         */
-        const stopNote = (t, isPanic = false) => {
+        const stopNote = (t: number, isPanic = false): void => {
             const dampingConstant = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
             rampGain(mainGain.gain, 0, t, dampingConstant);
             try {
@@ -245,10 +236,8 @@ export function playNote(
 
         osc.connect(filter);
 
-        /** @type {WaveShaperNode|null} */
-        let shaper = null;
-        /** @type {AudioNode} */
-        let lastNode = filter;
+        let shaper: WaveShaperNode | null = null;
+        let lastNode: AudioNode = filter;
         if (!muted) {
             shaper = playback.audio.createWaveShaper();
             const drive = Math.max(0.001, (intensity - 0.5) * 4.0);
@@ -264,10 +253,10 @@ export function playNote(
                 cachedShaperDrive = drive;
             }
 
-            shaper.curve = /** @type {any} */ (cachedShaperCurve);
+            shaper.curve = cachedShaperCurve;
             shaper.oversample = '2x';
             filter.connect(shaper);
-            lastNode = /** @type {AudioNode} */ (shaper);
+            lastNode = shaper;
         }
 
         lastNode.connect(mainGain);
@@ -318,13 +307,7 @@ export function playNote(
     }
 }
 
-/**
- * Plays a percussive "scratch" or muted strum sound for chord rhythms.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {number} time - Scheduled time.
- * @param {number} [vol=0.1] - Output volume.
- */
-export function playChordScratch(state, time, vol = 0.1) {
+export function playChordScratch(state: EnsembleState, time: number, vol = 0.1): void {
     const { playback, groove } = state;
     if (!playback.audio || !playback.chordsGain) {
         return;

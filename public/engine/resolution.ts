@@ -1,4 +1,6 @@
 import { KEY_ORDER } from '../config.js';
+import type { ArrangerState } from '../state/arranger.js';
+import type { EnsembleState } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { getBestInversion, getIntervals } from './chords-engine.js';
 
@@ -12,7 +14,20 @@ import { getBestInversion, getIntervals } from './chords-engine.js';
 const RESOLUTION_NORMALIZER = 0.85; // Global tamer to prevent limiter crushing
 const RESOLUTION_STAGGER = 0.015; // Max jitter in seconds for sample-accurate peak reduction
 
-const CADENCE_PROFILES = {
+interface CadenceStep {
+    label: string;
+    degree: number;
+    quality: string;
+    beats: number;
+    baseVelocity: number;
+}
+
+interface GenreConfig {
+    profile: string;
+    ritardando: number;
+}
+
+const CADENCE_PROFILES: Record<string, CadenceStep[]> = {
     // Single tonic landing, kept in the same lane as the band.
     BUTTON: [{ label: 'I', degree: 0, quality: 'major', beats: 4, baseVelocity: 0.8 }],
 
@@ -29,7 +44,7 @@ const CADENCE_PROFILES = {
     ],
 };
 
-const GENRE_MAP = {
+const GENRE_MAP: Record<string, GenreConfig> = {
     Jazz: { profile: 'JAZZ_V_I', ritardando: 1.2 },
     Bossa: { profile: 'JAZZ_V_I', ritardando: 1.0 },
     'Neo-Soul': { profile: 'JAZZ_V_I', ritardando: 1.5 },
@@ -43,60 +58,41 @@ const GENRE_MAP = {
     Reggae: { profile: 'BUTTON', ritardando: 0.0 },
 };
 
-/**
- * Generates intensity-aware resolution notes with cross-instrument normalization.
- * @param {import('../types.js').EnsembleState} state
- * @param {number} step
- * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {any} enabled
- * @param {number} [bpm=100]
- * @param {any} [groove={}]
- * @param {any} [soloist={}]
- */
 export function generateResolutionNotes(
-    state,
-    step,
-    arranger,
-    enabled,
+    state: EnsembleState,
+    step: number,
+    arranger: ArrangerState,
+    enabled: any,
     bpm = 100,
-    groove = {},
-    soloist = {},
-) {
-    /** @type {any[]} */
-    const notes = [];
+    groove: any = {},
+    soloist: any = {},
+): any[] {
+    const notes: any[] = [];
     const { playback } = state;
     const genre = groove.genreFeel || 'Rock';
-    const config = /** @type {any} */ (GENRE_MAP)[genre] || GENRE_MAP.Rock;
+    const config = GENRE_MAP[genre] || GENRE_MAP.Rock;
 
-    // --- Intensity Awareness ---
     // Scale the raw energy of the ending based on the current band intensity.
     // This ensures a chill track doesn't end with a jarring peak-velocity hit.
     const intensity = playback?.bandIntensity ?? 0.5;
     const intensityScale = 0.6 + intensity * 0.4; // 0.6 (min) to 1.0 (max)
 
-    /**
-     * @param {number} baseVel
-     */
-    const getFinalVel = (baseVel) => baseVel * intensityScale * RESOLUTION_NORMALIZER;
+    const getFinalVel = (baseVel: number): number =>
+        baseVel * intensityScale * RESOLUTION_NORMALIZER;
 
-    /**
-     * @param {number} maxMs
-     */
-    const getStagger = (maxMs = RESOLUTION_STAGGER) => Math.random() * maxMs;
+    const getStagger = (maxMs = RESOLUTION_STAGGER): number => Math.random() * maxMs;
 
-    // Use current song key as tonic
     const resolutionKey = arranger.key || 'C';
     const isMinor = arranger.isMinor;
     const keyIndex = KEY_ORDER.indexOf(resolutionKey);
 
-    const cadenceSteps =
-        /** @type {any} */ (CADENCE_PROFILES)[config.profile] || CADENCE_PROFILES.BUTTON;
+    const cadenceSteps = CADENCE_PROFILES[config.profile] || CADENCE_PROFILES.BUTTON;
     const ritardandoAmount = config.ritardando;
 
     // 1. Timing Map
     const spb = 60.0 / bpm;
     let currentTime = 0;
-    const timingMap = cadenceSteps.map((/** @type {any} */ s, /** @type {number} */ idx) => {
+    const timingMap: { time: number; step: CadenceStep }[] = cadenceSteps.map((s, idx) => {
         const time = currentTime;
         let duration = s.beats * spb;
 
@@ -110,7 +106,7 @@ export function generateResolutionNotes(
     const anchor = 60 + keyIndex; // Middle C range
     let lastMidis = [60, 64, 67];
 
-    timingMap.forEach((/** @type {any} */ entry, /** @type {number} */ idx) => {
+    timingMap.forEach((entry, idx) => {
         const { time, step: cadenceStep } = entry;
         const isLast = idx === cadenceSteps.length - 1;
         const targetPC = (keyIndex + cadenceStep.degree) % 12;
@@ -162,7 +158,7 @@ export function generateResolutionNotes(
                     ccEvents: [{ controller: 64, value: 127, timingOffset: 0 }],
                 });
             }
-            voicings.forEach((/** @type {number} */ m, /** @type {number} */ vIdx) => {
+            voicings.forEach((m: number, vIdx: number) => {
                 const vel = getFinalVel(cadenceStep.baseVelocity || 0.85);
                 // Acoustic strum + global stagger
                 const offset = (genre === 'Acoustic' ? vIdx * 0.035 : 0) + getStagger();
@@ -260,7 +256,7 @@ export function generateResolutionNotes(
         // --- HARMONY ---
         if (enabled.harmony) {
             // Pads follow the top notes of the voicing
-            voicings.slice(-3).forEach((/** @type {any} */ m) => {
+            voicings.slice(-3).forEach((m: any) => {
                 const vel = getFinalVel(0.5);
                 notes.push({
                     midi: m,
