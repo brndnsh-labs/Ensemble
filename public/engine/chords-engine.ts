@@ -658,7 +658,7 @@ export function getFormattedChordNames(
         romSuffix += '7';
     }
 
-    let romanName;
+    let romanName: string;
     if (
         quality === 'minor' ||
         quality === 'dim' ||

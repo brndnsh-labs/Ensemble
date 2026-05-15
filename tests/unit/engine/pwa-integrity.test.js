@@ -5,12 +5,12 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('PWA Offline Asset Integrity', () => {
-    it('should verify all assets listed in sw.js exist on disk', () => {
-        const swPath = path.resolve(__dirname, '../../../public/sw.js');
+    it('should verify all assets listed in sw.ts exist on disk', () => {
+        const swPath = path.resolve(__dirname, '../../../public/sw.ts');
         const swContent = fs.readFileSync(swPath, 'utf8');
 
         // Extract ASSETS array using regex
-        const match = swContent.match(/const ASSETS = \[([\s\S]*?)\];/);
+        const match = swContent.match(/const ASSETS(?::[^=]+)?\s*=\s*\[([\s\S]*?)\];/);
         expect(match).not.toBeNull();
 
         const assetsRaw = match[1];

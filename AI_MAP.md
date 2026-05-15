@@ -17,6 +17,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/main.ts` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.ts` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/visualizer-worker.ts` | Background rendering thread for 60fps visuals. | `engine.render` |
+| `public/sw.ts` | Service worker — PWA offline cache + asset pre-caching. | `install`, `fetch` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |

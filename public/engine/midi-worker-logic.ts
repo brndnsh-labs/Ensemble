@@ -343,7 +343,7 @@ export class ExportProcessor {
                     track.noteOn(notePulse, channel, finalMidi, midiVel);
                 }
 
-                let endTimeS;
+                let endTimeS: number;
                 let actualDurationSteps = res.durationSteps;
 
                 // Handle Staccato "Dry" notes (e.g. Reggae Skanks, Funk Chucks)

@@ -15,8 +15,6 @@ import type { EnsembleState } from './types.js';
 import { getStepInfo } from './utils.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
-const workerSelf = self as unknown as DedicatedWorkerGlobalScope;
-
 // Ensure we resume processing messages after an export completes
 setOnExportEnd(() => processMessageQueue());
 
@@ -125,6 +123,7 @@ function processMessageQueue(): void {
 }
 
 if (typeof self !== 'undefined') {
+    const workerSelf = self as unknown as DedicatedWorkerGlobalScope;
     workerSelf.onmessage = (e: MessageEvent) => {
         const { type, data } = e.data;
         const startTime = performance.now();
