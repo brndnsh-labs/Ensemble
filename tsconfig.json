@@ -2,7 +2,7 @@
     "compilerOptions": {
         "target": "ES2022",
         "module": "ESNext",
-        "moduleResolution": "Node",
+        "moduleResolution": "Bundler",
         "jsx": "react-jsx",
         "jsxImportSource": "preact",
         "allowJs": true,
@@ -17,6 +17,12 @@
             "*": ["node_modules/*", "public/*"]
         }
     },
-    "include": ["public/**/*.js", "public/**/*.jsx", "env.d.ts"],
+    "include": [
+        "public/**/*.js",
+        "public/**/*.jsx",
+        "public/**/*.ts",
+        "public/**/*.tsx",
+        "env.d.ts"
+    ],
     "exclude": ["node_modules", "dist", "tests", "scripts"]
 }

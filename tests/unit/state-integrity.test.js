@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * State Integrity Audit:
- * This test ensures that every ACTION defined in public/types.js
+ * This test ensures that every ACTION defined in public/types.ts
  * is both dispatched (by a component or controller) and handled (by a state slice).
  */
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
-const TYPES_FILE = path.resolve(PUBLIC_DIR, 'types.js');
+const TYPES_FILE = path.resolve(PUBLIC_DIR, 'types.ts');
 
 // Helper to get all files in a directory recursively
 function getFiles(dir, files = []) {
@@ -30,7 +30,7 @@ const fileContents = allFiles.map((f) => ({ path: f, content: fs.readFileSync(f,
 
 // Extract ACTIONS keys from public/types.js
 const typesContent = fs.readFileSync(TYPES_FILE, 'utf8');
-const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)};/);
+const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)} as const;/);
 const actionKeys = actionKeysMatch[1]
     .split('\n')
     .map((line) => line.trim().split(':')[0])

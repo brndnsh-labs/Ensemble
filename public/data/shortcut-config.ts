@@ -2,7 +2,15 @@
  * Global Keyboard Shortcut Configuration
  * Used by GlobalShortcuts.jsx for event handling and ManualModal.jsx for documentation.
  */
-export const SHORTCUT_CONFIG = [
+
+export interface ShortcutEntry {
+    key: string;
+    action: string;
+    description: string;
+    category: string;
+}
+
+export const SHORTCUT_CONFIG: ShortcutEntry[] = [
     {
         key: 'Space',
         action: 'Toggle Play',

@@ -1,8 +1,5 @@
-/**
- * Maps drum instrument names to standard MIDI drum notes (General MIDI).
- * @type {Record<string, number>}
- */
-export const DRUM_MAP = {
+/** Maps drum instrument names to standard MIDI drum notes (General MIDI). */
+export const DRUM_MAP: Record<string, number> = {
     Kick: 36,
     Snare: 38,
     HiHat: 42,

@@ -8,7 +8,7 @@ This folder groups the living documentation for Ensemble.
 - [`AI.md`](../AI.md) — operational rules for AI-assisted work.
 - [`AI_MAP.md`](../AI_MAP.md) — source and module map.
 - [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) — workspace-specific Copilot guidance.
-- [`docs/ROADMAP.md`](ROADMAP.md) — current open work and repo-organization notes.
+- [`docs/VISION.md`](VISION.md) — product direction, open work, and roadmap context.
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contributor workflow.
 - [`.github/CODE_OF_CONDUCT.md`](../.github/CODE_OF_CONDUCT.md) — community expectations.
 - [`.github/SECURITY.md`](../.github/SECURITY.md) — vulnerability reporting.

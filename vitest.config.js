@@ -1,8 +1,35 @@
+import path from 'node:path';
 import preact from '@preact/preset-vite';
 import { defineConfig } from 'vitest/config';
 
+// Maps each renamed .js → .ts file so `import './foo.js'` resolves to `foo.ts`
+// in the test environment. Mirrors TypeScript's `moduleResolution: Bundler` behavior.
+const renamedModules = [
+    'types',
+    'constants',
+    'ui-types',
+    'worker-types',
+    'platform',
+    'visualizer-utils',
+    'engine/midi-constants',
+    'data/instrument-styles',
+    'data/shortcut-config',
+];
+
+const publicDir = path.resolve(import.meta.dirname, 'public');
+
+// Regex anchors to the full ID so the entire specifier is replaced with the absolute .ts path.
+// This avoids Vite appending the absolute replacement to a relative prefix.
+const tsAliases = renamedModules.map((mod) => ({
+    find: new RegExp(`^.+/${mod.replace(/\//g, '/')}\\.js$`),
+    replacement: path.join(publicDir, `${mod}.ts`),
+}));
+
 export default defineConfig({
     plugins: [preact()],
+    resolve: {
+        alias: tsAliases,
+    },
     test: {
         globals: true,
         environment: 'node',

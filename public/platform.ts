@@ -1,24 +1,24 @@
 /**
- * platform.js
  * Handles environment-specific APIs (WakeLock, AudioContext unlocking, etc.)
  * to keep the core scheduler pure.
  */
 
-/**
- * @typedef {Object} PlatformState
- * @property {WakeLockSentinel | null} wakeLock
- * @property {HTMLAudioElement | {pause: () => void, play: () => Promise<void>, currentTime: number} | null} silentAudio
- * @property {boolean} iosAudioUnlocked
- */
+interface PlatformState {
+    wakeLock: WakeLockSentinel | null;
+    silentAudio:
+        | HTMLAudioElement
+        | { pause: () => void; play: () => Promise<void>; currentTime: number }
+        | null;
+    iosAudioUnlocked: boolean;
+}
 
-/** @type {PlatformState} */
-const state = {
+const state: PlatformState = {
     wakeLock: null,
     silentAudio: null,
     iosAudioUnlocked: false,
 };
 
-export function initPlatform() {
+export function initPlatform(): void {
     if (typeof Audio !== 'undefined') {
         const audio = new Audio(
             'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA== ',
@@ -32,7 +32,7 @@ export function initPlatform() {
     }
 }
 
-export function unlockAudio() {
+export function unlockAudio(): void {
     if (!state.iosAudioUnlocked && state.silentAudio) {
         state.silentAudio.play().catch(() => {
             /* ignore play error */
@@ -45,14 +45,14 @@ export function unlockAudio() {
     }
 }
 
-export function lockAudio() {
+export function lockAudio(): void {
     if (state.silentAudio) {
         state.silentAudio.pause();
         state.silentAudio.currentTime = 0;
     }
 }
 
-export async function activateWakeLock() {
+export async function activateWakeLock(): Promise<void> {
     if (!('wakeLock' in navigator)) {
         return;
     }
@@ -63,7 +63,7 @@ export async function activateWakeLock() {
     }
 }
 
-export function deactivateWakeLock() {
+export function deactivateWakeLock(): void {
     if (state.wakeLock) {
         state.wakeLock.release();
         state.wakeLock = null;

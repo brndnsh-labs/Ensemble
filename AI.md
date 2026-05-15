@@ -39,7 +39,7 @@ This document is the primary operational guide for AI agents working on the Ense
 *   **Writes**: ALWAYS use `dispatch(ACTIONS.TYPE, payload)`. This serves as the unified event bus for state updates and side effects (like Worker sync).
 *   **Reactivity**: Use the `useEnsembleState` hook in `public/ui-bridge.js` for component updates. Since the state uses `deepSignal`, accessing a property in the selector automatically subscribes the component to updates for that specific property.
 *   **Styles & Configuration**: 
-    *   **UI Metadata**: `public/data/instrument-styles.js` defines names and categories for menus.
+    *   **UI Metadata**: `public/data/instrument-styles.ts` defines names and categories for menus.
     *   **Generative Logic**: Modular style modules (e.g., `public/engine/bass-styles.js`) contain the actual musical algorithms.
 *   **The @direct-mutation Exception**: Direct mutation of state objects is **strictly forbidden** in controllers (e.g., `public/app-controller.js`) and UI components.
  It is **only allowed** in performance-critical engine code (e.g., `scheduler-core.js`, `synth-*.js`) for real-time audio parameters. These must be marked with a `// @direct-mutation` comment for transparency.
@@ -60,7 +60,7 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ### A. The "Musical Intent" & Type Safety Rule
 *   **Musical Intent**: In generative logic (bass, drums, soloist), always add JSDoc comments explaining **why** a specific probability or offset exists (e.g., `// 15% probability to add a 'ghost' note on step 14 for Jazz feel`). This prevents future agents from "optimizing" away intentional nuances.
-*   **Type Safety**: Achieve project-wide type safety via **Hardened JSDoc**. All new state properties, reducer actions, and musical engine functions MUST include explicit JSDoc `@type`, `@param`, and `@returns` tags. Use the global interfaces defined in `public/types.js` (e.g., `EnsembleState`, `StepInfo`) to ensure architectural consistency. ALWAYS run `npm run typecheck` before concluding a task.
+*   **Type Safety**: Achieve project-wide type safety via **Hardened JSDoc**. All new state properties, reducer actions, and musical engine functions MUST include explicit JSDoc `@type`, `@param`, and `@returns` tags. Use the global interfaces defined in `public/types.ts` (e.g., `EnsembleState`, `StepInfo`) to ensure architectural consistency. ALWAYS run `npm run typecheck` before concluding a task.
 
 ### B. Deterministic Phrasing & Dynamic Head
 *   **Dynamic Head (Soloist):** The soloist generates a session-wide "seed melody" (`soloist.sessionSeed`) at the start of playback. This melody uses **SRDC** (Statement, Restatement, Departure, Conclusion) structure. It features **Rhythmic Mirroring** (repeating rhythmic cells across measures) and **Leap-and-Fill** contour logic (balancing large jumps with stepwise returns) to ensure catchiness.
@@ -77,7 +77,7 @@ This document is the primary operational guide for AI agents working on the Ense
 *   **Preserve compatibility:** If a rename touches saved sessions, share URLs, presets, or other serialized surfaces, keep a compatibility shim until old inputs are deliberately migrated.
 *   **Split labels from logic:** Keep display labels in the UI/data layer and behavior keys in the engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
 *   **Style-family inventory:** For musical cleanup work, build a small alias matrix before broad edits. Known examples from this repo include `Rock`/`Shred` and `Neo-Soul`/`Neo`; add any newly discovered aliases to the same map instead of creating one-off fixes.
-*   **Doc targets:** Use `docs/ROADMAP.md` for the active cleanup item, `docs/guides/REFERENCE_TUNING.md` for concrete examples from tuning work, and `AI_MAP.md` only for navigation.
+*   **Doc targets:** Use `docs/VISION.md` ("Open work") for the active cleanup item, `docs/guides/REFERENCE_TUNING.md` for concrete examples from tuning work, and `AI_MAP.md` only for navigation.
 
 ### D. Coordination & Register Slotting
 Always pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:

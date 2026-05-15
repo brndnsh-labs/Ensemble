@@ -9,4 +9,4 @@ export const MODULES = {
     ARRANGER: 'arranger',
     VIZ: 'vizState',
     MIDI: 'midi',
-};
+} as const;

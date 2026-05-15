@@ -103,7 +103,6 @@ describe('Resolution Musicality: Final Button Overhaul', () => {
     });
 
     it('should only trigger resolution at chorus boundaries', () => {
-        const { getState } = require('../../public/state.js');
         const state = getState();
 
         state.arranger.totalSteps = 64; // 4 measures

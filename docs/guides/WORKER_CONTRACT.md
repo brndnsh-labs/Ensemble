@@ -2,7 +2,7 @@
 
 Ensemble offloads heavy musical generation and MIDI processing to a background Web Worker (`logic-worker.js`). This document defines the message schema and synchronization logic between the Main Thread and the Worker.
 
-Source of truth: message constants live in `public/worker-types.js`, and register slotting lives in `public/engine/coordination-engine.js`.
+Source of truth: message constants live in `public/worker-types.ts`, and register slotting lives in `public/engine/coordination-engine.js`.
 
 ## Architectural Overview
 

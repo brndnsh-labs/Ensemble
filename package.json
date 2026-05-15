@@ -12,7 +12,7 @@
         "depcheck": "depcruise public --config .dependency-cruiser.cjs",
         "knip": "knip",
         "jscpd": "jscpd public",
-        "typecheck": "tsc -p jsconfig.json",
+        "typecheck": "tsc -p tsconfig.json",
         "check-mutations": "node scripts/check-mutations.js public/*.js public/components/*.jsx",
         "test": "npm run check-mutations && npm run lint && npm run lint:docs && npx vitest run --reporter=dot --silent=true",
         "test:verbose": "npm run check-mutations && npm run lint && npx vitest run",

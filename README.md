@@ -86,7 +86,7 @@ npm run validate
 ## Documentation
 
 - [`docs/README.md`](docs/README.md) — documentation index and repo navigation hub.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — current open work and repo-organization notes.
+- [`docs/VISION.md`](docs/VISION.md) — current open work and product direction.
 - [`public/MANUAL.md`](public/MANUAL.md) — the in-app manual, including generated reference tables.
 - [`AI.md`](AI.md) — operational rules and state-management guidance for contributors.
 - [`AI_MAP.md`](AI_MAP.md) — a navigation map for the codebase.

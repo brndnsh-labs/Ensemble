@@ -1,4 +1,10 @@
-export const CHORD_STYLES = [
+export interface StyleEntry {
+    id: string;
+    name: string;
+    category: string;
+}
+
+export const CHORD_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Rhythmic)', category: 'Modern' },
     { id: 'pad', name: 'Pad (Sustain)', category: 'Modern' },
     { id: 'strum8', name: 'Strum (8th)', category: 'Pop/Rock' },
@@ -9,7 +15,7 @@ export const CHORD_STYLES = [
     { id: 'ska-upstroke', name: 'Ska Upstroke', category: 'Pop/Rock' },
 ];
 
-export const BASS_STYLES = [
+export const BASS_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'whole', name: 'Whole', category: 'Basic' },
     { id: 'half', name: 'Half', category: 'Basic' },
@@ -30,7 +36,7 @@ export const BASS_STYLES = [
     { id: 'walking-ska', name: 'Walking (Ska)', category: 'Pop/Rock' },
 ];
 
-export const SOLOIST_STYLES = [
+export const SOLOIST_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'rock', name: 'Rock', category: 'Basic' },
     { id: 'country', name: 'Country', category: 'Country/Folk' },
@@ -44,7 +50,7 @@ export const SOLOIST_STYLES = [
     { id: 'ska-horns', name: 'Ska Horns', category: 'Modern' },
 ];
 
-export const HARMONY_STYLES = [
+export const HARMONY_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'horns', name: 'Horns (Stabs)', category: 'Modern' },
     { id: 'strings', name: 'Strings (Pads)', category: 'Classical/Trad' },

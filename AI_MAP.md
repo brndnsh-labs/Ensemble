@@ -18,8 +18,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/visualizer-worker.js` | Background rendering thread for 60fps visuals. | `engine.render` |
 | `public/state.js` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
-| `public/types.js` | Global Action constants and shared types. | `ACTIONS` |
-| `public/ui-types.js` | Shared UI component prop definitions. | `SelectOption` |
+| `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
+| `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
 | `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.js` | Main-thread orchestrator for worker messaging. | `workerClient` |
@@ -89,7 +89,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/audio-recovery.js` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
 | `public/engine/midi-utils.js` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.js` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
-| `public/engine/midi-constants.js` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
+| `public/engine/midi-constants.ts` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
 
 ## Live vs Worker Responsibilities
 
@@ -117,8 +117,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/data/smart-genres.js` | High-level genre configurations. | `SMART_GENRES` |
 | `public/data/chord-presets.js` | Library chord progressions. | `CHORD_PRESETS` |
 | `public/data/song-templates.js` | Full song structure templates. | `SONG_TEMPLATES` |
-| `public/data/instrument-styles.js` | UI menu definitions for instruments. | `CHORD_STYLES`, `BASS_STYLES` |
-| `public/data/shortcut-config.js` | Centralized keyboard shortcuts. | `SHORTCUT_CONFIG` |
+| `public/data/instrument-styles.ts` | UI menu definitions for instruments. | `CHORD_STYLES`, `BASS_STYLES` |
+| `public/data/shortcut-config.ts` | Centralized keyboard shortcuts. | `SHORTCUT_CONFIG` |
 
 ## UI Components (Preact)
 
@@ -162,7 +162,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/song-generator.js` | Algorithmic song structure generation. |
 | `public/lead-sheet-model.js` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/persistence.js` | LocalStorage session saving. |
-| `public/platform.js` | Browser hacks (WakeLock, Audio Unlock). |
+| `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/sharing.js` | URL-based song sharing. | `getShareURL` |
 | `public/utils.js` | General-purpose musical and math utilities. | `getFrequency` |
 | `public/visualizer-events.js` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
@@ -175,18 +175,18 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- |
 | `public/ui-root.jsx` | Preact application entry point and hydration. |
 | `public/ui.js` | Lazy Proxy-based DOM access layer. |
-| `public/worker-types.js` | Shared message type definitions for workers. |
+| `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.js` | Global timing and musical constants. |
-| `public/constants.js` | Global visual and UI state constants. |
+| `public/constants.ts` | Global visual and UI state constants. |
 | `public/history.js` | Session history and undo/redo logic. |
-| `public/visualizer-utils.js` | Shared canvas math and drawing utilities. |
+| `public/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
 
 ## Documentation, Parsing & Testing
 
 | Path | Responsibility |
 | :--- | :--- |
 | `docs/README.md` | Documentation index and repo navigation hub. |
-| `docs/ROADMAP.md` | Living roadmap and repo-organization notes. |
+| `docs/VISION.md` | Product direction, open work items, and key decisions. |
 | `docs/guides/PERFORMANCE_GUIDELINES.md` | Hot-loop performance notes for audio and scheduler code. |
 | `public/MANUAL.md` | User-facing guide with auto-generated tables. |
 | `public/form-analysis.js` | Song section and structure detection. |
