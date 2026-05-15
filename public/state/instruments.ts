@@ -13,22 +13,32 @@ export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
     groove: 0.2,
 });
 
-/**
- * @typedef {Object} ChordState
- * @property {boolean} enabled - Whether the accompanist is active.
- * @property {string} style - The comping style ('smart', 'pad', etc).
- * @property {number} volume - Output gain multiplier.
- * @property {number} reverb - Reverb send amount.
- * @property {number} octave - Base MIDI octave for voicing.
- * @property {string} density - Voicing density ('thin', 'standard', 'rich').
- * @property {number|null} lastActiveChordIndex - Index of the currently playing chord (UI).
- * @property {number|null} scheduledChordIndex - Index of the last scheduled chord (Internal).
- * @property {Map<number, any>} buffer - Scheduled notes buffer.
- * @property {number} rhythmicMask - 16-bit mask of the current comping pattern.
- * @property {string} [instrument] - Optional instrument name.
- */
-/** @type {import('deepsignal').DeepSignal<ChordState>} */
-export const chords = deepSignal({
+export interface ChordState {
+    /** Whether the accompanist is active. */
+    enabled: boolean;
+    /** The comping style ('smart', 'pad', etc). */
+    style: string;
+    /** Output gain multiplier. */
+    volume: number;
+    /** Reverb send amount. */
+    reverb: number;
+    /** Base MIDI octave for voicing. */
+    octave: number;
+    /** Voicing density ('thin', 'standard', 'rich'). */
+    density: string;
+    /** Index of the currently playing chord (UI). */
+    lastActiveChordIndex: number | null;
+    /** Index of the last scheduled chord (Internal). */
+    scheduledChordIndex: number | null;
+    /** Scheduled notes buffer. */
+    buffer: Map<number, any>;
+    /** 16-bit mask of the current comping pattern. */
+    rhythmicMask: number;
+    /** Optional instrument name. */
+    instrument?: string;
+}
+
+export const chords = deepSignal<ChordState>({
     enabled: true,
     style: 'smart',
     volume: 1.0,
@@ -42,22 +52,32 @@ export const chords = deepSignal({
     instrument: 'Clean',
 });
 
-/**
- * @typedef {Object} BassState
- * @property {boolean} enabled - Whether the bass engine is active.
- * @property {number} volume - Volume level.
- * @property {number} reverb - Reverb level.
- * @property {number|null} lastFreq - Frequency of the last played note.
- * @property {number|null} lastPlayedFreq - Frequency of the note currently ringing.
- * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
- * @property {number} octave - Base MIDI octave.
- * @property {string} style - Playing style ID (e.g., 'walking', 'funk').
- * @property {number} busySteps - Counter for "busy" playing periods.
- * @property {number|null} lastMidiPlayed - Last MIDI note value played.
- * @property {GainNode|null} lastBassGain - Last gain node for dynamic continuity.
- */
-/** @type {import('deepsignal').DeepSignal<BassState>} */
-export const bass = deepSignal({
+export interface BassState {
+    /** Whether the bass engine is active. */
+    enabled: boolean;
+    /** Volume level. */
+    volume: number;
+    /** Reverb level. */
+    reverb: number;
+    /** Frequency of the last played note. */
+    lastFreq: number | null;
+    /** Frequency of the note currently ringing. */
+    lastPlayedFreq: number | null;
+    /** Map of scheduled notes from the worker. */
+    buffer: Map<number, any>;
+    /** Base MIDI octave. */
+    octave: number;
+    /** Playing style ID (e.g., 'walking', 'funk'). */
+    style: string;
+    /** Counter for "busy" playing periods. */
+    busySteps: number;
+    /** Last MIDI note value played. */
+    lastMidiPlayed: number | null;
+    /** Last gain node for dynamic continuity. */
+    lastBassGain: GainNode | null;
+}
+
+export const bass = deepSignal<BassState>({
     enabled: true,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.bass,
@@ -71,69 +91,142 @@ export const bass = deepSignal({
     lastBassGain: null,
 });
 
-/**
- * @typedef {Object} SoloistState
- * @property {boolean} enabled - Whether the soloist is active.
- * @property {number} volume - Mix volume (0.0 - 1.0).
- * @property {number} reverb - Reverb level.
- * @property {string} preset - The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone').
- * @property {string} mode - The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic).
- * @property {string} seed - Thematic seed for deterministic generation.
- * @property {number} phrasingIntensity - Slider for how dynamic/articulated the phrasing is.
- * @property {number} hookRetentionProb - Probability of retaining a hook motif.
- * @property {{notes: Array<any>, loopLengthSteps: number}|null} sessionSeed - Seed melody for the current session.
- * @property {Array<any>} rhythmPlan - Planned rhythmic phrase.
- * @property {Array<any>} deviceBuffer - Buffer for melodic embellishments.
- * @property {Array<any>} embellishmentBuffer - Buffer for melodic embellishments.
- * @property {Array<any>} hookBuffer - Short term hook memory.
- * @property {Array<any>} sharedHookBuffer - Hooks shared from other instruments.
- * @property {number} sessionSteps - Total steps played in current session.
- * @property {string} tradeMode - Mode for trading fours ('manual', 'auto').
- * @property {boolean} isWaitingForEntry - Whether waiting to start a phrase.
- * @property {boolean} isYielding - Whether yielding space to other instruments.
- * @property {boolean} motifTracking - Whether tracking motifs is enabled.
- * @property {number} phraseCount - Total phrases played.
- * @property {number} notesInPhrase - Number of notes played in the current phrase.
- * @property {number} rhythmicEntropy - Entropy level of the current rhythm.
- * @property {number|null} lastFreq - Last frequency played.
- * @property {number|null} lastPlayedFreq - Last frequency sent to visualizer.
- * @property {number|null} lastRenderedFreq - Last frequency sent to visualizer.
- * @property {number} tension - Current melodic tension level.
- * @property {number} activeSteps - Steps the soloist has been active.
- * @property {number} restSteps - Steps the soloist has been resting.
- * @property {boolean} isResting - Whether currently resting.
- * @property {number} contourSteps - Steps matching current melodic trend.
- * @property {string} melodicTrend - Current contour direction ('Up', 'Down', 'Static').
- * @property {number} direction - Melodic direction multiplier.
- * @property {number} complexity - Local complexity level.
- * @property {number} lastAttackStep - Step of the last note attack.
- * @property {string} phrasingState - Current state in the phrasing lifecycle.
- * @property {any} motifCache - Cached motif data.
- * @property {Array<any>} rhythmicMotif - Current rhythmic motif.
- * @property {Array<any>} lickDictionary - Dictionary of loaded licks.
- * @property {Array<any>} recentNotes - Recently played notes.
- * @property {number|null} phraseStartStep - Step when the current phrase started.
- * @property {number|null} phraseLoopCount - Loop index captured for the active phrase.
- * @property {string|null} phraseSectionLabel - Section label captured for the active phrase.
- * @property {number} phraseSectionOccurrence - Section occurrence captured for the active phrase.
- * @property {Record<string, any>} sectionRecall - Per-loop section signatures keyed by section label.
- * @property {number|null} sectionRecallLoop - Loop number currently represented in sectionRecall.
- * @property {Record<string, any>} formArcRecall - Cross-loop section signatures keyed by section label.
- * @property {any} phraseContext - Context data for the current phrase.
- * @property {number} doubleStopProb - Probability of playing double stops.
- * @property {Array<any>} activeVoices - Active polyphonic voices.
- * @property {number|null} lastMidiPlayed - Last MIDI note value played.
- * @property {string} [style] - Optional playing style.
- * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
- * @property {number} octave - Base MIDI octave.
- * @property {number} lastNoteEnd - Last note end time.
- * @property {number} busySteps - Optional busy steps counter.
- * @property {string|null} transitionState - Phrasing transition state.
- * @property {number} notesInPhrase - Current phrase note counter.
- * @property {string} lastSmartStyle - Last active smart style.
- */
-/** @type {import('deepsignal').DeepSignal<SoloistState>} */
-export const soloist = deepSignal({
+export interface SoloistSessionSeed {
+    notes: any[];
+    loopLengthSteps: number;
+}
+
+export interface SoloistPhraseContext {
+    role: string;
+    skeleton: any[];
+    lastInterval: any;
+    profile: string;
+    signature: any;
+    responseSignature: any;
+    responseMode: 'free' | 'paraphrase' | 'development';
+    responseSource: 'free' | 'form' | 'seed' | 'section' | 'recent';
+    sectionLabel: string | null;
+    sectionOccurrence: number;
+}
+
+export interface SoloistState {
+    /** Whether the soloist is active. */
+    enabled: boolean;
+    /** Mix volume (0.0 - 1.0). */
+    volume: number;
+    /** Reverb level. */
+    reverb: number;
+    /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
+    preset: string;
+    /** The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic). */
+    mode: string;
+    /** Thematic seed for deterministic generation. */
+    seed: string;
+    /** Slider for how dynamic/articulated the phrasing is. */
+    phrasingIntensity: number;
+    /** Probability of retaining a hook motif. */
+    hookRetentionProb: number;
+    /** Seed melody for the current session. */
+    sessionSeed: SoloistSessionSeed | null;
+    /** Planned rhythmic phrase. */
+    rhythmPlan: any[];
+    /** Buffer for melodic embellishments. */
+    deviceBuffer: any[];
+    /** Buffer for melodic embellishments. */
+    embellishmentBuffer: any[];
+    /** Short term hook memory. */
+    hookBuffer: any[];
+    /** Hooks shared from other instruments. */
+    sharedHookBuffer: any[];
+    /** Total steps played in current session. */
+    sessionSteps: number;
+    /** Mode for trading fours ('manual', 'auto'). */
+    tradeMode: string;
+    /** Whether waiting to start a phrase. */
+    isWaitingForEntry: boolean;
+    /** Whether yielding space to other instruments. */
+    isYielding: boolean;
+    /** Whether tracking motifs is enabled. */
+    motifTracking: boolean;
+    /** Total phrases played. */
+    phraseCount: number;
+    /** Number of notes played in the current phrase. */
+    notesInPhrase: number;
+    /** Entropy level of the current rhythm. */
+    rhythmicEntropy: number;
+    /** Last frequency played. */
+    lastFreq: number | null;
+    /** Last frequency sent to visualizer. */
+    lastPlayedFreq: number | null;
+    /** Last frequency sent to visualizer. */
+    lastRenderedFreq: number | null;
+    /** Current melodic tension level. */
+    tension: number;
+    /** Steps the soloist has been active. */
+    activeSteps: number;
+    /** Steps the soloist has been resting. */
+    restSteps: number;
+    /** Whether currently resting. */
+    isResting: boolean;
+    /** Steps matching current melodic trend. */
+    contourSteps: number;
+    /** Current contour direction ('Up', 'Down', 'Static'). */
+    melodicTrend: string;
+    /** Melodic direction multiplier. */
+    direction: number;
+    /** Local complexity level. */
+    complexity: number;
+    /** Step of the last note attack. */
+    lastAttackStep: number;
+    /** Current state in the phrasing lifecycle. */
+    phrasingState: string;
+    /** Cached motif data. */
+    motifCache: any;
+    /** Current rhythmic motif. */
+    rhythmicMotif: any[];
+    /** Dictionary of loaded licks. */
+    lickDictionary: any[];
+    /** Recently played notes. */
+    recentNotes: any[];
+    /** Step when the current phrase started. */
+    phraseStartStep: number | null;
+    /** Loop index captured for the active phrase. */
+    phraseLoopCount: number | null;
+    /** Section label captured for the active phrase. */
+    phraseSectionLabel: string | null;
+    /** Section occurrence captured for the active phrase. */
+    phraseSectionOccurrence: number;
+    /** Per-loop section signatures keyed by section label. */
+    sectionRecall: Record<string, any>;
+    /** Loop number currently represented in sectionRecall. */
+    sectionRecallLoop: number | null;
+    /** Cross-loop section signatures keyed by section label. */
+    formArcRecall: Record<string, any>;
+    /** Context data for the current phrase. */
+    phraseContext: SoloistPhraseContext;
+    /** Probability of playing double stops. */
+    doubleStopProb: number;
+    /** Active polyphonic voices. */
+    activeVoices: any[];
+    /** Last MIDI note value played. */
+    lastMidiPlayed: number | null;
+    /** Optional playing style. */
+    style?: string;
+    /** Map of scheduled notes from the worker. */
+    buffer: Map<number, any>;
+    /** Base MIDI octave. */
+    octave: number;
+    /** Last note end time. */
+    lastNoteEnd: number;
+    /** Optional busy steps counter. */
+    busySteps: number;
+    /** Phrasing transition state. */
+    transitionState: string | null;
+    /** Last active smart style. */
+    lastSmartStyle: string;
+}
+
+export const soloist = deepSignal<SoloistState>({
     enabled: false,
     preset: 'trumpet',
     volume: 1.0,
@@ -152,7 +245,7 @@ export const soloist = deepSignal({
     lastAttackStep: -100,
     phrasingState: 'rest',
     motifCache: null,
-    rhythmicMotif: [], // Template for current phrase
+    rhythmicMotif: [],
     lickDictionary: [],
     recentNotes: [],
     phraseStartStep: null,
@@ -166,7 +259,7 @@ export const soloist = deepSignal({
         role: 'call',
         skeleton: [],
         lastInterval: null,
-        profile: 'srv', // 'srv', 'monk', 'armstrong', 'miles'
+        profile: 'srv',
         signature: null,
         responseSignature: null,
         responseMode: 'free',
@@ -179,7 +272,7 @@ export const soloist = deepSignal({
     notesInPhrase: 0,
     lastSmartStyle: 'scalar',
     hookBuffer: [],
-    sharedHookBuffer: [], // Shared hooks for band interaction
+    sharedHookBuffer: [],
     tension: 0,
     mode: 'monophonic',
     doubleStopProb: 1.0,
@@ -204,23 +297,34 @@ export const soloist = deepSignal({
     embellishmentBuffer: [],
 });
 
-/**
- * @typedef {Object} HarmonyState
- * @property {boolean} enabled - Whether the harmony engine is active.
- * @property {number} volume - Volume level.
- * @property {number} reverb - Reverb level.
- * @property {Map<number, any>} buffer - Map of scheduled notes from the worker.
- * @property {number} octave - Base MIDI octave.
- * @property {string} style - Playing style ID (e.g., 'horns', 'strings').
- * @property {number} complexity - Local complexity override (0.0 - 1.0).
- * @property {Array<any>} motifBuffer - Short-term memory for current section hooks.
- * @property {number} rhythmicMask - 16-bit mask of the current rhythmic motif (16th notes).
- * @property {Array<number>} lastMidis - Array of recently played MIDI notes.
- * @property {Array<any>} activeVoices - Currently playing polyphonic voices.
- * @property {number} pocketOffset - Current micro-timing offset.
- */
-/** @type {import('deepsignal').DeepSignal<HarmonyState>} */
-export const harmony = deepSignal({
+export interface HarmonyState {
+    /** Whether the harmony engine is active. */
+    enabled: boolean;
+    /** Volume level. */
+    volume: number;
+    /** Reverb level. */
+    reverb: number;
+    /** Map of scheduled notes from the worker. */
+    buffer: Map<number, any>;
+    /** Base MIDI octave. */
+    octave: number;
+    /** Playing style ID (e.g., 'horns', 'strings'). */
+    style: string;
+    /** Local complexity override (0.0 - 1.0). */
+    complexity: number;
+    /** Short-term memory for current section hooks. */
+    motifBuffer: any[];
+    /** 16-bit mask of the current rhythmic motif (16th notes). */
+    rhythmicMask: number;
+    /** Array of recently played MIDI notes. */
+    lastMidis: number[];
+    /** Currently playing polyphonic voices. */
+    activeVoices: any[];
+    /** Current micro-timing offset. */
+    pocketOffset: number;
+}
+
+export const harmony = deepSignal<HarmonyState>({
     enabled: false,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.harmony,
@@ -235,10 +339,7 @@ export const harmony = deepSignal({
     pocketOffset: 0,
 });
 
-/**
- * @type {Record<string, any>}
- */
-const instrumentStateMap = {
+const instrumentStateMap: Record<string, any> = {
     cb: chords,
     chords,
     bb: bass,
@@ -251,14 +352,9 @@ const instrumentStateMap = {
     groove,
 };
 
-/**
- * @param {string} action
- * @param {any} payload
- */
-export function instrumentReducer(action, payload) {
+export function instrumentReducer(action: string, payload: any): boolean {
     switch (action) {
         case ACTIONS.SET_PARAM: {
-            // Unify "harmonies" vs "harmony"
             const modKey = payload.module === 'harmonies' ? 'harmony' : payload.module;
             if (instrumentStateMap[modKey]) {
                 instrumentStateMap[modKey][payload.param] = payload.value;
@@ -366,7 +462,6 @@ export function instrumentReducer(action, payload) {
             soloist.sessionSteps = 0;
             return true;
         case ACTIONS.SET_GENRE_FEEL:
-            // When a smart genre is selected, update all instrument styles and switch to smart mode
             if (payload.chord) {
                 chords.style = payload.chord;
             }
@@ -391,14 +486,14 @@ export function instrumentReducer(action, payload) {
         case ACTIONS.UPDATE_HB:
             for (const key in payload) {
                 if (Object.hasOwn(harmony, key)) {
-                    /** @type {any} */ (harmony)[key] = payload[key];
+                    (harmony as any)[key] = payload[key];
                 }
             }
             return true;
         case ACTIONS.UPDATE_SB:
             for (const key in payload) {
                 if (Object.hasOwn(soloist, key)) {
-                    /** @type {any} */ (soloist)[key] = payload[key];
+                    (soloist as any)[key] = payload[key];
                 }
             }
             return true;

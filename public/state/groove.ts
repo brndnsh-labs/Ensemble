@@ -1,65 +1,105 @@
 import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
+import type { GlobalContext } from './playback.js';
 
-/**
- * @typedef {Object} Instrument
- * @property {string} name - Instrument name (e.g., 'Kick').
- * @property {string} symbol - Display emoji/symbol.
- * @property {Array<number>} steps - Sequencer steps (0=off, 1=on, 2=accent).
- * @property {boolean} muted - Whether the instrument is muted.
- */
+export interface Instrument {
+    /** Instrument name (e.g., 'Kick'). */
+    name: string;
+    /** Display emoji/symbol. */
+    symbol: string;
+    /** Sequencer steps (0=off, 1=on, 2=accent). */
+    steps: number[];
+    /** Whether the instrument is muted. */
+    muted: boolean;
+}
 
-/**
- * @typedef {Object} PocketState
- * @property {number} globalDrive - -1.0 (behind) to 1.0 (ahead)
- * @property {number} tightness - 0.0 (loose/jittery) to 1.0 (grid-locked)
- * @property {number} bassGravity - 0.0 to 1.0 (how much bass follows Kick)
- * @property {number} chordGravity - 0.0 to 1.0 (how much chords follow Bass)
- * @property {number} soloistGravity - 0.0 to 1.0 (how much soloist follows Snare/Hats)
- */
+export interface PocketState {
+    /** -1.0 (behind) to 1.0 (ahead) */
+    globalDrive: number;
+    /** 0.0 (loose/jittery) to 1.0 (grid-locked) */
+    tightness: number;
+    /** 0.0 to 1.0 (how much bass follows Kick) */
+    bassGravity: number;
+    /** 0.0 to 1.0 (how much chords follow Bass) */
+    chordGravity: number;
+    /** 0.0 to 1.0 (how much soloist follows Snare/Hats) */
+    soloistGravity: number;
+}
 
-/**
- * @typedef {Object} GrooveState
- * @property {boolean} enabled - Whether the drum engine is active.
- * @property {Array<Instrument>} instruments - List of drum instruments.
- * @property {number} volume - Volume level.
- * @property {number} reverb - Reverb level.
- * @property {number} measures - Number of measures in the loop (1-8).
- * @property {number} currentMeasure - Currently visible measure for editing.
- * @property {boolean} followPlayback - Whether to scroll grid during playback.
- * @property {number} humanize - Humanization percentage (0-100).
- * @property {number} swing - Swing percentage (0-100).
- * @property {string} swingSub - Swing subdivision ('8th' or '16th').
- * @property {string} lastDrumPreset - Name of the last loaded drum preset.
- * @property {string} seed - Thematic seed for deterministic generation.
- * @property {any} audioBuffers - Cache for decoded drum samples.
- * @property {string} genreFeel - Active genre for procedural nuances ('Rock', 'Jazz', 'Funk').
- * @property {boolean} fillActive - Whether a drum fill is currently being played.
- * @property {Object} fillSteps - Transient storage for the generated fill pattern.
- * @property {GainNode|null} lastHatGain - Last gain node for the hi-hat.
- * @property {GainNode|null} lastRideGain - Last gain node for the ride cymbal.
- * @property {GainNode|null} lastCrashGain - Last gain node for the crash cymbal.
- * @property {number} fillStartStep - Step index where the current fill began.
- * @property {number} fillLength - Length of the current fill in steps.
- * @property {number} snareMask - 16-bit mask of the current snare pattern.
- * @property {boolean} pendingCrash - Whether a crash cymbal is queued for the next downbeat.
- * @property {boolean} creativity - Whether generative fills/variations are enabled.
- * @property {Object} sectionSeedMap - Random seeds for each song section.
- * @property {PocketState} pocket - Unified rhythmic pocket configuration.
- * @property {string} lastSmartGenre - Last selected smart genre.
- * @property {{genreName?: string, feel?: string}|null} pendingGenreFeel - Genre queued for the next measure.
- * @property {number|null} genreSwitchCountdown - Beats until genre switch.
- * @property {Array<any>|null} orchestrationMap - Pre-calculated section orchestration map.
- * @property {Record<number, any>|null} fillMap - Pre-calculated song-wide fill map.
- * @property {Record<number, any>|null} accentMap - Pre-calculated soloist accent catching map.
- * @property {number} seedTimelineStartStep - Absolute playback step when the current seed maps were generated.
- * @property {Array<any>|null} variations - Pre-calculated pattern variations for the current preset.
- * @property {Map<number, any>} buffer - Map of scheduled drum events.
- */
-/**
- * @type {import('deepsignal').DeepSignal<GrooveState>}
- */
-export const groove = deepSignal({
+export interface GrooveState {
+    /** Whether the drum engine is active. */
+    enabled: boolean;
+    /** List of drum instruments. */
+    instruments: Instrument[];
+    /** Volume level. */
+    volume: number;
+    /** Reverb level. */
+    reverb: number;
+    /** Number of measures in the loop (1-8). */
+    measures: number;
+    /** Currently visible measure for editing. */
+    currentMeasure: number;
+    /** Whether to scroll grid during playback. */
+    followPlayback: boolean;
+    /** Humanization percentage (0-100). */
+    humanize: number;
+    /** Swing percentage (0-100). */
+    swing: number;
+    /** Swing subdivision ('8th' or '16th'). */
+    swingSub: string;
+    /** Name of the last loaded drum preset. */
+    lastDrumPreset: string;
+    /** Thematic seed for deterministic generation. */
+    seed: string;
+    /** Cache for decoded drum samples. */
+    audioBuffers: any;
+    /** Active genre for procedural nuances ('Rock', 'Jazz', 'Funk'). */
+    genreFeel: string;
+    /** Whether a drum fill is currently being played. */
+    fillActive: boolean;
+    /** Transient storage for the generated fill pattern. */
+    fillSteps: object;
+    /** Last gain node for the hi-hat. */
+    lastHatGain: GainNode | null;
+    /** Last gain node for the ride cymbal. */
+    lastRideGain: GainNode | null;
+    /** Last gain node for the crash cymbal. */
+    lastCrashGain: GainNode | null;
+    /** Step index where the current fill began. */
+    fillStartStep: number;
+    /** Length of the current fill in steps. */
+    fillLength: number;
+    /** 16-bit mask of the current snare pattern. */
+    snareMask: number;
+    /** Whether a crash cymbal is queued for the next downbeat. */
+    pendingCrash: boolean;
+    /** Whether generative fills/variations are enabled. */
+    creativity: boolean;
+    /** Random seeds for each song section. */
+    sectionSeedMap: object;
+    /** Unified rhythmic pocket configuration. */
+    pocket: PocketState;
+    /** Last selected smart genre. */
+    lastSmartGenre: string;
+    /** Genre queued for the next measure. */
+    pendingGenreFeel: { genreName?: string; feel?: string } | null;
+    /** Beats until genre switch. */
+    genreSwitchCountdown: number | null;
+    /** Pre-calculated section orchestration map. */
+    orchestrationMap: any[] | null;
+    /** Pre-calculated song-wide fill map. */
+    fillMap: Record<number, any> | null;
+    /** Pre-calculated soloist accent catching map. */
+    accentMap: Record<number, any> | null;
+    /** Absolute playback step when the current seed maps were generated. */
+    seedTimelineStartStep: number;
+    /** Pre-calculated pattern variations for the current preset. */
+    variations: any[] | null;
+    /** Map of scheduled drum events. */
+    buffer: Map<number, any>;
+}
+
+export const groove = deepSignal<GrooveState>({
     enabled: true,
     instruments: [
         { name: 'Kick', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
@@ -108,7 +148,6 @@ export const groove = deepSignal({
     creativity: false,
     sectionSeedMap: {},
     variations: null,
-    // --- Unified Rhythmic Pocket System ---
     pocket: {
         globalDrive: 0, // -1.0 (behind) to 1.0 (ahead)
         tightness: 0.5, // 0.0 (loose/jittery) to 1.0 (grid-locked)
@@ -118,17 +157,12 @@ export const groove = deepSignal({
     },
 });
 
-/**
- * @param {string} action
- * @param {any} payload
- * @param {import('./playback.js').GlobalContext} playback
- */
-export function grooveReducer(action, payload, playback) {
+export function grooveReducer(action: string, payload: any, playback: GlobalContext): boolean {
     switch (action) {
         case ACTIONS.UPDATE_GB:
             for (const key in payload) {
                 if (Object.hasOwn(groove, key)) {
-                    /** @type {any} */ (groove)[key] = payload[key];
+                    (groove as any)[key] = payload[key];
                 }
             }
             return true;
@@ -138,7 +172,7 @@ export function grooveReducer(action, payload, playback) {
                 payload.module === 'drum' ||
                 payload.module === 'drums'
             ) {
-                /** @type {any} */ (groove)[payload.param] = payload.value;
+                (groove as any)[payload.param] = payload.value;
                 return true;
             }
             break;
@@ -207,7 +241,7 @@ export function grooveReducer(action, payload, playback) {
             if (!groove.sectionSeedMap) {
                 groove.sectionSeedMap = {};
             }
-            /** @type {any} */ (groove.sectionSeedMap)[payload.sectionId] = payload.seed;
+            (groove.sectionSeedMap as any)[payload.sectionId] = payload.seed;
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== payload) {

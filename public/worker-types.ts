@@ -21,22 +21,3 @@ export const WORKER_RESP = {
     EXPORT_PROGRESS: 'exportProgress',
     ERROR: 'error',
 } as const;
-
-export interface WorkerNote {
-    /** The engine module (bass, soloist, etc). */
-    module: string;
-    step: number;
-    freq: number;
-    midi: number;
-    /** 0.0 - 1.0 */
-    velocity: number;
-    durationSteps: number;
-    timingOffset?: number;
-}
-
-export interface NotesMessage {
-    type: typeof WORKER_RESP.NOTES;
-    notes: WorkerNote[];
-    requestTimestamp: number;
-    workerProcessTime: number;
-}

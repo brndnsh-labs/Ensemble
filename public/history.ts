@@ -1,11 +1,7 @@
 import { getState } from './state.js';
 import { showToast } from './ui.js';
 
-// We need some function references that are usually in main.js
-// For now, we'll assume they are globally available or we'll pass them.
-// Refactoring to use a more event-driven approach later.
-
-export function pushHistory() {
+export function pushHistory(): void {
     const { arranger } = getState();
     arranger.history.push(JSON.stringify(arranger.sections));
     if (arranger.history.length > 20) {
@@ -13,10 +9,7 @@ export function pushHistory() {
     }
 }
 
-/**
- * @param {Function} [refreshArrangerUI]
- */
-export function undo(refreshArrangerUI) {
+export function undo(refreshArrangerUI?: () => void): void {
     const { arranger } = getState();
     if (arranger.history.length === 0) {
         return;
@@ -26,7 +19,6 @@ export function undo(refreshArrangerUI) {
         return;
     }
     try {
-        /** @type {any} */
         const parsed = JSON.parse(last);
         if (Array.isArray(parsed)) {
             arranger.sections = parsed;

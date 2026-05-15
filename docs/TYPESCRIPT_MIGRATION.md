@@ -67,39 +67,41 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 
 ---
 
-## Phase 4: Small Modules (~40–100 lines) ⬜
+## Phase 4: Small Modules (~40–100 lines) ✅
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/history.js` | 46 | ⬜ | Direct state mutation — convert after state slices are typed |
-| `public/engine/platform-orchestrator.js` | 30 | ⬜ | |
-| `public/engine/worker-orchestrator.js` | 52 | ⬜ | |
-| `public/engine/worker-buffer-manager.js` | 88 | ⬜ | |
-| `public/engine/soloist-mode-policy.js` | 68 | ⬜ | |
-| `public/utils/manual-metadata.js` | 93 | ⬜ | |
-| `public/app-controller.js` | 63 | ⬜ | |
-| `public/performance-controller.js` | 58 | ⬜ | |
-| `public/pwa.js` | ~50 | ⬜ | |
-| `public/ui-bridge.js` | 57 | ⬜ | |
-| `public/state/conductor.js` | 54 | ⬜ | |
-| `public/state/midi.js` | 66 | ⬜ | |
-| `public/state/visualizer.js` | 29 | ⬜ | |
+| `public/engine/platform-orchestrator.ts` | 30 | ✅ | |
+| `public/engine/worker-orchestrator.ts` | 52 | ✅ | `WorkerContext` interface; `EnsembleState` import |
+| `public/engine/worker-buffer-manager.ts` | 88 | ✅ | |
+| `public/engine/soloist-mode-policy.ts` | 68 | ✅ | `Record<string,string>` alias map; TS cast for return |
+| `public/utils/manual-metadata.ts` | 93 | ✅ | `StyleEntry[]` param; `SMART_GENRES` cast to `any` (untyped source) |
+| `public/app-controller.ts` | 63 | ✅ | `viz?: any` (visualizer types not settled yet) |
+| `public/performance-controller.ts` | 58 | ✅ | |
+| `public/pwa.ts` | ~50 | ✅ | `deferredPrompt: any`; `triggerInstall(): Promise<boolean>` |
+| `public/ui-bridge.ts` | 57 | ✅ | Generic `useEnsembleState<T>`; `useDispatch` return typed |
+| `public/history.ts` | 46 | ✅ | `undo(refreshArrangerUI?: () => void)` |
+| `public/state/conductor.ts` | 54 | ✅ | `ConductorState` interface |
+| `public/state/midi.ts` | 66 | ✅ | `MidiOutput` + `MidiState` interfaces |
+| `public/state/visualizer.ts` | 29 | ✅ | `VisualizerState` interface |
+
+> **Note:** All state slices (including Phase 5 ones) were converted in this same session — see below.
 
 ---
 
-## Phase 5: Mid-size Modules (100–400 lines) ⬜
+## Phase 5: Mid-size Modules (100–400 lines) 🔄
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
 | `public/sharing.js` | ~120 | ⬜ | |
 | `public/persistence.js` | ~150 | ⬜ | |
-| `public/state/arranger.js` | ~111 | ⬜ | |
-| `public/state/groove.js` | ~250 | ⬜ | |
-| `public/state/playback.js` | 291 | ⬜ | `GlobalContext` has 50+ props; do after Phase 4 |
+| `public/state/arranger.ts` | ~111 | ✅ | `Section` + `ArrangerState` interfaces; pulled forward with other state slices |
+| `public/state/groove.ts` | ~250 | ✅ | `Instrument`, `PocketState`, `GrooveState`; `grooveReducer` takes `GlobalContext` |
+| `public/state/playback.ts` | 291 | ✅ | `GlobalContext` (50+ props); circular `import type` with `types.ts` is fine |
 | `public/state.js` | 293 | ⬜ | Root state; depends on all slices |
 | `public/worker-client.js` | 303 | ⬜ | Good JSDoc coverage already |
 | `public/arranger-controller.js` | 304 | ⬜ | |
-| `public/state/instruments.js` | 407 | ⬜ | Exports 4 state types used everywhere |
+| `public/state/instruments.ts` | 407 | ✅ | `ChordState`, `BassState`, `SoloistState`, `HarmonyState`; `responseMode`/`responseSource` tightened |
 | `public/state-effects.js` | ~300 | ⬜ | |
 | `public/state-hydration.js` | 497 | ⬜ | |
 | `public/midi-controller.js` | 401 | ⬜ | Good JSDoc coverage already |
@@ -159,6 +161,7 @@ Last — these are complex and depend on all types being settled.
 
 - **Import paths stay `.js`** throughout the migration — `moduleResolution: Bundler` resolves them to the `.ts` source automatically.
 - **`checkJs: true` stays on** until all `.js` files are converted; it keeps the remaining JS files type-checked.
-- **`history.js`** accesses `arranger.history` via direct mutation (`// @direct-mutation` pattern); convert after `state/arranger.js` is typed so the array type is known.
-- **State slices** (`state/*.js`) should all move in one session since `EnsembleState` in `types.ts` imports from all of them.
+- **State slices are done.** All `state/*.ts` files are converted; `EnsembleState` in `types.ts` now has real type imports.
 - **`tsConfig?: any`** in `StepInfo` — tighten once a proper time-signature config type is defined (likely in `engine/tick-logic` or `state/playback`).
+- **`responseMode`/`responseSource`** in `SoloistPhraseContext` are typed as narrow unions — if new values appear in engine files, expand the union rather than widening to `string`.
+- **`let responseSource`** in `engine/soloist.js` line 628 has a `@type` JSDoc narrowing it to the union — update when that file is converted.

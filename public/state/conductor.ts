@@ -1,18 +1,20 @@
 import { deepSignal } from 'deepsignal';
 import { ACTIONS } from '../types.js';
 
-/**
- * @typedef {Object} ConductorState
- * @property {number} targetIntensity - Target intensity level for auto-intensity drift.
- * @property {number} stepSize - Internal step size for auto-intensity.
- * @property {Object|null} form - Structural analysis of the song arrangement.
- * @property {number} loopCount - Number of times the current section has looped.
- * @property {number} formIteration - Number of times the entire song has looped.
- */
-/**
- * @type {import('deepsignal').DeepSignal<ConductorState>}
- */
-export const conductor = deepSignal({
+export interface ConductorState {
+    /** Target intensity level for auto-intensity drift. */
+    targetIntensity: number;
+    /** Internal step size for auto-intensity. */
+    stepSize: number;
+    /** Structural analysis of the song arrangement. */
+    form: object | null;
+    /** Number of times the current section has looped. */
+    loopCount: number;
+    /** Number of times the entire song has looped. */
+    formIteration: number;
+}
+
+export const conductor = deepSignal<ConductorState>({
     targetIntensity: 0.35,
     stepSize: 0.0005,
     form: null,
@@ -20,11 +22,7 @@ export const conductor = deepSignal({
     formIteration: 0,
 });
 
-/**
- * @param {string} action
- * @param {any} payload
- */
-export function conductorReducer(action, payload) {
+export function conductorReducer(action: string, payload: any): boolean {
     switch (action) {
         case ACTIONS.UPDATE_CONDUCTOR_STATE:
             if (payload.targetIntensity !== undefined) {

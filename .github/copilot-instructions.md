@@ -56,7 +56,7 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 
 - `public/state.js` composes the app state from domain slices in `public/state/` (`playback`, `arranger`, `groove`, `instruments`, `midi`, `ui`, `visualizer`, `conductor`).
 - Each slice is a `deepSignal`, so reducers mutate signal-backed objects directly, but app-level writes are still expected to flow through `dispatch(ACTIONS.*, payload)`.
-- `public/ui-bridge.js` exposes `useEnsembleState()`. In components, reading a property inside the selector is what establishes reactivity; there is no legacy "version bump" model to maintain.
+- `public/ui-bridge.ts` exposes `useEnsembleState()`. In components, reading a property inside the selector is what establishes reactivity; there is no legacy "version bump" model to maintain.
 - `public/state-effects.js` owns the cross-module side effects that are intentionally kept out of reducers: playback start/stop, session seeding, drum preset loading, BPM side effects, theme/MIDI hydration, and toast/flash expirations.
 
 ### Generative engine pipeline

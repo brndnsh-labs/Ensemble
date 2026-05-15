@@ -18,7 +18,12 @@ function getFiles(dir, files = []) {
         const name = path.join(dir, file);
         if (fs.statSync(name).isDirectory()) {
             getFiles(name, files);
-        } else if (name.endsWith('.js') || name.endsWith('.jsx')) {
+        } else if (
+            name.endsWith('.js') ||
+            name.endsWith('.jsx') ||
+            name.endsWith('.ts') ||
+            name.endsWith('.tsx')
+        ) {
             files.push(name);
         }
     }

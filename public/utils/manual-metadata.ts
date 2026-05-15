@@ -3,21 +3,18 @@ import {
     CHORD_STYLES,
     HARMONY_STYLES,
     SOLOIST_STYLES,
+    type StyleEntry,
 } from '../data/instrument-styles.js';
 import { SHORTCUT_CONFIG } from '../data/shortcut-config.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
 
-/**
- * Generates an HTML table of all available Smart Genres.
- * @returns {string} HTML table
- */
-export function generateGenreTable() {
+export function generateGenreTable(): string {
     let html = '<div class="table-container"><table class="notation-table">\n';
     html +=
         '<thead><tr><th>Genre</th><th>Drum Beat</th><th>Bass Style</th><th>Soloist Style</th><th>Harmony</th></tr></thead>\n';
     html += '<tbody>\n';
 
-    for (const [name, config] of Object.entries(SMART_GENRES)) {
+    for (const [name, config] of Object.entries(SMART_GENRES) as [string, any][]) {
         html += `<tr><td><strong>${name}</strong></td><td>${config.drum}</td><td>${config.bass}</td><td>${config.soloist}</td><td>${config.harmony}</td></tr>\n`;
     }
 
@@ -25,14 +22,8 @@ export function generateGenreTable() {
     return html;
 }
 
-/**
- * Generates a Markdown list of instrument styles by category.
- * @param {Array<any>} stylesArray - e.g. BASS_STYLES
- * @returns {string} Markdown list
- */
-function generateStyleMD(stylesArray) {
-    // Group by category
-    const grouped = stylesArray.reduce((acc, style) => {
+function generateStyleMD(stylesArray: StyleEntry[]): string {
+    const grouped = stylesArray.reduce<Record<string, string[]>>((acc, style) => {
         if (!acc[style.category]) {
             acc[style.category] = [];
         }
@@ -47,24 +38,20 @@ function generateStyleMD(stylesArray) {
     return md;
 }
 
-export function generateBassStylesMD() {
+export function generateBassStylesMD(): string {
     return generateStyleMD(BASS_STYLES);
 }
-export function generateChordStylesMD() {
+export function generateChordStylesMD(): string {
     return generateStyleMD(CHORD_STYLES);
 }
-export function generateSoloistStylesMD() {
+export function generateSoloistStylesMD(): string {
     return generateStyleMD(SOLOIST_STYLES);
 }
-export function generateHarmonyStylesMD() {
+export function generateHarmonyStylesMD(): string {
     return generateStyleMD(HARMONY_STYLES);
 }
 
-/**
- * Generates an HTML table for shortcuts.
- * @returns {string} HTML table
- */
-export function generateShortcutTable() {
+export function generateShortcutTable(): string {
     let html = '<div class="table-container"><table class="notation-table">\n';
     html += '<thead><tr><th>Key</th><th>Action</th><th>Description</th></tr></thead>\n';
     html += '<tbody>\n';
@@ -77,12 +64,7 @@ export function generateShortcutTable() {
     return html;
 }
 
-/**
- * Master injection function that replaces placeholders in a template string.
- * @param {string} template
- * @returns {string} Processed Markdown
- */
-export function injectManualMetadata(template) {
+export function injectManualMetadata(template: string): string {
     return template
         .replace('{{GENRE_TABLE}}', generateGenreTable())
         .replace('{{BASS_STYLES}}', generateBassStylesMD())

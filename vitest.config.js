@@ -14,6 +14,23 @@ const renamedModules = [
     'engine/midi-constants',
     'data/instrument-styles',
     'data/shortcut-config',
+    'engine/platform-orchestrator',
+    'engine/worker-orchestrator',
+    'engine/worker-buffer-manager',
+    'engine/soloist-mode-policy',
+    'utils/manual-metadata',
+    'app-controller',
+    'performance-controller',
+    'pwa',
+    'state/visualizer',
+    'state/conductor',
+    'state/midi',
+    'state/arranger',
+    'state/groove',
+    'state/playback',
+    'state/instruments',
+    'history',
+    'ui-bridge',
 ];
 
 const publicDir = path.resolve(import.meta.dirname, 'public');

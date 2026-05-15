@@ -20,21 +20,21 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state.js` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
-| `public/ui-bridge.js` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
-| `public/app-controller.js` | Top-level playback and session control. | `togglePlay`, `resetSession` |
+| `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
+| `public/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.js` | Main-thread orchestrator for worker messaging. | `workerClient` |
 
 ## State Management (Domain Slices)
 
 | Path | Domain Responsibility | Initial State |
 | :--- | :--- | :--- |
-| `public/state/playback.js` | BPM, transport, volume, and visual state. | `playback` |
-| `public/state/arranger.js` | Chords, sections, time signature, and key. | `arranger` |
-| `public/state/groove.js` | Genre, intensity, and drum kit selection. | `groove` |
-| `public/state/instruments.js` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
-| `public/state/midi.js` | WebMIDI routing and local muting state. | `midi` |
-| `public/state/visualizer.js` | Rendering settings and UI overlays. | `vizState` |
-| `public/state/conductor.js` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
+| `public/state/playback.ts` | BPM, transport, volume, and visual state. | `playback` |
+| `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
+| `public/state/groove.ts` | Genre, intensity, and drum kit selection. | `groove` |
+| `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
+| `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
+| `public/state/visualizer.ts` | Rendering settings and UI overlays. | `vizState` |
+| `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
 | `public/state-hydration.js` | Initial state loading and validation logic. | `hydrateState` |
 
@@ -73,18 +73,18 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/engine/scheduler-core.js` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
 | `public/engine/midi-scheduler.js` | MIDI scheduling logic. | `dispatchMidiDrum`, `dispatchMidiSoloist` |
-| `public/engine/platform-orchestrator.js` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
+| `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
 | `public/engine/engine.js` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
 | `public/engine/synth-utils.js` | Shared WebAudio boilerplate (ramping, voices). | `rampGain`, `killActiveVoices` |
 | `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/voicing-policy.js` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
 | `public/engine/groove-engine.js` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
-| `public/engine/soloist-mode-policy.js` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
+| `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/soloist-pitch-engine.js` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
 | `public/engine/soloist-rhythm-engine.js` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
 | `public/engine/worker-utils.js` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
-| `public/engine/worker-orchestrator.js` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
-| `public/engine/worker-buffer-manager.js` | Generative buffer orchestration. | `fillBuffers` |
+| `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
+| `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |
 | `public/engine/tick-logic.js` | Unified generative tick and transition logic. | `generateNotesForStep`, `applyWorkerTransition` |
 | `public/engine/audio-recovery.js` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
 | `public/engine/midi-utils.js` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
@@ -95,7 +95,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 - `public/worker-client.js` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
 - `public/logic-worker.js` is the worker-side message dispatcher and reset coordinator.
-- `public/engine/worker-buffer-manager.js` and `public/engine/tick-logic.js` own lookahead note generation inside the worker.
+- `public/engine/worker-buffer-manager.ts` and `public/engine/tick-logic.js` own lookahead note generation inside the worker.
 - `public/engine/worker-utils.js` holds shared worker-side helpers such as `getChordAtStep`.
 - `public/engine/scheduler-core.js` stays on the main thread and schedules already-generated note events into WebAudio/MIDI time.
 
@@ -142,13 +142,13 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/state/playback.js` | Transport, BPM, master volume, and global intensity. |
-| `public/state/arranger.js` | Progression, key signature, and sections. |
-| `public/state/groove.js` | Drum patterns, genre feel, and pocket timing. |
-| `public/state/instruments.js` | Bass, Chords, Soloist, and Harmony settings. |
-| `public/state/conductor.js` | Auto-intensity target, tempo drift, and form tracking. |
-| `public/state/midi.js` | MIDI device and channel configuration. |
-| `public/state/visualizer.js` | Visualizer rendering and flash state. |
+| `public/state/playback.ts` | Transport, BPM, master volume, and global intensity. |
+| `public/state/arranger.ts` | Progression, key signature, and sections. |
+| `public/state/groove.ts` | Drum patterns, genre feel, and pocket timing. |
+| `public/state/instruments.ts` | Bass, Chords, Soloist, and Harmony settings. |
+| `public/state/conductor.ts` | Auto-intensity target, tempo drift, and form tracking. |
+| `public/state/midi.ts` | MIDI device and channel configuration. |
+| `public/state/visualizer.ts` | Visualizer rendering and flash state. |
 
 ## High-Level Controllers & Integration
 
@@ -156,7 +156,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- |
 | `public/arranger-controller.js` | High-level song structure manipulation. |
 | `public/instrument-controller.js` | Per-instrument state and preset routing. |
-| `public/performance-controller.js` | Real-time keyboard performance logic. |
+| `public/performance-controller.ts` | Real-time keyboard performance logic. |
 | `public/midi-controller.js` | WebMIDI bridging and DAW sync. |
 | `public/midi-export.js` | Main-thread MIDI file triggers. |
 | `public/song-generator.js` | Algorithmic song structure generation. |
@@ -178,7 +178,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.js` | Global timing and musical constants. |
 | `public/constants.ts` | Global visual and UI state constants. |
-| `public/history.js` | Session history and undo/redo logic. |
+| `public/history.ts` | Session history and undo/redo logic. |
 | `public/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
 
 ## Documentation, Parsing & Testing

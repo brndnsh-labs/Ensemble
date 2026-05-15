@@ -37,14 +37,14 @@ This document is the primary operational guide for AI agents working on the Ense
 ### B. State Management (Signals-First)
 *   **Domain Slices:** State is decomposed into `public/state/` (e.g., `playback.js`, `arranger.js`). Each slice is a **reactive deepSignal**.
 *   **Writes**: ALWAYS use `dispatch(ACTIONS.TYPE, payload)`. This serves as the unified event bus for state updates and side effects (like Worker sync).
-*   **Reactivity**: Use the `useEnsembleState` hook in `public/ui-bridge.js` for component updates. Since the state uses `deepSignal`, accessing a property in the selector automatically subscribes the component to updates for that specific property.
+*   **Reactivity**: Use the `useEnsembleState` hook in `public/ui-bridge.ts` for component updates. Since the state uses `deepSignal`, accessing a property in the selector automatically subscribes the component to updates for that specific property.
 *   **Styles & Configuration**: 
     *   **UI Metadata**: `public/data/instrument-styles.ts` defines names and categories for menus.
     *   **Generative Logic**: Modular style modules (e.g., `public/engine/bass-styles.js`) contain the actual musical algorithms.
-*   **The @direct-mutation Exception**: Direct mutation of state objects is **strictly forbidden** in controllers (e.g., `public/app-controller.js`) and UI components.
+*   **The @direct-mutation Exception**: Direct mutation of state objects is **strictly forbidden** in controllers (e.g., `public/app-controller.ts`) and UI components.
  It is **only allowed** in performance-critical engine code (e.g., `scheduler-core.js`, `synth-*.js`) for real-time audio parameters. These must be marked with a `// @direct-mutation` comment for transparency.
 *   **Decoupling**: Avoid circular dependencies. Use **Inversion of Control (IoC)** for side effects (e.g., `state-effects.js` should not be imported by state slices; it should subscribe to state changes via `dispatch` event bus).
-*   **Complex Actions**: For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.js` or `scheduler-core.js` rather than dispatching raw actions.
+*   **Complex Actions**: For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.ts` or `scheduler-core.js` rather than dispatching raw actions.
 
 ### C. UI & Component Architecture
 *   **Preact (v10):** All new UI logic must be encapsulated in functional components within `public/components/`.
@@ -90,7 +90,7 @@ Always pass the `CoordinationContext` to instrument generators. In `logic-worker
 
 ### A. The "Self-Building" Manual
 Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written task guides with auto-generated technical tables.
-*   **Technical Appendix:** Placeholders like `{{GENRE_TABLE}}` and `{{BASS_STYLES}}` are automatically populated by `manual-metadata.js`. Adding a new style to the JS config files will update these tables automatically.
+*   **Technical Appendix:** Placeholders like `{{GENRE_TABLE}}` and `{{BASS_STYLES}}` are automatically populated by `manual-metadata.ts`. Adding a new style to the JS config files will update these tables automatically.
 *   **Task Guides:** If you add a major new feature (e.g., a new "Audio Workbench" tool), you **MUST** add a corresponding "Recipe" or "Pro-Tip" to the Markdown guide in `public/MANUAL.md`.
 *   **Deep Links:** Maintain the "Style Gallery" in the manual. If you create a new signature genre, consider adding a deep link example (e.g., `index.html?genre=MyNewStyle`) to the gallery.
 

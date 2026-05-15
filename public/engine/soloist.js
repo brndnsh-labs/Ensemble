@@ -625,6 +625,7 @@ function preparePhraseResponseContext(
     const lastSignature = soloist.phraseContext.signature;
     const formArcSignature = formArcCandidate?.signature || null;
     let responseSignature = null;
+    /** @type {'free' | 'form' | 'seed' | 'section' | 'recent'} */
     let responseSource = 'free';
     if (nextRole === 'response' && canUseMotivicResponse) {
         const seedSignature = buildSeedPhraseSignature(

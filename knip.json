@@ -9,7 +9,7 @@
         "scripts/*.js",
         "tests/scripts/*.js"
     ],
-    "project": ["public/**/*.{js,jsx}", "scripts/*.js", "tests/**/*.js"],
+    "project": ["public/**/*.{js,jsx,ts,tsx}", "scripts/*.js", "tests/**/*.js"],
     "ignoreDependencies": ["esbuild"],
     "ignoreExportsUsedInFile": true,
     "ignore": ["public/engine/grooves/*.js"]

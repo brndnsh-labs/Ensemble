@@ -42,14 +42,6 @@ export interface EnsembleState {
     midi: MidiState;
 }
 
-export interface ChordContext {
-    chord: object;
-    stepInChord: number;
-    chordIndex: number;
-    sectionStart?: number;
-    sectionEnd?: number;
-}
-
 export interface StepInfo {
     isMeasureStart: boolean;
     isBeatStart: boolean;
@@ -95,11 +87,6 @@ export interface ActionPayloadSetVolume {
 }
 
 export interface ActionPayloadSetReverb {
-    module: string;
-    value: number;
-}
-
-export interface ActionPayloadSetOctave {
     module: string;
     value: number;
 }
@@ -153,14 +140,6 @@ export interface ActionPayloadShowToast {
     id?: string;
     message?: string;
     type?: string;
-}
-
-export interface ActionPayloadSetPocketConfig {
-    globalDrive?: number;
-    tightness?: number;
-    bassGravity?: number;
-    chordGravity?: number;
-    soloistGravity?: number;
 }
 
 export interface ActionPayloadSetMidiConfig {
@@ -324,5 +303,3 @@ export const ACTIONS = {
     RESTORE_GAINS: 'RESTORE_GAINS',
     INIT_AUDIO: 'INIT_AUDIO',
 } as const;
-
-export type ActionType = (typeof ACTIONS)[keyof typeof ACTIONS];

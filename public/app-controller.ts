@@ -4,8 +4,7 @@ import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 import { syncWorker } from './worker-client.js';
 
-/** @param {string} theme */
-export function applyTheme(theme) {
+export function applyTheme(theme: string): void {
     const { playback } = getState();
     const currentTheme = playback.theme;
 
@@ -15,13 +14,12 @@ export function applyTheme(theme) {
     }
 }
 
-/**
- * @param {string|number} val
- * @param {any} [viz]
- * @param {boolean} [fromDispatch]
- * @param {number|null} [oldBpmParam]
- */
-export function setBpm(val, viz, fromDispatch = false, oldBpmParam = null) {
+export function setBpm(
+    val: string | number,
+    viz?: any,
+    fromDispatch = false,
+    oldBpmParam: number | null = null,
+): void {
     const { playback, arranger } = getState();
     const newBpm = Math.max(40, Math.min(240, parseInt(val.toString(), 10)));
     const currentBpm = fromDispatch ? oldBpmParam || playback.bpm : playback.bpm;

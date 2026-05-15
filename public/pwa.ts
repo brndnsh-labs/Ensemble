@@ -1,12 +1,11 @@
 import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 
-/** @type {any} */
-let deferredPrompt;
-/** @type {ServiceWorker | null} */
-let newWorker;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let deferredPrompt: any;
+let newWorker: ServiceWorker | null;
 
-export function initPWA() {
+export function initPWA(): void {
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -40,13 +39,11 @@ export function initPWA() {
                 console.log('SW registered');
                 reg.update();
 
-                // 1. Check if there's already a worker waiting from a previous session
                 if (reg.waiting) {
                     newWorker = reg.waiting;
                     dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
                 }
 
-                // 2. Check if a worker is currently installing
                 if (reg.installing) {
                     newWorker = reg.installing;
                     if (newWorker) {
@@ -62,7 +59,6 @@ export function initPWA() {
                     }
                 }
 
-                // 3. Check for updates every hour, but also check immediately on load
                 setInterval(
                     () => {
                         reg.update();
@@ -70,19 +66,16 @@ export function initPWA() {
                     60 * 60 * 1000,
                 );
 
-                // Trigger a check when the page is focused or becomes visible
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
                         reg.update();
                     }
                 });
 
-                // 3. Listen for new workers being installed
                 reg.addEventListener('updatefound', () => {
                     newWorker = reg.installing;
                     if (newWorker) {
                         newWorker.addEventListener('statechange', () => {
-                            // Only notify the user once the new worker is fully installed (waiting to activate)
                             if (
                                 newWorker &&
                                 newWorker.state === 'installed' &&
@@ -107,13 +100,13 @@ export function initPWA() {
     }
 }
 
-export function skipWaiting() {
+export function skipWaiting(): void {
     if (newWorker) {
         newWorker.postMessage({ type: 'SKIP_WAITING' });
     }
 }
 
-export async function triggerInstall() {
+export async function triggerInstall(): Promise<boolean> {
     if (deferredPrompt) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;

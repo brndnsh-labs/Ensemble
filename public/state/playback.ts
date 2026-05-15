@@ -1,83 +1,151 @@
 import { deepSignal } from 'deepsignal';
+import type { ModalsState, PlaybackIntent } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-/**
- * @typedef {Object} GlobalContext
- * @property {AudioContext|null} audio - The Web Audio API context.
- * @property {GainNode|null} masterGain - The master volume gain node.
- * @property {WaveShaperNode|null} saturator - The master soft-clipper/saturator.
- * @property {DynamicsCompressorNode|null} masterLimiter - The master safety limiter.
- * @property {ConvolverNode|null} reverbNode - The global reverb node.
- * @property {BiquadFilterNode|null} reverbPreFilter - HPF for reverb cleaning.
- * @property {GainNode|null} chordsGain - The gain node for chords.
- * @property {GainNode|null} chordsReverb - Reverb send for chords.
- * @property {BiquadFilterNode|null} chordsEQ - EQ for chords (HP/Notch).
- * @property {StereoPannerNode|null} chordsPanner - Stereo panner for chords.
- * @property {GainNode|null} drumsGain - The gain node for drums.
- * @property {BiquadFilterNode|null} drumsEQ - HP/air EQ for drums bus.
- * @property {GainNode|null} drumsReverb - Reverb send for drums.
- * @property {GainNode|null} bassGain - The gain node for bass.
- * @property {GainNode|null} bassReverb - Reverb send for bass.
- * @property {GainNode|null} bassSidechain - Sidechain ducking gain node for bass.
- * @property {BiquadFilterNode|null} bassEQ - EQ for bass (HPF/Notch).
- * @property {GainNode|null} soloistGain - The gain node for soloist.
- * @property {GainNode|null} soloistReverb - Reverb send for soloist.
- * @property {BiquadFilterNode|null} soloistEQ - EQ for soloist (LPF/Shelf).
- * @property {GainNode|null} harmoniesGain - The gain node for harmonies.
- * @property {GainNode|null} harmoniesReverb - Reverb send for harmonies.
- * @property {BiquadFilterNode|null} harmoniesEQ - EQ for harmonies (HPF).
- * @property {StereoPannerNode|null} harmoniesPanner - Stereo panner for harmonies.
- * @property {boolean} isPlaying - Whether the sequencer is currently playing.
- * @property {number} bpm - Beats per minute (40-240).
- * @property {number} nextNoteTime - The scheduler time for the next note (swung).
- * @property {number} unswungNextNoteTime - The scheduler time for the next note (straight/quantized).
- * @property {number} scheduleAheadTime - Lookahead time for scheduling (in seconds).
- * @property {number} step - The global step counter.
- * @property {Array<import('../visualizer-events.js').VisualizerQueuedEvent>} drawQueue - Queue of normalized visual events waiting to be rendered.
- * @property {boolean} isCountingIn - Whether the metronome count-in is active.
- * @property {number} countInBeat - Current beat of the count-in (0-3).
- * @property {boolean} isDrawing - Whether the visualizer loop is active.
- * @property {string} theme - The current UI theme ('auto', 'light', 'dark').
- * @property {WakeLockSentinel|null} wakeLock - The screen wake lock object.
- * @property {number} bandIntensity - Global band intensity/energy level (0.0 - 1.0).
- * @property {number} complexity - Global complexity level (0.0 - 1.0).
- * @property {boolean} autoIntensity - Whether the intensity automatically drifts over time.
- * @property {boolean} practiceMode - Whether muted instruments strictly reserve their sonic space.
- * @property {boolean} metronome - Whether the metronome is active.
- * @property {boolean} applyPresetSettings - Whether to apply BPM/Style from presets.
- * @property {boolean} sustainActive - Whether the global sustain pedal is "pressed".
- * @property {boolean} songMode - Whether "Song Mode" (intelligent evolution and endings) is active.
- * @property {number} sessionTimer - Session timer in minutes (0 = infinite).
- * @property {boolean} debugSoloist - Whether debug logging for the soloist is active.
- * @property {number} sessionStartTime - The performance.now() timestamp when playback started.
- * @property {boolean} stopAtEnd - Whether to stop at the end of the current progression/loop.
- * @property {boolean} isEndingPending - Whether the resolution sequence is about to trigger.
- * @property {import('../types.js').PlaybackIntent} intent - Current rhythmic intent (syncopation, anticipation, etc).
- * @property {Array<HTMLElement>|null} lastActiveDrumElements - Cache of currently animating drum UI elements.
- * @property {Set<any>} heldNotes - Currently sustaining piano notes.
- * @property {number} lastPlayingStep - The last step index processed by the UI loop.
- * @property {boolean} workerLogging - Whether to log messages from the audio worker.
- * @property {number|null|any} suspendTimeout - ID of the timeout for audio context suspension.
- * @property {string|null} currentKey - The current musical key being tracked by playback.
- * @property {number} conductorVelocity - Dynamic velocity modifier (0.0-1.0) applied by Conductor.
- * @property {number} lyricalBias - Bias towards lyrical phrasing in soloist (0.0-1.0).
- * @property {number} masterVolume - Master output volume.
- * @property {boolean} countIn - Whether the metronome count-in is enabled.
- * @property {boolean} visualFlash - Whether visual flashing is enabled.
- * @property {boolean} haptic - Whether haptic feedback is enabled.
- * @property {Array<{id: string, message: string}>} toasts - List of active toast notifications.
- * @property {number} flashIntensity - Current intensity of the screen flash effect.
- * @property {boolean} updateAvailable - Whether a PWA update is pending.
- * @property {boolean} resolutionTriggered - Whether the resolution ending sequence has been triggered.
- * @property {boolean} isScheduling - Whether the scheduler is currently active.
- * @property {import('../types.js').ModalsState} modals - Visibility state for various UI modals.
- * @property {number} loopLimit - Number of loops before stopping (0 = infinite).
- * @property {number} currentLoopCount - Current loop iteration counter.
- */
-/**
- * @type {import('deepsignal').DeepSignal<GlobalContext>}
- */
-export const playback = deepSignal({
+export interface GlobalContext {
+    /** The Web Audio API context. */
+    audio: AudioContext | null;
+    /** The master volume gain node. */
+    masterGain: GainNode | null;
+    /** The master soft-clipper/saturator. */
+    saturator: WaveShaperNode | null;
+    /** The master safety limiter. */
+    masterLimiter: DynamicsCompressorNode | null;
+    /** The global reverb node. */
+    reverbNode: ConvolverNode | null;
+    /** HPF for reverb cleaning. */
+    reverbPreFilter: BiquadFilterNode | null;
+    /** The gain node for chords. */
+    chordsGain: GainNode | null;
+    /** Reverb send for chords. */
+    chordsReverb: GainNode | null;
+    /** EQ for chords (HP/Notch). */
+    chordsEQ: BiquadFilterNode | null;
+    /** Stereo panner for chords. */
+    chordsPanner: StereoPannerNode | null;
+    /** The gain node for drums. */
+    drumsGain: GainNode | null;
+    /** HP/air EQ for drums bus. */
+    drumsEQ: BiquadFilterNode | null;
+    /** Reverb send for drums. */
+    drumsReverb: GainNode | null;
+    /** The gain node for bass. */
+    bassGain: GainNode | null;
+    /** Reverb send for bass. */
+    bassReverb: GainNode | null;
+    /** Sidechain ducking gain node for bass. */
+    bassSidechain: GainNode | null;
+    /** EQ for bass (HPF/Notch). */
+    bassEQ: BiquadFilterNode | null;
+    /** The gain node for soloist. */
+    soloistGain: GainNode | null;
+    /** Reverb send for soloist. */
+    soloistReverb: GainNode | null;
+    /** EQ for soloist (LPF/Shelf). */
+    soloistEQ: BiquadFilterNode | null;
+    /** The gain node for harmonies. */
+    harmoniesGain: GainNode | null;
+    /** Reverb send for harmonies. */
+    harmoniesReverb: GainNode | null;
+    /** EQ for harmonies (HPF). */
+    harmoniesEQ: BiquadFilterNode | null;
+    /** Stereo panner for harmonies. */
+    harmoniesPanner: StereoPannerNode | null;
+    /** Whether the sequencer is currently playing. */
+    isPlaying: boolean;
+    /** Beats per minute (40-240). */
+    bpm: number;
+    /** The scheduler time for the next note (swung). */
+    nextNoteTime: number;
+    /** The scheduler time for the next note (straight/quantized). */
+    unswungNextNoteTime: number;
+    /** Lookahead time for scheduling (in seconds). */
+    scheduleAheadTime: number;
+    /** The global step counter. */
+    step: number;
+    /** Queue of normalized visual events waiting to be rendered. */
+    drawQueue: any[];
+    /** Whether the metronome count-in is active. */
+    isCountingIn: boolean;
+    /** Current beat of the count-in (0-3). */
+    countInBeat: number;
+    /** Whether the visualizer loop is active. */
+    isDrawing: boolean;
+    /** The current UI theme ('auto', 'light', 'dark'). */
+    theme: string;
+    /** The screen wake lock object. */
+    wakeLock: WakeLockSentinel | null;
+    /** Global band intensity/energy level (0.0 - 1.0). */
+    bandIntensity: number;
+    /** Global complexity level (0.0 - 1.0). */
+    complexity: number;
+    /** Whether the intensity automatically drifts over time. */
+    autoIntensity: boolean;
+    /** Whether muted instruments strictly reserve their sonic space. */
+    practiceMode: boolean;
+    /** Whether the metronome is active. */
+    metronome: boolean;
+    /** Whether to apply BPM/Style from presets. */
+    applyPresetSettings: boolean;
+    /** Whether the global sustain pedal is "pressed". */
+    sustainActive: boolean;
+    /** Whether "Song Mode" (intelligent evolution and endings) is active. */
+    songMode: boolean;
+    /** Session timer in minutes (0 = infinite). */
+    sessionTimer: number;
+    /** Whether debug logging for the soloist is active. */
+    debugSoloist: boolean;
+    /** The performance.now() timestamp when playback started. */
+    sessionStartTime: number;
+    /** Whether to stop at the end of the current progression/loop. */
+    stopAtEnd: boolean;
+    /** Whether the resolution sequence is about to trigger. */
+    isEndingPending: boolean;
+    /** Current rhythmic intent (syncopation, anticipation, etc). */
+    intent: PlaybackIntent;
+    /** Cache of currently animating drum UI elements. */
+    lastActiveDrumElements: HTMLElement[] | null;
+    /** Currently sustaining piano notes. */
+    heldNotes: Set<any>;
+    /** The last step index processed by the UI loop. */
+    lastPlayingStep: number;
+    /** Whether to log messages from the audio worker. */
+    workerLogging: boolean;
+    /** ID of the timeout for audio context suspension. */
+    suspendTimeout: number | null | any;
+    /** The current musical key being tracked by playback. */
+    currentKey: string | null;
+    /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
+    conductorVelocity: number;
+    /** Bias towards lyrical phrasing in soloist (0.0-1.0). */
+    lyricalBias: number;
+    /** Master output volume. */
+    masterVolume: number;
+    /** Whether the metronome count-in is enabled. */
+    countIn: boolean;
+    /** Whether visual flashing is enabled. */
+    visualFlash: boolean;
+    /** Whether haptic feedback is enabled. */
+    haptic: boolean;
+    /** List of active toast notifications. */
+    toasts: Array<{ id: string; message: string }>;
+    /** Current intensity of the screen flash effect. */
+    flashIntensity: number;
+    /** Whether a PWA update is pending. */
+    updateAvailable: boolean;
+    /** Whether the resolution ending sequence has been triggered. */
+    resolutionTriggered: boolean;
+    /** Whether the scheduler is currently active. */
+    isScheduling: boolean;
+    /** Visibility state for various UI modals. */
+    modals: ModalsState;
+    /** Number of loops before stopping (0 = infinite). */
+    loopLimit: number;
+    /** Current loop iteration counter. */
+    currentLoopCount: number;
+}
+
+export const playback = deepSignal<GlobalContext>({
     audio: null,
     masterGain: null,
     saturator: null,
@@ -147,7 +215,7 @@ export const playback = deepSignal({
     countIn: true,
     visualFlash: false,
     haptic: false,
-    toasts: /** @type {any[]} */ ([]),
+    toasts: [] as any[],
     flashIntensity: 0,
     updateAvailable: false,
     resolutionTriggered: false,
@@ -161,11 +229,7 @@ export const playback = deepSignal({
     },
 });
 
-/**
- * @param {string} action
- * @param {any} payload
- */
-export function playbackReducer(action, payload) {
+export function playbackReducer(action: string, payload: any): boolean {
     switch (action) {
         case ACTIONS.RESET_STATE:
             playback.bpm = 100;
@@ -200,13 +264,13 @@ export function playbackReducer(action, payload) {
             return true;
         case ACTIONS.SET_MODAL_OPEN:
             if (Object.hasOwn(playback.modals, payload.modal)) {
-                /** @type {any} */ (playback.modals)[payload.modal] = !!payload.open;
+                (playback.modals as any)[payload.modal] = !!payload.open;
                 return true;
             }
             return false;
         case ACTIONS.SET_PARAM:
             if (payload.module === 'playback') {
-                /** @type {any} */ (playback)[payload.param] = payload.value;
+                (playback as any)[payload.param] = payload.value;
                 return true;
             }
             break;
@@ -278,7 +342,7 @@ export function playbackReducer(action, payload) {
             return true;
         }
         case 'TOAST_EXPIRED':
-            playback.toasts = playback.toasts.filter((/** @type {any} */ t) => t.id !== payload);
+            playback.toasts = playback.toasts.filter((t: any) => t.id !== payload);
             return true;
         case ACTIONS.TRIGGER_FLASH:
             playback.flashIntensity = payload || 0.25;

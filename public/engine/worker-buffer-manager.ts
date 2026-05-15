@@ -1,15 +1,14 @@
+import type { EnsembleState } from '../types.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { generateNotesForStep } from './tick-logic.js';
 import { workerContext } from './worker-orchestrator.js';
 
-/**
- * Fills the note buffers for the next n steps ahead of the current step.
- * @param {import('../types.js').EnsembleState} state
- * @param {number} currentStep
- * @param {number|null} requestTimestamp
- * @param {number|null} processStartTime
- */
-export function fillBuffers(state, currentStep, requestTimestamp = null, processStartTime = null) {
+export function fillBuffers(
+    state: EnsembleState,
+    currentStep: number,
+    requestTimestamp: number | null = null,
+    processStartTime: number | null = null,
+): void {
     const { chords, bass, soloist, harmony } = state;
     const targetStep = currentStep + workerContext.LOOKAHEAD;
     const notesToMain = [];
