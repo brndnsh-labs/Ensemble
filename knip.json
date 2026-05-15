@@ -3,7 +3,7 @@
     "entry": [
         "public/main.js",
         "public/sw.js",
-        "public/ui-types.js",
+        "public/ui-types.ts",
         "public/ui-root.jsx",
         "public/visualizer-worker.js",
         "scripts/*.js",
