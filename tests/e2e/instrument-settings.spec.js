@@ -54,9 +54,7 @@ test.describe('Studio settings surfaces - Visual & Interaction', () => {
         await expectNoVerticalOverflow(surfaceBody);
     });
 
-    test('Drum settings sheet keeps swing and Lars controls within bounds @desktop', async ({
-        page,
-    }) => {
+    test('Drum settings sheet keeps swing controls within bounds @desktop', async ({ page }) => {
         const groovePanel = page.locator('#panel-grooves');
         const settingsBtn = groovePanel.getByRole('button', { name: 'Drums settings' });
 
