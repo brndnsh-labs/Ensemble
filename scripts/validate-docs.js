@@ -11,13 +11,14 @@ import path from 'node:path';
 const DOCS_TO_SCAN = [
     'README.md',
     'AI_MAP.md',
-    'AI.md',
-    '.github/copilot-instructions.md',
+    'CLAUDE.md',
+    'AGENTS.md',
     '.github/CONTRIBUTING.md',
     '.github/SECURITY.md',
     '.github/CODE_OF_CONDUCT.md',
     'docs/README.md',
     'docs/ROADMAP.md',
+    'docs/ARCHITECTURE_FOLLOWUPS.md',
     'docs/guides/WORKER_CONTRACT.md',
     'docs/guides/ENSEMBLE_COORDINATION.md',
     'docs/guides/REFERENCE_TUNING.md',
@@ -48,7 +49,8 @@ const IGNORE_FILES = [
 
 const VALID_BARE_LINKS = new Set([
     'README.md',
-    'AI.md',
+    'CLAUDE.md',
+    'AGENTS.md',
     'AI_MAP.md',
     'package.json',
     'package-lock.json',
@@ -66,9 +68,9 @@ const VALID_LINK_PREFIXES = [
     'scripts/',
 ];
 
-const PLAYWRIGHT_DOCS = ['AI.md', '.github/copilot-instructions.md'];
+const PLAYWRIGHT_DOCS = ['CLAUDE.md'];
 const REGISTER_DOCS = [
-    'AI.md',
+    'CLAUDE.md',
     'docs/guides/WORKER_CONTRACT.md',
     'docs/guides/ENSEMBLE_COORDINATION.md',
 ];

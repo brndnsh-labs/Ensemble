@@ -5,10 +5,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 ## Guide Hierarchy
 
 - Start here when you need file ownership, entrypoints, or likely edit locations.
-- Use `AI.md` for operational rules and safety conventions.
-- Use `docs/README.md` for the docs index and roadmap.
-- Use `.github/copilot-instructions.md` for the concise Copilot CLI summary.
-- If guidance conflicts, prefer live code/config first, then realign the docs so `AI.md` and `AI_MAP.md` stay reliable.
+- Use `CLAUDE.md` for operational rules, architecture, and safety conventions. (`AGENTS.md` is a pointer to it.)
+- Use `docs/README.md` for the docs index; `docs/ARCHITECTURE_FOLLOWUPS.md` for known architectural debt.
+- If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture
 
@@ -196,5 +195,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `.github/SECURITY.md` | Private vulnerability reporting guidance. |
 | `.github/CODE_OF_CONDUCT.md` | Community behavior standards. |
 | `tests/` | Unit, Integration, and E2E test suites. |
-| `AI.md` | Primary operational guide and architectural rules. |
+| `CLAUDE.md` | Primary operational guide and architectural rules. |
+| `AGENTS.md` | Pointer to `CLAUDE.md` for AGENTS.md-aware tools. |
 | `AI_MAP.md` | Codebase navigation (this file). |

@@ -4,7 +4,7 @@ Thanks for helping improve the project.
 
 ## Before you start
 
-- Read [`AI.md`](../AI.md) for operational rules.
+- Read [`CLAUDE.md`](../CLAUDE.md) for operational rules and architectural overview.
 - Use [`AI_MAP.md`](../AI_MAP.md) to find the right file quickly.
 - Skim [`docs/README.md`](../docs/README.md) for the repo layout and documentation entrypoints.
 

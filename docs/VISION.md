@@ -70,7 +70,7 @@ The layout is responsive, designed primarily for desktop and tablet, and degrade
 
 ### Open work
 - **Audio identity refresh** — add new soloist sounds; revisit chords/bass/harmony synthesis if a future audit turns up a new outlier. Use the existing rendered/symbolic audit flow rather than reopening a global mix sweep.
-- **Naming conventions cleanup** — standardize canonical names across code, docs, tests, configs, and persisted surfaces so one concept has one internal key and a documented alias map. Build a naming inventory first; centralize alias resolution in the owning config or normalization helper; update persistence/share/hydration surfaces together so old links keep working. See `AI.md` → "Naming, Canonicalization & Aliases" and `docs/guides/REFERENCE_TUNING.md` for tuning examples and alias lessons.
+- **Naming conventions cleanup** — standardize canonical names across code, docs, tests, configs, and persisted surfaces so one concept has one internal key and a documented alias map. Build a naming inventory first; centralize alias resolution in the owning config or normalization helper; update persistence/share/hydration surfaces together so old links keep working. See `CLAUDE.md` → "Naming / Canonicalization" and `docs/guides/REFERENCE_TUNING.md` for tuning examples and alias lessons.
 
 ### Key decisions made
 - Chart-first single surface replaces the four-workspace model

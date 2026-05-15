@@ -88,9 +88,9 @@ npm run validate
 - [`docs/README.md`](docs/README.md) — documentation index and repo navigation hub.
 - [`docs/VISION.md`](docs/VISION.md) — current open work and product direction.
 - [`public/MANUAL.md`](public/MANUAL.md) — the in-app manual, including generated reference tables.
-- [`AI.md`](AI.md) — operational rules and state-management guidance for contributors.
+- [`CLAUDE.md`](CLAUDE.md) — operational rules and architectural overview for AI-assisted work. (`AGENTS.md` points here.)
 - [`AI_MAP.md`](AI_MAP.md) — a navigation map for the codebase.
-- [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — workspace-specific Copilot guidance.
+- [`docs/ARCHITECTURE_FOLLOWUPS.md`](docs/ARCHITECTURE_FOLLOWUPS.md) — known architectural debt.
 - [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) — contributor workflow and validation expectations.
 - [`.github/SECURITY.md`](.github/SECURITY.md) — private vulnerability reporting.
 - [`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md) — community standards.
