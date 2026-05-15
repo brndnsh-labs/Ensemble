@@ -169,30 +169,109 @@ All 28 Preact component files renamed `.jsx` → `.tsx` and converted to TypeScr
 
 ---
 
-## Phase 7: Large Engine Files (400+ lines) ⬜
+## Phase 7: Small/Medium Unlisted Files 🔄
 
-Last — these are complex and depend on all types being settled.
+During Phase 7 planning, the tracker was found to be incomplete — 62 `.js` files remained but only 19 were listed here. Phase 7 covers all the small/medium files that slipped through earlier phases, organized into 5 batches by dependency order.
+
+### Batch A — Tiny + Data files ✅
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/engine/engine.js` | 471 | ⬜ | |
-| `public/engine/tick-logic.js` | 538 | ⬜ | |
+| `public/ui.ts` | 13 | ✅ | Added `msg: string` param |
+| `public/midi-export.ts` | 20 | ✅ | `options: Record<string, any> = {}` |
+| `public/data/smart-genres.ts` | ~50 | ✅ | `GenreOverride` + `SmartGenre` interfaces; typed maps |
+| `public/data/chord-presets.ts` | ~100 | ✅ | Pure data rename |
+| `public/data/drum-presets.ts` | ~100 | ✅ | `deepMerge(target: any, source: any): any`; `DRUM_PRESETS: Record<string, any>` |
+| `public/data/song-templates.ts` | ~100 | ✅ | Pure data rename |
+
+### Batch B — Small leaf engine utilities ✅
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/config.ts` | 204 | ✅ | `resolveMappedStyle` typed; imported by almost every engine file |
+| `public/engine/voicing-policy.ts` | 109 | ✅ | All functions typed with `EnsembleState` |
+| `public/engine/arranger-utils.ts` | 120 | ✅ | `UnrolledArrangement` interface exported |
+| `public/engine/worker-utils.ts` | 191 | ✅ | `WORKER_MANAGED_KEYS: Record<string, string[]>` |
+| `public/engine/audio-recovery.ts` | 164 | ✅ | `Float32Array<ArrayBuffer>` for TS 5.x; `onRecover` callback typed |
+| `public/engine/synth-bass.ts` | 188 | ✅ | `killBassNote`, `playBassNote` typed |
+| `public/engine/synth-utils.ts` | 249 | ✅ | `MixState`, `PercussiveStrikeOptions`, `ResonantToneOptions` interfaces |
+| `public/form-analysis.ts` | 171 | ✅ | |
+
+### Batch C — Medium leaf engines ✅
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/engine/theory-scales.ts` | 333 | ✅ | `ENHARMONIC_KEY_MAP: Record<string, string>`; all helpers typed |
+| `public/engine/fills.ts` | 302 | ✅ | `FillTemplate` + `GenreFills` interfaces; `level: 'low' \| 'medium' \| 'high'` |
+| `public/engine/midi-utils.ts` | 283 | ✅ | `MidiEvent` interface; `MidiTrack` class fully typed |
+| `public/engine/midi-scheduler.ts` | 191 | ✅ | All dispatch functions typed |
+| `public/engine/synth-chords.ts` | 342 | ✅ | `ChordInstrumentPreset` + `PlayNoteOptions` interfaces; inner `stopNote` typed |
+| `public/engine/resolution.ts` | 281 | ✅ | `CadenceStep` + `GenreConfig` interfaces; `generateResolutionNotes` typed |
+| `public/instrument-controller.ts` | 244 | ✅ | `handleTap(setBpmRef: (bpm: number) => void)` |
+| `public/visualizer-proxy.ts` | 207 | ✅ | `WorkerLike` interface; `declare const VIZ_WORKER_PATH`; class properties declared |
+
+### Batch D — Grooves ⬜
+
+Convert `grooves/utils.ts` first (imported by all 15 genre files).
+
+| File | Lines | Status |
+|------|-------|--------|
+| `public/engine/grooves/utils.js` | 158 | ⬜ |
+| `public/engine/grooves/minimal.js` | 92 | ⬜ |
+| `public/engine/grooves/shred.js` | 13 | ⬜ |
+| `public/engine/grooves/ska-punk.js` | 156 | ⬜ |
+| `public/engine/grooves/acoustic.js` | 141 | ⬜ |
+| `public/engine/grooves/country.js` | 140 | ⬜ |
+| `public/engine/grooves/metal.js` | 162 | ⬜ |
+| `public/engine/grooves/reggae.js` | 147 | ⬜ |
+| `public/engine/grooves/hiphop.js` | 187 | ⬜ |
+| `public/engine/grooves/latin.js` | 181 | ⬜ |
+| `public/engine/grooves/blues.js` | 175 | ⬜ |
+| `public/engine/grooves/neo-soul.js` | 237 | ⬜ |
+| `public/engine/grooves/disco.js` | 191 | ⬜ |
+| `public/engine/grooves/jazz.js` | 245 | ⬜ |
+| `public/engine/grooves/rock.js` | 266 | ⬜ |
+| `public/engine/grooves/funk.js` | 270 | ⬜ |
+
+### Batch E — Medium tracked files ⬜
+
+Convert `utils.ts` first (imported by 15+ files).
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/utils.js` | 878 | ⬜ | Convert first in batch |
+| `public/engine/engine.js` | 471 | ⬜ | Depends on utils, synth-* |
+| `public/engine/synth-harmonies.js` | 442 | ⬜ | |
+| `public/engine/bass-styles.js` | 952 | ⬜ | Depends on config, utils |
+| `public/visualizer-engine.js` | 885 | ⬜ | Depends on constants.ts, visualizer-events.ts, visualizer-utils.ts |
+
+---
+
+## Phase 8: Large/Complex Engine Files ⬜
+
+<!-- cspell:ignore webworker -->
+
+Deferred — these are the largest and most complex files; convert in a dedicated session after Phase 7 is complete. Worker files need `/// <reference lib="webworker" />` at the top when converted.
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
 | `public/engine/conductor.js` | 553 | ⬜ | |
+| `public/engine/tick-logic.js` | 538 | ⬜ | |
 | `public/engine/bass-engine.js` | 692 | ⬜ | |
-| `public/engine/harmonies.js` | 799 | ⬜ | |
 | `public/engine/soloist-rhythm-engine.js` | 704 | ⬜ | |
 | `public/engine/soloist-devices.js` | 749 | ⬜ | |
+| `public/engine/harmonies.js` | 799 | ⬜ | |
 | `public/engine/midi-worker-logic.js` | 821 | ⬜ | |
-| `public/utils.js` | 878 | ⬜ | |
-| `public/visualizer-engine.js` | 885 | ⬜ | |
-| `public/engine/bass-styles.js` | 952 | ⬜ | |
-| `public/engine/synth-soloist.js` | 969 | ⬜ | |
+| `public/engine/synth-drums.js` | 1147 | ⬜ | |
 | `public/engine/chords-engine.js` | 1057 | ⬜ | |
+| `public/engine/synth-soloist.js` | 969 | ⬜ | |
 | `public/engine/soloist-config.js` | 1593 | ⬜ | |
+| `public/engine/soloist-pitch-engine.js` | 1182 | ⬜ | |
+| `public/engine/soloist.js` | 1505 | ⬜ | |
 | `public/engine/accompaniment.js` | 1835 | ⬜ | |
 | `public/engine/soloist-seeder.js` | 2233 | ⬜ | Largest file; convert last |
-| `public/logic-worker.js` | ~400 | ⬜ | Worker entry point |
-| `public/visualizer-worker.js` | ~300 | ⬜ | Worker entry point |
+| `public/logic-worker.js` | ~400 | ⬜ | Worker — add `/// <reference lib="webworker" />` |
+| `public/visualizer-worker.js` | ~300 | ⬜ | Worker — add `/// <reference lib="webworker" />` |
 | `public/main.js` | ~300 | ⬜ | App entry point; convert last |
 
 ---
