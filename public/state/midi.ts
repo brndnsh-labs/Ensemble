@@ -60,7 +60,7 @@ export const midi = deepSignal<MidiState>({
     velocitySensitivity: 1.0,
 });
 
-export function midiReducer(action: string, payload: any): boolean {
+export function midiReducer(action: string, payload?: any): boolean {
     switch (action) {
         case ACTIONS.SET_PARAM:
             if (payload.module === 'midi') {

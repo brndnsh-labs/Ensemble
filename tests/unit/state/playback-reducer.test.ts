@@ -204,7 +204,7 @@ describe('Playback Reducer', () => {
 
             for (const [param, value] of Object.entries(allParams)) {
                 playbackReducer(ACTIONS.SET_PARAM, { module: 'playback', param, value });
-                expect(playback[param]).toEqual(value);
+                expect((playback as any)[param]).toEqual(value);
             }
         });
     });

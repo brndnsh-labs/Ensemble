@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { groove, grooveReducer } from '../../../public/state/groove.js';
+import { groove, grooveReducer as grooveReducerImpl } from '../../../public/state/groove.js';
 import { ACTIONS } from '../../../public/types.js';
+
+// Tests call grooveReducer with 1-2 args; production signature requires 3.
+const grooveReducer = grooveReducerImpl as (action: string, payload?: any, playback?: any) => any;
 
 describe('Groove Reducer', () => {
     beforeEach(() => {
@@ -58,7 +61,7 @@ describe('Groove Reducer', () => {
         const payload = { steps: { 0: 1 }, startStep: 16, length: 16, crash: true };
         grooveReducer(ACTIONS.TRIGGER_FILL, payload);
         expect(groove.fillActive).toBe(true);
-        expect(groove.fillSteps[0]).toBe(1);
+        expect((groove.fillSteps as any)[0]).toBe(1);
         expect(groove.pendingCrash).toBe(true);
     });
 
@@ -117,7 +120,7 @@ describe('Groove Reducer', () => {
 
             for (const [param, value] of Object.entries(params)) {
                 grooveReducer(ACTIONS.SET_PARAM, { module: 'groove', param, value }, {});
-                expect(groove[param]).toEqual(value);
+                expect((groove as any)[param]).toEqual(value);
             }
         });
     });

@@ -31,8 +31,8 @@ vi.mock('../../../public/state.js', () => {
 
         dispatch: vi.fn((action, payload) => {
             if (action === 'SET_PARAM') {
-                if (mockState[payload.module]) {
-                    mockState[payload.module][payload.param] = payload.value;
+                if ((mockState as any)[payload.module]) {
+                    (mockState as any)[payload.module][payload.param] = payload.value;
                 }
             }
         }),
@@ -113,9 +113,9 @@ describe('Arrangement Logic & Mixed Meter', () => {
                 start: i,
                 end: i + 1,
             }));
-            arranger.stepMap = introSteps;
-            const form = analyzeForm();
-            expect(form.sections[0].role).toBe('Intro');
+            arranger.stepMap = introSteps as any;
+            const form = analyzeForm(arranger);
+            expect(form!.sections[0].role).toBe('Intro');
         });
     });
 

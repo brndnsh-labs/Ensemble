@@ -22,7 +22,7 @@ export const conductor = deepSignal<ConductorState>({
     formIteration: 0,
 });
 
-export function conductorReducer(action: string, payload: any): boolean {
+export function conductorReducer(action: string, payload?: any): boolean {
     switch (action) {
         case ACTIONS.UPDATE_CONDUCTOR_STATE:
             if (payload.targetIntensity !== undefined) {

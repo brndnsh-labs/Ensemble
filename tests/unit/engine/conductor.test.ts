@@ -11,7 +11,7 @@ import {
 import { dispatch, getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = (await importOriginal()) as any;
 
     // Create distinct mock objects so we can control them
     const mockPlayback = { ...actual.playback };
@@ -74,7 +74,14 @@ vi.mock('../../../public/engine/fills.js', () => ({
 }));
 
 describe('Conductor Logic', () => {
-    let arranger, playback, groove, soloist, conductor, chords, bass, harmony;
+    let arranger: any,
+        playback: any,
+        groove: any,
+        soloist: any,
+        conductor: any,
+        chords: any,
+        bass: any,
+        harmony: any;
 
     beforeEach(() => {
         vi.clearAllMocks();

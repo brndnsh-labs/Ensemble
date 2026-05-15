@@ -229,7 +229,7 @@ export const playback = deepSignal<GlobalContext>({
     },
 });
 
-export function playbackReducer(action: string, payload: any): boolean {
+export function playbackReducer(action: string, payload?: any): boolean {
     switch (action) {
         case ACTIONS.RESET_STATE:
             playback.bpm = 100;

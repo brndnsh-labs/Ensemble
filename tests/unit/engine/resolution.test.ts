@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateResolutionNotes } from '../../../public/engine/resolution.js';
+import { generateResolutionNotes as generateResolutionNotesImpl } from '../../../public/engine/resolution.js';
+
+// Tests pass partial state/arranger objects; cast to any for the test boundary.
+const generateResolutionNotes = generateResolutionNotesImpl as (...args: any[]) => any[];
 
 // Mock state.js to provide necessary state for chords.js
 vi.mock('../../../public/state.js', () => ({
@@ -13,11 +16,11 @@ vi.mock('../../../public/state.js', () => ({
 
 // Use real utils and config if possible, or minimal mocks
 vi.mock('../../../public/utils.js', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = (await importOriginal()) as any;
     return {
         ...actual,
-        getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
-        getFrequency: (midi) => 440 * 2 ** ((midi - 69) / 12),
+        getMidi: (freq: any) => Math.round(69 + 12 * Math.log2(freq / 440)),
+        getFrequency: (midi: any) => 440 * 2 ** ((midi - 69) / 12),
         applyBluesBends: vi.fn(),
         calculateTimingOffset: vi.fn(() => 0),
         midiToNote: () => ({ name: 'C', octave: 4 }), // Simple mock
@@ -32,7 +35,13 @@ describe('Resolution Logic', () => {
         const step = 64;
 
         const state = { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } };
-        const notes = generateResolutionNotes(state, step, arranger, enabled, bpm);
+        const notes = generateResolutionNotes(
+            state as any,
+            step,
+            arranger as any,
+            enabled as any,
+            bpm,
+        );
 
         expect(notes.length).toBeGreaterThan(0);
 

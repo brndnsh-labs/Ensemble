@@ -20,7 +20,7 @@ import {
 
 describe('Utility Functions', () => {
     describe('DSP Utility Functions', () => {
-        let mockAudioCtx;
+        let mockAudioCtx: any;
 
         beforeEach(() => {
             mockAudioCtx = {
@@ -30,7 +30,7 @@ describe('Utility Functions', () => {
                     length,
                     sampleRate,
                     _data: Array.from({ length: channels }, () => new Float32Array(length)),
-                    getChannelData(channel) {
+                    getChannelData(channel: number) {
                         return this._data[channel];
                     },
                 })),
@@ -321,9 +321,9 @@ describe('Utility Functions', () => {
         it('should return fallback for NaN or non-finite values', () => {
             expect(midiToNote(NaN)).toEqual({ name: '---', octave: 0 });
             expect(midiToNote(Infinity)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote(undefined)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote(null)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote('60')).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote(undefined as any)).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote(null as any)).toEqual({ name: '---', octave: 0 });
+            expect(midiToNote('60' as any)).toEqual({ name: '---', octave: 0 });
         });
     });
 

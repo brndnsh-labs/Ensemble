@@ -54,7 +54,7 @@ describe('Arranger Reducer', () => {
 
             for (const [param, value] of Object.entries(params)) {
                 arrangerReducer(ACTIONS.SET_PARAM, { module: 'arranger', param, value });
-                expect(arranger[param]).toEqual(value);
+                expect((arranger as any)[param]).toEqual(value);
             }
         });
     });

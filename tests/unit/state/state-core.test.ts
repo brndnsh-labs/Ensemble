@@ -7,14 +7,14 @@ import { ACTIONS } from '../../../public/types.js';
 
 // Manual localStorage mock
 const localStorageMock = (() => {
-    let store = {};
+    let store: Record<string, string> = {};
     return {
         getItem: vi.fn((key) => store[key] || null),
         setItem: vi.fn((key, value) => {
             store[key] = value.toString();
         }),
         clear: vi.fn(() => {
-            store = {};
+            store = {} as Record<string, string>;
         }),
         removeItem: vi.fn((key) => {
             delete store[key];

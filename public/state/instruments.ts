@@ -352,7 +352,7 @@ const instrumentStateMap: Record<string, any> = {
     groove,
 };
 
-export function instrumentReducer(action: string, payload: any): boolean {
+export function instrumentReducer(action: string, payload?: any): boolean {
     switch (action) {
         case ACTIONS.SET_PARAM: {
             const modKey = payload.module === 'harmonies' ? 'harmony' : payload.module;

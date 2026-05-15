@@ -28,7 +28,7 @@ describe('MIDI State Reducer', () => {
 
             for (const [param, value] of Object.entries(params)) {
                 midiReducer(ACTIONS.SET_PARAM, { module: 'midi', param, value });
-                expect(midi[param]).toEqual(value);
+                expect((midi as any)[param]).toEqual(value);
             }
         });
     });

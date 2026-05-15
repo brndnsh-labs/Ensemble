@@ -95,7 +95,7 @@ describe('Instrument Reducer', () => {
             };
             for (const [p, v] of Object.entries(params)) {
                 instrumentReducer(ACTIONS.SET_PARAM, { module: 'chords', param: p, value: v });
-                expect(chords[p]).toBe(v);
+                expect((chords as any)[p]).toBe(v);
             }
         });
 
@@ -107,7 +107,7 @@ describe('Instrument Reducer', () => {
             };
             for (const [p, v] of Object.entries(params)) {
                 instrumentReducer(ACTIONS.SET_PARAM, { module: 'bass', param: p, value: v });
-                expect(bass[p]).toEqual(v);
+                expect((bass as any)[p]).toEqual(v);
             }
         });
 
@@ -119,7 +119,7 @@ describe('Instrument Reducer', () => {
             };
             for (const [p, v] of Object.entries(params)) {
                 instrumentReducer(ACTIONS.SET_PARAM, { module: 'soloist', param: p, value: v });
-                expect(soloist[p]).toEqual(v);
+                expect((soloist as any)[p]).toEqual(v);
             }
         });
 
@@ -131,7 +131,7 @@ describe('Instrument Reducer', () => {
             };
             for (const [p, v] of Object.entries(params)) {
                 instrumentReducer(ACTIONS.SET_PARAM, { module: 'harmony', param: p, value: v });
-                expect(harmony[p]).toEqual(v);
+                expect((harmony as any)[p]).toEqual(v);
             }
         });
 

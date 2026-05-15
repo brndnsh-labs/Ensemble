@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "types": ["vitest/globals", "chai"]
+    },
+    "include": ["public/**/*.ts", "public/**/*.tsx", "env.d.ts", "tests/**/*.ts", "tests/**/*.tsx"],
+    "exclude": ["node_modules", "dist", "tests/e2e", "tests/bench"]
+}

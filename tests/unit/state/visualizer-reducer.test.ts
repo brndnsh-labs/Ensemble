@@ -5,7 +5,7 @@ import { ACTIONS } from '../../../public/types.js';
 describe('Visualizer State Reducer', () => {
     it('should handle generic SET_PARAM action', () => {
         vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param: 'showGrid', value: true });
-        expect(vizState.showGrid).toBe(true);
+        expect((vizState as any).showGrid).toBe(true);
 
         const result = vizReducer(ACTIONS.SET_PARAM, {
             module: 'other',
@@ -30,7 +30,7 @@ describe('Visualizer State Reducer', () => {
 
             for (const [param, value] of Object.entries(params)) {
                 vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param, value });
-                expect(vizState[param]).toBe(value);
+                expect((vizState as any)[param]).toBe(value);
             }
         });
     });

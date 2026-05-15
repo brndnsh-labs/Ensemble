@@ -10,7 +10,7 @@ export const vizState = deepSignal<VisualizerState>({
     enabled: false,
 });
 
-export function vizReducer(action: string, payload: any): boolean {
+export function vizReducer(action: string, payload?: any): boolean {
     switch (action) {
         case ACTIONS.SET_PARAM:
             if (payload.module === 'viz' || payload.module === 'vizState') {
