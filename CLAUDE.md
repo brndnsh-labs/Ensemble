@@ -18,7 +18,7 @@ npm run dev          # build dist/ and serve on http://localhost:5173 (not hot-r
 npm run build        # dry-run production bundle into dist/
 npm run lint         # Biome lint + format check
 npm run format       # Biome write fixes
-npm run typecheck    # TypeScript over JS/JSDoc
+npm run typecheck    # tsc over public/**/*.{ts,tsx}
 npm test             # mutation check + Biome + docs lint + full Vitest run
 npm run test:e2e     # build dist/ and run Playwright
 npm run validate     # full pipeline: typecheck + knip + jscpd + format + npm test
@@ -44,33 +44,33 @@ npx playwright test -g "@mobile"
 
 Ensemble is a browser-based "virtual band" PWA: a Preact UI, deep-signal state slices, a real-time logic worker for generative note creation, and a separate OffscreenCanvas worker for visuals.
 
-### Bootstrap (`public/main.js`)
+### Bootstrap (`public/main.ts`)
 Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the Preact tree, then initializes the logic worker and subscribes state changes so `syncWorker()` and `handleEffects()` run on every dispatch. Hydration-before-mount order is intentional.
 
-### State (`public/state/`, `public/ui-bridge.js`, `public/state-effects.js`)
+### State (`public/state/`, `public/ui-bridge.ts`, `public/state-effects.ts`)
 - Domain slices: `playback`, `arranger`, `groove`, `instruments`, `midi`, `ui`, `visualizer`, `conductor` — each a `deepSignal`.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
-- `useEnsembleState()` in `public/ui-bridge.js` — reading a property inside the selector establishes reactivity.
-- `public/state-effects.js` owns cross-module side effects kept deliberately outside reducers.
+- `useEnsembleState()` in `public/ui-bridge.ts` — reading a property inside the selector establishes reactivity.
+- `public/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
 - Exception: direct mutation is allowed only in performance-critical engine code explicitly marked `// @direct-mutation`.
 
 ### Generative Engine Pipeline (worker thread)
-- `public/worker-client.js` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
-- `public/logic-worker.js` — orchestrates note generation, buffer fills, resolution handling, MIDI export.
-- `public/engine/scheduler-core.js` — real-time scheduler consuming worker buffers; timing is based on `playback.audio.currentTime`, not UI clocks.
-- Musical engines: `soloist.js`, `bass-engine.js`, `accompaniment.js`, `chords-engine.js`, `harmonies.js`, `grooves/` (15+ genre strategies).
+- `public/worker-client.ts` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
+- `public/logic-worker.ts` — orchestrates note generation, buffer fills, resolution handling, MIDI export.
+- `public/engine/scheduler-core.ts` — real-time scheduler consuming worker buffers; timing is based on `playback.audio.currentTime`, not UI clocks.
+- Musical engines: `soloist.ts`, `bass-engine.ts`, `accompaniment.ts`, `chords-engine.ts`, `harmonies.ts`, `grooves/` (15+ genre strategies).
 
 ### Visualizer Pipeline (separate OffscreenCanvas worker)
-- `public/visualizer-proxy.js` — main-thread wrapper.
-- `public/visualizer-worker.js` — `VisualizerEngine` with `OffscreenCanvas`.
+- `public/visualizer-proxy.ts` — main-thread wrapper.
+- `public/visualizer-worker.ts` — `VisualizerEngine` with `OffscreenCanvas`.
 - Clock sync is message-based; the worker interpolates time locally.
 
-### UI (`public/components/`, `public/App.jsx`)
+### UI (`public/components/`, `public/App.tsx`)
 Single chart-first surface (`ChartSurface`): the chord chart is always visible, with transport and key/time controls in a topbar, the instrument rail always accessible along one edge, and a 🌈 button that opens a full-screen visualizer overlay. There are no workspace tabs. New UI work should follow this model — controls radiate outward from the chart rather than living in separate navigable views.
 
 ### Data / Config split
-- UI metadata (menus, categories): `public/data/instrument-styles.js`
-- Generative behavior: `public/engine/bass-styles.js`, `public/engine/chords-styles.js`, `public/engine/grooves/`
+- UI metadata (menus, categories): `public/data/instrument-styles.ts`
+- Generative behavior: `public/engine/bass-styles.ts`, `public/engine/chords-styles.ts`, `public/engine/grooves/`
 - `public/styles.css` is an import manifest only — put feature CSS in `public/css/`.
 
 ## Key Conventions
@@ -79,7 +79,7 @@ Single chart-first surface (`ChartSurface`): the chord chart is always visible, 
 - Prefer **deterministic, seeded motif generation** (`barIndex`, `sectionId`) over raw `Math.random()`. Keeps critique tests and looped playback coherent.
 - Always add JSDoc explaining **why** a probability or offset exists. Musical intent is part of the implementation, not disposable tuning noise.
 - When musical correctness and programmer convenience conflict, favor musicality.
-- **Register slotting** (enforced via `public/engine/coordination-engine.js`): Bass 23–57, Chords/Harmony 52–84, Soloist priority 60–90 (clamp only when < MIDI 52). Always pass `CoordinationContext` to instrument generators.
+- **Register slotting** (enforced via `public/engine/coordination-engine.ts`): Bass 23–57, Chords/Harmony 52–84, Soloist priority 60–90 (clamp only when < MIDI 52). Always pass `CoordinationContext` to instrument generators.
 
 ### Dynamic Head / Chorus Evolution (Soloist)
 The soloist generates a session-wide `sessionSeed` (SRDC structure) at playback start. Loop behavior:
@@ -87,8 +87,8 @@ The soloist generates a session-wide `sessionSeed` (SRDC structure) at playback 
 - Loop 1: Themed Improv — pitch jitter, Gap-Fill, Sequencing, effective intensity +0.05.
 - Loop 2+: Exploratory — Progressive Ornamentation (+20%/loop), Fatigue Decay, Common Tone Reward.
 
-### TypeScript migration
-The project currently uses JSDoc with `tsc` checking via `jsconfig.json`. A **gradual** TypeScript migration is planned — not a big-bang rewrite. New files and heavily-touched existing files should move toward explicit JSDoc `@type`, `@param`, and `@returns` tags using the global interfaces in `public/types.js`. Run `npm run typecheck` before concluding any task.
+### TypeScript
+Migration from JSDoc-annotated JS to real TypeScript is **complete** (May 2026). All source under `public/` is `.ts`/`.tsx`. Use real TS annotations and the global interfaces in `public/types.ts`. Run `npm run typecheck` before concluding any task. `tsconfig.json` has `strict: true` and `moduleResolution: Bundler` — import specifiers can keep `.js`/`.jsx` suffixes for compatibility; the resolver finds the `.ts`/`.tsx` source.
 
 ### Naming / Canonicalization
 - One canonical internal name per concept. Aliases live near the data/config that owns the concept.
@@ -110,7 +110,7 @@ The project currently uses JSDoc with `tsc` checking via `jsconfig.json`. A **gr
 ## Active Product Direction (from `docs/VISION.md`)
 
 - **UI redesign:** Chart-first single surface replacing the four-workspace model. Chart always visible, controls always accessible without navigating away.
-- **TypeScript migration:** Gradual. JSDoc + tsc today; `.ts`/`.tsx` files as the natural endpoint.
+- **TypeScript:** Migration complete. All `public/` source is `.ts`/`.tsx`.
 - **Cruft removal:** Lars mode and audio analyzer are slated for removal.
 - **Synthesis quality:** Named ongoing investment — if something doesn't sound good, fix it.
 - **URL sharing:** A marquee feature deserving more prominence, not a hidden option.

@@ -35,16 +35,16 @@ This document is the primary operational guide for AI agents working on the Ense
 *   **Verify Exports:** Ensure symbols are properly exported and check for circular dependencies.
 
 ### B. State Management (Signals-First)
-*   **Domain Slices:** State is decomposed into `public/state/` (e.g., `playback.js`, `arranger.js`). Each slice is a **reactive deepSignal**.
+*   **Domain Slices:** State is decomposed into `public/state/` (e.g., `playback.ts`, `arranger.ts`). Each slice is a **reactive deepSignal**.
 *   **Writes**: ALWAYS use `dispatch(ACTIONS.TYPE, payload)`. This serves as the unified event bus for state updates and side effects (like Worker sync).
 *   **Reactivity**: Use the `useEnsembleState` hook in `public/ui-bridge.ts` for component updates. Since the state uses `deepSignal`, accessing a property in the selector automatically subscribes the component to updates for that specific property.
 *   **Styles & Configuration**: 
     *   **UI Metadata**: `public/data/instrument-styles.ts` defines names and categories for menus.
     *   **Generative Logic**: Modular style modules (e.g., `public/engine/bass-styles.ts`) contain the actual musical algorithms.
 *   **The @direct-mutation Exception**: Direct mutation of state objects is **strictly forbidden** in controllers (e.g., `public/app-controller.ts`) and UI components.
- It is **only allowed** in performance-critical engine code (e.g., `scheduler-core.js`, `synth-*.js`) for real-time audio parameters. These must be marked with a `// @direct-mutation` comment for transparency.
-*   **Decoupling**: Avoid circular dependencies. Use **Inversion of Control (IoC)** for side effects (e.g., `state-effects.js` should not be imported by state slices; it should subscribe to state changes via `dispatch` event bus).
-*   **Complex Actions**: For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.ts` or `scheduler-core.js` rather than dispatching raw actions.
+ It is **only allowed** in performance-critical engine code (e.g., `scheduler-core.ts`, `synth-*.ts`) for real-time audio parameters. These must be marked with a `// @direct-mutation` comment for transparency.
+*   **Decoupling**: Avoid circular dependencies. Use **Inversion of Control (IoC)** for side effects (e.g., `state-effects.ts` should not be imported by state slices; it should subscribe to state changes via `dispatch` event bus).
+*   **Complex Actions**: For actions with audio side effects (e.g., `togglePlay`, `setBpm`), import the specific controller function from `app-controller.ts` or `scheduler-core.ts` rather than dispatching raw actions.
 
 ### C. UI & Component Architecture
 *   **Preact (v10):** All new UI logic must be encapsulated in functional components within `public/components/`.
@@ -68,7 +68,7 @@ This document is the primary operational guide for AI agents working on the Ense
     *   `Loop 0 (The Head)`: Adhere strictly to the "Head" (`sessionSeed`). Use `survivalProb = 1.0` to ensure no notes are skipped. Phrasing is driven by the seeder's SRDC structure and **Imperfect Symmetry** (30% motivic drift in cloned measures to avoid mechanical looping).
     *   `Loop 1 (Conversational)`: Shift to "Themed Improv." Start introducing pitch variation (jitter), **Gap-Fill Improvisation** (inserting generative notes between theme hits), and **Sequencing** (transposing seeded motifs). The "Effective Intensity" nudges up (+0.05) to naturally lift energy.
     *   `Loop 2+ (Exploratory)`: Transition to full generative performance. **Progressive Ornamentation** increases device probability (+20% per loop). "Fatigue Decay" shortens breaths (rests), and "Common Tone Reward" logic allows the soloist to intelligently "stick" to stable notes during chord changes for professional "pedal point" effects.
-*   **Motifs:** Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.js`.
+*   **Motifs:** Prioritize **Deterministic Motifs** (using `barIndex` or `sectionId` seeds) over raw `Math.random()`. This ensures structural cohesion and professional musical phrasing. Reference `getDrumMotif` in `groove-engine.ts`.
 
 ### C. Naming, Canonicalization & Aliases
 *   **One canonical name per concept:** Every musical concept, style, label, or preset must have one canonical internal name. UI labels may be friendlier or more descriptive, but state keys, config keys, persisted payloads, and code paths should normalize to the canonical form.
@@ -80,7 +80,7 @@ This document is the primary operational guide for AI agents working on the Ense
 *   **Doc targets:** Use `docs/VISION.md` ("Open work") for the active cleanup item, `docs/guides/REFERENCE_TUNING.md` for concrete examples from tuning work, and `AI_MAP.md` only for navigation.
 
 ### D. Coordination & Register Slotting
-Always pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:
+Always pass the `CoordinationContext` to instrument generators. In `logic-worker.ts`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:
 *   **Source of truth:** `public/engine/coordination-engine.ts`
 *   **Bass:** 23–57
 *   **Chords/Harmony:** 52–84
@@ -123,7 +123,7 @@ Ensemble uses a hybrid manual (`public/MANUAL.md`) that combines hand-written ta
 
 ## 6. AI-Friendly Best Practices
 
-1.  **Fail Fast in Workers:** Validate payload shapes immediately when sending data to `logic-worker.js`.
+1.  **Fail Fast in Workers:** Validate payload shapes immediately when sending data to `logic-worker.ts`.
 2.  **No Magic Numbers:** Use CSS variables for all spacing and colors.
 3.  **CSS Ownership:** Keep `public/styles.css` as an import manifest only. Put feature rules in the owning file under `public/css/` rather than adding ad hoc selectors to the entrypoint.
 4.  **Inline Style Rule:** Keep inline styles only for runtime-calculated values (e.g. widths, dynamic grid templates, transition names). Move static presentation into semantic CSS classes.

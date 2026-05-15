@@ -6,10 +6,10 @@
         "dist",
         "tests",
         "scripts",
-        "public/data/drum-presets.js",
-        "public/data/chord-presets.js",
-        "public/data/smart-genres.js",
-        "public/engine/soloist-config.js"
+        "public/data/drum-presets.ts",
+        "public/data/chord-presets.ts",
+        "public/data/smart-genres.ts",
+        "public/engine/soloist-config.ts"
     ],
     "absolute": true,
     "gitignore": true
