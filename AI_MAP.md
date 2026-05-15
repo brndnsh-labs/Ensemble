@@ -42,8 +42,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/engine/soloist.js` | Melodic soloist generation logic (Main). | `getSoloistNote` |
-| `public/engine/soloist-seeder.js` | Dynamic Head (Seed Melody) generation logic. | `generateSessionSeed` |
+| `public/engine/soloist.ts` | Melodic soloist generation logic (Main). | `getSoloistNote` |
+| `public/engine/soloist-seeder.ts` | Dynamic Head (Seed Melody) generation logic. | `generateSessionSeed` |
 | `public/engine/bass-engine.ts` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
@@ -80,7 +80,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
 | `public/engine/groove-engine.ts` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
-| `public/engine/soloist-pitch-engine.js` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
+| `public/engine/soloist-pitch-engine.ts` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
 | `public/engine/soloist-rhythm-engine.ts` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
 | `public/engine/worker-utils.ts` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
 | `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
@@ -107,7 +107,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/synth-chords.ts` | Polyphonic piano/pad synthesis. |
 | `public/engine/synth-drums.ts` | Procedural percussion synthesis. |
 | `public/engine/synth-harmonies.ts` | Background "Stab" and "Pad" synthesis. |
-| `public/engine/synth-soloist.js` | Lead instrument synthesis and glides. |
+| `public/engine/synth-soloist.ts` | Lead instrument synthesis and glides. |
 
 ## Data & Configuration
 

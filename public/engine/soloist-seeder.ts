@@ -1,8 +1,102 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { ArrangerState } from '../state/arranger.js';
+import type { EnsembleState } from '../types.js';
 import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
 import { getSoloistRegisterProfile, resolveSoloistStyle, STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
+
+export type SeedSupportRole = 'pickup' | 'line' | 'accent' | 'anchor' | 'cadence' | 'sustain';
+
+export interface SeedGuitarSupportHint {
+    /** Whether guitar mode may add a supporting note here. */
+    allowDoubleStop: boolean;
+    /** Which grip family best supports the note. */
+    intervalPalette: 'tight' | 'open' | 'blues';
+    /** Whether the supporting note should live below the melody. */
+    preferBelow: boolean;
+}
+
+export interface SeedSupportHints {
+    /** The melodic job of this note inside the head. */
+    role: SeedSupportRole;
+    /** Higher values invite more ringing support than moving lines. */
+    sustainBias: number;
+    /** Guitar-specific realization hints for this melody note. */
+    guitar: SeedGuitarSupportHint;
+}
+
+export interface SeedSupportHintOverrides {
+    role?: SeedSupportRole;
+    sustainBias?: number;
+    guitar?: Partial<SeedGuitarSupportHint>;
+}
+
+export interface SeedNote {
+    /** Global step target within the loop. */
+    step: number;
+    /** MIDI note value. */
+    midi: number;
+    /** True if it's a structural anchor (downbeat / phrase start). */
+    isAnchor: boolean;
+    /** Suggested duration in steps. */
+    durationSteps: number;
+    /** Suggested velocity (0.0 - 1.0). */
+    velocity: number;
+    /** Optional micro-timing offset in seconds for off-grid phrasing. */
+    timingOffset?: number;
+    /** Optional triplet slot tag for audits and playback. */
+    tripletPlacement?: 't1' | 't2';
+    /** Optional accompaniment hints that keep the melody primary. */
+    supportHints?: SeedSupportHints;
+}
+
+/**
+ * A single note-like event inside a rhythmic cell template.
+ * "isRest: false" cells are converted to SeedNotes during motif application.
+ */
+export interface MotifCellNote {
+    /** Beat position within the measure (fractional beats, e.g. 0.5 = "and of 1"). */
+    beatOffset: number;
+    /** When true the slot is silent; used to create space between phrases. */
+    isRest: boolean;
+    /** Note length in steps. */
+    duration: number;
+}
+
+/**
+ * Ordered list of motif events. Scale-degree offsets are relative to the root of the section's
+ * first chord; they get resolved to absolute MIDI values during the application phase.
+ */
+export interface MotifEvent {
+    beatOffset: number;
+    isPickup: boolean;
+    scaleDegreeOffset: number;
+    duration: number;
+    isRest: boolean;
+}
+
+/**
+ * One section's worth of rhythmic/melodic template that gets repeated and mutated
+ * as the arrangement progresses.  The motif stores relative scale-degree offsets so
+ * it can be transposed and re-harmonized against any chord progression.
+ */
+export interface MotifEntry {
+    motif: MotifEvent[];
+    /** Template length in measures (2 or 4). */
+    phraseLength: number;
+    /**
+     * Melodic contour archetype selected for this section
+     * ('ASCEND' | 'DESCEND' | 'ARCH' | 'VALLEY' | 'HOOK' | 'ARPEGGIATE' | 'STATIC').
+     */
+    contourType: string;
+    /** Summary stats used to detect contrast needs when generating departure sections. */
+    metrics: { density: number; syncopationRatio: number };
+    /**
+     * When true all notes stay near the anchor pitch, producing a drone-like pedal effect.
+     */
+    isStationaryMotif: boolean;
+}
 
 /**
  * Rhythmic Cell Dictionary
@@ -71,92 +165,17 @@ const PICKUP_DICTIONARY = {
  * stepwise motion, and pickups (anacrusis).
  */
 
-/**
- * @typedef {'pickup' | 'line' | 'accent' | 'anchor' | 'cadence' | 'sustain'} SeedSupportRole
- */
-
-/**
- * @typedef {Object} SeedGuitarSupportHint
- * @property {boolean} allowDoubleStop - Whether guitar mode may add a supporting note here.
- * @property {'tight' | 'open' | 'blues'} intervalPalette - Which grip family best supports the note.
- * @property {boolean} preferBelow - Whether the supporting note should live below the melody.
- */
-
-/**
- * @typedef {Object} SeedSupportHints
- * @property {SeedSupportRole} role - The melodic job of this note inside the head.
- * @property {number} sustainBias - Higher values invite more ringing support than moving lines.
- * @property {SeedGuitarSupportHint} guitar - Guitar-specific realization hints for this melody note.
- */
-
-/**
- * @typedef {Object} SeedSupportHintOverrides
- * @property {SeedSupportRole} [role]
- * @property {number} [sustainBias]
- * @property {Partial<SeedGuitarSupportHint>} [guitar]
- */
-
-/**
- * @typedef {Object} SeedNote
- * @property {number} step - Global step target within the loop.
- * @property {number} midi - MIDI note value.
- * @property {boolean} isAnchor - True if it's a structural anchor (downbeat / phrase start).
- * @property {number} durationSteps - Suggested duration in steps.
- * @property {number} velocity - Suggested velocity (0.0 - 1.0).
- * @property {number} [timingOffset] - Optional micro-timing offset in seconds for off-grid phrasing.
- * @property {'t1' | 't2'} [tripletPlacement] - Optional triplet slot tag for audits and playback.
- * @property {SeedSupportHints} [supportHints] - Optional accompaniment hints that keep the melody primary.
- */
-
-/**
- * A single note-like event inside a rhythmic cell template.
- * "isRest: false" cells are converted to SeedNotes during motif application.
- * @typedef {Object} MotifCellNote
- * @property {number} beatOffset - Beat position within the measure (fractional beats, e.g. 0.5 = "and of 1").
- * @property {boolean} isRest - When true the slot is silent; used to create space between phrases.
- * @property {number} duration - Note length in steps.
- */
-
-/**
- * One section's worth of rhythmic/melodic template that gets repeated and mutated
- * as the arrangement progresses.  The motif stores relative scale-degree offsets so
- * it can be transposed and re-harmonized against any chord progression.
- * @typedef {Object} MotifEntry
- * @property {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} motif
- *   Ordered list of motif events.  Scale-degree offsets are relative to the root of the section's
- *   first chord; they get resolved to absolute MIDI values during the application phase.
- * @property {number} phraseLength - Template length in measures (2 or 4).
- * @property {string} contourType - Melodic contour archetype selected for this section
- *   ('ASCEND' | 'DESCEND' | 'ARCH' | 'VALLEY' | 'HOOK' | 'ARPEGGIATE' | 'STATIC').
- * @property {{ density: number, syncopationRatio: number }} metrics - Summary stats used to
- *   detect contrast needs when generating departure sections.
- * @property {boolean} isStationaryMotif - When true all notes stay near the anchor pitch,
- *   producing a drone-like pedal effect.
- */
-
-/**
- * @param {number} interval
- * @returns {number}
- */
-function normalizeInterval(interval) {
+function normalizeInterval(interval: number): number {
     return ((interval % 12) + 12) % 12;
 }
 
 const TRIPLET_POSITION_TOLERANCE = 0.05;
 
-/**
- * @param {number} value
- * @returns {number}
- */
-function roundSeedRhythmValue(value) {
+function roundSeedRhythmValue(value: number): number {
     return Math.round(value * 1000) / 1000;
 }
 
-/**
- * @param {number} beatOffset
- * @returns {'t1' | 't2' | undefined}
- */
-function getTripletPlacementTag(beatOffset) {
+function getTripletPlacementTag(beatOffset: number): 't1' | 't2' | undefined {
     const beatFraction = ((beatOffset % 1) + 1) % 1;
     if (Math.abs(beatFraction - 1 / 3) <= TRIPLET_POSITION_TOLERANCE) {
         return 't1';
@@ -167,14 +186,12 @@ function getTripletPlacementTag(beatOffset) {
     return undefined;
 }
 
-/**
- * @param {number} beatOffset
- * @param {number} stepsPerBeat
- * @param {number} bpm
- * @param {number} timingStrength
- * @returns {{ stepOffset: number, timingOffset: number, tripletPlacement: 't1' | 't2' | undefined }}
- */
-function buildSeedTimingPlacement(beatOffset, stepsPerBeat, bpm, timingStrength) {
+function buildSeedTimingPlacement(
+    beatOffset: number,
+    stepsPerBeat: number,
+    bpm: number,
+    timingStrength: number,
+): { stepOffset: number; timingOffset: number; tripletPlacement: 't1' | 't2' | undefined } {
     const rawStep = beatOffset * stepsPerBeat;
     const stepOffset = Math.round(rawStep);
     const tripletPlacement = getTripletPlacementTag(beatOffset);
@@ -190,28 +207,19 @@ function buildSeedTimingPlacement(beatOffset, stepsPerBeat, bpm, timingStrength)
     return { stepOffset, timingOffset, tripletPlacement };
 }
 
-/**
- * @template T
- * @param {T[]} pool
- * @param {number} repeats
- * @returns {T[]}
- */
-function repeatCellPool(pool, repeats) {
-    /** @type {T[]} */
-    const repeated = [];
+function repeatCellPool<T>(pool: T[], repeats: number): T[] {
+    const repeated: T[] = [];
     for (let i = 0; i < repeats; i++) {
         repeated.push(...pool);
     }
     return repeated;
 }
 
-/**
- * @param {number[]} pattern
- * @param {number} beatsPerCell
- * @param {number} stepsPerBeat
- * @returns {MotifCellNote[]}
- */
-function buildPatternCell(pattern, beatsPerCell, stepsPerBeat) {
+function buildPatternCell(
+    pattern: number[],
+    beatsPerCell: number,
+    stepsPerBeat: number,
+): MotifCellNote[] {
     return pattern.map((beatOffset, idx) => {
         const nextOffset = pattern[idx + 1] ?? beatsPerCell;
         return {
@@ -222,28 +230,24 @@ function buildPatternCell(pattern, beatsPerCell, stepsPerBeat) {
     });
 }
 
-/**
- * @param {SeedNote | undefined | null} note
- * @returns {boolean}
- */
-function isTripletSeedNote(note) {
+function isTripletSeedNote(note: SeedNote | undefined | null): boolean {
     return Boolean(note?.tripletPlacement);
+}
+
+interface BuildSeedSupportHintsOptions {
+    style: string;
+    step: number;
+    durationSteps: number;
+    isAnchor: boolean;
+    isPickup: boolean;
+    stepsPerMeasure: number;
+    stepsPerBeat: number;
 }
 
 /**
  * Build optional support metadata so phrasing modes can reinforce the melody without rewriting it.
- * @param {{
- *   style: string,
- *   step: number,
- *   durationSteps: number,
- *   isAnchor: boolean,
- *   isPickup: boolean,
- *   stepsPerMeasure: number,
- *   stepsPerBeat: number,
- * }} options
- * @returns {SeedSupportHints}
  */
-function buildSeedSupportHints(options) {
+function buildSeedSupportHints(options: BuildSeedSupportHintsOptions): SeedSupportHints {
     const { style, step, durationSteps, isAnchor, isPickup, stepsPerMeasure, stepsPerBeat } =
         options;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
@@ -251,8 +255,7 @@ function buildSeedSupportHints(options) {
     const isCadenceZone = measureStep >= Math.max(0, stepsPerMeasure - stepsPerBeat);
     const isBeatAttack = measureStep % stepsPerBeat === 0;
 
-    /** @type {SeedSupportRole} */
-    let role = 'line';
+    let role: SeedSupportRole = 'line';
     if (isPickup || step < 0) {
         role = 'pickup';
     } else if (isAnchor && isCadenceZone) {
@@ -287,8 +290,7 @@ function buildSeedSupportHints(options) {
         }
     }
 
-    /** @type {'tight' | 'open' | 'blues'} */
-    let intervalPalette = 'tight';
+    let intervalPalette: 'tight' | 'open' | 'blues' = 'tight';
     if (style === 'blues') {
         intervalPalette = 'blues';
     } else if (style === 'country' || role === 'sustain' || role === 'cadence') {
@@ -306,23 +308,21 @@ function buildSeedSupportHints(options) {
     };
 }
 
-/**
- * @param {{
- *   style: string,
- *   step: number,
- *   midi: number,
- *   isAnchor: boolean,
- *   durationSteps: number,
- *   velocity: number,
- *   timingOffset?: number,
- *   tripletPlacement?: 't1' | 't2',
- *   isPickup?: boolean,
- *   stepsPerMeasure: number,
- *   stepsPerBeat: number,
- * }} options
- * @returns {SeedNote}
- */
-function createSeedNote(options) {
+interface CreateSeedNoteOptions {
+    style: string;
+    step: number;
+    midi: number;
+    isAnchor: boolean;
+    durationSteps: number;
+    velocity: number;
+    timingOffset?: number;
+    tripletPlacement?: 't1' | 't2';
+    isPickup?: boolean;
+    stepsPerMeasure: number;
+    stepsPerBeat: number;
+}
+
+function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
     const {
         style,
         step,
@@ -337,8 +337,7 @@ function createSeedNote(options) {
         stepsPerBeat,
     } = options;
 
-    /** @type {SeedNote} */
-    const note = {
+    const note: SeedNote = {
         step,
         midi,
         isAnchor,
@@ -365,12 +364,10 @@ function createSeedNote(options) {
     return note;
 }
 
-/**
- * @param {SeedNote} note
- * @param {SeedSupportHintOverrides} overrides
- * @returns {SeedSupportHints | undefined}
- */
-function overrideSeedSupportHints(note, overrides) {
+function overrideSeedSupportHints(
+    note: SeedNote,
+    overrides: SeedSupportHintOverrides,
+): SeedSupportHints | undefined {
     if (!note.supportHints) {
         return undefined;
     }
@@ -385,12 +382,7 @@ function overrideSeedSupportHints(note, overrides) {
     };
 }
 
-/**
- * @param {string | undefined} label
- * @param {string} style
- * @returns {string}
- */
-function getSectionCategory(label, style) {
+function getSectionCategory(label: string | undefined, style: string): string {
     const normalized = (label || 'Main').toLowerCase();
 
     if (normalized.includes('intro')) {
@@ -410,11 +402,7 @@ function getSectionCategory(label, style) {
     return category || 'main';
 }
 
-/**
- * @param {string} category
- * @returns {boolean}
- */
-function isDepartureCategory(category) {
+function isDepartureCategory(category: string): boolean {
     return (
         category === 'chorus' ||
         category === 'bridge' ||
@@ -423,44 +411,28 @@ function isDepartureCategory(category) {
     );
 }
 
-/**
- * @param {number} interval
- * @returns {boolean}
- */
-function isSoftCadenceInterval(interval) {
+function isSoftCadenceInterval(interval: number): boolean {
     const normalized = normalizeInterval(interval);
     return normalized === 2 || normalized === 5 || normalized === 9;
 }
 
-/**
- * @param {number} interval
- * @param {number[]} chordIntervals
- * @returns {boolean}
- */
-function isStableCadenceInterval(interval, chordIntervals) {
+function isStableCadenceInterval(interval: number, chordIntervals: number[]): boolean {
     const normalized = normalizeInterval(interval);
     return chordIntervals.some((chordInterval) => normalizeInterval(chordInterval) === normalized);
 }
 
-/**
- * @param {number[]} scale
- * @param {number[]} chordIntervals
- * @param {{ preferStable?: boolean, preferConclusive?: boolean }} [options]
- * @returns {number[]}
- */
 function buildCadenceDegreePool(
-    scale,
-    chordIntervals,
-    { preferStable = false, preferConclusive = false } = {},
-) {
-    /** @type {number[]} */
-    const rootDegrees = [];
-    /** @type {number[]} */
-    const thirdDegrees = [];
-    /** @type {number[]} */
-    const stableDegrees = [];
-    /** @type {number[]} */
-    const colorDegrees = [];
+    scale: number[],
+    chordIntervals: number[],
+    {
+        preferStable = false,
+        preferConclusive = false,
+    }: { preferStable?: boolean; preferConclusive?: boolean } = {},
+): number[] {
+    const rootDegrees: number[] = [];
+    const thirdDegrees: number[] = [];
+    const stableDegrees: number[] = [];
+    const colorDegrees: number[] = [];
 
     scale.forEach((interval, degree) => {
         const normalized = normalizeInterval(interval);
@@ -489,17 +461,14 @@ function buildCadenceDegreePool(
     return [...stableDegrees, ...stableDegrees, ...colorDegrees];
 }
 
-/**
- * @param {SeedNote} note
- * @param {SeedNote | null} previousNote
- * @param {any} chord
- * @param {boolean} allowSoftColor
- * @returns {number}
- */
-function selectLandingMidi(note, previousNote, chord, allowSoftColor) {
+function selectLandingMidi(
+    note: SeedNote,
+    previousNote: SeedNote | null,
+    chord: any,
+    allowSoftColor: boolean,
+): number {
     const chordIntervals = chord.intervals || [0, 4, 7];
-    /** @type {number[]} */
-    const allowedIntervals = [...chordIntervals];
+    const allowedIntervals: number[] = [...chordIntervals];
 
     if (allowSoftColor) {
         allowedIntervals.push(2, 5, 9);
@@ -535,28 +504,19 @@ function selectLandingMidi(note, previousNote, chord, allowSoftColor) {
     return bestMidi;
 }
 
-/**
- * @param {SeedNote[]} notes
- * @param {any[]} stepMap
- * @param {any[]} sectionMap
- * @param {number} actualTotalSteps
- * @param {number} stepsPerMeasure
- * @param {string} style
- * @returns {SeedNote[]}
- */
 function polishCadenceLandings(
-    notes,
-    stepMap,
-    sectionMap,
-    actualTotalSteps,
-    stepsPerMeasure,
-    style,
-) {
+    notes: SeedNote[],
+    stepMap: any[],
+    sectionMap: any[],
+    actualTotalSteps: number,
+    stepsPerMeasure: number,
+    style: string,
+): SeedNote[] {
     const polishedNotes = [...notes].sort((a, b) => a.step - b.step);
 
     for (let measureStart = 0; measureStart < actualTotalSteps; measureStart += stepsPerMeasure) {
         const measureEnd = measureStart + stepsPerMeasure;
-        const noteIndexes = [];
+        const noteIndexes: number[] = [];
 
         for (let i = 0; i < polishedNotes.length; i++) {
             const note = polishedNotes[i];
@@ -578,8 +538,7 @@ function polishCadenceLandings(
         }
 
         const currentSection = sectionMap.find(
-            (/** @type {any} */ section) =>
-                measureStart >= section.start && measureStart < section.end,
+            (section: any) => measureStart >= section.start && measureStart < section.end,
         );
         const category = getSectionCategory(currentSection?.label, style);
         const isDeparture = isDepartureCategory(category);
@@ -630,16 +589,21 @@ function polishCadenceLandings(
  * All randomness is driven by `prng` (seeded via `seedStr`) so the output is
  * fully deterministic for a given seed, enabling consistent replay and testing.
  *
- * @param {import('../types.js').EnsembleState} state
- * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {string} style - Resolved soloist style key (e.g. 'jazz', 'scalar', 'bossa').
- * @param {number} [_intensity] - Reserved for future intensity-aware seeding; currently unused.
- * @param {string} [seedStr] - Optional PRNG seed string.  Omit for a random seed each call.
- * @returns {{ notes: SeedNote[], loopLengthSteps: number }}
- *   `notes` is sorted ascending by `step`.  `loopLengthSteps` is the total length of one
+ * @param state - Ensemble state snapshot.
+ * @param arranger - Arranger state snapshot.
+ * @param style - Resolved soloist style key (e.g. 'jazz', 'scalar', 'bossa').
+ * @param _intensity - Reserved for future intensity-aware seeding; currently unused.
+ * @param seedStr - Optional PRNG seed string.  Omit for a random seed each call.
+ * @returns `notes` is sorted ascending by `step`.  `loopLengthSteps` is the total length of one
  *   arrangement loop in scheduler steps (matches the arranger's unrolled length).
  */
-export function generateSessionSeed(state, arranger, style, _intensity, seedStr) {
+export function generateSessionSeed(
+    state: EnsembleState,
+    arranger: ArrangerState,
+    style: string,
+    _intensity?: number,
+    seedStr?: string,
+): { notes: SeedNote[]; loopLengthSteps: number } {
     style = resolveSoloistStyle(style, state?.groove?.genreFeel);
 
     // Unroll the arrangement for virtual macro-form (max 128 bars for performance)
@@ -652,11 +616,11 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
     const prng = createPRNG(seedStr || generateRandomSeed());
 
-    const tsConfig =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const tsConfig: any =
+        (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
-    const styleConfig = /** @type {any} */ (STYLE_CONFIG[style] || STYLE_CONFIG.scalar);
+    const styleConfig: any = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
     const tripletProfile = styleConfig.seedTriplets || {};
     const tripletEnabled = Boolean(
         tripletProfile.enabled && !tsConfig.isCompound && tsConfig.beats === 4 && stepsPerBeat >= 4,
@@ -668,8 +632,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     const tripletTimingStrength = tripletEnabled ? tripletProfile.timingStrength || 0 : 0;
     const playbackBpm = state?.playback?.bpm || 100;
 
-    /** @type {SeedNote[]} */
-    const notes = [];
+    const notes: SeedNote[] = [];
 
     // Ensure totalSteps is a valid number
     const actualTotalSteps =
@@ -684,11 +647,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // To ensure repetition across identical sections (e.g. AABA form),
     // we'll memorize the target note sequence for each section label.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
-    /** @type {Map<string, MotifEntry>} */
-    const sectionMotifs = new Map();
+    const sectionMotifs = new Map<string, MotifEntry>();
 
-    /** @type {Map<string, number>} */
-    const sectionIterationCount = new Map();
+    const sectionIterationCount = new Map<string, number>();
 
     // Find macro turnaround index
     const turnaroundIndex = sectionMap.length - 1;
@@ -733,14 +694,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
 
         /**
          * Helper to generate a 1-measure rhythmic cell
-         * @param {boolean} sparse
-         * @param {boolean} dense
-         * @param {number} density
-         * @returns {any[]}
          */
-        const generateCell = (sparse, dense, density) => {
-            /** @type {any[]} */
-            const cell = [];
+        const generateCell = (sparse: boolean, dense: boolean, density: number): any[] => {
+            const cell: any[] = [];
             const beatsPerCell = tsConfig.beats;
             const isCompound = tsConfig.pulse && tsConfig.pulse.length > 0;
 
@@ -749,7 +705,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 const grouping = tsConfig.grouping || [beatsPerCell];
                 let currentGroupStep = 0;
 
-                grouping.forEach((/** @type {number} */ groupSize) => {
+                grouping.forEach((groupSize: number) => {
                     const groupSteps = groupSize * stepsPerBeat;
                     let stepInGroup = 0;
 
@@ -912,8 +868,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const isStationaryMotif = prng() < stationaryProb;
 
             // Generate a 2-measure template
-            /** @type {any[]} */
-            const motif = [];
+            const motif: any[] = [];
             let currentDegreeOffset = 0;
 
             // Check for contrast needs
@@ -1083,8 +1038,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             let lastMotion = 0;
             const structureArray = structureType.split('-');
 
-            /** @type {Map<string, number[]>} */
-            const cellMemory = new Map();
+            const cellMemory = new Map<string, number[]>();
 
             let tiedDurationBeats = 0;
 
@@ -1159,8 +1113,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // --- Melodic Sequencing Logic ---
                 // If we've seen this cell type before, reuse its relative intervals (offsets)
                 const previousOffsets = cellMemory.get(cellType);
-                /** @type {number[]} */
-                const currentCellOffsets = [];
+                const currentCellOffsets: number[] = [];
 
                 currentCell.forEach((cellNote, noteIdx) => {
                     let isRest = cellNote.isRest;
@@ -1426,8 +1379,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             } else if (r < 0.7) {
                 // Interval Expansion: Push the highest pitch up a diatonic third
                 let maxDegree = -999;
-                /** @type {any} */
-                let targetNote = null;
+                let targetNote: any = null;
                 motif.forEach((n) => {
                     if (!n.isRest && n.scaleDegreeOffset > maxDegree) {
                         maxDegree = n.scaleDegreeOffset;
@@ -1512,8 +1464,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 !isStationaryMotif &&
                 sectionEndMeasure - sectionStartMeasure >= 8 &&
                 isSectionTurnaround(baseStep, sectionMap, stepsPerMeasure, phraseLength);
-            /** @type {Array<{beatOffset: number, isPickup: boolean, scaleDegreeOffset: number, duration: number, isRest: boolean}>} */
-            let activeMotif = [...motif]; // Copy so we can safely inject one-off pickups
+            let activeMotif: MotifEvent[] = [...motif]; // Copy so we can safely inject one-off pickups
 
             if (isTurnaroundMeasures) {
                 // Generate a one-off "Departure" motif for the turnaround
@@ -1539,11 +1490,10 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                 // --- Sectional Entrance (Anacrusis) ---
                 // Only trigger at the start of a structural block (and avoid sparse sections)
                 if (prng() > 0.3 && !isStationaryMotif) {
-                    /** @type {Array<[string, number[]]>} */
-                    const pickupEntries = Object.entries(PICKUP_DICTIONARY);
+                    const pickupEntries: Array<[string, number[]]> =
+                        Object.entries(PICKUP_DICTIONARY);
                     if (tripletEnabled) {
-                        /** @type {Array<[string, number[]]>} */
-                        const tripletPickupEntries = [
+                        const tripletPickupEntries: Array<[string, number[]]> = [
                             ['TRIPLET_RUN', PICKUP_DICTIONARY.TRIPLET_RUN],
                         ];
                         pickupEntries.push(
@@ -1564,18 +1514,16 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     let currentDegree = targetDegree - pPattern.length;
 
                     // Inject pickup notes at the beginning of the motif
-                    const pickupNotes = pPattern.map(
-                        (/** @type {number} */ pOffset, /** @type {number} */ i) => {
-                            const nextOffset = pPattern[i + 1] || 0;
-                            return {
-                                beatOffset: pOffset,
-                                isPickup: true,
-                                scaleDegreeOffset: currentDegree++,
-                                duration: (nextOffset - pOffset) * stepsPerBeat,
-                                isRest: false,
-                            };
-                        },
-                    );
+                    const pickupNotes = pPattern.map((pOffset: number, i: number) => {
+                        const nextOffset = pPattern[i + 1] || 0;
+                        return {
+                            beatOffset: pOffset,
+                            isPickup: true,
+                            scaleDegreeOffset: currentDegree++,
+                            duration: (nextOffset - pOffset) * stepsPerBeat,
+                            isRest: false,
+                        };
+                    });
 
                     activeMotif = [...pickupNotes, ...activeMotif];
                     console.log(`[Composer] Injected ${pKey} pickup into section ${label}`);
@@ -1589,8 +1537,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             if (!entryForMeasure?.chord) {
                 continue;
             }
-            /** @type {any} */
-            const targetChord = entryForMeasure.chord;
+            const targetChord: any = entryForMeasure.chord;
             const chordTones = targetChord.intervals || [0, 4, 7]; // Fallback to triad if not parsed
             const targetInterval = chordTones[Math.floor(prng() * chordTones.length)]; // Root, 3rd, 5th, etc.
             const targetPitchClass = (targetChord.rootMidi + targetInterval) % 12;
@@ -1630,12 +1577,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
             const isArpeggioContour = contourType === 'ARPEGGIATE';
             const isHookContour = contourType === 'HOOK';
 
-            /** @type {any} */
-            let prevNoteChord = null;
-            /** @type {number[]} */
-            let prevScalePitches = [];
-            /** @type {number | null} */
-            let previousMotifDegree = null;
+            let prevNoteChord: any = null;
+            let prevScalePitches: number[] = [];
+            let previousMotifDegree: number | null = null;
 
             activeMotif.forEach((motifNote) => {
                 if (motifNote.isRest) {
@@ -1669,8 +1613,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
                     return;
                 }
 
-                /** @type {any} */
-                const currentChord = stepEntry.chord;
+                const currentChord: any = stepEntry.chord;
                 const scale = getScaleForChord(state, currentChord, null, style);
                 const currentScalePitches = scale.map((ivl) => (currentChord.rootMidi + ivl) % 12);
                 const chordIntervals = currentChord.intervals || [0, 4, 7];
@@ -1921,11 +1864,9 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // --- Improvisational Pass (Post-Processing) ---
     // Apply musical flair to the generated head to break up monotony
     // and make the melody sound more intentional and vocal.
-    /** @type {SeedNote[]} */
-    const processedNotes = [];
+    const processedNotes: SeedNote[] = [];
     const postSyncBias =
-        /** @type {any} */ (STYLE_CONFIG[style] || STYLE_CONFIG.scalar).syncopationLikelihood ||
-        0.2;
+        ((STYLE_CONFIG[style] || STYLE_CONFIG.scalar) as any).syncopationLikelihood || 0.2;
     const flairProb = Math.min(0.55, 0.22 + postSyncBias * 0.28);
     const subdivisionProb = Math.max(0, postSyncBias - 0.45);
 
@@ -2164,8 +2105,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
     // Reinforce sparse late-entry statement bars with a lead-in attack so
     // non-jazz heads speak earlier in the measure instead of waiting until beat 4.
     if (!['jazz', 'bird', 'bossa'].includes(style) && !tripletEnabled) {
-        /** @type {SeedNote[]} */
-        const reinforcedNotes = [];
+        const reinforcedNotes: SeedNote[] = [];
         const sortedSeedNotes = [...processedNotes].sort((a, b) => a.step - b.step);
 
         for (let i = 0; i < sortedSeedNotes.length; i++) {
@@ -2226,7 +2166,7 @@ export function generateSessionSeed(state, arranger, style, _intensity, seedStr)
         stepsPerMeasure,
         style,
     );
-    polishedNotes.sort((/** @type {SeedNote} */ a, /** @type {SeedNote} */ b) => a.step - b.step);
+    polishedNotes.sort((a: SeedNote, b: SeedNote) => a.step - b.step);
 
     console.log(`[Seeder Debug] Finished generation. Total seed notes: ${polishedNotes.length}.`);
     return { notes: polishedNotes, loopLengthSteps: actualTotalSteps };

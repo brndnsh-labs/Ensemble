@@ -10,6 +10,6 @@ This note captures small, repeatable optimizations that matter in hot audio and 
 
 ## Why this matters
 
-Audio synthesis and scheduling code runs under GC pressure. Tiny allocations in loops can show up as jitter or missed deadlines, especially in paths like `public/engine/soloist-pitch-engine.js` and other note-generation hot loops.
+Audio synthesis and scheduling code runs under GC pressure. Tiny allocations in loops can show up as jitter or missed deadlines, especially in paths like `public/engine/soloist-pitch-engine.ts` and other note-generation hot loops.
 
 The same rule applies to any worker or scheduler code that runs every frame or every step.

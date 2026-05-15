@@ -1,4 +1,7 @@
+import type { GlobalContext } from '../state/playback.js';
+import type { EnsembleState } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
+import type { SoloistIntent } from './soloist-config.js';
 import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';
 import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
 import {
@@ -9,17 +12,19 @@ import {
 } from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
 
+export interface DeviceBufferResult {
+    buffer: any[];
+    first: any;
+    busySteps: number;
+}
+
 /**
  * Utility to generate a device buffer and compute busy steps.
- * @param {string} deviceType
- * @param {any} contextOptions
- * @returns {{ buffer: any[], first: any, busySteps: number }|null}
  */
-function applyDeviceBuffer(deviceType, contextOptions) {
+function applyDeviceBuffer(deviceType: string, contextOptions: any): DeviceBufferResult | null {
     const deviceBuffer = generateMelodicDevice(deviceType, contextOptions);
     if (deviceBuffer && deviceBuffer.length > 0) {
-        /** @type {any} */
-        const first = deviceBuffer[0];
+        const first: any = deviceBuffer[0];
         const busySteps =
             (Array.isArray(first) ? first[0].durationSteps : first.durationSteps || 1) - 1;
         return { buffer: deviceBuffer.slice(1), first, busySteps };
@@ -37,34 +42,30 @@ const milesIntervals = new Set([2, 5, 9]);
 const evansIntervals = new Set([2, 5, 6, 9]);
 const alteredHookIntervals = new Set([1, 3, 6, 8]);
 
-/**
- * @param {string[]} devices
- * @param {string | null | undefined} device
- */
-function pushUniqueDevice(devices, device) {
+function pushUniqueDevice(devices: string[], device: string | null | undefined): void {
     if (device && !devices.includes(device)) {
         devices.push(device);
     }
 }
 
+export interface MotifDevicePrioritiesOptions {
+    activeStyle: string;
+    responseMode: string;
+    responseSource: string;
+    responseDirection: number;
+    responseSignature: any;
+    isResponseEntryTarget: boolean;
+    isResponseCadenceTarget: boolean;
+    intensity: number;
+    isLineStyle: boolean;
+    supportRole: string;
+    seedNote: any;
+}
+
 /**
  * Bias later-loop devices toward phrase commentary instead of generic flourish.
- * @param {{
- *   activeStyle: string,
- *   responseMode: string,
- *   responseSource: string,
- *   responseDirection: number,
- *   responseSignature: any,
- *   isResponseEntryTarget: boolean,
- *   isResponseCadenceTarget: boolean,
- *   intensity: number,
- *   isLineStyle: boolean,
- *   supportRole: string,
- *   seedNote: any
- * }} options
- * @returns {string[]}
  */
-function buildMotifDevicePriorities(options) {
+function buildMotifDevicePriorities(options: MotifDevicePrioritiesOptions): string[] {
     const {
         activeStyle,
         responseMode,
@@ -78,8 +79,7 @@ function buildMotifDevicePriorities(options) {
         supportRole,
         seedNote,
     } = options;
-    /** @type {string[]} */
-    const priorities = [];
+    const priorities: string[] = [];
     if (activeStyle === 'rock' || activeStyle === 'shred') {
         return priorities;
     }
@@ -157,47 +157,30 @@ function buildMotifDevicePriorities(options) {
 
 /**
  * Primary entry point for pitch selection.
- * @param {import('../types.js').EnsembleState} state
- * @param {number} step
- * @param {any} rhythmNode
- * @param {any} currentChord
- * @param {any} nextChord
- * @param {string} activeStyle
- * @param {number} intensity
- * @param {number} stepInChord
- * @param {any} coordination
- * @param {import('../state/playback.js').GlobalContext} playback
- * @param {import('../state/instruments.js').SoloistState} soloistState
- * @param {import('../state/groove.js').GrooveState} groove
- * @param {import('../state/arranger.js').ArrangerState} _arranger
- * @param {number} stepsPerMeasure
- * @param {number} stepsPerBeat
- * @param {any} [intent]
  */
 export function selectPitchAndDevices(
-    state,
-    step,
-    rhythmNode,
-    currentChord,
-    nextChord,
-    activeStyle,
-    intensity,
-    stepInChord,
-    coordination,
-    playback,
-    soloistState,
-    groove,
-    _arranger,
-    stepsPerMeasure,
-    stepsPerBeat,
-    intent = null,
-) {
+    state: EnsembleState,
+    step: number,
+    rhythmNode: any,
+    currentChord: any,
+    nextChord: any,
+    activeStyle: string,
+    intensity: number,
+    stepInChord: number,
+    coordination: any,
+    playback: GlobalContext,
+    soloistState: any,
+    groove: any,
+    _arranger: any,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    intent: SoloistIntent | null = null,
+): any {
     if (!currentChord) {
         return null;
     }
 
-    /** @type {any} */
-    const styleConfigAny = STYLE_CONFIG;
+    const styleConfigAny: any = STYLE_CONFIG;
     const config = { ...(styleConfigAny[activeStyle] || STYLE_CONFIG.scalar) };
     const registerProfile = getSoloistRegisterProfile(activeStyle);
 
@@ -268,7 +251,7 @@ export function selectPitchAndDevices(
     const headMeasureHasTripletSeed = Boolean(
         isHeadBypass &&
             loopCount === 0 &&
-            sessionSeed?.notes?.some((note) => {
+            sessionSeed?.notes?.some((note: any) => {
                 if (!note.tripletPlacement || sessionSeed.loopLengthSteps <= 0) {
                     return false;
                 }
@@ -284,7 +267,7 @@ export function selectPitchAndDevices(
     );
 
     // Helper to finalize note (formerly inline in getSoloistNote)
-    const finalizeNote = (/** @type {any} */ res) => {
+    const finalizeNote = (res: any): any => {
         if (!res) {
             return null;
         }
@@ -756,7 +739,7 @@ export function selectPitchAndDevices(
             const { notes, loopLengthSteps } = seed;
             const loopCount = playback.currentLoopCount || 0;
             const stepInLoop = step % loopLengthSteps;
-            const seedNote = notes.find((/** @type {any} */ n) => n.step === stepInLoop);
+            const seedNote = notes.find((n: any) => n.step === stepInLoop);
 
             if (seedNote) {
                 const pcMatch = m % 12 === seedNote.midi % 12;
@@ -907,7 +890,7 @@ export function selectPitchAndDevices(
     // --- Structural Awareness: Turnaround Handling ---
     if (
         activeStyle === 'blues' &&
-        /** @type {any} */ (coordination).isTurnaround &&
+        (coordination as any).isTurnaround &&
         !headMeasureHasTripletSeed &&
         !isResponseGuidedPhrase &&
         Math.random() < 0.6
@@ -927,10 +910,10 @@ export function selectPitchAndDevices(
             (!isLineStyle || durationSteps >= stepsPerBeat / 2)) ||
         (loopCount > 1 && !isStrongBeat && durationSteps <= stepsPerBeat && !isLineStyle);
     if (canTriggerDevice && Math.random() < deviceBaseProb) {
-        let allowed = [...(config.allowedDevices || [])];
+        let allowed: string[] = [...(config.allowedDevices || [])];
 
         if (isLaterHeadBypass && !isProtectedSeedTone) {
-            const thematicDevices = [];
+            const thematicDevices: string[] = [];
             if (!allowed.includes('graceNote')) {
                 thematicDevices.push('graceNote');
             }
@@ -993,7 +976,7 @@ export function selectPitchAndDevices(
                 allowed = ['bluesCurl', ...allowed]; // Prioritize the curl
             } else if (profile === 'monk' || profile === 'beck') {
                 allowed = ['graceNote', ...allowed]; // Prioritize crushed notes
-            } else if (profile === 'gilmour' && /** @type {any} */ (durationSteps) >= 4) {
+            } else if (profile === 'gilmour' && (durationSteps as any) >= 4) {
                 allowed = ['slide', ...allowed];
             }
         }
@@ -1011,8 +994,7 @@ export function selectPitchAndDevices(
                 supportRole,
                 seedNote,
             });
-            /** @type {string[]} */
-            const prioritized = [];
+            const prioritized: string[] = [];
             motifPriorities.forEach((device) => pushUniqueDevice(prioritized, device));
             allowed.forEach((device) => pushUniqueDevice(prioritized, device));
             allowed = prioritized;
@@ -1031,7 +1013,7 @@ export function selectPitchAndDevices(
     }
 
     // Base Result without polyphony
-    const result = {
+    const result: any = {
         midi: selectedMidi,
         velocity: velocity,
         durationSteps: durationSteps,
@@ -1144,7 +1126,7 @@ export function selectPitchAndDevices(
         });
         if (extra && extra.length > 0) {
             // Optimization: Replace spread and map with pre-allocated loop to avoid closure overhead and intermediate arrays
-            const polyResult = new Array(extra.length + 1);
+            const polyResult: any[] = new Array(extra.length + 1);
             for (let i = 0; i < extra.length; i++) {
                 const durationScale = extra[i].durationScale ?? 1;
                 const leadDuration = result.durationSteps || 1;

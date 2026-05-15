@@ -273,19 +273,19 @@ Split into 6 sub-batches by dependency order (leaves first). Worker files need `
 | `public/engine/soloist-rhythm-engine.ts` | 704 | ✅ | 3 type aliases (ResponseTransform/Mode/Source) |
 | `public/engine/harmonies.ts` | 799 | ✅ | 6 local interfaces (HarmonyBehavior, HarmonyContext, etc.) |
 
-### Batch C — soloist-pitch-engine ⬜
-
-| File | Lines | Status |
-|------|-------|--------|
-| `public/engine/soloist-pitch-engine.js` | 1182 | ⬜ |
-
-### Batch D — Soloist core ⬜
+### Batch C — soloist-pitch-engine ✅
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/engine/soloist.js` | 1505 | ⬜ | |
-| `public/engine/synth-soloist.js` | 969 | ⬜ | |
-| `public/engine/soloist-seeder.js` | 2233 | ⬜ | Largest file in the project |
+| `public/engine/soloist-pitch-engine.ts` | 1182 | ✅ | 2 interfaces (DeviceBufferResult, MotifDevicePrioritiesOptions); session state kept `any` |
+
+### Batch D — Soloist core ✅
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/engine/soloist.ts` | 1505 | ✅ | Local `PhraseResponseSource` union; resolves the line-628 narrowing note |
+| `public/engine/synth-soloist.ts` | 969 | ✅ | `SoloistVoice` exported; `as any` on `AudioParam` connects |
+| `public/engine/soloist-seeder.ts` | 2233 | ✅ | 10 interfaces; preserves SRDC/Dynamic Head comments verbatim |
 
 ### Batch E — Hubs ⬜
 

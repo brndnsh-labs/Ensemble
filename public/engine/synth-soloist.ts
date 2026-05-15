@@ -1,5 +1,6 @@
+import type { EnsembleState } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
-import { STYLE_CONFIG } from './soloist-config.js';
+import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
     isSoloistGuitarMode,
@@ -8,19 +9,25 @@ import {
 } from './soloist-mode-policy.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
-/**
- * @typedef {Object} SoloistVoice
- * @property {GainNode} gain
- * @property {number} time
- * @property {number} duration
- * @property {AudioNode[]} nodes
- */
+export interface SoloistVoice {
+    gain: GainNode;
+    time: number;
+    duration: number;
+    nodes: AudioNode[];
+}
+
+type SoloistState = EnsembleState['soloist'];
+
+interface VibratoNodes {
+    vibrato: OscillatorNode;
+    vibGain: GainNode;
+    depthModNodes: AudioNode[];
+}
 
 /**
  * Stop any currently playing soloist notes.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  */
-export function killSoloistNote(state) {
+export function killSoloistNote(state: EnsembleState): void {
     const { playback, soloist } = state;
     if (playback.audio) {
         killActiveVoices(soloist.activeVoices, playback.audio.currentTime, 0.01);
@@ -30,27 +37,18 @@ export function killSoloistNote(state) {
 /**
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {number} freq - Frequency in Hz.
- * @param {number} time - Start time in seconds.
- * @param {number} duration - Note duration in seconds.
- * @param {number} vol - Output volume.
- * @param {number} [bendStartInterval=0] - Interval in semitones to bend from.
- * @param {string} [style='scalar'] - Synthesis style preset.
- * @param {boolean} [isLegato=false] - Whether to use legato articulation.
- * @param {boolean} [vibrato=false] - Whether to apply vibrato.
  */
 export function playSoloNote(
-    state,
-    freq,
-    time,
-    duration,
-    vol,
-    bendStartInterval = 0,
-    style = 'scalar',
-    isLegato = false,
-    vibrato = false,
-) {
+    state: EnsembleState,
+    freq: number,
+    time: number,
+    duration: number,
+    vol: number,
+    bendStartInterval: number = 0,
+    style: string = 'scalar',
+    isLegato: boolean = false,
+    vibrato: boolean = false,
+): void {
     const { playback, soloist } = state;
     if (!Number.isFinite(freq)) {
         return;
@@ -86,11 +84,10 @@ export function playSoloNote(
 
     // Common output chain
     gain.connect(pan);
-    pan.connect(/** @type {any} */ (playback).soloistGain);
+    pan.connect((playback as any).soloistGain);
 
     // We store nodes in a single array for the utility to handle stopping/cleanup
-    /** @type {SoloistVoice} */
-    const voiceObj = { gain, time: playTime, duration, nodes: [gain, pan] };
+    const voiceObj: SoloistVoice = { gain, time: playTime, duration, nodes: [gain, pan] };
 
     // Retrieve last frequency for portamento
     const prevFreq = soloist.lastRenderedFreq || freq;
@@ -206,10 +203,8 @@ export function playSoloNote(
 
 /**
  * Manages active voices for the soloist synthesizer.
- * @param {number} playTime - The current play time.
- * @param {import('../types.js').EnsembleState['soloist']} soloist - The soloist state object.
  */
-function manageVoices(playTime, soloist) {
+function manageVoices(playTime: number, soloist: SoloistState): void {
     if (!soloist.activeVoices) {
         soloist.activeVoices = []; // @direct-mutation
     }
@@ -232,7 +227,7 @@ function manageVoices(playTime, soloist) {
     if (!isPolyphonicCluster && soloist.activeVoices.length >= VOICE_LIMIT) {
         // Only kill enough voices to stay under the limit for the NEW gesture
         const voicesToKill = soloist.activeVoices.length - VOICE_LIMIT + 1;
-        const killed = [];
+        const killed: SoloistVoice[] = [];
         for (let i = 0; i < voicesToKill; i++) {
             const oldest = soloist.activeVoices.shift();
             if (oldest) {
@@ -245,36 +240,21 @@ function manageVoices(playTime, soloist) {
 
 // --- PRESET IMPLEMENTATIONS ---
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
 function playTrumpet(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    playTime: number,
+    duration: number,
+    vol: number,
+    bendStartInterval: number,
+    style: string,
+    outputGain: GainNode,
+    voiceObj: SoloistVoice,
+    isLegato: boolean,
+    prevFreq: number,
+    vibratoFlag: boolean,
+): void {
     const { soloist } = state;
 
     const osc1 = ctx.createOscillator();
@@ -311,8 +291,8 @@ function playTrumpet(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
+        vibGain.connect(osc1.frequency as any);
+        vibGain.connect(osc2.frequency as any);
         voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
@@ -369,36 +349,21 @@ function playTrumpet(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
 function playSaxophone(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    playTime: number,
+    duration: number,
+    vol: number,
+    bendStartInterval: number,
+    style: string,
+    outputGain: GainNode,
+    voiceObj: SoloistVoice,
+    isLegato: boolean,
+    prevFreq: number,
+    vibratoFlag: boolean,
+): void {
     const { soloist } = state;
 
     const osc1 = ctx.createOscillator();
@@ -435,8 +400,8 @@ function playSaxophone(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
+        vibGain.connect(osc1.frequency as any);
+        vibGain.connect(osc2.frequency as any);
         voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
@@ -510,36 +475,21 @@ function playSaxophone(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
 function playNeoJuno(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    playTime: number,
+    duration: number,
+    vol: number,
+    bendStartInterval: number,
+    style: string,
+    outputGain: GainNode,
+    voiceObj: SoloistVoice,
+    isLegato: boolean,
+    prevFreq: number,
+    vibratoFlag: boolean,
+): void {
     const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -557,9 +507,9 @@ function playNeoJuno(
     lfo2Gain.gain.value = -7;
 
     lfo1.connect(lfo1Gain);
-    lfo1Gain.connect(/** @type {any} */ (osc1.detune));
+    lfo1Gain.connect(osc1.detune as any);
     lfo2.connect(lfo2Gain);
-    lfo2Gain.connect(/** @type {any} */ (osc2.detune));
+    lfo2Gain.connect(osc2.detune as any);
 
     voiceObj.nodes.push(osc1, osc2, lfo1, lfo1Gain, lfo2, lfo2Gain);
 
@@ -588,8 +538,8 @@ function playNeoJuno(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
+        vibGain.connect(osc1.frequency as any);
+        vibGain.connect(osc2.frequency as any);
         voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
@@ -625,36 +575,21 @@ function playNeoJuno(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
 function playVowel(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    playTime: number,
+    duration: number,
+    vol: number,
+    bendStartInterval: number,
+    style: string,
+    outputGain: GainNode,
+    voiceObj: SoloistVoice,
+    isLegato: boolean,
+    prevFreq: number,
+    vibratoFlag: boolean,
+): void {
     const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -689,8 +624,8 @@ function playVowel(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
+        vibGain.connect(osc1.frequency as any);
+        vibGain.connect(osc2.frequency as any);
         voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
@@ -721,36 +656,21 @@ function playVowel(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} vol
- * @param {number} bendStartInterval
- * @param {string} style
- * @param {GainNode} outputGain
- * @param {SoloistVoice} voiceObj
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} vibratoFlag
- */
 function playShred(
-    state,
-    ctx,
-    freq,
-    playTime,
-    duration,
-    vol,
-    bendStartInterval,
-    style,
-    outputGain,
-    voiceObj,
-    isLegato,
-    prevFreq,
-    vibratoFlag,
-) {
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    playTime: number,
+    duration: number,
+    vol: number,
+    bendStartInterval: number,
+    style: string,
+    outputGain: GainNode,
+    voiceObj: SoloistVoice,
+    isLegato: boolean,
+    prevFreq: number,
+    vibratoFlag: boolean,
+): void {
     const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -785,8 +705,8 @@ function playShred(
             vibratoFlag,
         );
         vibrato.connect(vibGain);
-        vibGain.connect(/** @type {any} */ (osc1.frequency));
-        vibGain.connect(/** @type {any} */ (osc2.frequency));
+        vibGain.connect(osc1.frequency as any);
+        vibGain.connect(osc2.frequency as any);
         voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
     }
 
@@ -815,32 +735,19 @@ function playShred(
     osc1.onended = () => safeDisconnect(voiceObj.nodes);
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {OscillatorNode} osc1
- * @param {OscillatorNode} osc2
- * @param {number} freq
- * @param {number} playTime
- * @param {number} duration
- * @param {number} bendStartInterval
- * @param {string} _style
- * @param {boolean} isLegato
- * @param {number} prevFreq
- * @param {boolean} [isPiano=false]
- */
 function applyPitchEnvelope(
-    state,
-    osc1,
-    osc2,
-    freq,
-    playTime,
-    duration,
-    bendStartInterval,
-    _style,
-    isLegato,
-    prevFreq,
-    isPiano = false,
-) {
+    state: EnsembleState,
+    osc1: OscillatorNode,
+    osc2: OscillatorNode,
+    freq: number,
+    playTime: number,
+    duration: number,
+    bendStartInterval: number,
+    _style: string,
+    isLegato: boolean,
+    prevFreq: number,
+    isPiano: boolean = false,
+): void {
     const { soloist } = state;
     if (isPiano) {
         osc1.frequency.setValueAtTime(freq, playTime);
@@ -868,19 +775,18 @@ function applyPitchEnvelope(
     }
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {AudioContext} ctx
- * @param {number} freq
- * @param {number} time
- * @param {number} duration
- * @param {string} style
- * @param {boolean} [forceVibrato=false]
- * @returns {{vibrato: OscillatorNode, vibGain: GainNode, depthModNodes: AudioNode[]}}
- */
-function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = false) {
+function createVibrato(
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    time: number,
+    duration: number,
+    style: string,
+    forceVibrato: boolean = false,
+): VibratoNodes {
     const { soloist, playback } = state;
-    const config = /** @type {any} */ (STYLE_CONFIG)[style] || STYLE_CONFIG.scalar;
+    const config: StyleConfig =
+        (STYLE_CONFIG as Record<string, StyleConfig>)[style] || STYLE_CONFIG.scalar;
     const intensity = playback.bandIntensity || 0.5;
     const vibrato = ctx.createOscillator();
 
@@ -956,7 +862,7 @@ function createVibrato(state, ctx, freq, time, duration, style, forceVibrato = f
     const depthModGain = ctx.createGain();
     depthModGain.gain.setValueAtTime(finalVibDepth * 0.2, time);
     depthMod.connect(depthModGain);
-    depthModGain.connect(/** @type {any} */ (vibGain.gain));
+    depthModGain.connect(vibGain.gain as any);
 
     if ((duration > 0.15 || forceVibrato) && !isSoloistPianoMode(soloist.mode)) {
         vibrato.start(time);

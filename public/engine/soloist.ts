@@ -1,4 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { SoloistState } from '../state/instruments.js';
+import type { EnsembleState, StepInfo } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import {
     INFLUENCE_POOLS,
@@ -8,6 +10,8 @@ import {
 } from './soloist-config.js';
 import { selectPitchAndDevices } from './soloist-pitch-engine.js';
 import { generateRhythmPlan } from './soloist-rhythm-engine.js';
+
+type PhraseResponseSource = 'free' | 'form' | 'seed' | 'section' | 'recent';
 
 const MOTIVIC_RESPONSE_STYLES = new Set([
     'blues',
@@ -22,13 +26,12 @@ const MOTIVIC_RESPONSE_STYLES = new Set([
 /**
  * Resets the internal generative state of the soloist.
  * Called when the transport is flushed or reset.
- * @param {import('../types.js').EnsembleState} state
  */
-export function resetSoloistState(state) {
+export function resetSoloistState(state: EnsembleState): void {
     const { soloist } = state;
     soloist.isResting = true; // @worker-mutation
     soloist.phrasingState = 'rest'; // @worker-mutation
-    /** @type {any} */ (soloist).transitionState = null; // @worker-mutation
+    (soloist as any).transitionState = null; // @worker-mutation
     soloist.rhythmicMotif = []; // @worker-mutation
     soloist.busySteps = 0; // @worker-mutation
     soloist.activeSteps = 0; // @worker-mutation
@@ -59,22 +62,17 @@ export function resetSoloistState(state) {
     }
 }
 
-/**
- * @param {number} step
- * @param {number} loopLength
- */
-function normalizeLoopStep(step, loopLength) {
+function normalizeLoopStep(step: number, loopLength: number): number {
     if (!Number.isFinite(loopLength) || loopLength <= 0) {
         return step;
     }
     return ((step % loopLength) + loopLength) % loopLength;
 }
 
-/**
- * @param {any} arranger
- * @param {number} step
- */
-function getSectionContext(arranger, step) {
+function getSectionContext(
+    arranger: any,
+    step: number,
+): { label: string; occurrence: number; totalOccurrences: number; isRestatement: boolean } {
     const sectionMap = arranger?.sectionMap;
     if (!Array.isArray(sectionMap) || sectionMap.length === 0) {
         return {
@@ -92,7 +90,7 @@ function getSectionContext(arranger, step) {
     const stepInForm = normalizeLoopStep(step, totalFormSteps);
     const currentSection =
         sectionMap.find(
-            (/** @type {{ start?: number, end?: number }} */ section) =>
+            (section: { start?: number; end?: number }) =>
                 stepInForm >= (section.start || 0) && stepInForm < (section.end || 0),
         ) || sectionMap[0];
     const label = currentSection?.label || 'Main';
@@ -117,11 +115,7 @@ function getSectionContext(arranger, step) {
     };
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {number} loopCount
- */
-function ensureSectionRecallLoop(soloist, loopCount) {
+function ensureSectionRecallLoop(soloist: SoloistState, loopCount: number): void {
     if (
         !soloist.sectionRecall ||
         typeof soloist.sectionRecall !== 'object' ||
@@ -129,16 +123,16 @@ function ensureSectionRecallLoop(soloist, loopCount) {
     ) {
         soloist.sectionRecall = {}; // @worker-mutation
     }
-    if (!Number.isFinite(soloist.sectionRecallLoop) || soloist.sectionRecallLoop !== loopCount) {
+    if (
+        !Number.isFinite(soloist.sectionRecallLoop as number) ||
+        soloist.sectionRecallLoop !== loopCount
+    ) {
         soloist.sectionRecall = {}; // @worker-mutation
         soloist.sectionRecallLoop = loopCount; // @worker-mutation
     }
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- */
-function ensureFormArcRecall(soloist) {
+function ensureFormArcRecall(soloist: SoloistState): void {
     if (
         !soloist.formArcRecall ||
         typeof soloist.formArcRecall !== 'object' ||
@@ -148,12 +142,11 @@ function ensureFormArcRecall(soloist) {
     }
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {number} loopCount
- * @param {any} signature
- */
-function storeSectionRecallSignature(soloist, loopCount, signature) {
+function storeSectionRecallSignature(
+    soloist: SoloistState,
+    loopCount: number,
+    signature: any,
+): void {
     if (!signature?.notes?.length || !soloist.phraseSectionLabel) {
         return;
     }
@@ -180,11 +173,12 @@ function storeSectionRecallSignature(soloist, loopCount, signature) {
 
 /**
  * Preserve section signatures across chorus changes so later loops can answer with longer-form memory.
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {number} sourceLoop
- * @param {any} signature
  */
-function storeFormArcRecallSignature(soloist, sourceLoop, signature) {
+function storeFormArcRecallSignature(
+    soloist: SoloistState,
+    sourceLoop: number,
+    signature: any,
+): void {
     if (!signature?.notes?.length || !soloist.phraseSectionLabel) {
         return;
     }
@@ -230,13 +224,11 @@ function storeFormArcRecallSignature(soloist, sourceLoop, signature) {
     soloist.formArcRecall[label] = existingEntry; // @worker-mutation
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {{ label: string, occurrence: number }} sectionContext
- * @param {number} loopCount
- * @returns {{ signature: any, source: 'form', sameOccurrence: boolean } | null}
- */
-function getFormArcRecallCandidate(soloist, sectionContext, loopCount) {
+function getFormArcRecallCandidate(
+    soloist: SoloistState,
+    sectionContext: { label: string; occurrence: number },
+    loopCount: number,
+): { signature: any; source: 'form'; sameOccurrence: boolean } | null {
     if (!Number.isFinite(loopCount) || loopCount <= 0) {
         return null;
     }
@@ -289,19 +281,12 @@ function getFormArcRecallCandidate(soloist, sectionContext, loopCount) {
     return null;
 }
 
-/**
- * @param {Array<any>} noteEvents
- * @param {number|null} phraseStartStep
- * @param {number} sourceLoop
- * @param {'performed' | 'seed'} sourceKind
- * @returns {any}
- */
 function buildPhraseSignatureFromEvents(
-    noteEvents,
-    phraseStartStep,
-    sourceLoop,
-    sourceKind = 'performed',
-) {
+    noteEvents: any[],
+    phraseStartStep: number | null,
+    sourceLoop: number,
+    sourceKind: 'performed' | 'seed' = 'performed',
+): any {
     const orderedEvents = [...noteEvents]
         .filter((event) => Number.isFinite(event?.midi) && Number.isFinite(event?.step))
         .sort((a, b) => a.step - b.step || a.midi - b.midi);
@@ -313,8 +298,7 @@ function buildPhraseSignatureFromEvents(
         Number.isFinite(phraseStartStep) && phraseStartStep !== null
             ? phraseStartStep
             : orderedEvents[0].step;
-    /** @type {any[]} */
-    const notes = [];
+    const notes: any[] = [];
 
     for (const event of orderedEvents) {
         const pitchClass = normalizeLoopStep(event.midi, 12);
@@ -376,23 +360,14 @@ function buildPhraseSignatureFromEvents(
     };
 }
 
-/**
- * @param {any} sessionSeed
- * @param {number} step
- * @param {number} activeSteps
- * @param {number} stepsPerMeasure
- * @param {number} stepsPerBeat
- * @param {number} loopCount
- * @returns {any}
- */
 function buildSeedPhraseSignature(
-    sessionSeed,
-    step,
-    activeSteps,
-    stepsPerMeasure,
-    stepsPerBeat,
-    loopCount,
-) {
+    sessionSeed: any,
+    step: number,
+    activeSteps: number,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    loopCount: number,
+): any {
     const loopLength = sessionSeed?.loopLengthSteps || 0;
     if (!loopLength || !sessionSeed?.notes?.length) {
         return null;
@@ -404,19 +379,14 @@ function buildSeedPhraseSignature(
         Math.min(loopLength, activeSteps > 0 ? activeSteps : stepsPerMeasure * 2),
     );
     const orderedNotes = sessionSeed.notes
-        .filter((/** @type {any} */ note) => Number.isFinite(note?.step) && note.step >= 0)
-        .map((/** @type {any} */ note) => ({
+        .filter((note: any) => Number.isFinite(note?.step) && note.step >= 0)
+        .map((note: any) => ({
             ...note,
             relativeStep: normalizeLoopStep(note.step - stepInLoop, loopLength),
             measureStep: normalizeLoopStep(note.step, loopLength) % stepsPerMeasure,
         }))
-        .sort(
-            (/** @type {any} */ a, /** @type {any} */ b) =>
-                a.relativeStep - b.relativeStep || a.midi - b.midi,
-        );
-    const windowNotes = orderedNotes.filter(
-        (/** @type {any} */ note) => note.relativeStep < windowLength,
-    );
+        .sort((a: any, b: any) => a.relativeStep - b.relativeStep || a.midi - b.midi);
+    const windowNotes = orderedNotes.filter((note: any) => note.relativeStep < windowLength);
     const sourceNotes = (windowNotes.length > 0 ? windowNotes : orderedNotes.slice(0, 8)).slice(
         0,
         8,
@@ -427,7 +397,7 @@ function buildSeedPhraseSignature(
 
     const rebaseStart = sourceNotes[0].relativeStep;
     return buildPhraseSignatureFromEvents(
-        sourceNotes.map((/** @type {any} */ note) => ({
+        sourceNotes.map((note: any) => ({
             step: note.relativeStep - rebaseStart,
             durationSteps: note.durationSteps || 1,
             midi: note.midi,
@@ -443,11 +413,7 @@ function buildSeedPhraseSignature(
     );
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {number} loopCount
- */
-function commitTrackedPhraseSignature(soloist, loopCount) {
+function commitTrackedPhraseSignature(soloist: SoloistState, loopCount: number): void {
     if (!Array.isArray(soloist.recentNotes) || soloist.recentNotes.length === 0) {
         return;
     }
@@ -476,24 +442,15 @@ function commitTrackedPhraseSignature(soloist, loopCount) {
     soloist.phraseSectionOccurrence = 0; // @worker-mutation
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {number} step
- * @param {any} result
- * @param {any} sourceNode
- * @param {number} loopCount
- * @param {number} stepsPerBeat
- * @param {number} stepsPerMeasure
- */
 function trackPhraseNote(
-    soloist,
-    step,
-    result,
-    sourceNode,
-    loopCount,
-    stepsPerBeat,
-    stepsPerMeasure,
-) {
+    soloist: SoloistState,
+    step: number,
+    result: any,
+    sourceNode: any,
+    loopCount: number,
+    stepsPerBeat: number,
+    stepsPerMeasure: number,
+): void {
     if (!result || !sourceNode) {
         return;
     }
@@ -558,28 +515,17 @@ function trackPhraseNote(
     }); // @worker-mutation
 }
 
-/**
- * @param {import('../state/instruments.js').SoloistState} soloist
- * @param {string} activeStyle
- * @param {any} sessionSeed
- * @param {number} step
- * @param {number} activeSteps
- * @param {number} loopCount
- * @param {number} stepsPerMeasure
- * @param {number} stepsPerBeat
- * @param {any} arranger
- */
 function preparePhraseResponseContext(
-    soloist,
-    activeStyle,
-    sessionSeed,
-    step,
-    activeSteps,
-    loopCount,
-    stepsPerMeasure,
-    stepsPerBeat,
-    arranger,
-) {
+    soloist: SoloistState,
+    activeStyle: string,
+    sessionSeed: any,
+    step: number,
+    activeSteps: number,
+    loopCount: number,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    arranger: any,
+): void {
     if (!soloist.phraseContext) {
         return;
     }
@@ -587,7 +533,7 @@ function preparePhraseResponseContext(
     commitTrackedPhraseSignature(soloist, loopCount);
     ensureSectionRecallLoop(soloist, loopCount);
 
-    const styleConfig = /** @type {any} */ (STYLE_CONFIG[activeStyle] || STYLE_CONFIG.scalar);
+    const styleConfig: any = (STYLE_CONFIG as any)[activeStyle] || STYLE_CONFIG.scalar;
     const responseConfig = styleConfig.motivicResponse || null;
     const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
     const canUseMotivicResponse = Boolean(
@@ -624,9 +570,8 @@ function preparePhraseResponseContext(
 
     const lastSignature = soloist.phraseContext.signature;
     const formArcSignature = formArcCandidate?.signature || null;
-    let responseSignature = null;
-    /** @type {'free' | 'form' | 'seed' | 'section' | 'recent'} */
-    let responseSource = 'free';
+    let responseSignature: any = null;
+    let responseSource: PhraseResponseSource = 'free';
     if (nextRole === 'response' && canUseMotivicResponse) {
         const seedSignature = buildSeedPhraseSignature(
             sessionSeed,
@@ -724,29 +669,19 @@ function preparePhraseResponseContext(
  * Simplified soloist engine.
  * Focuses on lively, probabilistic phrasing with form and meter awareness.
  * Uses a two-phase Rhythm and Pitch engine.
- * @param {import('../types.js').EnsembleState} state
- * @param {any} currentChord
- * @param {any} nextChord
- * @param {number} step
- * @param {number|null} _prevFreq
- * @param {number} _octave
- * @param {string} style
- * @param {number} stepInChord
- * @param {any} [coordination]
- * @param {import('../types.js').StepInfo} [stepInfo]
  */
 export function getSoloistNote(
-    state,
-    currentChord,
-    nextChord,
-    step,
-    _prevFreq,
-    _octave,
-    style,
-    stepInChord,
-    coordination = {},
-    stepInfo,
-) {
+    state: EnsembleState,
+    currentChord: any,
+    nextChord: any,
+    step: number,
+    _prevFreq: number | null,
+    _octave: number,
+    style: string,
+    stepInChord: number,
+    coordination: any = {},
+    stepInfo?: StepInfo,
+): any {
     const { playback, groove, soloist, arranger } = state;
     if (!currentChord) {
         return null;
@@ -765,8 +700,7 @@ export function getSoloistNote(
     const loopCount = playback.currentLoopCount !== undefined ? playback.currentLoopCount : -1;
     const effectiveIntensity = Math.min(1.0, intensity + Math.max(0, loopCount) * 0.05);
 
-    /** @param {string} msg */
-    const logDebug = (msg) => {
+    const logDebug = (msg: string) => {
         if (playback.debugSoloist) {
             console.log(`[Soloist Debug] Step ${step} (mStep: ${measureStep}): ${msg}`);
         }
@@ -775,10 +709,8 @@ export function getSoloistNote(
     /**
      * Evaluates the performance intent (Conservative, Conversational, Exploratory)
      * based on intensity and genre.
-     * @param {number} i Intensity (0.0 - 1.0)
-     * @param {string} s Active Style
      */
-    const calculateSoloistIntent = (i, s) => {
+    const calculateSoloistIntent = (i: number, s: string) => {
         let profile = SOLOIST_INTENTS.CONSERVATIVE;
         if (i > 0.75) {
             profile = SOLOIST_INTENTS.EXPLORATORY;
@@ -796,16 +728,16 @@ export function getSoloistNote(
 
     const intentBehavior = calculateSoloistIntent(effectiveIntensity, activeStyle);
 
-    const config = /** @type {any} */ (STYLE_CONFIG)[activeStyle] || STYLE_CONFIG.scalar;
-    const tsConfig =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const config: any = (STYLE_CONFIG as any)[activeStyle] || STYLE_CONFIG.scalar;
+    const tsConfig: any =
+        (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 
     const hasSessionSeed = Boolean(soloist.sessionSeed && soloist.sessionSeed.notes.length > 0);
     const headSessionSeed = hasSessionSeed ? soloist.sessionSeed : null;
     const headNotes = headSessionSeed
-        ? headSessionSeed.notes.filter((/** @type {any} */ n) => {
+        ? headSessionSeed.notes.filter((n: any) => {
               if (step < 0 && n.step === step) {
                   return true;
               }
@@ -818,11 +750,7 @@ export function getSoloistNote(
               return wrappedNoteStep === stepInLoop;
           })
         : [];
-    /**
-     * @param {number} currentSeedStep
-     * @returns {{ gap: number, nextSeedNote: any }}
-     */
-    const getNextSeedStepInfo = (currentSeedStep) => {
+    const getNextSeedStepInfo = (currentSeedStep: number): { gap: number; nextSeedNote: any } => {
         if (!headSessionSeed?.notes?.length) {
             return {
                 gap: Number.POSITIVE_INFINITY,
@@ -873,11 +801,7 @@ export function getSoloistNote(
 
     soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
 
-    /**
-     * @param {any} res
-     * @returns {any}
-     */
-    const finalizeNote = (res) => {
+    const finalizeNote = (res: any): any => {
         if (!res) {
             return null;
         }
@@ -986,8 +910,10 @@ export function getSoloistNote(
                     : sectionMap[sectionMap.length - 1]?.end || stepsPerMeasure * 8;
             const headStepInForm = normalizeLoopStep(step, headFormSteps);
             const currentSection =
-                sectionMap.find((s) => headStepInForm >= s.start && headStepInForm < s.end) ||
-                sectionMap[0];
+                sectionMap.find(
+                    (s: { start: number; end: number }) =>
+                        headStepInForm >= s.start && headStepInForm < s.end,
+                ) || sectionMap[0];
             const measuresInSection = Math.floor(
                 (headStepInForm - currentSection.start) / stepsPerMeasure,
             );
@@ -1221,8 +1147,7 @@ export function getSoloistNote(
     // At the start of a section, the soloist adopts a new "state of mind" (influence)
     // PRE-HEAT: Also trigger rotation at the start of the count-in (e.g., step -16)
     if (stepInForm === coordination.sectionStart || (step < 0 && step === -stepsPerMeasure)) {
-        /** @type {any} */
-        const pools = INFLUENCE_POOLS;
+        const pools: any = INFLUENCE_POOLS;
         const pool = pools[activeStyle] || [];
         if (pool.length > 0) {
             // High intensity sections might shift influence more frequently (probabilistically)
@@ -1361,7 +1286,7 @@ export function getSoloistNote(
                 if (nextRhythmPlan.length > 0) {
                     // Skeleton is relative steps from phrase start
                     soloist.phraseContext.skeleton = nextRhythmPlan.map(
-                        (/** @type {any} */ n) => n.stepTarget - step,
+                        (n: any) => n.stepTarget - step,
                     ); // @worker-mutation
                 }
             }
