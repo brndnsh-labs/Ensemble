@@ -1,26 +1,25 @@
+import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import type { StyleObject } from '../ui-types.js';
 
-/**
- * @typedef {Object} ToolbarPopoverRenderContext
- * @property {() => void} closePopover
- * @property {boolean} isOpen
- */
+interface ToolbarPopoverRenderContext {
+    closePopover: () => void;
+    isOpen: boolean;
+}
 
-/**
- * @typedef {Object} ToolbarPopoverProps
- * @property {string} [buttonId]
- * @property {string} panelId
- * @property {string} triggerAriaLabel
- * @property {string} panelLabel
- * @property {string} [triggerClassName]
- * @property {string} [panelClassName]
- * @property {'start' | 'end'} [align]
- * @property {import('preact').ComponentChildren} triggerContent
- * @property {import('preact').ComponentChildren | ((context: ToolbarPopoverRenderContext) => import('preact').ComponentChildren)} children
- */
+interface ToolbarPopoverProps {
+    buttonId?: string;
+    panelId: string;
+    triggerAriaLabel: string;
+    panelLabel: string;
+    triggerClassName?: string;
+    panelClassName?: string;
+    align?: 'start' | 'end';
+    triggerContent: ComponentChildren;
+    children: ComponentChildren | ((context: ToolbarPopoverRenderContext) => ComponentChildren);
+}
 
-/** @param {ToolbarPopoverProps} props */
 export function ToolbarPopover({
     buttonId,
     panelId,
@@ -31,26 +30,18 @@ export function ToolbarPopover({
     align = 'end',
     triggerContent,
     children,
-}) {
+}: ToolbarPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [panelStyle, setPanelStyle] = useState(
-        /** @type {import('preact').JSX.CSSProperties | undefined} */ (undefined),
-    );
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const rootRef = useRef(null);
-    /** @type {import('preact/hooks').MutableRef<HTMLButtonElement|null>} */
-    const triggerRef = useRef(null);
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const panelRef = useRef(null);
+    const [panelStyle, setPanelStyle] = useState<StyleObject | undefined>(undefined);
+    const rootRef = useRef<HTMLDivElement | null>(null);
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
+    const panelRef = useRef<HTMLDivElement | null>(null);
 
     const closePopover = () => {
         setIsOpen(false);
     };
 
-    /**
-     * @param {FocusEvent} event
-     */
-    const handleFocusExit = (event) => {
+    const handleFocusExit = (event: FocusEvent) => {
         const relatedTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
 
         if (
@@ -65,7 +56,7 @@ export function ToolbarPopover({
 
     useEffect(() => {
         if (panelRef.current && 'inert' in panelRef.current) {
-            panelRef.current.inert = !isOpen;
+            (panelRef.current as any).inert = !isOpen;
         }
     }, [isOpen]);
 
@@ -74,7 +65,7 @@ export function ToolbarPopover({
             return;
         }
 
-        const handlePointerDown = (/** @type {PointerEvent} */ event) => {
+        const handlePointerDown = (event: PointerEvent) => {
             const target = event.target instanceof Node ? event.target : null;
             if (
                 !target ||
@@ -87,7 +78,7 @@ export function ToolbarPopover({
             closePopover();
         };
 
-        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
+        const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key !== 'Escape') {
                 return;
             }

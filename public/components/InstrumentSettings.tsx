@@ -7,21 +7,20 @@ const { playback } = getState();
 
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
+import type { GrooveState } from '../state/groove.js';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
-/** @typedef {'groove' | 'bass' | 'chords' | 'harmony' | 'soloist'} StudioInstrumentModule */
-/** @typedef {'volume' | 'reverb'} InstrumentAudioControl */
+type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
+type InstrumentAudioControl = 'volume' | 'reverb';
 
-/** @param {StudioInstrumentModule} module */
-function getInstrumentState(module) {
-    return useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => {
+function getInstrumentState(module: StudioInstrumentModule) {
+    return useEnsembleState((s) => {
         const key = module === 'groove' ? 'groove' : module;
-        return /** @type {any} */ (s)[key];
+        return (s as any)[key];
     });
 }
 
-/** @param {StudioInstrumentModule} module */
-function getModuleName(module) {
+function getModuleName(module: StudioInstrumentModule) {
     return module === 'groove'
         ? 'drum'
         : module === 'chords'
@@ -31,13 +30,11 @@ function getModuleName(module) {
             : module;
 }
 
-/** @param {StudioInstrumentModule} module */
-function hasInstrumentSpecificSettings(module) {
+function hasInstrumentSpecificSettings(module: StudioInstrumentModule) {
     return module !== 'bass';
 }
 
-/** @param {StudioInstrumentModule} module */
-function getInstrumentSpecificTitle(module) {
+function getInstrumentSpecificTitle(module: StudioInstrumentModule) {
     return module === 'groove'
         ? 'Feel & Actions'
         : module === 'chords' || module === 'harmony'
@@ -45,12 +42,11 @@ function getInstrumentSpecificTitle(module) {
           : 'Instrument';
 }
 
-/**
- * @param {StudioInstrumentModule} module
- * @param {InstrumentAudioControl} type
- * @param {string | number} val
- */
-function updateInstrumentAudio(module, type, val) {
+function updateInstrumentAudio(
+    module: StudioInstrumentModule,
+    type: InstrumentAudioControl,
+    val: string | number,
+) {
     const numVal = typeof val === 'number' ? val : parseFloat(val);
     const isReverb = type === 'reverb';
 
@@ -63,11 +59,9 @@ function updateInstrumentAudio(module, type, val) {
     const internalName =
         module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
     const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
-    const multiplier = isReverb
-        ? 1.0
-        : /** @type {any} */ (MIXER_GAIN_MULTIPLIERS)[internalName] || 1.0;
+    const multiplier = isReverb ? 1.0 : (MIXER_GAIN_MULTIPLIERS as any)[internalName] || 1.0;
 
-    const node = /** @type {any} */ (playback)[gainKey];
+    const node = (playback as any)[gainKey];
     if (node && playback.audio) {
         const target = Math.max(0.0001, numVal * multiplier);
         node.gain.cancelScheduledValues(playback.audio.currentTime);
@@ -76,13 +70,17 @@ function updateInstrumentAudio(module, type, val) {
     }
 }
 
-/**
- * @typedef {Object} InstrumentSettingsProps
- * @property {StudioInstrumentModule} module
- */
+interface InstrumentMixerSettingsProps {
+    module: StudioInstrumentModule;
+    title?: string;
+    className?: string;
+}
 
-/** @param {InstrumentSettingsProps & { title?: string, className?: string }} props */
-export function InstrumentMixerSettings({ module, title = 'Mixer', className = '' }) {
+export function InstrumentMixerSettings({
+    module,
+    title = 'Mixer',
+    className = '',
+}: InstrumentMixerSettingsProps) {
     const state = getInstrumentState(module);
 
     if (!state) {
@@ -104,9 +102,7 @@ export function InstrumentMixerSettings({ module, title = 'Mixer', className = '
                     max="1"
                     step="0.05"
                     value={state.volume}
-                    onInput={(/** @type {any} */ val) =>
-                        updateInstrumentAudio(module, 'volume', val)
-                    }
+                    onInput={(val) => updateInstrumentAudio(module, 'volume', val)}
                     ariaValueText={`${Math.round(state.volume * 100)}%`}
                 />
             </SettingRow>
@@ -121,9 +117,7 @@ export function InstrumentMixerSettings({ module, title = 'Mixer', className = '
                     max="1"
                     step="0.05"
                     value={state.reverb}
-                    onInput={(/** @type {any} */ val) =>
-                        updateInstrumentAudio(module, 'reverb', val)
-                    }
+                    onInput={(val) => updateInstrumentAudio(module, 'reverb', val)}
                     ariaValueText={`${Math.round(state.reverb * 100)}%`}
                 />
             </SettingRow>
@@ -131,10 +125,19 @@ export function InstrumentMixerSettings({ module, title = 'Mixer', className = '
     );
 }
 
-/**
- * @param {InstrumentSettingsProps & { accent?: string, icon?: string, label?: string }} props
- */
-export function InstrumentMixerStrip({ module, accent = '', icon = '', label }) {
+interface InstrumentMixerStripProps {
+    module: StudioInstrumentModule;
+    accent?: string;
+    icon?: string;
+    label?: string;
+}
+
+export function InstrumentMixerStrip({
+    module,
+    accent = '',
+    icon = '',
+    label,
+}: InstrumentMixerStripProps) {
     const state = getInstrumentState(module);
 
     if (!state) {
@@ -172,9 +175,7 @@ export function InstrumentMixerStrip({ module, accent = '', icon = '', label }) 
                         max="1"
                         step="0.05"
                         value={state.volume}
-                        onInput={(/** @type {any} */ val) =>
-                            updateInstrumentAudio(module, 'volume', val)
-                        }
+                        onInput={(val) => updateInstrumentAudio(module, 'volume', val)}
                         ariaLabel={`${title} volume`}
                         ariaValueText={volumeDisplay}
                     />
@@ -193,9 +194,7 @@ export function InstrumentMixerStrip({ module, accent = '', icon = '', label }) 
                         max="1"
                         step="0.05"
                         value={state.reverb}
-                        onInput={(/** @type {any} */ val) =>
-                            updateInstrumentAudio(module, 'reverb', val)
-                        }
+                        onInput={(val) => updateInstrumentAudio(module, 'reverb', val)}
                         ariaLabel={`${title} reverb`}
                         ariaValueText={reverbDisplay}
                     />
@@ -206,10 +205,11 @@ export function InstrumentMixerStrip({ module, accent = '', icon = '', label }) 
     );
 }
 
-/**
- * @param {InstrumentSettingsProps} props
- */
-export function InstrumentSpecificSettings({ module }) {
+interface InstrumentSpecificSettingsProps {
+    module: StudioInstrumentModule;
+}
+
+export function InstrumentSpecificSettings({ module }: InstrumentSpecificSettingsProps) {
     const state = getInstrumentState(module);
 
     if (!state || !hasInstrumentSpecificSettings(module)) {
@@ -223,7 +223,7 @@ export function InstrumentSpecificSettings({ module }) {
                     <Select
                         id="densitySelect"
                         value={state.density || 'standard'}
-                        onChange={(/** @type {any} */ val) => {
+                        onChange={(val) => {
                             dispatch(ACTIONS.SET_DENSITY, val);
                             saveCurrentState();
                         }}
@@ -248,7 +248,7 @@ export function InstrumentSpecificSettings({ module }) {
                         max="1"
                         step="0.05"
                         value={state.complexity || 0.5}
-                        onInput={(/** @type {any} */ val) => {
+                        onInput={(val) => {
                             dispatch(ACTIONS.SET_PARAM, {
                                 module: 'harmony',
                                 param: 'complexity',
@@ -274,7 +274,7 @@ export function InstrumentSpecificSettings({ module }) {
                             max="1"
                             step="0.05"
                             value={state.complexity !== undefined ? state.complexity : 0.5}
-                            onInput={(/** @type {any} */ val) => {
+                            onInput={(val) => {
                                 dispatch(ACTIONS.SET_PARAM, {
                                     module: 'soloist',
                                     param: 'complexity',
@@ -290,7 +290,7 @@ export function InstrumentSpecificSettings({ module }) {
                         <Select
                             id="soloistPresetSelect"
                             value={state.preset || 'trumpet'}
-                            onChange={(/** @type {any} */ val) => {
+                            onChange={(val) => {
                                 dispatch(ACTIONS.SET_SOLOIST_PRESET, val);
                                 saveCurrentState();
                             }}
@@ -307,7 +307,7 @@ export function InstrumentSpecificSettings({ module }) {
                         <Select
                             id="soloistModeSelect"
                             value={state.mode || 'monophonic'}
-                            onChange={(/** @type {any} */ val) => {
+                            onChange={(val) => {
                                 dispatch(ACTIONS.SET_SOLOIST_MODE, val);
                                 saveCurrentState();
                             }}
@@ -325,8 +325,11 @@ export function InstrumentSpecificSettings({ module }) {
     );
 }
 
-/** @param {InstrumentSettingsProps} props */
-export function InstrumentSettings({ module }) {
+interface InstrumentSettingsProps {
+    module: StudioInstrumentModule;
+}
+
+export function InstrumentSettings({ module }: InstrumentSettingsProps) {
     return (
         <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
             <InstrumentSpecificSettings module={module} />
@@ -339,18 +342,15 @@ export function InstrumentSettings({ module }) {
     );
 }
 
-/**
- * @typedef {Object} GrooveControlsProps
- * @property {import('../state/groove.js').GrooveState} state
- */
-/** @param {GrooveControlsProps} props */
-function GrooveControls({ state }) {
-    const { swing, swingSub } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            swing: s.groove.swing,
-            swingSub: s.groove.swingSub,
-        }),
-    );
+interface GrooveControlsProps {
+    state: GrooveState;
+}
+
+function GrooveControls({ state }: GrooveControlsProps) {
+    const { swing, swingSub } = useEnsembleState((s) => ({
+        swing: s.groove.swing,
+        swingSub: s.groove.swingSub,
+    }));
 
     return (
         <Fragment>
@@ -361,7 +361,7 @@ function GrooveControls({ state }) {
                         min="0"
                         max="100"
                         value={swing || 0}
-                        onInput={(/** @type {any} */ val) => {
+                        onInput={(val) => {
                             dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
                             saveCurrentState();
                         }}
@@ -370,7 +370,7 @@ function GrooveControls({ state }) {
                     <Select
                         id="swingBaseSelect"
                         value={swingSub || '8th'}
-                        onChange={(/** @type {any} */ val) => {
+                        onChange={(val) => {
                             dispatch(ACTIONS.SET_SWING_SUB, val);
                             saveCurrentState();
                         }}
@@ -392,7 +392,7 @@ function GrooveControls({ state }) {
                     min="0"
                     max="100"
                     value={state.humanize || 0}
-                    onInput={(/** @type {any} */ val) => {
+                    onInput={(val) => {
                         dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
                         saveCurrentState();
                     }}
@@ -405,7 +405,7 @@ function GrooveControls({ state }) {
                     id="creativityCheck"
                     checked={!!state.creativity}
                     ariaLabel="Creativity"
-                    onChange={(/** @type {any} */ val) => {
+                    onChange={(val) => {
                         dispatch(ACTIONS.SET_PARAM, {
                             module: 'groove',
                             param: 'creativity',

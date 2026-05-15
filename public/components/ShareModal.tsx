@@ -1,4 +1,3 @@
-import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { exportToMidi } from '../midi-export.js';
 import { generateShareUrl } from '../sharing.js';
@@ -7,44 +6,27 @@ import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 
-/**
- * @typedef {import('preact').ComponentChildren} ComponentChildren
- */
-
-/**
- * @typedef {Object} ShareModalProps
- */
-
-/** @param {ShareModalProps} _props */
-export function ShareModal(_props) {
-    const isOpen = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.share,
-    );
+export function ShareModal() {
+    const isOpen = useEnsembleState((s) => s.playback.modals.share);
     const [isExporting, setIsExporting] = useState(false);
 
-    // --- Content Scope State ---
     const [includeSolo, setIncludeSolo] = useState(true);
     const [includeBass, setIncludeBass] = useState(true);
     const [includeChords, setIncludeChords] = useState(true);
     const [includeHarmony, setIncludeHarmony] = useState(true);
     const [includeDrums, setIncludeDrums] = useState(true);
 
-    // --- Duration State ---
     const [numLoops, setNumLoops] = useState(1);
     const [addEnding, setAddEnding] = useState(true);
 
-    // --- Export State ---
     const [filename, setFilename] = useState('My Song');
 
-    /** @type {import('preact').RefObject<HTMLDivElement>} */
-    const overlayRef = useRef(null);
+    const overlayRef = useRef<HTMLDivElement | null>(null);
     const dispatchAction = useDispatch();
 
-    // Calculate total duration based on current state
     const { playback, arranger } = getState();
     const measures = arranger.progression.length;
     const bpm = playback.bpm;
-    // Estimate arrangement length: (measures * 4 beats) / (bpm / 60)
     const totalSeconds = (numLoops * measures * 4 * 60) / bpm;
     const mins = Math.floor(totalSeconds / 60);
     const secs = Math.floor(totalSeconds % 60);
@@ -52,10 +34,8 @@ export function ShareModal(_props) {
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
-            const focusable = /** @type {HTMLElement} */ (
-                overlayRef.current.querySelector(
-                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-                )
+            const focusable = overlayRef.current.querySelector<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
             );
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
@@ -150,8 +130,8 @@ export function ShareModal(_props) {
             id="shareOverlay"
             ref={overlayRef}
             class={`modal-overlay ${isOpen ? 'active' : ''}`}
-            onClick={(/** @type {MouseEvent} */ e) => {
-                const target = /** @type {HTMLElement} */ (e.target);
+            onClick={(e: MouseEvent) => {
+                const target = e.target as HTMLElement;
                 if (target.id === 'shareOverlay') {
                     closeModal();
                 }
@@ -159,7 +139,7 @@ export function ShareModal(_props) {
         >
             <div
                 class="modal-content settings-content"
-                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
+                onClick={(e: MouseEvent) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
                     <h2>Share & Export</h2>
@@ -174,7 +154,6 @@ export function ShareModal(_props) {
                 </div>
 
                 <div class="modal-body share-modal-body">
-                    {/* --- SECTION 1: CONFIGURE CONTENT --- */}
                     <SettingGroup title="1. Configure Content">
                         <div class="instrument-selection-grid">
                             <div class="instrument-toggle-row">
@@ -235,11 +214,9 @@ export function ShareModal(_props) {
                         </div>
                     </SettingGroup>
 
-                    {/* --- SECTION 2: SELECT DESTINATION --- */}
                     <div class="settings-section settings-section--spaced settings-section--borderless">
                         <h3>2. Select Destination</h3>
                         <div class="flex-col share-destination-stack">
-                            {/* Link Card */}
                             <div class="help-card share-card">
                                 <h4 class="share-card-title">🔗 Cloud Link</h4>
                                 <p class="text-mini-muted share-card-copy">
@@ -264,7 +241,6 @@ export function ShareModal(_props) {
                                 </div>
                             </div>
 
-                            {/* MIDI Card */}
                             <div class="help-card share-card share-card--accent">
                                 <h4 class="share-card-title">🎹 DAW MIDI File</h4>
                                 <p class="text-mini-muted share-card-copy">
@@ -276,11 +252,8 @@ export function ShareModal(_props) {
                                         id="exportFilenameInput"
                                         type="text"
                                         value={filename}
-                                        onInput={(/** @type {Event} */ e) => {
-                                            const target = /** @type {HTMLInputElement} */ (
-                                                e.target
-                                            );
-                                            setFilename(target.value);
+                                        onInput={(e: Event) => {
+                                            setFilename((e.target as HTMLInputElement).value);
                                         }}
                                         placeholder="Filename..."
                                         maxLength={64}

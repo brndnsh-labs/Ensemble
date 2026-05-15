@@ -1,4 +1,3 @@
-import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { dispatch, getState } from '../state.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -17,18 +16,9 @@ import { pushHistory, undo } from '../history.js';
 import { ACTIONS } from '../types.js';
 import { formatUnicodeSymbols, generateId } from '../utils.js';
 
-/**
- * @typedef {import('../ui-types.js').ComponentChildren} ComponentChildren
- */
-
-/**
- * @typedef {Object} EditorModalProps
- */
-
-/** @param {EditorModalProps} _props */
-export function EditorModal(_props) {
+export function EditorModal() {
     const { isOpen, currentKey, sectionCount, linkedCount, sectionKeyCount } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+        (s) => ({
             isOpen: s.playback.modals.editor,
             currentKey: s.arranger.key,
             sectionCount: (s.arranger.sections || []).length,
@@ -39,8 +29,7 @@ export function EditorModal(_props) {
     );
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showConfirmClear, setShowConfirmClear] = useState(false);
-    /** @type {import('preact').RefObject<HTMLDivElement>} */
-    const overlayRef = useRef(null);
+    const overlayRef = useRef<HTMLDivElement | null>(null);
 
     const closeEditor = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
@@ -48,10 +37,8 @@ export function EditorModal(_props) {
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
-            const focusable = /** @type {HTMLElement} */ (
-                overlayRef.current.querySelector(
-                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-                )
+            const focusable = overlayRef.current.querySelector<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
             );
             if (focusable) {
                 setTimeout(() => focusable.focus(), 50);
@@ -85,7 +72,7 @@ export function EditorModal(_props) {
     const handleMutate = () => {
         setIsMenuOpen(false);
         const targetId = arranger.lastInteractedSectionId;
-        const section = arranger.sections.find((/** @type {any} */ s) => s.id === targetId);
+        const section = arranger.sections.find((s: any) => s.id === targetId);
         if (!section) {
             return;
         }
@@ -93,14 +80,12 @@ export function EditorModal(_props) {
         const { value } = mutateProgression(section.value);
         section.value = value;
 
-        // Visual feedback
         dispatch(ACTIONS.SET_PARAM, {
             module: 'arranger',
             param: 'mutatedSectionId',
             value: targetId,
         });
 
-        // Clear highlight after animation duration
         setTimeout(() => {
             dispatch(ACTIONS.SET_PARAM, {
                 module: 'arranger',
@@ -159,8 +144,8 @@ export function EditorModal(_props) {
             aria-modal="true"
             aria-labelledby="editorModalTitle"
             aria-hidden={!isOpen ? 'true' : 'false'}
-            onClick={(/** @type {MouseEvent} */ e) => {
-                const target = /** @type {HTMLElement} */ (e.target);
+            onClick={(e: MouseEvent) => {
+                const target = e.target as HTMLElement;
                 if (target.id === 'editorOverlay') {
                     closeEditor();
                 }
@@ -168,7 +153,7 @@ export function EditorModal(_props) {
         >
             <div
                 class="settings-content editor-modal"
-                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
+                onClick={(e: MouseEvent) => e.stopPropagation()}
             >
                 <div class="modal-header editor-modal-header">
                     <div class="editor-modal-header-copy">
@@ -198,7 +183,7 @@ export function EditorModal(_props) {
                                     isMenuOpen ? 'active' : ''
                                 }`}
                                 title="Arrangement Tools"
-                                onClick={(/** @type {MouseEvent} */ e) => {
+                                onClick={(e: MouseEvent) => {
                                     e.stopPropagation();
                                     setIsMenuOpen(!isMenuOpen);
                                 }}

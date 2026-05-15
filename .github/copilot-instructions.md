@@ -49,8 +49,8 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 
 - `public/main.js` is the orchestration entrypoint. It hydrates persisted/URL state first, validates the progression, mounts the Preact tree with `mountComponents()`, initializes the logic worker, and then subscribes state changes so `syncWorker()` and `handleEffects()` run on every dispatched action.
 - Hydration must happen before mounting the UI. That ordering is intentional and prevents stale initial renders.
-- `public/ui-root.jsx` mounts the root `App` inside an error boundary.
-- `public/App.jsx` renders the four main workspaces (`arranger`, `studio`, `perform`, `visuals`), global transport, modals, notifications, and PWA banner.
+- `public/ui-root.tsx` mounts the root `App` inside an error boundary.
+- `public/App.tsx` renders the four main workspaces (`arranger`, `studio`, `perform`, `visuals`), global transport, modals, notifications, and PWA banner.
 
 ### State and side effects
 

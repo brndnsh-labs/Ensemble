@@ -1,4 +1,4 @@
-import React, { memo } from 'preact/compat';
+import { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
 import {
@@ -9,21 +9,16 @@ import {
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 
-/**
- * @typedef {Object} ChordCardProps
- * @property {any} chord
- * @property {boolean} isActive
- * @property {string} notation
- */
+interface ChordCardProps {
+    chord: any;
+    isActive: boolean;
+    notation: string;
+}
 
-/**
- * @param {ChordCardProps} props
- */
-const ChordCardComponent = ({ chord, isActive, notation }) => {
+const ChordCardComponent = ({ chord, isActive, notation }: ChordCardProps) => {
     const disp = chord.display ? chord.display[notation] : null;
 
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const cardRef = useRef(null);
+    const cardRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (!cardRef.current) {
@@ -53,10 +48,10 @@ const ChordCardComponent = ({ chord, isActive, notation }) => {
         }
     }, [disp, chord.absName]);
 
-    const handleClick = (/** @type {any} */ event) => {
+    const handleClick = (event: MouseEvent) => {
         event.stopPropagation();
-        if (/** @type {any} */ (window).previewChord) {
-            /** @type {any} */ (window).previewChord(chord.globalIndex);
+        if ((window as any).previewChord) {
+            (window as any).previewChord(chord.globalIndex);
         }
     };
 
@@ -88,10 +83,7 @@ const ChordCardComponent = ({ chord, isActive, notation }) => {
 
 const ChordCard = memo(ChordCardComponent);
 
-/**
- * @returns {{ width: number, height: number }}
- */
-function getViewportSize() {
+function getViewportSize(): { width: number; height: number } {
     if (typeof window === 'undefined') {
         return { width: 1280, height: 800 };
     }
@@ -102,17 +94,14 @@ function getViewportSize() {
     };
 }
 
-/**
- * @param {string} sectionId
- */
-function openSectionEditor(sectionId) {
+function openSectionEditor(sectionId: string) {
     const detail = { detail: { sectionId } };
     document.dispatchEvent(new CustomEvent('open-editor', detail));
 }
 
 export function ChordVisualizer() {
     const { progression, timeSignature, lastActiveChordIndex, sectionsState, notation } =
-        useEnsembleState((/** @type {import('../types.js').EnsembleState} */ state) => ({
+        useEnsembleState((state) => ({
             progression: state.arranger.progression,
             timeSignature: state.arranger.timeSignature,
             lastActiveChordIndex: state.chords.lastActiveChordIndex,
@@ -120,12 +109,10 @@ export function ChordVisualizer() {
             notation: state.arranger.notation || 'roman',
         }));
 
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const containerRef = useRef(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
     const [containerSize, setContainerSize] = useState({ height: 0, width: 0 });
-    const timeSignatureConfig =
-        /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
+    const timeSignatureConfig = (TIME_SIGNATURES as any)[timeSignature] || TIME_SIGNATURES['4/4'];
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -189,7 +176,7 @@ export function ChordVisualizer() {
     const rowIndexById = useMemo(
         () =>
             new Map(
-                leadSheetRows.map((/** @type {any} */ row, index) => {
+                leadSheetRows.map((row: any, index: number) => {
                     return [row.id, index];
                 }),
             ),
@@ -197,29 +184,24 @@ export function ChordVisualizer() {
     );
 
     const totalMeasures = useMemo(
-        () => leadSheetRows.reduce((total, row) => total + row.measures.length, 0),
+        () => leadSheetRows.reduce((total: number, row: any) => total + row.measures.length, 0),
         [leadSheetRows],
     );
-    const activeRowIndex = leadSheetRows.findIndex((/** @type {any} */ row) =>
-        row.measures.some((/** @type {any} */ measure) =>
-            measure.chords.some(
-                (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
-            ),
+    const activeRowIndex = leadSheetRows.findIndex((row: any) =>
+        row.measures.some((measure: any) =>
+            measure.chords.some((chord: any) => chord.globalIndex === lastActiveChordIndex),
         ),
     );
     const activeSectionId =
-        leadSheetRows.find((/** @type {any} */ row) =>
-            row.measures.some((/** @type {any} */ measure) =>
-                measure.chords.some(
-                    (/** @type {any} */ chord) => chord.globalIndex === lastActiveChordIndex,
-                ),
+        leadSheetRows.find((row: any) =>
+            row.measures.some((measure: any) =>
+                measure.chords.some((chord: any) => chord.globalIndex === lastActiveChordIndex),
             ),
         )?.sectionId ?? null;
     const leadSheetSectionGroups = useMemo(() => {
-        /** @type {any[]} */
-        const groups = [];
+        const groups: any[] = [];
 
-        leadSheetRows.forEach((row) => {
+        leadSheetRows.forEach((row: any) => {
             const lastGroup = groups[groups.length - 1];
             if (lastGroup && lastGroup.sectionId === row.sectionId) {
                 lastGroup.rows.push(row);
@@ -282,10 +264,11 @@ export function ChordVisualizer() {
         const lookaheadRow = rows[lookaheadIndex] || activeRow;
         const containerRect = container.getBoundingClientRect();
         const scrollPadding = layoutProfile.scrollMode === 'guided' ? 18 : 12;
-        const getOffsetTop = (/** @type {Element} */ element) =>
+        const getOffsetTop = (element: Element) =>
             element.getBoundingClientRect().top - containerRect.top + container.scrollTop;
         const activeTop = getOffsetTop(activeRow);
-        const lookaheadBottom = getOffsetTop(lookaheadRow) + lookaheadRow.clientHeight;
+        const lookaheadBottom =
+            getOffsetTop(lookaheadRow) + (lookaheadRow as HTMLElement).clientHeight;
         const visibleTop = container.scrollTop + scrollPadding;
         const visibleBottom = container.scrollTop + container.clientHeight - scrollPadding;
         const shouldRevealAbove = activeTop < visibleTop;
@@ -324,7 +307,7 @@ export function ChordVisualizer() {
             data-viewport={layoutProfile.viewport}
             data-vertical-fill={layoutProfile.verticalFillMode}
         >
-            {leadSheetSectionGroups.map((/** @type {any} */ sectionGroup) => {
+            {leadSheetSectionGroups.map((sectionGroup: any) => {
                 const isActiveSection = activeSectionId === sectionGroup.sectionId;
 
                 return (
@@ -335,16 +318,15 @@ export function ChordVisualizer() {
                         }`}
                         data-section-id={sectionGroup.sectionId}
                     >
-                        {sectionGroup.rows.map((/** @type {any} */ row) => {
+                        {sectionGroup.rows.map((row: any) => {
                             const rowIndex = rowIndexById.get(row.id) ?? -1;
-                            const isActiveRow = row.measures.some((/** @type {any} */ measure) =>
+                            const isActiveRow = row.measures.some((measure: any) =>
                                 measure.chords.some(
-                                    (/** @type {any} */ chord) =>
-                                        chord.globalIndex === lastActiveChordIndex,
+                                    (chord: any) => chord.globalIndex === lastActiveChordIndex,
                                 ),
                             );
                             const hasSectionMarkers = row.measures.some(
-                                (/** @type {any} */ measure) => measure.isSectionStart,
+                                (measure: any) => measure.isSectionStart,
                             );
                             const isUpcomingRow =
                                 activeRowIndex >= 0 &&
@@ -362,82 +344,67 @@ export function ChordVisualizer() {
                                     data-row-index={rowIndex}
                                     data-section-id={row.sectionId}
                                 >
-                                    {row.measures.map(
-                                        (
-                                            /** @type {any} */ measure,
-                                            /** @type {any} */ measureIndex,
-                                        ) =>
-                                            measure.isSectionStart ? (
-                                                <div
-                                                    key={`${row.id}-marker-${measureIndex}`}
-                                                    className={`lead-sheet-marker-slot${
-                                                        activeSectionId &&
-                                                        measure.sectionId === activeSectionId
-                                                            ? ' lead-sheet-marker-slot--section-active'
-                                                            : ''
-                                                    }${
-                                                        isActiveRow &&
-                                                        activeSectionId &&
-                                                        measure.sectionId === activeSectionId
-                                                            ? ' lead-sheet-marker-slot--row-active'
-                                                            : ''
-                                                    }`}
-                                                    style={{
-                                                        gridColumn: `${measureIndex + 1}`,
-                                                        gridRow: '1',
-                                                    }}
-                                                    aria-hidden="true"
-                                                >
-                                                    <span className="lead-sheet-row-marker">
-                                                        {formatUnicodeSymbols(measure.sectionLabel)}
-                                                    </span>
-                                                </div>
-                                            ) : null,
+                                    {row.measures.map((measure: any, measureIndex: number) =>
+                                        measure.isSectionStart ? (
+                                            <div
+                                                key={`${row.id}-marker-${measureIndex}`}
+                                                className={`lead-sheet-marker-slot${
+                                                    activeSectionId &&
+                                                    measure.sectionId === activeSectionId
+                                                        ? ' lead-sheet-marker-slot--section-active'
+                                                        : ''
+                                                }${
+                                                    isActiveRow &&
+                                                    activeSectionId &&
+                                                    measure.sectionId === activeSectionId
+                                                        ? ' lead-sheet-marker-slot--row-active'
+                                                        : ''
+                                                }`}
+                                                style={{
+                                                    gridColumn: `${measureIndex + 1}`,
+                                                    gridRow: '1',
+                                                }}
+                                                aria-hidden="true"
+                                            >
+                                                <span className="lead-sheet-row-marker">
+                                                    {formatUnicodeSymbols(measure.sectionLabel)}
+                                                </span>
+                                            </div>
+                                        ) : null,
                                     )}
-                                    {row.measures.map(
-                                        (
-                                            /** @type {any} */ measure,
-                                            /** @type {any} */ measureIndex,
-                                        ) => {
-                                            const isActiveMeasure = measure.chords.some(
-                                                (/** @type {any} */ chord) =>
-                                                    chord.globalIndex === lastActiveChordIndex,
-                                            );
+                                    {row.measures.map((measure: any, measureIndex: number) => {
+                                        const isActiveMeasure = measure.chords.some(
+                                            (chord: any) =>
+                                                chord.globalIndex === lastActiveChordIndex,
+                                        );
 
-                                            return (
-                                                <div
-                                                    key={`${row.id}-${measureIndex}`}
-                                                    className={`measure-box${
-                                                        isActiveMeasure
-                                                            ? ' measure-box--active'
-                                                            : ''
-                                                    }`}
-                                                    data-section-id={measure.sectionId}
-                                                    style={{
-                                                        gridColumn: `${measureIndex + 1}`,
-                                                        gridRow: hasSectionMarkers ? '2' : '1',
-                                                    }}
-                                                    onClick={() =>
-                                                        openSectionEditor(measure.sectionId)
-                                                    }
-                                                >
-                                                    {measure.chords.map(
-                                                        (/** @type {any} */ chord) => (
-                                                            <ChordCard
-                                                                key={chord.globalIndex}
-                                                                chord={chord}
-                                                                isActive={
-                                                                    chord.globalIndex ===
-                                                                    lastActiveChordIndex
-                                                                }
-                                                                notation={notation}
-                                                            />
-                                                        ),
-                                                    )}
-                                                </div>
-                                            );
-                                        },
-                                    )}
+                                        return (
+                                            <div
+                                                key={`${row.id}-${measureIndex}`}
+                                                className={`measure-box${
+                                                    isActiveMeasure ? ' measure-box--active' : ''
+                                                }`}
+                                                data-section-id={measure.sectionId}
+                                                style={{
+                                                    gridColumn: `${measureIndex + 1}`,
+                                                    gridRow: hasSectionMarkers ? '2' : '1',
+                                                }}
+                                                onClick={() => openSectionEditor(measure.sectionId)}
+                                            >
+                                                {measure.chords.map((chord: any) => (
+                                                    <ChordCard
+                                                        key={chord.globalIndex}
+                                                        chord={chord}
+                                                        isActive={
+                                                            chord.globalIndex ===
+                                                            lastActiveChordIndex
+                                                        }
+                                                        notation={notation}
+                                                    />
+                                                ))}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             );
                         })}

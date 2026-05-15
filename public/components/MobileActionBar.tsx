@@ -3,16 +3,12 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { InstrumentRail, StudioSurface } from './InstrumentRail.jsx';
 
-/**
- * Fixed bottom action bar for mobile (<640px). Replaces the horizontal
- * instrument strip with three top-level actions: Mix, Share, Visualizer.
- *
- * @param {{
- *   isVizOpen: boolean,
- *   onOpenViz: () => void,
- * }} props
- */
-export function MobileActionBar({ isVizOpen, onOpenViz }) {
+interface MobileActionBarProps {
+    isVizOpen: boolean;
+    onOpenViz: () => void;
+}
+
+export function MobileActionBar({ isVizOpen, onOpenViz }: MobileActionBarProps) {
     const [isMixOpen, setIsMixOpen] = useState(false);
 
     return (

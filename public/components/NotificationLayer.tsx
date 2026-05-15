@@ -2,16 +2,10 @@ import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 
 export function NotificationLayer() {
-    const notifications = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) =>
-            /** @type {any} */ (s.playback).notifications || [],
-    );
-    /** @type {import('preact/hooks').StateUpdater<any[]>|any} */
-    const [visibleNotify, setVisibleNotify] = useState([]);
+    const notifications = useEnsembleState((s) => (s.playback as any).notifications ?? []);
+    const [visibleNotify, setVisibleNotify] = useState<any[]>([]);
 
     useEffect(() => {
-        // Track unique IDs to manage exit animations if needed,
-        // but for now we just filter the active ones from state.
         setVisibleNotify(notifications);
     }, [notifications]);
 
@@ -21,7 +15,7 @@ export function NotificationLayer() {
 
     return (
         <div id="notificationLayer" class="notification-layer" role="alert" aria-live="polite">
-            {visibleNotify.map((/** @type {any} */ n) => (
+            {visibleNotify.map((n: any) => (
                 <div key={n.id} class="notification-box">
                     <span class="notification-icon">
                         {n.type === 'error' ? '⚠️' : n.type === 'success' ? '✅' : 'ℹ️'}

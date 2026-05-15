@@ -1,22 +1,21 @@
+import type { ComponentChildren } from 'preact';
 import { Component, render } from 'preact';
 import { App } from './App.jsx';
 
-class ErrorBoundary extends Component {
-    constructor() {
-        super();
-        this.state = { errored: false };
-    }
-    /** @param {any} error */
-    componentDidCatch(error) {
+interface ErrorBoundaryState {
+    errored: boolean;
+}
+
+class ErrorBoundary extends Component<{ children: ComponentChildren }, ErrorBoundaryState> {
+    state = { errored: false };
+
+    componentDidCatch(error: unknown) {
         this.setState({ errored: true });
         console.error('[UI-Root] Component Crash:', error);
     }
-    /**
-     * @param {any} props
-     * @param {any} state
-     */
-    render(props, state) {
-        if (state.errored) {
+
+    render() {
+        if (this.state.errored) {
             return (
                 <div style="padding: 2rem; text-align: center; background: #1e293b; color: white; height: 100vh;">
                     <h2>Something went wrong in the UI.</h2>
@@ -27,14 +26,11 @@ class ErrorBoundary extends Component {
                 </div>
             );
         }
-        return props.children;
+        return <>{this.props.children}</>;
     }
 }
 
-/**
- * @param {function(): number} getVisualTime
- */
-export function mountComponents(getVisualTime) {
+export function mountComponents(getVisualTime: () => number) {
     console.log('[UI-Root] Mounting Preact Root...');
 
     const root = document.body;

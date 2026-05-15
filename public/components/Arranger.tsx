@@ -1,35 +1,17 @@
 import { Fragment } from 'preact';
-import React from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
 import { onSectionUpdate } from '../arranger-controller.js';
+import type { Section } from '../state/arranger.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { SectionCard } from './SectionCard.jsx';
 
-/**
- * @typedef {import('preact').ComponentChildren} ComponentChildren
- */
+export function Arranger() {
+    const { sections, lastInteractedSectionId } = useEnsembleState((s) => ({
+        sections: s.arranger.sections,
+        lastInteractedSectionId: s.arranger.lastInteractedSectionId,
+    }));
 
-/**
- * @typedef {import('../state/arranger.js').Section} Section
- */
-
-/**
- * @typedef {Object} ArrangerProps
- */
-
-/**
- * @param {ArrangerProps} _props
- */
-export function Arranger(_props) {
-    const { sections, lastInteractedSectionId } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            sections: s.arranger.sections,
-            lastInteractedSectionId: s.arranger.lastInteractedSectionId,
-        }),
-    );
-
-    /** @type {import('preact/hooks').MutableRef<Record<string, any>>} */
-    const sectionRefs = useRef({});
+    const sectionRefs = useRef<Record<string, any>>({});
 
     useEffect(() => {
         if (lastInteractedSectionId) {
@@ -49,20 +31,20 @@ export function Arranger(_props) {
     }, [lastInteractedSectionId]);
 
     useEffect(() => {
-        const handleReorder = (/** @type {any} */ e) => {
-            const { draggedId, targetId } = e.detail;
-            const draggedIdx = sections.findIndex((/** @type {any} */ sec) => sec.id === draggedId);
-            const targetIdx = sections.findIndex((/** @type {any} */ sec) => sec.id === targetId);
+        const handleReorder = (e: Event) => {
+            const { draggedId, targetId } = (e as CustomEvent).detail;
+            const draggedIdx = sections.findIndex((sec: Section) => sec.id === draggedId);
+            const targetIdx = sections.findIndex((sec: Section) => sec.id === targetId);
 
             if (draggedIdx === -1 || targetIdx === -1) {
                 return;
             }
 
-            const newOrder = sections.map((/** @type {any} */ sec) => sec.id);
+            const newOrder = sections.map((sec: Section) => sec.id);
             newOrder.splice(draggedIdx, 1);
             newOrder.splice(targetIdx, 0, draggedId);
 
-            onSectionUpdate(/** @type {any} */ (null), 'reorder', newOrder);
+            onSectionUpdate(null as any, 'reorder', newOrder);
         };
 
         window.addEventListener('reorder-sections', handleReorder);
@@ -73,9 +55,8 @@ export function Arranger(_props) {
         return null;
     }
 
-    /** @type {Section[][]} */
-    const groupedSections = [];
-    sections.forEach((/** @type {Section} */ section) => {
+    const groupedSections: Section[][] = [];
+    sections.forEach((section: Section) => {
         if (section.seamless && groupedSections.length > 0) {
             groupedSections[groupedSections.length - 1].push(section);
         } else {
@@ -88,13 +69,11 @@ export function Arranger(_props) {
             {groupedSections.map((group) => {
                 if (group.length === 1) {
                     const section = group[0];
-                    const index = sections.findIndex(
-                        (/** @type {Section} */ s) => s.id === section.id,
-                    );
+                    const index = sections.findIndex((s: Section) => s.id === section.id);
                     return (
                         <SectionCard
                             key={section.id}
-                            ref={(/** @type {any} */ el) => (sectionRefs.current[section.id] = el)}
+                            ref={(el: any) => (sectionRefs.current[section.id] = el)}
                             section={section}
                             index={index}
                             totalSections={sections.length}
@@ -105,15 +84,11 @@ export function Arranger(_props) {
                 return (
                     <div className="section-group" key={`group-${group[0].id}`}>
                         {group.map((section) => {
-                            const index = sections.findIndex(
-                                (/** @type {Section} */ s) => s.id === section.id,
-                            );
+                            const index = sections.findIndex((s: Section) => s.id === section.id);
                             return (
                                 <SectionCard
                                     key={section.id}
-                                    ref={(/** @type {any} */ el) =>
-                                        (sectionRefs.current[section.id] = el)
-                                    }
+                                    ref={(el: any) => (sectionRefs.current[section.id] = el)}
                                     section={section}
                                     index={index}
                                     totalSections={sections.length}

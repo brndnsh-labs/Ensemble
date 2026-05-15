@@ -12,7 +12,12 @@ function getFiles(dir, allFiles = []) {
         const name = path.join(dir, file);
         if (statSync(name).isDirectory()) {
             getFiles(name, allFiles);
-        } else if (name.endsWith('.js') || name.endsWith('.jsx')) {
+        } else if (
+            name.endsWith('.js') ||
+            name.endsWith('.jsx') ||
+            name.endsWith('.ts') ||
+            name.endsWith('.tsx')
+        ) {
             allFiles.push(name);
         }
     }
@@ -31,7 +36,7 @@ describe('Security Ledger Verification: DOM Injection', () => {
         return (
             !f.includes('public/dist/') &&
             !f.includes('test-dist/') &&
-            !f.includes('ManualModal.jsx')
+            !f.includes('ManualModal.tsx')
         );
     });
 
@@ -57,9 +62,9 @@ describe('Security Ledger Verification: DOM Injection', () => {
         // This is a stylistic/structural check.
         // We verify that ChordVisualizer, Arranger, and Modals rely on Preact's safe rendering.
         const filesToCheck = [
-            'public/components/ChordVisualizer.jsx',
-            'public/components/SectionCard.jsx',
-            'public/components/NotificationLayer.jsx',
+            'public/components/ChordVisualizer.tsx',
+            'public/components/SectionCard.tsx',
+            'public/components/NotificationLayer.tsx',
         ];
 
         filesToCheck.forEach((file) => {

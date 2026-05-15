@@ -1,5 +1,4 @@
 import { Fragment } from 'preact';
-import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { clearChordPresetHighlight, refreshArrangerUI } from '../arranger-controller.js';
 import { SONG_TEMPLATES } from '../data/song-templates.js';
@@ -15,24 +14,13 @@ import { ButtonGroup, SettingGroup, SettingRow, Toggle } from './UIControls.jsx'
 export function GenerateSongModal() {
     const { arranger } = getState();
     const dispatch = useDispatch();
-    const isOpen = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.generateSong,
-    );
-    const lastInteractedId = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) =>
-            s.arranger.lastInteractedSectionId,
-    );
-    const sections = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.sections,
-    );
-    const isDirty = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.isDirty,
-    );
+    const isOpen = useEnsembleState((s) => s.playback.modals.generateSong);
+    const lastInteractedId = useEnsembleState((s) => s.arranger.lastInteractedSectionId);
+    const sections = useEnsembleState((s) => s.arranger.sections);
+    const isDirty = useEnsembleState((s) => s.arranger.isDirty);
 
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const overlayRef = useRef(null);
+    const overlayRef = useRef<HTMLDivElement | null>(null);
 
-    // Internal component state for form values
     const [activeTab, setActiveTab] = useState('templates');
     const [key, setKey] = useState(arranger.key);
     const [isMinor, setIsMinor] = useState(arranger.isMinor);
@@ -46,7 +34,7 @@ export function GenerateSongModal() {
     const [manualSeedValue, setManualSeedValue] = useState('');
     const [seedType, setSeedType] = useState('Verse');
     const [hasGenerated, setHasGenerated] = useState(false);
-    const [confirmTemplate, setConfirmTemplate] = useState(null);
+    const [confirmTemplate, setConfirmTemplate] = useState<string | null>(null);
     const [confirmGen, setConfirmGen] = useState(false);
 
     const prevOpenRef = useRef(false);
@@ -55,12 +43,9 @@ export function GenerateSongModal() {
         if (isOpen && !prevOpenRef.current) {
             setHasGenerated(false);
 
-            // Focus first element
             if (overlayRef.current) {
-                const focusable = /** @type {HTMLElement} */ (
-                    overlayRef.current.querySelector(
-                        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-                    )
+                const focusable = overlayRef.current.querySelector<HTMLElement>(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
                 );
                 if (focusable) {
                     setTimeout(() => focusable.focus(), 50);
@@ -90,7 +75,7 @@ export function GenerateSongModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'generateSong', open: false });
     };
 
-    const applyTemplate = (/** @type {any} */ template) => {
+    const applyTemplate = (template: any) => {
         if (confirmTemplate !== template.name) {
             setConfirmTemplate(template.name);
             return;
@@ -100,7 +85,7 @@ export function GenerateSongModal() {
         try {
             pushHistory();
 
-            const newSections = template.sections.map((/** @type {any} */ s) => ({
+            const newSections = template.sections.map((s: any) => ({
                 id: generateId(),
                 label: s.label,
                 value: s.value,
@@ -119,9 +104,8 @@ export function GenerateSongModal() {
                 showToast('✨ Template Applied!');
                 setHasGenerated(true);
             }, 50);
-        } catch (/** @type {any} */ e) {
+        } catch (e: any) {
             if (e.name === 'TypeError' && e.message.includes('currentTime')) {
-                // Audio not initialized, ignore this error as it's expected if no user gesture yet
                 setHasGenerated(true);
                 return;
             }
@@ -148,8 +132,7 @@ export function GenerateSongModal() {
             let seed = null;
             if (seedMode === 'existing') {
                 const section =
-                    sections.find((/** @type {any} */ s) => s.id === selectedSectionId) ||
-                    sections[0];
+                    sections.find((s: any) => s.id === selectedSectionId) || sections[0];
                 if (section?.value) {
                     seed = {
                         type: seedType,
@@ -204,9 +187,8 @@ export function GenerateSongModal() {
                 showToast('✨ Arrangement Ready!');
                 setHasGenerated(true);
             }, 50);
-        } catch (/** @type {any} */ e) {
+        } catch (e: any) {
             if (e.name === 'TypeError' && e.message.includes('currentTime')) {
-                // Audio not initialized, ignore this error as it's expected if no user gesture yet
                 setHasGenerated(true);
                 return;
             }
@@ -214,6 +196,7 @@ export function GenerateSongModal() {
             showToast('Generation failed. Check console for details.');
         }
     };
+
     const structureOptions = [
         { id: 'pop', label: 'Pop 🎤', desc: 'Standard Verse-Chorus-Bridge' },
         { id: 'jazz', label: 'Jazz 🎷', desc: 'AABA Standard Form' },
@@ -232,8 +215,8 @@ export function GenerateSongModal() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="generate-song-title"
-            onClick={(/** @type {MouseEvent} */ e) => {
-                const target = /** @type {HTMLElement} */ (e.target);
+            onClick={(e: MouseEvent) => {
+                const target = e.target as HTMLElement;
                 if (target.id === 'generateSongOverlay') {
                     close();
                 }
@@ -241,7 +224,7 @@ export function GenerateSongModal() {
         >
             <div
                 class="modal-content settings-content generate-modal-shell"
-                onClick={(/** @type {MouseEvent} */ e) => e.stopPropagation()}
+                onClick={(e: MouseEvent) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
                     <h2 id="generate-song-title">Inspiration Hub</h2>
@@ -285,7 +268,7 @@ export function GenerateSongModal() {
                                         },
                                     ]}
                                     value={activeTab}
-                                    onChange={(/** @type {any} */ v) => setActiveTab(v)}
+                                    onChange={(v) => setActiveTab(v as string)}
                                 />
                             </div>
 
@@ -296,7 +279,7 @@ export function GenerateSongModal() {
                                         arrangement.
                                     </p>
                                     <div class="template-grid generate-template-grid">
-                                        {SONG_TEMPLATES.map((/** @type {any} */ template) => (
+                                        {SONG_TEMPLATES.map((template: any) => (
                                             <button
                                                 key={template.name}
                                                 class="template-card-btn generate-template-card"
@@ -323,10 +306,8 @@ export function GenerateSongModal() {
                                                 <div class="generate-template-card-meta">
                                                     {template.sections.length} Sections •{' '}
                                                     {template.sections.reduce(
-                                                        (
-                                                            /** @type {any} */ acc,
-                                                            /** @type {any} */ s,
-                                                        ) => acc + (s.repeat || 1),
+                                                        (acc: number, s: any) =>
+                                                            acc + (s.repeat || 1),
                                                         0,
                                                     )}{' '}
                                                     Blocks
@@ -337,7 +318,6 @@ export function GenerateSongModal() {
                                 </SettingGroup>
                             ) : (
                                 <Fragment>
-                                    {/* --- FOUNDATION --- */}
                                     <SettingGroup title="1. Foundation">
                                         <SettingRow
                                             label="Root Key"
@@ -346,9 +326,7 @@ export function GenerateSongModal() {
                                             <select
                                                 id="gen-root-key"
                                                 value={key}
-                                                onChange={(/** @type {any} */ e) =>
-                                                    setKey(e.target.value)
-                                                }
+                                                onChange={(e: any) => setKey(e.target.value)}
                                                 class="generate-select--sm"
                                             >
                                                 <option value="Random">Random</option>
@@ -389,7 +367,7 @@ export function GenerateSongModal() {
                                             <select
                                                 id="gen-time-sig"
                                                 value={timeSignature}
-                                                onChange={(/** @type {any} */ e) =>
+                                                onChange={(e: any) =>
                                                     setTimeSignature(e.target.value)
                                                 }
                                                 class="generate-select--sm"
@@ -406,7 +384,6 @@ export function GenerateSongModal() {
                                         </SettingRow>
                                     </SettingGroup>
 
-                                    {/* --- VIBE & STYLE --- */}
                                     <SettingGroup
                                         title="2. Vibe & Style"
                                         className="generate-section-spaced"
@@ -418,12 +395,10 @@ export function GenerateSongModal() {
                                             <select
                                                 id="gen-structure"
                                                 value={structure}
-                                                onChange={(/** @type {any} */ e) =>
-                                                    setStructure(e.target.value)
-                                                }
+                                                onChange={(e: any) => setStructure(e.target.value)}
                                                 class="generate-select--md"
                                             >
-                                                {structureOptions.map((/** @type {any} */ opt) => (
+                                                {structureOptions.map((opt) => (
                                                     <option key={opt.id} value={opt.id}>
                                                         {opt.label}
                                                     </option>
@@ -446,7 +421,7 @@ export function GenerateSongModal() {
                                                 max="1"
                                                 step="0.1"
                                                 value={complexity}
-                                                onInput={(/** @type {any} */ e) =>
+                                                onInput={(e: any) =>
                                                     setComplexity(parseFloat(e.target.value))
                                                 }
                                                 class="generate-range"
@@ -454,7 +429,6 @@ export function GenerateSongModal() {
                                         </SettingRow>
                                     </SettingGroup>
 
-                                    {/* --- ADVANCED --- */}
                                     <SettingGroup
                                         title="3. Seeds"
                                         className="generate-section-spaced generate-section-borderless"
@@ -465,9 +439,7 @@ export function GenerateSongModal() {
                                         >
                                             <select
                                                 value={seedMode}
-                                                onChange={(/** @type {any} */ e) =>
-                                                    setSeedMode(e.target.value)
-                                                }
+                                                onChange={(e: any) => setSeedMode(e.target.value)}
                                                 class="generate-select--md"
                                             >
                                                 <option value="none">None</option>
@@ -484,12 +456,12 @@ export function GenerateSongModal() {
                                                 >
                                                     <select
                                                         value={selectedSectionId}
-                                                        onChange={(/** @type {any} */ e) =>
+                                                        onChange={(e: any) =>
                                                             setSelectedSectionId(e.target.value)
                                                         }
                                                         class="generate-select--md"
                                                     >
-                                                        {sections.map((/** @type {any} */ s) => (
+                                                        {sections.map((s: any) => (
                                                             <option key={s.id} value={s.id}>
                                                                 {s.label}
                                                             </option>
@@ -508,7 +480,7 @@ export function GenerateSongModal() {
                                                     <input
                                                         type="text"
                                                         value={manualSeedValue}
-                                                        onInput={(/** @type {any} */ e) =>
+                                                        onInput={(e: any) =>
                                                             setManualSeedValue(e.target.value)
                                                         }
                                                         placeholder="I | IV | V"
@@ -527,7 +499,7 @@ export function GenerateSongModal() {
                                                     <select
                                                         id="gen-seed-type"
                                                         value={seedType}
-                                                        onChange={(/** @type {any} */ e) =>
+                                                        onChange={(e: any) =>
                                                             setSeedType(e.target.value)
                                                         }
                                                         class="generate-select--sm"

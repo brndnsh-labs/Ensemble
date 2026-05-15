@@ -8,7 +8,7 @@ import { escapeHTML } from '../utils.js';
  * A tiny, zero-dependency Markdown-to-HTML converter.
  * Handles just enough for the Ensemble manual.
  */
-function simpleMarkdown(/** @type {string} */ text) {
+function simpleMarkdown(text: string): string {
     if (!text) {
         return '';
     }
@@ -52,7 +52,7 @@ function simpleMarkdown(/** @type {string} */ text) {
             // Paragraphs (Very simple: double newline)
             // But avoid double wrapping headers/lists
             .split(/\n\n+/)
-            .map((/** @type {any} */ p) => {
+            .map((p) => {
                 if (
                     p.trim().startsWith('<h') ||
                     p.trim().startsWith('<ul') ||
@@ -99,10 +99,7 @@ export function ManualModal() {
 
     return (
         <div class="modal-overlay active" onClick={close}>
-            <div
-                class="settings-content manual-modal"
-                onClick={(/** @type {any} */ e) => e.stopPropagation()}
-            >
+            <div class="settings-content manual-modal" onClick={(e) => e.stopPropagation()}>
                 <div class="modal-header-shared">
                     <h2>Ensemble Manual</h2>
                     <button class="close-btn" onClick={close} aria-label="Close">

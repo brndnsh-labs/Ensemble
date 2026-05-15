@@ -115,17 +115,57 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 
 ---
 
-## Phase 6: Components (JSX → TSX) ⬜
+## Phase 6: Components (JSX → TSX) ✅
 
-Convert after Phase 5 state/engine types are settled.
+All 28 Preact component files renamed `.jsx` → `.tsx` and converted to TypeScript. `moduleResolution: Bundler` resolves `.jsx` imports to `.tsx` automatically — no import paths updated.
+
+**Batch A — tiny (< 50 lines):**
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/App.jsx` | 49 | ⬜ | |
-| `public/ui-root.jsx` | 48 | ⬜ | |
-| `public/components/NotificationLayer.jsx` | 36 | ⬜ | |
-| `public/components/PWAUpdateBanner.jsx` | 38 | ⬜ | |
-| *(remaining components)* | — | ⬜ | Rename `.jsx` → `.tsx` |
+| `public/components/NotificationLayer.tsx` | 36 | ✅ | `useState<any[]>` for notifications |
+| `public/components/PWAUpdateBanner.tsx` | 38 | ✅ | |
+| `public/ui-root.tsx` | 48 | ✅ | `ErrorBoundary extends Component<{children}, {errored}>` |
+| `public/App.tsx` | 49 | ✅ | `interface AppProps` |
+
+**Batch B — small (50–130 lines):**
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/components/MobileActionBar.tsx` | 73 | ✅ | |
+| `public/components/SymbolMenu.tsx` | 74 | ✅ | `const SYMBOLS: string[]`; `Record<string, string>` |
+| `public/components/GlobalShortcuts.tsx` | 77 | ✅ | `(e: KeyboardEvent)` |
+| `public/components/VisualizerOverlay.tsx` | 83 | ✅ | |
+| `public/components/SoloistControls.tsx` | 83 | ✅ | `mode: string \| number` to satisfy ButtonGroup |
+| `public/components/Modals.tsx` | 93 | ✅ | `ComponentType<object>` |
+| `public/components/LibraryModal.tsx` | 102 | ✅ | `useRef<HTMLDivElement \| null>` |
+| `public/components/Transport.tsx` | 105 | ✅ | `useState<string \| null>(null)` |
+| `public/components/ManualModal.tsx` | 125 | ✅ | `simpleMarkdown(text: string): string` |
+| `public/components/Arranger.tsx` | 128 | ✅ | `import type { Section }`; `useRef<Record<string, any>>` |
+
+**Batch C — medium (130–300 lines):**
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/components/ChartSurface.tsx` | 177 | ✅ | |
+| `public/components/UIControls.tsx` | 246 | ✅ | All 6 components with prop interfaces |
+| `public/components/ToolbarPopover.tsx` | 256 | ✅ | `ToolbarPopoverRenderContext`; `useState<StyleObject \| undefined>` |
+| `public/components/KeySignatureControls.tsx` | 272 | ✅ | `Record<string, number[][]>` grouping |
+
+**Batch D — large (300+ lines):**
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/components/ShareModal.tsx` | 304 | ✅ | |
+| `public/components/EditorModal.tsx` | 321 | ✅ | Module-level `getState()` between imports (kept as-is) |
+| `public/components/SectionCard.tsx` | 379 | ✅ | `forwardRef<SectionCardHandle, SectionCardProps>`; `useImperativeHandle` |
+| `public/components/InstrumentSettings.tsx` | 420 | ✅ | `StudioInstrumentModule` type; module-level `getState()` |
+| `public/components/Visualizer.tsx` | 422 | ✅ | `partitionDrawQueue` typed; `import type { StateMap }` |
+| `public/components/ChordVisualizer.tsx` | 449 | ✅ | `memo` from `preact/compat`; `className` kept throughout |
+| `public/components/GenerateSongModal.tsx` | 567 | ✅ | `useState<string \| null>(null)` for confirmTemplate |
+| `public/components/InstrumentRail.tsx` | 719 | ✅ | `ActiveSurface` type; `StudioSurface` exported; `StyleObject` |
+| `public/components/Settings.tsx` | 755 | ✅ | `Record<string, number>` for MIDI channels/octaves |
+| `public/components/PresetLibrary.tsx` | 820 | ✅ | 6 interfaces: `LibraryPreset`, `LibraryEntry`, `PresetSection`, etc. |
 
 ---
 

@@ -7,8 +7,7 @@ import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 
-/** @type {Record<string, number[][]>} */
-const GROUPING_OPTIONS = {
+const GROUPING_OPTIONS: Record<string, number[][]> = {
     '5/4': [
         [3, 2],
         [2, 3],
@@ -27,29 +26,15 @@ const GROUPING_OPTIONS = {
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const TIME_SIGNATURE_OPTIONS = ['4/4', '3/4', '2/4', '5/4', '6/8', '7/8', '7/4', '12/8'];
 
-/**
- * @typedef {Object} KeySignatureControlsProps
- * @property {boolean} [showTranspose]
- */
-
-/**
- * @param {string} key
- * @param {boolean} isMinor
- */
-function formatKeySummary(key, isMinor) {
+function formatKeySummary(key: string, isMinor: boolean) {
     return `${formatUnicodeSymbols(key)} ${isMinor ? 'min' : 'maj'}`;
 }
 
-/** @param {boolean} isMinor */
-function getRelativeKeyActionLabel(isMinor) {
+function getRelativeKeyActionLabel(isMinor: boolean) {
     return isMinor ? 'Relative major' : 'Relative minor';
 }
 
-/**
- * @param {string} newKey
- * @param {(action: string) => void} dispatch
- */
-function updateArrangerKey(newKey, dispatch) {
+function updateArrangerKey(newKey: string, dispatch: (action: any, ...args: any[]) => void) {
     import('../state.js').then(({ arranger }) => {
         arranger.key = newKey;
         validateAndAnalyze();
@@ -58,12 +43,11 @@ function updateArrangerKey(newKey, dispatch) {
     });
 }
 
-/**
- * @param {string} timeSignature
- * @param {string | null} lastDrumPreset
- * @param {(action: string) => void} dispatch
- */
-function updateTimeSignature(timeSignature, lastDrumPreset, dispatch) {
+function updateTimeSignature(
+    timeSignature: string,
+    lastDrumPreset: string | null,
+    dispatch: (action: any, ...args: any[]) => void,
+) {
     import('../state.js').then(({ arranger }) => {
         arranger.timeSignature = timeSignature;
         arranger.grouping = null;
@@ -76,19 +60,14 @@ function updateTimeSignature(timeSignature, lastDrumPreset, dispatch) {
     });
 }
 
-/**
- * @param {string} timeSignature
- * @param {(action: string) => void} dispatch
- */
-function cycleGrouping(timeSignature, dispatch) {
-    const options = /** @type {number[][] | undefined} */ (GROUPING_OPTIONS[timeSignature]);
+function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: any[]) => void) {
+    const options = GROUPING_OPTIONS[timeSignature];
     if (!options) {
         return;
     }
 
     import('../state.js').then(({ arranger }) => {
-        const current =
-            arranger.grouping || /** @type {any} */ (TIME_SIGNATURES)[timeSignature].grouping;
+        const current = arranger.grouping || (TIME_SIGNATURES as any)[timeSignature].grouping;
         const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
         const nextIndex = (currentIndex + 1) % options.length;
 
@@ -102,13 +81,11 @@ function cycleGrouping(timeSignature, dispatch) {
 
 export function TimeSignatureControl() {
     const dispatch = useDispatch();
-    const { timeSignature, grouping, lastDrumPreset } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            timeSignature: s.arranger.timeSignature,
-            grouping: s.arranger.grouping,
-            lastDrumPreset: s.groove.lastDrumPreset,
-        }),
-    );
+    const { timeSignature, grouping, lastDrumPreset } = useEnsembleState((s) => ({
+        timeSignature: s.arranger.timeSignature,
+        grouping: s.arranger.grouping,
+        lastDrumPreset: s.groove.lastDrumPreset,
+    }));
     const supportsGrouping = Boolean(GROUPING_OPTIONS[timeSignature]);
 
     return (
@@ -116,8 +93,12 @@ export function TimeSignatureControl() {
             <select
                 id="timeSigSelect"
                 value={timeSignature}
-                onChange={(/** @type {any} */ event) =>
-                    updateTimeSignature(event.target.value, lastDrumPreset, dispatch)
+                onChange={(event) =>
+                    updateTimeSignature(
+                        (event.target as HTMLSelectElement).value,
+                        lastDrumPreset,
+                        dispatch,
+                    )
                 }
                 aria-label="Time Signature"
             >
@@ -145,23 +126,25 @@ export function TimeSignatureControl() {
                 >
                     {grouping
                         ? grouping.join('+')
-                        : /** @type {any} */ (TIME_SIGNATURES)[timeSignature]?.grouping.join('+') ||
-                          '3+2'}
+                        : (TIME_SIGNATURES as any)[timeSignature]?.grouping.join('+') || '3+2'}
                 </button>
             </div>
         </div>
     );
 }
 
-/** @param {{ showTranspose?: boolean }} [props] */
-export function KeySignatureMenuControl({ showTranspose = true } = {}) {
+interface KeySignatureMenuControlProps {
+    showTranspose?: boolean;
+}
+
+export function KeySignatureMenuControl({
+    showTranspose = true,
+}: KeySignatureMenuControlProps = {}) {
     const dispatch = useDispatch();
-    const { arrangerKey, isMinor } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            arrangerKey: s.arranger.key,
-            isMinor: s.arranger.isMinor,
-        }),
-    );
+    const { arrangerKey, isMinor } = useEnsembleState((s) => ({
+        arrangerKey: s.arranger.key,
+        isMinor: s.arranger.isMinor,
+    }));
 
     return (
         <ToolbarPopover
@@ -192,8 +175,8 @@ export function KeySignatureMenuControl({ showTranspose = true } = {}) {
                 <select
                     id="keySelect"
                     value={arrangerKey}
-                    onChange={(/** @type {any} */ event) =>
-                        updateArrangerKey(event.target.value, dispatch)
+                    onChange={(event) =>
+                        updateArrangerKey((event.target as HTMLSelectElement).value, dispatch)
                     }
                     aria-label="Select Key"
                 >
@@ -216,7 +199,7 @@ export function KeySignatureMenuControl({ showTranspose = true } = {}) {
                     aria-label={getRelativeKeyActionLabel(isMinor)}
                     onClick={() => {
                         switchToRelativeKey();
-                        dispatch('REL_KEY_TOGGLE');
+                        dispatch('REL_KEY_TOGGLE' as any);
                     }}
                 >
                     {getRelativeKeyActionLabel(isMinor)}
@@ -235,7 +218,7 @@ export function KeySignatureMenuControl({ showTranspose = true } = {}) {
                             aria-label="Transpose Down"
                             onClick={() => {
                                 transposeKey(-1);
-                                dispatch('TRANSPOSE');
+                                dispatch('TRANSPOSE' as any);
                             }}
                         >
                             ♭ Down
@@ -249,7 +232,7 @@ export function KeySignatureMenuControl({ showTranspose = true } = {}) {
                             aria-label="Transpose Up"
                             onClick={() => {
                                 transposeKey(1);
-                                dispatch('TRANSPOSE');
+                                dispatch('TRANSPOSE' as any);
                             }}
                         >
                             ♯ Up
@@ -261,8 +244,11 @@ export function KeySignatureMenuControl({ showTranspose = true } = {}) {
     );
 }
 
-/** @param {KeySignatureControlsProps} [props] */
-export function KeySignatureControls({ showTranspose = true } = {}) {
+interface KeySignatureControlsProps {
+    showTranspose?: boolean;
+}
+
+export function KeySignatureControls({ showTranspose = true }: KeySignatureControlsProps = {}) {
     return (
         <div class="key-controls">
             <TimeSignatureControl />

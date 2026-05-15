@@ -75,8 +75,8 @@ export default defineConfig({
                 'public/data/**',
                 'public/sw.js',
                 'public/main.js',
-                'public/ui-root.jsx',
-                'public/App.jsx',
+                'public/ui-root.tsx',
+                'public/App.tsx',
             ],
         },
         exclude: [

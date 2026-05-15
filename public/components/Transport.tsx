@@ -1,4 +1,3 @@
-import React from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { handleTap } from '../instrument-controller.js';
 import { dispatch } from '../state.js';
@@ -7,7 +6,7 @@ import { useEnsembleState } from '../ui-bridge.js';
 
 export function Transport() {
     const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ state) => ({
+        (state) => ({
             isPlaying: state.playback.isPlaying,
             bpm: state.playback.bpm,
             sessionTimer: state.playback.sessionTimer,
@@ -17,12 +16,10 @@ export function Transport() {
     );
 
     const [tapActive, setTapActive] = useState(false);
-    /** @type {import('preact/hooks').StateUpdater<string|null>|any} */
-    const [timeLeft, setTimeLeft] = useState(null);
+    const [timeLeft, setTimeLeft] = useState<string | null>(null);
 
     useEffect(() => {
-        /** @type {ReturnType<typeof setInterval> | undefined} */
-        let interval;
+        let interval: ReturnType<typeof setInterval> | undefined;
         if (isPlaying && songMode && sessionTimer > 0 && sessionStartTime) {
             const updateTimer = () => {
                 const elapsedMs = performance.now() - sessionStartTime;
@@ -46,13 +43,12 @@ export function Transport() {
         dispatch(ACTIONS.TOGGLE_PLAY);
     };
 
-    const onBpmInput = (/** @type {any} */ e) => {
-        dispatch(ACTIONS.SET_BPM, e.target.value);
+    const onBpmInput = (e: Event) => {
+        dispatch(ACTIONS.SET_BPM, (e.target as HTMLInputElement).value);
     };
 
-    const onTap = (/** @type {any} */ _e) => {
-        handleTap((/** @type {any} */ val) => dispatch(ACTIONS.SET_BPM, val));
-
+    const onTap = () => {
+        handleTap((val: any) => dispatch(ACTIONS.SET_BPM, val));
         setTapActive(true);
         setTimeout(() => setTapActive(false), 100);
     };

@@ -1,4 +1,3 @@
-import React from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -13,10 +12,6 @@ import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 
-/**
- * @typedef {Object} SettingsProps
- * @property {string} [key]
- */
 export function Settings() {
     const {
         theme,
@@ -36,7 +31,7 @@ export function Settings() {
         midiOctaves,
         midiLatency,
         midiVelocity,
-    } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
+    } = useEnsembleState((s) => ({
         theme: s.playback.theme,
         countIn: s.playback.countIn,
         metronome: s.playback.metronome,
@@ -51,30 +46,26 @@ export function Settings() {
         midiMuteLocal: s.midi.muteLocal,
         midiSelectedOutputId: s.midi.selectedOutputId,
         midiOutputs: s.midi.outputs,
-        midiChannels: /** @type {Record<string, number>} */ ({
+        midiChannels: {
             chords: s.midi.chordsChannel,
             bass: s.midi.bassChannel,
             soloist: s.midi.soloistChannel,
             harmony: s.midi.harmonyChannel,
             drums: s.midi.drumsChannel,
-        }),
-        midiOctaves: /** @type {Record<string, number>} */ ({
+        } as Record<string, number>,
+        midiOctaves: {
             chords: s.midi.chordsOctave,
             bass: s.midi.bassOctave,
             soloist: s.midi.soloistOctave,
             harmony: s.midi.harmonyOctave,
             drums: s.midi.drumsOctave,
-        }),
+        } as Record<string, number>,
         midiLatency: s.midi.latency,
         midiVelocity: s.midi.velocitySensitivity,
     }));
 
-    const masterVolume = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.masterVolume,
-    );
-    const complexity = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.complexity,
-    );
+    const masterVolume = useEnsembleState((s) => s.playback.masterVolume);
+    const complexity = useEnsembleState((s) => s.playback.complexity);
 
     let complexityLabel = 'Low';
     if (complexity > 0.33) {
@@ -88,8 +79,7 @@ export function Settings() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
     };
 
-    /** @param {string|number} val */
-    const handleMasterVolume = (val) => {
+    const handleMasterVolume = (val: string | number) => {
         const numVal = parseFloat(val.toString());
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
 
@@ -108,8 +98,7 @@ export function Settings() {
         saveCurrentState();
     };
 
-    /** @param {any} enabled */
-    const handleMidiEnable = async (enabled) => {
+    const handleMidiEnable = async (enabled: boolean) => {
         if (enabled) {
             const success = await initMIDI();
             if (!success) {
@@ -130,8 +119,7 @@ export function Settings() {
 
     const handleInstall = async () => {
         if (await triggerInstall()) {
-            /** @type {HTMLElement|null} */
-            const btn = document.getElementById('installAppBtn');
+            const btn = document.getElementById('installAppBtn') as HTMLElement | null;
             if (btn) {
                 btn.style.display = 'none';
             }
@@ -140,25 +128,15 @@ export function Settings() {
 
     const [showConfirmReset, setShowConfirmReset] = useState(false);
 
-    const isOpen = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.modals.settings,
-    );
-    const notation = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.arranger.notation,
-    );
-    const applyPresetSettings = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback.applyPresetSettings,
-    );
-    const playbackState = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => s.playback,
-    );
-    /** @type {import('preact').RefObject<HTMLDivElement>} */
-    const overlayRef = useRef(null);
+    const isOpen = useEnsembleState((s) => s.playback.modals.settings);
+    const notation = useEnsembleState((s) => s.arranger.notation);
+    const applyPresetSettings = useEnsembleState((s) => s.playback.applyPresetSettings);
+    const playbackState = useEnsembleState((s) => s.playback);
+    const overlayRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (isOpen && overlayRef.current) {
-            /** @type {HTMLElement|null} */
-            const focusable = overlayRef.current.querySelector(
+            const focusable = overlayRef.current.querySelector<HTMLElement>(
                 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
             );
             if (focusable) {
@@ -173,13 +151,13 @@ export function Settings() {
             ref={overlayRef}
             class={`settings-overlay ${isOpen ? 'active' : ''}`}
             aria-hidden={!isOpen ? 'true' : 'false'}
-            onClick={(/** @type {Event} */ e) => {
-                if (/** @type {HTMLElement} */ (e.target).id === 'settingsOverlay') {
+            onClick={(e: Event) => {
+                if ((e.target as HTMLElement).id === 'settingsOverlay') {
                     closeSettings();
                 }
             }}
         >
-            <div class="settings-content" onClick={(/** @type {Event} */ e) => e.stopPropagation()}>
+            <div class="settings-content" onClick={(e: Event) => e.stopPropagation()}>
                 <div class="modal-header-shared">
                     <h2>Settings</h2>
                     <button
@@ -193,7 +171,6 @@ export function Settings() {
                 </div>
 
                 <div class="settings-controls">
-                    {/* Audio & Setup Section */}
                     <SettingGroup title="Audio & Setup">
                         <SettingRow
                             label="Master Volume"
@@ -215,7 +192,7 @@ export function Settings() {
                             <Toggle
                                 id="metronomeCheck"
                                 checked={metronome}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_METRONOME, val);
                                     saveCurrentState();
                                 }}
@@ -226,7 +203,7 @@ export function Settings() {
                             <Toggle
                                 id="countInCheck"
                                 checked={countIn}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'countIn',
@@ -241,7 +218,7 @@ export function Settings() {
                             <Toggle
                                 id="practiceModeCheck"
                                 checked={practiceMode}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'practiceMode',
@@ -253,13 +230,12 @@ export function Settings() {
                         </SettingRow>
                     </SettingGroup>
 
-                    {/* Visuals & Interface Section */}
                     <SettingGroup title="Visuals & Interface">
                         <SettingRow label="Theme" id="themeSelect">
                             <Select
                                 id="themeSelect"
                                 value={theme}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     applyTheme(val);
                                     saveCurrentState();
                                 }}
@@ -275,7 +251,7 @@ export function Settings() {
                             <Select
                                 id="notationSelect"
                                 value={notation}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_NOTATION, val);
                                     saveCurrentState();
                                 }}
@@ -291,7 +267,7 @@ export function Settings() {
                             <Toggle
                                 id="visualFlashCheck"
                                 checked={visualFlash}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'visualFlash',
@@ -306,7 +282,7 @@ export function Settings() {
                             <Toggle
                                 id="hapticCheck"
                                 checked={haptic}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'haptic',
@@ -318,7 +294,6 @@ export function Settings() {
                         </SettingRow>
                     </SettingGroup>
 
-                    {/* Performance Engine Section */}
                     <SettingGroup title="Performance Engine">
                         <SettingRow
                             label="Global Complexity"
@@ -331,7 +306,7 @@ export function Settings() {
                                 min="0"
                                 max="100"
                                 value={Math.round(complexity * 100)}
-                                onInput={(/** @type {string} */ val) => {
+                                onInput={(val: string) => {
                                     dispatch(ACTIONS.SET_COMPLEXITY, parseInt(val, 10) / 100);
                                 }}
                                 ariaValueText={complexityLabel}
@@ -344,7 +319,7 @@ export function Settings() {
                                     <Toggle
                                         id="sessionTimerCheck"
                                         checked={songMode}
-                                        onChange={(/** @type {any} */ val) => {
+                                        onChange={(val) => {
                                             dispatch(ACTIONS.SET_SONG_MODE, val);
                                             saveCurrentState();
                                         }}
@@ -451,7 +426,6 @@ export function Settings() {
                         </div>
                     </SettingGroup>
 
-                    {/* Library & Presets Section */}
                     <SettingGroup title="Library & Presets">
                         <SettingRow
                             label="Auto-Apply Preset Settings"
@@ -461,7 +435,7 @@ export function Settings() {
                             <Toggle
                                 id="applyPresetSettingsCheck"
                                 checked={applyPresetSettings}
-                                onChange={(/** @type {any} */ val) => {
+                                onChange={(val) => {
                                     dispatch(ACTIONS.SET_PRESET_SETTINGS_MODE, val);
                                     saveCurrentState();
                                 }}
@@ -469,7 +443,6 @@ export function Settings() {
                         </SettingRow>
                     </SettingGroup>
 
-                    {/* External Section (MIDI) */}
                     <SettingGroup title="External (MIDI Output)">
                         <SettingRow
                             label="Enable Web MIDI Output"
@@ -488,7 +461,7 @@ export function Settings() {
                                 <Toggle
                                     id="midiMuteLocalCheck"
                                     checked={midiMuteLocal}
-                                    onChange={(/** @type {any} */ val) => {
+                                    onChange={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             muteLocal: val,
                                         });
@@ -502,7 +475,7 @@ export function Settings() {
                                 <Select
                                     id="midiOutputSelect"
                                     value={midiSelectedOutputId || ''}
-                                    onChange={(/** @type {any} */ val) => {
+                                    onChange={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             selectedOutputId: val,
                                         });
@@ -510,9 +483,9 @@ export function Settings() {
                                     }}
                                     options={
                                         midiOutputs && midiOutputs.length > 0
-                                            ? midiOutputs.map((/** @type {any} */ out) => ({
-                                                  value: /** @type {any} */ (out).id,
-                                                  label: /** @type {any} */ (out).name,
+                                            ? (midiOutputs as any[]).map((out) => ({
+                                                  value: out.id,
+                                                  label: out.name,
                                               }))
                                             : [{ value: '', label: 'No outputs found' }]
                                     }
@@ -530,10 +503,10 @@ export function Settings() {
                                                 min="1"
                                                 max="16"
                                                 value={midiChannels[ch.toLowerCase()]}
-                                                onChange={(/** @type {Event} */ e) => {
+                                                onChange={(e: Event) => {
                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                         [`${ch.toLowerCase()}Channel`]: parseInt(
-                                                            /** @type {any} */ (e.target).value,
+                                                            (e.target as HTMLInputElement).value,
                                                             10,
                                                         ),
                                                     });
@@ -548,10 +521,10 @@ export function Settings() {
                                                 min="-2"
                                                 max="2"
                                                 value={midiOctaves[ch.toLowerCase()]}
-                                                onChange={(/** @type {Event} */ e) => {
+                                                onChange={(e: Event) => {
                                                     dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                         [`${ch.toLowerCase()}Octave`]: parseInt(
-                                                            /** @type {any} */ (e.target).value,
+                                                            (e.target as HTMLInputElement).value,
                                                             10,
                                                         ),
                                                     });
@@ -576,7 +549,7 @@ export function Settings() {
                                     max="100"
                                     step="1"
                                     value={midiLatency}
-                                    onInput={(/** @type {any} */ val) => {
+                                    onInput={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             latency: parseInt(val, 10),
                                         });
@@ -597,7 +570,7 @@ export function Settings() {
                                     max="2.0"
                                     step="0.1"
                                     value={midiVelocity}
-                                    onInput={(/** @type {any} */ val) => {
+                                    onInput={(val) => {
                                         dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                             velocitySensitivity: parseFloat(val),
                                         });
@@ -609,7 +582,6 @@ export function Settings() {
                         </div>
                     </SettingGroup>
 
-                    {/* Actions Section */}
                     <SettingGroup
                         title="System Actions"
                         className="settings-section--borderless settings-section--no-padding"
@@ -706,7 +678,7 @@ export function Settings() {
                             <Toggle
                                 id="debugSoloistToggle"
                                 checked={playbackState.debugSoloist}
-                                onChange={(/** @type {any} */ val) =>
+                                onChange={(val) =>
                                     dispatch(ACTIONS.SET_PARAM, {
                                         module: 'playback',
                                         param: 'debugSoloist',

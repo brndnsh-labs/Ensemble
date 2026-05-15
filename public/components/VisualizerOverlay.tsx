@@ -38,14 +38,16 @@ function VisualizerLegend() {
     );
 }
 
-/**
- * @param {{ getVisualTime: () => number, onClose: () => void }} props
- */
-export function VisualizerOverlay({ getVisualTime, onClose }) {
+interface VisualizerOverlayProps {
+    getVisualTime: () => number;
+    onClose: () => void;
+}
+
+export function VisualizerOverlay({ getVisualTime, onClose }: VisualizerOverlayProps) {
     useEffect(() => {
         dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: true });
 
-        const handleKeyDown = (/** @type {KeyboardEvent} */ e) => {
+        const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 onClose();
             }

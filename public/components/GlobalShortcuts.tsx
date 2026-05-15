@@ -10,11 +10,12 @@ import { ACTIONS } from '../types.js';
  */
 export function GlobalShortcuts() {
     useEffect(() => {
-        const handleKeyDown = (/** @type {any} */ e) => {
+        const handleKeyDown = (e: KeyboardEvent) => {
             const { playback } = getState();
+            const target = e.target as HTMLElement;
             const isTyping =
-                ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) ||
-                e.target.isContentEditable;
+                ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) ||
+                target.isContentEditable;
 
             // Space: Toggle Play
             const anyModalOpen =
@@ -43,16 +44,16 @@ export function GlobalShortcuts() {
             // Escape: Close Modal
             if (e.key === 'Escape') {
                 e.preventDefault();
-                Object.keys(playback.modals).forEach((/** @type {any} */ key) => {
-                    if (/** @type {any} */ (playback.modals)[key]) {
+                Object.keys(playback.modals).forEach((key) => {
+                    if ((playback.modals as any)[key]) {
                         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });
                     }
                 });
             }
         };
 
-        const handleOpenEditor = (/** @type {any} */ e) => {
-            const { sectionId } = e.detail || {};
+        const handleOpenEditor = (e: Event) => {
+            const { sectionId } = (e as CustomEvent).detail || {};
             if (sectionId) {
                 import('../state.js').then(() => {
                     dispatch(ACTIONS.SET_PARAM, {

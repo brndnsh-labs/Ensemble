@@ -1,3 +1,4 @@
+import type { ComponentType } from 'preact';
 import { Fragment } from 'preact';
 import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
@@ -15,17 +16,16 @@ const ManualModal = lazy(() =>
     import('./ManualModal.jsx').then((m) => ({ default: m.ManualModal })),
 );
 
-/**
- * @typedef {Object} AnimatedModalWrapperProps
- * @property {boolean} isOpen
- * @property {import('preact').ComponentType<any>} component
- */
+interface AnimatedModalWrapperProps {
+    isOpen: boolean;
+    component: ComponentType<object>;
+}
+
 /**
  * AnimatedModalWrapper handles the entrance and exit lifecycle for modals.
  * It ensures the component stays in the DOM long enough for exit animations to play.
- * @param {AnimatedModalWrapperProps} props
  */
-function AnimatedModalWrapper({ isOpen, component: Component }) {
+function AnimatedModalWrapper({ isOpen, component: Component }: AnimatedModalWrapperProps) {
     const [shouldRender, setShouldRender] = useState(isOpen);
     const [isClosing, setIsClosing] = useState(false);
 
@@ -61,9 +61,8 @@ function AnimatedModalWrapper({ isOpen, component: Component }) {
  * Monitors global state to determine which modal to show.
  */
 export function Modals() {
-    // Get modal visibility state from global store
     const { settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
+        (s) => ({
             settingsOpen: s.playback.modals.settings,
             editorOpen: s.playback.modals.editor,
             generateSongOpen: s.playback.modals.generateSong,

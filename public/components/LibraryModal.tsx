@@ -3,13 +3,14 @@ import { PresetLibrary } from './PresetLibrary.jsx';
 
 const LIBRARY_CLOSE_ANIMATION_MS = 180;
 
-/**
- * @param {{ isOpen: boolean; onClose: () => void }} props
- */
-export function LibraryModal({ isOpen, onClose }) {
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-    const overlayRef = useRef(null);
-    const closeTimerRef = useRef(/** @type {number | null} */ (null));
+interface LibraryModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export function LibraryModal({ isOpen, onClose }: LibraryModalProps) {
+    const overlayRef = useRef<HTMLDivElement | null>(null);
+    const closeTimerRef = useRef<number | null>(null);
     const [isRendered, setIsRendered] = useState(isOpen);
     const [isClosing, setIsClosing] = useState(false);
 
@@ -39,7 +40,7 @@ export function LibraryModal({ isOpen, onClose }) {
         setIsRendered(true);
         setIsClosing(false);
         overlayRef.current?.focus();
-        const handleKeyDown = (/** @type {KeyboardEvent} */ e) => {
+        const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 onClose();
             }

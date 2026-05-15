@@ -1,45 +1,39 @@
-import React, { forwardRef } from 'preact/compat';
+import { forwardRef } from 'preact/compat';
 import { useEffect, useImperativeHandle, useRef, useState } from 'preact/hooks';
 import { onSectionDelete, onSectionDuplicate, onSectionUpdate } from '../arranger-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
+import type { Section } from '../state/arranger.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { SymbolMenu } from './SymbolMenu.jsx';
 
-/**
- * @typedef {import('preact').ComponentChildren} ComponentChildren
- */
+interface SectionCardProps {
+    section: Section;
+    index: number;
+    totalSections: number;
+}
 
-/**
- * @typedef {Object} SectionCardProps
- * @property {import('../state/arranger.js').Section} section
- * @property {number} index
- * @property {number} totalSections
- * @property {any} [ref]
- * @property {string} [key]
- */
-/**
- * @type {import('preact/compat').ForwardFn<SectionCardProps>}
- */
-export const SectionCard = forwardRef(
-    (/** @type {SectionCardProps} */ { section, index, totalSections }, ref) => {
+interface SectionCardHandle {
+    scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+    focusInput: () => void;
+}
+
+export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
+    ({ section, index, totalSections }, ref) => {
         const dispatch = useDispatch();
         const [isMenuOpen, setIsMenuOpen] = useState(false);
         const isTouch = useMediaQuery('(pointer: coarse)');
-        /** @type {import('preact/hooks').MutableRef<HTMLTextAreaElement|null>} */
-        const textareaRef = useRef(null);
-        /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-        const rootRef = useRef(null);
-        /** @type {import('preact/hooks').MutableRef<HTMLDivElement|null>} */
-        const menuRef = useRef(null);
+        const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+        const rootRef = useRef<HTMLDivElement | null>(null);
+        const menuRef = useRef<HTMLDivElement | null>(null);
 
         useEffect(() => {
             if (!isMenuOpen) {
                 return;
             }
 
-            const handleClickOutside = (/** @type {MouseEvent} */ event) => {
+            const handleClickOutside = (event: MouseEvent) => {
                 if (
                     menuRef.current &&
                     event.target instanceof Node &&
@@ -56,7 +50,7 @@ export const SectionCard = forwardRef(
         }, [isMenuOpen]);
 
         useImperativeHandle(ref, () => ({
-            scrollIntoView: (/** @type {ScrollIntoViewOptions} */ options) => {
+            scrollIntoView: (options?: ScrollIntoViewOptions) => {
                 if (rootRef.current) {
                     rootRef.current.scrollIntoView(options);
                 }
@@ -68,16 +62,14 @@ export const SectionCard = forwardRef(
             },
         }));
 
-        const { isMinor, mutatedSectionId } = useEnsembleState(
-            (/** @type {import('../types.js').EnsembleState} */ s) => ({
-                isMinor: s.arranger.isMinor,
-                mutatedSectionId: s.arranger.mutatedSectionId,
-            }),
-        );
+        const { isMinor, mutatedSectionId } = useEnsembleState((s) => ({
+            isMinor: s.arranger.isMinor,
+            mutatedSectionId: s.arranger.mutatedSectionId,
+        }));
 
         const isMutated = mutatedSectionId === section.id;
 
-        const handleDragStart = (/** @type {DragEvent} */ e) => {
+        const handleDragStart = (e: DragEvent) => {
             if (e.dataTransfer) {
                 e.dataTransfer.setData('text/plain', section.id);
             }
@@ -86,7 +78,7 @@ export const SectionCard = forwardRef(
             }
         };
 
-        const handleDragEnd = (/** @type {DragEvent} */ e) => {
+        const handleDragEnd = (e: DragEvent) => {
             if (e.currentTarget instanceof HTMLElement) {
                 e.currentTarget.classList.remove('dragging');
             }
@@ -95,7 +87,7 @@ export const SectionCard = forwardRef(
                 .forEach((el) => el.classList.remove('drag-over'));
         };
 
-        const handleDragEnter = (/** @type {DragEvent} */ e) => {
+        const handleDragEnter = (e: DragEvent) => {
             e.preventDefault();
             if (e.dataTransfer) {
                 const draggedId = e.dataTransfer.getData('text/plain');
@@ -105,13 +97,13 @@ export const SectionCard = forwardRef(
             }
         };
 
-        const handleDragLeave = (/** @type {DragEvent} */ e) => {
+        const handleDragLeave = (e: DragEvent) => {
             if (e.currentTarget instanceof HTMLElement) {
                 e.currentTarget.classList.remove('drag-over');
             }
         };
 
-        const handleDrop = (/** @type {DragEvent} */ e) => {
+        const handleDrop = (e: DragEvent) => {
             e.preventDefault();
             if (e.currentTarget instanceof HTMLElement) {
                 e.currentTarget.classList.remove('drag-over');
@@ -127,7 +119,7 @@ export const SectionCard = forwardRef(
             }
         };
 
-        const insertSymbol = (/** @type {any} */ sym) => {
+        const insertSymbol = (sym: string) => {
             const input = textareaRef.current;
             if (!input) {
                 return;
@@ -151,7 +143,7 @@ export const SectionCard = forwardRef(
             }, 0);
         };
 
-        const handleViewTransition = (/** @type {any} */ fn) => {
+        const handleViewTransition = (fn: () => void) => {
             if (!document.startViewTransition) {
                 fn();
                 return;
@@ -184,7 +176,7 @@ export const SectionCard = forwardRef(
                             value={section.label}
                             aria-label="Section Name"
                             maxLength={100}
-                            onChange={(/** @type {any} */ e) =>
+                            onChange={(e: any) =>
                                 onSectionUpdate(section.id, 'label', e.target.value)
                             }
                         />
@@ -198,7 +190,6 @@ export const SectionCard = forwardRef(
 
                     <div class="section-controls-row">
                         <div class="section-settings-row">
-                            {/* Repeat Control */}
                             <div class="section-setting-item">
                                 <span class="setting-label">x</span>
                                 <input
@@ -208,7 +199,7 @@ export const SectionCard = forwardRef(
                                     min="1"
                                     max="8"
                                     aria-label="Repeat Count"
-                                    onChange={(/** @type {any} */ e) =>
+                                    onChange={(e: any) =>
                                         onSectionUpdate(
                                             section.id,
                                             'repeat',
@@ -218,12 +209,11 @@ export const SectionCard = forwardRef(
                                 />
                             </div>
 
-                            {/* Key Control */}
                             <select
                                 class="section-key-select"
                                 value={section.key || ''}
                                 aria-label="Section Key"
-                                onChange={(/** @type {any} */ e) =>
+                                onChange={(e: any) =>
                                     onSectionUpdate(section.id, 'key', e.target.value)
                                 }
                             >
@@ -236,12 +226,11 @@ export const SectionCard = forwardRef(
                                 ))}
                             </select>
 
-                            {/* Time Signature Control */}
                             <select
                                 class="section-ts-select"
                                 value={section.timeSignature || ''}
                                 aria-label="Time Signature"
-                                onChange={(/** @type {any} */ e) =>
+                                onChange={(e: any) =>
                                     onSectionUpdate(section.id, 'timeSignature', e.target.value)
                                 }
                             >
@@ -324,7 +313,7 @@ export const SectionCard = forwardRef(
                                         aria-label={`Actions for ${section.label || 'Section'}`}
                                         aria-expanded={isMenuOpen}
                                         aria-haspopup="true"
-                                        onClick={(/** @type {any} */ e) => {
+                                        onClick={(e: MouseEvent) => {
                                             e.stopPropagation();
                                             setIsMenuOpen(!isMenuOpen);
                                         }}
@@ -361,11 +350,8 @@ export const SectionCard = forwardRef(
                     aria-label="Chord Progression"
                     maxLength={1000}
                     placeholder="Enter chords (e.g. C Am F G)"
-                    onInput={(/** @type {any} */ e) =>
-                        onSectionUpdate(section.id, 'value', e.target.value)
-                    }
+                    onInput={(e: any) => onSectionUpdate(section.id, 'value', e.target.value)}
                     onFocus={() => {
-                        // Update legacy state for mutation logic
                         dispatch(ACTIONS.SET_PARAM, {
                             module: 'arranger',
                             param: 'lastInteractedSectionId',

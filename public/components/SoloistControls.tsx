@@ -5,13 +5,11 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { ButtonGroup } from './UIControls.jsx';
 
 export function SoloistControls() {
-    const { tradeMode } = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => ({
-            tradeMode: s.soloist.tradeMode,
-        }),
-    );
+    const { tradeMode } = useEnsembleState((s) => ({
+        tradeMode: s.soloist.tradeMode,
+    }));
 
-    const updateTradeMode = (/** @type {any} */ mode) => {
+    const updateTradeMode = (mode: string | number) => {
         dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
         saveCurrentState();
     };
@@ -36,11 +34,11 @@ export function SoloistControls() {
 }
 
 export function SoloistSeedControl() {
-    const { seed } = useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
+    const { seed } = useEnsembleState((s) => ({
         seed: s.soloist.seed,
     }));
 
-    const updateSeed = (/** @type {any} */ val) => {
+    const updateSeed = (val: string) => {
         dispatch(ACTIONS.SET_SOLOIST_SEED, val);
         saveCurrentState();
     };
@@ -67,7 +65,7 @@ export function SoloistSeedControl() {
                     placeholder="Random"
                     class="seed-input"
                     aria-label="Soloist seed"
-                    onInput={(/** @type {any} */ e) => updateSeed(e.target.value)}
+                    onInput={(e) => updateSeed((e.target as HTMLInputElement).value)}
                 />
                 <button
                     class="icon-btn"

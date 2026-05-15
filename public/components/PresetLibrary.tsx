@@ -4,6 +4,7 @@ import { validateAndAnalyze } from '../arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
 import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
+import type { Section } from '../state/arranger.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
@@ -16,41 +17,49 @@ const RECENTS_STORAGE_KEY = 'ensemble_presetLibraryRecents';
 const ALL_GENRES_LABEL = 'All';
 const RECENT_PRESET_LIMIT = 6;
 
-/**
- * @typedef {import('../state/arranger.js').Section} Section
- * @typedef {Partial<Section> & { keyShift?: number }} PresetSection
- * @typedef {{ bpm?: number, style?: string, timeSignature?: string }} PresetSettings
- * @typedef {{ variant?: string, notes?: string, references?: string[] }} PresetProvenance
- * @typedef {{
- *   name: string,
- *   sections: string | Array<PresetSection>,
- *   category?: string,
- *   isMinor?: boolean,
- *   timestamp?: number,
- *   settings?: PresetSettings,
- *   provenance?: PresetProvenance
- * }} LibraryPreset
- * @typedef {'built-in' | 'user'} PresetSource
- * @typedef {{
- *   id: string,
- *   name: string,
- *   source: PresetSource,
- *   preset: LibraryPreset,
- *   category: string,
- *   styleLabel: string,
- *   preview: string,
- *   searchableText: string,
- *   isMinor: boolean,
- *   isFavorite: boolean,
- *   isRecent: boolean
- * }} LibraryEntry
- */
+type PresetSource = 'built-in' | 'user';
 
-/**
- * @param {string} value
- * @returns {string}
- */
-function formatBadgeLabel(value) {
+interface PresetSettings {
+    bpm?: number;
+    style?: string;
+    timeSignature?: string;
+}
+
+interface PresetProvenance {
+    variant?: string;
+    notes?: string;
+    references?: string[];
+}
+
+interface PresetSection extends Partial<Section> {
+    keyShift?: number;
+}
+
+interface LibraryPreset {
+    name: string;
+    sections: string | Array<PresetSection>;
+    category?: string;
+    isMinor?: boolean;
+    timestamp?: number;
+    settings?: PresetSettings;
+    provenance?: PresetProvenance;
+}
+
+interface LibraryEntry {
+    id: string;
+    name: string;
+    source: PresetSource;
+    preset: LibraryPreset;
+    category: string;
+    styleLabel: string;
+    preview: string;
+    searchableText: string;
+    isMinor: boolean;
+    isFavorite: boolean;
+    isRecent: boolean;
+}
+
+function formatBadgeLabel(value: string): string {
     return value
         .split(/[-_]/g)
         .map((part) => part.trim())
@@ -59,20 +68,11 @@ function formatBadgeLabel(value) {
         .join(' ');
 }
 
-/**
- * @param {number} count
- * @returns {string}
- */
-function formatPresetCount(count) {
+function formatPresetCount(count: number): string {
     return `${count} preset${count === 1 ? '' : 's'}`;
 }
 
-/**
- * @param {PresetSource} source
- * @param {LibraryPreset} preset
- * @returns {string}
- */
-function buildPresetId(source, preset) {
+function buildPresetId(source: PresetSource, preset: LibraryPreset): string {
     if (source === 'built-in') {
         return `built-in:${preset.name}`;
     }
@@ -82,10 +82,7 @@ function buildPresetId(source, preset) {
         : `user:${preset.name}`;
 }
 
-/**
- * @returns {LibraryPreset[]}
- */
-function loadStoredUserPresets() {
+function loadStoredUserPresets(): LibraryPreset[] {
     const stored = localStorage.getItem(USER_PRESETS_STORAGE_KEY);
     if (!stored) {
         return [];
@@ -110,11 +107,7 @@ function loadStoredUserPresets() {
     }
 }
 
-/**
- * @param {string} key
- * @returns {string[]}
- */
-function loadStoredStringArray(key) {
+function loadStoredStringArray(key: string): string[] {
     const stored = localStorage.getItem(key);
     if (!stored) {
         return [];
@@ -133,13 +126,7 @@ function loadStoredStringArray(key) {
     }
 }
 
-/**
- * @param {string} key
- * @param {string[]} values
- * @param {string} failureMessage
- * @returns {boolean}
- */
-function persistStoredStringArray(key, values, failureMessage) {
+function persistStoredStringArray(key: string, values: string[], failureMessage: string): boolean {
     try {
         localStorage.setItem(key, JSON.stringify(values));
         window.dispatchEvent(new Event('storage_sync'));
@@ -151,13 +138,9 @@ function persistStoredStringArray(key, values, failureMessage) {
     }
 }
 
-/**
- * @param {LibraryPreset} preset
- * @returns {PresetSection[]}
- */
-function getRawPresetSections(preset) {
+function getRawPresetSections(preset: LibraryPreset): PresetSection[] {
     if (Array.isArray(preset.sections)) {
-        return /** @type {PresetSection[]} */ (preset.sections);
+        return preset.sections as PresetSection[];
     }
 
     if (typeof preset.sections !== 'string') {
@@ -166,28 +149,18 @@ function getRawPresetSections(preset) {
 
     try {
         const sections = decompressSections(preset.sections);
-        return Array.isArray(sections) ? /** @type {PresetSection[]} */ (sections) : [];
+        return Array.isArray(sections) ? (sections as PresetSection[]) : [];
     } catch (error) {
         console.warn(`[PresetLibrary] Failed to decompress preset "${preset.name}":`, error);
         return [];
     }
 }
 
-/**
- * @param {LibraryPreset} preset
- * @param {PresetSource} source
- * @returns {string}
- */
-function getPresetCategory(preset, source) {
+function getPresetCategory(preset: LibraryPreset, source: PresetSource): string {
     return preset.category || (source === 'user' ? 'Custom' : 'Library');
 }
 
-/**
- * @param {LibraryPreset} preset
- * @param {PresetSection[]} sections
- * @returns {string}
- */
-function getPresetPreview(preset, sections) {
+function getPresetPreview(preset: LibraryPreset, sections: PresetSection[]): string {
     if (preset.provenance?.variant) {
         return preset.provenance.variant;
     }
@@ -206,13 +179,11 @@ function getPresetPreview(preset, sections) {
     return 'Saved progression';
 }
 
-/**
- * @param {LibraryPreset} preset
- * @param {PresetSource} source
- * @param {PresetSection[]} sections
- * @returns {string}
- */
-function getPresetSearchText(preset, source, sections) {
+function getPresetSearchText(
+    preset: LibraryPreset,
+    source: PresetSource,
+    sections: PresetSection[],
+): string {
     const sectionText = sections
         .flatMap((section) => [section.label, section.value, section.key, section.timeSignature])
         .filter(Boolean)
@@ -235,14 +206,12 @@ function getPresetSearchText(preset, source, sections) {
         .toLowerCase();
 }
 
-/**
- * @param {LibraryEntry} entry
- * @param {string[]} searchTokens
- * @param {string} activeGenre
- * @param {boolean} favoritesOnly
- * @returns {boolean}
- */
-function matchesEntry(entry, searchTokens, activeGenre, favoritesOnly) {
+function matchesEntry(
+    entry: LibraryEntry,
+    searchTokens: string[],
+    activeGenre: string,
+    favoritesOnly: boolean,
+): boolean {
     if (favoritesOnly && !entry.isFavorite) {
         return false;
     }
@@ -258,16 +227,15 @@ function matchesEntry(entry, searchTokens, activeGenre, favoritesOnly) {
     return searchTokens.every((token) => entry.searchableText.includes(token));
 }
 
-/**
- * @param {{
- *   entry: LibraryEntry,
- *   isActive: boolean,
- *   onSelect: (entry: LibraryEntry) => void,
- *   onToggleFavorite: (entryId: string) => void,
- *   onDelete: ((entry: LibraryEntry) => void) | undefined
- * }} props
- */
-function PresetCard({ entry, isActive, onSelect, onToggleFavorite, onDelete }) {
+interface PresetCardProps {
+    entry: LibraryEntry;
+    isActive: boolean;
+    onSelect: (entry: LibraryEntry) => void;
+    onToggleFavorite: (entryId: string) => void;
+    onDelete: ((entry: LibraryEntry) => void) | undefined;
+}
+
+function PresetCard({ entry, isActive, onSelect, onToggleFavorite, onDelete }: PresetCardProps) {
     return (
         <article
             class={`preset-library-card${isActive ? ' active' : ''}`}
@@ -321,31 +289,22 @@ function PresetCard({ entry, isActive, onSelect, onToggleFavorite, onDelete }) {
     );
 }
 
-/**
- * @param {{ onSelect?: (() => void) | undefined }} props
- */
-export function PresetLibrary({ onSelect }) {
-    const currentKey = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ state) => state.arranger.key,
-    );
-    const lastChordPreset = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ state) =>
-            state.arranger.lastChordPreset,
-    );
-    const isDirty = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ state) => state.arranger.isDirty,
-    );
-    const applyPresetSettings = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ state) =>
-            state.playback.applyPresetSettings,
-    );
+interface PresetLibraryProps {
+    onSelect?: () => void;
+}
+
+export function PresetLibrary({ onSelect }: PresetLibraryProps) {
+    const currentKey = useEnsembleState((state) => state.arranger.key);
+    const lastChordPreset = useEnsembleState((state) => state.arranger.lastChordPreset);
+    const isDirty = useEnsembleState((state) => state.arranger.isDirty);
+    const applyPresetSettings = useEnsembleState((state) => state.playback.applyPresetSettings);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeGenre, setActiveGenre] = useState(ALL_GENRES_LABEL);
     const [favoritesOnly, setFavoritesOnly] = useState(false);
-    const [userPresets, setUserPresets] = useState(/** @type {LibraryPreset[]} */ ([]));
-    const [favoriteIds, setFavoriteIds] = useState(/** @type {string[]} */ ([]));
-    const [recentIds, setRecentIds] = useState(/** @type {string[]} */ ([]));
+    const [userPresets, setUserPresets] = useState<LibraryPreset[]>([]);
+    const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+    const [recentIds, setRecentIds] = useState<string[]>([]);
 
     useEffect(() => {
         const syncStoredLibraryState = () => {
@@ -366,63 +325,54 @@ export function PresetLibrary({ onSelect }) {
     const favoriteIdSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
     const recentIdSet = useMemo(() => new Set(recentIds), [recentIds]);
 
-    /** @type {LibraryEntry[]} */
     const builtInEntries = useMemo(
         () =>
-            /** @type {LibraryEntry[]} */ (
-                CHORD_PRESETS.map((preset) => {
-                    const presetId = buildPresetId('built-in', preset);
-                    const sections = getRawPresetSections(preset);
-                    return {
-                        id: presetId,
-                        name: preset.name,
-                        source: /** @type {PresetSource} */ ('built-in'),
-                        preset,
-                        category: getPresetCategory(preset, 'built-in'),
-                        styleLabel: preset.settings?.style
-                            ? formatBadgeLabel(preset.settings.style)
-                            : '',
-                        preview: getPresetPreview(preset, sections),
-                        searchableText: getPresetSearchText(preset, 'built-in', sections),
-                        isMinor: Boolean(preset.isMinor),
-                        isFavorite: favoriteIdSet.has(presetId),
-                        isRecent: recentIdSet.has(presetId),
-                    };
-                })
-            ),
+            (CHORD_PRESETS as LibraryPreset[]).map((preset): LibraryEntry => {
+                const presetId = buildPresetId('built-in', preset);
+                const sections = getRawPresetSections(preset);
+                return {
+                    id: presetId,
+                    name: preset.name,
+                    source: 'built-in',
+                    preset,
+                    category: getPresetCategory(preset, 'built-in'),
+                    styleLabel: preset.settings?.style
+                        ? formatBadgeLabel(preset.settings.style)
+                        : '',
+                    preview: getPresetPreview(preset, sections),
+                    searchableText: getPresetSearchText(preset, 'built-in', sections),
+                    isMinor: Boolean(preset.isMinor),
+                    isFavorite: favoriteIdSet.has(presetId),
+                    isRecent: recentIdSet.has(presetId),
+                };
+            }),
         [favoriteIdSet, recentIdSet],
     );
 
-    /** @type {LibraryEntry[]} */
     const userEntries = useMemo(() => {
         const sortedPresets = [...userPresets].sort(
             (left, right) => (right.timestamp || 0) - (left.timestamp || 0),
         );
 
-        return /** @type {LibraryEntry[]} */ (
-            sortedPresets.map((preset) => {
-                const presetId = buildPresetId('user', preset);
-                const sections = getRawPresetSections(preset);
-                return {
-                    id: presetId,
-                    name: preset.name,
-                    source: /** @type {PresetSource} */ ('user'),
-                    preset,
-                    category: getPresetCategory(preset, 'user'),
-                    styleLabel: preset.settings?.style
-                        ? formatBadgeLabel(preset.settings.style)
-                        : '',
-                    preview: getPresetPreview(preset, sections),
-                    searchableText: getPresetSearchText(preset, 'user', sections),
-                    isMinor: Boolean(preset.isMinor),
-                    isFavorite: favoriteIdSet.has(presetId),
-                    isRecent: recentIdSet.has(presetId),
-                };
-            })
-        );
+        return sortedPresets.map((preset): LibraryEntry => {
+            const presetId = buildPresetId('user', preset);
+            const sections = getRawPresetSections(preset);
+            return {
+                id: presetId,
+                name: preset.name,
+                source: 'user',
+                preset,
+                category: getPresetCategory(preset, 'user'),
+                styleLabel: preset.settings?.style ? formatBadgeLabel(preset.settings.style) : '',
+                preview: getPresetPreview(preset, sections),
+                searchableText: getPresetSearchText(preset, 'user', sections),
+                isMinor: Boolean(preset.isMinor),
+                isFavorite: favoriteIdSet.has(presetId),
+                isRecent: recentIdSet.has(presetId),
+            };
+        });
     }, [favoriteIdSet, recentIdSet, userPresets]);
 
-    /** @type {LibraryEntry[]} */
     const allEntries = useMemo(
         () => [...builtInEntries, ...userEntries],
         [builtInEntries, userEntries],
@@ -433,8 +383,7 @@ export function PresetLibrary({ onSelect }) {
     );
 
     const genres = useMemo(() => {
-        /** @type {string[]} */
-        const nextGenres = [];
+        const nextGenres: string[] = [];
         for (const entry of allEntries) {
             if (entry.category === 'Custom' || nextGenres.includes(entry.category)) {
                 continue;
@@ -469,8 +418,7 @@ export function PresetLibrary({ onSelect }) {
         searchTokens.length > 0 || activeGenre !== ALL_GENRES_LABEL || favoritesOnly;
     const activeName = isDirty ? null : lastChordPreset;
 
-    /** @type {LibraryEntry[]} */
-    const pinnedEntries = [];
+    const pinnedEntries: LibraryEntry[] = [];
     for (const entryId of favoriteIds) {
         const entry = entryById.get(entryId);
         if (entry) {
@@ -478,8 +426,7 @@ export function PresetLibrary({ onSelect }) {
         }
     }
 
-    /** @type {LibraryEntry[]} */
-    const recentEntries = [];
+    const recentEntries: LibraryEntry[] = [];
     for (const entryId of recentIds) {
         const entry = entryById.get(entryId);
         if (entry && !favoriteIdSet.has(entry.id)) {
@@ -487,11 +434,7 @@ export function PresetLibrary({ onSelect }) {
         }
     }
 
-    /**
-     * @param {LibraryPreset} preset
-     * @returns {Section[]}
-     */
-    const getPresetSections = (preset) => {
+    const getPresetSections = (preset: LibraryPreset): Section[] => {
         const rawSections = getRawPresetSections(preset);
 
         return rawSections.map((section, index) => ({
@@ -510,10 +453,7 @@ export function PresetLibrary({ onSelect }) {
         }));
     };
 
-    /**
-     * @param {string} entryId
-     */
-    const toggleFavorite = (entryId) => {
+    const toggleFavorite = (entryId: string) => {
         const isCurrentlyFavorite = favoriteIdSet.has(entryId);
         const nextFavoriteIds = isCurrentlyFavorite
             ? favoriteIds.filter((id) => id !== entryId)
@@ -530,10 +470,7 @@ export function PresetLibrary({ onSelect }) {
         }
     };
 
-    /**
-     * @param {string} entryId
-     */
-    const recordRecentPreset = (entryId) => {
+    const recordRecentPreset = (entryId: string) => {
         const nextRecentIds = [entryId, ...recentIds.filter((id) => id !== entryId)].slice(
             0,
             RECENT_PRESET_LIMIT,
@@ -550,10 +487,7 @@ export function PresetLibrary({ onSelect }) {
         }
     };
 
-    /**
-     * @param {LibraryEntry} entry
-     */
-    const handleSelect = (entry) => {
+    const handleSelect = (entry: LibraryEntry) => {
         const preset = entry.preset;
         const sections = getPresetSections(preset);
         if (sections.length === 0) {
@@ -593,10 +527,7 @@ export function PresetLibrary({ onSelect }) {
         onSelect?.();
     };
 
-    /**
-     * @param {LibraryEntry} entry
-     */
-    const handleDelete = (entry) => {
+    const handleDelete = (entry: LibraryEntry) => {
         if (!confirm(`Delete user preset "${entry.name}"?`)) {
             return;
         }
@@ -642,9 +573,7 @@ export function PresetLibrary({ onSelect }) {
                         value={searchQuery}
                         data-testid="preset-library-search"
                         onInput={(event) =>
-                            setSearchQuery(
-                                /** @type {HTMLInputElement} */ (event.currentTarget).value,
-                            )
+                            setSearchQuery((event.currentTarget as HTMLInputElement).value)
                         }
                     />
                     {(searchQuery || hasActiveFilters) && (

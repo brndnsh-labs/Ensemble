@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { TIME_SIGNATURES } from '../config.js';
 import { switchMeasure } from '../instrument-controller.js';
+import type { StateMap } from '../state.js';
 import { dispatch, getState, stateMap } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -21,12 +22,11 @@ const RETAINED_DRAW_QUEUE_EVENTS = 200;
 /**
  * Partitions the visual event queue into due events for this frame and the remaining backlog.
  * Old events are dropped in a single batch so Visuals startup never replays a long stale queue.
- *
- * @param {Array<{time?: number}>} drawQueue
- * @param {number} now
- * @returns {{ readyEvents: Array<any>, remainingEvents: Array<any> }}
  */
-export function partitionDrawQueue(drawQueue, now) {
+export function partitionDrawQueue(
+    drawQueue: Array<{ time?: number }>,
+    now: number,
+): { readyEvents: Array<any>; remainingEvents: Array<any> } {
     let startIndex = 0;
 
     while (startIndex < drawQueue.length) {
@@ -63,39 +63,26 @@ export function partitionDrawQueue(drawQueue, now) {
     };
 }
 
-/**
- * @typedef {Object} VisualizerProps
- * @property {boolean} enabled - Whether the visualizer is enabled.
- * @property {function(import('../state.js').StateMap): number} getVisualTime - Callback to get current visual time.
- */
+interface VisualizerProps {
+    enabled: boolean;
+    getVisualTime: (stateMap: StateMap) => number;
+}
 
-/**
- * @param {VisualizerProps} props
- */
-export function Visualizer({ enabled, getVisualTime }) {
-    /** @type {import('preact').RefObject<HTMLDivElement>} */
-    const containerRef = useRef(null);
-    /** @type {import('preact').RefObject<HTMLCanvasElement>} */
-    const canvasRef = useRef(null);
-    /** @type {import('preact').RefObject<HTMLCanvasElement>} */
-    const staticCanvasRef = useRef(null);
-    /** @type {import('preact').RefObject<import('../visualizer-proxy.js').UnifiedVisualizer|null>} */
-    const vizRef = useRef(null);
-    /** @type {import('preact').RefObject<number|null>} */
-    const loopRef = useRef(null);
+export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const vizRef = useRef<UnifiedVisualizer | null>(null);
+    const loopRef = useRef<number | null>(null);
     const prevPlayingRef = useRef(false);
 
-    const { isPlaying, theme, bpm, timeSignature } = useEnsembleState(
-        /** @param {import('../types.js').EnsembleState} s */
-        (s) => ({
-            isPlaying: s.playback.isPlaying,
-            theme: s.playback.theme,
-            bpm: s.playback.bpm,
-            timeSignature: s.arranger.timeSignature,
-        }),
-    );
+    const { isPlaying, theme, bpm, timeSignature } = useEnsembleState((s) => ({
+        isPlaying: s.playback.isPlaying,
+        theme: s.playback.theme,
+        bpm: s.playback.bpm,
+        timeSignature: s.arranger.timeSignature,
+    }));
 
-    // Initialize visualizer with OffscreenCanvas
     useLayoutEffect(() => {
         if (!canvasRef.current || !staticCanvasRef.current) {
             return;
@@ -104,7 +91,7 @@ export function Visualizer({ enabled, getVisualTime }) {
         const viz = new UnifiedVisualizer(canvasRef.current, staticCanvasRef.current);
         const style = getComputedStyle(document.documentElement);
 
-        const resolve = (/** @type {string} */ v, /** @type {string} */ fallback) =>
+        const resolve = (v: string, fallback: string) =>
             style.getPropertyValue(v).trim() || fallback;
 
         for (const trackId of VISUALIZER_TRACK_ORDER) {
@@ -119,13 +106,11 @@ export function Visualizer({ enabled, getVisualTime }) {
 
         vizRef.current = viz;
 
-        // Initial Resize
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
             viz.resize(rect.width, rect.height, window.devicePixelRatio || 1);
         }
 
-        // Initial Theme
         if (vizRef.current) {
             updateTheme(vizRef.current);
         }
@@ -138,7 +123,6 @@ export function Visualizer({ enabled, getVisualTime }) {
         };
     }, []);
 
-    // Handle resizing
     useEffect(() => {
         if (!containerRef.current || !vizRef.current) {
             return;
@@ -157,19 +141,16 @@ export function Visualizer({ enabled, getVisualTime }) {
         return () => observer.disconnect();
     }, []);
 
-    // Helper to extract theme colors for the worker
-    /** @param {import('../visualizer-proxy.js').UnifiedVisualizer|null} viz */
-    const updateTheme = (viz) => {
+    const updateTheme = (viz: UnifiedVisualizer | null) => {
         if (!viz) {
             return;
         }
         const style = getComputedStyle(document.documentElement);
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        const resolve = (/** @type {string} */ prop, /** @type {string} */ fallback) =>
+        const resolve = (prop: string, fallback: string) =>
             style.getPropertyValue(prop).trim() || fallback;
 
-        /** @type {Record<string, string|string[]>} */
-        const themeCache = {
+        const themeCache: Record<string, string | string[]> = {
             bgColor: resolve('--surface-sunken', isDark ? '#0f172a' : '#f8fafc'),
             labelRailBg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(226, 232, 240, 0.92)',
             laneBg: isDark ? 'rgba(255, 255, 255, 0.025)' : 'rgba(255, 255, 255, 0.82)',
@@ -202,29 +183,24 @@ export function Visualizer({ enabled, getVisualTime }) {
         viz.setTheme(themeCache);
     };
 
-    // Apply theme changes
     useEffect(() => {
         updateTheme(vizRef.current);
     }, [theme]);
 
-    // Sync playing state to worker
     useEffect(() => {
         if (vizRef.current) {
             vizRef.current.setPlaying(isPlaying);
         }
     }, [isPlaying]);
 
-    // Update worker loop parameters
     useEffect(() => {
         if (vizRef.current) {
-            /** @type {any} */
-            const signatures = TIME_SIGNATURES;
+            const signatures = TIME_SIGNATURES as any;
             const ts = signatures[timeSignature] || signatures['4/4'];
-            vizRef.current.render(0, bpm, ts); // Note: 0 is ignored by worker loop, but triggers param update
+            vizRef.current.render(0, bpm, ts);
         }
     }, [bpm, timeSignature]);
 
-    // Handle render loop (Data Forwarding Only)
     useEffect(() => {
         if (!vizRef.current) {
             return;
@@ -266,10 +242,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                 return;
             }
 
-            // Sync clock periodically or every frame for high precision
-            // Apply visual offset to worker clock as well for perfect sync
-            /** @type {import('../state.js').StateMap} */
-            const typedStateMap = stateMap;
+            const typedStateMap: StateMap = stateMap;
             const now = getVisualTime(typedStateMap);
             if (enabled && vizRef.current) {
                 vizRef.current.syncClock(now, performance.now());
@@ -287,7 +260,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                         param: 'lastActiveChordIndex',
                         value: null,
                     });
-                    dispatch('VIS_RESET');
+                    dispatch('VIS_RESET' as any);
                 }
                 if (enabled && vizRef.current) {
                     vizRef.current.clear();
@@ -333,7 +306,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                             param: 'lastActiveChordIndex',
                             value: ev.index,
                         });
-                        dispatch('VIS_UPDATE', { type: 'chord', index: ev.index });
+                        dispatch('VIS_UPDATE' as any, { type: 'chord', index: ev.index });
                     }
                     if (enabled && playback.isDrawing && vizRef.current) {
                         ev.notes = ev.chordNotes;
@@ -351,12 +324,8 @@ export function Visualizer({ enabled, getVisualTime }) {
                         vizRef.current.pushNote(trackId, ev);
                     }
                 } else if (ev.type === 'fill') {
-                    if (
-                        enabled &&
-                        playback.isDrawing &&
-                        /** @type {any} */ (vizRef.current)?.worker
-                    ) {
-                        /** @type {any} */ (vizRef.current).worker.postMessage({
+                    if (enabled && playback.isDrawing && (vizRef.current as any)?.worker) {
+                        (vizRef.current as any).worker.postMessage({
                             type: 'SET_FILL',
                             active: ev.active,
                         });
@@ -375,8 +344,7 @@ export function Visualizer({ enabled, getVisualTime }) {
         };
 
         if (isPlaying) {
-            /** @type {import('../state.js').StateMap} */
-            const typedStateMap2 = stateMap;
+            const typedStateMap2: StateMap = stateMap;
             dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'isDrawing', value: true });
             if (enabled) {
                 const { playback, arranger } = typedStateMap2;
@@ -385,7 +353,7 @@ export function Visualizer({ enabled, getVisualTime }) {
                 const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
                 const measureTime =
                     playback.unswungNextNoteTime - (playback.step % stepsPerMeasure) * sixteenth;
-                vizRef.current.setBeatReference(measureTime);
+                vizRef.current!.setBeatReference(measureTime);
             }
         }
 
@@ -400,7 +368,6 @@ export function Visualizer({ enabled, getVisualTime }) {
         };
     }, [isPlaying, enabled]);
 
-    // Cleanup and visual clear on disable or stop
     useEffect(() => {
         if (!enabled || !isPlaying) {
             if (vizRef.current) {

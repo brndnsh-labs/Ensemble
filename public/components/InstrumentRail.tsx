@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
@@ -6,25 +7,26 @@ import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
+import type { StyleObject } from '../ui-types.js';
 import { syncWorker } from '../worker-client.js';
 import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
 import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
-/** @typedef {'groove' | 'bass' | 'chords' | 'harmony' | 'soloist'} StudioInstrumentModule */
-/**
- * @typedef {Object} StudioInstrumentConfig
- * @property {string} id
- * @property {StudioInstrumentModule} module
- * @property {string} label
- * @property {string} icon
- * @property {string} summary
- * @property {string} accent
- */
 
-/** @type {StudioInstrumentConfig[]} */
-const STUDIO_INSTRUMENTS = [
+type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
+
+interface StudioInstrumentConfig {
+    id: string;
+    module: StudioInstrumentModule;
+    label: string;
+    icon: string;
+    summary: string;
+    accent: string;
+}
+
+const STUDIO_INSTRUMENTS: StudioInstrumentConfig[] = [
     {
         id: 'panel-grooves',
         module: 'groove',
@@ -67,21 +69,17 @@ const STUDIO_INSTRUMENTS = [
     },
 ];
 
-/**
- * @returns {{ kind: null | 'genre' | 'settings', module: string | null }}
- */
-function getClosedSurface() {
+type ActiveSurface = { kind: null | 'genre' | 'settings'; module: string | null };
+
+function getClosedSurface(): ActiveSurface {
     return {
         kind: null,
         module: null,
     };
 }
 
-/**
- * @param {string} genreName
- */
-function setGenre(genreName) {
-    const config = /** @type {any} */ (SMART_GENRES)[genreName];
+function setGenre(genreName: string) {
+    const config = (SMART_GENRES as any)[genreName];
     const payload = {
         genreName,
         ...config,
@@ -91,28 +89,15 @@ function setGenre(genreName) {
     saveCurrentState();
 }
 
-/**
- * @param {number} bandIntensity
- */
-function formatBandIntensity(bandIntensity) {
+function formatBandIntensity(bandIntensity: number) {
     return `${Math.round(bandIntensity * 100)}%`;
 }
 
-/**
- * @param {string} activeGenre
- * @param {boolean} autoIntensity
- * @param {number} bandIntensity
- */
-function getBandFeelValue(activeGenre, autoIntensity, bandIntensity) {
+function getBandFeelValue(activeGenre: string, autoIntensity: boolean, bandIntensity: number) {
     return `${activeGenre} · ${autoIntensity ? 'Auto' : formatBandIntensity(bandIntensity)}`;
 }
 
-/**
- * @param {boolean} enabled
- * @param {string | undefined} tradeMode
- * @param {string} module
- */
-function getStudioState(enabled, tradeMode, module) {
+function getStudioState(enabled: boolean, tradeMode: string | undefined, module: string) {
     const isQueued = module === 'soloist' && !enabled && tradeMode !== 'manual';
     return {
         isQueued,
@@ -125,27 +110,25 @@ function getStudioState(enabled, tradeMode, module) {
     };
 }
 
-/** @param {StudioInstrumentModule} module */
-function hasStudioInstrumentControls(module) {
+function hasStudioInstrumentControls(module: StudioInstrumentModule) {
     return module !== 'bass';
 }
 
-/**
- * @param {{
- *   accent: string,
- *   anchorElement?: HTMLElement | null,
- *   className?: string,
- *   closeLabel: string,
- *   isCompactViewport: boolean,
- *   isOpen: boolean,
- *   kicker: string,
- *   meta?: import('../ui-types.js').ComponentChildren,
- *   onClose: () => void,
- *   subtitle?: string,
- *   title: string,
- *   children: import('../ui-types.js').ComponentChildren
- * }} props
- */
+interface StudioSurfaceProps {
+    accent: string;
+    anchorElement?: HTMLElement | null;
+    className?: string;
+    closeLabel: string;
+    isCompactViewport: boolean;
+    isOpen: boolean;
+    kicker: string;
+    meta?: ComponentChildren;
+    onClose: () => void;
+    subtitle?: string;
+    title: string;
+    children: ComponentChildren;
+}
+
 export function StudioSurface({
     accent,
     anchorElement = null,
@@ -159,19 +142,16 @@ export function StudioSurface({
     subtitle,
     title,
     children,
-}) {
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement | null>} */
-    const surfaceRef = useRef(null);
-    const [surfaceStyle, setSurfaceStyle] = useState(
-        /** @type {import('preact').JSX.CSSProperties | undefined} */ (undefined),
-    );
+}: StudioSurfaceProps) {
+    const surfaceRef = useRef<HTMLDivElement | null>(null);
+    const [surfaceStyle, setSurfaceStyle] = useState<StyleObject | undefined>(undefined);
 
     useEffect(() => {
         if (!isOpen) {
             return undefined;
         }
 
-        const handleKeyDown = (/** @type {KeyboardEvent} */ event) => {
+        const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 onClose();
             }
@@ -298,18 +278,17 @@ export function StudioSurface({
     return surfaceLayer;
 }
 
-/**
- * @param {{
- *   activeGenre: string,
- *   autoIntensity: boolean,
- *   anchorElement?: HTMLElement | null,
- *   bandIntensity: number,
- *   isCompactViewport: boolean,
- *   isOpen: boolean,
- *   onClose: () => void,
- *   onToggle: () => void
- * }} props
- */
+interface StudioBandFeelChooserProps {
+    activeGenre: string;
+    autoIntensity: boolean;
+    anchorElement?: HTMLElement | null;
+    bandIntensity: number;
+    isCompactViewport: boolean;
+    isOpen: boolean;
+    onClose: () => void;
+    onToggle: () => void;
+}
+
 function StudioBandFeelChooser({
     activeGenre,
     autoIntensity,
@@ -319,7 +298,7 @@ function StudioBandFeelChooser({
     isOpen,
     onClose,
     onToggle,
-}) {
+}: StudioBandFeelChooserProps) {
     return (
         <div class="workspace-studio-surface-root workspace-studio-genre-chooser">
             <button
@@ -426,21 +405,24 @@ function StudioBandFeelChooser({
     );
 }
 
-/**
- * @param {{
- *   instrument: typeof STUDIO_INSTRUMENTS[number],
- *   isOpen: boolean,
- *   onToggleSettings: () => void,
- *   rowRef?: (node: HTMLDivElement | null) => void,
- *   showSettings: boolean,
- *   triggerRef?: (node: HTMLButtonElement | null) => void
- * }} props
- */
-function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, showSettings, triggerRef }) {
-    const enabled = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) =>
-            /** @type {any} */ (s)[instrument.module].enabled,
-    );
+interface StudioMixRowProps {
+    instrument: StudioInstrumentConfig;
+    isOpen: boolean;
+    onToggleSettings: () => void;
+    rowRef?: (node: HTMLDivElement | null) => void;
+    showSettings: boolean;
+    triggerRef?: (node: HTMLButtonElement | null) => void;
+}
+
+function StudioMixRow({
+    instrument,
+    isOpen,
+    onToggleSettings,
+    rowRef,
+    showSettings,
+    triggerRef,
+}: StudioMixRowProps) {
+    const enabled = useEnsembleState((s) => (s as any)[instrument.module].enabled);
     const powerClass = `power-btn ${enabled ? 'active' : ''}`;
 
     return (
@@ -486,8 +468,11 @@ function StudioMixRow({ instrument, isOpen, onToggleSettings, rowRef, showSettin
     );
 }
 
-/** @param {{ activeCount: number }} props */
-function StudioMixerAccordion({ activeCount }) {
+interface StudioMixerAccordionProps {
+    activeCount: number;
+}
+
+function StudioMixerAccordion({ activeCount }: StudioMixerAccordionProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -525,38 +510,35 @@ function StudioMixerAccordion({ activeCount }) {
     );
 }
 
-/**
- * @param {{
- *   anchorElement?: HTMLElement | null,
- *   instrument: typeof STUDIO_INSTRUMENTS[number] | undefined,
- *   isCompactViewport: boolean,
- *   isOpen: boolean,
- *   onClose: () => void
- * }} props
- */
+interface StudioSettingsSurfaceProps {
+    anchorElement?: HTMLElement | null;
+    instrument: StudioInstrumentConfig | undefined;
+    isCompactViewport: boolean;
+    isOpen: boolean;
+    onClose: () => void;
+}
+
 function StudioSettingsSurface({
     anchorElement = null,
     instrument,
     isCompactViewport,
     isOpen,
     onClose,
-}) {
-    const instrumentState = useEnsembleState(
-        (/** @type {import('../types.js').EnsembleState} */ s) => {
-            if (!instrument) {
-                return {
-                    enabled: false,
-                    tradeMode: 'manual',
-                };
-            }
-
-            const modState = /** @type {any} */ (s)[instrument.module];
+}: StudioSettingsSurfaceProps) {
+    const instrumentState = useEnsembleState((s) => {
+        if (!instrument) {
             return {
-                enabled: modState.enabled,
-                tradeMode: modState.tradeMode,
+                enabled: false,
+                tradeMode: 'manual',
             };
-        },
-    );
+        }
+
+        const modState = (s as any)[instrument.module];
+        return {
+            enabled: modState.enabled,
+            tradeMode: modState.tradeMode,
+        };
+    });
 
     if (!instrument) {
         return null;
@@ -592,12 +574,13 @@ function StudioSettingsSurface({
     );
 }
 
-/**
- * @param {{ orientation?: 'vertical' | 'horizontal' }} props
- */
-export function InstrumentRail({ orientation = 'vertical' }) {
+interface InstrumentRailProps {
+    orientation?: 'vertical' | 'horizontal';
+}
+
+export function InstrumentRail({ orientation = 'vertical' }: InstrumentRailProps) {
     const { groove, bass, chords, harmony, soloist, activeGenre, autoIntensity, bandIntensity } =
-        useEnsembleState((/** @type {import('../types.js').EnsembleState} */ s) => ({
+        useEnsembleState((s) => ({
             groove: s.groove.enabled,
             bass: s.bass.enabled,
             chords: s.chords.enabled,
@@ -607,14 +590,11 @@ export function InstrumentRail({ orientation = 'vertical' }) {
             autoIntensity: s.playback.autoIntensity,
             bandIntensity: s.playback.bandIntensity,
         }));
-    const [activeSurface, setActiveSurface] = useState(getClosedSurface);
+    const [activeSurface, setActiveSurface] = useState<ActiveSurface>(getClosedSurface);
     const isCompactViewport = useMediaQuery(STUDIO_SURFACE_BREAKPOINT);
-    /** @type {import('preact/hooks').MutableRef<Record<string, HTMLDivElement | null>>} */
-    const rowElementsRef = useRef({});
-    /** @type {import('preact/hooks').MutableRef<Record<string, HTMLButtonElement | null>>} */
-    const settingsTriggerRef = useRef({});
-    /** @type {import('preact/hooks').MutableRef<HTMLDivElement | null>} */
-    const genreTriggerRef = useRef(null);
+    const rowElementsRef = useRef<Record<string, HTMLDivElement | null>>({});
+    const settingsTriggerRef = useRef<Record<string, HTMLButtonElement | null>>({});
+    const genreTriggerRef = useRef<HTMLDivElement | null>(null);
 
     const activeCount = [groove, bass, chords, harmony, soloist].filter(Boolean).length;
     const activeInstrument =
@@ -643,10 +623,7 @@ export function InstrumentRail({ orientation = 'vertical' }) {
         );
     };
 
-    /**
-     * @param {string} module
-     */
-    const toggleSettingsSurface = (module) => {
+    const toggleSettingsSurface = (module: string) => {
         setActiveSurface((current) =>
             current.kind === 'settings' && current.module === module
                 ? getClosedSurface()

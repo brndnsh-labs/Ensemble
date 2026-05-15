@@ -14,10 +14,11 @@ import { VisualizerOverlay } from './VisualizerOverlay.jsx';
 const NARROW_MQ = '(max-width: 1023px)';
 const MOBILE_MQ = '(max-width: 640px)';
 
-/**
- * @param {{ getVisualTime: () => number }} props
- */
-export function ChartSurface({ getVisualTime }) {
+interface ChartSurfaceProps {
+    getVisualTime: () => number;
+}
+
+export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isVizOpen, setIsVizOpen] = useState(false);
     const [isSharedUrl, setIsSharedUrl] = useState(() => {
@@ -30,8 +31,7 @@ export function ChartSurface({ getVisualTime }) {
     const isNarrow = useMediaQuery(NARROW_MQ);
     const isMobile = useMediaQuery(MOBILE_MQ);
 
-    const openModal = (/** @type {keyof import('../types.js').ModalsState} */ modal) =>
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
+    const openModal = (modal: string) => dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
 
     const closeViz = useCallback(() => setIsVizOpen(false), []);
 

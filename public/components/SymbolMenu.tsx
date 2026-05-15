@@ -1,7 +1,4 @@
-import React from 'preact/compat';
-
-/** @type {string[]} */
-const SYMBOLS = [
+const SYMBOLS: string[] = [
     '|',
     'maj7',
     'm7',
@@ -18,8 +15,7 @@ const SYMBOLS = [
     '-',
 ];
 
-/** @type {Record<string, string>} */
-const SYMBOL_LABELS = {
+const SYMBOL_LABELS: Record<string, string> = {
     '|': 'Bar Line',
     maj7: 'Major 7th',
     m7: 'Minor 7th',
@@ -36,16 +32,13 @@ const SYMBOL_LABELS = {
     '-': 'Minor',
 };
 
-/**
- * @typedef {Object} SymbolMenuProps
- * @property {function(string): void} onSelect
- * @property {function(): void} [onClose]
- * @property {'dropdown'|'row'} [variant]
- */
-/**
- * @param {SymbolMenuProps} props
- */
-export function SymbolMenu({ onSelect, onClose, variant = 'dropdown' }) {
+interface SymbolMenuProps {
+    onSelect: (sym: string) => void;
+    onClose?: () => void;
+    variant?: 'dropdown' | 'row';
+}
+
+export function SymbolMenu({ onSelect, onClose, variant = 'dropdown' }: SymbolMenuProps) {
     const isRow = variant === 'row';
 
     return (

@@ -124,18 +124,18 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
-| **Containers** | `public/App.jsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, and notification layers. |
-| **Surface** | `public/components/ChartSurface.jsx` | Chart-first single surface. Three slot regions: TopBar (transport + key/time + actions), Chart (ChordVisualizer), Rail (InstrumentRail). Visualizer overlay is gated behind the 🌈 button. |
-| **Workspaces** | `public/components/InstrumentRail.jsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
-| **Visuals** | `public/components/VisualizerOverlay.jsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
-| **Shared** | `public/components/UIControls.jsx` | Reusable UI toolkit. |
-| **Orchestration** | `public/components/Modals.jsx` | Lazy-loading modal orchestrator. |
-| **Logic Views** | `public/components/Arranger.jsx` | Arranger editor surface used by the editor modal and related flows. |
-| **Logic Views** | `public/components/ChordVisualizer.jsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
-| **Controls** | `public/components/Transport.jsx` | Playback controls and tempo. |
-| **Visuals** | `public/components/Visualizer.jsx` | Canvas rendering container. |
-| **Library** | `public/components/PresetLibrary.jsx` | Chord progression library modal. |
-| **Settings** | `public/components/InstrumentSettings.jsx` | Reusable per-instrument settings surface used from Studio. |
+| **Containers** | `public/App.tsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, and notification layers. |
+| **Surface** | `public/components/ChartSurface.tsx` | Chart-first single surface. Three slot regions: TopBar (transport + key/time + actions), Chart (ChordVisualizer), Rail (InstrumentRail). Visualizer overlay is gated behind the 🌈 button. |
+| **Workspaces** | `public/components/InstrumentRail.tsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
+| **Visuals** | `public/components/VisualizerOverlay.tsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
+| **Shared** | `public/components/UIControls.tsx` | Reusable UI toolkit. |
+| **Orchestration** | `public/components/Modals.tsx` | Lazy-loading modal orchestrator. |
+| **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface used by the editor modal and related flows. |
+| **Logic Views** | `public/components/ChordVisualizer.tsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
+| **Controls** | `public/components/Transport.tsx` | Playback controls and tempo. |
+| **Visuals** | `public/components/Visualizer.tsx` | Canvas rendering container. |
+| **Library** | `public/components/PresetLibrary.tsx` | Chord progression library modal. |
+| **Settings** | `public/components/InstrumentSettings.tsx` | Reusable per-instrument settings surface used from Studio. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
 
 ## Domain State Slices (Modular State)
@@ -173,7 +173,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/ui-root.jsx` | Preact application entry point and hydration. |
+| `public/ui-root.tsx` | Preact application entry point and hydration. |
+| `public/pwa.ts` | PWA install prompt management. |
 | `public/ui.js` | Lazy Proxy-based DOM access layer. |
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.js` | Global timing and musical constants. |

@@ -7,16 +7,12 @@ import { NotificationLayer } from './components/NotificationLayer.jsx';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner.jsx';
 import { useEnsembleState } from './ui-bridge.js';
 
-/**
- * @typedef {Object} AppProps
- * @property {() => number} getVisualTime
- */
+interface AppProps {
+    getVisualTime: () => number;
+}
 
-/**
- * @param {AppProps} props
- */
-export function App({ getVisualTime }) {
-    const { theme } = useEnsembleState((/** @type {import('./types.js').EnsembleState} */ s) => ({
+export function App({ getVisualTime }: AppProps) {
+    const { theme } = useEnsembleState((s) => ({
         theme: s.playback.theme,
     }));
 
