@@ -54,7 +54,7 @@ This document tracks specific reference recordings used to calibrate the Ensembl
 - **Status:** v2.0 Codebase Health Audit completed.
 - **Action:**
     - **Global:** Implemented intensity-brightness mapping. `playback.bandIntensity` now modulates filter cutoffs for Chords and Bass, providing more dynamic timbral range.
-    - **Rock/Pop:** Refactored `accompaniment.js` with "Expressive Phrasing" pools. Piano cells now adapt to intensity and soloist activity (Call & Response).
+    - **Rock/Pop:** Refactored `accompaniment.ts` with "Expressive Phrasing" pools. Piano cells now adapt to intensity and soloist activity (Call & Response).
     - **Performance:** Verified stability with "Emergency Lookahead" and "Logic Latency" monitoring.
     - **Verification:** 346 tests passing, including new stress tests for congestion and continuity.
 
