@@ -1,17 +1,16 @@
-import { applyStandardBase, DEFAULT_CONFIG } from './utils.js';
+import {
+    applyStandardBase,
+    DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
+} from './utils.js';
 
 export const config = {
     ...DEFAULT_CONFIG,
     entropyMultiplier: 0.05,
 };
 
-/**
- * @param {number} _sectionSeed
- * @param {number} drumComplexity
- * @param {number} intensity
- * @returns {number}
- */
-export function getMotif(_sectionSeed, drumComplexity, intensity) {
+export function getMotif(_sectionSeed: number, drumComplexity: number, intensity: number): number {
     if (drumComplexity <= 0.2 || intensity < 0.3) {
         return 0; // Ultralight
     }
@@ -21,16 +20,12 @@ export function getMotif(_sectionSeed, drumComplexity, intensity) {
     return 2; // Slightly more active
 }
 
-/**
- * @param {any} context
- * @param {any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         isDownbeat,

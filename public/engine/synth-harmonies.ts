@@ -1,3 +1,4 @@
+import type { EnsembleState } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
@@ -11,11 +12,12 @@ const HARMONY_VOICE_LIMIT_FADE = 0.02;
 /**
  * Same-pitch retriggers are common in funk and horn writing. Crossfade them instead of
  * hard-choking the old voice so repeated hits can re-articulate without zipper-like clicks.
- *
- * @param {string} style
- * @returns {{fadeTime: number, attackFloor: number, suppressClick: boolean}}
  */
-function getHarmonyRetriggerProfile(style) {
+function getHarmonyRetriggerProfile(style: string): {
+    fadeTime: number;
+    attackFloor: number;
+    suppressClick: boolean;
+} {
     if (style === 'organ') {
         return { fadeTime: 0.02, attackFloor: 0.012, suppressClick: true };
     }
@@ -25,12 +27,7 @@ function getHarmonyRetriggerProfile(style) {
     return { fadeTime: 0.03, attackFloor: 0.02, suppressClick: false };
 }
 
-/**
- * Stop any currently playing harmony notes.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {number} fadeTime - Fade out time in seconds.
- */
-export function killHarmonyNote(state, fadeTime = 0.05) {
+export function killHarmonyNote(state: EnsembleState, fadeTime = 0.05) {
     const { playback, harmony } = state;
     if (!playback.audio) {
         return;
@@ -38,29 +35,14 @@ export function killHarmonyNote(state, fadeTime = 0.05) {
     killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
 }
 
-/**
- * Plays a harmony note with genre-specific synthesis and articulations.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {number} freq - Frequency in Hz.
- * @param {number} time - Start time in seconds.
- * @param {number} duration - Note duration in seconds.
- * @param {number} [vol=0.4] - Output volume.
- * @param {string} [style='stabs'] - Synthesis style preset.
- * @param {number|null} [midi=null] - Optional MIDI note number for voice stealing.
- * @param {number} [slideInterval=0] - Interval in semitones to slide from.
- * @param {number} [slideDuration=0] - Duration of the slide in seconds.
- * @param {Object} [vibrato={rate: 0, depth: 0}] - Vibrato settings.
- * @param {number} [vibrato.rate] - Vibrato rate in Hz.
- * @param {number} [vibrato.depth] - Vibrato depth.
- */
 export function playHarmonyNote(
-    state,
-    freq,
-    time,
-    duration,
+    state: EnsembleState,
+    freq: number,
+    time: number,
+    duration: number,
     vol = 0.4,
     style = 'stabs',
-    midi = null,
+    midi: number | null = null,
     slideInterval = 0,
     slideDuration = 0,
     vibrato = { rate: 0, depth: 0 },
@@ -73,7 +55,7 @@ export function playHarmonyNote(
     const now = playback.audio.currentTime;
     const playTime = Math.max(time, now);
     const feel = groove.genreFeel;
-    let retriggerProfile = null;
+    let retriggerProfile: ReturnType<typeof getHarmonyRetriggerProfile> | null = null;
 
     if (!harmony.activeVoices) {
         harmony.activeVoices = []; // @direct-mutation
@@ -88,7 +70,7 @@ export function playHarmonyNote(
 
     // Pitch-aware Stealing
     if (midi !== null) {
-        const existing = harmony.activeVoices.find(/** @param {any} v */ (v) => v.midi === midi);
+        const existing = harmony.activeVoices.find((v: { midi: number | null }) => v.midi === midi);
         if (existing) {
             retriggerProfile = getHarmonyRetriggerProfile(style);
             killActiveVoices([existing], playTime, retriggerProfile.fadeTime);
@@ -126,22 +108,21 @@ export function playHarmonyNote(
     const useSub = freq > 250;
     const sub = useSub ? playback.audio.createOscillator() : null;
 
-    /** @type {AudioNode[]} */
-    const voiceNodes = [gain, filter, panner, osc1, osc2];
+    const voiceNodes: AudioNode[] = [gain, filter, panner, osc1, osc2];
     if (sub) {
         voiceNodes.push(sub);
     }
 
-    let lfo = null;
-    let lfoGain = null;
-    let tremoloLfo = null;
-    let tremoloGain = null;
-    let fifthOsc = null;
-    let click = null;
-    let clickGain = null;
-    let saturator = null;
-    let subGain = null;
-    let hp = null;
+    let lfo: OscillatorNode | null = null;
+    let lfoGain: GainNode | null = null;
+    let tremoloLfo: OscillatorNode | null = null;
+    let tremoloGain: GainNode | null = null;
+    let fifthOsc: OscillatorNode | null = null;
+    let click: OscillatorNode | null = null;
+    let clickGain: GainNode | null = null;
+    let saturator: WaveShaperNode | null = null;
+    let subGain: GainNode | null = null;
+    let hp: BiquadFilterNode | null = null;
 
     if (style === 'organ') {
         const intensityForLeslie = playback.bandIntensity || 0.5;

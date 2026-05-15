@@ -5,23 +5,38 @@ import { INTERVAL_CATEGORY, RingBuffer } from './visualizer-utils.js';
 const { PI, abs, max, min } = Math;
 const DEFAULT_TRACK_RANGE = { midiMin: 48, midiMax: 84 };
 
-/**
- * @param {number} t
- * @param {number} currentTime
- * @param {number} labelRailWidth
- * @param {number} timeScale
- * @returns {number}
- */
-function getXStandalone(t, currentTime, labelRailWidth, timeScale) {
+function getXStandalone(
+    t: number,
+    currentTime: number,
+    labelRailWidth: number,
+    timeScale: number,
+): number {
     return labelRailWidth + (currentTime - t) * timeScale;
 }
 
-/**
- * @param {string} name
- * @returns {string}
- */
-function formatTrackLabel(name) {
+function formatTrackLabel(name: string): string {
     return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+interface Lane {
+    index: number;
+    top: number;
+    bottom: number;
+    height: number;
+    innerTop: number;
+    innerBottom: number;
+    innerHeight: number;
+    mid: number;
+}
+
+interface Track {
+    color: string;
+    resolvedColor: string;
+    label: string;
+    history: RingBuffer;
+    currentNoteLabel: string;
+    midiMin: number;
+    midiMax: number;
 }
 
 /**
@@ -30,55 +45,64 @@ function formatTrackLabel(name) {
  * Operates on Canvas or OffscreenCanvas.
  */
 export class VisualizerEngine {
-    /**
-     * @param {any} canvas
-     * @param {any} staticCanvas
-     */
-    constructor(canvas, staticCanvas) {
+    canvas: HTMLCanvasElement | OffscreenCanvas;
+    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    staticCanvas: HTMLCanvasElement | OffscreenCanvas;
+    staticCtx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    tracks: Record<string, Track>;
+    chordEvents: unknown[];
+    windowSize: number;
+    labelRailWidth: number;
+    registers: Record<string, number>;
+    beatReferenceTime: number | null;
+    themeCache: Record<string, unknown> | null;
+    isFillActive: boolean;
+    width: number;
+    height: number;
+    dpr: number;
+    timeScale: number;
+    trackOrder: string[];
+    lanes: Record<string, Lane>;
+    categoryColors: string[];
+    intervalColors: string[];
+
+    constructor(
+        canvas: HTMLCanvasElement | OffscreenCanvas,
+        staticCanvas: HTMLCanvasElement | OffscreenCanvas,
+    ) {
         this.canvas = canvas;
-        /** @type {any} */
-        this.ctx = this.canvas.getContext('2d', { alpha: false });
+        this.ctx = this.canvas.getContext('2d', { alpha: false }) as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D;
 
         this.staticCanvas = staticCanvas;
-        /** @type {any} */
-        this.staticCtx = this.staticCanvas.getContext('2d', { alpha: false });
+        this.staticCtx = this.staticCanvas.getContext('2d', { alpha: false }) as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D;
 
-        /** @type {Record<string, any>} */
         this.tracks = {};
-        /** @type {Array<any>} */
         this.chordEvents = [];
         this.windowSize = 4.0;
         this.labelRailWidth = 92;
-        /** @type {Record<string, number>} */
         this.registers = { chords: 60 };
-        /** @type {number|null} */
         this.beatReferenceTime = null;
-        /** @type {any} */
         this.themeCache = null;
         this.isFillActive = false;
 
-        /** @type {number} */
         this.width = 0;
-        /** @type {number} */
         this.height = 0;
-        /** @type {number} */
         this.dpr = 1;
-        /** @type {number} */
         this.timeScale = 1;
 
-        /** @type {string[]} */
         this.trackOrder = [...VISUALIZER_TRACK_ORDER];
-        /** @type {Record<string, any>} */
         this.lanes = {};
+        this.categoryColors = [];
+        this.intervalColors = [];
     }
 
-    /**
-     * @param {any} themeCache
-     * @returns {void}
-     */
-    setTheme(themeCache) {
+    setTheme(themeCache: Record<string, unknown>): void {
         this.themeCache = themeCache;
-        this.categoryColors = themeCache.chordColors || [
+        this.categoryColors = (themeCache.chordColors as string[]) || [
             '#268bd2',
             '#859900',
             '#cb4b16',
@@ -93,13 +117,7 @@ export class VisualizerEngine {
         }
     }
 
-    /**
-     * @param {number} width
-     * @param {number} height
-     * @param {number} [dpr=1]
-     * @returns {void}
-     */
-    resize(width, height, dpr = 1) {
+    resize(width: number, height: number, dpr = 1): void {
         this.width = width;
         this.height = height;
         this.dpr = dpr;
@@ -119,50 +137,29 @@ export class VisualizerEngine {
         this.renderStaticLayer();
     }
 
-    /**
-     * @param {number} t
-     * @param {number} currentTime
-     * @returns {number}
-     */
-    getX(t, currentTime) {
+    getX(t: number, currentTime: number): number {
         return getXStandalone(t, currentTime, this.labelRailWidth, this.timeScale);
     }
 
-    /**
-     * @param {string} name
-     * @param {number} midi
-     * @returns {void}
-     */
-    setRegister(name, midi) {
+    setRegister(name: string, midi: number): void {
         this.registers[name] = midi;
     }
 
-    /**
-     * @param {number} time
-     * @returns {void}
-     */
-    setBeatReference(time) {
+    setBeatReference(time: number): void {
         this.beatReferenceTime = time;
     }
 
-    /**
-     * @returns {string[]}
-     */
-    getTrackOrder() {
+    getTrackOrder(): string[] {
         return VISUALIZER_TRACK_ORDER.filter((name) => this.tracks[name]);
     }
 
-    /**
-     * @returns {void}
-     */
-    buildLaneLayout() {
+    buildLaneLayout(): void {
         const order = this.getTrackOrder();
         this.trackOrder = order.length > 0 ? order : [...VISUALIZER_TRACK_ORDER];
 
         const count = max(this.trackOrder.length, 1);
         const laneHeight = this.height / count;
-        /** @type {Record<string, any>} */
-        const lanes = {};
+        const lanes: Record<string, Lane> = {};
 
         this.trackOrder.forEach((name, index) => {
             const top = index * laneHeight;
@@ -184,7 +181,7 @@ export class VisualizerEngine {
         this.lanes = lanes;
     }
 
-    renderStaticLayer() {
+    renderStaticLayer(): void {
         if (!this.themeCache || !this.width || !this.height) {
             return;
         }
@@ -197,19 +194,27 @@ export class VisualizerEngine {
         const graphX = this.labelRailWidth;
         const graphW = w - graphX;
 
-        const bgColor = this.themeCache.bgColor || '#0f172a';
-        const labelRailBg = this.themeCache.labelRailBg || this.themeCache.keyBlack || '#111827';
-        const laneBg = this.themeCache.laneBg || 'rgba(255, 255, 255, 0.025)';
-        const laneAltBg = this.themeCache.laneAltBg || 'rgba(255, 255, 255, 0.05)';
+        const bgColor = (this.themeCache.bgColor as string) || '#0f172a';
+        const labelRailBg =
+            (this.themeCache.labelRailBg as string) ||
+            (this.themeCache.keyBlack as string) ||
+            '#111827';
+        const laneBg = (this.themeCache.laneBg as string) || 'rgba(255, 255, 255, 0.025)';
+        const laneAltBg = (this.themeCache.laneAltBg as string) || 'rgba(255, 255, 255, 0.05)';
         const laneGuideColor =
-            this.themeCache.laneGuideColor ||
-            this.themeCache.guideLineWhite ||
+            (this.themeCache.laneGuideColor as string) ||
+            (this.themeCache.guideLineWhite as string) ||
             'rgba(255,255,255,0.04)';
-        const separatorColor = this.themeCache.separatorColor || 'rgba(148, 163, 184, 0.24)';
+        const separatorColor =
+            (this.themeCache.separatorColor as string) || 'rgba(148, 163, 184, 0.24)';
         const trackLabelColor =
-            this.themeCache.trackLabelColor || this.themeCache.labelColor || '#cbd5e1';
+            (this.themeCache.trackLabelColor as string) ||
+            (this.themeCache.labelColor as string) ||
+            '#cbd5e1';
         const noteLabelColor =
-            this.themeCache.noteLabelColor || this.themeCache.labelColor || '#94a3b8';
+            (this.themeCache.noteLabelColor as string) ||
+            (this.themeCache.labelColor as string) ||
+            '#94a3b8';
 
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, w, h);
@@ -265,15 +270,8 @@ export class VisualizerEngine {
         ctx.stroke();
     }
 
-    /**
-     * @param {string} name
-     * @param {string} color
-     * @param {string} [resolvedColor]
-     * @param {string} [label]
-     * @returns {void}
-     */
-    addTrack(name, color, resolvedColor, label) {
-        const meta = VISUALIZER_TRACKS[/** @type {keyof typeof VISUALIZER_TRACKS} */ (name)];
+    addTrack(name: string, color: string, resolvedColor?: string, label?: string): void {
+        const meta = VISUALIZER_TRACKS[name as keyof typeof VISUALIZER_TRACKS];
         const capacity = name === 'drums' ? 240 : name === 'chords' ? 180 : 140;
         this.tracks[name] = {
             color,
@@ -292,54 +290,38 @@ export class VisualizerEngine {
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {any} event
-     * @returns {void}
-     */
-    pushNote(name, event) {
+    pushNote(name: string, event: unknown): void {
         if (!this.tracks[name]) {
             return;
         }
         this.tracks[name].history.push(event);
-        if (event.noteName && typeof event.octave === 'number') {
-            this.tracks[name].currentNoteLabel = `${event.noteName}${event.octave}`;
+        const ev = event as { noteName?: string; octave?: number };
+        if (ev.noteName && typeof ev.octave === 'number') {
+            this.tracks[name].currentNoteLabel = `${ev.noteName}${ev.octave}`;
         }
     }
 
-    /**
-     * @param {any} event
-     * @returns {void}
-     */
-    pushChord(event) {
+    pushChord(event: unknown): void {
         this.chordEvents.push(event);
         while (this.chordEvents.length > 40) {
             this.chordEvents.shift();
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {number} time
-     * @returns {void}
-     */
-    truncateNotes(name, time) {
+    truncateNotes(name: string, time: number): void {
         if (!this.tracks[name]) {
             return;
         }
         for (const ev of this.tracks[name].history) {
-            const noteEnd = ev.time + (ev.duration || 0.25);
-            if (ev.time < time && noteEnd > time) {
-                ev.duration = time - ev.time;
+            const e = ev as { time: number; duration?: number };
+            const noteEnd = e.time + (e.duration || 0.25);
+            if (e.time < time && noteEnd > time) {
+                e.duration = time - e.time;
             }
         }
     }
 
-    /**
-     * @param {string} name
-     * @returns {{ midiMin: number, midiMax: number }}
-     */
-    getTrackMidiRange(name) {
+    getTrackMidiRange(name: string): { midiMin: number; midiMax: number } {
         const track = this.tracks[name];
         return {
             midiMin: track?.midiMin ?? DEFAULT_TRACK_RANGE.midiMin,
@@ -347,20 +329,11 @@ export class VisualizerEngine {
         };
     }
 
-    /**
-     * @param {string} name
-     * @returns {any}
-     */
-    getLane(name) {
+    getLane(name: string): Lane | null {
         return this.lanes[name] || null;
     }
 
-    /**
-     * @param {string} name
-     * @param {number} midi
-     * @returns {number}
-     */
-    getLaneY(name, midi) {
+    getLaneY(name: string, midi: number): number {
         const lane = this.getLane(name);
         if (!lane) {
             return 0;
@@ -372,11 +345,7 @@ export class VisualizerEngine {
         return lane.innerBottom - ratio * lane.innerHeight;
     }
 
-    /**
-     * @param {string} name
-     * @returns {number}
-     */
-    getTrackThickness(name) {
+    getTrackThickness(name: string): number {
         const lane = this.getLane(name);
         if (!lane) {
             return 4;
@@ -387,24 +356,20 @@ export class VisualizerEngine {
         return max(3, min(7, lane.innerHeight * 0.08));
     }
 
-    /**
-     * @param {string} name
-     * @param {any} event
-     * @returns {string}
-     */
-    getEventColor(name, event) {
+    getEventColor(name: string, event: unknown): string {
         const track = this.tracks[name];
         const baseColor = track?.resolvedColor || track?.color || '#ffffff';
         const chordColors = this.categoryColors || ['#268bd2', '#859900', '#cb4b16', '#d33682'];
+        const ev = event as { noteType?: string };
 
         if (name === MODULES.SOLOIST) {
-            if (event.noteType === 'target') {
+            if (ev.noteType === 'target') {
                 return chordColors[0] || baseColor;
             }
-            if (event.noteType === 'arp') {
+            if (ev.noteType === 'arp') {
                 return chordColors[2] || baseColor;
             }
-            if (event.noteType === 'altered') {
+            if (ev.noteType === 'altered') {
                 return chordColors[3] || baseColor;
             }
         }
@@ -412,23 +377,15 @@ export class VisualizerEngine {
         return baseColor;
     }
 
-    /**
-     * @param {any} event
-     * @returns {string}
-     */
-    getEventLabel(event) {
-        if (event.noteName && typeof event.octave === 'number') {
-            return `${event.noteName}${event.octave}`;
+    getEventLabel(event: unknown): string {
+        const ev = event as { noteName?: string; octave?: number };
+        if (ev.noteName && typeof ev.octave === 'number') {
+            return `${ev.noteName}${ev.octave}`;
         }
         return '';
     }
 
-    /**
-     * @param {RingBuffer} history
-     * @param {(event: any) => boolean | void} visit
-     * @returns {void}
-     */
-    forEachHistoryEvent(history, visit) {
+    forEachHistoryEvent(history: RingBuffer, visit: (event: unknown) => boolean | undefined): void {
         const buffer = history.buffer;
         const capacity = history.capacity;
         const count = history.count;
@@ -453,14 +410,12 @@ export class VisualizerEngine {
         }
     }
 
-    /**
-     * @param {string} name
-     * @param {number} currentTime
-     * @param {number} minTime
-     * @param {(event: any, noteEnd: number) => void} visit
-     * @returns {void}
-     */
-    forEachVisibleTrackEvent(name, currentTime, minTime, visit) {
+    forEachVisibleTrackEvent(
+        name: string,
+        currentTime: number,
+        minTime: number,
+        visit: (event: unknown, noteEnd: number) => void,
+    ): void {
         const track = this.tracks[name];
         if (!track) {
             return;
@@ -470,12 +425,13 @@ export class VisualizerEngine {
             if (!event) {
                 return true;
             }
-            if (event.time > currentTime) {
+            const ev = event as { time: number; duration?: number };
+            if (ev.time > currentTime) {
                 return false;
             }
 
             const defaultDuration = name === 'drums' ? 0.1 : 0.25;
-            const noteEnd = event.time + (event.duration || defaultDuration);
+            const noteEnd = ev.time + (ev.duration || defaultDuration);
             if (noteEnd < minTime) {
                 return true;
             }
@@ -485,38 +441,40 @@ export class VisualizerEngine {
         });
     }
 
-    /**
-     * @param {number} currentTime
-     * @param {number} minTime
-     * @param {(event: any, chordEnd: number) => void} visit
-     * @returns {void}
-     */
-    forEachVisibleChordEvent(currentTime, minTime, visit) {
+    forEachVisibleChordEvent(
+        currentTime: number,
+        minTime: number,
+        visit: (event: unknown, chordEnd: number) => void,
+    ): void {
         for (const event of this.chordEvents) {
-            const chordEnd = event.time + (event.duration || 2.0);
+            const ev = event as { time: number; duration?: number };
+            const chordEnd = ev.time + (ev.duration || 2.0);
             if (chordEnd < minTime) {
                 continue;
             }
-            if (event.time > currentTime) {
+            if (ev.time > currentTime) {
                 break;
             }
             visit(event, chordEnd);
         }
     }
 
-    /**
-     * @param {string} laneName
-     * @param {any} event
-     * @returns {Array<{ midi: number, colorIdx: number }>}
-     */
-    getChordOverlayEntries(laneName, event) {
+    getChordOverlayEntries(
+        laneName: string,
+        event: unknown,
+    ): Array<{ midi: number; colorIdx: number }> {
         const { midiMin, midiMax } = this.getTrackMidiRange(laneName);
-        const rootPc = ((event.rootMidi % 12) + 12) % 12;
-        /** @type {number[]} */
-        const notes = Array.isArray(event.notes)
-            ? event.notes
-            : Array.isArray(event.chordNotes)
-              ? event.chordNotes
+        const ev = event as {
+            rootMidi: number;
+            notes?: number[];
+            chordNotes?: number[];
+            intervals?: number[];
+        };
+        const rootPc = ((ev.rootMidi % 12) + 12) % 12;
+        const notes: number[] = Array.isArray(ev.notes)
+            ? ev.notes
+            : Array.isArray(ev.chordNotes)
+              ? ev.chordNotes
               : [];
 
         if (laneName === 'chords' && notes.length > 0) {
@@ -528,16 +486,15 @@ export class VisualizerEngine {
                 }));
         }
 
-        /** @type {number[]} */
-        const intervalSource =
-            Array.isArray(event.intervals) && event.intervals.length > 0
-                ? event.intervals
+        const intervalSource: number[] =
+            Array.isArray(ev.intervals) && ev.intervals.length > 0
+                ? ev.intervals
                 : notes.map((midi) => ((midi % 12) - rootPc + 12) % 12);
         const uniqueIntervals = [
             ...new Set(intervalSource.map((interval) => ((interval % 12) + 12) % 12)),
         ];
-        const overlayEntries = [];
-        const seenMidis = new Set();
+        const overlayEntries: Array<{ midi: number; colorIdx: number }> = [];
+        const seenMidis = new Set<number>();
         const minOctave = Math.floor(midiMin / 12) - 1;
         const maxOctave = Math.ceil(midiMax / 12) + 1;
 
@@ -557,13 +514,7 @@ export class VisualizerEngine {
         return overlayEntries.sort((a, b) => a.midi - b.midi);
     }
 
-    /**
-     * @param {number} currentTime
-     * @param {number} bpm
-     * @param {any} tsConfig
-     * @returns {void}
-     */
-    drawVerticalGrid(currentTime, bpm, tsConfig) {
+    drawVerticalGrid(currentTime: number, bpm: number, tsConfig: unknown): void {
         if (!bpm || this.beatReferenceTime === null) {
             return;
         }
@@ -571,17 +522,26 @@ export class VisualizerEngine {
         const ctx = this.ctx;
         const h = this.height;
         const minTime = currentTime - this.windowSize;
+        const tsRaw = tsConfig as
+            | { beats: number; grouping?: number[]; stepsPerBeat: number }
+            | number
+            | null;
         const ts =
-            typeof tsConfig === 'object' && tsConfig !== null
-                ? tsConfig
-                : { beats: tsConfig || 4, grouping: [tsConfig || 4], stepsPerBeat: 4 };
+            typeof tsRaw === 'object' && tsRaw !== null
+                ? tsRaw
+                : {
+                      beats: (tsRaw as number) || 4,
+                      grouping: [(tsRaw as number) || 4],
+                      stepsPerBeat: 4,
+                  };
         const beatsPerMeasure = ts.beats;
         const beatLen = 60 / bpm;
         const startBeat = Math.floor((minTime - this.beatReferenceTime) / beatLen);
 
         ctx.lineWidth = 1;
 
-        ctx.strokeStyle = this.themeCache.gridColorMeasure || 'rgba(56, 189, 248, 0.35)';
+        ctx.strokeStyle =
+            (this.themeCache?.gridColorMeasure as string) || 'rgba(56, 189, 248, 0.35)';
         ctx.beginPath();
         for (let i = startBeat; ; i++) {
             const t = this.beatReferenceTime + i * beatLen;
@@ -603,7 +563,7 @@ export class VisualizerEngine {
         }
         ctx.stroke();
 
-        ctx.strokeStyle = this.themeCache.gridColorBeat || 'rgba(255, 255, 255, 0.08)';
+        ctx.strokeStyle = (this.themeCache?.gridColorBeat as string) || 'rgba(255, 255, 255, 0.08)';
         ctx.beginPath();
         for (let i = startBeat; ; i++) {
             const t = this.beatReferenceTime + i * beatLen;
@@ -641,12 +601,7 @@ export class VisualizerEngine {
         ctx.stroke();
     }
 
-    /**
-     * @param {number} currentTime
-     * @param {number} minTime
-     * @returns {void}
-     */
-    drawChordLaneBackdrop(currentTime, minTime) {
+    drawChordLaneBackdrop(currentTime: number, minTime: number): void {
         const ctx = this.ctx;
         const overlayConfigs = [
             {
@@ -674,12 +629,17 @@ export class VisualizerEngine {
 
             const trackColor = track.resolvedColor || track.color || '#268bd2';
             const markerColor =
-                this.themeCache.chordMarkerColor || this.themeCache.separatorColor || trackColor;
+                (this.themeCache?.chordMarkerColor as string) ||
+                (this.themeCache?.separatorColor as string) ||
+                trackColor;
             const labelColor =
-                this.themeCache.trackLabelColor || this.themeCache.labelColor || trackColor;
+                (this.themeCache?.trackLabelColor as string) ||
+                (this.themeCache?.labelColor as string) ||
+                trackColor;
 
             this.forEachVisibleChordEvent(currentTime, minTime, (event, chordEnd) => {
-                const start = max(minTime, event.time);
+                const ev = event as { time: number; label?: string };
+                const start = max(minTime, ev.time);
                 const end = min(currentTime, chordEnd);
                 const xStart = this.getX(start, currentTime);
                 const xEnd = this.getX(end, currentTime);
@@ -708,21 +668,18 @@ export class VisualizerEngine {
                     ctx.stroke();
                 }
 
-                if (config.showLabels && event.label && width > 28) {
+                if (config.showLabels && ev.label && width > 28) {
                     ctx.fillStyle = labelColor;
                     ctx.font = '11px sans-serif';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'top';
-                    ctx.fillText(event.label, left + 4, lane.top + 6);
+                    ctx.fillText(ev.label, left + 4, lane.top + 6);
                 }
             });
         }
     }
 
-    /**
-     * @returns {void}
-     */
-    drawFillOverlay() {
+    drawFillOverlay(): void {
         if (!this.isFillActive) {
             return;
         }
@@ -739,26 +696,29 @@ export class VisualizerEngine {
             this.labelRailWidth,
             lane.bottom,
         );
-        fillGradient.addColorStop(0, this.themeCache.fillGradientTop || 'rgba(211, 54, 130, 0)');
+        fillGradient.addColorStop(
+            0,
+            (this.themeCache?.fillGradientTop as string) || 'rgba(211, 54, 130, 0)',
+        );
         fillGradient.addColorStop(
             0.5,
-            this.themeCache.fillGradientMid || 'rgba(211, 54, 130, 0.16)',
+            (this.themeCache?.fillGradientMid as string) || 'rgba(211, 54, 130, 0.16)',
         );
-        fillGradient.addColorStop(1, this.themeCache.fillGradientBottom || 'rgba(211, 54, 130, 0)');
+        fillGradient.addColorStop(
+            1,
+            (this.themeCache?.fillGradientBottom as string) || 'rgba(211, 54, 130, 0)',
+        );
         ctx.fillStyle = fillGradient;
         ctx.fillRect(this.labelRailWidth, lane.top, this.width - this.labelRailWidth, lane.height);
     }
 
-    /**
-     * @param {number} currentTime
-     * @param {number} minTime
-     * @returns {void}
-     */
-    drawTrackNotes(currentTime, minTime) {
+    drawTrackNotes(currentTime: number, minTime: number): void {
         const ctx = this.ctx;
-        const outlineColor = this.themeCache.outlineColor || '#ffffff';
+        const outlineColor = (this.themeCache?.outlineColor as string) || '#ffffff';
         const noteLabelColor =
-            this.themeCache.noteLabelColor || this.themeCache.labelColor || '#94a3b8';
+            (this.themeCache?.noteLabelColor as string) ||
+            (this.themeCache?.labelColor as string) ||
+            '#94a3b8';
 
         for (const name of this.trackOrder) {
             const track = this.tracks[name];
@@ -777,14 +737,15 @@ export class VisualizerEngine {
                 ctx.fillStyle = track.resolvedColor || track.color || '#ffffff';
                 ctx.beginPath();
                 this.forEachVisibleTrackEvent(name, currentTime, minTime, (event, noteEnd) => {
-                    const x = this.getX(event.time, currentTime);
-                    const y = this.getLaneY(name, event.midi);
-                    const size = 2 + (event.velocity || 1.0) * 2.5;
+                    const ev = event as { time: number; midi: number; velocity?: number };
+                    const x = this.getX(ev.time, currentTime);
+                    const y = this.getLaneY(name, ev.midi);
+                    const size = 2 + (ev.velocity || 1.0) * 2.5;
                     ctx.moveTo(x, y - size);
                     ctx.lineTo(x + size, y);
                     ctx.lineTo(x, y + size);
                     ctx.lineTo(x - size, y);
-                    if (event.time <= currentTime && noteEnd >= currentTime) {
+                    if (ev.time <= currentTime && noteEnd >= currentTime) {
                         hasActive = true;
                         activeX = x;
                         activeY = y;
@@ -793,13 +754,14 @@ export class VisualizerEngine {
                 ctx.fill();
             } else {
                 this.forEachVisibleTrackEvent(name, currentTime, minTime, (event, noteEnd) => {
-                    const start = max(minTime, event.time);
+                    const ev = event as { time: number; midi: number };
+                    const start = max(minTime, ev.time);
                     const end = min(currentTime, noteEnd);
                     const xStart = this.getX(start, currentTime);
                     const xEnd = this.getX(end, currentTime);
                     const left = min(xStart, xEnd);
                     const width = max(2, abs(xStart - xEnd));
-                    const y = this.getLaneY(name, event.midi);
+                    const y = this.getLaneY(name, ev.midi);
                     const thickness = this.getTrackThickness(name);
                     const eventColor = this.getEventColor(name, event);
 
@@ -808,7 +770,7 @@ export class VisualizerEngine {
                     ctx.fillStyle = eventColor;
                     ctx.fillRect(left, y - thickness / 2, width, thickness);
 
-                    if (event.time <= currentTime && noteEnd >= currentTime) {
+                    if (ev.time <= currentTime && noteEnd >= currentTime) {
                         hasActive = true;
                         activeX = xEnd;
                         activeY = y;
@@ -838,13 +800,7 @@ export class VisualizerEngine {
         }
     }
 
-    /**
-     * @param {number} currentTime
-     * @param {number} bpm
-     * @param {any} tsConfig
-     * @returns {void}
-     */
-    render(currentTime, bpm, tsConfig) {
+    render(currentTime: number, bpm: number, tsConfig: unknown): void {
         if (!this.themeCache || !this.width || !this.height) {
             return;
         }
@@ -857,14 +813,14 @@ export class VisualizerEngine {
         const h = this.height;
         const minTime = currentTime - this.windowSize;
 
-        ctx.drawImage(this.staticCanvas, 0, 0, this.width, this.height);
+        ctx.drawImage(this.staticCanvas as CanvasImageSource, 0, 0, this.width, this.height);
 
         this.drawVerticalGrid(currentTime, bpm, tsConfig);
         this.drawChordLaneBackdrop(currentTime, minTime);
         this.drawFillOverlay();
         this.drawTrackNotes(currentTime, minTime);
 
-        ctx.strokeStyle = this.themeCache.playheadColor || 'rgba(255, 255, 255, 0.3)';
+        ctx.strokeStyle = (this.themeCache?.playheadColor as string) || 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(this.labelRailWidth, 0);
@@ -872,7 +828,7 @@ export class VisualizerEngine {
         ctx.stroke();
     }
 
-    clear() {
+    clear(): void {
         for (const name in this.tracks) {
             this.tracks[name].history.clear();
             this.tracks[name].currentNoteLabel = '';

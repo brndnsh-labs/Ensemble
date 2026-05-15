@@ -462,7 +462,7 @@ export function getBassNote(
         return null;
     }
 
-    const isSameAsPrev = (/** @type {number|null} */ midi) => prevMidi && midi === prevMidi;
+    const isSameAsPrev = (/** @type {number|null} */ midi) => !!prevMidi && midi === prevMidi;
     const kickInst = (groove.instruments || []).find((i) => i.name === 'Kick');
     const hasKickTrigger = !!(
         kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
@@ -583,7 +583,7 @@ export function getBassNote(
         result,
         stepInMeasure % ((ts.grouping?.[0] || ts.beats) * ts.stepsPerBeat) === 0,
         hasKickTrigger,
-        kickInst,
+        kickInst ?? null,
     );
     if (styleResult !== undefined) {
         return styleResult;

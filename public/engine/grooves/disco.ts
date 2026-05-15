@@ -1,6 +1,8 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     getPhraseSeed,
     INTENSITY_BANDS,
     roll,
@@ -15,17 +17,13 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Disco.
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
+ * 0: Classic 4-on-the-floor, 1: Shimmering hats, 2: Syncopated interplay, 3: Octave Percussion
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
+export function getMotif(seed: number, complexity: number, intensity = 1.0): number {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Pure 4-on-the-floor foundation
     }
 
-    // Stable seed ranges for core motifs
     if (seed < 0.25) {
         return 0; // Classic is always an option
     }
@@ -33,7 +31,6 @@ export function getMotif(seed, complexity, intensity = 1.0) {
         return 1; // Shimmering hats reachable at mid intensity
     }
 
-    // For seeds > 0.55, allow high-energy styles at higher intensity
     if (intensity < 0.7) {
         return seed < 0.8 ? 0 : 1;
     }
@@ -44,16 +41,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3; // Octave Percussion
 }
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         isBeatStart,
@@ -78,7 +71,6 @@ export function applyOverrides(context, state) {
     if (context.inst.name === 'Kick') {
         shouldPlay = isBeatStart;
         if (shouldPlay) {
-            // Scale velocity to drive the energy
             velocity =
                 beatIndex === 0
                     ? scaleVelocity(1.2, intensity, 0.15)
@@ -94,7 +86,6 @@ export function applyOverrides(context, state) {
 
         // --- Snare Ghosts & Turnarounds ---
         if (intensity > 0.7 && activeMotif >= 2) {
-            // Occasional ghost note on "a" of the last beat
             if (isAOfBeat && beatIndex >= 3 && roll(0.4, intensity)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
@@ -102,7 +93,6 @@ export function applyOverrides(context, state) {
         }
 
         if (isTurnaround && intensity > 0.65) {
-            // Energetic "Kick-Snare-Crash" finish on the last step of the bar
             if (loopStep === stepsPerBar - 1) {
                 shouldPlay = true;
                 velocity = 1.3;
@@ -155,13 +145,11 @@ export function applyOverrides(context, state) {
             if (isEighthNote) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.8, intensity, 0.2);
-                // Alternate High/Low cowbell sounds based on beat index
                 soundName =
                     isBeatStart && (beatIndex === 0 || beatIndex === 2)
                         ? 'CowbellHigh'
                         : 'CowbellLow';
             }
-            // Add extra syncopation at peak intensity
             if (intensity > 0.9 && !isEighthNote && roll(0.3)) {
                 shouldPlay = true;
                 velocity = 0.6;
@@ -176,7 +164,6 @@ export function applyOverrides(context, state) {
             soundName = 'Sidestick';
         }
         if (context.inst.name === 'Open') {
-            // Ensure the open hat has that "shimmer"
             velocity *= 1.15;
         }
         if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {

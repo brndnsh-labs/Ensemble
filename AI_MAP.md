@@ -61,7 +61,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Patterns |
 | :--- | :--- | :--- |
-| `public/engine/bass-styles.js` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
+| `public/engine/bass-styles.ts` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
 | `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
 | `public/engine/soloist-config.js` | Style definitions and influence pools. | `STYLE_CONFIG` |
 | `public/engine/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
@@ -74,7 +74,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/scheduler-core.js` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
 | `public/engine/midi-scheduler.ts` | MIDI scheduling logic. | `dispatchMidiDrum`, `dispatchMidiSoloist` |
 | `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
-| `public/engine/engine.js` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
+| `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices). | `rampGain`, `killActiveVoices` |
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
@@ -106,7 +106,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/synth-bass.ts` | Sub-bass and Growl synthesis. |
 | `public/engine/synth-chords.ts` | Polyphonic piano/pad synthesis. |
 | `public/engine/synth-drums.js` | Procedural percussion synthesis. |
-| `public/engine/synth-harmonies.js` | Background "Stab" and "Pad" synthesis. |
+| `public/engine/synth-harmonies.ts` | Background "Stab" and "Pad" synthesis. |
 | `public/engine/synth-soloist.js` | Lead instrument synthesis and glides. |
 
 ## Data & Configuration
@@ -164,9 +164,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/persistence.ts` | LocalStorage session saving. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/sharing.ts` | URL-based song sharing. | `getShareURL` |
-| `public/utils.js` | General-purpose musical and math utilities. | `getFrequency` |
+| `public/utils.ts` | General-purpose musical and math utilities. | `getFrequency` |
 | `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
-| `public/visualizer-engine.js` | High-performance Canvas rendering logic. | `VisualizerEngine` |
+| `public/visualizer-engine.ts` | High-performance Canvas rendering logic. | `VisualizerEngine` |
 | `public/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
 
 ## Infrastructure & Lifecycle (Internal)

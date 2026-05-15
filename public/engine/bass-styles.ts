@@ -1,29 +1,18 @@
 import { REGGAE_RIDDIMS } from '../config.js';
+import type { EnsembleState, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 
-/**
- * @param {string} style
- * @param {number} step
- * @param {number} stepInChord
- * @param {import('../types.js').StepInfo | null} stepInfo
- * @param {any} ts
- * @param {number} intBeat
- * @param {boolean} isQuarter
- * @param {boolean} is8th
- * @param {import('../types.js').EnsembleState['playback']} playback
- * @param {import('../types.js').EnsembleState['groove']} groove
- */
 export function checkBassActiveStyle(
-    style,
-    step,
-    stepInChord,
-    stepInfo,
-    ts,
-    intBeat,
-    isQuarter,
-    is8th,
-    playback,
-    groove,
+    style: string,
+    step: number,
+    stepInChord: number,
+    stepInfo: StepInfo | null,
+    ts: { stepsPerBeat: number; beats: number },
+    intBeat: number,
+    isQuarter: boolean,
+    is8th: boolean,
+    playback: EnsembleState['playback'],
+    groove: EnsembleState['groove'],
 ) {
     if (style === 'whole') {
         return stepInChord === 0;
@@ -167,77 +156,57 @@ export function checkBassActiveStyle(
     return false;
 }
 
-/**
- * @param {string} style
- * @param {any} chord
- * @param {any} nextChord
- * @param {number} step
- * @param {number} stepInChord
- * @param {import('../types.js').StepInfo | null} _stepInfo
- * @param {any} context
- * @param {any} ts
- * @param {number} stepsPerMeasure
- * @param {number} intBeat
- * @param {boolean} _isQuarter
- * @param {boolean} _is8th
- * @param {boolean} isBeatStart
- * @param {boolean} isDownbeat
- * @param {number} stepInMeasure
- * @param {number} _stepInBeat
- * @param {number} baseRoot
- * @param {number} _prevFreq
- * @param {number | null} prevMidi
- * @param {number} _centerMidi
- * @param {number} absMin
- * @param {number} absMax
- * @param {number[]} scale
- * @param {import('../types.js').EnsembleState['playback']} playback
- * @param {import('../types.js').EnsembleState['groove']} groove
- * @param {import('../types.js').EnsembleState['soloist']} soloist
- * @param {number} intensity
- * @param {number} velocity
- * @param {boolean} isSoloistBusy
- * @param {number} beatsInChord
- * @param {Function} result
- * @param {boolean} isGroupStart
- * @param {boolean} hasKickTrigger
- * @param {any} kickInst
- */
 export function getBassNoteStyle(
-    style,
-    chord,
-    nextChord,
-    step,
-    stepInChord,
-    _stepInfo,
-    context,
-    ts,
-    stepsPerMeasure,
-    intBeat,
-    _isQuarter,
-    _is8th,
-    isBeatStart,
-    isDownbeat,
-    stepInMeasure,
-    _stepInBeat,
-    baseRoot,
-    _prevFreq,
-    prevMidi,
-    _centerMidi,
-    absMin,
-    absMax,
-    scale,
-    playback,
-    groove,
-    soloist,
-    intensity,
-    velocity,
-    isSoloistBusy,
-    beatsInChord,
-    result,
-    isGroupStart,
-    hasKickTrigger,
-    kickInst,
+    style: string,
+    chord: {
+        rootMidi: number;
+        quality: string;
+        intervals: number[];
+        bassMidi?: number | null;
+    },
+    nextChord: { rootMidi: number; quality: string; bassMidi?: number | null } | null,
+    step: number,
+    stepInChord: number,
+    _stepInfo: StepInfo | null,
+    context: {
+        withOctaveJump: (midi: number) => number;
+        isSameAsPrev: (midi: number) => boolean;
+        clampAndNormalize: (midi: number) => number;
+        normalizeToRange: (midi: number) => number;
+    },
+    ts: { stepsPerBeat: number; beats: number },
+    stepsPerMeasure: number,
+    intBeat: number,
+    _isQuarter: boolean,
+    _is8th: boolean,
+    isBeatStart: boolean,
+    isDownbeat: boolean,
+    stepInMeasure: number,
+    _stepInBeat: number,
+    baseRoot: number,
+    _prevFreq: number,
+    prevMidi: number | null,
+    _centerMidi: number,
+    absMin: number,
+    absMax: number,
+    scale: number[],
+    playback: EnsembleState['playback'],
+    groove: EnsembleState['groove'],
+    soloist: EnsembleState['soloist'],
+    intensity: number,
+    velocity: number,
+    isSoloistBusy: boolean,
+    beatsInChord: number,
+    result: (
+        freq: number,
+        dur?: number | null,
+        vel?: number,
+        ghost?: number,
+        bend?: number,
+    ) => { timingOffset: number; [key: string]: unknown },
+    isGroupStart: boolean,
+    hasKickTrigger: boolean,
+    kickInst: { steps: number[] } | null,
 ) {
     const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange } = context;
     if (style === 'whole') {
@@ -408,7 +377,7 @@ export function getBassNoteStyle(
                     getFrequency(clampAndNormalize(note)),
                     0.3,
                     velocity * (isGhost ? 0.7 : 1.0),
-                    isGhost,
+                    isGhost ? 1 : 0,
                 );
                 // Tight, aggressive timing
                 res.timingOffset -= 0.002;
@@ -434,7 +403,7 @@ export function getBassNoteStyle(
         }
 
         // 1. Kick Locking: Mirror the drummer's kick pattern at high complexity
-        if (hasKickTrigger && (playback.complexity > 0.6 || intensity > 0.7)) {
+        if (hasKickTrigger && kickInst && (playback.complexity > 0.6 || intensity > 0.7)) {
             const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
             if (kickStepVal > 0) {
                 const kickVel = kickStepVal === 2 ? 1.25 : 1.1;
@@ -534,14 +503,14 @@ export function getBassNoteStyle(
 
         // 3. Syncopated "Pushes" & "Gallops" (16ths)
         if (stepInBeat % 2 !== 0) {
-            const isSoloistBusy = soloist.enabled && (soloist.busySteps || 0) > 0;
+            const isSoloistBusyLocal = soloist.enabled && (soloist.busySteps || 0) > 0;
 
             // High complexity "Pop" on the 'a'
             if (
                 stepInBeat === 3 &&
                 playback.complexity > 0.7 &&
                 Math.random() < 0.3 + intensity * 0.3 &&
-                !isSoloistBusy
+                !isSoloistBusyLocal
             ) {
                 const note = baseRoot + 12;
                 const finalNote = note > absMax ? baseRoot : note;
@@ -549,8 +518,8 @@ export function getBassNoteStyle(
             }
 
             // Dead-note/Ghost chucks to maintain engine
-            const chuckProb = (isSoloistBusy ? 0.1 : 0.2) + intensity * 0.4;
-            if (Math.random() < chuckProb && !isSoloistBusy) {
+            const chuckProb = (isSoloistBusyLocal ? 0.1 : 0.2) + intensity * 0.4;
+            if (Math.random() < chuckProb && !isSoloistBusyLocal) {
                 // Usually repeat root or previous note as a ghost
                 return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, 1);
             }
@@ -560,7 +529,7 @@ export function getBassNoteStyle(
                 playback.complexity > 0.7 &&
                 intensity > 0.6 &&
                 Math.random() < 0.3 &&
-                !isSoloistBusy
+                !isSoloistBusyLocal
             ) {
                 const hammerNote = scale.includes(2) ? baseRoot + 2 : baseRoot + 1;
                 return result(getFrequency(clampAndNormalize(hammerNote)), 0.2, 1.1);
@@ -577,7 +546,6 @@ export function getBassNoteStyle(
         return null;
     }
 
-    // --- ROCCO STYLE (Machine-Gun 16ths) ---
     // --- ROCCO STYLE (Machine-Gun 16ths) ---
     if (style === 'rocco') {
         const stepInBeat = step % ts.stepsPerBeat;
@@ -640,7 +608,7 @@ export function getBassNoteStyle(
                 // Mostly muted/ghosts
                 // At very high intensity, some might become short staccato tones
                 const isTone = intensity > 0.8 && Math.random() < 0.3;
-                return result(getFrequency(baseRoot), 0.5, isTone ? 0.9 : 0.6, !isTone);
+                return result(getFrequency(baseRoot), 0.5, isTone ? 0.9 : 0.6, isTone ? 0 : 1);
             }
         }
         return null;
@@ -723,8 +691,10 @@ export function getBassNoteStyle(
             selectedRiddim = 'One Drop';
         }
 
-        const riddim = /** @type {any} */ (REGGAE_RIDDIMS)[selectedRiddim];
-        const match = riddim.find((/** @type {any} */ r) => r[0] === stepInMeasure);
+        const riddim = (
+            REGGAE_RIDDIMS as unknown as Record<string, [number, number, number, number][]>
+        )[selectedRiddim];
+        const match = riddim.find((r) => r[0] === stepInMeasure);
 
         if (match) {
             const [, interval, vel, dur] = match;
@@ -840,7 +810,7 @@ export function getBassNoteStyle(
             );
         }
 
-        // --- NEW: Jazz Path-Note Logic (Beat 2) ---
+        // --- Jazz Path-Note Logic (Beat 2) ---
         if (isJazz && isBeatStart && intBeat === 1) {
             const nextTarget = nextChord ? nextChord.rootMidi : baseRoot;
             const targetRoot = normalizeToRange(nextTarget);
@@ -848,8 +818,8 @@ export function getBassNoteStyle(
             // Find a scale note that moves towards the target
             const candidates = scale
                 .map((ivl) => normalizeToRange(baseRoot + ivl))
-                .filter((midi) => {
-                    const diff = Math.abs(midi - (prevMidi || baseRoot));
+                .filter((midiNote) => {
+                    const diff = Math.abs(midiNote - (prevMidi || baseRoot));
                     return diff > 0 && diff <= 5; // Within a reasonable distance
                 });
 

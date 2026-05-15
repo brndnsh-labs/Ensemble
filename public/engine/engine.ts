@@ -1,5 +1,7 @@
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
+import type { GlobalContext } from '../state/playback.js';
+import type { EnsembleState } from '../types.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
@@ -31,37 +33,40 @@ export {
     updateSustain,
 };
 
-/** @type {boolean | null} */
-let isChromium = null;
+let isChromium: boolean | null = null;
 export function _resetChromiumCheck() {
     isChromium = null;
 }
 
-/**
- * Initializes the Web Audio context and global audio nodes.
- * Must be called in response to a user gesture.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {{audioContext?: AudioContext, enableWatchdog?: boolean}} [options]
- */
-export function initAudio(state, options = {}) {
+export function initAudio(
+    state: EnsembleState,
+    options: { audioContext?: AudioContext; enableWatchdog?: boolean } = {},
+) {
     const { playback, groove, chords, bass, soloist, harmony, midi } = state;
     const providedAudioContext = options.audioContext;
     const usingOfflineContext = Boolean(
         providedAudioContext &&
-            typeof (/** @type {any} */ (providedAudioContext).startRendering) === 'function',
+            typeof (providedAudioContext as unknown as { startRendering?: unknown })
+                .startRendering === 'function',
     );
     const enableWatchdog = options.enableWatchdog ?? !usingOfflineContext;
 
     if (!playback.audio || playback.audio.state === 'closed' || providedAudioContext) {
-        if (!providedAudioContext && /** @type {any} */ (navigator).audioSession) {
-            /** @type {any} */ (navigator).audioSession.type = 'playback';
+        if (
+            !providedAudioContext &&
+            (navigator as unknown as { audioSession?: { type: string } }).audioSession
+        ) {
+            (navigator as unknown as { audioSession: { type: string } }).audioSession.type =
+                'playback';
         }
 
         if (providedAudioContext) {
             playback.audio = providedAudioContext; // @direct-mutation
         } else {
             const AudioContextClass =
-                window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+                window.AudioContext ||
+                (window as unknown as { webkitAudioContext: typeof AudioContext })
+                    .webkitAudioContext;
             playback.audio = new AudioContextClass(); // @direct-mutation
         }
 
@@ -90,9 +95,7 @@ export function initAudio(state, options = {}) {
             audioWatchdog.attachToMaster(playback.masterGain, playback);
         }
         if (enableWatchdog) {
-            audioWatchdog.onRecover = async (
-                /** @type {import('../state/playback.js').GlobalContext} */ pbState,
-            ) => {
+            audioWatchdog.onRecover = async (pbState: GlobalContext) => {
                 await killAllNotes(state);
                 if (pbState.audio) {
                     pbState.audio.close().then(() => {
@@ -159,7 +162,7 @@ export function initAudio(state, options = {}) {
             { name: 'drums', state: groove, mult: MIXER_GAIN_MULTIPLIERS.drums },
         ];
 
-        modules.forEach((/** @type {any} */ m) => {
+        modules.forEach((m) => {
             if (!playback.audio || !playback.masterGain) {
                 return;
             }
@@ -278,7 +281,7 @@ export function initAudio(state, options = {}) {
                 playback.drumsEQ = drumsHP; // @direct-mutation
             }
 
-            /** @type {any} */ (playback)[`${m.name}Gain`] = gainNode;
+            (playback as unknown as Record<string, GainNode>)[`${m.name}Gain`] = gainNode;
 
             const reverbGain = playback.audio.createGain();
             const targetReverb = Math.max(0.0001, m.state.reverb);
@@ -288,20 +291,17 @@ export function initAudio(state, options = {}) {
                 playback.audio.currentTime + 0.04,
             );
             gainNode.connect(reverbGain);
-            reverbGain.connect(
-                playback.reverbPreFilter || /** @type {any} */ (playback.reverbNode),
-            );
-            /** @type {any} */ (playback)[`${m.name}Reverb`] = reverbGain;
+            reverbGain.connect(playback.reverbPreFilter || (playback.reverbNode as AudioNode));
+            (playback as unknown as Record<string, GainNode>)[`${m.name}Reverb`] = reverbGain;
         });
 
-        const bufSize = playback.audio.sampleRate * 2;
-        /** @type {any} */
-        const buffer = playback.audio.createBuffer(1, bufSize, playback.audio.sampleRate);
+        const bufSize = playback.audio!.sampleRate * 2;
+        const buffer = playback.audio!.createBuffer(1, bufSize, playback.audio!.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufSize; i++) {
             data[i] = Math.random() * 2 - 1;
         }
-        /** @type {any} */ (groove.audioBuffers).noise = buffer;
+        (groove.audioBuffers as unknown as Record<string, AudioBuffer>).noise = buffer;
     }
     if (playback.audio && playback.audio.state === 'suspended') {
         if (playback.audio) {
@@ -310,11 +310,7 @@ export function initAudio(state, options = {}) {
     }
 }
 
-/**
- * Kill the chord bus.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killChordBus(state) {
+export function killChordBus(state: EnsembleState) {
     const { playback } = state;
     if (playback.chordsGain && playback.audio) {
         playback.chordsGain.gain.cancelScheduledValues(playback.audio.currentTime);
@@ -322,11 +318,7 @@ export function killChordBus(state) {
     }
 }
 
-/**
- * Kill the bass bus.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killBassBus(state) {
+export function killBassBus(state: EnsembleState) {
     const { playback } = state;
     if (playback.bassGain && playback.audio) {
         playback.bassGain.gain.cancelScheduledValues(playback.audio.currentTime);
@@ -334,11 +326,7 @@ export function killBassBus(state) {
     }
 }
 
-/**
- * Kill the soloist bus.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killSoloistBus(state) {
+export function killSoloistBus(state: EnsembleState) {
     const { playback } = state;
     if (playback.soloistGain && playback.audio) {
         playback.soloistGain.gain.cancelScheduledValues(playback.audio.currentTime);
@@ -346,11 +334,7 @@ export function killSoloistBus(state) {
     }
 }
 
-/**
- * Kill the harmony bus.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killHarmonyBus(state) {
+export function killHarmonyBus(state: EnsembleState) {
     const { playback } = state;
     if (playback.harmoniesGain && playback.audio) {
         playback.harmoniesGain.gain.cancelScheduledValues(playback.audio.currentTime);
@@ -358,11 +342,7 @@ export function killHarmonyBus(state) {
     }
 }
 
-/**
- * Kill the drum bus.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function killDrumBus(state) {
+export function killDrumBus(state: EnsembleState) {
     const { playback } = state;
     if (playback.drumsGain && playback.audio) {
         playback.drumsGain.gain.cancelScheduledValues(playback.audio.currentTime);
@@ -370,11 +350,7 @@ export function killDrumBus(state) {
     }
 }
 
-/**
- * Kills all instrument notes immediately.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export async function killAllNotes(state) {
+export async function killAllNotes(state: EnsembleState) {
     const { playback } = state;
     if (!playback.audio) {
         return;
@@ -386,11 +362,7 @@ export async function killAllNotes(state) {
     killHarmonyNote(state);
 }
 
-/**
- * Restores instrument buses to their state-defined volumes.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function restoreGains(state) {
+export function restoreGains(state: EnsembleState) {
     const { playback, chords, bass, soloist, harmony, groove, midi } = state;
     if (!playback.audio) {
         return;
@@ -423,7 +395,7 @@ export function restoreGains(state) {
             name: 'drums',
         },
     ];
-    modules.forEach((/** @type {any} */ m) => {
+    modules.forEach((m) => {
         if (m.node && playback.audio) {
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
@@ -439,11 +411,7 @@ export function restoreGains(state) {
 let lastAudioTime = 0;
 let lastPerfTime = 0;
 
-/**
- * Unified getter for the visualizer clock.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- */
-export function getVisualTime(state) {
+export function getVisualTime(state: EnsembleState): number {
     const { playback } = state;
     if (!playback.audio) {
         return 0;

@@ -2,6 +2,8 @@ import {
     applyStandardBase,
     binaryTier,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     makeMotifSelector,
     roll,
     scaleVelocity,
@@ -16,7 +18,6 @@ export const config = {
 /**
  * Maps intensity to motif complexity for Ska-Punk.
  * 0: Classic Ska, 1: Driving 2-Step, 2: Double-Time/Skate Punk, 3: D-Beat
- * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
     binaryTier(0.6, 0.6),
@@ -25,16 +26,12 @@ export const getMotif = makeMotifSelector([
     },
 ]);
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         drumComplexity,
@@ -62,8 +59,6 @@ export function applyOverrides(context, state) {
         const isOpenLane = context.inst.name === 'Open';
         shouldPlay = false;
 
-        // The Skank should feel tight and choked first.
-        // Use the Open lane as an accent, not a second mandatory voice.
         if (isOffbeat) {
             if (!isOpenLane) {
                 shouldPlay = true;

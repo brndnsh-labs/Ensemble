@@ -1,11 +1,11 @@
 import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
+import type { Section } from './state/arranger.js';
+import type { StepInfo } from './types.js';
 
 /**
  * Creates a seeded pseudo-random number generator (Mulberry32).
- * @param {number|string} seed - The seed value.
- * @returns {() => number} A function that returns a random number between 0 and 1.
  */
-export function createPRNG(seed) {
+export function createPRNG(seed: number | string): () => number {
     let s = typeof seed === 'string' ? hashString(seed) : seed;
     return () => {
         s |= 0;
@@ -18,10 +18,8 @@ export function createPRNG(seed) {
 
 /**
  * Simple string hash function (djb2).
- * @param {string} str
- * @returns {number}
  */
-export function hashString(str) {
+export function hashString(str: string): number {
     let hash = 5381;
     for (let i = 0; i < str.length; i++) {
         hash = (hash << 5) + hash + str.charCodeAt(i);
@@ -31,9 +29,8 @@ export function hashString(str) {
 
 /**
  * Generates a random 6-character hex string to act as a default seed.
- * @returns {string}
  */
-export function generateRandomSeed() {
+export function generateRandomSeed(): string {
     // 🛡️ Sentinel: Security Enhancement - Cryptographically Secure RNG
     // Fallback to Math.random() is maintained for environments without crypto.
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -49,22 +46,15 @@ export function generateRandomSeed() {
 
 /**
  * Normalizes a note name (e.g., C# to Db) based on the project's map.
- * @param {string} k - The note name to normalize.
- * @returns {string} The normalized note name.
  */
-export function normalizeKey(k) {
-    /** @type {any} */
-    const map = ENHARMONIC_MAP;
-    return map[k] || k;
+export function normalizeKey(k: string): string {
+    return (ENHARMONIC_MAP as Record<string, string>)[k] || k;
 }
 
 /**
  * Transposes a note-name key by semitones using the app's normalized spelling policy.
- * @param {string} key
- * @param {number} semitoneShift
- * @returns {string}
  */
-export function transposeKeyName(key, semitoneShift) {
+export function transposeKeyName(key: string, semitoneShift: number): string {
     const normalized = normalizeKey(key);
     const currentIndex = KEY_ORDER.indexOf(normalized);
     if (currentIndex === -1) {
@@ -82,10 +72,8 @@ const REGEX_BACKTICK = /`/g;
 
 /**
  * Escapes unsafe HTML characters to prevent XSS.
- * @param {string} str
- * @returns {string}
  */
-export function escapeHTML(str) {
+export function escapeHTML(str: string): string {
     if (str === null || str === undefined) {
         return '';
     }
@@ -107,10 +95,8 @@ const REGEX_DANGEROUS = /[<>"=`]/g;
 /**
  * Strips dangerous characters from musical input strings to prevent XSS.
  * Allows common musical symbols but removes HTML/Script vectors.
- * @param {string} str
- * @returns {string}
  */
-export function stripDangerousChars(str) {
+export function stripDangerousChars(str: string): string {
     if (!str) {
         return '';
     }
@@ -129,12 +115,9 @@ for (let i = 0; i < 128; i++) {
 
 /**
  * Converts a MIDI note number to a frequency in Hertz.
- * @param {number} midi - The MIDI note number.
- * @returns {number} The frequency in Hz.
  */
-export function getFrequency(midi) {
+export function getFrequency(midi: number): number {
     // Fast path: lookup from cache if within 0-127 and integer
-    // Float32Array returns undefined for out-of-bounds or non-integer indices
     const freq = FREQUENCY_CACHE[midi];
     if (freq !== undefined) {
         return freq;
@@ -147,8 +130,7 @@ export function getFrequency(midi) {
 const NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 // Pre-calculate note names and octaves for standard MIDI range (0-127) to avoid object allocation
-/** @type {Array<{name: string, octave: number}>} */
-const MIDI_NOTE_CACHE = new Array(128);
+const MIDI_NOTE_CACHE: Array<{ name: string; octave: number }> = new Array(128);
 for (let i = 0; i < 128; i++) {
     MIDI_NOTE_CACHE[i] = {
         name: NOTE_NAMES[i % 12],
@@ -158,10 +140,8 @@ for (let i = 0; i < 128; i++) {
 
 /**
  * Converts a MIDI note number to an object containing its note name and octave.
- * @param {number} midi - The MIDI note number.
- * @returns {{name: string, octave: number}}
  */
-export function midiToNote(midi) {
+export function midiToNote(midi: number): { name: string; octave: number } {
     if (typeof midi !== 'number' || !Number.isFinite(midi)) {
         return { name: '---', octave: 0 };
     }
@@ -182,10 +162,8 @@ export function midiToNote(midi) {
 
 /**
  * Converts a frequency in Hertz to a MIDI note number.
- * @param {number} freq - The frequency in Hz.
- * @returns {number | null} The MIDI note number.
  */
-export function getMidi(freq) {
+export function getMidi(freq: number): number | null {
     if (!freq || freq <= 0 || !Number.isFinite(freq)) {
         return null;
     }
@@ -195,10 +173,9 @@ export function getMidi(freq) {
 /**
  * Generates a unique ID for sections.
  */
-export function generateId() {
+export function generateId(): string {
     // 🛡️ Sentinel: Security Enhancement - Cryptographically Secure UUID
     // Date.now() + Math.random() is susceptible to collisions and is not secure.
-    // We prefix with 'id-' to ensure the ID is a valid CSS selector and DOM id.
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return `id-${crypto.randomUUID()}`;
     }
@@ -213,12 +190,8 @@ export function generateId() {
 /**
  * Calculates MIDI notes for specific scale degrees (Full 10-note scale)
  * based on a given chord object.
- *
- * @param {any} chordObj - The chord object containing rootMidi and quality.
- * @param {number} [baseOctave] - The default octave to use (default: 4 for Soloist).
- * @returns {number[]} Array of 10 MIDI note numbers.
  */
-export function getChordMidiNotes(chordObj, baseOctave = 4) {
+export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
     if (!chordObj || typeof chordObj.rootMidi !== 'number' || !Number.isFinite(chordObj.rootMidi)) {
         return [];
     }
@@ -246,10 +219,8 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         quality === '13' ||
         quality.startsWith('7');
 
-    /** @type {number[]} */
-    let safeIntervals = [0, 4, 7, 11, 14];
-    /** @type {number[]} */
-    let colorIntervals = [2, 5, 9, 12, 16];
+    let safeIntervals: number[] = [0, 4, 7, 11, 14];
+    let colorIntervals: number[] = [2, 5, 9, 12, 16];
 
     if (isMinorQuality) {
         safeIntervals = [0, 3, 7, 10, 14];
@@ -265,18 +236,10 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         colorIntervals = [2, 5, 9, 12, 16];
     }
 
-    // rootMidi from the engine is usually based around C4 = 60
-    // We adjust it based on the baseOctave parameter
-    // Assuming rootMidi is in the 0-11 range + some octave base, we normalize it to pc
     const pc = chordObj.rootMidi % 12;
-    const baseMidi = (baseOctave + 1) * 12 + pc; // C4 is MIDI 60, so (4+1)*12 = 60
+    const baseMidi = (baseOctave + 1) * 12 + pc;
 
-    /**
-     * @param {number[]} source
-     * @param {number} targetCount
-     * @returns {number[]}
-     */
-    const expandIntervals = (source, targetCount) => {
+    const expandIntervals = (source: number[], targetCount: number): number[] => {
         const unique = [...new Set(source.filter(Number.isFinite))].sort((a, b) => a - b);
         if (unique.length === 0) {
             return [];
@@ -298,22 +261,21 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
         return result.sort((a, b) => a - b);
     };
 
-    const parsedIntervals = Array.isArray(chordObj.intervals)
+    const parsedIntervals: number[] = Array.isArray(chordObj.intervals)
         ? chordObj.intervals.filter(Number.isFinite)
         : [];
     if (parsedIntervals.length > 0) {
         safeIntervals = expandIntervals(parsedIntervals, 5);
         const remainingParsed = parsedIntervals.filter(
-            (/** @type {number} */ interval) => !safeIntervals.includes(interval),
+            (interval: number) => !safeIntervals.includes(interval),
         );
         const mergedColors = [...remainingParsed, ...colorIntervals].filter(
-            (/** @type {number} */ interval) => !safeIntervals.includes(interval),
+            (interval: number) => !safeIntervals.includes(interval),
         );
         colorIntervals = expandIntervals(mergedColors, 5);
     }
 
-    /** @type {number[]} */
-    let notes = [
+    let notes: number[] = [
         ...safeIntervals.map((interval) => baseMidi + interval),
         ...colorIntervals.map((interval) => baseMidi + interval),
     ];
@@ -349,30 +311,23 @@ export function getChordMidiNotes(chordObj, baseOctave = 4) {
 
 /**
  * Compresses the sections array into a Base64 string, handling Unicode.
- * @param {Array<import('./state/arranger.js').Section>} sections
- * @returns {string}
  */
-export function compressSections(sections) {
-    const minified = sections.map((/** @type {any} */ s) => {
-        const m = { l: s.label, v: s.value };
+export function compressSections(sections: Section[]): string {
+    const minified = sections.map((s) => {
+        const m: Record<string, unknown> = { l: s.label, v: s.value };
         if (s.key) {
-            // @ts-expect-error
             m.k = s.key;
         }
         if (typeof s.isMinor === 'boolean') {
-            // @ts-expect-error
             m.m = s.isMinor ? 1 : 0;
         }
         if (s.repeat && s.repeat > 1) {
-            // @ts-expect-error
             m.r = s.repeat;
         }
         if (s.timeSignature) {
-            // @ts-expect-error
             m.t = s.timeSignature;
         }
         if (s.seamless) {
-            // @ts-expect-error
             m.s = 1;
         }
         return m;
@@ -385,10 +340,8 @@ export function compressSections(sections) {
 
 /**
  * Decompresses the Base64 string back into sections, handling Unicode.
- * @param {string} str
- * @returns {Array<import('./state/arranger.js').Section>}
  */
-export function decompressSections(str) {
+export function decompressSections(str: string): Section[] {
     try {
         if (!str || typeof str !== 'string') {
             throw new Error('Invalid input');
@@ -409,7 +362,7 @@ export function decompressSections(str) {
         // Limit number of sections to prevent DoS
         const safeMinified = minified.slice(0, 500);
 
-        return safeMinified.map((s, i) => {
+        return safeMinified.map((s: any, i: number) => {
             // Sanitize label to prevent XSS (even though likely handled by UI framework, defense in depth)
             let safeLabel = escapeHTML(s.l || `Section ${i + 1}`);
             if (safeLabel.length > 100) {
@@ -443,10 +396,8 @@ export function decompressSections(str) {
 
 /**
  * Calculates the number of 16th-note (or equivalent) steps per measure for a given time signature.
- * @param {string} ts - Time signature (e.g. "4/4", "3/4", "6/8").
- * @returns {number}
  */
-export function getStepsPerMeasure(ts) {
+export function getStepsPerMeasure(ts: string): number {
     if (ts === '2/4') {
         return 8;
     }
@@ -474,12 +425,11 @@ export function getStepsPerMeasure(ts) {
 /**
  * Optimized binary search for arrays containing objects with `start` and `end` properties.
  * Useful for fast O(log N) lookups in `arranger.stepMap`, `sectionMap`, and `measureMap`.
- *
- * @param {Array<{start: number, end: number}>} mapArray - A sorted array of range objects.
- * @param {number} step - The global step to find.
- * @returns {number} The index of the matching element, or -1 if not found.
  */
-export function binarySearchMapIndex(mapArray, step) {
+export function binarySearchMapIndex(
+    mapArray: Array<{ start: number; end: number }>,
+    step: number,
+): number {
     if (!mapArray || mapArray.length === 0) {
         return -1;
     }
@@ -500,27 +450,23 @@ export function binarySearchMapIndex(mapArray, step) {
     return -1;
 }
 
-/**
- * @template T
- * @param {Array<T & {start: number, end: number}>} mapArray
- * @param {number} step
- * @returns {T | null}
- */
-export function binarySearchMap(mapArray, step) {
+export function binarySearchMap<T extends { start: number; end: number }>(
+    mapArray: T[],
+    step: number,
+): T | null {
     const index = binarySearchMapIndex(mapArray, step);
     return index !== -1 ? mapArray[index] : null;
 }
 
 /**
  * Checks if a specific step falls within the "turnaround" (final part) of its section.
- *
- * @param {number} step - Current global step.
- * @param {Array<{start: number, end: number}>} sectionMap - Map of section boundaries.
- * @param {number} stepsPerBar - Steps per measure.
- * @param {number} [thresholdBars=1] - Number of measures before the section end to consider as turnaround.
- * @returns {boolean}
  */
-export function isSectionTurnaround(step, sectionMap, stepsPerBar, thresholdBars = 1) {
+export function isSectionTurnaround(
+    step: number,
+    sectionMap: Array<{ start: number; end: number }>,
+    stepsPerBar: number,
+    thresholdBars = 1,
+): boolean {
     if (!sectionMap || sectionMap.length === 0) {
         return false;
     }
@@ -545,20 +491,19 @@ export function isSectionTurnaround(step, sectionMap, stepsPerBar, thresholdBars
 
 /**
  * Returns detailed structural information about a specific step in a measure.
- * @param {number} step - The global step counter.
- * @param {any} tsConfig - The global time signature configuration (fallback).
- * @param {Array<any>} [measureMap] - Optional map of measure boundaries for variable time signatures.
- * @param {any} [allTSConfigs] - Map of all available time signature configurations.
- * @returns {import('./types.js').StepInfo}
  */
-export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
+export function getStepInfo(
+    step: number,
+    tsConfig: any,
+    measureMap?: any[],
+    allTSConfigs?: any,
+): StepInfo {
     let currentTS = typeof tsConfig === 'object' ? tsConfig : null;
     const allTS = allTSConfigs || {};
 
     if (typeof tsConfig === 'string') {
         currentTS = allTS[tsConfig] || allTS['4/4'];
     } else if (currentTS && !currentTS.beats && currentTS.tsName) {
-        // Handle case where it's an object with only tsName
         currentTS = allTS[currentTS.tsName] || allTS['4/4'];
     }
 
@@ -687,9 +632,8 @@ export function getStepInfo(step, tsConfig, measureMap, allTSConfigs) {
 
 /**
  * Safely disconnects multiple Web Audio nodes.
- * @param {AudioNode[]} nodes
  */
-export function safeDisconnect(nodes) {
+export function safeDisconnect(nodes: AudioNode[]): void {
     nodes.forEach((node) => {
         if (node) {
             try {
@@ -705,18 +649,17 @@ export function safeDisconnect(nodes) {
  * Creates an algorithmic reverb impulse response with pre-delay, early reflections,
  * and a true exponential diffuse tail. The 0–15ms gap before the first reflection
  * acts as a natural pre-delay, giving a sense of room distance.
- * @param {AudioContext} audioCtx
- * @param {number} duration - Total IR length in seconds.
- * @param {number} decay - Controls tail falloff rate; higher = shorter-sounding reverb.
- * @returns {AudioBuffer}
  */
-export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
+export function createReverbImpulse(
+    audioCtx: AudioContext,
+    duration = 2.0,
+    decay = 2.0,
+): AudioBuffer {
     const sampleRate = audioCtx.sampleRate;
     const length = Math.ceil(sampleRate * duration);
     const impulse = audioCtx.createBuffer(2, length, sampleRate);
 
     // Sparse early reflections 15–75ms — give sense of room dimension.
-    // The silent 0–15ms gap before these is the implicit pre-delay.
     const earlyTimes = [0.015, 0.023, 0.031, 0.043, 0.057, 0.074];
     const earlyAmps = [0.58, 0.48, 0.4, 0.3, 0.2, 0.13];
 
@@ -733,7 +676,6 @@ export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
             if (idx >= 0 && idx < length) {
                 const amp = earlyAmps[r] * (0.9 + Math.random() * 0.2);
                 data[idx] += amp;
-                // Two-sample smear to avoid spectral comb artifacts from single-sample impulses
                 if (idx + 1 < length) {
                     data[idx + 1] += amp * 0.25;
                 }
@@ -743,9 +685,7 @@ export function createReverbImpulse(audioCtx, duration = 2.0, decay = 2.0) {
             }
         }
 
-        // Diffuse tail: exponential decay normalized over the tail length so the
-        // buffer always reaches near-silence at the end regardless of duration/decay.
-        // rtDecay ≥ 10 → max amplitude at t=1 is e^(-10)*0.65 ≈ 3e-5 (inaudible).
+        // Diffuse tail: exponential decay normalized over the tail length
         const tailLength = length - tailStart;
         const rtDecay = 10 + (decay - 2) * 2;
         for (let i = tailStart; i < length; i++) {
@@ -763,25 +703,20 @@ const REGEX_FLAT2 = /b(?=[0-9IVivm\-/])/g;
 
 /**
  * Replaces ASCII # and b with Unicode ♯ and ♭ for display.
- * @param {string} str - The string to format.
- * @returns {string}
  */
-export function formatUnicodeSymbols(str) {
+export function formatUnicodeSymbols(str: string): string {
     if (!str) {
         return str;
     }
     return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
 }
 
-/** @type {any} */
-let cachedSoftClipCurve = null;
+let cachedSoftClipCurve: Float32Array<ArrayBuffer> | null = null;
 
 /**
- * Creates a soft-clipping curve for the WaveShaperNode.
- * Cached for performance.
- * @returns {any}
+ * Creates a soft-clipping curve for the WaveShaperNode. Cached for performance.
  */
-export function createSoftClipCurve() {
+export function createSoftClipCurve(): Float32Array<ArrayBuffer> {
     if (cachedSoftClipCurve) {
         return cachedSoftClipCurve;
     }
@@ -798,59 +733,47 @@ export function createSoftClipCurve() {
 
 /**
  * Clamps a frequency value to be within the safe range for Web Audio BiquadFilters.
- * @param {number} freq
- * @param {number} max
- * @returns {number}
  */
-export function clampFreq(freq, max = 24000) {
+export function clampFreq(freq: number, max = 24000): number {
     // Nominal range for most browser implementations of BiquadFilter is [0, 24000]
     return Math.min(Math.max(0, freq), max);
 }
 
 /**
  * Calculates a unified timing offset for an instrument based on the global pocket state.
- * @param {string} instrument - 'drums', 'bass', 'chords', or 'soloist'.
- * @param {any} pocket - The global pocket state.
- * @param {number} intensity - Current band intensity.
- * @returns {number} Offset in seconds.
  */
-export function calculateTimingOffset(instrument, pocket, intensity) {
+export function calculateTimingOffset(instrument: string, pocket: any, intensity: number): number {
     if (!pocket) {
         return 0;
     }
 
     // 1. Global Drive (The whole band pushes or pulls)
     // Scale: 1.0 drive = -12ms (ahead), -1.0 drive = +12ms (behind)
-    const driveBase = -(/** @type {any} */ (pocket.globalDrive * 0.012));
+    const driveBase = -(pocket.globalDrive * 0.012);
 
     // 2. Tightness (Inverse variance)
     // High tightness (1.0) = no random jitter. Low tightness (0.0) = ±8ms jitter.
-    const jitter = (1.0 - /** @type {any} */ (pocket).tightness) * (Math.random() - 0.5) * 0.016;
+    const jitter = (1.0 - pocket.tightness) * (Math.random() - 0.5) * 0.016;
 
     let instrumentSpecific = 0;
 
     // 3. Holistic Gravity (Instruments following each other)
     switch (instrument) {
         case 'drums':
-            // Drums set the grid reference.
             if (intensity > 0.8) {
                 instrumentSpecific -= 0.005;
             }
             break;
         case 'bass':
-            // Bass follows Kick. High gravity = perfectly with Kick.
-            // Low gravity = adds 'human' displacement (usually laid back).
-            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).bassGravity) * 0.008;
+            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.008;
             break;
         case 'chords':
-            // Chords follow Bass.
-            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).chordGravity) * 0.006;
+            instrumentSpecific += (1.0 - pocket.chordGravity) * 0.006;
             // Inherit 30% of the bass's expected displacement for cohesion
-            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).bassGravity) * 0.003;
+            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.003;
             break;
         case 'soloist':
-            // Soloist is the most elastic, but still feels the 'pull' of the band.
-            instrumentSpecific += (1.0 - /** @type {any} */ (pocket).soloistGravity) * 0.012;
+            instrumentSpecific += (1.0 - pocket.soloistGravity) * 0.012;
             break;
     }
 
@@ -863,11 +786,8 @@ export function calculateTimingOffset(instrument, pocket, intensity) {
 
 /**
  * Applies blues bend styling to a note.
- * @param {any} primary
- * @param {string} activeStyle
- * @param {any} currentChord
  */
-export function applyBluesBends(primary, activeStyle, currentChord) {
+export function applyBluesBends(primary: any, activeStyle: string, currentChord: any): void {
     if (activeStyle === 'blues') {
         const relativeInterval =
             ((primary.midi % 12) - ((currentChord.rootMidi || 0) % 12) + 12) % 12;

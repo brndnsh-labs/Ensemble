@@ -40,7 +40,7 @@ This document is the primary operational guide for AI agents working on the Ense
 *   **Reactivity**: Use the `useEnsembleState` hook in `public/ui-bridge.ts` for component updates. Since the state uses `deepSignal`, accessing a property in the selector automatically subscribes the component to updates for that specific property.
 *   **Styles & Configuration**: 
     *   **UI Metadata**: `public/data/instrument-styles.ts` defines names and categories for menus.
-    *   **Generative Logic**: Modular style modules (e.g., `public/engine/bass-styles.js`) contain the actual musical algorithms.
+    *   **Generative Logic**: Modular style modules (e.g., `public/engine/bass-styles.ts`) contain the actual musical algorithms.
 *   **The @direct-mutation Exception**: Direct mutation of state objects is **strictly forbidden** in controllers (e.g., `public/app-controller.ts`) and UI components.
  It is **only allowed** in performance-critical engine code (e.g., `scheduler-core.js`, `synth-*.js`) for real-time audio parameters. These must be marked with a `// @direct-mutation` comment for transparency.
 *   **Decoupling**: Avoid circular dependencies. Use **Inversion of Control (IoC)** for side effects (e.g., `state-effects.js` should not be imported by state slices; it should subscribe to state changes via `dispatch` event bus).

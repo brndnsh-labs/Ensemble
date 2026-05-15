@@ -8,24 +8,69 @@ export const INTENSITY_BANDS = {
     HIGH: 0.85,
 };
 
+export interface GrooveContext {
+    step: number;
+    inst: { name: string; muted: boolean };
+    stepVal: number;
+    playback: {
+        bandIntensity: number;
+        bpm?: number;
+        songMode?: boolean;
+        isEndingPending?: boolean;
+    };
+    groove: Record<string, unknown>;
+    isDownbeat: boolean;
+    isBeatStart: boolean;
+    isPulse: boolean;
+    isPulseStart: boolean;
+    isGroupStart: boolean;
+    isBackbeat: boolean;
+    isOffbeat: boolean;
+    isEOfBeat: boolean;
+    isAOfBeat: boolean;
+    beatIndex: number;
+    tsConfig?: { pulse?: number[]; grouping?: number[]; stepsPerBeat?: number };
+    mStep: number;
+    isCompound: boolean;
+    stepInGroup: number;
+    groupIndex: number;
+    stepsPerBar: number;
+    loopStep: number;
+    drumComplexity: number;
+    orchestration: { rideVoice?: string; snareVoice?: string } | null;
+    barIndex: number;
+    isFirstStepOfNewBar: boolean;
+    sectionSeed: number;
+    isTurnaround: boolean;
+    isSoloistBusy: boolean;
+}
+
+export interface DrumStepBase {
+    shouldPlay: boolean;
+    velocity: number;
+    soundName: string;
+    instTimeOffset: number;
+}
+
+export interface DrumStepExtended extends DrumStepBase {
+    intensity: number;
+    isEighthNote: boolean;
+    halfBarStep: number;
+}
+
+type MotifTier = { maxIntensity?: number; picks: ([number, number] | number)[] };
+
 /**
  * Returns true if a random roll is successful, scaled by intensity.
- * @param {number} probability - Value between 0 and 1
- * @param {number} [intensity=1.0] - Optional intensity multiplier
- * @returns {boolean}
  */
-export function roll(probability, intensity = 1.0) {
+export function roll(probability: number, intensity = 1.0): boolean {
     return Math.random() < probability * intensity;
 }
 
 /**
  * Scales a velocity value based on intensity.
- * @param {number} base - Base velocity
- * @param {number} intensity - Current performance intensity
- * @param {number} [factor=0.2] - Scaling factor
- * @returns {number}
  */
-export function scaleVelocity(base, intensity, factor = 0.2) {
+export function scaleVelocity(base: number, intensity: number, factor = 0.2): number {
     return base + intensity * factor;
 }
 
@@ -33,18 +78,16 @@ export function scaleVelocity(base, intensity, factor = 0.2) {
  * Derive a deterministic phrase-level seed so grooves can vary bar-to-bar without
  * falling back to unconstrained randomness. Reusing the same phrase seed across a
  * small bar span helps hats and cymbals read like a player shaping a phrase.
- *
- * @param {number} sectionSeed
- * @param {number} barIndex
- * @param {number} [phraseBars=2]
- * @param {number} [salt=0]
- * @returns {number}
  */
-export function getPhraseSeed(sectionSeed, barIndex, phraseBars = 2, salt = 0) {
+export function getPhraseSeed(
+    sectionSeed: number,
+    barIndex: number,
+    phraseBars = 2,
+    salt = 0,
+): number {
     const normalizedSeed = Math.max(0, Math.min(0.999, sectionSeed || 0));
     const phraseIndex = Math.floor(barIndex / Math.max(1, phraseBars));
     const seedInt = Math.floor(normalizedSeed * 256);
-
     return ((phraseIndex * 97 + seedInt * 53 + salt * 29) % 256) / 256;
 }
 
@@ -60,35 +103,22 @@ export const DEFAULT_CONFIG = {
     isLatin: false,
 };
 
-/**
- * Selects a motif index from a sorted picks list.
- * Each entry is either `[seedThreshold, motifIndex]` or a bare `motifIndex` number.
- * The last entry (bare number or pair) is always the fallback — its threshold is ignored.
- *
- * @param {number} seed
- * @param {([number, number] | number)[]} picks
- * @returns {number}
- */
-function pickBySeed(seed, picks) {
+function pickBySeed(seed: number, picks: ([number, number] | number)[]): number {
     for (let i = 0; i < picks.length - 1; i++) {
-        const [threshold, motif] = /** @type {[number, number]} */ (picks[i]);
+        const [threshold, motif] = picks[i] as [number, number];
         if (seed < threshold) {
             return motif;
         }
     }
     const last = picks[picks.length - 1];
-    return Array.isArray(last) ? last[1] : /** @type {number} */ (last);
+    return Array.isArray(last) ? last[1] : (last as number);
 }
 
 /**
  * Convenience factory for the common "low-intensity binary tier":
  * returns motif 0 when `seed < seedThreshold`, otherwise motif 1.
- *
- * @param {number} maxIntensity - Upper bound (exclusive) for this intensity tier
- * @param {number} seedThreshold - Seed boundary between motif 0 and motif 1
- * @returns {{ maxIntensity: number, picks: ([number, number] | number)[] }}
  */
-export function binaryTier(maxIntensity, seedThreshold) {
+export function binaryTier(maxIntensity: number, seedThreshold: number): MotifTier {
     return { maxIntensity, picks: [[seedThreshold, 0], 1] };
 }
 
@@ -104,16 +134,15 @@ export function binaryTier(maxIntensity, seedThreshold) {
  *   binaryTier(0.6, 0.6),                          // seed < 0.6 → 0, else → 1
  *   { picks: [[0.3, 0], [0.7, 1], 2] },             // high-intensity tier
  * ]);
- *
- * @param {Array<{maxIntensity?: number, picks: ([number, number] | number)[]}>} tiers
- * @param {{complexityThreshold?: number, intensityFloor?: number}} [opts]
- * @returns {(seed: number, complexity: number, intensity?: number) => number}
  */
-export function makeMotifSelector(tiers, opts = {}) {
+export function makeMotifSelector(
+    tiers: MotifTier[],
+    opts: { complexityThreshold?: number; intensityFloor?: number } = {},
+): (seed: number, complexity: number, intensity?: number) => number {
     const complexityThreshold = opts.complexityThreshold ?? 0.3;
     const intensityFloor = opts.intensityFloor ?? INTENSITY_BANDS.LOW;
 
-    return function getMotif(seed, complexity, intensity = 1.0) {
+    return function getMotif(seed: number, complexity: number, intensity = 1.0): number {
         if (complexity < complexityThreshold || intensity < intensityFloor) {
             return 0;
         }
@@ -129,12 +158,11 @@ export function makeMotifSelector(tiers, opts = {}) {
 /**
  * Standard base logic for groove overrides.
  * Extracts context and handles early returns for muted instruments.
- *
- * @param {any} context
- * @param {any} state
- * @returns {{base: any, muted: boolean}}
  */
-export function applyStandardBase(context, state) {
+export function applyStandardBase(
+    context: GrooveContext,
+    state: DrumStepBase,
+): { base: DrumStepExtended; muted: false } | { base: DrumStepBase; muted: true } {
     const { inst, playback, stepsPerBar } = context;
 
     if (inst.muted) {
@@ -142,7 +170,6 @@ export function applyStandardBase(context, state) {
     }
 
     const intensity = playback.bandIntensity;
-    // Common helpers derived from context
     const isEighthNote = context.isBeatStart || context.isOffbeat;
     const halfBarStep = Math.floor(stepsPerBar / 2);
 

@@ -1,6 +1,8 @@
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     getPhraseSeed,
     INTENSITY_BANDS,
     roll,
@@ -18,12 +20,8 @@ export const config = {
  * 1: Ghost Note Heavy (Busy ghosting)
  * 2: Dilla Skips (Heavy syncopation / drunken swing)
  * 3: Modern Hybrid (Percussive & Expressive)
- * @param {number} seed
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- * @returns {number}
  */
-export function getMotif(seed, complexity, intensity = 1.0) {
+export function getMotif(seed: number, complexity: number, intensity = 1.0): number {
     if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
         return 0; // Solid Boom Bap at low intensity
     }
@@ -48,16 +46,12 @@ export function getMotif(seed, complexity, intensity = 1.0) {
     return 3;
 }
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         isDownbeat,
@@ -85,7 +79,6 @@ export function applyOverrides(context, state) {
         (isEOfBeat && beatIndex === 3 && phraseSeed < 0.18);
 
     // --- 1. THE EXPRESSIVE DRAG (Dilla Micro-timing) ---
-    // At high intensity, we push/pull the boundaries further for that "leaning" feel.
     const snareDrag = 0.006 + intensity * 0.012; // Up to +0.018s delay
     const hiHatPush = -0.008 - intensity * 0.012; // Up to -0.020s rush
 
@@ -98,7 +91,6 @@ export function applyOverrides(context, state) {
     }
 
     // --- 2. DRUNKEN JITTER ---
-    // Non-backbeat steps drift noticeably as intensity rises.
     const drunkenFactor = 0.005 + intensity * 0.02;
 
     if (!isBackbeat) {

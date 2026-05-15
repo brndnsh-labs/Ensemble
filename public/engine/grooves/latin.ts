@@ -2,6 +2,8 @@ import {
     applyStandardBase,
     binaryTier,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     makeMotifSelector,
     roll,
     scaleVelocity,
@@ -15,7 +17,6 @@ export const config = {
 /**
  * Maps intensity to motif complexity for Latin / Bossa.
  * 0: Pure Bossa Nova, 1: Mid-intensity Latin, 2: Samba, 3: Partido Alto
- * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
     binaryTier(0.6, 0.7),
@@ -24,16 +25,12 @@ export const getMotif = makeMotifSelector([
     },
 ]);
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         step,
@@ -61,10 +58,8 @@ export function applyOverrides(context, state) {
         // Foundation: 1 and 3 in 4/4 (Surdo heart), generalizing to non-backbeat pulses
         if (isBeatStart && !isBackbeat) {
             shouldPlay = true;
-            // The secondary hit (non-downbeat pulse) is often heavier or more "open" in feel
             const accent = !isDownbeat ? 1.15 : 1.0;
             velocity = scaleVelocity(1.1 * accent, intensity, 0.1);
-            // Extra "weight" (lag) on the non-downbeat surdo hit
             if (!isDownbeat) {
                 instTimeOffset += 0.005;
             }
@@ -91,7 +86,6 @@ export function applyOverrides(context, state) {
 
         if (activeMotif === 0 || activeMotif === 1) {
             // Authentic 3-2 Bossa Clave
-            // Downbeat, Offbeat of second pulse, 4th pulse start
             if (isBar1) {
                 if (
                     isDownbeat ||
@@ -101,13 +95,11 @@ export function applyOverrides(context, state) {
                     shouldPlay = true;
                 }
             } else {
-                // Downbeat offbeat, 3rd pulse start
                 if ((isOffbeat && isDownbeat) || (isBeatStart && !isBackbeat && !isDownbeat)) {
                     shouldPlay = true;
                 }
             }
 
-            // Add a bit of chatter if complexity is high
             if (!shouldPlay && drumComplexity > 0.7 && intensity > 0.6) {
                 if (isOffbeat && roll(0.3)) {
                     shouldPlay = true;
@@ -158,7 +150,6 @@ export function applyOverrides(context, state) {
     // --- 4. PERCUSSION (Ganza/Shaker) ---
     else if (context.inst.name === 'Shaker' || context.inst.name === 'Perc') {
         shouldPlay = true;
-        // Consistent 16th note shimmer with tiered pulse
         if (isBeatStart) {
             velocity = scaleVelocity(0.95, intensity, 0.1);
         } else if (isOffbeat) {

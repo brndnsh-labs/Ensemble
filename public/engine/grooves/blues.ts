@@ -2,6 +2,8 @@ import {
     applyStandardBase,
     binaryTier,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     INTENSITY_BANDS,
     makeMotifSelector,
     roll,
@@ -18,7 +20,6 @@ export const config = {
 /**
  * Motifs represent different "feels" within the Blues Shuffle universe.
  * 0: Standard tight shuffle, 1: Driving shuffle, 2: Heavy shuffle, 3: Texas Double Shuffle
- * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
     binaryTier(0.6, 0.75),
@@ -31,16 +32,12 @@ export const getMotif = makeMotifSelector([
     },
 ]);
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         isDownbeat,
@@ -122,7 +119,6 @@ export function applyOverrides(context, state) {
         }
 
         // "Four-on-the-Floor" Drive (High intensity only)
-        // Re-introduced but strictly feathered (quiet) to anchor the walking bass
         if (isBeatStart && isBackbeat && intensity > 0.8 && roll(0.7, intensity)) {
             shouldPlay = true;
             velocity = scaleVelocity(0.55, intensity, 0.1); // Significantly quieter than primary hits
@@ -139,7 +135,6 @@ export function applyOverrides(context, state) {
         }
 
         // Texas Shuffle snare participation (isOffbeat ghosting)
-        // Now more pervasive at high complexity/intensity
         const texasProb = activeMotif === 3 ? 0.7 : intensity > 0.7 ? 0.3 : 0;
         if (isOffbeat && !isBackbeat && drumComplexity > 0.6) {
             if (roll(texasProb)) {
@@ -149,7 +144,6 @@ export function applyOverrides(context, state) {
             }
         } else if (activeMotif >= 2 && !isOffbeat && !isBeatStart) {
             // Very occasional 16th ghost notes at high intensity
-            // EXCEPTION: Avoid steps immediately after the backbeat (5 and 13) to maintain clarity
             const stepInMeasure = context.step % context.stepsPerBar;
             if (
                 stepInMeasure !== 1 &&

@@ -2,6 +2,8 @@ import {
     applyStandardBase,
     binaryTier,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     getPhraseSeed,
     makeMotifSelector,
     roll,
@@ -20,7 +22,6 @@ export const config = {
  * Maps intensity to motif complexity for Hip Hop.
  * 0: Classic Boom Bap (MPC Style), 1: Trap Foundation (Consistent 16ths),
  * 2: Trap Skitter (Hi-hat rolls), 3: Modern Hybrid (Syncopated & Busy)
- * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
     binaryTier(0.65, 0.6),
@@ -29,16 +30,12 @@ export const getMotif = makeMotifSelector([
     },
 ]);
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         isDownbeat,

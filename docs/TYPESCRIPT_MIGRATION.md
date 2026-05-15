@@ -210,40 +210,40 @@ During Phase 7 planning, the tracker was found to be incomplete — 62 `.js` fil
 | `public/instrument-controller.ts` | 244 | ✅ | `handleTap(setBpmRef: (bpm: number) => void)` |
 | `public/visualizer-proxy.ts` | 207 | ✅ | `WorkerLike` interface; `declare const VIZ_WORKER_PATH`; class properties declared |
 
-### Batch D — Grooves ⬜
+### Batch D — Grooves ✅
 
 Convert `grooves/utils.ts` first (imported by all 15 genre files).
 
 | File | Lines | Status |
 |------|-------|--------|
-| `public/engine/grooves/utils.js` | 158 | ⬜ |
-| `public/engine/grooves/minimal.js` | 92 | ⬜ |
-| `public/engine/grooves/shred.js` | 13 | ⬜ |
-| `public/engine/grooves/ska-punk.js` | 156 | ⬜ |
-| `public/engine/grooves/acoustic.js` | 141 | ⬜ |
-| `public/engine/grooves/country.js` | 140 | ⬜ |
-| `public/engine/grooves/metal.js` | 162 | ⬜ |
-| `public/engine/grooves/reggae.js` | 147 | ⬜ |
-| `public/engine/grooves/hiphop.js` | 187 | ⬜ |
-| `public/engine/grooves/latin.js` | 181 | ⬜ |
-| `public/engine/grooves/blues.js` | 175 | ⬜ |
-| `public/engine/grooves/neo-soul.js` | 237 | ⬜ |
-| `public/engine/grooves/disco.js` | 191 | ⬜ |
-| `public/engine/grooves/jazz.js` | 245 | ⬜ |
-| `public/engine/grooves/rock.js` | 266 | ⬜ |
-| `public/engine/grooves/funk.js` | 270 | ⬜ |
+| `public/engine/grooves/utils.ts` | 158 | ✅ |
+| `public/engine/grooves/minimal.ts` | 92 | ✅ |
+| `public/engine/grooves/shred.ts` | 13 | ✅ |
+| `public/engine/grooves/ska-punk.ts` | 156 | ✅ |
+| `public/engine/grooves/acoustic.ts` | 141 | ✅ |
+| `public/engine/grooves/country.ts` | 140 | ✅ |
+| `public/engine/grooves/metal.ts` | 162 | ✅ |
+| `public/engine/grooves/reggae.ts` | 147 | ✅ |
+| `public/engine/grooves/hiphop.ts` | 187 | ✅ |
+| `public/engine/grooves/latin.ts` | 181 | ✅ |
+| `public/engine/grooves/blues.ts` | 175 | ✅ |
+| `public/engine/grooves/neo-soul.ts` | 237 | ✅ |
+| `public/engine/grooves/disco.ts` | 191 | ✅ |
+| `public/engine/grooves/jazz.ts` | 245 | ✅ |
+| `public/engine/grooves/rock.ts` | 266 | ✅ |
+| `public/engine/grooves/funk.ts` | 270 | ✅ |
 
-### Batch E — Medium tracked files ⬜
+### Batch E — Medium tracked files ✅
 
 Convert `utils.ts` first (imported by 15+ files).
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/utils.js` | 878 | ⬜ | Convert first in batch |
-| `public/engine/engine.js` | 471 | ⬜ | Depends on utils, synth-* |
-| `public/engine/synth-harmonies.js` | 442 | ⬜ | |
-| `public/engine/bass-styles.js` | 952 | ⬜ | Depends on config, utils |
-| `public/visualizer-engine.js` | 885 | ⬜ | Depends on constants.ts, visualizer-events.ts, visualizer-utils.ts |
+| `public/utils.ts` | 878 | ✅ | Convert first in batch |
+| `public/engine/engine.ts` | 471 | ✅ | Depends on utils, synth-* |
+| `public/engine/synth-harmonies.ts` | 442 | ✅ | |
+| `public/engine/bass-styles.ts` | 952 | ✅ | Depends on config, utils |
+| `public/visualizer-engine.ts` | 885 | ✅ | Depends on constants.ts, visualizer-events.ts, visualizer-utils.ts |
 
 ---
 

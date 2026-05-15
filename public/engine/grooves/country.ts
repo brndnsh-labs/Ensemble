@@ -2,6 +2,8 @@ import {
     applyStandardBase,
     binaryTier,
     DEFAULT_CONFIG,
+    type DrumStepBase,
+    type GrooveContext,
     makeMotifSelector,
     roll,
     scaleVelocity,
@@ -17,7 +19,6 @@ export const config = {
 /**
  * Motifs for Country:
  * 0: Traditional Two-Step, 1: Train Beat Light, 2: Full Heavy Train Beat
- * @type {(seed: number, complexity: number, intensity?: number) => number}
  */
 export const getMotif = makeMotifSelector([
     binaryTier(0.6, 0.6),
@@ -26,16 +27,12 @@ export const getMotif = makeMotifSelector([
     },
 ]);
 
-/**
- * @param {any} context
- * @param {import('../../types.js').EnsembleState & any} state
- * @returns {any}
- */
-export function applyOverrides(context, state) {
-    const { base, muted } = applyStandardBase(context, state);
-    if (muted) {
-        return base;
+export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
+    const result = applyStandardBase(context, state);
+    if (result.muted) {
+        return result.base;
     }
+    const { base } = result;
 
     const {
         isDownbeat,
@@ -64,20 +61,16 @@ export function applyOverrides(context, state) {
             const jitter = (Math.random() - 0.5) * 0.08;
 
             if (isBackbeat) {
-                // Strong accent on 2 and 4
                 soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
                 velocity = scaleVelocity(0.95, intensity, 0.1) + jitter;
             } else if (isBeatStart) {
-                // Quarter note foundation (non-backbeat)
                 soundName = 'Snare';
                 velocity = scaleVelocity(0.35, intensity, 0.1) + jitter;
             } else if (isOffbeat) {
-                // Eighth note offbeats
                 soundName = 'Snare';
                 velocity = scaleVelocity(0.3, intensity, 0.1) + jitter;
             } else if (isEOfBeat || isAOfBeat) {
                 // The "chicka" ghosts (16ths)
-                // Probability scales with intensity
                 const ghostProb = 0.5 + intensity * 0.5;
                 if (roll(ghostProb)) {
                     shouldPlay = true;
@@ -126,8 +119,6 @@ export function applyOverrides(context, state) {
                 velocity = 0.75;
                 soundName = 'HiHat';
 
-                // Let the phrase lift on beat 4 at peak intensity,
-                // but avoid turning the whole train beat into an open-hat wash.
                 if (intensity > 0.82 && beatIndex === 3) {
                     soundName = 'Open';
                     velocity = 0.85;
