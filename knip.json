@@ -4,7 +4,7 @@
         "public/main.js",
         "public/sw.js",
         "public/ui-types.ts",
-        "public/ui-root.jsx",
+        "public/ui-root.tsx",
         "public/visualizer-worker.js",
         "scripts/*.js",
         "tests/scripts/*.js"
