@@ -3,21 +3,19 @@ import { getState } from './state.js';
 import { showToast } from './ui.js';
 import { compressSections } from './utils.js';
 
-/**
- * @typedef {Object} ShareOptions
- * @property {boolean} [includeSolo]
- * @property {boolean} [includeBass]
- * @property {boolean} [includeChords]
- * @property {boolean} [includeHarmony]
- * @property {boolean} [includeDrums]
- * @property {number} [targetDuration]
- */
+export interface ShareOptions {
+    includeSolo?: boolean;
+    includeBass?: boolean;
+    includeChords?: boolean;
+    includeHarmony?: boolean;
+    includeDrums?: boolean;
+    targetDuration?: number;
+}
 
 /**
  * Compresses the full band/mixer state into a Base64 string.
- * @param {ShareOptions} options
  */
-function compressBandSettings(options = {}) {
+function compressBandSettings(options: ShareOptions = {}): string {
     const { soloist, bass, chords, harmony, groove } = getState();
 
     const band = {
@@ -75,10 +73,7 @@ function compressBandSettings(options = {}) {
     return btoa(binString);
 }
 
-/**
- * @param {ShareOptions} options
- */
-export function generateShareUrl(options = {}) {
+export function generateShareUrl(options: ShareOptions = {}): string {
     const { arranger, chords, groove, playback } = getState();
     const params = new URLSearchParams();
     params.set('s', compressSections(arranger.sections));
@@ -102,7 +97,7 @@ export function generateShareUrl(options = {}) {
     return `${window.location.origin + window.location.pathname}?${params.toString()}`;
 }
 
-export function shareProgression() {
+export function shareProgression(): void {
     try {
         const url = generateShareUrl();
 

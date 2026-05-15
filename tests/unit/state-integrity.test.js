@@ -62,7 +62,9 @@ describe('State Integrity Audit', () => {
                 const isHandlerFile =
                     f.path.includes('public/state/') ||
                     f.path.includes('public/state-effects.js') ||
-                    f.path.includes('public/state-hydration.js');
+                    f.path.includes('public/state-effects.ts') ||
+                    f.path.includes('public/state-hydration.js') ||
+                    f.path.includes('public/state-hydration.ts');
                 if (!isHandlerFile) {
                     return false;
                 }

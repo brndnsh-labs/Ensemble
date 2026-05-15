@@ -20,15 +20,7 @@ import {
     stripDangerousChars,
 } from './utils.js';
 
-/**
- * Helper to safely clamp numeric values.
- * @param {any} val
- * @param {number} min
- * @param {number} max
- * @param {number} defaultVal
- * @returns {number}
- */
-const clamp = (val, min, max, defaultVal) => {
+const clamp = (val: any, min: number, max: number, defaultVal: number): number => {
     const num = typeof val === 'string' ? parseFloat(val) : Number(val);
     if (Number.isNaN(num)) {
         return defaultVal;
@@ -38,19 +30,11 @@ const clamp = (val, min, max, defaultVal) => {
 
 const SUPPORTED_SOLOIST_PRESETS = new Set(['neo', 'vowel', 'trumpet', 'saxophone', 'shred']);
 
-/**
- * @param {any} preset
- * @param {string} fallback
- */
-function normalizeSoloistPreset(preset, fallback = 'trumpet') {
+function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
     return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;
 }
 
-/**
- * Decompresses the Base64 band settings string.
- * @param {string} str
- */
-function decompressBandSettings(str) {
+function decompressBandSettings(str: string): any {
     try {
         const binString = atob(str);
         const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
@@ -64,9 +48,8 @@ function decompressBandSettings(str) {
 
 /**
  * Validates and sanitizes sections array from untrusted source.
- * @param {any[]} sections
  */
-function validateSections(sections) {
+function validateSections(sections: any[]): any[] {
     if (!Array.isArray(sections)) {
         return [];
     }
@@ -112,8 +95,7 @@ function validateSections(sections) {
             isMinor: typeof s.isMinor === 'boolean' ? s.isMinor : undefined,
             repeat: Math.min(Math.max(1, parseInt(s.repeat, 10) || 1), 64),
             timeSignature:
-                typeof s.timeSignature === 'string' &&
-                /** @type {any} */ (TIME_SIGNATURES)[s.timeSignature]
+                typeof s.timeSignature === 'string' && (TIME_SIGNATURES as any)[s.timeSignature]
                     ? s.timeSignature
                     : '',
             seamless: !!s.seamless,
@@ -121,7 +103,7 @@ function validateSections(sections) {
     });
 }
 
-export function hydrateState() {
+export function hydrateState(): void {
     const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
     const savedState = storage.get('currentState');
     if (savedState?.sections) {
@@ -137,10 +119,7 @@ export function hydrateState() {
         }
 
         let validatedTS = '4/4';
-        if (
-            savedState.timeSignature &&
-            /** @type {any} */ (TIME_SIGNATURES)[savedState.timeSignature]
-        ) {
+        if (savedState.timeSignature && (TIME_SIGNATURES as any)[savedState.timeSignature]) {
             validatedTS = savedState.timeSignature;
         }
 
@@ -281,11 +260,11 @@ export function hydrateState() {
             });
 
             if (savedState.groove.pattern && savedState.groove.pattern.length > 0) {
-                savedState.groove.pattern.forEach((/** @type {any} */ savedInst) => {
+                savedState.groove.pattern.forEach((savedInst: any) => {
                     const inst = groove.instruments.find((i) => i.name === savedInst.name);
                     if (inst) {
                         inst.steps.fill(0);
-                        savedInst.steps.forEach((/** @type {any} */ v, /** @type {number} */ i) => {
+                        savedInst.steps.forEach((v: any, i: number) => {
                             if (i < 128) {
                                 inst.steps[i] = v;
                             }
@@ -327,7 +306,7 @@ export function hydrateState() {
     dispatch('HYDRATE');
 }
 
-export function loadFromUrl() {
+export function loadFromUrl(): void {
     const { arranger, groove, soloist, bass, chords, harmony } = getState();
     const params = new URLSearchParams(window.location.search);
     let hasParams = false;
@@ -363,7 +342,7 @@ export function loadFromUrl() {
 
     const tsParam = params.get('ts');
     if (tsParam) {
-        if (/** @type {any} */ (TIME_SIGNATURES)[tsParam]) {
+        if ((TIME_SIGNATURES as any)[tsParam]) {
             arranger.timeSignature = tsParam;
         }
     }

@@ -9,7 +9,7 @@ A single `CoordinationContext` object must be passed to every note generator per
 
 ## Strict Register Slotting
 To ensure a clean mix and avoid harmonic masking, instruments are strictly assigned to specific MIDI note ranges:
-Implementation source of truth lives in `public/engine/coordination-engine.js`.
+Implementation source of truth lives in `public/engine/coordination-engine.ts`.
 *   **Bass:** Claims MIDI 23 to 57 (Expanded 5-String Range). This is subdivided into a "Three-Lane" model:
     *   **Sub-Basement (23-35):** The deep pocket for Neo-Soul, Dub, and Reggae.
     *   **The Meat (36-47):** The standard home for Rock, Funk, and Pop (low E/A strings).

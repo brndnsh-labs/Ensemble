@@ -17,12 +17,12 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/main.js` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/visualizer-worker.js` | Background rendering thread for 60fps visuals. | `engine.render` |
-| `public/state.js` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
+| `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
-| `public/worker-client.js` | Main-thread orchestrator for worker messaging. | `workerClient` |
+| `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `workerClient` |
 
 ## State Management (Domain Slices)
 
@@ -35,8 +35,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.ts` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
-| `public/state-effects.js` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
-| `public/state-hydration.js` | Initial state loading and validation logic. | `hydrateState` |
+| `public/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
+| `public/state-hydration.ts` | Initial state loading and validation logic. | `hydrateState` |
 
 ## Generative Engines (Worker Thread)
 
@@ -50,7 +50,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/soloist-config.js` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
 | `public/engine/soloist-devices.js` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
-| `public/engine/drum-seeder.js` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
+| `public/engine/drum-seeder.ts` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
 | `public/engine/fills.js` | Procedural drum fill generation. | `generateProceduralFill` |
 | `public/engine/conductor.js` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
 | `public/engine/theory-scales.js` | Scale degrees and mode definitions. | `getScaleForChord` |
@@ -62,7 +62,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Patterns |
 | :--- | :--- | :--- |
 | `public/engine/bass-styles.js` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
-| `public/engine/chords-styles.js` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
+| `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
 | `public/engine/soloist-config.js` | Style definitions and influence pools. | `STYLE_CONFIG` |
 | `public/engine/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
 | `public/engine/grooves/` | Directory of 15+ genre-specific drum strategies. | `jazz.js`, `rock.js`, `funk.js`, etc. |
@@ -76,9 +76,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
 | `public/engine/engine.js` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
 | `public/engine/synth-utils.js` | Shared WebAudio boilerplate (ramping, voices). | `rampGain`, `killActiveVoices` |
-| `public/engine/coordination-engine.js` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
+| `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/voicing-policy.js` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
-| `public/engine/groove-engine.js` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
+| `public/engine/groove-engine.ts` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/soloist-pitch-engine.js` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
 | `public/engine/soloist-rhythm-engine.js` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
@@ -93,7 +93,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 ## Live vs Worker Responsibilities
 
-- `public/worker-client.js` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
+- `public/worker-client.ts` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
 - `public/logic-worker.js` is the worker-side message dispatcher and reset coordinator.
 - `public/engine/worker-buffer-manager.ts` and `public/engine/tick-logic.js` own lookahead note generation inside the worker.
 - `public/engine/worker-utils.js` holds shared worker-side helpers such as `getChordAtStep`.
@@ -154,18 +154,18 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/arranger-controller.js` | High-level song structure manipulation. |
+| `public/arranger-controller.ts` | High-level song structure manipulation. |
 | `public/instrument-controller.js` | Per-instrument state and preset routing. |
 | `public/performance-controller.ts` | Real-time keyboard performance logic. |
-| `public/midi-controller.js` | WebMIDI bridging and DAW sync. |
+| `public/midi-controller.ts` | WebMIDI bridging and DAW sync. |
 | `public/midi-export.js` | Main-thread MIDI file triggers. |
-| `public/song-generator.js` | Algorithmic song structure generation. |
-| `public/lead-sheet-model.js` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
-| `public/persistence.js` | LocalStorage session saving. |
+| `public/song-generator.ts` | Algorithmic song structure generation. |
+| `public/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
+| `public/persistence.ts` | LocalStorage session saving. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/sharing.js` | URL-based song sharing. | `getShareURL` |
+| `public/sharing.ts` | URL-based song sharing. | `getShareURL` |
 | `public/utils.js` | General-purpose musical and math utilities. | `getFrequency` |
-| `public/visualizer-events.js` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
+| `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
 | `public/visualizer-engine.js` | High-performance Canvas rendering logic. | `VisualizerEngine` |
 | `public/visualizer-proxy.js` | Main-thread bridge to visualizer worker. |
 

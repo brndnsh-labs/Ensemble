@@ -6,7 +6,11 @@ const LEAD_SHEET_MOBILE_MAX_WIDTH = 700;
 const LEAD_SHEET_TABLET_MAX_WIDTH = 1100;
 const SHORT_LEAD_SHEET_VIEWPORT_HEIGHT = 720;
 
-const LEAD_SHEET_FIT_ROW_BUDGET = {
+type Density = 'comfortable' | 'compact' | 'ultra-compact';
+type Viewport = 'mobile' | 'tablet' | 'desktop';
+type ScrollMode = 'fit' | 'guided';
+
+const LEAD_SHEET_FIT_ROW_BUDGET: Record<Density, Record<Viewport, number>> = {
     comfortable: {
         desktop: 88,
         mobile: 68,
@@ -24,46 +28,33 @@ const LEAD_SHEET_FIT_ROW_BUDGET = {
     },
 };
 
-/**
- * @param {number} value
- */
-function roundLeadSheetScale(value) {
+function roundLeadSheetScale(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
-/**
- * @param {number} value
- * @param {number} min
- * @param {number} max
- */
-function clampLeadSheetScale(value, min, max) {
+function clampLeadSheetScale(value: number, min: number, max: number): number {
     return roundLeadSheetScale(Math.min(max, Math.max(min, value)));
 }
 
-/**
- * @param {{
- *   totalMeasures: number,
- *   rowCount: number,
- *   viewport: 'mobile' | 'tablet' | 'desktop',
- *   scrollMode: 'fit' | 'guided',
- *   isShortViewport: boolean,
- * }} options
- * @returns {'comfortable' | 'compact' | 'ultra-compact'}
- */
 function getLeadSheetLayoutDensity({
     totalMeasures,
     rowCount,
     viewport,
     scrollMode,
     isShortViewport,
-}) {
+}: {
+    totalMeasures: number;
+    rowCount: number;
+    viewport: Viewport;
+    scrollMode: ScrollMode;
+    isShortViewport: boolean;
+}): Density {
     const compactRowThreshold = viewport === 'mobile' ? 5 : 6;
     const ultraRowThreshold =
         scrollMode === 'guided' ? (viewport === 'mobile' ? 10 : 12) : viewport === 'mobile' ? 8 : 9;
     const ultraMeasureThreshold = scrollMode === 'guided' ? 48 : ULTRA_COMPACT_MEASURE_THRESHOLD;
 
-    /** @type {'comfortable' | 'compact' | 'ultra-compact'} */
-    let density =
+    let density: Density =
         totalMeasures >= COMPACT_MEASURE_THRESHOLD || rowCount >= compactRowThreshold
             ? 'compact'
             : 'comfortable';
@@ -79,15 +70,17 @@ function getLeadSheetLayoutDensity({
     return density;
 }
 
-/**
- * @param {{
- *   viewport: 'mobile' | 'tablet' | 'desktop',
- *   rowCount: number,
- *   scrollMode: 'fit' | 'guided',
- *   containerWidth: number,
- * }} options
- */
-function getLeadSheetRowWidth({ viewport, rowCount, scrollMode, containerWidth }) {
+function getLeadSheetRowWidth({
+    viewport,
+    rowCount,
+    scrollMode,
+    containerWidth,
+}: {
+    viewport: Viewport;
+    rowCount: number;
+    scrollMode: ScrollMode;
+    containerWidth: number;
+}): number {
     if (viewport === 'mobile') {
         return Math.max(0, Math.round(containerWidth - 6));
     }
@@ -136,16 +129,19 @@ function getLeadSheetRowWidth({ viewport, rowCount, scrollMode, containerWidth }
     );
 }
 
-/**
- * @param {{
- *   viewport: 'mobile' | 'tablet' | 'desktop',
- *   rowCount: number,
- *   density: 'comfortable' | 'compact' | 'ultra-compact',
- *   availableHeight: number,
- *   isShortViewport: boolean,
- * }} options
- */
-function getLeadSheetFitSizing({ viewport, rowCount, density, availableHeight, isShortViewport }) {
+function getLeadSheetFitSizing({
+    viewport,
+    rowCount,
+    density,
+    availableHeight,
+    isShortViewport,
+}: {
+    viewport: Viewport;
+    rowCount: number;
+    density: Density;
+    availableHeight: number;
+    isShortViewport: boolean;
+}) {
     const baseBudget = LEAD_SHEET_FIT_ROW_BUDGET[density][viewport];
     const shortViewportPenalty =
         isShortViewport && viewport === 'mobile' ? 0.12 : isShortViewport ? 0.08 : 0;
@@ -201,15 +197,17 @@ function getLeadSheetFitSizing({ viewport, rowCount, density, availableHeight, i
     };
 }
 
-/**
- * @param {{
- *   viewport: 'mobile' | 'tablet' | 'desktop',
- *   rowCount: number,
- *   density: 'comfortable' | 'compact' | 'ultra-compact',
- *   isShortViewport: boolean,
- * }} options
- */
-function getLeadSheetGuidedSizing({ viewport, rowCount, density, isShortViewport }) {
+function getLeadSheetGuidedSizing({
+    viewport,
+    rowCount,
+    density,
+    isShortViewport,
+}: {
+    viewport: Viewport;
+    rowCount: number;
+    density: Density;
+    isShortViewport: boolean;
+}) {
     if (isShortViewport) {
         return {
             mode: 'compact',
@@ -254,18 +252,14 @@ function getLeadSheetGuidedSizing({ viewport, rowCount, density, isShortViewport
     };
 }
 
-/**
- * @param {any[]} progression
- * @param {any[]} sectionsState
- * @param {{ beats: number, stepsPerBeat: number }} timeSignatureConfig
- */
-export function buildLeadSheetSections(progression, sectionsState, timeSignatureConfig) {
-    /** @type {any[]} */
-    const blocks = [];
-    /** @type {any} */
-    let currentBlock = null;
-    /** @type {any} */
-    let currentMeasure = null;
+export function buildLeadSheetSections(
+    progression: any[],
+    sectionsState: any[],
+    timeSignatureConfig: { beats: number; stepsPerBeat: number },
+): any[] {
+    const blocks: any[] = [];
+    let currentBlock: any = null;
+    let currentMeasure: any = null;
     let currentMeasureBeats = 0;
     let currentStep = 0;
 
@@ -321,19 +315,16 @@ export function buildLeadSheetSections(progression, sectionsState, timeSignature
     return blocks;
 }
 
-/**
- * @param {any[]} sectionBlocks
- * @param {number} [measuresPerRow]
- */
-export function buildLeadSheetRows(sectionBlocks, measuresPerRow = LEAD_SHEET_MEASURES_PER_ROW) {
-    /** @type {any[]} */
-    const rows = [];
-    /** @type {any} */
-    let currentRow = null;
+export function buildLeadSheetRows(
+    sectionBlocks: any[],
+    measuresPerRow = LEAD_SHEET_MEASURES_PER_ROW,
+): any[] {
+    const rows: any[] = [];
+    let currentRow: any = null;
     let rowCount = 0;
 
     sectionBlocks.forEach((sectionBlock) => {
-        sectionBlock.measures.forEach((/** @type {any} */ measure) => {
+        sectionBlock.measures.forEach((measure: any) => {
             const startsSection = Boolean(measure.startsSection);
             const isSeamlessStart = Boolean(measure.isSeamlessStart);
             const sectionId = measure.sectionId || sectionBlock.id;
@@ -369,11 +360,7 @@ export function buildLeadSheetRows(sectionBlocks, measuresPerRow = LEAD_SHEET_ME
     return rows;
 }
 
-/**
- * @param {number} totalMeasures
- * @returns {'comfortable' | 'compact' | 'ultra-compact'}
- */
-export function getLeadSheetDensity(totalMeasures) {
+export function getLeadSheetDensity(totalMeasures: number): Density {
     if (totalMeasures > ULTRA_COMPACT_MEASURE_THRESHOLD) {
         return 'ultra-compact';
     }
@@ -385,11 +372,7 @@ export function getLeadSheetDensity(totalMeasures) {
     return 'comfortable';
 }
 
-/**
- * @param {number} viewportWidth
- * @returns {'mobile' | 'tablet' | 'desktop'}
- */
-export function getLeadSheetViewport(viewportWidth) {
+export function getLeadSheetViewport(viewportWidth: number): Viewport {
     if (viewportWidth <= LEAD_SHEET_MOBILE_MAX_WIDTH) {
         return 'mobile';
     }
@@ -401,16 +384,6 @@ export function getLeadSheetViewport(viewportWidth) {
     return 'desktop';
 }
 
-/**
- * @param {{
- *   totalMeasures: number,
- *   rowCount: number,
- *   viewportWidth?: number,
- *   viewportHeight?: number,
- *   containerWidth?: number,
- *   containerHeight?: number,
- * }} options
- */
 export function getLeadSheetLayoutProfile({
     totalMeasures,
     rowCount,
@@ -418,12 +391,19 @@ export function getLeadSheetLayoutProfile({
     viewportHeight = 800,
     containerWidth = viewportWidth,
     containerHeight = viewportHeight,
+}: {
+    totalMeasures: number;
+    rowCount: number;
+    viewportWidth?: number;
+    viewportHeight?: number;
+    containerWidth?: number;
+    containerHeight?: number;
 }) {
     const viewport = getLeadSheetViewport(viewportWidth);
     const isShortViewport = viewportHeight < SHORT_LEAD_SHEET_VIEWPORT_HEIGHT;
     const availableHeight = Math.max(0, containerHeight);
     const fitRowThreshold = viewport === 'desktop' ? 8 : 9;
-    const scrollMode = rowCount > fitRowThreshold ? 'guided' : 'fit';
+    const scrollMode: ScrollMode = rowCount > fitRowThreshold ? 'guided' : 'fit';
     const rowWidth = getLeadSheetRowWidth({
         viewport,
         rowCount,

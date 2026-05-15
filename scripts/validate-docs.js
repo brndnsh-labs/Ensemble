@@ -116,7 +116,7 @@ function extractRegisterSlotting(engineContent) {
         );
 
     if (!bassMatch || !chordMatch || !soloMatch) {
-        throw new Error('Unable to extract register slotting rules from coordination-engine.js');
+        throw new Error('Unable to extract register slotting rules from coordination-engine.ts');
     }
 
     return {
@@ -184,7 +184,7 @@ function validatePlaywrightProjectDocs() {
 
 function validateRegisterSlottingDocs() {
     let hasError = false;
-    const slotting = extractRegisterSlotting(readText('public/engine/coordination-engine.js'));
+    const slotting = extractRegisterSlotting(readText('public/engine/coordination-engine.ts'));
     const rangeSep = '(?:[–-]|to)';
 
     for (const docPath of REGISTER_DOCS) {

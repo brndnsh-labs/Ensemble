@@ -1,4 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { ArrangerState } from '../state/arranger.js';
+import type { EnsembleState } from '../types.js';
 import { createPRNG, generateRandomSeed } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
 import { generateDeterministicFill } from './fills.js';
@@ -8,39 +10,41 @@ import { generateDeterministicFill } from './fills.js';
  * Generates an orchestration map, fill map, and accent map for the entire song arrangement.
  */
 
-/**
- * @typedef {Object} OrchestrationMapEntry
- * @property {number} start - Global start step.
- * @property {number} end - Global end step.
- * @property {string} rideVoice - Cymbal/Timekeeping voice ('HiHat-Closed', 'HiHat-Open', 'Ride', 'Ride-Bell', 'Tom-Groove').
- * @property {string} snareVoice - Snare voicing ('Sidestick', 'Snare', 'None').
- * @property {number} motifComplexity - Rhythmic density (0-3).
- * @property {number} energyLevel - Pre-calculated section energy (0.0 - 1.0).
- */
+export interface OrchestrationMapEntry {
+    start: number;
+    end: number;
+    /** Cymbal/Timekeeping voice ('HiHat-Closed', 'HiHat-Open', 'Ride', 'Ride-Bell', 'Tom-Groove'). */
+    rideVoice: string;
+    /** Snare voicing ('Sidestick', 'Snare', 'None'). */
+    snareVoice: string;
+    /** Rhythmic density (0-3). */
+    motifComplexity: number;
+    /** Pre-calculated section energy (0.0 - 1.0). */
+    energyLevel: number;
+}
 
-/**
- * @typedef {Object} FillMapEntry
- * @property {Record<number, {name: string, vel: number}[]>} steps
- * @property {number} length
- * @property {boolean} crash
- */
+export interface FillMapEntry {
+    steps: Record<number, { name: string; vel: number }[]>;
+    length: number;
+    crash: boolean;
+}
 
-/**
- * @typedef {Object} AccentCatch
- * @property {string} type - Catch type ('crash-catch', 'snare-stab', 'hat-bark').
- * @property {number} velocity - Drum velocity.
- */
+export interface AccentCatch {
+    /** Catch type ('crash-catch', 'snare-stab', 'hat-bark'). */
+    type: string;
+    velocity: number;
+}
 
 /**
  * Generates a song-wide orchestration map for the drummer.
- * @param {import('../types.js').EnsembleState} _state
- * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {string} _style
- * @param {number} intensity
- * @param {string} [seedStr]
- * @returns {OrchestrationMapEntry[]}
  */
-export function generateDrumOrchestration(_state, arranger, _style, intensity, seedStr) {
+export function generateDrumOrchestration(
+    _state: EnsembleState,
+    arranger: ArrangerState,
+    _style: string,
+    intensity: number,
+    seedStr?: string,
+): OrchestrationMapEntry[] {
     const unrolled = unrollArrangement(arranger, 128);
     const { sectionMap } = unrolled;
 
@@ -49,13 +53,12 @@ export function generateDrumOrchestration(_state, arranger, _style, intensity, s
     }
 
     const prng = createPRNG(seedStr || generateRandomSeed());
-    /** @type {OrchestrationMapEntry[]} */
-    const orchestrationMap = [];
+    const orchestrationMap: OrchestrationMapEntry[] = [];
 
-    sectionMap.forEach((sectionRange, index) => {
+    sectionMap.forEach((sectionRange: any, index: number) => {
         const label = (sectionRange.label || 'Verse').toLowerCase();
-        const sourceLabels = Array.isArray(sectionRange.sourceLabels)
-            ? /** @type {string[]} */ (sectionRange.sourceLabels)
+        const sourceLabels: string[] = Array.isArray(sectionRange.sourceLabels)
+            ? sectionRange.sourceLabels
             : [sectionRange.label || ''];
         const hasActualIntroLikeLabel = sourceLabels.some((sourceLabel) => {
             const normalized = String(sourceLabel).toLowerCase();
@@ -170,14 +173,14 @@ export function generateDrumOrchestration(_state, arranger, _style, intensity, s
 
 /**
  * Generates a song-wide fill map for the drummer.
- * @param {import('../types.js').EnsembleState} state
- * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {string} genre
- * @param {number} intensity
- * @param {string} [seedStr]
- * @returns {Record<number, FillMapEntry>}
  */
-export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
+export function generateDrumFills(
+    state: EnsembleState,
+    arranger: ArrangerState,
+    genre: string,
+    intensity: number,
+    seedStr?: string,
+): Record<number, FillMapEntry> {
     const unrolled = unrollArrangement(arranger, 128);
     const { sectionMap } = unrolled;
 
@@ -186,18 +189,17 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
     }
 
     const prng = createPRNG(seedStr || generateRandomSeed());
-    /** @type {Record<number, FillMapEntry>} */
-    const fillMap = {};
+    const fillMap: Record<number, FillMapEntry> = {};
     const isVirtualMacroForm = unrolled.totalSteps !== unrolled.originalSteps;
 
     const tsConfig =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
     const stepsPerMeasure = tsConfig.beats * tsConfig.stepsPerBeat;
 
     // Orchestration is needed to check energy levels for the "Crash Contract"
     const orchestrationMap = generateDrumOrchestration(state, arranger, genre, intensity, seedStr);
 
-    sectionMap.forEach((sectionRange, index) => {
+    sectionMap.forEach((sectionRange: any, index: number) => {
         // Keep the generated "Outro" quiet at the end of virtual macro form.
         if (isVirtualMacroForm && index === sectionMap.length - 1) {
             return;
@@ -213,7 +215,7 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
         }
 
         const nextArrangerSection = arranger.sections?.find(
-            (/** @type {any} */ section) => section.id === nextSection.id,
+            (section: any) => section.id === nextSection.id,
         );
         if (nextArrangerSection?.seamless) {
             return;
@@ -277,25 +279,24 @@ export function generateDrumFills(state, arranger, genre, intensity, seedStr) {
 
 /**
  * Generates a song-wide accent map for catching soloist peaks.
- * @param {import('../types.js').EnsembleState} _state
- * @param {import('../state/arranger.js').ArrangerState} arranger
- * @param {{notes: any[]}} soloistSeed
- * @param {string} genre
- * @param {number} intensity
- * @param {string} [seedStr]
- * @returns {Record<number, AccentCatch>}
  */
-export function generateSoloistAccents(_state, arranger, soloistSeed, genre, intensity, seedStr) {
+export function generateSoloistAccents(
+    _state: EnsembleState,
+    arranger: ArrangerState,
+    soloistSeed: { notes: any[] },
+    genre: string,
+    intensity: number,
+    seedStr?: string,
+): Record<number, AccentCatch> {
     if (!soloistSeed?.notes || soloistSeed.notes.length === 0) {
         return {};
     }
 
     const prng = createPRNG(seedStr || generateRandomSeed());
-    /** @type {Record<number, AccentCatch>} */
-    const accentMap = {};
+    const accentMap: Record<number, AccentCatch> = {};
 
     const tsConfig =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
 
     let lastCatchStep = -100;

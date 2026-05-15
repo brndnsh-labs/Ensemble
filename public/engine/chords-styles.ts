@@ -1,13 +1,12 @@
+import type { EnsembleState } from '../types.js';
 import { shouldUseRootlessVoicing } from './voicing-policy.js';
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {string} quality
- * @param {boolean} is7th
- * @param {boolean} isRich
- * @returns {number[] | null}
- */
-export function getRootlessVoicing(state, quality, is7th, isRich) {
+export function getRootlessVoicing(
+    state: EnsembleState,
+    quality: string,
+    is7th: boolean,
+    isRich: boolean,
+): number[] | null {
     const { groove, playback } = state;
     const genre = groove.genreFeel;
     const intensity = playback.bandIntensity;
@@ -132,15 +131,13 @@ export function getRootlessVoicing(state, quality, is7th, isRich) {
     return null; // Fallback to standard triads
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {string} quality
- * @param {boolean} is7th
- * @param {string} density
- * @param {string} genre
- * @returns {number[]}
- */
-export function getIntervals(state, quality, is7th, density, genre = 'Rock') {
+export function getIntervals(
+    state: EnsembleState,
+    quality: string,
+    is7th: boolean,
+    density: string,
+    genre = 'Rock',
+): number[] {
     const { playback } = state;
     const isRich = density === 'rich';
     const intensity = playback.bandIntensity;
@@ -161,7 +158,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock') {
         }
     }
 
-    let intervals = null;
+    let intervals: number[] | null = null;
 
     // 2. POP & ROCK: SPREAD 10ths
     if (genre === 'Rock' || (genre === 'Bossa' && !shouldBeRootless)) {
@@ -289,10 +286,10 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock') {
     // 4. DENSITY-BASED MODIFICATIONS
     if (density === 'thin' && intervals.length >= 4) {
         if (intervals.includes(7)) {
-            intervals = intervals.filter((/** @type {any} */ i) => i !== 7);
+            intervals = intervals.filter((i) => i !== 7);
         }
     } else if (isRich && intervals.length <= 5 && quality !== '5') {
-        const safeExtensions = /** @type {any} */ ({
+        const safeExtensions: Record<string, number[]> = {
             major: [14], // 9
             maj7: [14, 18], // 9, #11
             minor: [14, 17], // 9, 11
@@ -304,7 +301,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock') {
             '7alt': [13, 15, 20], // b9, #9, b13
             9: [21], // 13
             13: [18], // #11
-        });
+        };
 
         const potential = safeExtensions[quality] || (isAltered5 ? [14, 18] : [14]);
         for (const ext of potential) {
@@ -351,7 +348,7 @@ export function getIntervals(state, quality, is7th, density, genre = 'Rock') {
 
     // FINAL SAFETY: if augmented or altered 5th, ensure natural 5th is NOT present
     if (isAltered5 || isAug) {
-        intervals = intervals.filter((/** @type {any} */ i) => i % 12 !== 7);
+        intervals = intervals.filter((i) => i % 12 !== 7);
     }
 
     return intervals;

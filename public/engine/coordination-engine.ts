@@ -1,17 +1,13 @@
-// public/engine/coordination-engine.js
+import type { StepInfo } from '../types.js';
 
 /**
  * Coordination Context Management and Contract Enforcement
  * This module ensures the "Musical Coordination Contract" is satisfied.
  */
 
-/**
- * @param {number} step
- * @param {import('../types.js').StepInfo|null} [stepInfo=null]
- */
-export function createCoordinationContext(step, stepInfo = null) {
+export function createCoordinationContext(step: number, stepInfo: StepInfo | null = null) {
     // Initial context derived from the "anchor" (Groove)
-    const ts = /** @type {any} */ (stepInfo)?.tsConfig || { beats: 4, stepsPerBeat: 4 };
+    const ts = (stepInfo as any)?.tsConfig || { beats: 4, stepsPerBeat: 4 };
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
     const mStep = stepInfo ? stepInfo.mStep : step % stepsPerBar;
 
@@ -29,18 +25,13 @@ export function createCoordinationContext(step, stepInfo = null) {
         bassHit: false, // Set by bass turn
         bassMidi: 0, // Set by bass turn
         accompanimentHit: false,
-        accompanimentMidis: [],
+        accompanimentMidis: [] as number[],
         avgChordMidi: 0,
-        upcomingSectionFirstChord: null,
+        upcomingSectionFirstChord: null as any,
     };
 }
 
-/**
- * @param {any} context
- * @param {string} module
- * @param {any} result
- */
-export function updateCoordinationContext(context, module, result) {
+export function updateCoordinationContext(context: any, module: string, result: any): void {
     if (!result) {
         return;
     }
@@ -85,7 +76,7 @@ export function updateCoordinationContext(context, module, result) {
         case 'chords': {
             const notes = Array.isArray(result) ? result : [result];
             // Optimization: Replace map/filter/reduce chain with standard for loop to avoid intermediate array allocations
-            const activeMidis = [];
+            const activeMidis: number[] = [];
             let sum = 0;
             for (let i = 0; i < notes.length; i++) {
                 const m = notes[i].midi;
@@ -108,12 +99,13 @@ export function updateCoordinationContext(context, module, result) {
 /**
  * Enforces the "Strict Register Slotting" rules defined in ENSEMBLE_COORDINATION.md.
  * If a note is outside its designated slot, it is transposed to the nearest octave within range.
- * @param {string} module
- * @param {number} midi
- * @param {any} _context
- * @param {number|null} [targetMidi=null]
  */
-export function enforceRegisterSlotting(module, midi, _context, targetMidi = null) {
+export function enforceRegisterSlotting(
+    module: string,
+    midi: number,
+    _context: any,
+    targetMidi: number | null = null,
+): number {
     if (midi <= 0) {
         return midi;
     }
@@ -141,13 +133,12 @@ export function enforceRegisterSlotting(module, midi, _context, targetMidi = nul
     }
 }
 
-/**
- * @param {number} midi
- * @param {number} min
- * @param {number} max
- * @param {number|null} [target=null]
- */
-function smoothOctaveClamp(midi, min, max, target = null) {
+function smoothOctaveClamp(
+    midi: number,
+    min: number,
+    max: number,
+    target: number | null = null,
+): number {
     let current = midi;
 
     // If we have a target (e.g. previous note), try to get as close as possible

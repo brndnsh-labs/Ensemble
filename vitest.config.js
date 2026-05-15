@@ -31,6 +31,21 @@ const renamedModules = [
     'state/instruments',
     'history',
     'ui-bridge',
+    'visualizer-events',
+    'engine/coordination-engine',
+    'song-generator',
+    'lead-sheet-model',
+    'state',
+    'persistence',
+    'sharing',
+    'worker-client',
+    'midi-controller',
+    'engine/chords-styles',
+    'engine/drum-seeder',
+    'engine/groove-engine',
+    'state-hydration',
+    'state-effects',
+    'arranger-controller',
 ];
 
 const publicDir = path.resolve(import.meta.dirname, 'public');

@@ -6,12 +6,15 @@ import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
 import { vizReducer, vizState } from './state/visualizer.js';
+import type { ActionPayloadMap, EnsembleState } from './types.js';
 import { ACTIONS } from './types.js';
+
+/** @deprecated Use EnsembleState directly */
+export type StateMap = EnsembleState;
 
 // --- Global Export for E2E ---
 if (typeof window !== 'undefined') {
-    /** @type {Promise<any> | null} */
-    let toolLoaderPromise = null;
+    let toolLoaderPromise: Promise<any> | null = null;
 
     const ensemble = {
         dispatch,
@@ -49,18 +52,10 @@ if (typeof window !== 'undefined') {
         },
     };
 
-    /** @type {any} */ (window).ensemble = ensemble;
+    (window as any).ensemble = ensemble;
 }
 
-// Central State Map for Generic PARAM Updates
-/**
- * @typedef {import('./types.js').EnsembleState} StateMap
- */
-
-/**
- * @type {StateMap}
- */
-export const stateMap = {
+export const stateMap: EnsembleState = {
     playback,
     chords,
     bass,
@@ -77,16 +72,14 @@ export const stateMap = {
  * Unified getter for global state.
  * Use this instead of importing individual state slices to ensure
  * easier refactoring and better type safety in the future.
- * @returns {import('./types.js').EnsembleState}
  */
-export function getState() {
+export function getState(): EnsembleState {
     return stateMap;
 }
 
 /**
  * Creates a worker-safe, raw snapshot of the global state.
- * Strips deepSignal proxies and filter for necessary worker properties.
- * @returns {Object}
+ * Strips deepSignal proxies and filters for necessary worker properties.
  */
 export function getSyncState() {
     const { playback, arranger, chords, bass, soloist, harmony, groove, midi } = stateMap;
@@ -176,7 +169,7 @@ export function getSyncState() {
             fillMap: groove.fillMap,
             accentMap: groove.accentMap,
             seedTimelineStartStep: groove.seedTimelineStartStep,
-            instruments: groove.instruments.map((/** @type {any} */ i) => ({
+            instruments: groove.instruments.map((i: any) => ({
                 name: i.name,
                 steps: [...i.steps],
                 muted: i.muted,
@@ -223,11 +216,7 @@ export {
 
 // Persistence Helpers
 export const storage = {
-    /**
-     * @param {string} key
-     * @returns {any}
-     */
-    get: (key) => {
+    get: (key: string): any => {
         if (typeof localStorage === 'undefined' || !localStorage?.getItem) {
             return [];
         }
@@ -238,11 +227,7 @@ export const storage = {
             return [];
         }
     },
-    /**
-     * @param {string} key
-     * @param {any} val
-     */
-    save: (key, val) => {
+    save: (key: string, val: any): void => {
         if (typeof localStorage === 'undefined' || !localStorage?.setItem) {
             return;
         }
@@ -256,16 +241,21 @@ export const storage = {
 
 // --- Event Bus / State Manager ---
 
-/** @type {Set<Function>} */
-const listeners = new Set();
+type StateListener = (
+    action: string,
+    payload: any,
+    state: EnsembleState,
+    meta: { oldBpm: number; dispatch: typeof dispatch },
+) => void;
 
-/**
- * Dispatch a state change action.
- * @template {keyof import('./types.js').ActionPayloadMap | string} T
- * @param {T} action - The action type (e.g., ACTIONS.SET_BAND_INTENSITY).
- * @param {T extends keyof import('./types.js').ActionPayloadMap ? import('./types.js').ActionPayloadMap[T] : any} [payload] - The data associated with the action.
- */
-export function dispatch(action, payload) {
+const listeners = new Set<StateListener>();
+
+export function dispatch<T extends keyof ActionPayloadMap>(
+    action: T,
+    payload: ActionPayloadMap[T],
+): void;
+export function dispatch(action: string, payload?: any): void;
+export function dispatch(action: any, payload?: any): void {
     // Accessing deepSignal property directly works like a getter
     const oldBpm = playback.bpm;
 
@@ -284,10 +274,9 @@ export function dispatch(action, payload) {
 
 /**
  * Subscribe to state changes.
- * @param {Function} listener - Callback function receiving (action, payload, state).
- * @returns {Function} Unsubscribe function.
+ * @returns Unsubscribe function.
  */
-export function subscribe(listener) {
+export function subscribe(listener: StateListener): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
 }

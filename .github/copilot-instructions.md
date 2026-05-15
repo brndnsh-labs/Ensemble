@@ -54,14 +54,14 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 
 ### State and side effects
 
-- `public/state.js` composes the app state from domain slices in `public/state/` (`playback`, `arranger`, `groove`, `instruments`, `midi`, `ui`, `visualizer`, `conductor`).
+- `public/state.ts` composes the app state from domain slices in `public/state/` (`playback`, `arranger`, `groove`, `instruments`, `midi`, `ui`, `visualizer`, `conductor`).
 - Each slice is a `deepSignal`, so reducers mutate signal-backed objects directly, but app-level writes are still expected to flow through `dispatch(ACTIONS.*, payload)`.
 - `public/ui-bridge.ts` exposes `useEnsembleState()`. In components, reading a property inside the selector is what establishes reactivity; there is no legacy "version bump" model to maintain.
-- `public/state-effects.js` owns the cross-module side effects that are intentionally kept out of reducers: playback start/stop, session seeding, drum preset loading, BPM side effects, theme/MIDI hydration, and toast/flash expirations.
+- `public/state-effects.ts` owns the cross-module side effects that are intentionally kept out of reducers: playback start/stop, session seeding, drum preset loading, BPM side effects, theme/MIDI hydration, and toast/flash expirations.
 
 ### Generative engine pipeline
 
-- `public/worker-client.js` is the main-thread bridge to `public/logic-worker.js`. It sends either a full raw snapshot (`getSyncState()`) or targeted deltas (`syncWorker(action, payload)`).
+- `public/worker-client.ts` is the main-thread bridge to `public/logic-worker.js`. It sends either a full raw snapshot (`getSyncState()`) or targeted deltas (`syncWorker(action, payload)`).
 - `public/logic-worker.js` owns real-time note generation, buffer fills, resolution handling, and MIDI export orchestration. Worker state is reset/synced through the message types in `public/worker-types.ts`.
 - `public/engine/scheduler-core.js` is the real-time scheduler. It consumes worker-produced buffers, schedules WebAudio and MIDI, handles transport start/stop, and coordinates resolution endings.
 - Timing-sensitive audio work is based on `playback.audio.currentTime`, not UI clocks.
@@ -80,7 +80,7 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 - For transport/audio behavior, reuse existing controller and scheduler entrypoints (`togglePlay`, `setBpm`, `loadDrumPreset`, etc.) instead of creating parallel side-effect paths.
 - UI code should read state through `useEnsembleState()`, not by manually mirroring global state into component-local copies.
 - `public/styles.css` is an import manifest, not a dumping ground. Add CSS rules to the owning file under `public/css/` instead of appending feature styles to the manifest.
-- UI metadata and musical behavior are split deliberately: menu/category definitions live in `public/data/instrument-styles.ts`, while the actual generative behavior lives in engine modules such as `public/engine/bass-styles.js`, `public/engine/chords-styles.js`, and `public/engine/grooves/`.
+- UI metadata and musical behavior are split deliberately: menu/category definitions live in `public/data/instrument-styles.ts`, while the actual generative behavior lives in engine modules such as `public/engine/bass-styles.js`, `public/engine/chords-styles.ts`, and `public/engine/grooves/`.
 - Musical engine changes should preserve deterministic, seeded behavior where possible. Prefer bar/section/seed-driven motif generation over unstructured `Math.random()` so critique tests and looped playback stay coherent.
 - When musical correctness and programmer convenience conflict, favor musicality: preserve groove, phrasing, voice-leading, and authentic feel instead of "clean" math that flattens the music.
 - New or changed musical heuristics should keep explicit JSDoc and comments for intentional probabilities, offsets, and phrasing rules. This codebase treats "musical intent" as part of the implementation, not as disposable tuning noise.

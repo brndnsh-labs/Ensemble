@@ -2,7 +2,7 @@
 
 Ensemble offloads heavy musical generation and MIDI processing to a background Web Worker (`logic-worker.js`). This document defines the message schema and synchronization logic between the Main Thread and the Worker.
 
-Source of truth: message constants live in `public/worker-types.ts`, and register slotting lives in `public/engine/coordination-engine.js`.
+Source of truth: message constants live in `public/worker-types.ts`, and register slotting lives in `public/engine/coordination-engine.ts`.
 
 ## Architectural Overview
 
@@ -153,7 +153,7 @@ Reports an internal worker error.
 
 ## Responsibility Split
 
-- `public/worker-client.js` posts `WORKER_MSG.*` messages and routes `WORKER_RESP.*` back to the main thread.
+- `public/worker-client.ts` posts `WORKER_MSG.*` messages and routes `WORKER_RESP.*` back to the main thread.
 - `public/logic-worker.js` translates those messages into sync, reset, buffer-fill, resolution, and export work.
 - `public/engine/worker-buffer-manager.ts` handles lookahead fill orchestration.
 - `public/engine/tick-logic.js` generates per-step musical data and applies coordination/register slotting before notes leave the worker.

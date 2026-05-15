@@ -10,17 +10,15 @@ import { togglePlay } from './engine/scheduler-core.js';
 import { generateSessionSeed } from './engine/soloist-seeder.js';
 import { loadDrumPreset } from './instrument-controller.js';
 import { initMIDI } from './midi-controller.js';
+import type { EnsembleState } from './types.js';
 import { ACTIONS } from './types.js';
 
-/**
- * Handle side effects for specific actions.
- * Extracted from state.js to break circular dependencies with the engine.
- * @param {string} action
- * @param {any} payload
- * @param {import('./types.js').EnsembleState} stateMap
- * @param {any} [context={}]
- */
-export function handleEffects(action, payload, stateMap, context = {}) {
+export function handleEffects(
+    action: string,
+    payload: any,
+    stateMap: EnsembleState,
+    context: any = {},
+): void {
     const { dispatch } = context;
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
@@ -153,16 +151,6 @@ export function handleEffects(action, payload, stateMap, context = {}) {
             break;
         }
         case ACTIONS.SHOW_TOAST: {
-            // We re-dispatch with an ID so the reducer can store it and we can expire it
-            // but the reducer already handles the first SHOW_TOAST.
-            // Actually, we can just use the payload if it's already an object with an ID,
-            // or if it's a string, we know the reducer will generate one.
-            // Better: let the reducer handle the initial state, and here we just set the timer.
-            // But we need the ID. Let's look at how SHOW_TOAST is called.
-
-            // Optimization: If payload is a string, we need to know what ID the reducer gave it.
-            // Or we can generate the ID here and pass it to the reducer.
-            // Let's assume the reducer and effects are called in sequence.
             const toastId = stateMap.playback.toasts[stateMap.playback.toasts.length - 1]?.id;
             if (toastId) {
                 setTimeout(() => {

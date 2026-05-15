@@ -1,30 +1,29 @@
 import { DRUM_MAP } from './engine/midi-constants.js';
 import { normalizeMidiVelocity } from './engine/midi-utils.js';
+import type { MidiState } from './state/midi.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
 
-/** @type {any} */
-let midiAccess = null;
+let midiAccess: any = null;
 
 // Track pending Note Offs to handle overlaps/legato properly.
 // Key: `${channel}_${note}`, Value: timeoutId
-const activeNoteOffs = new Map();
+const activeNoteOffs = new Map<string, { id: ReturnType<typeof setTimeout>; endTime: number }>();
 
 // Track currently active ("On") notes to send explicit Offs during panic.
 // Key: `${channel}_${note}`
-const activeNotes = new Set();
+const activeNotes = new Set<string>();
 
 // Cache for redundant message filtering to prevent flooding the MIDI stream.
 // Key: `${channel}_${controller}` -> value
-const sentCCValues = new Map();
+const sentCCValues = new Map<string, number>();
 // Key: `${channel}` -> value
-const sentBendValues = new Map();
+const sentBendValues = new Map<number, number>();
 
 /**
  * Handles incoming MIDI messages from controllers.
- * @param {any} event
  */
-function handleMIDIMessage(event) {
+function handleMIDIMessage(event: any): void {
     const { midi } = getState();
     if (!midi.enabled) {
         return;
@@ -46,7 +45,7 @@ function handleMIDIMessage(event) {
 /**
  * Initializes Web MIDI access and populates available outputs.
  */
-export async function initMIDI() {
+export async function initMIDI(): Promise<boolean> {
     if (!navigator.requestMIDIAccess) {
         console.warn('Web MIDI API not supported in this browser.');
         return false;
@@ -76,11 +75,11 @@ export async function initMIDI() {
 /**
  * Updates the state with current list of MIDI outputs.
  */
-function syncMIDIOutputs() {
+function syncMIDIOutputs(): void {
     if (!midiAccess) {
         return;
     }
-    const outputs = [];
+    const outputs: { id: string; name: string }[] = [];
     for (const output of midiAccess.outputs.values()) {
         outputs.push({ id: output.id, name: output.name });
     }
@@ -89,10 +88,10 @@ function syncMIDIOutputs() {
 
 /**
  * Internal helper to get active MIDI output and calculated timestamp.
- * @param {number} time - AudioContext time.
- * @returns {{output: any, midiTime: number, midiState: import('./state/midi.js').MidiState}|null}
  */
-function getMIDIOutputAndTimestamp(time) {
+function getMIDIOutputAndTimestamp(
+    time: number,
+): { output: any; midiTime: number; midiState: MidiState } | null {
     const { playback, midi } = getState();
     if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
         return null;
@@ -103,19 +102,21 @@ function getMIDIOutputAndTimestamp(time) {
     }
 
     const midiTime =
-        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
+        (time - ((playback as any).audio?.currentTime || 0)) * 1000 +
+        performance.now() +
+        midi.latency;
 
     return { output, midiTime, midiState: midi };
 }
 
 /**
  * Sends a MIDI Note On message.
- * @param {number} channel - 1-16
- * @param {number} note - MIDI note number 0-127
- * @param {number} velocity - 0-127
- * @param {number} time - AudioContext time
+ * @param channel - 1-16
+ * @param note - MIDI note number 0-127
+ * @param velocity - 0-127
+ * @param time - AudioContext time
  */
-function sendMIDINoteOn(channel, note, velocity, time) {
+function sendMIDINoteOn(channel: number, note: number, velocity: number, time: number): void {
     const res = getMIDIOutputAndTimestamp(time);
     if (!res) {
         return;
@@ -129,11 +130,11 @@ function sendMIDINoteOn(channel, note, velocity, time) {
 
 /**
  * Sends a MIDI Note Off message.
- * @param {number} channel - 1-16
- * @param {number} note - MIDI note number 0-127
- * @param {number} time - AudioContext time
+ * @param channel - 1-16
+ * @param note - MIDI note number 0-127
+ * @param time - AudioContext time
  */
-function sendMIDINoteOff(channel, note, time) {
+function sendMIDINoteOff(channel: number, note: number, time: number): void {
     const res = getMIDIOutputAndTimestamp(time);
     if (!res) {
         return;
@@ -147,12 +148,12 @@ function sendMIDINoteOff(channel, note, time) {
 
 /**
  * Sends a MIDI Control Change message.
- * @param {number} channel - 1-16
- * @param {number} controller - CC number 0-127
- * @param {number} value - 0-127
- * @param {number} time - AudioContext time
+ * @param channel - 1-16
+ * @param controller - CC number 0-127
+ * @param value - 0-127
+ * @param time - AudioContext time
  */
-export function sendMIDICC(channel, controller, value, time) {
+export function sendMIDICC(channel: number, controller: number, value: number, time: number): void {
     const res = getMIDIOutputAndTimestamp(time);
     if (!res) {
         return;
@@ -172,11 +173,11 @@ export function sendMIDICC(channel, controller, value, time) {
 
 /**
  * Sends a MIDI Pitch Bend message.
- * @param {number} channel - 1-16
- * @param {number} value - -8192 to 8191 (Center 0)
- * @param {number} time - AudioContext time
+ * @param channel - 1-16
+ * @param value - -8192 to 8191 (Center 0)
+ * @param time - AudioContext time
  */
-export function sendMIDIPitchBend(channel, value, time) {
+export function sendMIDIPitchBend(channel: number, value: number, time: number): void {
     const res = getMIDIOutputAndTimestamp(time);
     if (!res) {
         return;
@@ -201,21 +202,22 @@ export function sendMIDIPitchBend(channel, value, time) {
 /**
  * Convenience helper to send a note with a duration.
  * Includes a small safety gap to ensure Note Offs occur before the next Note On.
- * intelligently handles overlaps by truncating previous notes if they overlap with new ones.
- * @param {number} channel
- * @param {number} note
- * @param {number} velocity
- * @param {number} time
- * @param {number} duration
- * @param {boolean|Object} [options] - If true, enforces monophony. Or pass object { isMono, bend }
+ * Intelligently handles overlaps by truncating previous notes if they overlap with new ones.
  */
-export function sendMIDINote(channel, note, velocity, time, duration, options = false) {
+export function sendMIDINote(
+    channel: number,
+    note: number,
+    velocity: number,
+    time: number,
+    duration: number,
+    options: boolean | { isMono?: boolean; bend?: number } = false,
+): void {
     const { playback } = getState();
-    const isMono = typeof options === 'boolean' ? options : !!(/** @type {any} */ (options).isMono);
-    const bend = typeof options === 'object' ? /** @type {any} */ (options).bend : 0;
+    const isMono = typeof options === 'boolean' ? options : !!(options as any).isMono;
+    const bend = typeof options === 'object' ? (options as any).bend : 0;
 
     const key = `${channel}_${note}`;
-    const now = playback.audio?.currentTime || 0;
+    const now = (playback as any).audio?.currentTime || 0;
 
     // 0. Strict Monophony Enforcement (Voice Stealing at MIDI level)
     if (isMono) {
@@ -230,8 +232,7 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
                     const { output, midiState } = res;
                     const status = 0x80 | (channel - 1);
                     if (activeNoteOffs.has(activeKey)) {
-                        /** @type {any} */
-                        const prev = activeNoteOffs.get(activeKey);
+                        const prev = activeNoteOffs.get(activeKey)!;
                         if (prev.endTime > time) {
                             clearTimeout(prev.id);
                             const cutoffTime = Math.max(now, time - 0.005);
@@ -241,7 +242,8 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
                                 if (activeNotes.has(ak)) {
                                     output.send(
                                         [status, activeNote, 0],
-                                        (cutoffTime - (playback.audio?.currentTime || 0)) * 1000 +
+                                        (cutoffTime - ((playback as any).audio?.currentTime || 0)) *
+                                            1000 +
                                             performance.now() +
                                             midiState.latency,
                                     );
@@ -265,8 +267,7 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
 
     // 1. Check for overlapping previous note on the same channel/pitch
     if (activeNoteOffs.has(key)) {
-        /** @type {any} */
-        const prev = activeNoteOffs.get(key);
+        const prev = activeNoteOffs.get(key)!;
         if (prev.endTime > time) {
             // Cancel the original late Off
             clearTimeout(prev.id);
@@ -306,9 +307,7 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
     const delayMs = Math.max(0, delaySeconds * 1000);
 
     const timeoutId = setTimeout(() => {
-        sendMIDINoteOff(channel, note, playback.audio?.currentTime || 0);
-        // Only delete if it's THIS timeout (in case we overwrote it, but we cleared before, so it's fine)
-        /** @type {any} */
+        sendMIDINoteOff(channel, note, (playback as any).audio?.currentTime || 0);
         const current = activeNoteOffs.get(key);
         if (current && current.id === timeoutId) {
             activeNoteOffs.delete(key);
@@ -321,16 +320,15 @@ export function sendMIDINote(channel, note, velocity, time, duration, options = 
 
 /**
  * Specifically handles drum scheduling for MIDI.
- * @param {string} instrumentName
- * @param {number} time
- * @param {number} velocity
- * @param {number} [octaveOffset]
  */
-export function sendMIDIDrum(instrumentName, time, velocity, octaveOffset = 0) {
+export function sendMIDIDrum(
+    instrumentName: string,
+    time: number,
+    velocity: number,
+    octaveOffset = 0,
+): void {
     const { midi } = getState();
-    /** @type {any} */
-    const drumMap = DRUM_MAP;
-    const note = (drumMap[instrumentName] || 36) + octaveOffset * 12;
+    const note = ((DRUM_MAP as Record<string, number>)[instrumentName] || 36) + octaveOffset * 12;
     const vel = normalizeMidiVelocity(velocity, midi.velocitySensitivity);
     // Drums are usually short triggers, so we'll send a note off shortly after
     sendMIDINote(midi.drumsChannel, note, vel, time, 0.05);
@@ -338,10 +336,10 @@ export function sendMIDIDrum(instrumentName, time, velocity, octaveOffset = 0) {
 
 /**
  * Sends a MIDI Transport message (Start/Stop).
- * @param {string} type - 'start' (0xFA) or 'stop' (0xFC)
- * @param {number} time - AudioContext time
+ * @param type - 'start' (0xFA) or 'stop' (0xFC)
+ * @param time - AudioContext time
  */
-export function sendMIDITransport(type, time) {
+export function sendMIDITransport(type: string, time: number): void {
     const res = getMIDIOutputAndTimestamp(time);
     if (!res) {
         return;
@@ -353,22 +351,19 @@ export function sendMIDITransport(type, time) {
 
 /**
  * All Notes Off for all channels.
- * @param {boolean} [resetAll] - If true, sends Reset All Controllers (CC 121) to all channels.
+ * @param resetAll - If true, sends Reset All Controllers (CC 121) to all channels.
  */
-export function panic(resetAll = false) {
+export function panic(resetAll = false): void {
     const { midi } = getState();
     // 1. Clear future Note Offs (they are no longer needed as we'll kill now)
     for (const [, value] of activeNoteOffs) {
-        /** @type {any} */
-        const v = value;
-        clearTimeout(v.id);
+        clearTimeout(value.id);
     }
     activeNoteOffs.clear();
 
     if (!midi.selectedOutputId || !midiAccess) {
         return;
     }
-    /** @type {any} */
     const output = midiAccess.outputs.get(midi.selectedOutputId);
     if (!output) {
         return;

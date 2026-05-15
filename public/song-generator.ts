@@ -1,7 +1,7 @@
 import { KEY_ORDER } from './config.js';
 import { generateId } from './utils.js';
 
-const STRUCTURES = {
+const STRUCTURES: Record<string, string[]> = {
     pop: ['Intro', 'Verse', 'Chorus', 'Verse', 'Chorus', 'Bridge', 'Chorus', 'Outro'],
     ballad: ['Intro', 'Verse', 'Verse', 'Chorus', 'Verse', 'Chorus', 'Bridge', 'Chorus', 'Outro'],
     blues: ['Intro', 'Verse', 'Verse', 'Solo', 'Verse', 'Outro'],
@@ -11,7 +11,7 @@ const STRUCTURES = {
 };
 
 // Weighted pools for different sections
-const PROGRESSIONS = {
+const PROGRESSIONS: Record<string, Record<string, string[][]>> = {
     pop: {
         Intro: [
             ['I', 'IV', 'I', 'IV'],
@@ -122,20 +122,14 @@ const PROGRESSIONS = {
     },
 };
 
-/**
- * @template T
- * @param {Array<T>} arr
- * @returns {T}
- */
-const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+function rand<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
 
 /**
  * Adds extensions to basic Roman Numeral chords based on complexity.
- * @param {string} chord
- * @param {number} complexity
- * @returns {string}
  */
-function applyComplexity(chord, complexity) {
+function applyComplexity(chord: string, complexity: number): string {
     if (complexity < 0.2) {
         return chord;
     }
@@ -186,17 +180,13 @@ function applyComplexity(chord, complexity) {
 /**
  * Formats a progression by looping/truncating chord array to desired bar length
  * and optionally adding complexity extensions.
- * @param {Array<string>} chordArray
- * @param {number} bars
- * @param {number} [complexity=0.3]
- * @returns {string}
  */
-function formatProgression(chordArray, bars, complexity = 0.3) {
+function formatProgression(chordArray: string[], bars: number, complexity = 0.3): string {
     if (chordArray.length === 12) {
         return chordArray.join(' | ');
     }
 
-    const result = [];
+    const result: string[] = [];
     const sourceLen = chordArray.length;
 
     for (let i = 0; i < bars; i++) {
@@ -208,13 +198,21 @@ function formatProgression(chordArray, bars, complexity = 0.3) {
     return result.join(' | ');
 }
 
+export interface GeneratedSection {
+    id: string;
+    label: string;
+    value: string;
+    key: string;
+    timeSignature: string;
+    repeat: number;
+}
+
 /**
  * Generates a song structure and progressions based on options.
- * @param {any} [options={}]
- * @returns {Array<{id: string, label: string, value: string, key: string, timeSignature: string, repeat: number}>}
  */
-export function generateSong(options = {}) {
-    const key = options.key === 'Random' ? rand(KEY_ORDER) : options.key || 'C';
+export function generateSong(options: any = {}): GeneratedSection[] {
+    const key =
+        options.key === 'Random' ? rand(KEY_ORDER as unknown as string[]) : options.key || 'C';
     const isMinor = !!options.isMinor;
     const complexity = options.complexity !== undefined ? options.complexity : 0.3;
 
@@ -237,19 +235,15 @@ export function generateSong(options = {}) {
     }
 
     let poolKey = style;
-    if (isMinor && /** @type {any} */ (PROGRESSIONS)[`${style}_minor`]) {
+    if (isMinor && PROGRESSIONS[`${style}_minor`]) {
         poolKey = `${style}_minor`;
     }
 
-    /** @type {Array<string>} */
-    const structureTemplate = /** @type {any} */ (STRUCTURES)[style] || STRUCTURES.pop;
-    /** @type {any} */
-    const pool = /** @type {any} */ (PROGRESSIONS)[poolKey] || PROGRESSIONS.pop;
+    const structureTemplate: string[] = STRUCTURES[style] || STRUCTURES.pop;
+    const pool = PROGRESSIONS[poolKey] || PROGRESSIONS.pop;
 
-    /** @type {Array<{id: string, label: string, value: string, key: string, timeSignature: string, repeat: number}>} */
-    const sections = [];
-    /** @type {Record<string, string>} */
-    const memory = {}; // Remember what "Verse" (or "A") sounds like
+    const sections: GeneratedSection[] = [];
+    const memory: Record<string, string> = {}; // Remember what "Verse" (or "A") sounds like
 
     // If a seed is provided, pre-populate memory for that section type
     if (options.seed?.type && options.seed.value) {
@@ -272,7 +266,7 @@ export function generateSong(options = {}) {
             bars = 4;
         }
 
-        let progressionStr;
+        let progressionStr: string;
 
         // Simplified memory for Jazz AABA
         const memKey = label.startsWith('A') ? 'A' : label;

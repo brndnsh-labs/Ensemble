@@ -81,7 +81,7 @@ This document is the primary operational guide for AI agents working on the Ense
 
 ### D. Coordination & Register Slotting
 Always pass the `CoordinationContext` to instrument generators. In `logic-worker.js`, ensure all notes are processed through `enforceRegisterSlotting` to maintain interactive register slots:
-*   **Source of truth:** `public/engine/coordination-engine.js`
+*   **Source of truth:** `public/engine/coordination-engine.ts`
 *   **Bass:** 23–57
 *   **Chords/Harmony:** 52–84
 *   **Soloist:** Priority 60–90, but only clamp into that lane when a note would fall below MIDI 52.

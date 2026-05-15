@@ -1,30 +1,27 @@
 import { getState, getSyncState } from './state.js';
+import type { EnsembleState } from './types.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
+
+declare const WORKER_PATH: string;
 
 const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 
-/** @type {Worker|null} */
-let timerWorker = null;
-/** @type {Function|null} */
-let schedulerRequestHandler = null;
-/** @type {Function|null} */
-let notesReceivedHandler = null;
-/** @type {Function|null} */
-let exportProgressHandler = null;
+let timerWorker: Worker | null = null;
+let schedulerRequestHandler: ((...args: any[]) => void) | null = null;
+let notesReceivedHandler: ((...args: any[]) => void) | null = null;
+let exportProgressHandler: ((progress: number) => void) | null = null;
 
-export const getTimerWorker = () => timerWorker;
+export const getTimerWorker = (): Worker | null => timerWorker;
 
-/** @param {Function} handler */
-export function setExportProgressHandler(handler) {
+export function setExportProgressHandler(handler: (progress: number) => void): void {
     exportProgressHandler = handler;
 }
 
-/**
- * @param {Function} onSchedulerRequest
- * @param {Function} onNotesReceived
- */
-export function initWorker(onSchedulerRequest, onNotesReceived) {
+export function initWorker(
+    onSchedulerRequest: (...args: any[]) => void,
+    onNotesReceived: (...args: any[]) => void,
+): void {
     if (timerWorker) {
         schedulerRequestHandler = onSchedulerRequest;
         notesReceivedHandler = onNotesReceived;
@@ -82,20 +79,19 @@ export function initWorker(onSchedulerRequest, onNotesReceived) {
     };
 }
 
-/** @param {any} options */
-export function startExport(options) {
+export function startExport(options: any): void {
     if (timerWorker) {
         timerWorker.postMessage({ type: WORKER_MSG.EXPORT, data: options });
     }
 }
 
-export function startWorker() {
+export function startWorker(): void {
     if (timerWorker) {
         timerWorker.postMessage({ type: WORKER_MSG.START });
     }
 }
 
-export function stopWorker() {
+export function stopWorker(): void {
     if (timerWorker) {
         timerWorker.postMessage({ type: WORKER_MSG.STOP });
     }
@@ -104,10 +100,8 @@ export function stopWorker() {
 /**
  * Deeply unwrap proxy/signal objects into plain objects.
  * Much faster than JSON.parse(JSON.stringify(val)).
- * @param {any} val
- * @returns {any}
  */
-function toRaw(val) {
+function toRaw(val: any): any {
     if (val === null || typeof val !== 'object') {
         return val;
     }
@@ -126,8 +120,7 @@ function toRaw(val) {
     if (val instanceof Map) {
         return new Map(Array.from(val.entries()).map(([k, v]) => [k, toRaw(v)]));
     }
-    /** @type {Record<string, any>} */
-    const raw = {};
+    const raw: Record<string, any> = {};
     for (const key in val) {
         if (Object.hasOwn(val, key)) {
             const rawVal = toRaw(val[key]);
@@ -140,11 +133,7 @@ function toRaw(val) {
     return raw;
 }
 
-/**
- * @param {number} step
- * @param {any} [syncData]
- */
-export function flushWorker(step, syncData = null) {
+export function flushWorker(step: number, syncData: any = null): void {
     if (timerWorker) {
         timerWorker.postMessage({
             type: WORKER_MSG.FLUSH,
@@ -157,8 +146,7 @@ export function flushWorker(step, syncData = null) {
     }
 }
 
-/** @param {number} step */
-export function requestBuffer(step) {
+export function requestBuffer(step: number): void {
     if (timerWorker) {
         timerWorker.postMessage({
             type: WORKER_MSG.REQUEST_BUFFER,
@@ -167,8 +155,7 @@ export function requestBuffer(step) {
     }
 }
 
-/** @param {number} step */
-export function requestResolution(step) {
+export function requestResolution(step: number): void {
     if (timerWorker) {
         timerWorker.postMessage({
             type: WORKER_MSG.RESOLUTION,
@@ -177,18 +164,13 @@ export function requestResolution(step) {
     }
 }
 
-/**
- * @param {string} [action]
- * @param {any} [payload]
- */
-export function syncWorker(action, payload) {
+export function syncWorker(action?: string, payload?: any): void {
     if (!timerWorker) {
         return;
     }
     const { arranger, chords, soloist, harmony, groove, playback } = getState();
 
-    /** @type {Partial<Record<keyof import('./types.js').EnsembleState, any>>} */
-    const data = {};
+    const data: Partial<Record<keyof EnsembleState, any>> = {};
 
     if (!action) {
         // Full Sync
@@ -219,7 +201,7 @@ export function syncWorker(action, payload) {
             break;
         case 'SET_PARAM':
             if (payload.module) {
-                /** @type {any} */ (data)[payload.module] = { [payload.param]: payload.value };
+                (data as any)[payload.module] = { [payload.param]: payload.value };
             }
             break;
         case 'UPDATE_CONDUCTOR_DECISION':
@@ -232,17 +214,17 @@ export function syncWorker(action, payload) {
             break;
         case 'SET_STYLE':
             if (payload.module) {
-                /** @type {any} */ (data)[payload.module] = { style: payload.style };
+                (data as any)[payload.module] = { style: payload.style };
             }
             break;
         case 'SET_VOLUME':
             if (payload.module) {
-                /** @type {any} */ (data)[payload.module] = { volume: payload.value };
+                (data as any)[payload.module] = { volume: payload.value };
             }
             break;
         case 'SET_OCTAVE':
             if (payload.module) {
-                /** @type {any} */ (data)[payload.module] = { octave: payload.value };
+                (data as any)[payload.module] = { octave: payload.value };
             }
             break;
         case 'SET_MIDI_CONFIG':

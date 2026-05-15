@@ -1,10 +1,9 @@
 import { MIXER_SETTINGS_VERSION } from './state/instruments.js';
 import { getState, storage } from './state.js';
 
-/** @type {ReturnType<typeof setTimeout> | undefined} */
-let saveTimeout;
+let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 
-export function saveCurrentState() {
+export function saveCurrentState(): void {
     const { arranger, playback, chords, bass, soloist, harmony, groove, vizState, midi } =
         getState();
     if (saveTimeout) {
@@ -34,7 +33,7 @@ export function saveCurrentState() {
         chords: {
             enabled: chords.enabled,
             style: chords.style,
-            instrument: /** @type {any} */ (chords).instrument,
+            instrument: (chords as any).instrument,
             octave: chords.octave,
             density: chords.density,
             volume: chords.volume,
@@ -103,7 +102,7 @@ export function saveCurrentState() {
     storage.save('currentState', data);
 }
 
-export function debounceSaveState() {
+export function debounceSaveState(): void {
     if (saveTimeout) {
         clearTimeout(saveTimeout);
     }

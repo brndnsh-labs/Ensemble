@@ -21,8 +21,7 @@ import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG } from './grooves/utils.js';
 
-/** @type {Record<string, any>} */
-const strategies = {
+const strategies: Record<string, any> = {
     Jazz: jazz,
     Blues: blues,
     Rock: rock,
@@ -41,9 +40,7 @@ const strategies = {
     Shred: shred,
 };
 
-/** @param {any} groove */
-/** @param {any} groove */
-function getStrategy(groove) {
+function getStrategy(groove: any): any {
     const isLatinStyle =
         groove.genreFeel === 'Bossa Nova' ||
         ['Bossa Nova', 'Latin/Salsa', 'Afro-Cuban 6/8', 'Samba'].includes(groove.lastDrumPreset) ||
@@ -55,28 +52,12 @@ function getStrategy(groove) {
     return strategies[groove.genreFeel] || null;
 }
 
-/**
- * @param {number} vel
- * @param {number} [amount=0.05]
- */
-/**
- * @param {number} vel
- * @param {number} [amount=0.05]
- */
-function humanizeVelocity(vel, amount = 0.05) {
+function humanizeVelocity(vel: number, amount = 0.05): number {
     return vel * (1.0 + (Math.random() - 0.5) * amount);
 }
 
-/**
- * @param {any} state
- * @param {any} options
- */
-/**
- * @param {any} state
- * @param {any} options
- */
 export function applyGrooveOverrides(
-    state,
+    state: any,
     {
         stepVal,
         step,
@@ -98,7 +79,7 @@ export function applyGrooveOverrides(
         isCompound,
         stepInGroup,
         groupIndex,
-    },
+    }: any,
 ) {
     const { soloist, arranger } = state;
     const arrangerState = { timeSignature: '4/4', ...(arranger || {}) };
@@ -133,7 +114,7 @@ export function applyGrooveOverrides(
     const seedTimelineStartStep = groove.seedTimelineStartStep || 0;
     const timelineStep = step - seedTimelineStartStep;
 
-    const orchestration = groove.orchestrationMap
+    const orchestration: any = groove.orchestrationMap
         ? binarySearchMap(groove.orchestrationMap, timelineStep)
         : null;
     const effectiveComplexity =
@@ -153,7 +134,7 @@ export function applyGrooveOverrides(
 
     const justFinishedTurnaround = prevWasTurnaround && isFirstStepOfNewBar;
 
-    const chordEntry = binarySearchMap(arrangerState.stepMap || [], step);
+    const chordEntry: any = binarySearchMap(arrangerState.stepMap || [], step);
     const sectionId = chordEntry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
     if (sectionSeed === undefined) {
@@ -307,13 +288,7 @@ export function applyGrooveOverrides(
     return currentState;
 }
 
-/**
- * @param {number} step
- * @param {number} bpm
- * @param {any} ts
- * @param {any} groove
- */
-export function calculateStepDuration(step, bpm, ts, groove) {
+export function calculateStepDuration(step: number, bpm: number, ts: any, groove: any): number {
     const sixteenthSec = 0.25 * (60.0 / bpm);
     let duration = sixteenthSec;
 
@@ -346,11 +321,7 @@ export function calculateStepDuration(step, bpm, ts, groove) {
     return duration;
 }
 
-/**
- * @param {any} playback
- * @param {any} groove
- */
-export function calculatePocketOffset(playback, groove) {
+export function calculatePocketOffset(playback: any, groove: any): number {
     let pocketOffset = calculateTimingOffset('drums', groove.pocket, playback.bandIntensity);
     const strategy = getStrategy(groove);
     if (strategy?.config.dillaFeel) {
@@ -359,19 +330,12 @@ export function calculatePocketOffset(playback, groove) {
     return pocketOffset;
 }
 
-/**
- * @param {number} seed
- * @param {string} genreFeel
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- */
-/**
- * @param {number} seed
- * @param {string} genreFeel
- * @param {number} complexity
- * @param {number} [intensity=1.0]
- */
-export function getDrumMotif(seed, genreFeel, complexity, intensity = 1.0) {
+export function getDrumMotif(
+    seed: number,
+    genreFeel: string,
+    complexity: number,
+    intensity = 1.0,
+): number {
     const mockGroove = { genreFeel };
     const strategy = getStrategy(mockGroove);
     if (strategy?.getMotif) {

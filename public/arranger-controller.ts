@@ -1,5 +1,3 @@
-const NOTE_MATCH_PATTERN = /^([A-G](?:[#b\u266F\u266D])?)(.*)/i;
-
 import { KEY_ORDER } from './config.js';
 import {
     mutateProgression,
@@ -20,7 +18,9 @@ import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
 import { syncWorker } from './worker-client.js';
 
-export function saveProgression() {
+const NOTE_MATCH_PATTERN = /^([A-G](?:[#b♯♭])?)(.*)/i;
+
+export function saveProgression(): void {
     const { arranger } = getState();
     const name = prompt(
         'Name your chord progression:',
@@ -30,7 +30,7 @@ export function saveProgression() {
         return;
     }
 
-    let userPresets = [];
+    let userPresets: any[] = [];
     try {
         userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
         if (!Array.isArray(userPresets)) {
@@ -52,18 +52,18 @@ export function saveProgression() {
     showToast(`Saved "${name}" to library`);
 }
 
-export function validateAndAnalyze() {
+export function validateAndAnalyze(): void {
     validateProgression(stateMap, undefined, () => {
         analyzeFormUI();
     });
 }
 
-export function clearChordPresetHighlight() {
+export function clearChordPresetHighlight(): void {
     // DOM manipulation is no longer needed; PresetLibrary.jsx tracks isDirty state
     // Keeping this function as a no-op to maintain API compatibility
 }
 
-export function refreshArrangerUI() {
+export function refreshArrangerUI(): void {
     validateAndAnalyze();
     syncWorker();
     flushBuffers();
@@ -71,24 +71,16 @@ export function refreshArrangerUI() {
     saveCurrentState();
 }
 
-/**
- * @param {string} id
- * @param {string} field
- * @param {any} value
- */
-export function onSectionUpdate(id, field, value) {
+export function onSectionUpdate(id: string, field: string, value: any): void {
     const { arranger } = getState();
     if (field === 'reorder') {
-        const sectionMap = new Map(arranger.sections.map((/** @type {any} */ s) => [s.id, s]));
-        const newSections = value.map((/** @type {string} */ sid) => sectionMap.get(sid));
+        const sectionMap = new Map(arranger.sections.map((s: any) => [s.id, s]));
+        const newSections = value.map((sid: string) => sectionMap.get(sid));
 
-        // Check for changes more efficiently than JSON.stringify
-        const currentIds = arranger.sections.map((/** @type {any} */ s) => s.id);
+        const currentIds = arranger.sections.map((s: any) => s.id);
         const hasChanged =
             value.length !== currentIds.length ||
-            value.some(
-                (/** @type {string} */ id, /** @type {number} */ index) => id !== currentIds[index],
-            );
+            value.some((id: string, index: number) => id !== currentIds[index]);
 
         if (hasChanged) {
             pushHistory();
@@ -101,7 +93,7 @@ export function onSectionUpdate(id, field, value) {
             return;
         }
     } else {
-        const index = arranger.sections.findIndex((s) => s.id === id);
+        const index = arranger.sections.findIndex((s: any) => s.id === id);
         if (index === -1) {
             return;
         }
@@ -141,15 +133,13 @@ export function onSectionUpdate(id, field, value) {
     saveCurrentState();
 }
 
-/** @param {string} id */
-export function onSectionDelete(id) {
+export function onSectionDelete(id: string): void {
     const { arranger } = getState();
     if (arranger.sections.length <= 1) {
         return;
     }
 
-    const section = arranger.sections.find((s) => s.id === id);
-    // Prompt if section has content (ignoring the default 'I' for new sections)
+    const section = arranger.sections.find((s: any) => s.id === id);
     if (section?.value && section.value.trim() !== '' && section.value.trim() !== 'I') {
         if (!confirm(`Delete section "${section.label || 'Untitled'}" and its chords?`)) {
             return;
@@ -159,23 +149,22 @@ export function onSectionDelete(id) {
     dispatch(ACTIONS.SET_PARAM, {
         module: 'arranger',
         param: 'sections',
-        value: arranger.sections.filter((/** @type {any} */ s) => s.id !== id),
+        value: arranger.sections.filter((s: any) => s.id !== id),
     });
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
     refreshArrangerUI();
 }
 
-/** @param {string} id */
-export function onSectionDuplicate(id) {
+export function onSectionDuplicate(id: string): void {
     const { arranger } = getState();
-    const section = arranger.sections.find((s) => s.id === id);
+    const section = arranger.sections.find((s: any) => s.id === id);
     if (!section) {
         return;
     }
     pushHistory();
     const newSection = { ...section, id: generateId(), label: `${section.label} (Copy)` };
-    const index = arranger.sections.findIndex((s) => s.id === id);
+    const index = arranger.sections.findIndex((s: any) => s.id === id);
     const newSections = [...arranger.sections];
     newSections.splice(index + 1, 0, newSection);
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
@@ -184,7 +173,7 @@ export function onSectionDuplicate(id) {
     refreshArrangerUI();
 }
 
-export function addSection() {
+export function addSection(): void {
     const { arranger } = getState();
     dispatch(ACTIONS.SET_PARAM, {
         module: 'arranger',
@@ -204,32 +193,28 @@ export function addSection() {
     refreshArrangerUI();
 }
 
-/** @param {number} delta */
-export function transposeKey(delta) {
+export function transposeKey(delta: number): void {
     const { arranger } = getState();
-    // Use arranger.key as the source of truth
     const currentKeyName = arranger.key || 'C';
     const currentIndex = KEY_ORDER.indexOf(normalizeKey(currentKeyName));
     const newKey = KEY_ORDER[(currentIndex + delta + 12) % 12];
 
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: newKey });
 
-    /** @param {string} part */
-    const isMusicalNotation = (part) => {
+    const isMusicalNotation = (part: string): RegExpMatchArray | null => {
         return (
             part.match(/^(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i) ||
-            part.match(/^[#b\u266F\u266D](III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i)
+            part.match(/^[#b♯♭](III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i)
         );
     };
 
-    arranger.sections.forEach((section) => {
+    arranger.sections.forEach((section: any) => {
         const parts = section.value.split(/([\s,|,-]+)/);
-        const transposed = parts.map((part) => {
+        const transposed = parts.map((part: string) => {
             const noteMatch = part.match(NOTE_MATCH_PATTERN);
             if (noteMatch && !isMusicalNotation(part)) {
                 let rootStr = noteMatch[1];
-                // Normalize Unicode to ASCII for lookup
-                rootStr = rootStr.replace('\u266F', '#').replace('\u266D', 'b');
+                rootStr = rootStr.replace('♯', '#').replace('♭', 'b');
 
                 const root = normalizeKey(
                     rootStr.charAt(0).toUpperCase() + rootStr.slice(1).toLowerCase(),
@@ -245,7 +230,6 @@ export function transposeKey(delta) {
         });
         section.value = transposed.join('');
 
-        // Also transpose explicit section key if present
         if (section.key) {
             const secKeyIndex = KEY_ORDER.indexOf(normalizeKey(section.key));
             if (secKeyIndex !== -1) {
@@ -254,7 +238,7 @@ export function transposeKey(delta) {
         }
     });
 
-    // We mutated the `sections` objects directly in the loop, so we should dispatch the updated array reference
+    // We mutated sections directly in the loop, so dispatch an updated array reference
     dispatch(ACTIONS.SET_PARAM, {
         module: 'arranger',
         param: 'sections',
@@ -266,7 +250,7 @@ export function transposeKey(delta) {
     refreshArrangerUI();
 }
 
-export function switchToRelativeKey() {
+export function switchToRelativeKey(): void {
     const { arranger } = getState();
     const wasMinor = !!arranger.isMinor;
     const currentIndex = KEY_ORDER.indexOf(normalizeKey(arranger.key));
@@ -277,10 +261,9 @@ export function switchToRelativeKey() {
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isMinor', value: !wasMinor });
 
     pushHistory();
-    arranger.sections.forEach((section) => {
+    arranger.sections.forEach((section: any) => {
         section.value = transformRelativeProgression(section.value, shift);
 
-        // Also transpose explicit section key if present
         if (section.key) {
             const secKeyIndex = KEY_ORDER.indexOf(normalizeKey(section.key));
             if (secKeyIndex !== -1) {
@@ -289,7 +272,7 @@ export function switchToRelativeKey() {
         }
     });
 
-    // We mutated the `sections` objects directly in the loop, so we should dispatch the updated array reference
+    // We mutated sections directly in the loop, so dispatch an updated array reference
     dispatch(ACTIONS.SET_PARAM, {
         module: 'arranger',
         param: 'sections',

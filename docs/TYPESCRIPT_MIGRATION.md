@@ -89,29 +89,29 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 
 ---
 
-## Phase 5: Mid-size Modules (100–400 lines) 🔄
+## Phase 5: Mid-size Modules (100–400 lines) ✅
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/sharing.js` | ~120 | ⬜ | |
-| `public/persistence.js` | ~150 | ⬜ | |
-| `public/state/arranger.ts` | ~111 | ✅ | `Section` + `ArrangerState` interfaces; pulled forward with other state slices |
+| `public/visualizer-events.ts` | 365 | ✅ | `VisualizerTrackId` union; 4 event interfaces; generic `queueVisualizerEvent<T>` |
+| `public/engine/coordination-engine.ts` | 184 | ✅ | `StepInfo` import type; `createCoordinationContext` returns inferred object |
+| `public/song-generator.ts` | 301 | ✅ | `STRUCTURES/PROGRESSIONS` as `Record<string, ...>`; `GeneratedSection` interface |
+| `public/lead-sheet-model.ts` | 474 | ✅ | Local `Density`/`Viewport` type aliases; `LEAD_SHEET_FIT_ROW_BUDGET` typed |
+| `public/state.ts` | 293 | ✅ | `dispatch` overloads on `ActionPayloadMap`; `StateMap = EnsembleState` compat alias |
+| `public/persistence.ts` | 111 | ✅ | `saveTimeout: ReturnType<typeof setTimeout>` |
+| `public/sharing.ts` | 122 | ✅ | `ShareOptions` interface; typed `generateShareUrl` |
+| `public/worker-client.ts` | 303 | ✅ | `declare const WORKER_PATH: string`; typed handler callbacks |
+| `public/midi-controller.ts` | 401 | ✅ | `Map<string, {id, endTime}>` for note-offs; `MidiState` import type |
+| `public/engine/chords-styles.ts` | 358 | ✅ | `EnsembleState` param; `safeExtensions: Record<string, number[]>` |
+| `public/engine/drum-seeder.ts` | 348 | ✅ | `OrchestrationMapEntry`, `FillMapEntry`, `AccentCatch` exported interfaces |
+| `public/engine/groove-engine.ts` | 381 | ✅ | `strategies: Record<string, any>`; `binarySearchMap` return annotated `: any` |
+| `public/state-hydration.ts` | 497 | ✅ | `(TIME_SIGNATURES as any)` casts; `clamp`/`normalizeSoloistPreset` typed |
+| `public/state-effects.ts` | 196 | ✅ | `EnsembleState` param; `handleEffects` typed |
+| `public/arranger-controller.ts` | 304 | ✅ | `NOTE_MATCH_PATTERN` moved after imports; `isMusicalNotation` inner fn typed |
+| `public/state/arranger.ts` | ~111 | ✅ | `Section` + `ArrangerState` interfaces; pulled forward with state slices |
 | `public/state/groove.ts` | ~250 | ✅ | `Instrument`, `PocketState`, `GrooveState`; `grooveReducer` takes `GlobalContext` |
 | `public/state/playback.ts` | 291 | ✅ | `GlobalContext` (50+ props); circular `import type` with `types.ts` is fine |
-| `public/state.js` | 293 | ⬜ | Root state; depends on all slices |
-| `public/worker-client.js` | 303 | ⬜ | Good JSDoc coverage already |
-| `public/arranger-controller.js` | 304 | ⬜ | |
 | `public/state/instruments.ts` | 407 | ✅ | `ChordState`, `BassState`, `SoloistState`, `HarmonyState`; `responseMode`/`responseSource` tightened |
-| `public/state-effects.js` | ~300 | ⬜ | |
-| `public/state-hydration.js` | 497 | ⬜ | |
-| `public/midi-controller.js` | 401 | ⬜ | Good JSDoc coverage already |
-| `public/engine/coordination-engine.js` | 184 | ⬜ | |
-| `public/engine/groove-engine.js` | 381 | ⬜ | |
-| `public/engine/drum-seeder.js` | 348 | ⬜ | |
-| `public/engine/chords-styles.js` | 358 | ⬜ | |
-| `public/song-generator.js` | 301 | ⬜ | |
-| `public/lead-sheet-model.js` | 474 | ⬜ | Good JSDoc coverage |
-| `public/visualizer-events.js` | 365 | ⬜ | Good JSDoc coverage |
 
 ---
 

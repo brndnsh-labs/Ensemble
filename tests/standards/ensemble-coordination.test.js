@@ -202,7 +202,7 @@ describe('Ensemble Coordination Contract', () => {
     });
 
     describe('Register Slotting Enforcement (Middleware)', () => {
-        const { enforceRegisterSlotting } = require('../../public/engine/coordination-engine.js');
+        const { enforceRegisterSlotting } = require('../../public/engine/coordination-engine.ts');
 
         it('transposes any active note to the correct register regardless of input', () => {
             for (let i = 0; i < 100; i++) {

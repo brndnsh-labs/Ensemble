@@ -54,5 +54,5 @@ npx vitest
 ## Writing Tests
 
 *   **Environment**: Most tests require a DOM environment. Add `// @vitest-environment happy-dom` to the top of your test file.
-*   **Mocking**: Use `vi.mock()` to isolate dependencies, especially for global state (`public/state.js`) or browser APIs (`AudioContext`).
+*   **Mocking**: Use `vi.mock()` to isolate dependencies, especially for global state (`public/state.ts`) or browser APIs (`AudioContext`).
 *   **Canvas**: For visualizer tests, mock the Canvas API and `ResizeObserver` as `happy-dom` support for these is limited.
