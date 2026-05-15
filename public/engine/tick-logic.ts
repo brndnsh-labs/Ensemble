@@ -116,7 +116,7 @@ export function generateNotesForStep(
 
     // Pre-calculate Drum Hits for Coordination
     const drumStep = step % (groove.measures * stepsPerBar);
-    const sectionId = (chordData?.chord as any)?.sectionId || null;
+    const sectionId = chordData?.chord?.sectionId || null;
     const seedIdx =
         groove.sectionSeedMap && sectionId ? (groove.sectionSeedMap as any)[sectionId] || 0 : 0;
 
@@ -246,8 +246,8 @@ export function generateNotesForStep(
             const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
             soloResult = getSoloistNote(
                 state,
-                chord || '',
-                nextChordData?.chord || '',
+                chord || null,
+                nextChordData?.chord || null,
                 step,
                 (soloist.lastFreq || null) as any,
                 soloist.octave,
@@ -464,7 +464,7 @@ export function applyWorkerTransition(
         // Incorporate Section Energy
         let targetEnergy = 0.5;
         if (conductorState.form?.sections && entry?.chord) {
-            const currentSectionId = (entry.chord as any).sectionId;
+            const currentSectionId = entry.chord.sectionId;
             const currentSection = conductorState.form.sections.find(
                 (s: any) => s.id === currentSectionId,
             );

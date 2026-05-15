@@ -1,4 +1,5 @@
 import { deepSignal } from 'deepsignal';
+import type { Chord } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export interface Section {
@@ -26,7 +27,7 @@ export interface ArrangerState {
     /** List of song sections. */
     sections: Section[];
     /** Flattened list of parsed chord objects. */
-    progression: object[];
+    progression: Chord[];
     /** The global musical key (e.g., "C", "F#"). */
     key: string;
     /** The global time signature (e.g., "4/4", "3/4"). */
@@ -40,7 +41,7 @@ export interface ArrangerState {
     /** Total number of 16th note steps in the song. */
     totalSteps: number;
     /** Map of steps to chord objects. */
-    stepMap: Array<{ start: number; end: number; chord: object }>;
+    stepMap: Array<{ start: number; end: number; chord: Chord }>;
     /** Map of measures to time signatures. */
     measureMap: Array<{ start: number; end: number; ts: string }>;
     /** Map of sections to step ranges. */
@@ -79,7 +80,7 @@ export const arranger = deepSignal<ArrangerState>({
     isDirty: false,
 });
 
-export function arrangerReducer(action: string, payload: any): boolean {
+export function arrangerReducer(action: string, payload?: any): boolean {
     switch (action) {
         case ACTIONS.SET_PARAM:
             if (payload.module === 'arranger') {

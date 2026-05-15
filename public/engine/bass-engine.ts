@@ -1,4 +1,4 @@
-import type { EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -69,8 +69,8 @@ export function isBassActive(
 
 export function getBassNote(
     state: EnsembleState,
-    chord: any,
-    nextChord: any,
+    chord: Chord,
+    nextChord: Chord | null | undefined,
     _beatInMeasure: number,
     prevFreq: number | null,
     centerMidi: number,
@@ -515,7 +515,7 @@ export function getBassNote(
     const styleResult = getBassNoteStyle(
         style,
         chord,
-        nextChord,
+        nextChord ?? null,
         step,
         stepInChord,
         stepInfo || null,

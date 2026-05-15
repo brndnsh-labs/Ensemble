@@ -8,8 +8,8 @@ import { generateProceduralFill } from './fills.js';
 
 type Dispatch = (action: any, payload?: any) => void;
 
-export function analyzeFormUI(dispatch?: Dispatch) {
-    const form = analyzeForm();
+export function analyzeFormUI(arranger: EnsembleState['arranger'], dispatch?: Dispatch) {
+    const form = analyzeForm(arranger);
     if (form && dispatch) {
         dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { form });
     }

@@ -1,4 +1,5 @@
-import { getState } from './state.js';
+import type { ArrangerState } from './state/arranger.js';
+import type { Chord } from './types.js';
 
 const SECTION_ENERGY_MAP: Record<string, number> = {
     intro: 0.4,
@@ -13,7 +14,7 @@ const SECTION_ENERGY_MAP: Record<string, number> = {
     breakdown: 0.3,
 };
 
-export function getSectionEnergy(label: string): number {
+export function getSectionEnergy(label: string | null | undefined): number {
     if (!label) {
         return 0.5;
     }
@@ -26,7 +27,7 @@ export function getSectionEnergy(label: string): number {
     return 0.5; // Default
 }
 
-function calculateHarmonicFlux(sectionSteps: any[]): number {
+function calculateHarmonicFlux(sectionSteps: Array<{ chord: Chord }>): number {
     if (!sectionSteps.length) {
         return 0;
     }
@@ -37,7 +38,7 @@ function calculateHarmonicFlux(sectionSteps: any[]): number {
 
     sectionSteps.forEach((entry) => {
         // Simple heuristic: if the chord symbol or root changes, it's a "move"
-        const chordId = `${entry.chord.value}_${entry.chord.rootMidi}`;
+        const chordId = `${entry.chord.absName}_${entry.chord.rootMidi}`;
         if (chordId !== lastChordId) {
             changes++;
             lastChordId = chordId;
@@ -49,8 +50,7 @@ function calculateHarmonicFlux(sectionSteps: any[]): number {
     return bars > 0 ? changes / bars : 0;
 }
 
-export function analyzeForm() {
-    const { arranger } = getState();
+export function analyzeForm(arranger: Pick<ArrangerState, 'stepMap'>) {
     if (!arranger.stepMap.length) {
         return null;
     }
@@ -60,7 +60,7 @@ export function analyzeForm() {
     let currentSection: any = null;
 
     arranger.stepMap.forEach((entry) => {
-        const chord = entry.chord as any;
+        const chord = entry.chord;
         if (!currentSection || chord.sectionId !== currentSection.id) {
             currentSection = {
                 id: chord.sectionId,
@@ -72,7 +72,7 @@ export function analyzeForm() {
         }
         currentSection.steps.push(entry);
         // Track unique chord symbols in this section for similarity matching
-        const chordSym = chord.value;
+        const chordSym = chord.absName;
         if (currentSection.chords[currentSection.chords.length - 1] !== chordSym) {
             currentSection.chords.push(chordSym);
         }

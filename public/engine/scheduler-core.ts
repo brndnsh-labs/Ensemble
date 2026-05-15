@@ -59,7 +59,7 @@ import {
 import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { generateNotesForStep } from './tick-logic.js';
-import { getChordAtStep as _getChordAtStep } from './worker-utils.js';
+import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
 type Dispatch = (action: any, payload?: any) => void;
 
@@ -218,8 +218,10 @@ function scheduleResolution(
 
     // 1. Schedule all instruments that came from the worker (Bass, Chords, Soloist, Harmony, Groove)
     // The worker-client puts these in track buffers.
-    // Create a dummy chord data for visuals
-    const dummyChordData = { chord: { freqs: [] } };
+    // Create a dummy chord data for visuals during ring-out (buffer-only) playback.
+    // The schedulers only touch `chord.freqs` when emitting visualizer events; the
+    // empty freqs makes those events no-ops without disabling the visualizer path.
+    const dummyChordData = { chord: { freqs: [] } } as unknown as ChordAtStep;
 
     if (bass.enabled) {
         scheduleBass(state, dummyChordData, playback.step, time);
@@ -533,7 +535,7 @@ function advanceGlobalStep(state: EnsembleState): void {
  *
  * If you need to change chord-lookup behavior, edit `worker-utils.js`.
  */
-function getChordAtStep(state: EnsembleState, step: number): any {
+function getChordAtStep(state: EnsembleState, step: number): ChordAtStep | null {
     const { arranger, chords } = state;
     const cursor = { index: chords.scheduledChordIndex || 0, sectionIndex: 0 };
     const result = _getChordAtStep(step, arranger, cursor);
@@ -663,7 +665,12 @@ function scheduleDrumsFromBuffer(state: EnsembleState, step: number, time: numbe
 /**
  * Schedules bass notes from the worker buffer.
  */
-function scheduleBass(state: EnsembleState, chordData: any, step: number, time: number): void {
+function scheduleBass(
+    state: EnsembleState,
+    chordData: ChordAtStep,
+    step: number,
+    time: number,
+): void {
     const { bass, playback, vizState } = state;
     const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
@@ -713,7 +720,7 @@ function scheduleBass(state: EnsembleState, chordData: any, step: number, time: 
  */
 function scheduleSoloist(
     state: EnsembleState,
-    chordData: any,
+    chordData: ChordAtStep,
     step: number,
     playTime: number,
 ): void {
@@ -813,7 +820,11 @@ function scheduleSoloist(
     }
 }
 
-export function scheduleChordVisuals(state: EnsembleState, chordData: any, t: number): void {
+export function scheduleChordVisuals(
+    state: EnsembleState,
+    chordData: ChordAtStep,
+    t: number,
+): void {
     const { playback, chords, vizState } = state;
     if (chordData.stepInChord === 0) {
         const freqs = chordData.chord.freqs;
@@ -852,7 +863,12 @@ export function scheduleChordVisuals(state: EnsembleState, chordData: any, t: nu
  * Schedules chord notes from the worker buffer.
  * Handles sustain pedal events (MIDI CC 64).
  */
-function scheduleChords(state: EnsembleState, _chordData: any, step: number, time: number): void {
+function scheduleChords(
+    state: EnsembleState,
+    _chordData: ChordAtStep,
+    step: number,
+    time: number,
+): void {
     const { chords, playback, vizState } = state;
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
@@ -925,7 +941,7 @@ function scheduleChords(state: EnsembleState, _chordData: any, step: number, tim
  */
 function scheduleHarmonies(
     state: EnsembleState,
-    _chordData: any,
+    _chordData: ChordAtStep,
     step: number,
     time: number,
 ): void {
@@ -1099,7 +1115,7 @@ export function scheduleGlobalEvent(
             queueVisualizerStepEvent(playback, swungTime, drumStep);
         }
 
-        const chordDataForDrums: any = getChordAtStep(state, step);
+        const chordDataForDrums = getChordAtStep(state, step);
         const sectionId = chordDataForDrums?.chord?.sectionId || null;
 
         // --- Port Turnaround Logic from Worker ---
@@ -1129,7 +1145,7 @@ export function scheduleGlobalEvent(
         );
     }
 
-    const chordData: any = getChordAtStep(state, step);
+    const chordData = getChordAtStep(state, step);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
             playback.currentKey = chordData.chord.key as any; // @direct-mutation

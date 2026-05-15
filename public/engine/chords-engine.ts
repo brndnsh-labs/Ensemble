@@ -6,26 +6,17 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
+import type { Chord, ChordNamePart, FormattedChordNames } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { getBassSpaceFloor } from './voicing-policy.js';
+
+export type { Chord, ChordNamePart, FormattedChordNames };
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
 const SHARP_NOTE_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const SHARP_FRIENDLY_KEYS = new Set(['G', 'D', 'A', 'E', 'B', 'F#', 'C#']);
-
-export interface ChordNamePart {
-    root: string;
-    suffix: string;
-    bass?: string;
-}
-
-export interface FormattedChordNames {
-    name: ChordNamePart;
-    nns: ChordNamePart;
-    roman: ChordNamePart;
-}
 
 export interface ChordDetails {
     quality: string;
@@ -40,30 +31,6 @@ export interface ResolvedChordRoot {
     nnsMatch: RegExpMatchArray | null;
     noteMatch: RegExpMatchArray | null;
     rootRomanBase: string;
-}
-
-export interface ParsedChord {
-    romanName: string;
-    absName: string;
-    nnsName: string;
-    display: FormattedChordNames;
-    isMinor: boolean;
-    beats: number;
-    freqs: number[];
-    rootMidi: number;
-    bassMidi: number | null;
-    intervals: number[];
-    quality: string;
-    is7th: boolean;
-    charStart: number;
-    charEnd: number;
-    timeSignature: string;
-    key: string;
-    sectionId?: any;
-    sectionLabel?: string;
-    keyIsMinor?: boolean;
-    localIndex?: number;
-    repeatIndex?: number;
 }
 
 /**
@@ -689,9 +656,9 @@ function parseProgressionPart(
     key: string,
     timeSignature: string,
     initialMidis: number[],
-): { chords: ParsedChord[]; finalMidis: number[] } {
+): { chords: Chord[]; finalMidis: number[] } {
     const { chords, groove } = state;
-    const parsed: ParsedChord[] = [];
+    const parsed: Chord[] = [];
     const baseOctave = Math.floor(chords.octave / 12) * 12;
     const keyRootMidi = baseOctave + KEY_ORDER.indexOf(normalizeKey(key));
 
@@ -910,7 +877,7 @@ export function validateProgression(
     renderCallback?: () => any,
 ): void {
     const { arranger } = state;
-    let allChords: ParsedChord[] = [];
+    let allChords: Chord[] = [];
     let lastMidis: number[] = [];
 
     arranger.sections.forEach((section: any) => {

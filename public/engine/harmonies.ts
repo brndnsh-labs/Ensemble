@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import type { EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
 import {
@@ -48,7 +48,7 @@ interface HarmonyContext {
     soloist: any;
     coordination: any;
     playback: any;
-    chord: any;
+    chord: Chord;
     feel: string;
     ts: TimeSignatureConfig;
     measureStep: number;
@@ -396,7 +396,7 @@ function playSeaMode(context: HarmonyContext): HarmonyBehavior | null {
  */
 function finalizeHarmonyNotes(
     activeState: EnsembleState,
-    chord: any,
+    chord: Chord,
     step: number,
     behavior: HarmonyBehavior,
     styleConfig: StyleConfig,
@@ -613,8 +613,8 @@ function finalizeHarmonyNotes(
 
 export function getHarmonyNotes(
     state: EnsembleState | null,
-    chord: any,
-    _nextChord: any,
+    chord: Chord,
+    _nextChord: Chord | null | undefined,
     step: number,
     octave: number,
     style: string,
@@ -727,7 +727,8 @@ export function getHarmonyNotes(
     }
 
     // 2. CONTEXT OBJECT
-    if (!motifCache.has(chord.sectionId)) {
+    const sectionKey = chord.sectionId ?? '';
+    if (!motifCache.has(sectionKey)) {
         const seed = Math.abs(
             chord.sectionId
                 ?.split('')
@@ -744,14 +745,14 @@ export function getHarmonyNotes(
             }
         }
 
-        motifCache.set(chord.sectionId, {
+        motifCache.set(sectionKey, {
             seed,
             rhythmicMask,
             pattern,
         });
     }
 
-    const motif = motifCache.get(chord.sectionId)!;
+    const motif = motifCache.get(sectionKey)!;
     if (harmony.rhythmicMask !== motif.rhythmicMask) {
         harmony.rhythmicMask = motif.rhythmicMask; // @worker-mutation
     }

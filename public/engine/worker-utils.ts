@@ -1,4 +1,13 @@
 import type { ArrangerState } from '../state/arranger.js';
+import type { Chord } from '../types.js';
+
+export interface ChordAtStep {
+    chord: Chord;
+    stepInChord: number;
+    chordIndex: number;
+    sectionStart: number;
+    sectionEnd: number;
+}
 
 /**
  * GENERATIVE STATE PROTECTION
@@ -92,7 +101,11 @@ export function recursiveSafeSync(target: any, source: any, moduleName: string):
  * Pass a `cursor` object (`{ index, sectionIndex }`) to keep state across
  * calls; omit it to fall back to module-level globals.
  */
-export function getChordAtStep(step: number, arranger: ArrangerState, cursor: any = null) {
+export function getChordAtStep(
+    step: number,
+    arranger: ArrangerState,
+    cursor: any = null,
+): ChordAtStep | null {
     if (!arranger || arranger.totalSteps === 0 || !arranger.stepMap) {
         return null;
     }

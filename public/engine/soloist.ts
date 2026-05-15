@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { SoloistState } from '../state/instruments.js';
-import type { EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, StepInfo } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import {
     INFLUENCE_POOLS,
@@ -672,8 +672,8 @@ function preparePhraseResponseContext(
  */
 export function getSoloistNote(
     state: EnsembleState,
-    currentChord: any,
-    nextChord: any,
+    currentChord: Chord,
+    nextChord: Chord | null,
     step: number,
     _prevFreq: number | null,
     _octave: number,

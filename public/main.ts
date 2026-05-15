@@ -125,7 +125,7 @@ function init() {
             }
         });
 
-        analyzeFormUI();
+        analyzeFormUI(getState().arranger);
 
         subscribe((action: any, payload: any, stateMap: any, context: any) => {
             syncWorker(action, payload);

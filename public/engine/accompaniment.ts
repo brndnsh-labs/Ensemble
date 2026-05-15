@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import type { EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import {
     getBassSpaceFloor,
@@ -963,7 +963,7 @@ interface AccompanimentCoordination {
  */
 export function getAccompanimentNotes(
     state: EnsembleState,
-    chord: any,
+    chord: Chord,
     step: number,
     stepInChord: number,
     measureStep: number,
@@ -1169,9 +1169,9 @@ export function getAccompanimentNotes(
                 genre,
             );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
-            let voicing = chord.freqs
+            let voicing: number[] = chord.freqs
                 .map((f: number) => getMidi(f))
-                .filter((midi: number | null) => Number.isFinite(midi));
+                .filter((midi: number | null): midi is number => Number.isFinite(midi));
 
             if (voicing.length === 0) {
                 voicing = [chord.rootMidi + 3, chord.rootMidi + 10, chord.rootMidi + 14];
@@ -1321,9 +1321,9 @@ export function getAccompanimentNotes(
             );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
 
-            let voicing = chord.freqs
+            let voicing: number[] = chord.freqs
                 .map((f: number) => getMidi(f))
-                .filter((midi: number | null) => Number.isFinite(midi));
+                .filter((midi: number | null): midi is number => Number.isFinite(midi));
 
             if (voicing.length === 0) {
                 voicing = [chord.rootMidi + 4, chord.rootMidi + 10];

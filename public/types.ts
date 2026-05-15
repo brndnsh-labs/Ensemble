@@ -10,6 +10,68 @@ import type { MidiState } from './state/midi.js';
 import type { GlobalContext } from './state/playback.js';
 import type { VisualizerState } from './state/visualizer.js';
 
+/**
+ * One component of a chord display string (root + suffix, with optional slash bass).
+ */
+export interface ChordNamePart {
+    root: string;
+    suffix: string;
+    bass?: string;
+}
+
+/**
+ * Pre-formatted chord names in all three notation styles. Built by chords-engine.
+ */
+export interface FormattedChordNames {
+    name: ChordNamePart;
+    nns: ChordNamePart;
+    roman: ChordNamePart;
+}
+
+/**
+ * Canonical parsed-chord type produced by `chords-engine.validateProgression()` and
+ * consumed by every musical engine. Section-context fields (sectionId, sectionLabel,
+ * localIndex, keyIsMinor, repeatIndex) are tagged on by validateProgression after
+ * parsing — they're absent on a freshly parsed chord and present once it's been
+ * placed in the arrangement.
+ */
+export interface Chord {
+    // --- Display ---
+    romanName: string;
+    absName: string;
+    nnsName: string;
+    display: FormattedChordNames;
+
+    // --- Pitch content (audio-critical) ---
+    rootMidi: number;
+    bassMidi: number | null;
+    freqs: number[];
+    intervals: number[];
+
+    // --- Quality / harmony ---
+    quality: string;
+    is7th: boolean;
+    isMinor: boolean;
+
+    // --- Temporal / structural ---
+    beats: number;
+    timeSignature: string;
+
+    // --- Tonal context ---
+    key: string;
+
+    // --- Parser metadata (used by the chart editor) ---
+    charStart: number;
+    charEnd: number;
+
+    // --- Section context (added by validateProgression) ---
+    sectionId?: string;
+    sectionLabel?: string;
+    keyIsMinor?: boolean;
+    localIndex?: number;
+    repeatIndex?: number;
+}
+
 export interface PlaybackIntent {
     /** 0-1 */
     syncopation: number;

@@ -54,7 +54,7 @@ export function saveProgression(): void {
 
 export function validateAndAnalyze(): void {
     validateProgression(stateMap, undefined, () => {
-        analyzeFormUI();
+        analyzeFormUI(getState().arranger);
     });
 }
 

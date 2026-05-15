@@ -222,7 +222,7 @@ export class ExportProcessor {
             formIteration: 0,
             targetIntensity: playback.bandIntensity,
             stepSize: 0,
-            form: analyzeForm(),
+            form: analyzeForm(this.state.arranger),
             loopMode: this.loopMode,
             totalLoops: this.loopCount,
         };
@@ -461,10 +461,10 @@ export class ExportProcessor {
             if (section && section.start === modStep) {
                 this.metaTrack.marker(pulse, `--- ${section.label} ---`);
             }
-            this.metaTrack.marker(pulse, ((chord as any).absName || 'Chord') as string);
+            this.metaTrack.marker(pulse, chord.absName || 'Chord');
 
             if (this.includedTracks.includes('chords')) {
-                this.chordTrack.text(pulse, ((chord as any).absName || 'Chord') as string);
+                this.chordTrack.text(pulse, chord.absName || 'Chord');
             }
         }
 
