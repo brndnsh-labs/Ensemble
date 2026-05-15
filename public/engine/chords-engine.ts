@@ -15,49 +15,93 @@ const NOTE_REGEX = /^([A-G][#b]?)/i;
 const SHARP_NOTE_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const SHARP_FRIENDLY_KEYS = new Set(['G', 'D', 'A', 'E', 'B', 'F#', 'C#']);
 
+export interface ChordNamePart {
+    root: string;
+    suffix: string;
+    bass?: string;
+}
+
+export interface FormattedChordNames {
+    name: ChordNamePart;
+    nns: ChordNamePart;
+    roman: ChordNamePart;
+}
+
+export interface ChordDetails {
+    quality: string;
+    is7th: boolean;
+    suffix: string;
+}
+
+export interface ResolvedChordRoot {
+    rootMidi: number;
+    rootPart: string;
+    romanMatch: RegExpMatchArray | null;
+    nnsMatch: RegExpMatchArray | null;
+    noteMatch: RegExpMatchArray | null;
+    rootRomanBase: string;
+}
+
+export interface ParsedChord {
+    romanName: string;
+    absName: string;
+    nnsName: string;
+    display: FormattedChordNames;
+    isMinor: boolean;
+    beats: number;
+    freqs: number[];
+    rootMidi: number;
+    bassMidi: number | null;
+    intervals: number[];
+    quality: string;
+    is7th: boolean;
+    charStart: number;
+    charEnd: number;
+    timeSignature: string;
+    key: string;
+    sectionId?: any;
+    sectionLabel?: string;
+    keyIsMinor?: boolean;
+    localIndex?: number;
+    repeatIndex?: number;
+}
+
 /**
  * Formats an absolute note name using explicit accidentals first, then the local key context.
  * This avoids flat-biased spellings like Gb inside sharp-oriented keys such as E major.
- * @param {number} pitchClass
- * @param {string} keyContext
- * @param {string} [accidentalHint]
- * @param {string} [explicitNote]
- * @returns {string}
  */
 function getAbsoluteDisplayNoteName(
-    pitchClass,
-    keyContext,
-    accidentalHint = '',
-    explicitNote = '',
-) {
+    pitchClass: number,
+    keyContext: string,
+    accidentalHint: string = '',
+    explicitNote: string = '',
+): string {
     if (accidentalHint === '#' || explicitNote.includes('#')) {
         return SHARP_NOTE_ORDER[pitchClass];
     }
     if (accidentalHint === 'b' || explicitNote.includes('b')) {
-        return /** @type {any} */ (KEY_ORDER)[pitchClass];
+        return (KEY_ORDER as any)[pitchClass];
     }
 
     const tonic = (keyContext || '').replace(/m$/, '');
     return SHARP_FRIENDLY_KEYS.has(tonic)
         ? SHARP_NOTE_ORDER[pitchClass]
-        : /** @type {any} */ (KEY_ORDER)[pitchClass];
+        : (KEY_ORDER as any)[pitchClass];
 }
 
-/**
- * @param {number[]} midis
- * @param {number} pitchClass
- * @param {number} minMidi
- * @param {number} [maxMidi]
- * @returns {number[]}
- */
-function ensurePitchClassAboveFloor(midis, pitchClass, minMidi, maxMidi = 84) {
+function ensurePitchClassAboveFloor(
+    midis: number[],
+    pitchClass: number,
+    minMidi: number,
+    maxMidi: number = 84,
+): number[] {
     if (midis.some((midi) => midi % 12 === pitchClass)) {
         return midis;
     }
 
     const targetCenter =
         midis.length > 0 ? midis.reduce((sum, midi) => sum + midi, 0) / midis.length : minMidi + 12;
-    let bestMidi = null;
+    let bestMidi: number | null = null;
     let bestScore = Number.POSITIVE_INFINITY;
 
     for (let octave = -1; octave <= 8; octave++) {
@@ -76,15 +120,13 @@ function ensurePitchClassAboveFloor(midis, pitchClass, minMidi, maxMidi = 84) {
         return midis;
     }
 
-    return [...midis, /** @type {number} */ (bestMidi)].sort((a, b) => a - b);
+    return [...midis, bestMidi as number].sort((a, b) => a - b);
 }
 
 /**
  * Extracts quality and 7th status from a chord symbol string.
- * @param {string} symbol
- * @returns {{quality: string, is7th: boolean, suffix: string}}
  */
-export function getChordDetails(symbol) {
+export function getChordDetails(symbol: string): ChordDetails {
     let quality = 'major',
         is7th =
             symbol.includes('7') ||
@@ -187,40 +229,19 @@ export function getChordDetails(symbol) {
  * Calculates the best inversion for a chord to maintain smooth voice leading
  * while preventing register creep using an anchored "Home Register".
  *
- * @param {number} rootMidi - The raw root MIDI note.
- * @param {number[]} intervals - Semitone intervals from the root.
- * @param {number[]} previousMidis - MIDI notes of the previous chord.
- * @param {boolean} isPivot - Whether this chord is a section/phrase pivot point.
- * @param {number|null} anchor - Optional custom anchor MIDI note.
- * @param {number} min - Minimum allowed MIDI note for the average.
- * @param {number} max - Maximum allowed MIDI note for the average.
- * @param {string} style - The style of the music, e.g., 'stabs', 'organ'.
- * @returns {number[]} - Optimized MIDI notes for the chord.
- */
-/**
  * Resolves chord root midi to an absolute note, searching octaves.
- * @param {any} state
- * @param {number} rootMidi
- * @param {Array<number>} intervals
- * @param {Array<number>} previousMidis
- * @param {boolean} [isPivot=false]
- * @param {number|null} [anchor=null]
- * @param {number} [min=52]
- * @param {number} [max=84]
- * @param {string} [style='stabs']
- * @returns {Array<number>}
  */
 export function getBestInversion(
-    state,
-    rootMidi,
-    intervals,
-    previousMidis,
-    isPivot = false,
-    anchor = null,
-    min = 52,
-    max = 84,
-    style = 'stabs',
-) {
+    state: any,
+    rootMidi: number,
+    intervals: number[],
+    previousMidis: number[],
+    isPivot: boolean = false,
+    anchor: number | null = null,
+    min: number = 52,
+    max: number = 84,
+    style: string = 'stabs',
+): number[] {
     const { chords } = state;
     const homeAnchor = anchor || chords.octave || 60;
 
@@ -263,13 +284,10 @@ export function getBestInversion(
                 bestShift = shift;
             }
         }
-        return intervals
-            .map((/** @type {any} */ i) => rootMidi + i + bestShift)
-            .sort((a, b) => a - b);
+        return intervals.map((i: any) => rootMidi + i + bestShift).sort((a, b) => a - b);
     }
 
-    /** @type {Array<number>} */
-    const result = [];
+    const result: number[] = [];
     intervals.forEach((inter, i) => {
         const note = rootMidi + inter;
         const pc = note % 12;
@@ -301,24 +319,23 @@ export function getBestInversion(
 
 /**
  * Mutates an existing progression string by subtly changing one or more chords.
- * @param {string} progressionStr
- * @returns {{ value: string, mutatedIndex: number }}
  */
-export function mutateProgression(progressionStr) {
+export function mutateProgression(progressionStr: string): {
+    value: string;
+    mutatedIndex: number;
+} {
     if (!progressionStr?.trim()) {
         return { value: progressionStr, mutatedIndex: -1 };
     }
     const parts = progressionStr.split('|').map((p) => p.trim());
 
     // Pick 1 random index to mutate
-    /** @type {Array<string>} */
-    const mutatedParts = [...parts];
+    const mutatedParts: string[] = [...parts];
     const idx = Math.floor(Math.random() * parts.length);
     const original = parts[idx];
 
     // Simple substitutions based on common harmonic functions
-    /** @type {Record<string, Array<string>>} */
-    const substitutions = {
+    const substitutions: Record<string, string[]> = {
         I: ['vi', 'IV', 'Imaj7'],
         IV: ['ii', 'IVmaj7', 'iv'],
         V: ['V7', 'viio', 'bVII'],
@@ -351,11 +368,8 @@ export function mutateProgression(progressionStr) {
 /**
  * Intelligent transposition for relative major/minor toggles.
  * Rewrites the progression string while maintaining original pitches.
- * @param {string} input - The progression string.
- * @param {number} semitoneShift - How many semitones the key is moving (e.g., -3 for Maj->Min).
- * @returns {string} The transformed progression string.
  */
-export function transformRelativeProgression(input, semitoneShift) {
+export function transformRelativeProgression(input: string, semitoneShift: number): string {
     const parts = input.split(/([\s,|,-]+|\/)/);
     const transformed = parts.map((part) => {
         if (!part.trim() || part === '|' || part === '/' || part === ',' || part === '-') {
@@ -371,7 +385,7 @@ export function transformRelativeProgression(input, semitoneShift) {
             const numeral = romanMatch[2];
             const suffix = part.slice(romanMatch[0].length);
 
-            let originalOffset = /** @type {any} */ (ROMAN_VALS)[numeral.toUpperCase()];
+            let originalOffset = (ROMAN_VALS as any)[numeral.toUpperCase()];
             if (accidental === 'b') {
                 originalOffset -= 1;
             }
@@ -381,8 +395,7 @@ export function transformRelativeProgression(input, semitoneShift) {
 
             // Calculate new offset relative to the new key
             const newOffset = (originalOffset - semitoneShift + 12) % 12;
-            /** @type {string} */
-            let newRoman = /** @type {any} */ (INTERVAL_TO_ROMAN)[newOffset];
+            let newRoman: string = (INTERVAL_TO_ROMAN as any)[newOffset];
 
             // Preserve the original casing/quality of the chord
             const isSourceMinorChord = numeral === numeral.toLowerCase();
@@ -405,7 +418,7 @@ export function transformRelativeProgression(input, semitoneShift) {
             }
 
             const newOffset = (originalOffset - semitoneShift + 12) % 12;
-            const newNNS = /** @type {any} */ (INTERVAL_TO_NNS)[newOffset];
+            const newNNS = (INTERVAL_TO_NNS as any)[newOffset];
 
             return newNNS + suffix;
         } else if (noteMatch) {
@@ -428,12 +441,12 @@ export function transformRelativeProgression(input, semitoneShift) {
 
 /**
  * Resolves the root midi and base representations from a chord string.
- * @param {string} part
- * @param {number} keyRootMidi
- * @param {number} baseOctave
- * @returns {{ rootMidi: number, rootPart: string, romanMatch: RegExpMatchArray|null, nnsMatch: RegExpMatchArray|null, noteMatch: RegExpMatchArray|null, rootRomanBase: string }}
  */
-function resolveChordRoot(part, keyRootMidi, baseOctave) {
+function resolveChordRoot(
+    part: string,
+    keyRootMidi: number,
+    baseOctave: number,
+): ResolvedChordRoot {
     const romanMatch = part.match(ROMAN_REGEX);
     const nnsMatch = part.match(NNS_REGEX);
     const noteMatch = part.match(NOTE_REGEX);
@@ -447,7 +460,7 @@ function resolveChordRoot(part, keyRootMidi, baseOctave) {
         const accidental = romanMatch[1] || '',
             numeral = romanMatch[2];
         rootRomanBase = numeral;
-        let rootOffset = /** @type {any} */ (ROMAN_VALS)[numeral.toUpperCase()];
+        let rootOffset = (ROMAN_VALS as any)[numeral.toUpperCase()];
         if (accidental === 'b') {
             rootOffset -= 1;
         }
@@ -490,14 +503,14 @@ export { getIntervals, getRootlessVoicing };
 
 /**
  * Formats chord names with appropriate suffixes based on quality and extensions.
- * @param {string} rootName
- * @param {string} rootNNS
- * @param {string} rootRomanBase
- * @param {string} quality
- * @param {boolean} is7th
- * @returns {{ name: {root: string, suffix: string, bass?: string}, nns: {root: string, suffix: string, bass?: string}, roman: {root: string, suffix: string, bass?: string} }}
  */
-export function getFormattedChordNames(rootName, rootNNS, rootRomanBase, quality, is7th) {
+export function getFormattedChordNames(
+    rootName: string,
+    rootNNS: string,
+    rootRomanBase: string,
+    quality: string,
+    is7th: boolean,
+): FormattedChordNames {
     let absSuffix = '',
         nnsSuffix = '',
         romSuffix = '';
@@ -669,17 +682,16 @@ export function getFormattedChordNames(rootName, rootNNS, rootRomanBase, quality
 
 /**
  * Parses a single progression string part (e.g., from one section).
- * @param {any} state
- * @param {string} input
- * @param {string} key
- * @param {string} timeSignature
- * @param {number[]} initialMidis
- * @returns {{chords: Array<any>, finalMidis: number[]}}
  */
-function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
+function parseProgressionPart(
+    state: any,
+    input: string,
+    key: string,
+    timeSignature: string,
+    initialMidis: number[],
+): { chords: ParsedChord[]; finalMidis: number[] } {
     const { chords, groove } = state;
-    /** @type {Array<any>} */
-    const parsed = [];
+    const parsed: ParsedChord[] = [];
     const baseOctave = Math.floor(chords.octave / 12) * 12;
     const keyRootMidi = baseOctave + KEY_ORDER.indexOf(normalizeKey(key));
 
@@ -697,7 +709,7 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
         const chordTokens = barText.split(/(\s+)/);
         const actualChordParts = chordTokens.filter((t) => t.trim() && t !== '|');
 
-        const ts = /** @type {any} */ (TIME_SIGNATURES)[timeSignature] || TIME_SIGNATURES['4/4'];
+        const ts = (TIME_SIGNATURES as any)[timeSignature] || TIME_SIGNATURES['4/4'];
         const beatsPerChord = actualChordParts.length > 0 ? ts.beats / actualChordParts.length : 0;
 
         let barInternalOffset = 0;
@@ -713,10 +725,10 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                 );
 
                 // Handle slash bass if present
-                let bassMidi = null;
-                let bassNameAbs = null,
-                    bassNameNNS = null,
-                    bassNameRom = null;
+                let bassMidi: number | null = null;
+                let bassNameAbs: string | null = null,
+                    bassNameNNS: string | null = null,
+                    bassNameRom: string | null = null;
                 if (bassPart) {
                     const resolvedBass = resolveChordRoot(bassPart, keyRootMidi, baseOctave);
                     bassMidi = resolvedBass.rootMidi;
@@ -736,8 +748,8 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                         bassAccidentalHint,
                         resolvedBass.noteMatch?.[1] || '',
                     );
-                    bassNameNNS = /** @type {any} */ (INTERVAL_TO_NNS)[bassInterval];
-                    bassNameRom = /** @type {any} */ (INTERVAL_TO_ROMAN)[bassInterval];
+                    bassNameNNS = (INTERVAL_TO_NNS as any)[bassInterval];
+                    bassNameRom = (INTERVAL_TO_ROMAN as any)[bassInterval];
                 }
 
                 const suffixPart = chordPart.slice(rootPart.length);
@@ -803,9 +815,7 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                         bassMidi -= 12;
                     }
                     const bassPC = bassMidi % 12;
-                    const filtered = currentMidis.filter(
-                        (/** @type {any} */ m) => m % 12 !== bassPC,
-                    );
+                    const filtered = currentMidis.filter((m: any) => m % 12 !== bassPC);
                     if (filtered.length > 0) {
                         currentMidis = filtered;
                     }
@@ -815,10 +825,10 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                 lastMidis = currentMidis;
 
                 const interval = (rootMidi - keyRootMidi + 24) % 12;
-                const rootNNS = /** @type {any} */ (INTERVAL_TO_NNS)[interval];
+                const rootNNS = (INTERVAL_TO_NNS as any)[interval];
                 const displayRomanBase = romanMatch
                     ? `${romanMatch[1] || ''}${romanMatch[2].toUpperCase()}`
-                    : /** @type {any} */ (INTERVAL_TO_ROMAN)[interval];
+                    : (INTERVAL_TO_ROMAN as any)[interval];
                 const rootAccidentalHint =
                     romanMatch?.[1] ||
                     nnsMatch?.[1] ||
@@ -850,9 +860,9 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
                     finalAbsName += `/${bassNameAbs}`;
                     finalNNSName += `/${bassNameNNS}`;
                     finalRomName += `/${bassNameRom}`;
-                    /** @type {any} */ (formatted.name).bass = bassNameAbs;
-                    /** @type {any} */ (formatted.nns).bass = bassNameNNS;
-                    /** @type {any} */ (formatted.roman).bass = bassNameRom;
+                    (formatted.name as any).bass = bassNameAbs;
+                    (formatted.nns as any).bass = bassNameNNS;
+                    (formatted.roman as any).bass = bassNameRom;
                 }
 
                 const isMinor =
@@ -893,18 +903,17 @@ function parseProgressionPart(state, input, key, timeSignature, initialMidis) {
 
 /**
  * Parses the progression input string and updates the chord state.
- * @param {any} state
- * @param {Function} [dispatch]
- * @param {Function} [renderCallback] - Callback to trigger visual update.
  */
-export function validateProgression(state, dispatch, renderCallback) {
+export function validateProgression(
+    state: any,
+    dispatch?: (...args: any[]) => any,
+    renderCallback?: () => any,
+): void {
     const { arranger } = state;
-    /** @type {Array<any>} */
-    let allChords = [];
-    /** @type {Array<number>} */
-    let lastMidis = [];
+    let allChords: ParsedChord[] = [];
+    let lastMidis: number[] = [];
 
-    arranger.sections.forEach((/** @type {any} */ section) => {
+    arranger.sections.forEach((section: any) => {
         try {
             const repeats = section.repeat || 1;
             const sectionKey = section.key || arranger.key;
@@ -949,9 +958,8 @@ export function validateProgression(state, dispatch, renderCallback) {
 
 /**
  * Caches progression metadata to avoid redundant calculations in the scheduler.
- * @param {any} state
  */
-function updateProgressionCache(state) {
+function updateProgressionCache(state: any): void {
     const { arranger } = state;
     if (!arranger.progression.length) {
         Object.assign(arranger, {
@@ -964,24 +972,22 @@ function updateProgressionCache(state) {
     }
 
     let current = 0;
-    const newStepMap = arranger.progression.map((/** @type {any} */ chord) => {
+    const newStepMap = arranger.progression.map((chord: any) => {
         const tsName = chord.timeSignature || arranger.timeSignature;
-        const ts = /** @type {any} */ (TIME_SIGNATURES)[tsName] || TIME_SIGNATURES['4/4'];
+        const ts = (TIME_SIGNATURES as any)[tsName] || TIME_SIGNATURES['4/4'];
         const steps = Math.round(chord.beats * ts.stepsPerBeat);
         const entry = { start: current, end: current + steps, chord };
         current += steps;
         return entry;
     });
 
-    /** @type {Array<any>} */
-    const newSectionMap = [];
-    /** @type {Array<any>} */
-    const newMeasureMap = [];
+    const newSectionMap: any[] = [];
+    const newMeasureMap: any[] = [];
 
     let mapIndex = 0;
     let sectionAcc = 0;
 
-    arranger.sections.forEach((/** @type {any} */ section) => {
+    arranger.sections.forEach((section: any) => {
         const sectionStart = sectionAcc;
         let iterationSteps = 0;
 
@@ -1027,7 +1033,7 @@ function updateProgressionCache(state) {
         if (iterationSteps > 0) {
             const repeats = section.repeat || 1;
             const tsName = section.timeSignature || arranger.timeSignature;
-            const ts = /** @type {any} */ (TIME_SIGNATURES)[tsName] || TIME_SIGNATURES['4/4'];
+            const ts = (TIME_SIGNATURES as any)[tsName] || TIME_SIGNATURES['4/4'];
             const stepsPerMeasure = Math.round(ts.beats * ts.stepsPerBeat);
 
             let stepAccLocal = sectionStart;

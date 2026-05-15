@@ -1,23 +1,21 @@
 import { analyzeForm, getSectionEnergy } from '../form-analysis.js';
 import { debounceSaveState, saveCurrentState } from '../persistence.js';
+import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { generateProceduralFill } from './fills.js';
 
-/** @param {Function} [dispatch] */
-export function analyzeFormUI(dispatch) {
+type Dispatch = (action: any, payload?: any) => void;
+
+export function analyzeFormUI(dispatch?: Dispatch) {
     const form = analyzeForm();
     if (form && dispatch) {
         dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { form });
     }
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {Function} dispatch
- */
-export function applyConductor(state, dispatch) {
+export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     const { playback, soloist, groove, arranger } = state;
     const intensity = playback.bandIntensity; // 0.0 - 1.0
     const complexity = playback.complexity; // 0.0 - 1.0
@@ -81,7 +79,7 @@ export function applyConductor(state, dispatch) {
     const modStep = arranger.totalSteps > 0 ? playback.step % arranger.totalSteps : 0;
     const currentEntry = binarySearchMap(arranger.stepMap || [], modStep);
     if (currentEntry) {
-        const label = /** @type {any} */ (currentEntry.chord).sectionLabel.toLowerCase();
+        const label = (currentEntry.chord as any).sectionLabel.toLowerCase();
         let sectionBias = 0.5;
         if (label.includes('solo')) {
             sectionBias = 0.2;
@@ -175,10 +173,8 @@ export function applyConductor(state, dispatch) {
 
 /**
  * Updates auto-intensity and monitors the band's "conversation".
- * @param {import('../types.js').EnsembleState} state
- * @param {Function} dispatch
  */
-export function updateAutoConductor(state, dispatch) {
+export function updateAutoConductor(state: EnsembleState, dispatch: Dispatch) {
     const { playback, conductor } = state;
     if (!playback.autoIntensity || !playback.isPlaying) {
         return;
@@ -203,13 +199,12 @@ export function updateAutoConductor(state, dispatch) {
     }
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {number} currentStep
- * @param {number} stepsPerMeasure
- * @param {Function} dispatch
- */
-export function checkSectionTransition(state, currentStep, stepsPerMeasure, dispatch) {
+export function checkSectionTransition(
+    state: EnsembleState,
+    currentStep: number,
+    stepsPerMeasure: number,
+    dispatch: Dispatch,
+) {
     const { groove, arranger, playback, conductor } = state;
     if (!groove.enabled) {
         return;
@@ -279,9 +274,7 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
 
         if (
             nextEntry &&
-            (isLoopEnd ||
-                /** @type {any} */ (nextEntry.chord).sectionId !==
-                    /** @type {any} */ (entry.chord).sectionId)
+            (isLoopEnd || (nextEntry.chord as any).sectionId !== (entry.chord as any).sectionId)
         ) {
             // --- 1. THE SOLOIST TRADE ---
             // Real musicians trade even if there isn't a drum fill!
@@ -292,7 +285,7 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
                     (soloistState.tradeMode === 'loops' && isLoopEnd))
             ) {
                 const nextSoloState = !soloistState.enabled;
-                const sbUpdate = { enabled: nextSoloState };
+                const sbUpdate: Record<string, unknown> = { enabled: nextSoloState };
 
                 if (nextSoloState) {
                     Object.assign(sbUpdate, {
@@ -316,10 +309,8 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
             let shouldFill = true;
 
             // CHECK FOR SEAMLESS TRANSITION
-            const nextSectionId = /** @type {any} */ (nextEntry.chord).sectionId;
-            const nextSection = arranger.sections.find(
-                (/** @type {any} */ s) => s.id === nextSectionId,
-            );
+            const nextSectionId = (nextEntry.chord as any).sectionId;
+            const nextSection = arranger.sections.find((s: any) => s.id === nextSectionId);
             if (nextSection?.seamless) {
                 shouldFill = false;
             }
@@ -401,10 +392,9 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
                     }
 
                     // --- 2. THE LOCAL FUNCTIONAL ROLE ---
-                    if (conductor.form && /** @type {any} */ (conductor.form).sections) {
-                        const nextSection = /** @type {any} */ (conductor.form).sections.find(
-                            (/** @type {any} */ s) =>
-                                s.id === /** @type {any} */ (nextEntry.chord).sectionId,
+                    if (conductor.form && (conductor.form as any).sections) {
+                        const nextSection = (conductor.form as any).sections.find(
+                            (s: any) => s.id === (nextEntry.chord as any).sectionId,
                         );
                         if (nextSection) {
                             const role = nextSection.role;
@@ -445,14 +435,10 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
                                 targetEnergy -= 0.15;
                             }
                         } else {
-                            targetEnergy = getSectionEnergy(
-                                /** @type {any} */ (nextEntry.chord).sectionLabel,
-                            );
+                            targetEnergy = getSectionEnergy((nextEntry.chord as any).sectionLabel);
                         }
                     } else {
-                        targetEnergy = getSectionEnergy(
-                            /** @type {any} */ (nextEntry.chord).sectionLabel,
-                        );
+                        targetEnergy = getSectionEnergy((nextEntry.chord as any).sectionLabel);
                     }
 
                     targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
@@ -507,7 +493,7 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
                 // --- 3. THE DRUM SEED (Creativity Memory) ---
                 if (groove.creativity && nextSection) {
                     // Re-evaluate the drum seed only if it hasn't been set for this section
-                    if (/** @type {any} */ (groove.sectionSeedMap)[nextSection.id] === undefined) {
+                    if ((groove.sectionSeedMap as any)[nextSection.id] === undefined) {
                         // Generate a robust float seed (0.0 to 1.0) to serve as the abstract pool marker
                         const seed = Math.random();
                         dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed });
@@ -532,9 +518,7 @@ export function checkSectionTransition(state, currentStep, stepsPerMeasure, disp
     if (isChordEnd) {
         const nextEntry = arranger.stepMap[currentChordIdx + 1];
         const isTransition =
-            !nextEntry ||
-            /** @type {any} */ (nextEntry.chord).sectionId !==
-                /** @type {any} */ (entry.chord).sectionId;
+            !nextEntry || (nextEntry.chord as any).sectionId !== (entry.chord as any).sectionId;
 
         if (isTransition && !groove.fillActive && playback.bandIntensity > 0.4) {
             dispatch(ACTIONS.TRIGGER_FILL, {

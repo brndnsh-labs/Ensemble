@@ -88,7 +88,7 @@ initPlatformHacks();
  *
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {boolean} [fromDispatch=false] - Whether this call originated from a Redux-like dispatch.
- * @param {Function} [dispatch] - State dispatch function.
+ * @param {(action: any, payload?: any) => void} [dispatch] - State dispatch function.
  */
 export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
     const { playback, chords } = state;
@@ -189,7 +189,7 @@ export function togglePlay(state, fromDispatch = false, dispatch = undefined) {
 /**
  * @param {import('../types.js').EnsembleState} state
  * @param {number} time
- * @param {Function} [dispatch]
+ * @param {(action: any, payload?: any) => void} [dispatch]
  */
 function triggerResolution(state, time, dispatch) {
     const { playback, bass, soloist, chords, harmony, groove } = state;
@@ -216,7 +216,7 @@ function triggerResolution(state, time, dispatch) {
 /**
  * @param {import('../types.js').EnsembleState} state
  * @param {number} time
- * @param {Function} [dispatch]
+ * @param {(action: any, payload?: any) => void} [dispatch]
  */
 function scheduleResolution(state, time, dispatch = undefined) {
     const { playback, bass, soloist, chords, harmony, groove } = state;
@@ -278,7 +278,7 @@ function scheduleResolution(state, time, dispatch = undefined) {
  * Handles count-in, session timing, and resolution triggers.
  *
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {Function} [dispatch] - State dispatch function.
+ * @param {(action: any, payload?: any) => void} [dispatch] - State dispatch function.
  */
 export function scheduler(state, dispatch = undefined) {
     const { playback, groove, arranger } = state;
@@ -585,7 +585,7 @@ function getChordAtStep(state, step) {
  *
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {any} params - Drum parameters.
- * @param {Function} [dispatch] - State dispatch function.
+ * @param {(action: any, payload?: any) => void} [dispatch] - State dispatch function.
  */
 function scheduleDrums(state, params, dispatch = undefined) {
     const { time, absoluteStep } = params;
@@ -1067,7 +1067,7 @@ function scheduleHarmonies(state, _chordData, step, time) {
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} step - The global step index.
  * @param {number} swungTime - The swung AudioContext time.
- * @param {Function} [dispatch] - State dispatch function.
+ * @param {(action: any, payload?: any) => void} [dispatch] - State dispatch function.
  */
 export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined) {
     const { arranger, playback, groove, soloist, chords, bass, harmony, vizState } = state;
@@ -1217,7 +1217,7 @@ export function scheduleGlobalEvent(state, step, swungTime, dispatch = undefined
  *
  * @param {import('../types.js').EnsembleState} state - Global ensemble state.
  * @param {number} step - The current global step.
- * @param {Function} [dispatch] - State dispatch function.
+ * @param {(action: any, payload?: any) => void} [dispatch] - State dispatch function.
  */
 function syncAndFlushWorker(state, step, dispatch = undefined) {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;

@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import type { EnsembleState, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import {
     getBassSpaceFloor,
@@ -12,47 +13,54 @@ import {
  * Standardized to return Note Objects for the Worker/Scheduler.
  */
 
+interface CompingState {
+    currentVibe: string;
+    currentCell: number[];
+    lockedUntil: number;
+    soloistActivity: number;
+    lastChordIndex: number;
+    lastChordQuality: string | null;
+    grooveRetentionCount: number;
+    maxGrooveLength: number;
+    lastSectionId: string | null;
+    lastVoicingMidis: number[];
+}
+
 /**
  * Module-level persistent comping state.
  * Mutated each bar (and each section change) by {@link updateRhythmicIntent}.
  * Survives across calls to {@link getAccompanimentNotes} to provide groove memory,
  * voice-leading continuity, and soloist-aware density adjustment.
  */
-export const compingState = {
+export const compingState: CompingState = {
     currentVibe: 'balanced',
     currentCell: new Array(16).fill(0),
     lockedUntil: 0,
     soloistActivity: 0,
     lastChordIndex: -1,
-    /** @type {string|null} */
     lastChordQuality: null, // Track quality for tension resolution
     grooveRetentionCount: 0,
     maxGrooveLength: 4,
     lastSectionId: null,
-    /** @type {number[]} */
     lastVoicingMidis: [],
 };
 
 const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
 
-/**
- * @param {number[]} midis
- * @returns {number}
- */
-function averageMidi(midis) {
+function averageMidi(midis: number[]): number {
     return midis.length === 0 ? 0 : midis.reduce((sum, midi) => sum + midi, 0) / midis.length;
 }
 
 /**
  * Neo-Soul favors compact upper-structure clusters, but we still want the line to move
  * from the previous comp naturally instead of re-jumping from the root every hit.
- * @param {number[]} midis
- * @param {number[]} previousMidis
- * @param {number} maxVoices
- * @param {number} minMidi
- * @returns {number[]}
  */
-function selectCompactCluster(midis, previousMidis = [], maxVoices = 3, minMidi = 0) {
+function selectCompactCluster(
+    midis: number[],
+    previousMidis: number[] = [],
+    maxVoices = 3,
+    minMidi = 0,
+): number[] {
     const sorted = [...new Set(midis.filter((midi) => Number.isFinite(midi)))].sort(
         (a, b) => a - b,
     );
@@ -83,13 +91,13 @@ function selectCompactCluster(midis, previousMidis = [], maxVoices = 3, minMidi 
 
 /**
  * Keeps a voicing in the same register pocket as the previous hit when possible.
- * @param {number[]} midis
- * @param {number[]} previousMidis
- * @param {number} minMidi
- * @param {number} maxMidi
- * @returns {number[]}
  */
-function recenterVoicing(midis, previousMidis = [], minMidi = 0, maxMidi = 127) {
+function recenterVoicing(
+    midis: number[],
+    previousMidis: number[] = [],
+    minMidi = 0,
+    maxMidi = 127,
+): number[] {
     const sorted = [...new Set(midis.filter((midi) => Number.isFinite(midi)))].sort(
         (a, b) => a - b,
     );
@@ -136,17 +144,12 @@ function recenterVoicing(midis, previousMidis = [], minMidi = 0, maxMidi = 127) 
     });
 }
 
-/**
- * @param {number} midi
- * @param {{ rootMidi?: number } | null} chord
- * @returns {number | null}
- */
-function getChordIntervalClass(midi, chord) {
+function getChordIntervalClass(midi: number, chord: { rootMidi?: number } | null): number | null {
     const rootMidi = chord?.rootMidi;
     if (!Number.isFinite(midi) || !Number.isFinite(rootMidi)) {
         return null;
     }
-    const resolvedRootMidi = /** @type {number} */ (rootMidi);
+    const resolvedRootMidi = rootMidi as number;
     return (((Math.round(midi) - resolvedRootMidi) % 12) + 12) % 12;
 }
 
@@ -154,12 +157,12 @@ function getChordIntervalClass(midi, chord) {
  * Keep guide tones first when slimming practice/rootless comping voicings.
  * This preserves harmonic identity in bass-reserved contexts instead of
  * dropping the lowest note blindly.
- * @param {number[]} midis
- * @param {{ rootMidi?: number } | null} chord
- * @param {number} targetCount
- * @returns {number[]}
  */
-function selectSupportiveVoicing(midis, chord, targetCount = 3) {
+function selectSupportiveVoicing(
+    midis: number[],
+    chord: { rootMidi?: number } | null,
+    targetCount = 3,
+): number[] {
     const unique = [...new Set(midis.filter((midi) => Number.isFinite(midi)))].sort(
         (a, b) => a - b,
     );
@@ -167,16 +170,11 @@ function selectSupportiveVoicing(midis, chord, targetCount = 3) {
         return unique;
     }
 
-    /** @type {number[]} */
-    const guides = [];
-    /** @type {number[]} */
-    const colors = [];
-    /** @type {number[]} */
-    const roots = [];
-    /** @type {number[]} */
-    const fifths = [];
-    /** @type {number[]} */
-    const others = [];
+    const guides: number[] = [];
+    const colors: number[] = [];
+    const roots: number[] = [];
+    const fifths: number[] = [];
+    const others: number[] = [];
 
     unique.forEach((midi) => {
         const intervalClass = getChordIntervalClass(midi, chord);
@@ -204,8 +202,7 @@ function selectSupportiveVoicing(midis, chord, targetCount = 3) {
     });
 
     const ordered = [...guides, ...colors, ...roots, ...fifths, ...others];
-    /** @type {number[]} */
-    const selected = [];
+    const selected: number[] = [];
 
     for (const midi of ordered) {
         if (!selected.includes(midi)) {
@@ -219,33 +216,25 @@ function selectSupportiveVoicing(midis, chord, targetCount = 3) {
     return selected.sort((a, b) => a - b);
 }
 
-/**
- * @param {number[]} voicing
- * @returns {number[]}
- */
-function getMidiVoicing(voicing) {
-    /** @type {number[]} */
-    const midis = [];
-    voicing.forEach((/** @type {number} */ freq) => {
+function getMidiVoicing(voicing: number[]): number[] {
+    const midis: number[] = [];
+    voicing.forEach((freq: number) => {
         const midi = getMidi(freq);
         if (Number.isFinite(midi)) {
-            midis.push(/** @type {number} */ (midi));
+            midis.push(midi as number);
         }
     });
     return midis;
 }
 
-/**
- * @param {number} rootMidi
- * @param {number[]} intervals
- * @param {number} targetCenter
- * @param {number} minMidi
- * @param {number} maxMidi
- * @returns {number[]}
- */
-function placeIntervalsNearTarget(rootMidi, intervals, targetCenter, minMidi = 0, maxMidi = 127) {
-    /** @type {number[]} */
-    const placed = [];
+function placeIntervalsNearTarget(
+    rootMidi: number,
+    intervals: number[],
+    targetCenter: number,
+    minMidi = 0,
+    maxMidi = 127,
+): number[] {
+    const placed: number[] = [];
 
     intervals.forEach((interval) => {
         let bestMidi = rootMidi + interval;
@@ -269,12 +258,7 @@ function placeIntervalsNearTarget(rootMidi, intervals, targetCenter, minMidi = 0
     return [...new Set(placed)].sort((a, b) => a - b);
 }
 
-/**
- * @param {number[]} fromMidis
- * @param {number[]} toMidis
- * @returns {number}
- */
-function getNearestVoiceLeadingCost(fromMidis, toMidis) {
+function getNearestVoiceLeadingCost(fromMidis: number[], toMidis: number[]): number {
     if (fromMidis.length === 0 || toMidis.length === 0) {
         return 0;
     }
@@ -288,12 +272,10 @@ function getNearestVoiceLeadingCost(fromMidis, toMidis) {
     }, 0);
 }
 
-/**
- * @param {number[]} midis
- * @param {{ rootMidi?: number; freqs?: number[] } | null} chord
- * @returns {number}
- */
-function countSharedPitchClasses(midis, chord) {
+function countSharedPitchClasses(
+    midis: number[],
+    chord: { rootMidi?: number; freqs?: number[] } | null,
+): number {
     const chordMidis = getMidiVoicing(chord?.freqs || []);
     if (midis.length === 0 || chordMidis.length === 0) {
         return 0;
@@ -307,30 +289,22 @@ function countSharedPitchClasses(midis, chord) {
  * Altered dominants should still resolve like a voice-led dominant, not just a bag of sharp notes.
  * Favor guide tones plus one or two strong colors, and avoid exposing the 3rd/#9 semitone clash
  * unless the intensity/complexity is high enough to justify that heat.
- * @param {{ rootMidi?: number; freqs?: number[]; quality?: string } | null} chord
- * @param {number[]} previousMidis
- * @param {{ rootMidi?: number; freqs?: number[]; quality?: string } | null} nextChord
- * @param {number} minMidi
- * @param {number} maxMidi
- * @param {number} intensity
- * @param {number} complexity
- * @returns {number[]}
  */
 function buildResolvingAlteredVoicing(
-    chord,
-    previousMidis = [],
-    nextChord = null,
+    chord: { rootMidi?: number; freqs?: number[]; quality?: string } | null,
+    previousMidis: number[] = [],
+    nextChord: { rootMidi?: number; freqs?: number[]; quality?: string } | null = null,
     minMidi = 0,
     maxMidi = 127,
     intensity = 0.5,
     complexity = 0.5,
-) {
+): number[] {
     const rootMidi = chord?.rootMidi;
     if (!Number.isFinite(rootMidi)) {
         return [];
     }
 
-    const resolvedRootMidi = /** @type {number} */ (rootMidi);
+    const resolvedRootMidi = rootMidi as number;
     const nextMidis = getMidiVoicing(nextChord?.freqs || []);
     const targetCenter =
         previousMidis.length > 0
@@ -400,14 +374,17 @@ function buildResolvingAlteredVoicing(
  * Algorithmic Pattern Generator
  * Generates a binary rhythmic hit pattern for a single measure.
  * Replaces static PIANO_CELLS table to save space and increase variety.
- * @param {import('../types.js').EnsembleState} state
- * @param {string} genre
- * @param {string} vibe - 'sparse' | 'balanced' | 'active'
- * @param {any} tsConfig
- * @param {number} [length] - Pattern length in steps (default 16).
- * @returns {number[]} Binary array (0 | 1) of length `length`, where 1 marks a rhythmic hit.
+ * @param vibe - 'sparse' | 'balanced' | 'active'
+ * @param length - Pattern length in steps (default 16).
+ * @returns Binary array (0 | 1) of length `length`, where 1 marks a rhythmic hit.
  */
-export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16) {
+export function generateCompingPattern(
+    state: EnsembleState,
+    genre: string,
+    vibe: string,
+    tsConfig: any,
+    length = 16,
+): number[] {
     const { playback } = state;
     const pattern = new Array(length).fill(0);
     const intensity = playback.bandIntensity;
@@ -419,25 +396,17 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
     const middleBeat = ts.beats >= 4 ? 2 : Math.max(1, ts.beats - 1);
     const finalBeat = Math.max(0, ts.beats - 1);
 
-    /** @param {number} step */
-    const hit = (step) => {
+    const hit = (step: number) => {
         if (step < length) {
             pattern[step] = 1;
         }
     };
 
-    /**
-     * @param {number} beatIdx
-     * @param {number} [offsetSteps]
-     */
-    const getBeatStep = (beatIdx, offsetSteps = 0) => {
+    const getBeatStep = (beatIdx: number, offsetSteps = 0) => {
         return beatIdx * spb + offsetSteps;
     };
 
-    /**
-     * @param {number[]} beats
-     */
-    const addBeatHits = (beats) => {
+    const addBeatHits = (beats: number[]) => {
         beats.forEach((beatIdx) => {
             if (beatIdx >= 0 && beatIdx < ts.beats) {
                 hit(getBeatStep(beatIdx));
@@ -450,14 +419,14 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
     if (genre === 'Neo-Soul') {
         // Lay back heavily on the "and" of beats 2 and 4 (in 4/4) or semantic backbeats
         const backbeats = ts.backbeat || [1, 3];
-        backbeats.forEach((/** @type {number} */ b) => {
+        backbeats.forEach((b: number) => {
             hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
         });
 
         // Add random syncopated "filler" at high intensity
         if (intensity > 0.6) {
             // fillers roughly on offbeats of 1, 3 etc
-            [0, 2].forEach((/** @type {number} */ b) => {
+            [0, 2].forEach((b: number) => {
                 if (Math.random() < intensity * 0.4) {
                     hit(getBeatStep(b, Math.floor(spb * 0.75)));
                 }
@@ -469,13 +438,13 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
     if (genre === 'Reggae') {
         // Skank on backbeats
         const backbeats = ts.backbeat || [1, 3];
-        backbeats.forEach((/** @type {number} */ b) => {
+        backbeats.forEach((b: number) => {
             hit(getBeatStep(b));
         });
 
         // Sometimes double skank if active
         if (vibe === 'active' || intensity > 0.7) {
-            backbeats.forEach((/** @type {number} */ b) => {
+            backbeats.forEach((b: number) => {
                 hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
             });
         }
@@ -750,22 +719,26 @@ export function generateCompingPattern(state, genre, vibe, tsConfig, length = 16
  *  - Writes `chords.rhythmicMask` for cross-module coordination.
  *  - Writes `playback.intent.*` fields used by the timing pocket.
  *
- * @param {import('../types.js').EnsembleState} state
- * @param {number} step - Absolute scheduler step.
- * @param {boolean} soloistBusy - True when the soloist is actively playing notes.
- * @param {number} [spm] - Steps per measure (default 16).
- * @param {string|null} [sectionId] - Current arranger section ID; triggers a groove reset on change.
+ * @param step - Absolute scheduler step.
+ * @param soloistBusy - True when the soloist is actively playing notes.
+ * @param spm - Steps per measure (default 16).
+ * @param sectionId - Current arranger section ID; triggers a groove reset on change.
  */
-function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = null) {
+function updateRhythmicIntent(
+    state: EnsembleState,
+    step: number,
+    soloistBusy: boolean,
+    spm = 16,
+    sectionId: string | null = null,
+): void {
     const { playback, chords, groove, arranger } = state;
-    /** @type {any} */
-    const signatures = TIME_SIGNATURES;
+    const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
 
     // --- Section Change Detection ---
     if (sectionId && compingState.lastSectionId !== sectionId) {
         compingState.grooveRetentionCount = 0;
-        compingState.lastSectionId = /** @type {any} */ (sectionId);
+        compingState.lastSectionId = sectionId as any;
         compingState.lockedUntil = 0; // Force update
     }
 
@@ -798,8 +771,7 @@ function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = nu
     }
 
     if (chords.style === 'smart') {
-        /** @type {any} */
-        const smartMapping = {
+        const smartMapping: any = {
             Afrobeat: 'Funk',
             Country: 'Rock',
         };
@@ -888,30 +860,34 @@ function updateRhythmicIntent(state, step, soloistBusy, spm = 16, sectionId = nu
     compingState.lockedUntil = step + spm;
 }
 
+interface CCEvent {
+    type: string;
+    controller: number;
+    value: number;
+    timingOffset: number;
+}
+
 /**
  * Generates sustain-pedal (CC 64) on/off events for the current step.
  * Releases sustain on chord changes (with a brief "breath" before tense chords resolve)
  * and re-engages it immediately after to allow the next harmony to bloom naturally.
  *
- * @param {number} _step - Absolute step (unused; kept for call-site symmetry).
- * @param {number} measureStep - Step within the current measure.
- * @param {number} chordIndex - Index of the current chord in the progression.
- * @param {number} intensity - Band intensity (0.0 – 1.0).
- * @param {string} genre
- * @param {import('../types.js').StepInfo} [stepInfo]
- * @param {string|null} [currentQuality] - Chord quality string (e.g. '7alt', 'dim') for tension tracking.
- * @returns {Array<{type: string, controller: number, value: number, timingOffset: number}>}
+ * @param _step - Absolute step (unused; kept for call-site symmetry).
+ * @param measureStep - Step within the current measure.
+ * @param chordIndex - Index of the current chord in the progression.
+ * @param intensity - Band intensity (0.0 – 1.0).
+ * @param currentQuality - Chord quality string (e.g. '7alt', 'dim') for tension tracking.
  */
 function handleSustainEvents(
-    _step,
-    measureStep,
-    chordIndex,
-    intensity,
-    genre,
-    stepInfo,
-    currentQuality,
-) {
-    const events = [];
+    _step: number,
+    measureStep: number,
+    chordIndex: number,
+    intensity: number,
+    genre: string,
+    stepInfo?: StepInfo,
+    currentQuality?: string | null,
+): CCEvent[] {
+    const events: CCEvent[] = [];
     const isNewChord = chordIndex !== compingState.lastChordIndex;
     const isNewMeasure = measureStep === 0;
 
@@ -958,6 +934,16 @@ function handleSustainEvents(
     return events;
 }
 
+interface AccompanimentCoordination {
+    soloistBusy?: boolean;
+    soloistActive?: boolean;
+    soloistMidi?: number;
+    bassHit?: boolean;
+    bassMidi?: number;
+    kickHit?: boolean;
+    snareHit?: boolean;
+}
+
 /**
  * Main entry point for generating accompaniment notes.
  * Returns an array of standardized Note Objects.
@@ -967,42 +953,32 @@ function handleSustainEvents(
  * share the same setup: sustain CC generation, rhythmic-intent update, and soloist
  * yielding.  Each lane returns early, so at most one lane fires per step.
  *
- * @param {import('../types.js').EnsembleState} state
- * @param {any} chord - Current chord object from the arranger progression.
- * @param {number} step - Absolute scheduler step.
- * @param {number} stepInChord - Step within the current chord duration.
- * @param {number} measureStep - Step within the current measure (0 … stepsPerMeasure-1).
- * @param {import('../types.js').StepInfo} stepInfo - Semantic timing flags for this step.
- * @param {{
- *   soloistBusy?: boolean,
- *   soloistActive?: boolean,
- *   soloistMidi?: number,
- *   bassHit?: boolean,
- *   bassMidi?: number,
- *   kickHit?: boolean,
- *   snareHit?: boolean,
- * }} [coordination] - Optional cross-instrument coordination signals from the CoordinationContext.
- * @returns {Array<any>} Standardized Note Objects (may include CC-only sentinel notes with `muted: true`).
+ * @param chord - Current chord object from the arranger progression.
+ * @param step - Absolute scheduler step.
+ * @param stepInChord - Step within the current chord duration.
+ * @param measureStep - Step within the current measure (0 … stepsPerMeasure-1).
+ * @param stepInfo - Semantic timing flags for this step.
+ * @param coordination - Optional cross-instrument coordination signals from the CoordinationContext.
+ * @returns Standardized Note Objects (may include CC-only sentinel notes with `muted: true`).
  */
 export function getAccompanimentNotes(
-    state,
-    chord,
-    step,
-    stepInChord,
-    measureStep,
-    stepInfo,
-    coordination = {},
-) {
+    state: EnsembleState,
+    chord: any,
+    step: number,
+    stepInChord: number,
+    measureStep: number,
+    stepInfo: StepInfo,
+    coordination: AccompanimentCoordination = {},
+): any[] {
     const { playback, arranger, chords, bass, soloist, groove, harmony } = state;
     if (!chords.enabled || !chord) {
         return [];
     }
 
-    const notes = /** @type {any[]} */ ([]);
+    const notes: any[] = [];
     const genre = groove.genreFeel;
     const intensity = playback.bandIntensity;
-    /** @type {any} */
-    const signatures = TIME_SIGNATURES;
+    const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
 
@@ -1194,8 +1170,8 @@ export function getAccompanimentNotes(
             );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
             let voicing = chord.freqs
-                .map((/** @type {number} */ f) => getMidi(f))
-                .filter((/** @type {number | null} */ midi) => Number.isFinite(midi));
+                .map((f: number) => getMidi(f))
+                .filter((midi: number | null) => Number.isFinite(midi));
 
             if (voicing.length === 0) {
                 voicing = [chord.rootMidi + 3, chord.rootMidi + 10, chord.rootMidi + 14];
@@ -1209,7 +1185,7 @@ export function getAccompanimentNotes(
 
             if (reserveBassSpace && bassMidi) {
                 while (voicing.length > 0 && voicing[0] <= bassMidi + 12) {
-                    voicing = voicing.map((/** @type {number} */ midi) => midi + 12);
+                    voicing = voicing.map((midi: number) => midi + 12);
                 }
             }
             compingState.lastVoicingMidis = [...voicing];
@@ -1217,7 +1193,7 @@ export function getAccompanimentNotes(
             // Neo-Soul "Drunken" Timing (Randomized displacement) - TIGHTENED
             const drunk = (Math.random() - 0.5) * (intensity * 0.02);
 
-            voicing.forEach((/** @type {any} */ m, /** @type {number} */ i) => {
+            voicing.forEach((m: any, i: number) => {
                 notes.push({
                     midi: m,
                     velocity: (isGhost ? 0.2 : 0.55) * (0.5 + intensity * 0.9),
@@ -1346,8 +1322,8 @@ export function getAccompanimentNotes(
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
 
             let voicing = chord.freqs
-                .map((/** @type {number} */ f) => getMidi(f))
-                .filter((/** @type {number | null} */ midi) => Number.isFinite(midi));
+                .map((f: number) => getMidi(f))
+                .filter((midi: number | null) => Number.isFinite(midi));
 
             if (voicing.length === 0) {
                 voicing = [chord.rootMidi + 4, chord.rootMidi + 10];
@@ -1367,7 +1343,7 @@ export function getAccompanimentNotes(
             );
             compingState.lastVoicingMidis = [...voicing];
 
-            voicing.forEach((/** @type {any} */ m, /** @type {number} */ i) => {
+            voicing.forEach((m: any, i: number) => {
                 notes.push({
                     midi: m,
                     velocity:
@@ -1571,8 +1547,7 @@ export function getAccompanimentNotes(
         ) {
             // If we have extensions beyond the triad/7th, prioritize them in the voicing
             const extensions = chord.intervals.filter(
-                (/** @type {number} */ i) =>
-                    i !== 0 && i !== 3 && i !== 4 && i !== 7 && i !== 10 && i !== 11,
+                (i: number) => i !== 0 && i !== 3 && i !== 4 && i !== 7 && i !== 10 && i !== 11,
             );
             if (extensions.length > 0 && Math.random() < (complexity - 0.4) * 1.5) {
                 // Shift voicing to include more color tones
@@ -1654,9 +1629,9 @@ export function getAccompanimentNotes(
             // HIGH INTENSITY & COMPLEX: Shells to avoid mud
             else if (!groundingRequired && genre === 'Jazz' && intensity > 0.6 && isComplex) {
                 // Find 3rd and 7th
-                const third = chord.intervals.find((/** @type {number} */ i) => i === 3 || i === 4);
+                const third = chord.intervals.find((i: number) => i === 3 || i === 4);
                 const seventh = chord.intervals.find(
-                    (/** @type {number} */ i) => i === 10 || i === 11 || i === 9 || i === 6,
+                    (i: number) => i === 10 || i === 11 || i === 9 || i === 6,
                 ); // 6 for dim
                 if (third !== undefined && seventh !== undefined) {
                     voicing = [
@@ -1746,9 +1721,7 @@ export function getAccompanimentNotes(
                     if ((chord.is7th || chord.quality.includes('9')) && voicing.length > 3) {
                         const rootPC = chord.rootMidi % 12;
                         const fifthPC = (rootPC + 7) % 12;
-                        voicing = voicing.filter(
-                            (/** @type {number} */ f) => (getMidi(f) || 0) % 12 !== fifthPC,
-                        );
+                        voicing = voicing.filter((f: number) => (getMidi(f) || 0) % 12 !== fifthPC);
                     }
                 }
             }
@@ -1783,7 +1756,7 @@ export function getAccompanimentNotes(
             compingState.lastVoicingMidis = [...finalVoicingMidis];
         }
 
-        voicing.forEach((/** @type {number} */ f, i) => {
+        voicing.forEach((f: number, i: number) => {
             const humanShift = Math.random() * 0.006 - 0.003;
             const humanVol = 0.95 + Math.random() * 0.1;
 

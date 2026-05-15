@@ -1,3 +1,4 @@
+import type { EnsembleState, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -17,25 +18,22 @@ import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 
 /**
  * Resets the internal generative state of the bass.
- * @param {import('../types.js').EnsembleState} state
  */
-export function resetBassState(state) {
+export function resetBassState(state: EnsembleState): void {
     const { bass } = state;
     bass.busySteps = 0; // @worker-mutation
     bass.lastFreq = null; // @worker-mutation
     bass.lastMidiPlayed = null; // @worker-mutation
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {string} style
- * @param {number} step
- * @param {number} stepInChord
- * @param {import('../types.js').StepInfo} [stepInfo]
- * @param {any} [coordination]
- * @returns {boolean}
- */
-export function isBassActive(state, style, step, stepInChord, stepInfo, coordination) {
+export function isBassActive(
+    state: EnsembleState,
+    style: string,
+    step: number,
+    stepInChord: number,
+    stepInfo?: StepInfo,
+    coordination?: any,
+): boolean {
     const { playback, groove, arranger } = state;
 
     // Rhythmic Yielding: Lock to Kick if available
@@ -47,8 +45,7 @@ export function isBassActive(state, style, step, stepInChord, stepInfo, coordina
         style = resolveMappedStyle(SMART_BASS_STYLE_MAP, groove.genreFeel, groove.lastDrumPreset);
     }
 
-    /** @type {any} */
-    const signatures = TIME_SIGNATURES;
+    const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const intBeat = stepInfo
         ? stepInfo.beatIndex
@@ -70,35 +67,20 @@ export function isBassActive(state, style, step, stepInChord, stepInfo, coordina
     );
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @param {any} chord
- * @param {any} nextChord
- * @param {number} _beatInMeasure
- * @param {number|null} prevFreq
- * @param {number} centerMidi
- * @param {string} style
- * @param {number} _chordIndex
- * @param {number} step
- * @param {number} stepInChord
- * @param {any} [context]
- * @param {import('../types.js').StepInfo} [stepInfo]
- * @returns {any}
- */
 export function getBassNote(
-    state,
-    chord,
-    nextChord,
-    _beatInMeasure,
-    prevFreq,
-    centerMidi,
-    style,
-    _chordIndex,
-    step,
-    stepInChord,
-    context = {},
-    stepInfo,
-) {
+    state: EnsembleState,
+    chord: any,
+    nextChord: any,
+    _beatInMeasure: number,
+    prevFreq: number | null,
+    centerMidi: number,
+    style: string,
+    _chordIndex: number,
+    step: number,
+    stepInChord: number,
+    context: any = {},
+    stepInfo?: StepInfo,
+): any {
     const { playback, groove, soloist, arranger } = state;
     if (!chord) {
         return null;
@@ -108,8 +90,7 @@ export function getBassNote(
         style = resolveMappedStyle(SMART_BASS_STYLE_MAP, groove.genreFeel, groove.lastDrumPreset);
     }
 
-    /** @type {any} */
-    const signatures = TIME_SIGNATURES;
+    const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
     const stepInMeasure = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
@@ -164,12 +145,10 @@ export function getBassNote(
     const isSectionStart = context && step === context.sectionStart;
     const allowSubRange = isDownbeat || isSectionStart;
 
-    /**
-     * @param {number} midi
-     * @param {number|null} [referenceMidi]
-     * @returns {{midi: number, weight: number}}
-     */
-    const clampAndNormalize = (midi, referenceMidi = null) => {
+    const clampAndNormalize = (
+        midi: number,
+        referenceMidi: number | null = null,
+    ): { midi: number; weight: number } => {
         if (!Number.isFinite(midi)) {
             return { midi: safeCenterMidi, weight: 1.0 };
         }
@@ -178,7 +157,7 @@ export function getBassNote(
         const octaveBase = Math.floor(targetRef / 12) * 12;
         const currentRootPC = chord.rootMidi % 12;
 
-        const candidates = [];
+        const candidates: { midi: number; weight: number }[] = [];
         for (let o = -24; o <= 24; o += 12) {
             const c = octaveBase + o + pc;
             if (c >= absMin && c <= absMax) {
@@ -255,17 +234,11 @@ export function getBassNote(
         return { midi: Math.max(absMin, Math.min(absMax, octaveBase + pc)), weight: 0.1 };
     };
 
-    /**
-     * @param {number} midi
-     * @param {number|null} [referenceMidi]
-     * @returns {number}
-     */
-    const clampAndNormalizeMidi = (midi, referenceMidi = null) => {
+    const clampAndNormalizeMidi = (midi: number, referenceMidi: number | null = null): number => {
         return clampAndNormalize(midi, referenceMidi).midi;
     };
 
-    /** @param {number} midi */
-    const normalizeToRange = (midi) => {
+    const normalizeToRange = (midi: number): number => {
         if (!Number.isFinite(midi)) {
             return safeCenterMidi;
         }
@@ -325,26 +298,21 @@ export function getBassNote(
     const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;
 
     /**
-     * @param {number} freq
-     * @param {number|null} [durationMultiplier]
-     * @param {number} [velocityParam]
-     * @param {number} [muted] - Palm-mute amount: 0 (open) to 1 (fully muted).
-     * @param {number} [bendStartInterval]
+     * @param muted - Palm-mute amount: 0 (open) to 1 (fully muted).
      */
     const result = (
-        /** @type {number} */ freq,
-        durationMultiplier = null,
-        velocityParam = 1.0,
-        muted = 0,
-        bendStartInterval = 0,
+        freq: number,
+        durationMultiplier: number | null = null,
+        velocityParam: number = 1.0,
+        muted: number = 0,
+        bendStartInterval: number = 0,
     ) => {
         let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
             timingOffset += 0.01 + intensity * 0.015;
         }
 
-        /** @type {number} */
-        let durationSteps = 1;
+        let durationSteps: number = 1;
         if (durationMultiplier !== null) {
             durationSteps = durationMultiplier;
         } else {
@@ -359,7 +327,7 @@ export function getBassNote(
             } else if (style === 'funk') {
                 durationSteps = 0.8;
             } else if (
-                /** @type {any} */ (style) === 'disco' ||
+                (style as any) === 'disco' ||
                 style === 'rocco' ||
                 style === 'metal' ||
                 style === 'neo' ||
@@ -367,7 +335,7 @@ export function getBassNote(
                 style === 'quarter'
             ) {
                 durationSteps =
-                    style === 'quarter' || /** @type {any} */ (style) === 'blues'
+                    style === 'quarter' || (style as any) === 'blues'
                         ? ts.stepsPerBeat * 0.4
                         : style === 'neo'
                           ? ts.stepsPerBeat * 0.5
@@ -413,7 +381,7 @@ export function getBassNote(
 
     const isSoloistBusy = (soloist.busySteps || 0) > 0;
 
-    const withOctaveJump = (/** @type {number} */ note) => {
+    const withOctaveJump = (note: number): number => {
         if (isSoloistBusy || intensity < 0.4) {
             return note;
         }
@@ -462,8 +430,8 @@ export function getBassNote(
         return null;
     }
 
-    const isSameAsPrev = (/** @type {number|null} */ midi) => !!prevMidi && midi === prevMidi;
-    const kickInst = (groove.instruments || []).find((i) => i.name === 'Kick');
+    const isSameAsPrev = (midi: number | null) => !!prevMidi && midi === prevMidi;
+    const kickInst = (groove.instruments || []).find((i: any) => i.name === 'Kick');
     const hasKickTrigger = !!(
         kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
     );
@@ -657,9 +625,8 @@ export function getBassNote(
     }
 
     if (intBeat > 0) {
-        /** @type {{midi: number, weight: number}[]} */
-        let candidates = scale
-            .map((pc) => clampAndNormalize(baseRoot + pc, prevMidi))
+        let candidates: { midi: number; weight: number }[] = scale
+            .map((pc: number) => clampAndNormalize(baseRoot + pc, prevMidi))
             .filter((n) => !isSameAsPrev(n.midi));
         if (isSoloistBusy) {
             candidates = candidates.filter((n) => {

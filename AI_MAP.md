@@ -16,7 +16,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/main.js` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
-| `public/visualizer-worker.js` | Background rendering thread for 60fps visuals. | `engine.render` |
+| `public/visualizer-worker.ts` | Background rendering thread for 60fps visuals. | `engine.render` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
@@ -44,15 +44,15 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/engine/soloist.js` | Melodic soloist generation logic (Main). | `getSoloistNote` |
 | `public/engine/soloist-seeder.js` | Dynamic Head (Seed Melody) generation logic. | `generateSessionSeed` |
-| `public/engine/bass-engine.js` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
-| `public/engine/accompaniment.js` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
-| `public/engine/chords-engine.js` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
+| `public/engine/bass-engine.ts` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
+| `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
+| `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
 | `public/engine/harmonies.js` | Background pad/stab generation. | `getHarmonyNotes` |
-| `public/engine/soloist-config.js` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
+| `public/engine/soloist-config.ts` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
 | `public/engine/soloist-devices.js` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
 | `public/engine/drum-seeder.ts` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
 | `public/engine/fills.ts` | Procedural drum fill generation. | `generateProceduralFill` |
-| `public/engine/conductor.js` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
+| `public/engine/conductor.ts` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
 | `public/engine/theory-scales.ts` | Scale degrees and mode definitions. | `getScaleForChord` |
 | `public/engine/resolution.ts` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
 | `public/engine/arranger-utils.ts` | Arrangement unrolling and form utilities. | `unrollArrangement` |
@@ -63,7 +63,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/engine/bass-styles.ts` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
 | `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
-| `public/engine/soloist-config.js` | Style definitions and influence pools. | `STYLE_CONFIG` |
+| `public/engine/soloist-config.ts` | Style definitions and influence pools. | `STYLE_CONFIG` |
 | `public/engine/soloist-devices.js` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
 | `public/engine/grooves/` | Directory of 15+ genre-specific drum strategies. | `jazz.js`, `rock.js`, `funk.js`, etc. |
 
@@ -105,7 +105,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- |
 | `public/engine/synth-bass.ts` | Sub-bass and Growl synthesis. |
 | `public/engine/synth-chords.ts` | Polyphonic piano/pad synthesis. |
-| `public/engine/synth-drums.js` | Procedural percussion synthesis. |
+| `public/engine/synth-drums.ts` | Procedural percussion synthesis. |
 | `public/engine/synth-harmonies.ts` | Background "Stab" and "Pad" synthesis. |
 | `public/engine/synth-soloist.js` | Lead instrument synthesis and glides. |
 

@@ -1,3 +1,5 @@
+import type { GrooveState } from '../state/groove.js';
+import type { EnsembleState } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import {
     createSimplePanner,
@@ -7,6 +9,142 @@ import {
     rampGain,
     updateDensityDucking,
 } from './synth-utils.js';
+
+type CymbalName = 'HiHat' | 'Open' | 'Ride' | 'Crash';
+
+interface CymbalBufferProfile {
+    key: string;
+    duration: number;
+    baseFreq: number;
+    partials: number[];
+    metalMix: number;
+    noiseMix: number;
+    transientMix: number;
+    partialDecay: number;
+    partialSpread: number;
+    noiseDecay: number;
+    smooth: number;
+    saturation: number;
+    jitter: number;
+}
+
+interface CymbalRuntimeProfile {
+    volumeScale: number;
+    playbackRate: number;
+    playbackVariance: number;
+    bandpassBase: number;
+    bandpassVelocity: number;
+    bandpassCap: number;
+    highpassBase: number;
+    highpassVelocity: number;
+    highpassCap: number;
+    q: number;
+    attack: number;
+    decayDelay: number;
+    decayBase: number;
+    decayVelocityFocus: number;
+    decayIntensityFocus: number;
+    minDecay: number;
+    stopTime: number;
+    pingFreq?: number;
+    pingVolume?: number;
+}
+
+interface TomVoiceProfile {
+    baseFreq: number;
+    stickRatioBase: number;
+    stickRatioVelocity: number;
+    stickVolume: number;
+    skinFreqMultiplier: number;
+    skinVolume: number;
+    skinQ: number;
+    bodyStartRatio: number;
+    bodyVolume: number;
+    bodyDecay: number;
+    bodyDuration: number;
+    shellVolume: number;
+    shellDecay: number;
+    shellDuration: number;
+    shellAttack: number;
+}
+
+interface CymbalVoiceConfig {
+    volumeScale: number;
+    playbackRate: number;
+    playbackVariance: number;
+    q: number;
+    attack: number;
+    decayDelay: number;
+    decayTime: number;
+    stopTime: number;
+    bandpassFreq: number;
+    highpassFreq: number;
+    pingFreq?: number;
+    pingVolume?: number;
+}
+
+interface KickVoiceConfig {
+    beaterFreq: number;
+    beaterEndFreq: number;
+    beaterVolume: number;
+    beaterDecay: number;
+    skinVolume: number;
+    skinFreq: number;
+    knockStartFreq: number;
+    knockEndFreq: number;
+    knockVolume: number;
+    knockDecay: number;
+    shellFreq: number;
+    shellVolume: number;
+    shellDecay: number;
+    shellDuration: number;
+}
+
+interface SnareVoiceConfig {
+    lowBodyFreq: number;
+    highBodyFreq: number;
+    lowBodyVolume: number;
+    highBodyVolume: number;
+    bodyDecay: number;
+    wiresVolume: number;
+    wiresFreq: number;
+    wiresQ: number;
+    wiresDecay: number;
+    wiresDuration: number;
+    crackFreq: number;
+    crackEndFreq: number;
+    crackVolume: number;
+    crackDecay: number;
+}
+
+type TomRegister = 'High' | 'Mid' | 'Low';
+
+interface TomVoiceConfig {
+    register: TomRegister;
+    baseFreq: number;
+    stickFreqStart: number;
+    stickFreqEnd: number;
+    stickVolume: number;
+    skinVolume: number;
+    skinFreq: number;
+    skinQ: number;
+    bodyFreqStart: number;
+    bodyFreqEnd: number;
+    bodyVolume: number;
+    bodyDecay: number;
+    bodyDuration: number;
+    shellFreq: number;
+    shellVolume: number;
+    shellDecay: number;
+    shellDuration: number;
+    shellAttack: number;
+}
+
+interface DrumMixState {
+    recentHits: number;
+    densityDuck: number;
+    lastTick: number;
+}
 
 const RIGHT_PANNED_INSTRUMENTS = new Set([
     'HiHat',
@@ -21,7 +159,7 @@ const RIGHT_PANNED_INSTRUMENTS = new Set([
 
 const TAU = Math.PI * 2;
 
-const CYMBAL_BUFFER_PROFILES = {
+const CYMBAL_BUFFER_PROFILES: Record<CymbalName, CymbalBufferProfile> = {
     HiHat: {
         key: 'hihatMetal',
         duration: 0.6,
@@ -84,7 +222,7 @@ const CYMBAL_BUFFER_PROFILES = {
     },
 };
 
-const CYMBAL_RUNTIME_PROFILES = {
+const CYMBAL_RUNTIME_PROFILES: Record<CymbalName, CymbalRuntimeProfile> = {
     HiHat: {
         volumeScale: 0.69,
         playbackRate: 1.0,
@@ -165,7 +303,7 @@ const CYMBAL_RUNTIME_PROFILES = {
     },
 };
 
-const TOM_VOICE_PROFILES = {
+const TOM_VOICE_PROFILES: Record<TomRegister, TomVoiceProfile> = {
     High: {
         baseFreq: 188,
         stickRatioBase: 4.1,
@@ -219,31 +357,20 @@ const TOM_VOICE_PROFILES = {
     },
 };
 
-/**
- * @param {number} value
- * @returns {number}
- */
-function clamp01(value) {
+function clamp01(value: number): number {
     return Math.max(0, Math.min(1, value));
 }
 
-/**
- * @param {import('../state/groove.js').GrooveState} groove
- * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
- * @returns {AudioBuffer|null}
- */
-function getCymbalBuffer(groove, name) {
+function getCymbalBuffer(groove: GrooveState, name: CymbalName): AudioBuffer | null {
     const profile = CYMBAL_BUFFER_PROFILES[name];
     return profile ? groove.audioBuffers[profile.key] || null : null;
 }
 
-/**
- * @param {AudioContext} audioCtx
- * @param {import('../state/groove.js').GrooveState} groove
- * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
- * @returns {AudioBuffer}
- */
-function ensureCymbalBuffer(audioCtx, groove, name) {
+function ensureCymbalBuffer(
+    audioCtx: AudioContext,
+    groove: GrooveState,
+    name: CymbalName,
+): AudioBuffer {
     const profile = CYMBAL_BUFFER_PROFILES[name];
     if (!profile) {
         return groove.audioBuffers.noise;
@@ -254,22 +381,18 @@ function ensureCymbalBuffer(audioCtx, groove, name) {
     return groove.audioBuffers[profile.key];
 }
 
-/**
- * @param {import('../types.js').EnsembleState} state
- * @returns {number}
- */
-function getBandLayerCount(state) {
+function getBandLayerCount(state: EnsembleState): number {
     let layers = 0;
-    if (state.bass?.enabled) {
+    if ((state as any).bass?.enabled) {
         layers++;
     }
-    if (state.chords?.enabled) {
+    if ((state as any).chords?.enabled) {
         layers++;
     }
-    if (state.harmony?.enabled) {
+    if ((state as any).harmony?.enabled) {
         layers++;
     }
-    if (state.soloist?.enabled) {
+    if ((state as any).soloist?.enabled) {
         layers++;
     }
     return layers;
@@ -277,14 +400,11 @@ function getBandLayerCount(state) {
 
 /**
  * Keep cymbals supportive when the full arrangement is active.
- * @param {import('../types.js').EnsembleState} state
- * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
- * @returns {number}
  */
-export function getCymbalMixScale(state, name) {
-    const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
+export function getCymbalMixScale(state: EnsembleState, name: CymbalName): number {
+    const bandIntensity = clamp01((state.playback as any)?.bandIntensity ?? 0.5);
     const crowding = getBandLayerCount(state) / 4;
-    const genreFeel = state.groove?.genreFeel;
+    const genreFeel = (state.groove as any)?.genreFeel;
     const instrumentBase =
         name === 'HiHat' ? 0.96 : name === 'Ride' ? 0.92 : name === 'Open' ? 0.82 : 0.95;
     const intensityTrim = 1 - Math.max(0, bandIntensity - 0.6) * 0.18;
@@ -299,13 +419,10 @@ export function getCymbalMixScale(state, name) {
 
 /**
  * Keep the snare present as the backbeat anchor, with a small lift for rock/blues.
- * @param {import('../types.js').EnsembleState} state
- * @param {number} velocity
- * @returns {number}
  */
-export function getSnareMixScale(state, velocity) {
-    const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
-    const genreFeel = state.groove?.genreFeel;
+export function getSnareMixScale(state: EnsembleState, velocity: number): number {
+    const bandIntensity = clamp01((state.playback as any)?.bandIntensity ?? 0.5);
+    const genreFeel = (state.groove as any)?.genreFeel;
     const genreBoost =
         genreFeel === 'Rock' || genreFeel === 'Blues' ? 1.06 : genreFeel === 'Jazz' ? 1.03 : 1;
     const intensityLift = 1 + Math.max(0, bandIntensity - 0.55) * 0.04;
@@ -317,12 +434,9 @@ export function getSnareMixScale(state, velocity) {
 /**
  * Keep the rhythm section's low-mid body a touch more forward in Blues/Jazz without
  * inflating cymbal presence.
- * @param {import('../types.js').EnsembleState} state
- * @param {string} name
- * @returns {number}
  */
-export function getRhythmBodyMixScale(state, name) {
-    const genreFeel = state.groove?.genreFeel;
+export function getRhythmBodyMixScale(state: EnsembleState, name: string): number {
+    const genreFeel = (state.groove as any)?.genreFeel;
 
     if (name === 'Kick') {
         return genreFeel === 'Jazz' ? 1.05 : genreFeel === 'Blues' ? 1.04 : 1;
@@ -337,25 +451,12 @@ export function getRhythmBodyMixScale(state, name) {
 
 /**
  * Runtime cymbal shaping keeps high-intensity hits focused instead of simply brighter/longer.
- * @param {'HiHat'|'Open'|'Ride'|'Crash'} name
- * @param {number} velocity
- * @param {number} [bandIntensity=0.5]
- * @returns {null|({
- *   volumeScale: number,
- *   playbackRate: number,
- *   playbackVariance: number,
- *   q: number,
- *   attack: number,
- *   decayDelay: number,
- *   decayTime: number,
- *   stopTime: number,
- *   bandpassFreq: number,
- *   highpassFreq: number,
- *   pingFreq?: number,
- *   pingVolume?: number
- * })}
  */
-export function getCymbalVoiceConfig(name, velocity, bandIntensity = 0.5) {
+export function getCymbalVoiceConfig(
+    name: CymbalName,
+    velocity: number,
+    bandIntensity = 0.5,
+): CymbalVoiceConfig | null {
     const base = CYMBAL_RUNTIME_PROFILES[name];
     if (!base) {
         return null;
@@ -392,26 +493,8 @@ export function getCymbalVoiceConfig(name, velocity, bandIntensity = 0.5) {
 
 /**
  * Keep the kick centered on body/punch while trimming overly clicky top-end in dense sections.
- * @param {number} velocity
- * @param {number} [bandIntensity=0.5]
- * @returns {{
- *   beaterFreq: number,
- *   beaterEndFreq: number,
- *   beaterVolume: number,
- *   beaterDecay: number,
- *   skinVolume: number,
- *   skinFreq: number,
- *   knockStartFreq: number,
- *   knockEndFreq: number,
- *   knockVolume: number,
- *   knockDecay: number,
- *   shellFreq: number,
- *   shellVolume: number,
- *   shellDecay: number,
- *   shellDuration: number
- * }}
  */
-export function getKickVoiceConfig(velocity, bandIntensity = 0.5) {
+export function getKickVoiceConfig(velocity: number, bandIntensity = 0.5): KickVoiceConfig {
     const vel = clamp01(Math.max(0.2, velocity));
     const intensity = clamp01(bandIntensity);
     const denseMix = Math.max(0, intensity - 0.6);
@@ -437,25 +520,8 @@ export function getKickVoiceConfig(velocity, bandIntensity = 0.5) {
 
 /**
  * Strong snare hits should crack and bloom; ghost notes should stay short and papery.
- * @param {number} velocity
- * @returns {{
- *   lowBodyFreq: number,
- *   highBodyFreq: number,
- *   lowBodyVolume: number,
- *   highBodyVolume: number,
- *   bodyDecay: number,
- *   wiresVolume: number,
- *   wiresFreq: number,
- *   wiresQ: number,
- *   wiresDecay: number,
- *   wiresDuration: number,
- *   crackFreq: number,
- *   crackEndFreq: number,
- *   crackVolume: number,
- *   crackDecay: number
- * }}
  */
-export function getSnareVoiceConfig(velocity) {
+export function getSnareVoiceConfig(velocity: number): SnareVoiceConfig {
     const vel = clamp01(Math.max(0.1, velocity));
     const accent = clamp01((vel - 0.55) / 0.35);
     const ghost = 1 - clamp01((vel - 0.35) / 0.45);
@@ -480,31 +546,13 @@ export function getSnareVoiceConfig(velocity) {
 
 /**
  * Toms should separate more clearly by shell size, pitch drop, and sustain.
- * @param {string} name
- * @param {number} velocity
- * @returns {{
- *   register: 'High'|'Mid'|'Low',
- *   baseFreq: number,
- *   stickFreqStart: number,
- *   stickFreqEnd: number,
- *   stickVolume: number,
- *   skinVolume: number,
- *   skinFreq: number,
- *   skinQ: number,
- *   bodyFreqStart: number,
- *   bodyFreqEnd: number,
- *   bodyVolume: number,
- *   bodyDecay: number,
- *   bodyDuration: number,
- *   shellFreq: number,
- *   shellVolume: number,
- *   shellDecay: number,
- *   shellDuration: number,
- *   shellAttack: number
- * }}
  */
-export function getTomVoiceConfig(name, velocity) {
-    const register = name.includes('High') ? 'High' : name.includes('Mid') ? 'Mid' : 'Low';
+export function getTomVoiceConfig(name: string, velocity: number): TomVoiceConfig {
+    const register: TomRegister = name.includes('High')
+        ? 'High'
+        : name.includes('Mid')
+          ? 'Mid'
+          : 'Low';
     const base = TOM_VOICE_PROFILES[register];
     const vel = clamp01(Math.max(0.2, velocity));
 
@@ -532,9 +580,9 @@ export function getTomVoiceConfig(name, velocity) {
 
 /**
  * Stop any currently decaying drum sounds (specifically hat/ride).
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
+ * @param state - Global ensemble state.
  */
-export function killDrumNote(state) {
+export function killDrumNote(state: EnsembleState): void {
     const { playback, groove } = state;
     if (!playback.audio) {
         return;
@@ -554,7 +602,7 @@ export function killDrumNote(state) {
 }
 
 // Internal mix state for density-aware normalization
-const mixState = {
+const mixState: DrumMixState = {
     recentHits: 0,
     densityDuck: 1.0,
     lastTick: 0,
@@ -562,12 +610,17 @@ const mixState = {
 
 /**
  * Drum synthesis engine.
- * @param {import('../types.js').EnsembleState} state - Global ensemble state.
- * @param {string} name - Drum instrument name.
- * @param {number} time - Start time in seconds.
- * @param {number} [velocity=1.0] - Note velocity (0.0 - 1.0).
+ * @param state - Global ensemble state.
+ * @param name - Drum instrument name.
+ * @param time - Start time in seconds.
+ * @param velocity - Note velocity (0.0 - 1.0).
  */
-export function playDrumSound(state, name, time, velocity = 1.0) {
+export function playDrumSound(
+    state: EnsembleState,
+    name: string,
+    time: number,
+    velocity = 1.0,
+): void {
     const { playback, groove } = state;
     if (!name || !playback.audio) {
         return;
@@ -595,20 +648,20 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
         panValue = (Math.random() * 2 - 1) * 0.25;
     }
     const panner = createSimplePanner(playback.audio, panValue, playTime);
-    if (playback.drumsGain) {
-        panner.connect(playback.drumsGain);
+    if ((playback as any).drumsGain) {
+        panner.connect((playback as any).drumsGain);
     }
 
     // Round-robin variation (±1.5%)
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
 
     if (name === 'Kick') {
-        const voiceConfig = getKickVoiceConfig(velocity, playback.bandIntensity || 0.5);
+        const voiceConfig = getKickVoiceConfig(velocity, (playback as any).bandIntensity || 0.5);
         const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
-        if (playback.bassSidechain) {
-            duckGain(playback.bassSidechain.gain, 0.45, playTime, 0.005, 0.12);
+        if ((playback as any).bassSidechain) {
+            duckGain((playback as any).bassSidechain.gain, 0.45, playTime, 0.005, 0.12);
         }
 
         // 1. Beater Snap: Higher velocity = Sharper snap
@@ -761,7 +814,11 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
     } else if (name === 'HiHat' || name === 'Open' || name === 'Ride') {
         const isRide = name === 'Ride';
         const isClosedHat = name === 'HiHat';
-        const voiceConfig = getCymbalVoiceConfig(name, velocity, playback.bandIntensity || 0.5);
+        const voiceConfig = getCymbalVoiceConfig(
+            name,
+            velocity,
+            (playback as any).bandIntensity || 0.5,
+        );
         if (!voiceConfig) {
             safeDisconnect([panner]);
             return;
@@ -878,7 +935,11 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
         };
     } else if (name === 'Crash') {
-        const voiceConfig = getCymbalVoiceConfig('Crash', velocity, playback.bandIntensity || 0.5);
+        const voiceConfig = getCymbalVoiceConfig(
+            'Crash',
+            velocity,
+            (playback as any).bandIntensity || 0.5,
+        );
         if (!voiceConfig) {
             safeDisconnect([panner]);
             return;
@@ -1101,12 +1162,7 @@ export function playDrumSound(state, name, time, velocity = 1.0) {
     }
 }
 
-/**
- * @param {AudioContext} audioCtx
- * @param {typeof CYMBAL_BUFFER_PROFILES.HiHat} profile
- * @returns {AudioBuffer}
- */
-function createMetallicBuffer(audioCtx, profile) {
+function createMetallicBuffer(audioCtx: AudioContext, profile: CymbalBufferProfile): AudioBuffer {
     const sampleRate = audioCtx.sampleRate;
     const requestedLength = Math.max(1, Math.floor(sampleRate * profile.duration));
     const buffer = audioCtx.createBuffer(1, requestedLength, sampleRate);

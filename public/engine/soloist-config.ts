@@ -1,6 +1,63 @@
 import { SMART_GENRES } from '../data/smart-genres.js';
 
-const DEFAULT_SEED_TRIPLETS = {
+export interface SeedTriplets {
+    enabled: boolean;
+    cellBias: number;
+    pickupBias: number;
+    mutationBias: number;
+    cadenceBias: number;
+    timingStrength: number;
+}
+
+export interface MotivicResponse {
+    enabled: boolean;
+    rhythmReuse: number;
+    pitchReuse: number;
+    contourReuse: number;
+    cadenceWeight: number;
+    tripletCarry: number;
+    deviceDamp: number;
+    delayBias: number;
+    echoBias: number;
+    compressionBias: number;
+    sectionRecall: number;
+    formArcRecall: number;
+    maxResponseNotes: number;
+    spaceBias: number;
+}
+
+export interface ContourSkeletonStep {
+    interval: number;
+    durationSteps: number;
+}
+
+export interface StyleConfig {
+    genreGravityOffset: number;
+    restBase: number;
+    tensionScale: number;
+    timingJitter: number;
+    maxNotesPerPhrase: number;
+    minNotesPerPhrase: number;
+    doubleStopProb: number;
+    anticipationProb: number;
+    targetExtensions: number[];
+    deviceProb: number;
+    allowedDevices: string[];
+    sustainProb: number;
+    maxSustainSteps: number;
+    vibratoIntensity: number;
+    commonToneWeight: number;
+    stationaryProb: number;
+    rhythmicDensity: number;
+    syncopationLikelihood: number;
+    targetAnchoring: number;
+    chromaticism: number;
+    seedTriplets: SeedTriplets;
+    motivicResponse: MotivicResponse;
+    contourSkeletons: ContourSkeletonStep[][];
+}
+
+const DEFAULT_SEED_TRIPLETS: SeedTriplets = {
     enabled: false,
     cellBias: 0,
     pickupBias: 0,
@@ -9,7 +66,7 @@ const DEFAULT_SEED_TRIPLETS = {
     timingStrength: 0,
 };
 
-const DEFAULT_MOTIVIC_RESPONSE = {
+const DEFAULT_MOTIVIC_RESPONSE: MotivicResponse = {
     enabled: false,
     rhythmReuse: 0.68,
     pitchReuse: 0.42,
@@ -26,7 +83,7 @@ const DEFAULT_MOTIVIC_RESPONSE = {
     spaceBias: 0,
 };
 
-const DEFAULT_STYLE_CONFIG = {
+const DEFAULT_STYLE_CONFIG: StyleConfig = {
     genreGravityOffset: 0,
     restBase: 0.1,
     tensionScale: 0.6,
@@ -95,7 +152,7 @@ const DEFAULT_STYLE_CONFIG = {
     ],
 };
 
-const STYLE_OVERRIDES = {
+const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     scalar: {
         motivicResponse: {
             enabled: true,
@@ -1206,10 +1263,10 @@ const STYLE_OVERRIDES = {
     },
 };
 
-export const STYLE_CONFIG = /** @type {any} */ (
-    Object.keys(STYLE_OVERRIDES).reduce((acc, key) => {
-        const styleOverride = /** @type {any} */ (STYLE_OVERRIDES)[key];
-        /** @type {any} */ (acc)[key] = {
+export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERRIDES).reduce(
+    (acc: Record<string, StyleConfig>, key) => {
+        const styleOverride = (STYLE_OVERRIDES as Record<string, any>)[key];
+        acc[key] = {
             ...DEFAULT_STYLE_CONFIG,
             ...styleOverride,
             seedTriplets: {
@@ -1222,10 +1279,11 @@ export const STYLE_CONFIG = /** @type {any} */ (
             },
         };
         return acc;
-    }, {})
+    },
+    {} as Record<string, StyleConfig>,
 );
 
-export const GENRE_STYLE_MAPPING = {
+export const GENRE_STYLE_MAPPING: Record<string, string> = {
     Rock: 'rock',
     Jazz: 'jazz',
     Funk: 'funk',
@@ -1250,7 +1308,7 @@ export const GENRE_STYLE_MAPPING = {
  * Collective pools of stylistic influences for each genre.
  * The soloist randomly "channels" one of these for the duration of a section.
  */
-export const INFLUENCE_POOLS = {
+export const INFLUENCE_POOLS: Record<string, string[]> = {
     rock: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
     jazz: ['bird', 'evans', 'coltrane', 'miles'],
     bird: ['bird', 'evans', 'coltrane', 'miles'],
@@ -1260,13 +1318,22 @@ export const INFLUENCE_POOLS = {
     shred: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
 };
 
+export interface SoloistIntent {
+    maxIntensity: number;
+    thematicAnchorScale: number;
+    phrasingBridgeProb: number;
+    syncopationBias: number;
+    embellishmentProb: number;
+    stationaryScale: number;
+}
+
 /**
  * Soloist Intent Behaviors
  * Maps intensity ranges to specific performance "intentions".
  * These allow the soloist to "dissolve" the melody or bridge gaps
  * based on musical intent rather than rigid intensity cliffs.
  */
-export const SOLOIST_INTENTS = {
+export const SOLOIST_INTENTS: Record<string, SoloistIntent> = {
     CONSERVATIVE: {
         maxIntensity: 0.35,
         thematicAnchorScale: 1.0, // Stick strictly to theme
@@ -1293,7 +1360,20 @@ export const SOLOIST_INTENTS = {
     },
 };
 
-const DEFAULT_REGISTER_PROFILE = {
+export interface RegisterProfile {
+    seedFloor: number;
+    seedCenter: number;
+    seedCeiling: number;
+    seedIntroDrop: number;
+    seedChorusLift: number;
+    seedDepartureLift: number;
+    liveFloor: number;
+    liveCenter: number;
+    liveCeiling: number;
+    liveLoopLift: number;
+}
+
+const DEFAULT_REGISTER_PROFILE: RegisterProfile = {
     seedFloor: 60,
     seedCenter: 66,
     seedCeiling: 84,
@@ -1306,7 +1386,7 @@ const DEFAULT_REGISTER_PROFILE = {
     liveLoopLift: 2,
 };
 
-export const SOLOIST_REGISTER_PROFILES = {
+export const SOLOIST_REGISTER_PROFILES: Record<string, Partial<RegisterProfile>> = {
     scalar: {},
     acoustic: {
         seedFloor: 60,
@@ -1486,8 +1566,7 @@ export const SOLOIST_REGISTER_PROFILES = {
     },
 };
 
-/** @type {Record<string, keyof typeof SOLOIST_REGISTER_PROFILES>} */
-const REGISTER_PROFILE_ALIASES = {
+const REGISTER_PROFILE_ALIASES: Record<string, string> = {
     armstrong: 'jazz',
     beck: 'rock',
     coltrane: 'bird',
@@ -1501,17 +1580,12 @@ const REGISTER_PROFILE_ALIASES = {
     srv: 'blues',
 };
 
-/** @type {Record<string, string>} */
-const SOLOIST_STYLE_ALIASES = {
+const SOLOIST_STYLE_ALIASES: Record<string, string> = {
     ...REGISTER_PROFILE_ALIASES,
     'ska-horns': 'ska',
 };
 
-/**
- * @param {string | undefined} genreFeel
- * @returns {string | null}
- */
-function getSmartGenreSoloistStyle(genreFeel) {
+function getSmartGenreSoloistStyle(genreFeel: string | undefined): string | null {
     if (!genreFeel || !Object.hasOwn(SMART_GENRES, genreFeel)) {
         return null;
     }
@@ -1529,27 +1603,23 @@ function getSmartGenreSoloistStyle(genreFeel) {
     return config.soloist;
 }
 
-/**
- * @param {string | undefined} genreFeel
- * @returns {string}
- */
-function getGenreMappedSoloistStyle(genreFeel) {
+function getGenreMappedSoloistStyle(genreFeel: string | undefined): string {
     if (!genreFeel || !Object.hasOwn(GENRE_STYLE_MAPPING, genreFeel)) {
         return 'scalar';
     }
 
-    return GENRE_STYLE_MAPPING[/** @type {keyof typeof GENRE_STYLE_MAPPING} */ (genreFeel)];
+    return GENRE_STYLE_MAPPING[genreFeel];
 }
 
 /**
  * Resolve the effective soloist style for smart-mode playback.
  * The active Studio genre feel should be the source of truth for smart instruments,
  * while a few legacy UI-only style ids still need lightweight aliasing.
- * @param {string | undefined} style
- * @param {string | undefined} genreFeel
- * @returns {string}
  */
-export function resolveSoloistStyle(style, genreFeel) {
+export function resolveSoloistStyle(
+    style: string | undefined,
+    genreFeel: string | undefined,
+): string {
     if (!style || style === 'smart') {
         const smartStyle = getSmartGenreSoloistStyle(genreFeel);
         if (smartStyle && smartStyle !== 'smart') {
@@ -1573,15 +1643,15 @@ export function resolveSoloistStyle(style, genreFeel) {
  * Resolve a register profile for the active soloist style.
  * Seeded heads stay within a genre-appropriate singable lane, while live loops
  * can climb a little more with intensity and later choruses.
- * @param {string} style
- * @param {string | undefined} [genreFeel]
  */
-export function getSoloistRegisterProfile(style, genreFeel) {
+export function getSoloistRegisterProfile(
+    style: string,
+    genreFeel?: string | undefined,
+): RegisterProfile {
     const effectiveStyle = resolveSoloistStyle(style, genreFeel);
-    /** @type {keyof typeof SOLOIST_REGISTER_PROFILES} */
     let resolvedStyle = 'scalar';
     if (Object.hasOwn(SOLOIST_REGISTER_PROFILES, effectiveStyle)) {
-        resolvedStyle = /** @type {keyof typeof SOLOIST_REGISTER_PROFILES} */ (effectiveStyle);
+        resolvedStyle = effectiveStyle;
     } else if (Object.hasOwn(REGISTER_PROFILE_ALIASES, effectiveStyle)) {
         resolvedStyle = REGISTER_PROFILE_ALIASES[effectiveStyle];
     }

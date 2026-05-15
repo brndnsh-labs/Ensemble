@@ -1,14 +1,21 @@
+/// <reference lib="webworker" />
 import { VisualizerEngine } from './visualizer-engine.js';
 
-/** @type {VisualizerEngine | null} */
-let engine = null;
+interface TimeSignatureConfig {
+    beats: number;
+    grouping: number[];
+    stepsPerBeat: number;
+}
+
+let engine: VisualizerEngine | null = null;
 let currentBpm = 120;
-/** @type {{ beats: number, grouping: number[], stepsPerBeat: number }} */
-let currentTS = { beats: 4, grouping: [4], stepsPerBeat: 4 };
+let currentTS: TimeSignatureConfig = { beats: 4, grouping: [4], stepsPerBeat: 4 };
 let syncAudioTime = 0;
 let syncPerfTime = 0;
 let isRunning = false;
 let isPlayingLocal = false;
+
+const workerSelf = self as unknown as DedicatedWorkerGlobalScope;
 
 function getInterpolatedTime() {
     if (!syncPerfTime) {
@@ -34,7 +41,7 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-self.onmessage = (/** @type {MessageEvent} */ e) => {
+workerSelf.onmessage = (e: MessageEvent) => {
     const {
         type,
         canvas,

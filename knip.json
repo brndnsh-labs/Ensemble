@@ -5,7 +5,7 @@
         "public/sw.js",
         "public/ui-types.ts",
         "public/ui-root.tsx",
-        "public/visualizer-worker.js",
+        "public/visualizer-worker.ts",
         "scripts/*.js",
         "tests/scripts/*.js"
     ],

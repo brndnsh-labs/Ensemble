@@ -247,32 +247,61 @@ Convert `utils.ts` first (imported by 15+ files).
 
 ---
 
-## Phase 8: Large/Complex Engine Files ⬜
+## Phase 8: Large/Complex Engine Files 🔄
 
 <!-- cspell:ignore webworker -->
 
-Deferred — these are the largest and most complex files; convert in a dedicated session after Phase 7 is complete. Worker files need `/// <reference lib="webworker" />` at the top when converted.
+Split into 6 sub-batches by dependency order (leaves first). Worker files need `/// <reference lib="webworker" />` at the top.
+
+### Batch A — Pure leaves ✅
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/engine/conductor.js` | 553 | ⬜ | |
-| `public/engine/tick-logic.js` | 538 | ⬜ | |
-| `public/engine/bass-engine.js` | 692 | ⬜ | |
-| `public/engine/soloist-rhythm-engine.js` | 704 | ⬜ | |
-| `public/engine/soloist-devices.js` | 749 | ⬜ | |
-| `public/engine/harmonies.js` | 799 | ⬜ | |
-| `public/engine/midi-worker-logic.js` | 821 | ⬜ | |
-| `public/engine/synth-drums.js` | 1147 | ⬜ | |
-| `public/engine/chords-engine.js` | 1057 | ⬜ | |
-| `public/engine/synth-soloist.js` | 969 | ⬜ | |
-| `public/engine/soloist-config.js` | 1593 | ⬜ | |
-| `public/engine/soloist-pitch-engine.js` | 1182 | ⬜ | |
+| `public/engine/accompaniment.ts` | 1835 | ✅ | 3 interfaces; `chord/notes` typed `any` per Phase 5–7 precedent |
+| `public/engine/bass-engine.ts` | 692 | ✅ | 0 interfaces; `TIME_SIGNATURES` indexed via `any` cast |
+| `public/engine/chords-engine.ts` | 1057 | ✅ | 5 interfaces; `state: any` kept since deep nested access |
+| `public/engine/conductor.ts` | 553 | ✅ | Local `Dispatch` callable type; many `(x as any)` for chord shape |
+| `public/engine/soloist-config.ts` | 1593 | ✅ | 6 interfaces (`StyleConfig`, `SoloistIntent`, etc.); `Record<string, StyleConfig>` for tables |
+| `public/engine/synth-drums.ts` | 1147 | ✅ | 7 interfaces + 2 type aliases; local `DrumMixState` (synth-utils types are non-exported) |
+| `public/visualizer-worker.ts` | 152 | ✅ | `/// <reference lib="webworker" />`; `workerSelf as DedicatedWorkerGlobalScope` |
+
+### Batch B — Single-level deps ⬜
+
+| File | Lines | Status |
+|------|-------|--------|
+| `public/engine/soloist-devices.js` | 749 | ⬜ |
+| `public/engine/soloist-rhythm-engine.js` | 704 | ⬜ |
+| `public/engine/harmonies.js` | 799 | ⬜ |
+
+### Batch C — soloist-pitch-engine ⬜
+
+| File | Lines | Status |
+|------|-------|--------|
+| `public/engine/soloist-pitch-engine.js` | 1182 | ⬜ |
+
+### Batch D — Soloist core ⬜
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
 | `public/engine/soloist.js` | 1505 | ⬜ | |
-| `public/engine/accompaniment.js` | 1835 | ⬜ | |
-| `public/engine/soloist-seeder.js` | 2233 | ⬜ | Largest file; convert last |
-| `public/logic-worker.js` | ~400 | ⬜ | Worker — add `/// <reference lib="webworker" />` |
-| `public/visualizer-worker.js` | ~300 | ⬜ | Worker — add `/// <reference lib="webworker" />` |
-| `public/main.js` | ~300 | ⬜ | App entry point; convert last |
+| `public/engine/synth-soloist.js` | 969 | ⬜ | |
+| `public/engine/soloist-seeder.js` | 2233 | ⬜ | Largest file in the project |
+
+### Batch E — Hubs ⬜
+
+| File | Lines | Status |
+|------|-------|--------|
+| `public/engine/tick-logic.js` | 538 | ⬜ |
+| `public/engine/midi-worker-logic.js` | 821 | ⬜ |
+
+### Batch F — Roots + service worker ⬜
+
+| File | Lines | Status | Notes |
+|------|-------|--------|-------|
+| `public/engine/scheduler-core.js` | 1304 | ⬜ | Root orchestrator (was missing from tracker until Phase 8) |
+| `public/logic-worker.js` | 187 | ⬜ | Worker — `/// <reference lib="webworker" />` |
+| `public/main.js` | 187 | ⬜ | App entrypoint — convert last |
+| `public/sw.js` | 41 | ⬜ | Service worker — `/// <reference lib="webworker" />` |
 
 ---
 

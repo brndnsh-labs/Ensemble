@@ -68,7 +68,7 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 
 ### Visualizer pipeline
 
-- The visualizer is intentionally off the main thread. `public/visualizer-proxy.ts` owns the main-thread wrapper, and `public/visualizer-worker.js` runs `VisualizerEngine` with `OffscreenCanvas`.
+- The visualizer is intentionally off the main thread. `public/visualizer-proxy.ts` owns the main-thread wrapper, and `public/visualizer-worker.ts` runs `VisualizerEngine` with `OffscreenCanvas`.
 - Clock sync is message-based: the main thread pushes audio time updates to the visualizer worker, which interpolates time locally for smoother rendering.
 - The Visuals workspace is a dedicated surface, but its rendering path is still coupled to playback state and scheduled events rather than ad hoc DOM animation.
 
