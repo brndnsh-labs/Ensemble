@@ -15,7 +15,7 @@ module.exports = {
                 'Engine should receive state via parameters or specific modular state slices, not the global state manager.',
             severity: 'warn',
             from: { path: '^public/engine/' },
-            to: { path: '^public/state.js$' },
+            to: { path: '^public/state\\.(js|ts)$' },
         },
         {
             name: 'no-circular-dependencies',
@@ -29,7 +29,7 @@ module.exports = {
             severity: 'info',
             from: { orphan: true },
             to: {
-                pathNot: ['^public/sw.js$', '^tests/', '^scripts/'],
+                pathNot: ['^public/sw\\.ts$', '^tests/', '^scripts/'],
             },
         },
     ],

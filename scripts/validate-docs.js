@@ -40,8 +40,8 @@ const IGNORE_FILES = [
     '.git',
     'index.html',
     'manifest.json',
-    'pwa.js',
-    'sw.js',
+    'pwa.ts',
+    'sw.ts',
     'styles.css',
     'icon.svg',
 ];

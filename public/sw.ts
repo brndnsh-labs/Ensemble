@@ -2,7 +2,7 @@
 
 const swSelf = self as unknown as ServiceWorkerGlobalScope;
 
-// Note: Keep CACHE_NAME version in sync with APP_VERSION in config.js
+// Note: Keep CACHE_NAME version in sync with APP_VERSION in config.ts
 const CACHE_NAME = '/* CACHE_NAME_PLACEHOLDER */';
 const ASSETS: string[] = [
     /* ASSETS_PLACEHOLDER */
