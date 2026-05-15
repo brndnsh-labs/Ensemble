@@ -74,7 +74,7 @@ JS_FILES=$(find dist -name "*.js" -not -name "sw.js" -printf "'./%f', ")
 JS_FILES=${JS_FILES%, }
 
 STATIC_ASSETS="'./', './index.html', './MANUAL.md', './styles.$REV.css', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'"
-sed -i "s#/\* ASSETS_PLACEHOLDER \*/#$STATIC_ASSETS, $JS_FILES#" dist/sw.js
+sed -i "s#[\"']ASSETS_PLACEHOLDER[\"']#$STATIC_ASSETS, $JS_FILES#" dist/sw.js
 
 # 8. Report Final Footprint
 if [ "$QUIET" = false ]; then
