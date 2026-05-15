@@ -1,3 +1,4 @@
+/// <reference lib="webworker" />
 import { TIME_SIGNATURES } from './config.js';
 import { compingState } from './engine/accompaniment.js';
 import { resetBassState } from './engine/bass-engine.js';
@@ -10,21 +11,20 @@ import { fillBuffers } from './engine/worker-buffer-manager.js';
 import { resetWorkerContext, workerContext } from './engine/worker-orchestrator.js';
 import { recursiveSafeSync, resetCursors } from './engine/worker-utils.js';
 import { getState } from './state.js';
+import type { EnsembleState } from './types.js';
 import { getStepInfo } from './utils.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
+
+const workerSelf = self as unknown as DedicatedWorkerGlobalScope;
 
 // Ensure we resume processing messages after an export completes
 setOnExportEnd(() => processMessageQueue());
 
 /**
  * Process incoming messages from the main thread.
- * @param {string} type
- * @param {any} data
- * @param {number} startTime
  */
-function processMessage(type, data, startTime) {
-    /** @type {import('./types.js').EnsembleState} */
-    const state = getState();
+function processMessage(type: string, data: any, startTime: number): void {
+    const state: EnsembleState = getState();
     // Initialize the workerContext state for engine functions
     if (!workerContext.state) {
         workerContext.state = state;
@@ -95,7 +95,7 @@ function processMessage(type, data, startTime) {
                 compingState.lastChordIndex = -1;
                 compingState.lockedUntil = 0;
                 compingState.lastVoicingMidis = [];
-                /** @type {any} */ (compingState).rhythmPattern = [];
+                (compingState as any).rhythmPattern = [];
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
             case WORKER_MSG.RESOLUTION:
@@ -106,12 +106,12 @@ function processMessage(type, data, startTime) {
                 break;
         }
     } catch (err) {
-        const e = /** @type {Error} */ (err);
+        const e = err as Error;
         postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
     }
 }
 
-function processMessageQueue() {
+function processMessageQueue(): void {
     while (workerContext.messageQueue.length > 0) {
         const msg = workerContext.messageQueue.shift();
         if (msg) {
@@ -125,8 +125,7 @@ function processMessageQueue() {
 }
 
 if (typeof self !== 'undefined') {
-    /** @param {MessageEvent} e */
-    self.onmessage = (e) => {
+    workerSelf.onmessage = (e: MessageEvent) => {
         const { type, data } = e.data;
         const startTime = performance.now();
         if (isExporting()) {
@@ -139,15 +138,15 @@ if (typeof self !== 'undefined') {
 
 /**
  * Handles generating a resolution/ending sequence.
- * @param {import('./types.js').EnsembleState} state
- * @param {number} step
- * @param {number|null} requestTimestamp
- * @param {number|null} processStartTime
  */
-export function handleResolution(state, step, requestTimestamp = null, processStartTime = null) {
+export function handleResolution(
+    state: EnsembleState,
+    step: number,
+    requestTimestamp: number | null = null,
+    processStartTime: number | null = null,
+): void {
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
-    const ts =
-        /** @type {any} */ (TIME_SIGNATURES)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES) || {
         mStep: 0,
         isMeasureStart: false,
@@ -160,18 +159,18 @@ export function handleResolution(state, step, requestTimestamp = null, processSt
         isAOfBeat: false,
         tsConfig: ts,
     };
-    const _coordination = createCoordinationContext(step, /** @type {any} */ (stepInfo));
+    const _coordination = createCoordinationContext(step, stepInfo as any);
     const resolutionNotes = generateResolutionNotes(
         state,
         step,
         arranger,
-        /** @type {any} */ ({
+        {
             bass: bass.enabled,
             chords: chords.enabled,
             soloist: soloist.enabled,
             harmony: harmony.enabled,
             groove: groove.enabled,
-        }),
+        } as any,
         playback.bpm,
         groove,
         soloist,

@@ -247,7 +247,7 @@ Convert `utils.ts` first (imported by 15+ files).
 
 ---
 
-## Phase 8: Large/Complex Engine Files 🔄
+## Phase 8: Large/Complex Engine Files ✅
 
 <!-- cspell:ignore webworker -->
 
@@ -294,14 +294,18 @@ Split into 6 sub-batches by dependency order (leaves first). Worker files need `
 | `public/engine/tick-logic.ts` | 538 | ✅ | 5 interfaces (TickCursors, NoteResult, DrumHitInfo, GenerateNotesOptions/Result) |
 | `public/engine/midi-worker-logic.ts` | 821 | ✅ | 4 interfaces (ExportOptions, ExportCursor, ExportPrevStates, ExportConductor) |
 
-### Batch F — Roots + service worker ⬜
+### Batch F — Roots + service worker ✅
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/engine/scheduler-core.js` | 1304 | ⬜ | Root orchestrator (was missing from tracker until Phase 8) |
-| `public/logic-worker.js` | 187 | ⬜ | Worker — `/// <reference lib="webworker" />` |
-| `public/main.js` | 187 | ⬜ | App entrypoint — convert last |
-| `public/sw.js` | 41 | ⬜ | Service worker — `/// <reference lib="webworker" />` |
+| `public/engine/scheduler-core.ts` | 1304 | ✅ | `Dispatch` type alias; all `@direct-mutation` markers preserved |
+| `public/logic-worker.ts` | 187 | ✅ | `/// <reference lib="webworker" />`; `workerSelf` cast |
+| `public/main.ts` | 187 | ✅ | `(window as any)` for `window.ensemble` augmentation |
+| `public/sw.ts` | 41 | ✅ | `/// <reference lib="webworker" />`; `swSelf` cast |
+
+**Build pipeline update:** `scripts/deploy-test.sh` and `scripts/deploy-prod.sh` esbuild entries updated to `.ts`. Added a dedicated `esbuild public/sw.ts --outfile=dist/sw.js` step so the service worker (which can't be an ES module) is compiled separately. Removed `sw.js` from the `cp` static-asset list.
+
+**Migration is COMPLETE.** Zero `.js` source files remain in `public/`.
 
 ---
 

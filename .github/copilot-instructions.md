@@ -47,7 +47,7 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 
 ### Bootstrap and app shell
 
-- `public/main.js` is the orchestration entrypoint. It hydrates persisted/URL state first, validates the progression, mounts the Preact tree with `mountComponents()`, initializes the logic worker, and then subscribes state changes so `syncWorker()` and `handleEffects()` run on every dispatched action.
+- `public/main.ts` is the orchestration entrypoint. It hydrates persisted/URL state first, validates the progression, mounts the Preact tree with `mountComponents()`, initializes the logic worker, and then subscribes state changes so `syncWorker()` and `handleEffects()` run on every dispatched action.
 - Hydration must happen before mounting the UI. That ordering is intentional and prevents stale initial renders.
 - `public/ui-root.tsx` mounts the root `App` inside an error boundary.
 - `public/App.tsx` renders the four main workspaces (`arranger`, `studio`, `perform`, `visuals`), global transport, modals, notifications, and PWA banner.
@@ -61,9 +61,9 @@ Ensemble is a browser-based "virtual band" PWA built around a Preact UI, deep-si
 
 ### Generative engine pipeline
 
-- `public/worker-client.ts` is the main-thread bridge to `public/logic-worker.js`. It sends either a full raw snapshot (`getSyncState()`) or targeted deltas (`syncWorker(action, payload)`).
-- `public/logic-worker.js` owns real-time note generation, buffer fills, resolution handling, and MIDI export orchestration. Worker state is reset/synced through the message types in `public/worker-types.ts`.
-- `public/engine/scheduler-core.js` is the real-time scheduler. It consumes worker-produced buffers, schedules WebAudio and MIDI, handles transport start/stop, and coordinates resolution endings.
+- `public/worker-client.ts` is the main-thread bridge to `public/logic-worker.ts`. It sends either a full raw snapshot (`getSyncState()`) or targeted deltas (`syncWorker(action, payload)`).
+- `public/logic-worker.ts` owns real-time note generation, buffer fills, resolution handling, and MIDI export orchestration. Worker state is reset/synced through the message types in `public/worker-types.ts`.
+- `public/engine/scheduler-core.ts` is the real-time scheduler. It consumes worker-produced buffers, schedules WebAudio and MIDI, handles transport start/stop, and coordinates resolution endings.
 - Timing-sensitive audio work is based on `playback.audio.currentTime`, not UI clocks.
 
 ### Visualizer pipeline

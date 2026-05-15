@@ -49,7 +49,10 @@ mkdir -p dist
 
 # 3. Bundle and Minify JavaScript
 if [ "$QUIET" = false ]; then echo "📦 Bundling JavaScript..."; fi
-./node_modules/.bin/esbuild public/main.js public/logic-worker.js public/visualizer-worker.js --bundle $MINIFY_FLAG --sourcemap --outdir=dist --splitting --format=esm --entry-names=[name].$REV --chunk-names=chunk-[hash] --define:WORKER_PATH="'logic-worker.$REV.js'" --define:VIZ_WORKER_PATH="'visualizer-worker.$REV.js'" --jsx=automatic --jsx-import-source=preact
+./node_modules/.bin/esbuild public/main.ts public/logic-worker.ts public/visualizer-worker.ts --bundle $MINIFY_FLAG --sourcemap --outdir=dist --splitting --format=esm --entry-names=[name].$REV --chunk-names=chunk-[hash] --define:WORKER_PATH="'logic-worker.$REV.js'" --define:VIZ_WORKER_PATH="'visualizer-worker.$REV.js'" --jsx=automatic --jsx-import-source=preact
+
+# 3b. Compile service worker (no bundling — sw.ts has no imports, must stay top-level)
+./node_modules/.bin/esbuild public/sw.ts $MINIFY_FLAG --outfile=dist/sw.js
 
 # 4. Bundle and Minify CSS
 if [ "$QUIET" = false ]; then echo "🎨 Bundling CSS..."; fi
@@ -57,7 +60,7 @@ if [ "$QUIET" = false ]; then echo "🎨 Bundling CSS..."; fi
 
 # 5. Copy static assets
 if [ "$QUIET" = false ]; then echo "📄 Copying static assets..."; fi
-cp public/{index.html,MANUAL.md,manifest.json,icon.svg,icon-192.png,icon-512.png,sw.js} dist/
+cp public/{index.html,MANUAL.md,manifest.json,icon.svg,icon-192.png,icon-512.png} dist/
 
 # 6. Update HTML and Service Worker
 if [ "$QUIET" = false ]; then echo "🔧 Injecting hashes and manifest..."; fi

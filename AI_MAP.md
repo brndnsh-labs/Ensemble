@@ -14,8 +14,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
-| `public/main.js` | App entry point, worker init, global events. | `init` |
-| `public/logic-worker.js` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
+| `public/main.ts` | App entry point, worker init, global events. | `init` |
+| `public/logic-worker.ts` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/visualizer-worker.ts` | Background rendering thread for 60fps visuals. | `engine.render` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
@@ -71,7 +71,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Exports |
 | :--- | :--- | :--- |
-| `public/engine/scheduler-core.js` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
+| `public/engine/scheduler-core.ts` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
 | `public/engine/midi-scheduler.ts` | MIDI scheduling logic. | `dispatchMidiDrum`, `dispatchMidiSoloist` |
 | `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
 | `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
@@ -94,10 +94,10 @@ This map provides a quick reference for AI agents to understand the responsibili
 ## Live vs Worker Responsibilities
 
 - `public/worker-client.ts` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
-- `public/logic-worker.js` is the worker-side message dispatcher and reset coordinator.
+- `public/logic-worker.ts` is the worker-side message dispatcher and reset coordinator.
 - `public/engine/worker-buffer-manager.ts` and `public/engine/tick-logic.ts` own lookahead note generation inside the worker.
 - `public/engine/worker-utils.ts` holds shared worker-side helpers such as `getChordAtStep`.
-- `public/engine/scheduler-core.js` stays on the main thread and schedules already-generated note events into WebAudio/MIDI time.
+- `public/engine/scheduler-core.ts` stays on the main thread and schedules already-generated note events into WebAudio/MIDI time.
 
 ## Synthesis Engine (WebAudio)
 

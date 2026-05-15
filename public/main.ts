@@ -24,8 +24,8 @@ function init() {
             applyTheme(playback.theme);
         });
 
-        validateProgression(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
-            /** @type {any} */ (window).ensemble?.dispatch(a, p),
+        validateProgression(getState(), (a: any, p: any) =>
+            (window as any).ensemble?.dispatch(a, p),
         );
 
         // --- ASSEMBLE UI ---
@@ -34,14 +34,12 @@ function init() {
         // --- WORKER INIT ---
         initWorker(
             () =>
-                scheduler(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
-                    /** @type {any} */ (window).ensemble?.dispatch(a, p),
-                ),
+                scheduler(getState(), (a: any, p: any) => (window as any).ensemble?.dispatch(a, p)),
             (
-                /** @type {any[]} */ notes,
-                /** @type {number} */ requestTimestamp,
-                /** @type {number} */ workerProcessTime,
-                /** @type {boolean} */ isResolution,
+                notes: any[],
+                requestTimestamp: number,
+                workerProcessTime: number,
+                isResolution: boolean,
             ) => {
                 const { playback, soloist, bass, harmony, chords, groove } = getState();
 
@@ -64,7 +62,7 @@ function init() {
 
                 const sbUpdatedSteps = new Set();
                 const bassUpdatedSteps = new Set();
-                notes.forEach((/** @type {any} */ n) => {
+                notes.forEach((n: any) => {
                     if (n.module === 'bass') {
                         if (!bassUpdatedSteps.has(n.step)) {
                             bass.buffer.set(n.step, []);
@@ -100,20 +98,20 @@ function init() {
                     }
                 });
                 if (playback.isPlaying) {
-                    scheduler(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
-                        /** @type {any} */ (window).ensemble?.dispatch(a, p),
+                    scheduler(getState(), (a: any, p: any) =>
+                        (window as any).ensemble?.dispatch(a, p),
                     );
                 }
             },
         );
 
         setInstrumentControllerRefs(() =>
-            scheduler(getState(), (/** @type {any} */ a, /** @type {any} */ p) =>
-                /** @type {any} */ (window).ensemble?.dispatch(a, p),
-            ),
+            scheduler(getState(), (a: any, p: any) => (window as any).ensemble?.dispatch(a, p)),
         );
 
-        const hasDrumPattern = groove.instruments.some((inst) => inst.steps.some((s) => s > 0));
+        const hasDrumPattern = groove.instruments.some((inst: any) =>
+            inst.steps.some((s: number) => s > 0),
+        );
         if (!hasDrumPattern) {
             loadDrumPreset(groove.lastDrumPreset || 'Basic Rock');
         }
@@ -129,17 +127,10 @@ function init() {
 
         analyzeFormUI();
 
-        subscribe(
-            (
-                /** @type {any} */ action,
-                /** @type {any} */ payload,
-                /** @type {any} */ stateMap,
-                /** @type {any} */ context,
-            ) => {
-                syncWorker(action, payload);
-                handleEffects(action, payload, stateMap, context);
-            },
-        );
+        subscribe((action: any, payload: any, stateMap: any, context: any) => {
+            syncWorker(action, payload);
+            handleEffects(action, payload, stateMap, context);
+        });
         syncWorker();
 
         // Signal to E2E tests that hydration and mounting are complete
@@ -149,13 +140,13 @@ function init() {
     }
 }
 
-/** @type {any} */ (window).previewChord = (/** @type {number} */ index) => {
+(window as any).previewChord = (index: number) => {
     const { playback, arranger } = getState();
     if (playback.isPlaying) {
         return;
     }
     initAudio(getState());
-    const chord = /** @type {any} */ (arranger.progression[index]);
+    const chord = arranger.progression[index] as any;
     if (!chord) {
         return;
     }
@@ -163,7 +154,7 @@ function init() {
     playback.sustainActive = false; // @direct-mutation
     const now = playback.audio?.currentTime || 0;
     if (playback.audio) {
-        chord.freqs.forEach((/** @type {number} */ f) =>
+        chord.freqs.forEach((f: number) =>
             playNote(getState(), f, now, 1.0, { vol: 0.15, instrument: 'Piano' }),
         );
     }

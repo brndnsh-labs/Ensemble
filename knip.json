@@ -1,8 +1,9 @@
 {
     "$schema": "https://unpkg.com/knip@5/schema.json",
     "entry": [
-        "public/main.js",
-        "public/sw.js",
+        "public/main.ts",
+        "public/sw.ts",
+        "public/logic-worker.ts",
         "public/ui-types.ts",
         "public/ui-root.tsx",
         "public/visualizer-worker.ts",
