@@ -23,6 +23,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `workerClient` |
+| `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
 
 ## State Management (Domain Slices)
 

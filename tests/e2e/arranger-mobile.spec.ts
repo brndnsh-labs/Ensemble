@@ -244,7 +244,6 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.click('[data-workspace-nav="arranger"]');
 
         await page.evaluate(async () => {
-            await window.ensemble.loadTools();
             const { ACTIONS, dispatch, validateProgression } = window.ensemble;
             const cycle = ['Imaj7', 'vim7', 'iim7', 'V7'];
             const testSections = [

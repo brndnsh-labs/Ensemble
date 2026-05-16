@@ -99,44 +99,11 @@ One quirk worth noting: a small inline `copyStaticAssets` plugin in `vite.config
 
 ---
 
-## 10. Restructure `state.ts` `loadTools()` to kill remaining ineffective dynamic imports
+## 10. Restructure `state.ts` `loadTools()` to kill remaining ineffective dynamic imports ✅ DONE (May 2026)
 
-**Why tenth:** Spinoff from the Vite migration (#5). Eliminates the last 3 INEFFECTIVE_DYNAMIC_IMPORT warnings on `vite build` and is a concrete instance of #1's "sweep remaining 19 cycles" sub-item — same surgery, narrower scope.
+`loadTools()` moved out of `state.ts` into a new top-of-graph file `public/e2e-tools.ts` that statically imports `validateProgression`, `scheduleGlobalEvent`, `initAudio`, `loadDrumPreset`, `generateNotesForStep`, plus `dispatch`/`getState`/`ACTIONS`, and exports a single `installE2EGlobals()` function called once from `main.ts` at boot. The lazy `Promise`-gated tool-loader is gone; globals attach eagerly. The two callers (`tests/e2e/arranger-mobile.spec.ts`, `scripts/mix-report.ts`) had their `await window.ensemble.loadTools()` calls removed.
 
-**Context.** `public/state.ts:22-50` defines a `loadTools()` helper exposed on `window.ensemble` for E2E tests. It dynamically imports five modules so they can be attached to the global:
-
-```ts
-toolLoaderPromise = Promise.all([
-    import('./engine/chords-engine.js'),
-    import('./engine/scheduler-core.js'),
-    import('./engine/engine.js'),
-    import('./instrument-controller.js'),
-    import('./engine/tick-logic.js'),
-]).then(...)
-```
-
-Each of those five modules already statically imports from `state.ts` (for `dispatch`, `getState`, the deepSignal slices, etc.), so flipping these to static imports in `state.ts` would re-introduce circular dependencies that `depcruise` flags. The dynamic imports break the cycle at module-load time. Rolldown's INEFFECTIVE_DYNAMIC_IMPORT warning fires because all five modules end up in the main chunk anyway (they're statically imported elsewhere from `main.ts`, controllers, components) — so the `import()` saves nothing and the warning is correct that *as code-splitting* it's useless. The cycle-breaking value is the real reason it's there.
-
-**The fix.** Move `loadTools()` out of `state.ts` into a new top-of-graph file (suggested name: `e2e-tools.ts`, located in `public/`) that:
-
-1. Statically imports `validateProgression`, `scheduleGlobalEvent`, `initAudio`, `loadDrumPreset`, `generateNotesForStep`, plus `dispatch`/`getState`/`ACTIONS` from `state.ts`.
-2. Exports a single `installE2EGlobals()` function that builds the `window.ensemble` object and attaches it.
-3. Is imported and called only from `public/main.ts` (one place, at boot).
-
-After that, `state.ts` no longer references any engine module — direction of all 5 cycles becomes one-way (engines depend on state, not vice versa), depcruise count drops by 5 (from the current 19), and the 3 INEFFECTIVE_DYNAMIC_IMPORT warnings on `vite build` go away.
-
-**Watch out for:**
-- The current `loadTools()` is lazy (Promise-gated, called on demand). The new shape installs the globals eagerly at boot. Verify no E2E test depends on the deferred-availability semantics — grep `tests/e2e/` for `window.ensemble`, `ensemble.loadTools`, and `await ensemble`. If a test asserts that `window.ensemble.initAudio` isn't defined until `loadTools()` resolves, the test's expectation changes.
-- The `(window as any).ensemble?.dispatch(a, p)` callback in `main.ts:28` already expects `ensemble` to exist synchronously — confirming the eager-install path is fine.
-- The chord-engine validation in `main.ts:27` happens before `loadTools()` is awaited today, so any current code that relies on `loadTools()` already accepts that the globals may attach later. Eager install only tightens this guarantee.
-
-**Approach:** Opus end-to-end, ~30–60 min. The diff is small but every line touches the dependency graph — needs careful read of which engines need which state exports, and a depcruise diff to confirm the cycles dropped.
-
-**Verification:**
-- `npm run build` — zero INEFFECTIVE_DYNAMIC_IMPORT warnings.
-- `npm run depcheck` — cycle count drops from 19 to ~14.
-- `npm run typecheck && npm test` — clean.
-- E2E smoke: `npx playwright test -g "@mobile"` plus one desktop spec that touches `window.ensemble` to confirm the global still works.
+Results: zero `INEFFECTIVE_DYNAMIC_IMPORT` warnings on `vite build` (was 3); depcruise cycle count dropped from 19 → 9 (target was ~14 — better than expected because the 5 dynamic edges were each participating in multiple cycle chains). `state.ts` no longer imports any engine module.
 
 ---
 

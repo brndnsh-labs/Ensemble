@@ -1,5 +1,6 @@
 import './styles.css';
 import { applyTheme } from './app-controller.js';
+import { installE2EGlobals } from './e2e-tools.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
@@ -20,6 +21,8 @@ function init() {
         // Ensure state is populated BEFORE the UI mounts so components initialize with correct data.
         hydrateState();
         loadFromUrl();
+
+        installE2EGlobals();
 
         applyTheme(playback.theme);
 

@@ -7,53 +7,9 @@ import { midi, midiReducer } from './state/midi.js';
 import { playback, playbackReducer } from './state/playback.js';
 import { vizReducer, vizState } from './state/visualizer.js';
 import type { ActionPayloadMap, EnsembleState } from './types.js';
-import { ACTIONS } from './types.js';
 
 /** @deprecated Use EnsembleState directly */
 export type StateMap = EnsembleState;
-
-// --- Global Export for E2E ---
-if (typeof window !== 'undefined') {
-    let toolLoaderPromise: Promise<any> | null = null;
-
-    const ensemble = {
-        dispatch,
-        getState,
-        ACTIONS,
-        loadTools: () => {
-            if (!toolLoaderPromise) {
-                toolLoaderPromise = Promise.all([
-                    import('./engine/chords-engine.js'),
-                    import('./engine/scheduler-core.js'),
-                    import('./engine/engine.js'),
-                    import('./instrument-controller.js'),
-                    import('./engine/tick-logic.js'),
-                ]).then(
-                    ([
-                        chordsEngine,
-                        schedulerCore,
-                        engineModule,
-                        instrumentController,
-                        tickLogic,
-                    ]) => {
-                        Object.assign(ensemble, {
-                            validateProgression: chordsEngine.validateProgression,
-                            scheduleGlobalEvent: schedulerCore.scheduleGlobalEvent,
-                            initAudio: engineModule.initAudio,
-                            loadDrumPreset: instrumentController.loadDrumPreset,
-                            generateNotesForStep: tickLogic.generateNotesForStep,
-                        });
-                        return ensemble;
-                    },
-                );
-            }
-
-            return toolLoaderPromise;
-        },
-    };
-
-    (window as any).ensemble = ensemble;
-}
 
 export const stateMap: EnsembleState = {
     playback,

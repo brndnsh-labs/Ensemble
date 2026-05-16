@@ -292,7 +292,6 @@ async function renderSceneReports({ scenes, seeds }) {
             return await page.evaluate(
                 async ({ scenes, stems, seeds }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
-                    await ensemble.loadTools();
                     const {
                         getState,
                         validateProgression,
