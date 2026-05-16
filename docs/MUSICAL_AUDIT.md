@@ -25,6 +25,32 @@ Two additional smells discovered during the May 2026 audit pass:
 
 The audit looks for any of these five smells per test file, then verifies the engine against the *named* musical claim before deciding whether the test, the engine, or both need to change.
 
+## Patterns proven
+
+Recipes from this audit's engine wins, captured here so future passes start from a known shape instead of re-deriving the architecture.
+
+### Engine-knows-where-it-is (form-aware pitch / rhythm selection)
+
+When you want an engine to shape its output based on musical structure (phrase position, section position, loop count, role), the proven recipe is:
+
+1. **Planner / scheduler derives the structural fact** in the layer that already knows it. Phrase-end markers belong in the rhythm planner (`soloist-rhythm-engine.ts`) because it builds the phrase; SRDC phase belongs in the plan-build site (`soloist.ts:preparePhraseResponseContext`) because it already calls `getSectionContext`. Don't try to re-derive structure at the picker layer.
+
+2. **Attach the fact to the work unit.** Phrase-end marks ride on the rhythm node (`isPhraseEnd: true`). SRDC phase rides on the phrase context (`phrase.context.srdcState`). The work unit is the unit of musical thought; the structural fact should travel with it.
+
+3. **Picker reads at use-site** and applies the bias. The pitch picker (`soloist-pitch-engine.ts`) reads both `rhythmNode.isPhraseEnd` and `phrase.context.srdcState`.
+
+4. **Apply as a final-stage `weight *= mult`**, not as a multiplier on one factor's additive bonus. Generative engines have many simultaneous biases pushing the same direction; scaling just one of them gets washed out. See [[feedback-weight-tuning-multiplier-placement]] for the full reasoning.
+
+5. **Add a top-level state override slot for tests.** Production writes the canonical nested location every call; without an override slot, test mocks setting the same nested field get clobbered immediately. Read order: `topLevel || nested || default`. See [[feedback-state-mock-vs-production-override]].
+
+6. **Tune to a musical sweet spot, not a statistical one.** A ×8/×0.15 multiplier produces a tight statistical gap but sounds robotic (Response always lands on root, Departure always avoids it). A ×4/×0.3 multiplier produces a smaller but reliably-directional gap AND preserves musical variability. Confirmed on both phrase-end (2026-05-16) and SRDC (2026-05-16) work.
+
+7. **Multi-trial reliability check before locking in thresholds.** A 20-30 run loop (`for i in $(seq 1 30); do npx vitest run ... | grep -E "FAIL|metric"; done`) catches sample-size flake that single-run testing misses. The phrase-end test went through three threshold iterations using this loop before settling on the combined-condition assertion that passed 30/30.
+
+### Test-mock isolation (for bias-comparison tests)
+
+When measuring whether a new engine bias differentiates outcomes, audit the mock state for *other* biases that push the same direction and neutralize them in the test. See [[feedback-test-isolation-competing-biases]] for the recipe.
+
 ## Shipped
 
 | Date | Area | Root cause | Fix |

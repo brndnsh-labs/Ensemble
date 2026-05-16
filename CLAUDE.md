@@ -104,6 +104,10 @@ In generative logic, always document **why** a probability or offset exists (e.g
 
 Prefer **deterministic, seeded motif generation** (`barIndex`, `sectionId`) over raw `Math.random()`. Keeps critique tests and looped playback coherent. Reference: `getDrumMotif` in `groove-engine.ts`.
 
+### Weight-based selectors: final-stage multipliers win
+
+For any weight-based picker (e.g. `selectPitchAndDevices` in `soloist-pitch-engine.ts`), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line. Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.); scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
+
 ### Dynamic Head / Chorus Evolution (Soloist)
 
 The soloist generates a session-wide `sessionSeed` (SRDC structure: Statement, Restatement, Departure, Conclusion) at playback start. Loop behavior:
